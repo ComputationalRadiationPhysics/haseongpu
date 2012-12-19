@@ -1,0 +1,27 @@
+Readme
+
+1) Ordnerstruktur
+2) Bauen der Binaries
+3) Versionierung
+4) Lizenz
+
+1) Ordnerstruktur
+	bin			vom Compiler erstellte Binaries. Wird nicht versioniert!
+	src			enthaelt die Quelldateien
+	include		libraries, die von den Quelldateien benötigt werden
+	literature	Literatur zum Thema
+	doc			Dokumentation durch doxygen
+	utils		Hilfslibraries, skripte, etc
+
+2) Bauen der Binaries
+	- im Wurzelverzeichnis (in dem sich diese Datei befindet) den Befehl "make" ausfuehren.
+	- das fertige Programm sollte sich im Ordner "bin" befinden
+	- der Befehl "make clean" beseitigt die von Make erzeugten Dateien
+
+3) Versionierung
+	- mit git
+	- bitte IMMER einen sinnvollen Kommentar dazuschreiben
+	
+4) Lizenz
+	?
+	Open Source auf jeden Fall
