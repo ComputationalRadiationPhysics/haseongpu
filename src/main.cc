@@ -1,5 +1,7 @@
 #include "stdio.h"
+#include "stdlib.h"
 #include "math.h"
+#include <vector>
 
 //----------------------------------------------------
 // Structures
@@ -36,6 +38,8 @@ typedef struct plane {
 //----------------------------------------------------
 // Auxillary function declaration
 //----------------------------------------------------
+std::vector<triangle> generate_triangles(int height, int weight, float level);
+ray generate_ray(int height, int weight, float level);
 point intersection(plane p, ray r);
 bool  collide(triangle t, ray r);
 bool  collide(triangle t, point p);
@@ -46,24 +50,42 @@ void  print_point(point p);
 //  Calculations
 //----------------------------------------------------
 int main(){
+  const unsigned triangle_cnt = 2;
+  const unsigned max_rays = 1000;
+
+  ray ray_0 = {
+    {6.0, 5.0, 5.0},
+    {0.0, 0.0, 1.0}};
+
+  triangle triangle_0 = {
+    {0.0, 0.0, 0.0},
+    {1.0, 0.0, 0.0},
+    {0.0, 1.0, 0.0}};
 
   triangle triangle_1 = {
-    {0.0, 0.0, 0.0},
-    {3.0, 0.0, 0.0},
-    {0.0, 3.0, 0.0}};
+    {1.0, 0.0, 0.0},
+    {0.0, 1.0, 0.0},
+    {1.0, 1.0, 0.0}};
 
-  ray ray_1 = {
-    {5.0, 5.0, 5.0},
-    {0.0, 0.0, 1.0}};
+  std::vector<triangle> triangles = generate_triangles(100,100,0);
 
-  plane plane_1 = {
-    {0.0, 0.0, 0.0},
-    {0.0, 0.0, 1.0}};
+  // Lets do some raytracing
+  unsigned ray_cnt = 0;
+  unsigned i;
+  unsigned ray_i;
+  ray r;
+  for(ray_i = 0; ray_i < max_rays; ++ray_i){
+    r = generate_ray(100, 100, 0);
+    for(i = 0; i < triangles.size(); ++i){
+      if(collide(triangles[i], r)){
+	fprintf(stdout, "Ray %d on Triangle %d: Ahh collision, don't panic\n", ray_cnt, i);
+	// Do something on collision
+      }
 
-  if(collide(triangle_1, ray_1))
-    fprintf(stdout, "Collision\n");
-  else
-    fprintf(stdout, "no collision\n");
+    }
+    ray_cnt++;
+
+  }
 
   return 0;
 }
@@ -168,6 +190,36 @@ point intersection(plane pl, ray r){
 float distance(point a, point b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
   return fabs(d);
+}
+
+std::vector<triangle> generate_triangles(int height, int weight, float level){
+  int h,w;
+  std::vector<triangle> triangles;
+  for(h = 0; h < height; ++h){
+    for(w = 0; w < weight; ++w){
+      triangle t1 = {
+	{float(h), float(w), level},
+	{float(h), float(w+1), level},
+	{float(h+1), float(w), level}};
+      triangle t2 = {
+	{float(h), float(w+1), level},
+	{float(h+1), float(w+1), level},
+	{float(h+1), float(w), level}};
+      triangles.push_back(t1);
+      triangles.push_back(t2);
+
+    }
+
+  }
+
+  return triangles;
+}
+
+ray generate_ray(int height, int weight, float level){
+  ray r = {
+    {float(rand() % height), float(rand() % weight),level},
+    {0,0,1}};
+  return r;
 }
 
 void print_point(point p){
