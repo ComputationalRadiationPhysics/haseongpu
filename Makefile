@@ -35,7 +35,7 @@ all: octrace
 
 # build octrace
 octrace: $(OBJS)
-	$(CPP) -o $@ $(OBJS) $(LIBS) $(LDFLAGS) $(CMD) $(CPPFLAGS) $(ARGS)
+	$(CPP) -o bin/$@ $(OBJS) $(LIBS) $(LDFLAGS) $(CMD) $(CPPFLAGS) $(ARGS)
 
 # build object file and dependencies files
 .cc.o:
