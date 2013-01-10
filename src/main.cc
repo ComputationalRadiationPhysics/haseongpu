@@ -42,10 +42,10 @@ typedef float4 point_cu;
 typedef float4 vector_cu;
 
 typedef struct triangle_cu{
-   point_cu A;
-   point_cu B;
-   point_cu C;
- } TRIANGLE_CU;
+  point_cu A;
+  point_cu B;
+  point_cu C;
+} TRIANGLE_CU;
 
 typedef struct prism_cu{
   triangle_cu t1;
@@ -85,21 +85,37 @@ ray_cu   generate_ray(int height, int weight, float level);
 //----------------------------------------------------
 //  Calculations
 //----------------------------------------------------
+__global__ void trace_on_gpu(int max_triangles, triangle* triangles)
+{
+  //Thread ID
+  //int thread_i = blockDim.y * blockIdx.y + threadIdx.y;
+  //int block_j = blockDim.x * blockIdx.x + threadIdx.x;
+
+}
+
 int main(){
-   const unsigned triangle_cnt = 2;
-   const unsigned max_rays = 1000;
-
-   std::vector<triangle_cu> triangles = generate_triangles(100, 100, 0);
-
-  // Lets do some raytracing
+  const unsigned triangle_cnt = 2;
+  const unsigned max_rays = 1000;
+  const unsigned max_triangles = 20000;
+  unsigned length = 20000 / (100 * 2);
   unsigned ray_cnt = 0;
   unsigned i;
   unsigned ray_i;
   ray_cu r;
+  point_cu p;
+
+  plane_cu pl = {
+    {0, 0, 0, 1},
+    {0, 0, 1, 0}};
+
+  std::vector<triangle_cu> triangles = generate_triangles(length, length, 0);
+
+  // CPU Raytracing
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    r = generate_ray(100, 100, 0);
+    r = generate_ray(length, length, 0);
+    p = intersection(pl, r);
     for(i = 0; i < triangles.size(); ++i){
-      if(collide(triangles[i], r)){
+      if(collide(triangles[i], p)){
   	fprintf(stdout, "Ray %d on Triangle %d: Ahh collision, don't panic\n", ray_cnt, i);
   	// Do something on collision
       }
@@ -108,6 +124,24 @@ int main(){
     ray_cnt++;
 
   }
+
+  // GPU Raytracing
+  triangle_cu** h_triangles;
+  triangle_cu** d_triangles;
+  int threads = 0;
+  int blocks = 0;
+
+  // Memory allocation on host
+  cudaHostAlloc( (void**)&h_triangles, max_triangles * sizeof(triangle_cu), cudaHostAllocDefault);
+
+  // Memory allocation on device
+  cudaMalloc(&d_triangles, max_triangles * sizeof(triangle_cu));
+
+  // Copy data from host to device
+  cudaMemcpy(d_triangles, h_triangles, max_triangles * sizeof(triangle_cu), cudaMemcpyHostToDevice);
+
+  // Start kernel
+  trace_on_gpu<<<threads, blocks>>>(d_triangles, max_triangles);
 
   return 0;
 }
@@ -142,9 +176,9 @@ float4 to_barycentric(triangle_cu t, point_cu p){
 
 /**
    @brief Detects collisions of triangle and point with
-          precondition, that the point is on the same 
-	  plane as the point.
- **/
+   precondition, that the point is on the same 
+   plane as the point.
+**/
 bool collide(triangle_cu t, point_cu p){
   float4 b = to_barycentric(t, p);
   bool has_collided = true;
@@ -156,9 +190,9 @@ bool collide(triangle_cu t, point_cu p){
 }
 
 /**
-  @brief Detects collisions of a triangle and a ray without
-         a precondition.
- **/
+   @brief Detects collisions of a triangle and a ray without
+   a precondition.
+**/
 bool collide(triangle_cu t, ray_cu r){
   plane_cu pl;
   float b1, b2, b3, c1, c2, c3;
@@ -180,18 +214,18 @@ bool collide(triangle_cu t, ray_cu r){
 }
 
 /**
-  @brief Intersection calculates the intersection between a plane p
-         and a ray r. There is no detection for rays in the plane
-	 or for parallel plane. 
+   @brief Intersection calculates the intersection between a plane p
+   and a ray r. There is no detection for rays in the plane
+   or for parallel plane. 
 
-  It uses the normal of the plane to derive the coordinate form 
-  of the plane. With the help of a coordinate form it is very
-  easy to get the intersection point between a ray and a plane.
+   It uses the normal of the plane to derive the coordinate form 
+   of the plane. With the help of a coordinate form it is very
+   easy to get the intersection point between a ray and a plane.
 
-  ray   g: y~ = x~ + t*p~
-  plane E: y~ = a~ + r*b~ + s*c~
-           d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
-           d  = n~ * a~
+   ray   g: y~ = x~ + t*p~
+   plane E: y~ = a~ + r*b~ + s*c~
+   d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
+   d  = n~ * a~
 **/
 point_cu intersection(plane_cu pl, ray_cu r){
   point_cu intersection_point = {0.0,0.0,0.0};
