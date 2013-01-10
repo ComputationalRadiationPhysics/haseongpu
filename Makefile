@@ -4,22 +4,26 @@
 DATE="`date +%y%m%d%H%M%S`"
 
 # commandline
-CMD = -O0 -g -J2
+#CMD = -O0 -g -J2 -MD
+CMD =
 ARGS = 
 SPACE = " "
 
 # compiler, linker, archiver
-CPP = g++
+#CPP = g++
 #CPP = colorgcc
 #CPP = clang
+CPP = nvcc
 DOXYGEN = doxygen
 
 # compiler flags
 LIBS		= 
 CPPINCLUDES 	= -I./include 
 COMMON_CPPFLAGS = $(CPPINCLUDES)
-CPPFLAGS 	= $(COMMON_CPPFLAGS) -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -g3  -fno-strict-aliasing -g 
-LDFLAGS 	= -L. 
+#CPPFLAGS 	= $(COMMON_CPPFLAGS) -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -g3  -fno-strict-aliasing -g 
+CPPFLAGS        =
+#LDFLAGS 	= -L. 
+LDFLAGS         =
 
 
 # build variables
@@ -39,7 +43,7 @@ octrace: $(OBJS)
 
 # build object file and dependencies files
 .cc.o:
-	$(CPP) $(CMD) -MD $(CPPFLAGS) $(ARGS) -c -o $@ $<
+	$(CPP) $(CMD) $(CPPFLAGS) $(ARGS) -c -o $@ $<
 
 # clean up backups and old files
 clean:
