@@ -85,7 +85,7 @@ ray_cu   generate_ray(int height, int weight, float level);
 //----------------------------------------------------
 //  Calculations
 //----------------------------------------------------
-__global__ void trace_on_gpu(int max_triangles, triangle* triangles)
+__global__ void trace_on_gpu(triangle_cu** triangles, unsigned max_triangles)
 {
   //Thread ID
   //int thread_i = blockDim.y * blockIdx.y + threadIdx.y;
@@ -94,7 +94,6 @@ __global__ void trace_on_gpu(int max_triangles, triangle* triangles)
 }
 
 int main(){
-  const unsigned triangle_cnt = 2;
   const unsigned max_rays = 1000;
   const unsigned max_triangles = 20000;
   unsigned length = 20000 / (100 * 2);

@@ -27,12 +27,12 @@ LDFLAGS         =
 
 
 # build variables
-SRCS = $(wildcard src/*.cc src/*/*.cc)
-OBJS = $(SRCS:.cc=.o)
-DEPS = $(SRCS:.cc=.d)
+SRCS = $(wildcard src/*.cu src/*/*.cu)
+OBJS = $(SRCS:.cu=.o)
+DEPS = $(SRCS:.cu=.d)
 
 # for building the component libraries
-DEPS += $(LIBSRCS:.cc=.d)
+DEPS += $(LIBSRCS:.cu=.d)
 
 all: octrace
 	notify-send "COMPILATION" "finished"	
@@ -42,7 +42,7 @@ octrace: $(OBJS)
 	$(CPP) -o bin/$@ $(OBJS) $(LIBS) $(LDFLAGS) $(CMD) $(CPPFLAGS) $(ARGS)
 
 # build object file and dependencies files
-.cc.o:
+.cu.o:
 	$(CPP) $(CMD) $(CPPFLAGS) $(ARGS) -c -o $@ $<
 
 # clean up backups and old files
