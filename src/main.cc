@@ -79,7 +79,7 @@ bool  collide(triangle_cu t, point_cu p);
 bool  collide(triangle_cu t, ray_cu r);
 float4 to_barycentric(triangle_cu t, point_cu p);
 point_cu intersection(plane_cu p, ray_cu r);
-std::vector<triangle_cu> generate_triangles(int height, int weight, float level);
+std::vector<triangle_cu> generate_triangles(int height, int width, float level);
 ray_cu   generate_ray(int height, int weight, float level);
 
 //----------------------------------------------------
@@ -87,9 +87,9 @@ ray_cu   generate_ray(int height, int weight, float level);
 //----------------------------------------------------
 int main(){
    const unsigned triangle_cnt = 2;
-   const unsigned max_rays = 2;
+   const unsigned max_rays = 1000;
 
-   std::vector<triangle_cu> triangles = generate_triangles(1,1,0);
+   std::vector<triangle_cu> triangles = generate_triangles(100, 100, 0);
 
   // Lets do some raytracing
   unsigned ray_cnt = 0;
@@ -97,7 +97,7 @@ int main(){
   unsigned ray_i;
   ray_cu r;
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    r = generate_ray(1, 1, 0);
+    r = generate_ray(100, 100, 0);
     for(i = 0; i < triangles.size(); ++i){
       if(collide(triangles[i], r)){
   	fprintf(stdout, "Ray %d on Triangle %d: Ahh collision, don't panic\n", ray_cnt, i);
@@ -135,7 +135,8 @@ float4 to_barycentric(triangle_cu t, point_cu p){
   b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
   b.z = 1 - b.x - b.y;
   b.w = 0;
-  assert((b.x + b.y + b.z) == 1);
+  //printf("%4.20f\n", (b.x + b.y + b.z));
+  assert(fabs((b.x + b.y + b.z) - 1) < 0.0001);
   return b;
 }
 
@@ -257,9 +258,11 @@ std::vector<triangle_cu> generate_triangles(int height, int weight, float level)
   return triangles;
 }
 
-ray_cu generate_ray(int height, int weight, float level){
+ray_cu generate_ray(int height, int width, float level){
+  float random1 = float(rand() % height) + (rand() / (float) RAND_MAX);
+  float random2 = float(rand() % width) + (rand() / (float) RAND_MAX);
   ray_cu r = {
-    {float(rand() % height), float(rand() % weight),level, 1},
+    {random1, random2, level, 1},
     {0,0,1, 0}};
   return r;
 }
