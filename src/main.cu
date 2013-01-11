@@ -86,9 +86,11 @@ void  print_point(point p);
 // New functions
 bool  collide(triangle_cu t, point_cu p);
 bool  collide(triangle_cu t, ray_cu r);
+bool  collide(prism_cu pr, ray_cu r);
 float4 to_barycentric(triangle_cu t, point_cu p);
 point_cu intersection(plane_cu p, ray_cu r);
 std::vector<triangle_cu> generate_triangles(int height, int width, float level);
+std::vector<prism_cu> generate_prisms(int height, int width, float level);
 std::vector<ray_cu> generate_rays(int height, int width, float level, unsigned max_rays);
 ray_cu   generate_ray(int height, int weight, float level);
 
@@ -182,11 +184,13 @@ __global__ void trace_on_gpu(triangle_cu* triangles, const unsigned max_triangle
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
     intersection_point = intersection_gpu(plane, rays[ray_i]);
     if(collide_gpu(triangle, intersection_point)){
-      collisions[gid].x = intersection_point.x;
-      collisions[gid].y = intersection_point.y;
-      collisions[gid].z = intersection_point.z;
+      collisions[gid].x++;
+      collisions[gid].y = intersection_point.x;
+      collisions[gid].z = intersection_point.y;
+      collisions[gid].w = intersection_point.z;
+
     }
-    //__syncthreads();
+    __syncthreads();
     
   }
   
@@ -197,41 +201,58 @@ __global__ void trace_on_gpu(triangle_cu* triangles, const unsigned max_triangle
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 100000;
-  const unsigned max_triangles =  10000;
+  const unsigned max_rays = 2;
+  const unsigned max_triangles =  2;
+  const unsigned max_prism = 0;
   unsigned length = ceil(sqrt(max_triangles / 2));
   unsigned ray_i;
   unsigned triangle_i;
-  ray_cu r;
   point_cu p;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = false;
+  bool use_cpu = true;
+  bool use_gpu = false;
   const plane_cu pl = {
     {0, 0, 0, 1},
     {0, 0, 1, 0}};
 
+  const prism_cu pr = {
+    {{0, 0, 0, 1},{0, 1, 0, 1},{1, 0, 0, 1}},
+    {{0, 0, 1, 1},{0, 1, 1, 1},{1, 0, 1, 1}}
+  };
+
   // Generate testdata
   std::vector<triangle_cu> triangles = generate_triangles(length, length, 0);
+  std::vector<prism_cu> prisms = generate_prisms(length, length, 1);
   std::vector<ray_cu> rays = generate_rays(length, length, 0, max_rays);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+  // CPU Raytracing
   if(use_cpu){
-    // CPU Raytracing
-    cudaEventRecord(start, 0);
-    for(ray_i = 0; ray_i < max_rays; ++ray_i){
-      p = intersection(pl, rays[ray_i]);
+    for(ray_i = 0; ray_i < rays.size(); ++ray_i){
       for(triangle_i = 0; triangle_i < triangles.size(); ++triangle_i){
-	if(collide(triangles[triangle_i], p)){
-	  fprintf(stdout, "CPU: Ray %d hits on Triangle %d\n", ray_i, triangle_i);
-	  // Do something on collision
+	if(collide(prisms[triangle_i], rays[ray_i])){
+	  fprintf(stdout, "CPU: Ray %d hits on prism %d\n", ray_i, triangle_i);
+
 	}
 
       }
-
     }
+
+    /*
+    for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+      for(triangle_i = 0; triangle_i < triangles.size(); ++triangle_i){
+	if(collide(triangles[triangle_i], rays[rays_i])){
+	  fprintf(stdout, "CPU: Ray %d hits on triangle %d\n", ray_i, triangle_i);
+
+	}
+
+      }
+    }
+    */
+
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtime_cpu, start, stop);
@@ -243,47 +264,50 @@ int main(){
   float4* h_collisions, *d_collisions;
   int threads = 256;
   int blocks = ceil(max_triangles / threads);
+  if(use_gpu){
 
-  // Memory allocation on host
-  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_triangles, max_triangles * sizeof(triangle_cu), cudaHostAllocDefault));
-  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, max_rays * sizeof(ray_cu), cudaHostAllocDefault));
-  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_collisions, max_triangles * sizeof(float4), cudaHostAllocDefault));
+    // Memory allocation on host
+    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_triangles, max_triangles * sizeof(triangle_cu), cudaHostAllocDefault));
+    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, max_rays * sizeof(ray_cu), cudaHostAllocDefault));
+    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_collisions, max_triangles * sizeof(float4), cudaHostAllocDefault));
 
-  // Memory initialisation on host
-  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    h_rays[ray_i] = rays[ray_i];
-  }
-  for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
-    h_collisions[triangle_i].x = 0;
-    h_triangles[triangle_i] = triangles[triangle_i];
-  }
+    // Memory initialisation on host
+    for(ray_i = 0; ray_i < max_rays; ++ray_i){
+      h_rays[ray_i] = rays[ray_i];
+    }
+    for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
+      h_collisions[triangle_i].x = 0;
+      h_triangles[triangle_i] = triangles[triangle_i];
+    }
 
-  // Memory allocation on device
-  CUDA_CHECK_RETURN(cudaMalloc(&d_triangles, max_triangles * sizeof(triangle_cu)));
-  CUDA_CHECK_RETURN(cudaMalloc(&d_rays, max_rays * sizeof(ray_cu)));
-  CUDA_CHECK_RETURN(cudaMalloc(&d_collisions, max_triangles * sizeof(float4)));
+    // Memory allocation on device
+    CUDA_CHECK_RETURN(cudaMalloc(&d_triangles, max_triangles * sizeof(triangle_cu)));
+    CUDA_CHECK_RETURN(cudaMalloc(&d_rays, max_rays * sizeof(ray_cu)));
+    CUDA_CHECK_RETURN(cudaMalloc(&d_collisions, max_triangles * sizeof(float4)));
 
-  // Copy data from host to device
-  cudaEventRecord(start, 0);
-  CUDA_CHECK_RETURN(cudaMemcpy(d_triangles, h_triangles, max_triangles * sizeof(triangle_cu), cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(d_collisions, h_collisions, max_triangles * sizeof(float4), cudaMemcpyHostToDevice));
+    // Copy data from host to device
+    cudaEventRecord(start, 0);
+    CUDA_CHECK_RETURN(cudaMemcpy(d_triangles, h_triangles, max_triangles * sizeof(triangle_cu), cudaMemcpyHostToDevice));
+    CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
+    CUDA_CHECK_RETURN(cudaMemcpy(d_collisions, h_collisions, max_triangles * sizeof(float4), cudaMemcpyHostToDevice));
 
-  // Start kernel
-  trace_on_gpu<<<threads, blocks>>>(d_triangles, max_triangles, d_rays, max_rays, d_collisions);
+    // Start kernel
+    trace_on_gpu<<<threads, blocks>>>(d_triangles, max_triangles, d_rays, max_rays, d_collisions);
 
-  // Copy data from device to host
-  CUDA_CHECK_RETURN(cudaMemcpy(h_collisions, d_collisions, max_triangles * sizeof(float4), cudaMemcpyDeviceToHost));
+    // Copy data from device to host
+    CUDA_CHECK_RETURN(cudaMemcpy(h_collisions, d_collisions, max_triangles * sizeof(float4), cudaMemcpyDeviceToHost));
 
-  // Evaluate device data
-  cudaEventRecord(stop, 0);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&runtime_gpu, start, stop);
-  for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
-    if(h_collisions[triangle_i].x > 0){
-      fprintf(stderr, "GPU: (%f, %f, %f, %f) on triangle %d\n", h_collisions[triangle_i].x, h_collisions[triangle_i].y, h_collisions[triangle_i].z, h_collisions[triangle_i].w, triangle_i);
+    // Evaluate device data
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&runtime_gpu, start, stop);
+    for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
+      if(h_collisions[triangle_i].x > 0){
+	fprintf(stderr, "GPU: (%f, %f, %f, %f) on triangle %d\n", h_collisions[triangle_i].x, h_collisions[triangle_i].y, h_collisions[triangle_i].z, h_collisions[triangle_i].w, triangle_i);
+      }
     }
   }
+
   fprintf(stderr, "\n");
   fprintf(stderr, "Triangles   : %d\n", max_triangles);
   fprintf(stderr, "Rays        : %d\n", max_rays);
@@ -324,7 +348,7 @@ float4 to_barycentric(triangle_cu t, point_cu p){
   b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
   b.z = 1 - b.x - b.y;
   b.w = 0;
-  assert(fabs((b.x + b.y + b.z) - 1) < 0.0001);
+  assert(fabs((b.x + b.y + b.z) - 1) < 0.0001 || (fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)));
   return b;
 }
 
@@ -365,6 +389,30 @@ bool collide(triangle_cu t, ray_cu r){
   pl.normal.z = (b1*c2 - b2*c1);
 
   return collide(t, intersection(pl, r));
+}
+
+bool collide(prism_cu pr, ray_cu r){
+  bool has_collide;
+  triangle_cu triangles[8] = {
+    pr.t1,
+    pr.t2,
+    {pr.t1.A, pr.t1.B, pr.t2.A},
+    {pr.t1.B, pr.t2.B, pr.t2.A},
+    {pr.t1.B, pr.t1.C, pr.t2.C},
+    {pr.t1.B, pr.t2.B, pr.t2.C},
+    {pr.t1.A, pr.t1.C, pr.t2.C},
+    {pr.t1.A, pr.t2.A, pr.t2.C}};
+
+  has_collide = 
+    collide(triangles[0], r) 
+    || collide(triangles[1], r) 
+    || collide(triangles[2], r) 
+    || collide(triangles[3], r) 
+    || collide(triangles[4], r) 
+    || collide(triangles[5], r) 
+    || collide(triangles[6], r) 
+    || collide(triangles[7], r);
+  return has_collide;
 }
 
 /**
@@ -444,6 +492,44 @@ std::vector<triangle_cu> generate_triangles(int height, int weight, float level)
   }
 
   return triangles;
+}
+
+std::vector<prism_cu> generate_prisms(int height, int weight, float level){
+  int h,w,l;
+  std::vector<prism_cu> prisms;
+  for(l = 0; l < level; ++l){
+    for(h = 0; h < height; ++h){
+      for(w = 0; w < weight; ++w){
+	triangle_cu a1 = {
+	  {float(h), float(w), l, 1},
+	  {float(h), float(w+1), l, 1},
+	  {float(h+1), float(w), l, 1}};
+	triangle_cu a2 = {
+	  {float(h), float(w), l+1, 1},
+	  {float(h), float(w+1), l+1, 1},
+	  {float(h+1), float(w), l+1, 1}};
+	triangle_cu b1 = {
+	  {float(h), float(w+1), l, 1},
+	  {float(h+1), float(w+1), l, 1},
+	  {float(h+1), float(w), l, 1}};
+	triangle_cu b2 = {
+	  {float(h), float(w+1), l+1, 1},
+	  {float(h+1), float(w+1), l+1, 1},
+	  {float(h+1), float(w), l+1, 1}};
+      
+	prism_cu pr1 = {a1, a2};
+	prism_cu pr2 = {b1, b2};
+
+	prisms.push_back(pr1);
+	prisms.push_back(pr2);
+
+      }
+
+    }
+
+  }
+
+  return prisms;
 }
 
 ray_cu generate_ray(const int height, const int width, const float level){
