@@ -5,6 +5,15 @@
 #include "assert.h"
 #include <vector>
 
+#define CUDA_CHECK_RETURN(value) {				\
+  cudaError_t _m_cudaStat = value;				\
+  if (_m_cudaStat != cudaSuccess) {				\
+    fprintf(stderr, "Error %s at line %d in file %s\n",	\
+    cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);	\
+    exit(1);							\
+  }								\
+}
+
 //----------------------------------------------------
 // Structures
 //----------------------------------------------------
@@ -84,7 +93,7 @@ std::vector<ray_cu> generate_rays(int height, int width, float level, unsigned m
 ray_cu   generate_ray(int height, int weight, float level);
 
 //----------------------------------------------------
-//  Calculations
+// Device Code
 //----------------------------------------------------
 __device__ float4 to_barycentric_gpu(triangle_cu t, point_cu p){
   float x1,x2,x3, y1,y2,y3, x,y;
@@ -173,19 +182,24 @@ __global__ void trace_on_gpu(triangle_cu* triangles, const unsigned max_triangle
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
     intersection_point = intersection_gpu(plane, rays[ray_i]);
     if(collide_gpu(triangle, intersection_point)){
-      collisions[gid].x++;
+      collisions[gid].x = intersection_point.x;
+      collisions[gid].y = intersection_point.y;
+      collisions[gid].z = intersection_point.z;
     }
-    __syncthreads();
+    //__syncthreads();
     
   }
   
 }
 
+
+//----------------------------------------------------
+// Host Code
+//----------------------------------------------------
 int main(){
-  const unsigned max_rays = 2;
-  const unsigned max_triangles =  100;
+  const unsigned max_rays = 100000;
+  const unsigned max_triangles =  10000;
   unsigned length = ceil(sqrt(max_triangles / 2));
-  unsigned i;
   unsigned ray_i;
   unsigned triangle_i;
   ray_cu r;
@@ -193,6 +207,7 @@ int main(){
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
+  bool use_cpu = false;
   const plane_cu pl = {
     {0, 0, 0, 1},
     {0, 0, 1, 0}};
@@ -203,61 +218,62 @@ int main(){
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  // CPU Raytracing
-  cudaEventRecord(start, 0);
-  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    p = intersection(pl, rays[ray_i]);
-    for(triangle_i = 0; triangle_i < triangles.size(); ++triangle_i){
-      if(collide(triangles[triangle_i], p)){
-  	fprintf(stdout, "CPU: Ray %d hits on Triangle %d\n", ray_i, triangle_i);
-  	// Do something on collision
-      }
+  if(use_cpu){
+    // CPU Raytracing
+    cudaEventRecord(start, 0);
+    for(ray_i = 0; ray_i < max_rays; ++ray_i){
+      p = intersection(pl, rays[ray_i]);
+      for(triangle_i = 0; triangle_i < triangles.size(); ++triangle_i){
+	if(collide(triangles[triangle_i], p)){
+	  fprintf(stdout, "CPU: Ray %d hits on Triangle %d\n", ray_i, triangle_i);
+	  // Do something on collision
+	}
 
       }
 
+    }
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&runtime_cpu, start, stop);
   }
-  cudaEventRecord(stop, 0);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&runtime_cpu, start, stop);
 
   // GPU Raytracing
   triangle_cu* h_triangles, *d_triangles;
   ray_cu* h_rays, *d_rays;
   float4* h_collisions, *d_collisions;
-  int threads = 32;
+  int threads = 256;
   int blocks = ceil(max_triangles / threads);
 
   // Memory allocation on host
-  cudaHostAlloc( (void**)&h_triangles, max_triangles * sizeof(triangle_cu), cudaHostAllocDefault);
-  cudaHostAlloc( (void**)&h_rays, max_rays * sizeof(ray_cu), cudaHostAllocDefault);
-  cudaHostAlloc( (void**)&h_collisions, max_triangles * sizeof(float4), cudaHostAllocDefault);
+  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_triangles, max_triangles * sizeof(triangle_cu), cudaHostAllocDefault));
+  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, max_rays * sizeof(ray_cu), cudaHostAllocDefault));
+  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_collisions, max_triangles * sizeof(float4), cudaHostAllocDefault));
 
   // Memory initialisation on host
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    h_rays[i] = rays[i];
+    h_rays[ray_i] = rays[ray_i];
   }
-
   for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
     h_collisions[triangle_i].x = 0;
     h_triangles[triangle_i] = triangles[triangle_i];
   }
 
   // Memory allocation on device
-  cudaMalloc(&d_triangles, max_triangles * sizeof(triangle_cu));
-  cudaMalloc(&d_rays, max_rays * sizeof(ray_cu));
-  cudaMalloc(&d_collisions, max_triangles * sizeof(float4));
+  CUDA_CHECK_RETURN(cudaMalloc(&d_triangles, max_triangles * sizeof(triangle_cu)));
+  CUDA_CHECK_RETURN(cudaMalloc(&d_rays, max_rays * sizeof(ray_cu)));
+  CUDA_CHECK_RETURN(cudaMalloc(&d_collisions, max_triangles * sizeof(float4)));
 
   // Copy data from host to device
   cudaEventRecord(start, 0);
-  cudaMemcpy(d_triangles, h_triangles, max_triangles * sizeof(triangle_cu), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_rays, h_rays, max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_collisions, h_collisions, max_triangles * sizeof(float4), cudaMemcpyHostToDevice);
+  CUDA_CHECK_RETURN(cudaMemcpy(d_triangles, h_triangles, max_triangles * sizeof(triangle_cu), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(d_collisions, h_collisions, max_triangles * sizeof(float4), cudaMemcpyHostToDevice));
 
   // Start kernel
   trace_on_gpu<<<threads, blocks>>>(d_triangles, max_triangles, d_rays, max_rays, d_collisions);
 
   // Copy data from device to host
-  cudaMemcpy(h_collisions, d_collisions, max_triangles * sizeof(float4), cudaMemcpyDeviceToHost);
+  CUDA_CHECK_RETURN(cudaMemcpy(h_collisions, d_collisions, max_triangles * sizeof(float4), cudaMemcpyDeviceToHost));
 
   // Evaluate device data
   cudaEventRecord(stop, 0);
@@ -265,7 +281,7 @@ int main(){
   cudaEventElapsedTime(&runtime_gpu, start, stop);
   for(triangle_i = 0; triangle_i < max_triangles; ++triangle_i){
     if(h_collisions[triangle_i].x > 0){
-      fprintf(stderr, "GPU: %d collisions on triangle %d\n", (int)h_collisions[triangle_i].x, triangle_i );
+      fprintf(stderr, "GPU: (%f, %f, %f, %f) on triangle %d\n", h_collisions[triangle_i].x, h_collisions[triangle_i].y, h_collisions[triangle_i].z, h_collisions[triangle_i].w, triangle_i);
     }
   }
   fprintf(stderr, "\n");
