@@ -221,17 +221,18 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 
   // Local data
   prism_cu prism = prisms[gid];
-  float4 local_collisions = {0, 0, 0, 0};
+  unsigned local_collisions = 0;
   unsigned ray_i;
 
   __syncthreads();
   // Calculation
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    local_collisions.x *= (int)collide_gpu(prism, rays[ray_i]);
-    __syncthreads();
+    local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
+  
 	       
   }
-  //collisions[gid].x = local_collisions.x;
+  __syncthreads();
+  collisions[gid].x = local_collisions;
   
 }
 //*/
@@ -241,21 +242,22 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 5000000;
-  const unsigned max_triangles = 10000;
-  unsigned length = ceil(sqrt(max_triangles / 2));
-  unsigned depth  = 10;
+  const unsigned max_rays = 1;
+  const unsigned max_triangles = 10;
+  const unsigned length = ceil(sqrt(max_triangles / 2));
+  const unsigned depth  = 1;
   const unsigned max_prisms = length * length * depth * 2;
   unsigned ray_i, prism_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = false;
+  bool use_cpu = true;
   bool use_gpu = true;
 
   // Generate testdata
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
   std::vector<ray_cu> rays = generate_rays(length, length, depth, max_rays);
+  std::vector<float> collisions(max_prisms, 0);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -266,7 +268,7 @@ int main(){
       for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
 	if(collide(prisms[prism_i], rays[ray_i])){
 	  fprintf(stdout, "CPU: Ray %d hits on prism %d\n", ray_i, prism_i);
-
+	  collisions[prism_i]++;
 	}
 
       }
@@ -321,9 +323,15 @@ int main(){
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtime_gpu, start, stop);
     for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      if(h_collisions[prism_i].x > 0){
-	//fprintf(stderr, "GPU: (%f, %f, %f, %f) on prism %d\n", h_collisions[prism_i].x, h_collisions[prism_i].y, h_collisions[prism_i].z, h_collisions[prism_i].w, prism_i);
+      if(h_collisions[prism_i].x != collisions[prism_i]){
+	fprintf(stderr, "GPU: (%f, %f, %f, %f) CPU != GPU on prism %d\n", h_collisions[prism_i].x, h_collisions[prism_i].y, h_collisions[prism_i].z, h_collisions[prism_i].w, prism_i);
       }
+    }
+
+    for(prism_i = 0; prism_i < max_prisms; ++prism_i){
+      if(h_collisions[prism_i].x > 0)
+	fprintf(stderr, "GPU: (%f, %f, %f, %f) collission on prism %d", h_collisions[prism_i].x, h_collisions[prism_i].y, h_collisions[prism_i].z, h_collisions[prism_i].w, prism_i);
+
     }
   }
 
