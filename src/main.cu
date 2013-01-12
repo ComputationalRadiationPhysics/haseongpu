@@ -61,19 +61,18 @@ typedef struct prism_cu{
   triangle_cu t2;
 } PRISM_CU;
 
+typedef struct prism_cu2{
+  triangle_cu t1;
+} PRISM_CU2;
+
 typedef struct plane_cu {
   point_cu P;
   vector_cu normal;
 } PLANE_CU;
 
-typedef struct ray_par {
-  float wavelength, b, c, d;
-} RAY_PAR;
-
 typedef struct ray_cu {
   point_cu P;
   vector_cu direction;
-  ray_par data;
 } RAY_CU;
 
 //----------------------------------------------------
@@ -184,15 +183,22 @@ __device__ bool collide_gpu(triangle_cu t, ray_cu r){
 
 __device__ bool collide_gpu(prism_cu pr, ray_cu r){
   bool has_collide = false;
+  point_cu A1 = pr.t1.A;
+  point_cu B1 = pr.t1.B;
+  point_cu C1 = pr.t1.C;
+  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
+  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
+  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
+
   triangle_cu triangles[8] = {
     pr.t1,
-    pr.t2,
-    {pr.t1.A, pr.t1.B, pr.t2.A},
-    {pr.t1.B, pr.t2.B, pr.t2.A},
-    {pr.t1.B, pr.t1.C, pr.t2.C},
-    {pr.t1.B, pr.t2.B, pr.t2.C},
-    {pr.t1.A, pr.t1.C, pr.t2.C},
-    {pr.t1.A, pr.t2.A, pr.t2.C}};
+    {A2, B2, C2},
+    {A1, B1, A2},
+    {B1, B2, A2},
+    {B1, C1, C2},
+    {B1, B2, C2},
+    {A1, C1, C2},
+    {A1, A2, C2}};
 
   has_collide = has_collide || collide_gpu(triangles[0], r);
   has_collide = has_collide || collide_gpu(triangles[1], r);
@@ -365,7 +371,7 @@ float4 to_barycentric(triangle_cu t, point_cu p){
 
   // In case of division by 0 --> nan
   if((fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)))
-    b.z = 2
+    b.z = 2;
   return b;
 }
 
@@ -405,16 +411,22 @@ bool collide(triangle_cu t, ray_cu r){
 
 bool collide(prism_cu pr, ray_cu r){
   bool has_collide;
+  point_cu A1 = pr.t1.A;
+  point_cu B1 = pr.t1.B;
+  point_cu C1 = pr.t1.C;
+  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
+  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
+  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
+
   triangle_cu triangles[8] = {
     pr.t1,
-    pr.t2,
-    {pr.t1.A, pr.t1.B, pr.t2.A},
-    {pr.t1.B, pr.t2.B, pr.t2.A},
-
-    {pr.t1.B, pr.t1.C, pr.t2.C},
-    {pr.t1.B, pr.t2.B, pr.t2.C},
-    {pr.t1.A, pr.t1.C, pr.t2.C},
-    {pr.t1.A, pr.t2.A, pr.t2.C}};
+    {A2, B2, C2},
+    {A1, B1, A2},
+    {B1, B2, A2},
+    {B1, C1, C2},
+    {B1, B2, C2},
+    {A1, C1, C2},
+    {A1, A2, C2}};
 
   has_collide = 
     collide(triangles[0], r)
@@ -515,24 +527,16 @@ std::vector<prism_cu> generate_prisms(int height, int weight, float level){
     for(h = 0; h < height; ++h){
       for(w = 0; w < weight; ++w){
 	triangle_cu a1 = {
-	  {float(h), float(w), l, 1},
-	  {float(h), float(w+1), l, 1},
-	  {float(h+1), float(w), l, 1}};
-	triangle_cu a2 = {
-	  {float(h), float(w), l+1, 1},
-	  {float(h), float(w+1), l+1, 1},
-	  {float(h+1), float(w), l+1, 1}};
+	  {float(h), float(w), l, l+1},
+	  {float(h), float(w+1), l, l+1},
+	  {float(h+1), float(w), l, l+1}};
 	triangle_cu b1 = {
-	  {float(h), float(w+1), l, 1},
-	  {float(h+1), float(w+1), l, 1},
-	  {float(h+1), float(w), l, 1}};
-	triangle_cu b2 = {
-	  {float(h), float(w+1), l+1, 1},
-	  {float(h+1), float(w+1), l+1, 1},
-	  {float(h+1), float(w), l+1, 1}};
+	  {float(h), float(w+1), l, 1+1},
+	  {float(h+1), float(w+1), l, 1+1},
+	  {float(h+1), float(w), l, 1+1}};
       
-	prism_cu pr1 = {a1, a2};
-	prism_cu pr2 = {b1, b2};
+	prism_cu pr1 = {a1};
+	prism_cu pr2 = {b1};
 
 	prisms.push_back(pr1);
 	prisms.push_back(pr2);
