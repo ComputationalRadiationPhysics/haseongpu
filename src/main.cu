@@ -91,8 +91,8 @@ float4 to_barycentric(triangle_cu t, point_cu p);
 point_cu intersection(plane_cu p, ray_cu r);
 std::vector<triangle_cu> generate_triangles(int height, int width, float level);
 std::vector<prism_cu> generate_prisms(int height, int width, float level);
-std::vector<ray_cu> generate_rays(int height, int width, float level, unsigned max_rays);
-ray_cu   generate_ray(int height, int weight, float level);
+std::vector<ray_cu> generate_rays(int height, int width, int level, unsigned max_rays);
+ray_cu   generate_ray(int height, int weight, int level);
 
 //----------------------------------------------------
 // Device Code
@@ -207,32 +207,6 @@ __device__ bool collide_gpu(prism_cu pr, ray_cu r){
   return has_collide;
 }
 
-/*
-__global__ void trace_on_triangles(triangle_cu* triangles, const unsigned max_triangles, ray_cu* rays, const unsigned max_rays, float4 *collisions){
-  // Cuda ids
-  //unsigned tid = threadIdx.x;
-  //unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
-  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  // Local data
-  triangle_cu triangle = triangles[gid];
-  unsigned ray_i;
-
-  __syncthreads();
-  // Calculation
-  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    if(collide_gpu(triangle, rays[ray_i])){
-      collisions[gid].x++;
-
-    }
-    __syncthreads();
-    
-  }
-  
-}
-//*/
-
-
 __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays, float4 *collisions){
   // Cuda ids
   //unsigned tid = threadIdx.x;
@@ -277,7 +251,7 @@ int main(){
 
   // Generate testdata
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
-  std::vector<ray_cu> rays = generate_rays(length, length, 0, max_rays);
+  std::vector<ray_cu> rays = generate_rays(length, length, depth, max_rays);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -573,16 +547,22 @@ std::vector<prism_cu> generate_prisms(int height, int weight, float level){
   return prisms;
 }
 
-ray_cu generate_ray(const int height, const int width, const float level){
-  float random1 = float(rand() % height) + (rand() / (float) RAND_MAX);
-  float random2 = float(rand() % width) + (rand() / (float) RAND_MAX);
+ray_cu generate_ray(const int heigth, const int width, const int level){
+  float rand_heigth = float(rand() % heigth) + (rand() / (float) RAND_MAX);
+  float rand_width  = float(rand() % width ) + (rand() / (float) RAND_MAX);
+  float rand_level  = float(rand() % level ) + (rand() / (float) RAND_MAX);
+
+  float dir_x = (rand() / (float) RAND_MAX);
+  float dir_y = (rand() / (float) RAND_MAX);
+  float dir_z = (rand() / (float) RAND_MAX);
+
   ray_cu r = {
-    {random1, random2, level, 1},
-    {0,0,1, 0}};
+    {rand_heigth, rand_width, rand_level, 1},
+    {dir_x, dir_y, dir_z, 0}};
   return r;
 }
 
-std::vector<ray_cu> generate_rays(const int height, const int width, const float level, const unsigned max_rays){
+std::vector<ray_cu> generate_rays(const int height, const int width, const int level, const unsigned max_rays){
   std::vector<ray_cu> rays;
   unsigned ray_i;
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
