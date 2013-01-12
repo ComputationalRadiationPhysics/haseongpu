@@ -122,7 +122,8 @@ __device__ float4 to_barycentric_gpu(triangle_cu t, point_cu p){
 __device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
   point_cu intersection_point = {0.0,0.0,0.0};
 
-  float t, d;
+  float t = 0;
+  float d = 0;
 
   // vector coordinates
   float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
@@ -158,7 +159,7 @@ __device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
 
 __device__ bool collide_gpu(triangle_cu t, point_cu p){
   float4 b = to_barycentric_gpu(t, p);
-  return (b.x > 0) && (b.x < 1) && (b.y > 0) && (b.y < 1) && (b.z > 0) && (b.z < 1) && (b.z == b.z);
+  return  (b.x > 0) && (b.x < 1) && (b.y > 0) && (b.y < 1) && (b.z > 0) && (b.z < 1) && (b.z == b.z);
 }
 
 __device__ bool collide_gpu(triangle_cu t, ray_cu r){
@@ -182,27 +183,25 @@ __device__ bool collide_gpu(triangle_cu t, ray_cu r){
 }
 
 __device__ bool collide_gpu(prism_cu pr, ray_cu r){
-  bool has_collide;
+  bool has_collide = false;
   triangle_cu triangles[8] = {
     pr.t1,
     pr.t2,
     {pr.t1.A, pr.t1.B, pr.t2.A},
     {pr.t1.B, pr.t2.B, pr.t2.A},
-
     {pr.t1.B, pr.t1.C, pr.t2.C},
     {pr.t1.B, pr.t2.B, pr.t2.C},
     {pr.t1.A, pr.t1.C, pr.t2.C},
     {pr.t1.A, pr.t2.A, pr.t2.C}};
 
-  has_collide = 
-    collide_gpu(triangles[0], r)
-    || collide_gpu(triangles[1], r)
-    || collide_gpu(triangles[2], r) 
-    || collide_gpu(triangles[3], r)
-    || collide_gpu(triangles[4], r) 
-    || collide_gpu(triangles[5], r) 
-    || collide_gpu(triangles[6], r) 
-    || collide_gpu(triangles[7], r);
+  has_collide = has_collide || collide_gpu(triangles[0], r);
+  has_collide = has_collide || collide_gpu(triangles[1], r);
+  has_collide = has_collide || collide_gpu(triangles[2], r); 
+  has_collide = has_collide || collide_gpu(triangles[3], r);
+  has_collide = has_collide || collide_gpu(triangles[4], r); 
+  has_collide = has_collide || collide_gpu(triangles[5], r); 
+  has_collide = has_collide || collide_gpu(triangles[6], r); 
+  has_collide = has_collide || collide_gpu(triangles[7], r);
 
   return has_collide;
 }
@@ -216,18 +215,17 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 
   // Local data
   prism_cu prism = prisms[gid];
+  float4 local_collisions = {0, 0, 0, 0};
   unsigned ray_i;
 
   __syncthreads();
   // Calculation
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    if(collide_gpu(prism, rays[ray_i])){
-      collisions[gid].x++;
-
-    }
+    local_collisions.x *= (int)collide_gpu(prism, rays[ray_i]);
     __syncthreads();
-    
+	       
   }
+  //collisions[gid].x = local_collisions.x;
   
 }
 //*/
@@ -237,8 +235,8 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 1000;
-  const unsigned max_triangles = 1000;
+  const unsigned max_rays = 5000000;
+  const unsigned max_triangles = 10000;
   unsigned length = ceil(sqrt(max_triangles / 2));
   unsigned depth  = 10;
   const unsigned max_prisms = length * length * depth * 2;
@@ -246,7 +244,7 @@ int main(){
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = true;
+  bool use_cpu = false;
   bool use_gpu = true;
 
   // Generate testdata
@@ -329,8 +327,8 @@ int main(){
   fprintf(stderr, "Rays        : %d\n", max_rays);
   fprintf(stderr, "GPU Blocks  : %d\n", blocks);
   fprintf(stderr, "GPU Threads : %d\n", threads);
-  fprintf(stderr, "Runtime_GPU : %f s\n", runtime_gpu / 100.0);
-  fprintf(stderr, "Runtime_CPU : %f s\n", runtime_cpu / 100.0);
+  fprintf(stderr, "Runtime_GPU : %f s\n", runtime_gpu / 1000.0);
+  fprintf(stderr, "Runtime_CPU : %f s\n", runtime_cpu / 1000.0);
   fprintf(stderr, "\n");
 
   // Cleanup
@@ -364,9 +362,10 @@ float4 to_barycentric(triangle_cu t, point_cu p){
   b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
   b.z = 1 - b.x - b.y;
   b.w = 0;
-  assert(fabs((b.x + b.y + b.z) - 1) < 0.0001 || (fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)));
+
+  // In case of division by 0 --> nan
   if((fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)))
-    b.z = 2;
+    b.z = 2
   return b;
 }
 
