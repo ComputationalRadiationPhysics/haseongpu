@@ -222,9 +222,7 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
   __syncthreads();
   // Calculation
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    if(collide_gpu(prism, rays[ray_i]))
-      local_collisions++;
-      //local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
+     local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
   
 	       
   }
@@ -239,16 +237,16 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 1000;
-  const unsigned max_triangles = 10000;
+  const unsigned max_rays = 1000000;
+  const unsigned max_triangles = 100000;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 1;
+  const unsigned depth  = 2;
   const unsigned max_prisms = length * length * depth * 2;
   unsigned ray_i, prism_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = true;
+  bool use_cpu = false;
   bool use_gpu = true;
 
   // Generate testdata
@@ -325,7 +323,7 @@ int main(){
 
     }
     for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      if(h_collisions[prism_i].x != collisions[prism_i]){
+      if((h_collisions[prism_i].x != collisions[prism_i]) && use_cpu && use_gpu){
 	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%.0f) != GPU(%.0f) on prism %d\n",collisions[prism_i], h_collisions[prism_i].x, prism_i);
       }
     }
