@@ -53,6 +53,7 @@ typedef struct plane {
 std::vector<triangle> generate_triangles(int height, int weight, float level);
 ray generate_ray(int height, int weight, float level);
 point intersection(plane p, ray r);
+point add_vector(point p, vector v);
 bool  collide(triangle t, ray r);
 bool  collide(triangle t, point p);
 float distance(point a, point b);
@@ -146,6 +147,15 @@ bool collide(triangle t, ray r){
   pl.normal.z = (b1*c2 - b2*c1);
 
   return collide(t, intersection(pl, r));
+}
+
+/**
+/**
+ * @brief Adds a vector to a point and returns the resulting point.
+ **/
+point add_vector(point p, vector v) {
+  point res = {p.x+v.x, p.y+v.y, p.z+v.z};
+  return res;
 }
 
 /**
