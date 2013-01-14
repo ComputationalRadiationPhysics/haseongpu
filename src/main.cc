@@ -29,6 +29,18 @@ typedef struct triangle {
   point c;
 } TRIANGLE;
 
+typedef struct prism {
+  triangle base;
+  vector normal;
+} PRISM;
+
+typedef struct rect {
+  point a;
+  point b;
+  point c;
+  point d;
+} RECT;
+
 typedef struct plane {
   point start;
   vector normal;
