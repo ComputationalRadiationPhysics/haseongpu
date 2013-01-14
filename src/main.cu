@@ -249,7 +249,7 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 __device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, curandState randomstate){
 	float u = curand_uniform(&randomstate);
 	float v = curand_uniform(&randomstate);
-	if((u+v) > 1){
+	if((u+v) > 1){ //OPTIMIZE: remove if
 		u = 1-u;
 		v = 1-v;
 	}
@@ -279,15 +279,16 @@ __device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, 
 __global__ void setup_kernel ( curandState * state, unsigned long seed ){
     int id = threadIdx.x + blockDim.x*blockIdx.x;
     curand_init ( seed, id, 0, &state[id] );
+	// OPTIMIZE: Use MersenneTwister or even a better PRNG
 } 
 
 __global__ void raytrace_step( curandState* globalState ) {
     int id = threadIdx.x + blockDim.x*blockIdx.x;
     curandState localState = globalState[id];
-    float RANDOM = curand_uniform( &localState );
+    //float RANDOM = curand_uniform( &localState );
 		
 	
-	globalState[id] = localState; 
+	globalState[id] = localState;
 }
 
 
