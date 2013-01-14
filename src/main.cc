@@ -56,6 +56,7 @@ point intersection(plane p, ray r);
 point add_vector(point p, vector v);
 bool  collide(triangle t, ray r);
 bool  collide(triangle t, point p);
+bool collide(rect re, ray r);
 float distance(point a, point b);
 void  print_point(point p);
 
@@ -150,6 +151,16 @@ bool collide(triangle t, ray r){
 }
 
 /**
+ * @brief Detects collision between a rectangle and a ray
+ **/
+bool collide(rect re, ray r) {
+  triangle t1 = { re.a, re.b, re.d };
+  triangle t2 = { re.c, re.d, re.b };
+
+  if (collide(t1, r) || collide(t2, r)) return true;
+  return false;
+}
+
 /**
  * @brief Adds a vector to a point and returns the resulting point.
  **/
