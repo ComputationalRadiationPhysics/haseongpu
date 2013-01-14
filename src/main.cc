@@ -57,6 +57,7 @@ point add_vector(point p, vector v);
 bool  collide(triangle t, ray r);
 bool  collide(triangle t, point p);
 bool collide(rect re, ray r);
+bool  collide(prism p, ray r);
 float distance(point a, point b);
 void  print_point(point p);
 
@@ -159,6 +160,29 @@ bool collide(rect re, ray r) {
 
   if (collide(t1, r) || collide(t2, r)) return true;
   return false;
+}
+
+/**
+ * @brief Detects collision between a prism and a ray
+ **/
+bool collide(prism p, ray r) {
+  bool has_collide = false;
+
+  // check for collision of ray with the base triangle and the side rectangles
+  // leave out cover, because intersection produces 2 collisions (so the other one would be caught anyway)
+  if (collide(p.base, r)) has_collide = true;
+  else {
+    point d = add_vector(p.base.a, p.normal);
+    point e = add_vector(p.base.b, p.normal);
+    point f = add_vector(p.base.c, p.normal);
+    rect r1 = {p.base.a, p.base.b, e, d};
+    rect r2 = {p.base.b, p.base.c, f, e};
+    rect r3 = {p.base.c, p.base.a, d, f};
+
+    if(collide(r1, r) || collide(r2, r) || collide(r3, r)) has_collide = true;
+  }
+
+  return has_collide;
 }
 
 /**
