@@ -4,6 +4,7 @@
 #include "vector_types.h"
 #include "assert.h"
 #include <vector>
+#include "curand_kernel.h"
 
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
@@ -58,6 +59,7 @@ typedef struct triangle_cu{
 
 typedef struct prism_cu{
   triangle_cu t1;
+  float height; //OPTIMIZE: The height could be stored as 4th parameter of one of the Triangle-coordinates?
 } PRISM_CU;
 
 typedef struct plane_cu {
@@ -65,9 +67,22 @@ typedef struct plane_cu {
   vector_cu normal;
 } PLANE_CU;
 
+// Describes one vertex of the input-Mesh
+typedef struct vertex_cu {
+	point_cu P;		// the Position
+	float4 G;		// The ASE-Gain in this Point (values from the rays are added)
+
+	// OPTIMIZE: distribute Writes of G over more than 1 position in this
+	// variable (e.g. through modulo thread-ID)
+	// -> could result in less concurrent write-operations
+	// Alternatively, save G in 4th coordinate of P
+} VERTEX_CU;
+
 typedef struct ray_cu {
-  point_cu P;
-  vector_cu direction;
+  point_cu P;			// the random starting point
+  vector_cu direction;  // the position of the vertex_cu, where the ray is going to
+  float phi_ase;		// the accumulated ASE-Flux for this ray
+						// OPTIMIZE: ASE-Flux might be stored as 4th parameter of P or direction
 } RAY_CU;
 
 //----------------------------------------------------
@@ -230,6 +245,52 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
   collisions[gid].x = local_collisions;
   
 }
+
+__device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, curandState randomstate){
+	float u = curand_uniform(&randomstate);
+	float v = curand_uniform(&randomstate);
+	if((u+v) > 1){
+		u = 1-u;
+		v = 1-v;
+	}
+	const float w = 1-(u+v);
+
+	point_cu A = start_prism.t1.A;
+	point_cu B = start_prism.t1.B;
+	point_cu C = start_prism.t1.C;
+
+	// Get x and y coordinates from the random barycentric values
+	const float x_rand = u*A.x + v*B.x + w*C.x ;
+	const float y_rand = u*A.y + v*B.y + w*C.y ;
+	
+	// Take one of the given z-coordinates and add a random part of the prism height
+	const float z_rand = A.z + curand_uniform(&randomstate) * start_prism.height;
+
+	float ase=0.f;
+	
+	// Take the values to assemble a ray
+	ray_cu r = {
+		{x_rand, y_rand, z_rand, 1},
+		vertex_point,
+		ase};
+	return r;
+}
+
+__global__ void setup_kernel ( curandState * state, unsigned long seed ){
+    int id = threadIdx.x + blockDim.x*blockIdx.x;
+    curand_init ( seed, id, 0, &state[id] );
+} 
+
+__global__ void raytrace_step( curandState* globalState ) {
+    int id = threadIdx.x + blockDim.x*blockIdx.x;
+    curandState localState = globalState[id];
+    float RANDOM = curand_uniform( &localState );
+		
+	
+	globalState[id] = localState; 
+}
+
+
 //*/
 
 
@@ -307,11 +368,23 @@ int main(){
     CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, max_prisms * sizeof(prism_cu), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(d_collisions, h_collisions, max_prisms * sizeof(float4), cudaMemcpyHostToDevice));
 
+	// Generating Random Numbers
+    curandState* devStates;
+    CUDA_CHECK_RETURN(cudaMalloc(&devStates, threads*blocks*sizeof( curandState )));
+    // setup seeds
+    setup_kernel<<< threads, blocks >>> ( devStates, time(NULL) );
+    // Start our kernel
+    raytrace_step<<< threads, blocks >>> ( devStates );
+
+
     // Start kernel
-    trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_collisions);
+    //trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_collisions);
 
     // Copy data from device to host
     CUDA_CHECK_RETURN(cudaMemcpy(h_collisions, d_collisions, max_prisms * sizeof(float4), cudaMemcpyDeviceToHost));
+
+	// Free memory on device
+	cudaFree(devStates);
 
     // Evaluate device data
     cudaEventRecord(stop, 0);
@@ -343,6 +416,7 @@ int main(){
   cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_collisions);
+
 
   return 0;
 }
@@ -566,6 +640,7 @@ ray_cu generate_ray(const int heigth, const int width, const int level){
     {dir_x, dir_y, dir_z, 0}};
   return r;
 }
+
 
 std::vector<ray_cu> generate_rays(const int height, const int width, const int level, const unsigned max_rays){
   std::vector<ray_cu> rays;
