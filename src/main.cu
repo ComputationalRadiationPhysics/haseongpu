@@ -65,7 +65,7 @@ typedef struct plane_cu {
   vector_cu normal;
 } PLANE_CU;
 
-typedef struct ray_cu {
+Typedef struct ray_cu {
   point_cu P;
   vector_cu direction;
 } RAY_CU;
@@ -79,8 +79,8 @@ void  print_point(point p);
 
 // New functions
 bool  collide(triangle_cu t, point_cu p);
-bool  collide(triangle_cu t, ray_cu r);
-bool  collide(prism_cu pr, ray_cu r);
+point_cu  collide(triangle_cu t, ray_cu r);
+int  collide(prism_cu pr, ray_cu r);
 float4 to_barycentric(triangle_cu t, point_cu p);
 point_cu intersection(plane_cu p, ray_cu r);
 std::vector<triangle_cu> generate_triangles(int height, int width, float level);
@@ -237,17 +237,17 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 1000000;
-  const unsigned max_triangles = 10000;
+  const unsigned max_rays = 1;
+  const unsigned max_triangles = 10;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 10;
+  const unsigned depth  = 1;
   const unsigned max_prisms = length * length * depth * 2;
   unsigned ray_i, prism_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = false;
-  bool use_gpu = true;
+  bool use_cpu = true;
+  bool use_gpu = false;
 
   // Generate testdata
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
@@ -391,7 +391,7 @@ bool collide(triangle_cu t, point_cu p){
    @brief Detects collisions of a triangle and a ray without
    a precondition.
 **/
-bool collide(triangle_cu t, ray_cu r){
+point_cu collide(triangle_cu t, ray_cu r){
   plane_cu pl;
   float b1, b2, b3, c1, c2, c3;
 
@@ -408,11 +408,20 @@ bool collide(triangle_cu t, ray_cu r){
   pl.normal.y = (b3*c1 - b1*c3);
   pl.normal.z = (b1*c2 - b2*c1);
 
-  return collide(t, intersection(pl, r));
+  point_cu p = intersection(pl, r);
+  if(collide(t, p)){
+    return p;
+  }
+  else{
+    {0,0,0,0};
+  }
+
+  return 
 }
 
-bool collide(prism_cu pr, ray_cu r){
+int collide(prism_cu pr, ray_cu r){
   bool has_collide;
+  point_cu intersections[2];
   point_cu A1 = pr.t1.A;
   point_cu B1 = pr.t1.B;
   point_cu C1 = pr.t1.C;
@@ -430,17 +439,18 @@ bool collide(prism_cu pr, ray_cu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
-  has_collide = 
-    collide(triangles[0], r)
-    || collide(triangles[1], r)
-    || collide(triangles[2], r) 
-    || collide(triangles[3], r)
-    || collide(triangles[4], r) 
-    || collide(triangles[5], r) 
-    || collide(triangles[6], r) 
-    || collide(triangles[7], r);
-
-  return has_collide;
+  unsigned i; 
+  unsigned j = 0;
+  for(i = 0; i < 8; ++i){
+    point_cu p = collide(triangles[i]);
+    if(p.x == 0 && p.y == 0 && p.z == 0 && p.w == 0)
+      continue;
+    intersections[j++] = p;
+  }
+  if(j > 0)
+    return distance(intersections[0], intersections[1]);
+  else
+    return 0;
 }
 
 /**
@@ -494,7 +504,7 @@ point_cu intersection(plane_cu pl, ray_cu r){
 
 }
 
-float distance(point a, point b){
+float distance(point_cu a, point_cu b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
   return fabs(d);
 }
