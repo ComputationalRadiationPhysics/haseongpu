@@ -17,36 +17,6 @@
 //----------------------------------------------------
 // Structures
 //----------------------------------------------------
-typedef struct point {
-  float x;
-  float y;
-  float z;
-} POINT;
-
-typedef struct vector {
-  float x;
-  float y;
-  float z;
-} VECTOR;
-
-typedef struct ray {
-  point start;
-  vector direction;
-} RAY;
-
-typedef struct triangle {
-  point a;
-  point b;
-  point c;
-} TRIANGLE;
-
-typedef struct plane {
-  point start;
-  vector normal;
-  
-} PLANE;
-
-//------------------------------------------
 typedef float4 point_cu;
 typedef float4 vector_cu;
 
@@ -65,28 +35,10 @@ typedef struct plane_cu {
   vector_cu normal;
 } PLANE_CU;
 
-Typedef struct ray_cu {
+typedef struct ray_cu {
   point_cu P;
   vector_cu direction;
 } RAY_CU;
-
-//----------------------------------------------------
-// Auxillary function declaration
-//----------------------------------------------------
-
-float distance(point a, point b);
-void  print_point(point p);
-
-// New functions
-bool  collide(triangle_cu t, point_cu p);
-point_cu  collide(triangle_cu t, ray_cu r);
-int  collide(prism_cu pr, ray_cu r);
-float4 to_barycentric(triangle_cu t, point_cu p);
-point_cu intersection(plane_cu p, ray_cu r);
-std::vector<triangle_cu> generate_triangles(int height, int width, float level);
-std::vector<prism_cu> generate_prisms(int height, int width, float level);
-std::vector<ray_cu> generate_rays(int height, int width, int level, unsigned max_rays);
-ray_cu   generate_ray(int height, int weight, int level);
 
 //----------------------------------------------------
 // Device Code
@@ -231,13 +183,28 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
   
 }
 //*/
-
+//----------------------------------------------------
+// Auxillary function declaration
+//----------------------------------------------------
+bool  collide(triangle_cu t, point_cu p);
+point_cu  collide(triangle_cu t, ray_cu r);
+float  collide(prism_cu pr, ray_cu r);
+float4 to_barycentric(triangle_cu t, point_cu p);
+point_cu intersection(plane_cu p, ray_cu r);
+std::vector<triangle_cu> generate_triangles(int height, int width, float level);
+std::vector<prism_cu> generate_prisms(int height, int width, float level);
+std::vector<ray_cu> generate_rays(int height, int width, int level, unsigned max_rays);
+ray_cu   generate_ray(int height, int weight, int level);
+float distance(point_cu a, point_cu b);
+void print_point(point_cu p);
+void print_vector(vector_cu v);
+void print_plane(plane_cu pl);
 
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 1;
+  const unsigned max_rays = 5;
   const unsigned max_triangles = 10;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 1;
@@ -256,17 +223,34 @@ int main(){
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+  triangle_cu tr = {
+    {1, 1, 1, 1},
+    {3, 1, 1, 1},
+    {1, 3, 1, 1}};
+  prism_cu pr = {tr};
+
+  ray_cu r = {
+    {2, 2, 2, 1},
+    {0, 0, 1, 0}};
+
   // CPU Raytracing
   cudaEventRecord(start, 0);
   if(use_cpu){
+    /*
     for(ray_i = 0; ray_i < rays.size(); ++ray_i){
       for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
-	if(collide(prisms[prism_i], rays[ray_i])){
-	  fprintf(stdout, "CPU: Ray %d hits on prism %d\n", ray_i, prism_i);
+	float distance = collide(prisms[prism_i], rays[ray_i]);
+	if(distance > 0){
+	  fprintf(stdout, "CPU: Ray %d hits on prism %d with distance %f\n", ray_i, prism_i, distance);
 	  collisions[prism_i]++;
 	}
 
       }
+    }
+    */
+    float distance = collide(pr, r);
+    if(distance > 0){
+      fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
     }
 
     cudaEventRecord(stop, 0);
@@ -395,13 +379,13 @@ point_cu collide(triangle_cu t, ray_cu r){
   plane_cu pl;
   float b1, b2, b3, c1, c2, c3;
 
-  b1 = t.B.x;
-  b2 = t.B.y;
-  b3 = t.B.z;
+  b1 = t.B.x - t.A.x;
+  b2 = t.B.y - t.A.y;
+  b3 = t.B.z - t.A.z;
 
-  c1 = t.C.x;
-  c2 = t.C.y;
-  c3 = t.C.z;
+  c1 = t.C.x - t.A.x;
+  c2 = t.C.y - t.A.y;
+  c3 = t.C.z - t.A.z;
 
   pl.P = t.A;
   pl.normal.x = (b2*c3 - b3*c2);
@@ -413,21 +397,21 @@ point_cu collide(triangle_cu t, ray_cu r){
     return p;
   }
   else{
-    {0,0,0,0};
+    point_cu no_inter = {0,0,0,0}; 
+    return no_inter;
   }
 
-  return 
 }
 
-int collide(prism_cu pr, ray_cu r){
-  bool has_collide;
+float collide(prism_cu pr, ray_cu r){
+  //bool has_collide;
   point_cu intersections[2];
   point_cu A1 = pr.t1.A;
   point_cu B1 = pr.t1.B;
   point_cu C1 = pr.t1.C;
-  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
-  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
-  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
+  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
+  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
+  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
 
   triangle_cu triangles[8] = {
     pr.t1,
@@ -442,7 +426,7 @@ int collide(prism_cu pr, ray_cu r){
   unsigned i; 
   unsigned j = 0;
   for(i = 0; i < 8; ++i){
-    point_cu p = collide(triangles[i]);
+    point_cu p = collide(triangles[i], r);
     if(p.x == 0 && p.y == 0 && p.z == 0 && p.w == 0)
       continue;
     intersections[j++] = p;
@@ -468,7 +452,7 @@ int collide(prism_cu pr, ray_cu r){
    d  = n~ * a~
 **/
 point_cu intersection(plane_cu pl, ray_cu r){
-  point_cu intersection_point = {0.0,0.0,0.0};
+  point_cu intersection_point = {0.0,0.0,0.0, 1};
 
   float t, d;
 
@@ -499,6 +483,7 @@ point_cu intersection(plane_cu pl, ray_cu r){
   intersection_point.x = x1 + t * p1;
   intersection_point.y = x2 + t * p2;
   intersection_point.z = x3 + t * p3;
+  intersection_point.w = 1;
 
   return intersection_point;
 
@@ -587,10 +572,19 @@ std::vector<ray_cu> generate_rays(const int height, const int width, const int l
   return rays;
 }
 
-void print_point(point p){
-  fprintf(stdout, "Point\n");
-  fprintf(stdout, "x: %f\n", p.x);
-  fprintf(stdout, "y: %f\n", p.y);
-  fprintf(stdout, "z: %f\n", p.z);
+void print_point(point_cu p){
+  fprintf(stderr, "Point (%f, %f, %f)\n",p.x, p.y, p.z);
 
+}
+
+void print_vector(vector_cu v){
+  fprintf(stderr, "Vector (%f, %f, %f)\n",v.x, v.y, v.z);
+
+}
+
+void print_plane(plane_cu pl){
+  fprintf(stderr, "Plane: \n\t");
+  print_point(pl.P);
+  fprintf(stderr, "\t");
+  print_vector(pl.normal);
 }
