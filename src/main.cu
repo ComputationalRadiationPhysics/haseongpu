@@ -6,6 +6,7 @@
 #include <vector>
 #include "curand_kernel.h"
 
+#define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
   if (_m_cudaStat != cudaSuccess) {				\
@@ -106,145 +107,6 @@ ray_cu   generate_ray(int height, int weight, int level);
 //----------------------------------------------------
 // Device Code
 //----------------------------------------------------
-__device__ float4 to_barycentric_gpu(triangle_cu t, point_cu p){
-  float x1,x2,x3, y1,y2,y3, x,y;
-  float4 b;
-
-  x1 = t.A.x;
-  x2 = t.B.x;
-  x3 = t.C.x;
-
-  y1 = t.A.y;
-  y2 = t.B.y;
-  y3 = t.C.y;
-    
-  x = p.x;
-  y = p.y;
-
-  b.x = ((y2-y3)*(x-x3)+(x3-x2)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
-  b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
-  b.z = 1 - b.x - b.y;
-  b.w = 0;
-  return b;
-}
-
-__device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
-  point_cu intersection_point = {0.0,0.0,0.0};
-
-  float t = 0;
-  float d = 0;
-
-  // vector coordinates
-  float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
-  
-  // just get the coordinates from the structs
-  n1 = pl.normal.x;
-  n2 = pl.normal.y;
-  n3 = pl.normal.z;
-
-  a1 = pl.P.x;
-  a2 = pl.P.y;
-  a3 = pl.P.z;
-
-  x1 = r.P.x;
-  x2 = r.P.y;
-  x3 = r.P.z;
-
-  p1 = r.direction.x;
-  p2 = r.direction.y;
-  p3 = r.direction.z;
-
-  // calculation of intersection
-  d = n1*a1 + n2*a2 + n3*a3;
-  t = (d - n1*x1 - n2*x2 - n3*x3) / (n1*p1 + n2*p2 + n3*p3);
-
-  intersection_point.x = x1 + t * p1;
-  intersection_point.y = x2 + t * p2;
-  intersection_point.z = x3 + t * p3;
-
-  return intersection_point;
-
-}
-
-__device__ bool collide_gpu(triangle_cu t, point_cu p){
-  float4 b = to_barycentric_gpu(t, p);
-  return  (b.x > 0) && (b.x < 1) && (b.y > 0) && (b.y < 1) && (b.z > 0) && (b.z < 1) && (b.z == b.z);
-}
-
-__device__ bool collide_gpu(triangle_cu t, ray_cu r){
-  plane_cu pl;
-  float b1, b2, b3, c1, c2, c3;
-
-  b1 = t.B.x;
-  b2 = t.B.y;
-  b3 = t.B.z;
-
-  c1 = t.C.x;
-  c2 = t.C.y;
-  c3 = t.C.z;
-
-  pl.P = t.A;
-  pl.normal.x = (b2*c3 - b3*c2);
-  pl.normal.y = (b3*c1 - b1*c3);
-  pl.normal.z = (b1*c2 - b2*c1);
-
-  return collide_gpu(t, intersection_gpu(pl, r));
-}
-
-__device__ bool collide_gpu(prism_cu pr, ray_cu r){
-  bool has_collide = false;
-  point_cu A1 = pr.t1.A;
-  point_cu B1 = pr.t1.B;
-  point_cu C1 = pr.t1.C;
-  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
-  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
-  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
-
-  triangle_cu triangles[8] = {
-    pr.t1,
-    {A2, B2, C2},
-    {A1, B1, A2},
-    {B1, B2, A2},
-    {B1, C1, C2},
-    {B1, B2, C2},
-    {A1, C1, C2},
-    {A1, A2, C2}};
-
-  has_collide = has_collide || collide_gpu(triangles[0], r);
-  has_collide = has_collide || collide_gpu(triangles[1], r);
-  has_collide = has_collide || collide_gpu(triangles[2], r); 
-  has_collide = has_collide || collide_gpu(triangles[3], r);
-  has_collide = has_collide || collide_gpu(triangles[4], r); 
-  has_collide = has_collide || collide_gpu(triangles[5], r); 
-  has_collide = has_collide || collide_gpu(triangles[6], r); 
-  has_collide = has_collide || collide_gpu(triangles[7], r);
-
-  return has_collide;
-}
-
-//__global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays, float4 *collisions){
-//  // Cuda ids
-//  //unsigned tid = threadIdx.x;
-//  //unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
-//  
-//  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
-//
-//  // Local data
-//  prism_cu prism = prisms[gid];
-//  unsigned local_collisions = 0;
-//  unsigned ray_i;
-//
-//  __syncthreads();
-//  // Calculation
-//  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-//     local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
-//  
-//	       
-//  }
-//  __syncthreads();
-//  collisions[gid].x = local_collisions;
-//  
-//}
 
 __device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, curandState randomstate){
 	float u = curand_uniform(&randomstate);
@@ -281,12 +143,15 @@ __device__ prism_cu select_prism(int id, prism_cu prisms[]){
 	return prisms[0];
 }
 
-__device__ float propagate(ray_cu ray, prism_cu prisms[], const prism_cu startprism){
+__device__ float propagate(ray_cu ray, prism_cu prisms[], prism_cu startprism){
+	float gain = 1.f;
 	float vec_x = ray.direction.x - ray.P.x;
 	float vec_y = ray.direction.y - ray.P.y;
 	float vec_z = ray.direction.z - ray.P.z;
  
     const float distance_total = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+	float distance = distance_total;
+	float length = distance_total;
 	vec_x /= distance_total;
 	vec_y /= distance_total;
 	vec_z /= distance_total;
@@ -295,6 +160,7 @@ __device__ float propagate(ray_cu ray, prism_cu prisms[], const prism_cu startpr
 	
 
 	for(;;){
+		length = distance;
 		//generate the triangle surfaces of the prism
 		const triangle_cu t1 = current.t1;
 		const triangle_cu t2 = { 
@@ -315,25 +181,56 @@ __device__ float propagate(ray_cu ray, prism_cu prisms[], const prism_cu startpr
 			{t1.A, t2.A, t2.C}
 		};
 
-		int i_surface=0;
-		for(i_surface=0; i_surface<8 ; ++i_surface){
-			vector_cu AB = surface[i_surface].B - surface[i_surface].A;
-			vector_cu AC = surface[i_surface].C - surface[i_surface].A;
+		int i=0;
+		float length_help = 0.f;
+		for(i=0; i<8 ; ++i){ //OPTIMIZE: unroll, so that every surface can be optimized differently
+			vector_cu AB = surfaces[i].B - surfaces[i].A;
+			vector_cu AC = surfaces[i].C - surfaces[i].A;
 			
 			plane_cu pl;
-			pl.P = surface[i_surface].A;
-			pl.normal.x = (b2*c3 - b3*c2);
-			pl.normal.y = (b3*c1 - b1*c3);
-			pl.normal.z = (b1*c2 - b2*c1);
+			pl.P = surfaces[i].A;
+			pl.normal.x = AB.y*AC.z - AB.z*AC.y;
+			pl.normal.y = AB.z*AC.x - AB.x*AC.z;
+			pl.normal.z = AB.x*AC.y - AB.y*AC.x;
 		
+			float denominator = (ray.direction.x * pl.normal.x) + (ray.direction.y * pl.normal.y) + (ray.direction.z * pl.normal.z);
+			float d = 0.f;
+			float nominator = 0.f;
+			if(denominator != 0.f) //OPTIMIZE: check if we have a lot of branch diversion, or if all threads behave the same
+			{
+				d = (surfaces[i].A.x * pl.normal.x) + (surfaces[i].A.y * pl.normal.y) + (surfaces[i].A.z * pl.normal.z);
+				nominator = d - ((ray.P.x * pl.normal.x) + (ray.P.y * pl.normal.y) + (ray.P.z * pl.normal.y)); 
+				length_help = nominator/denominator;
+				if(length_help < length && length_help > 0.f) //OPTIMIZE: most threads should do the same?
+				{
+						length = length_help;
+				}
+			}
 		}
 
 
-		break;//TODO remove
+		//with the new length, get the gain and add it
+		// TODO
+		gain *= exp(length);
+
+		// calculate values for next iteration
+		distance -= length;
+		if(abs(distance) < SMALL)
+		{
+			break;
+		}
+
+		ray.P.x += length*vec_x;
+		ray.P.y += length*vec_y;
+		ray.P.z += length*vec_z;
+
+		//TODO:
+		// calculate the next PRISM (maybe with help of some neighbor-datastructure?
+
 	}
 
 
-	return 0.f;
+	return gain;
 }
 
 
@@ -364,9 +261,6 @@ __global__ void raytrace_step( curandState* globalState, vertex_cu vertex, prism
 	
 	globalState[id] = localState;
 }
-
-
-//*/
 
 
 //----------------------------------------------------
