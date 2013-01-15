@@ -206,8 +206,8 @@ void print_plane(plane_cu pl);
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 5;
-  const unsigned max_triangles = 10;
+  const unsigned max_rays = 1;
+  const unsigned max_triangles = 8;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 1;
   const unsigned max_prisms = length * length * depth * 2;
@@ -226,15 +226,16 @@ int main(){
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
+
   triangle_cu tr = {
-    {1, 1, 1, 1},
-    {3, 1, 1, 1},
-    {1, 3, 1, 1}};
+    {1, 1, 0, 1},
+    {3, 1, 0, 1},
+    {1, 3, 0, 1}};
   prism_cu pr = {tr};
 
   ray_cu r = {
-    {2, 2, 2, 1},
-    {0, 0, 1, 0}};
+    {1, 2, 0, 1},
+    {1, 0, 0, 0}};
 
   // CPU Raytracing
   cudaEventRecord(start, 0);
@@ -251,11 +252,15 @@ int main(){
       }
     }
     */
+    
+    /*
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
       std::vector<ray_cu> rays = generate_sample_rays(length, length, depth, max_rays, samples[sample_i]);
       for(ray_i = 0; ray_i < rays.size(); ++ray_i){
 	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
-	  float distance = collide(pr, r);
+	  float distance = collide(prisms[prism_i], rays[ray_i]);
+	  print_point(rays[ray_i].P);
+	  print_point(rays[ray_i].direction);
 	  if(distance > 0){
 	    fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
 	  }
@@ -265,6 +270,15 @@ int main(){
       }
 
     }
+    */
+    
+    print_point(collide(tr, r));
+
+    /*
+    if(distance > 0){
+      fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
+    }
+    */
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
@@ -363,11 +377,14 @@ float4 to_barycentric(triangle_cu t, point_cu p){
   x = p.x;
   y = p.y;
 
-  b.x = ((y2-y3)*(x-x3)+(x3-x2)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
-  b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
+  float tmp = ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
+  fprintf(stderr, "%f\n", tmp);
+
+  b.x = ((y2-y3)*(x-x3)+(x3-x2)*(y-y3)) / tmp;
+  b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / tmp;
   b.z = 1 - b.x - b.y;
   b.w = 0;
-
+  print_point(b);
   // In case of division by 0 --> nan
   if((fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)))
     b.z = 2;
@@ -381,7 +398,7 @@ float4 to_barycentric(triangle_cu t, point_cu p){
 **/
 bool collide(triangle_cu t, point_cu p){
   float4 b = to_barycentric(t, p);
-  return (b.x > 0) && (b.x < 1) && (b.y > 0) && (b.y < 1) && (b.z > 0) && (b.z < 1) && (b.z == b.z);
+  return (b.x >= 0) && (b.x <= 1) && (b.y >= 0) && (b.y <= 1) && (b.z >= 0) && (b.z <= 1) && (b.z == b.z);
 }
 
 /**
