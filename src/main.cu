@@ -276,17 +276,56 @@ __device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, 
 	return r;
 }
 
+__device__ prism_cu select_prism(int id, prism_cu prisms[]){
+	//TODO
+	return prisms[0];
+}
+
+__device__ float propagate(ray_cu ray, prism_cu prisms[]){
+	float vec_x = ray.direction.x - ray.P.x;
+	float vec_y = ray.direction.y - ray.P.y;
+	float vec_z = ray.direction.z - ray.P.z;
+ 
+    const float distance_total = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+	vec_x /= distance_total;
+	vec_y /= distance_total;
+	vec_z /= distance_total;
+
+	for(;;){
+
+			
+	
+	}
+
+
+	return 0.f;
+}
+
+
 __global__ void setup_kernel ( curandState * state, unsigned long seed ){
     int id = threadIdx.x + blockDim.x*blockIdx.x;
     curand_init ( seed, id, 0, &state[id] );
 	// OPTIMIZE: Use MersenneTwister or even a better PRNG
 } 
 
-__global__ void raytrace_step( curandState* globalState ) {
+
+// does the raytracing for a single ray (randomly generated) and a single (given) Vertex
+__global__ void raytrace_step( curandState* globalState, vertex_cu vertex, prism_cu prisms[]) {
     int id = threadIdx.x + blockDim.x*blockIdx.x;
     curandState localState = globalState[id];
-    //float RANDOM = curand_uniform( &localState );
-		
+
+	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
+
+
+	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
+	// big benefits for the memory access (and caching!)
+	prism_cu startprism = select_prism(id, prisms);	
+
+	ray_cu ray = generate_ray_gpu(vertex.P,startprism, localState); //TODO:verify
+
+	float gain = propagate(ray,prisms);
+	
+	//atomicAdd(&(vertex.G.x),gain);
 	
 	globalState[id] = localState;
 }
@@ -301,6 +340,7 @@ __global__ void raytrace_step( curandState* globalState ) {
 int main(){
   const unsigned max_rays = 1000000;
   const unsigned max_triangles = 10000;
+  const unsigned max_vertices = 5;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 10;
   const unsigned max_prisms = length * length * depth * 2;
@@ -312,6 +352,7 @@ int main(){
   bool use_gpu = true;
 
   // Generate testdata
+  std::vector<vertex_cu> vertices;
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
   std::vector<ray_cu> rays = generate_rays(length, length, depth, max_rays);
   std::vector<float> collisions(max_prisms, 0);
@@ -354,7 +395,6 @@ int main(){
       h_rays[ray_i] = rays[ray_i];
     }
     for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      h_collisions[prism_i].x = 0;
       h_prisms[prism_i] = prisms[prism_i];
     }
 
@@ -375,7 +415,11 @@ int main(){
     // setup seeds
     setup_kernel<<< threads, blocks >>> ( devStates, time(NULL) );
     // Start our kernel
-    raytrace_step<<< threads, blocks >>> ( devStates );
+
+	int vertex_i;
+    for(vertex_i = 0; vertex_i < max_vertices; ++vertex_i){
+		raytrace_step<<< threads, blocks >>> ( devStates , vertices[vertex_i] , d_prisms);
+    }
 
 
     // Start kernel

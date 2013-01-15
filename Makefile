@@ -6,7 +6,7 @@ DATE="`date +%y%m%d%H%M%S`"
 
 # compiler, linker, archiver
 NVCC = nvcc
-NVCC_FLAGS = --ptxas-options=-v -arch=sm_10 --use_fast_math --maxrregcount=63
+NVCC_FLAGS = --ptxas-options=-v -arch=sm_30 --use_fast_math --maxrregcount=63
 
 # build variables
 SRCS = $(wildcard src/*.cu src/*/*.cu)
