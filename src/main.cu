@@ -27,7 +27,7 @@ typedef struct triangle_cu{
 } TRIANGLE_CU;
 
 typedef struct prism_cu{
-  triangle_cu t1;
+  triangle_cu t1; // height in w coordinate
 } PRISM_CU;
 
 typedef struct plane_cu {
@@ -112,13 +112,13 @@ __device__ bool collide_gpu(triangle_cu t, ray_cu r){
   plane_cu pl;
   float b1, b2, b3, c1, c2, c3;
 
-  b1 = t.B.x;
-  b2 = t.B.y;
-  b3 = t.B.z;
+  b1 = t.B.x - t.A.x;
+  b2 = t.B.y - t.A.y;
+  b3 = t.B.z - t.A.z;
 
-  c1 = t.C.x;
-  c2 = t.C.y;
-  c3 = t.C.z;
+  c1 = t.C.x - t.A.x;
+  c2 = t.C.y - t.A.y;
+  c3 = t.C.z - t.A.z;
 
   pl.P = t.A;
   pl.normal.x = (b2*c3 - b3*c2);
@@ -194,6 +194,8 @@ point_cu intersection(plane_cu p, ray_cu r);
 std::vector<triangle_cu> generate_triangles(int height, int width, float level);
 std::vector<prism_cu> generate_prisms(int height, int width, float level);
 std::vector<ray_cu> generate_rays(int height, int width, int level, unsigned max_rays);
+std::vector<point_cu> generate_samples(int height, int width, int level);
+std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsigned max_rays, point_cu sample);
 ray_cu   generate_ray(int height, int weight, int level);
 float distance(point_cu a, point_cu b);
 void print_point(point_cu p);
@@ -209,7 +211,7 @@ int main(){
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 1;
   const unsigned max_prisms = length * length * depth * 2;
-  unsigned ray_i, prism_i;
+  unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
@@ -218,7 +220,8 @@ int main(){
 
   // Generate testdata
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
-  std::vector<ray_cu> rays = generate_rays(length, length, depth, max_rays);
+  std::vector<point_cu> samples = generate_samples(length, length, depth);
+  std::vector<ray_cu> rays = generate_sample_rays(length, length, depth, max_rays, samples[0]);
   std::vector<float> collisions(max_prisms, 0);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
@@ -248,9 +251,19 @@ int main(){
       }
     }
     */
-    float distance = collide(pr, r);
-    if(distance > 0){
-      fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
+    for(sample_i = 0; sample_i < samples.size(); ++sample_i){
+      std::vector<ray_cu> rays = generate_sample_rays(length, length, depth, max_rays, samples[sample_i]);
+      for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
+	  float distance = collide(pr, r);
+	  if(distance > 0){
+	    fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
+	  }
+
+	}
+
+      }
+
     }
 
     cudaEventRecord(stop, 0);
@@ -517,12 +530,12 @@ std::vector<triangle_cu> generate_triangles(int height, int weight, float level)
   return triangles;
 }
 
-std::vector<prism_cu> generate_prisms(int height, int weight, float level){
+std::vector<prism_cu> generate_prisms(int height, int width, float level){
   int h,w,l;
   std::vector<prism_cu> prisms;
   for(l = 0; l < level; ++l){
     for(h = 0; h < height; ++h){
-      for(w = 0; w < weight; ++w){
+      for(w = 0; w < width; ++w){
 	triangle_cu a1 = {
 	  {float(h), float(w), l, l+1},
 	  {float(h), float(w+1), l, l+1},
@@ -567,6 +580,31 @@ std::vector<ray_cu> generate_rays(const int height, const int width, const int l
   unsigned ray_i;
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
     ray_cu ray = generate_ray(height, width, level);
+    rays.push_back(ray);
+  }
+  return rays;
+}
+
+std::vector<point_cu> generate_samples(int height, int width, int level){
+  std::vector<point_cu> sample_points;
+  int h,w,l;
+  for(l = 0; l < level; ++l){
+    for(h = 0; h < height; ++h){
+      for(w = 0; w < width; ++w){
+	point_cu p = {float(h), float(w), float(l), 0};
+	sample_points.push_back(p);
+      }
+    }
+  }
+  return sample_points;
+}
+
+std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsigned max_rays, point_cu sample){
+  std::vector<ray_cu> rays;
+  unsigned ray_i;
+  for(ray_i = 0; ray_i < max_rays; ++ray_i){
+    ray_cu ray = generate_ray(height, width, level);
+    ray.direction = (vector_cu) sample;
     rays.push_back(ray);
   }
   return rays;
