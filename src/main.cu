@@ -190,6 +190,7 @@ bool  collide(triangle_cu t, point_cu p);
 point_cu  collide(triangle_cu t, ray_cu r);
 float  collide(prism_cu pr, ray_cu r);
 float4 to_barycentric(triangle_cu t, point_cu p);
+float4 to_barycentric(triangle_cu t, ray_cu r);
 point_cu intersection(plane_cu p, ray_cu r);
 std::vector<triangle_cu> generate_triangles(int height, int width, float level);
 std::vector<prism_cu> generate_prisms(int height, int width, float level);
@@ -198,6 +199,8 @@ std::vector<point_cu> generate_samples(int height, int width, int level);
 std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsigned max_rays, point_cu sample);
 ray_cu   generate_ray(int height, int weight, int level);
 float distance(point_cu a, point_cu b);
+vector_cu crossproduct(vector_cu a, vector_cu b);
+float skalar_mul(vector_cu a, vector_cu b);
 void print_point(point_cu p);
 void print_vector(vector_cu v);
 void print_plane(plane_cu pl);
@@ -207,7 +210,7 @@ void print_plane(plane_cu pl);
 //----------------------------------------------------
 int main(){
   const unsigned max_rays = 1;
-  const unsigned max_triangles = 8;
+  const unsigned max_triangles = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 1;
   const unsigned max_prisms = length * length * depth * 2;
@@ -226,32 +229,37 @@ int main(){
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-
   triangle_cu tr = {
-    {1, 1, 0, 1},
-    {3, 1, 0, 1},
-    {1, 3, 0, 1}};
+    {1, 1, 1, 1},
+    {3, 1, 1, 1},
+    {1, 3, 1, 1}};
+
+  triangle_cu tr2 = {
+    {1, 1, 1, 1},
+    {1, 1, 4, 1},
+    {1, 3, 1, 1}};
+
   prism_cu pr = {tr};
 
   ray_cu r = {
-    {1, 2, 0, 1},
+    {0, 0.5, 0.5, 1},
     {1, 0, 0, 0}};
 
   // CPU Raytracing
   cudaEventRecord(start, 0);
   if(use_cpu){
-    /*
-    for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+
+    //for(ray_i = 0; ray_i < rays.size(); ++ray_i){
       for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
-	float distance = collide(prisms[prism_i], rays[ray_i]);
+	//float distance = collide(prisms[prism_i], rays[ray_i]);
+	float distance = collide(prisms[prism_i], r);
 	if(distance > 0){
 	  fprintf(stdout, "CPU: Ray %d hits on prism %d with distance %f\n", ray_i, prism_i, distance);
 	  collisions[prism_i]++;
 	}
 
       }
-    }
-    */
+      //}
     
     /*
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
@@ -272,12 +280,15 @@ int main(){
     }
     */
     
-    print_point(collide(tr, r));
 
     /*
-    if(distance > 0){
-      fprintf(stderr, "CPU: Ray hit with distance %f\n", distance);
-    }
+    point_cu p = collide(tr2, r);
+    print_point(p);
+
+    float distance = collide(pr, r);
+     if(distance > 0){ 
+       fprintf(stderr, "CPU: Ray hit with distance %f\n", distance); 
+     } 
     */
 
     cudaEventRecord(stop, 0);
@@ -362,9 +373,69 @@ int main(){
 // Auxillary function definition
 //----------------------------------------------------
 
+/**
+   @brief Algorithm based on a paper. exact copy of pseudo code.
+ **/
+float4 to_barycentric(triangle_cu tr, ray_cu ray){
+  float4 b = {0,0,0,0};
+  vector_cu e1, e2, q, s, r;
+  point_cu p0, p1, p2;
+  float a, f, u, v, t;
+
+  p0 = tr.A;
+  p1 = tr.B;
+  p2 = tr.C;
+
+  e1.x = p1.x - p0.x;
+  e1.y = p1.y - p0.y;
+  e1.z = p1.z - p0.z;
+
+  e2.x = p2.x - p0.x;
+  e2.y = p2.y - p0.y;
+  e2.z = p2.z - p0.z;
+
+  q = crossproduct(ray.direction, e2);
+  a = skalar_mul(e1, q);
+  
+  // a is to close to 0
+  if(fabs(a) < 0.000001)
+    return b;
+
+  f = 1 / a;
+  
+  s.x = ray.P.x - p0.x;
+  s.y = ray.P.y - p0.y;
+  s.z = ray.P.z - p0.z;
+
+  u = f * skalar_mul(s, q);
+
+  if(u < 0.0)
+    return b;
+
+  r = crossproduct(s, e1);
+  v = f * skalar_mul(ray.direction, r);
+  if( v < 0.0 || (u + v) > 1)
+    return b;
+  
+  t = f * skalar_mul(e2, q);
+  
+  b.x = u;
+  b.y = v;
+  b.z = t;
+  b.w = 1;
+
+  return b;
+}
+
+/**
+  @brief Does just produce correct solutions for triangles
+  parallel to x, y axes.
+
+   DEPRECATED --> new to_barycentric function
+**/
 float4 to_barycentric(triangle_cu t, point_cu p){
+  float4 b = {0,0,0,0};
   float x1,x2,x3, y1,y2,y3, x,y;
-  float4 b;
 
   x1 = t.A.x;
   x2 = t.B.x;
@@ -378,16 +449,19 @@ float4 to_barycentric(triangle_cu t, point_cu p){
   y = p.y;
 
   float tmp = ((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
-  fprintf(stderr, "%f\n", tmp);
+
 
   b.x = ((y2-y3)*(x-x3)+(x3-x2)*(y-y3)) / tmp;
   b.y = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3)) / tmp;
   b.z = 1 - b.x - b.y;
   b.w = 0;
+  fprintf(stderr, "Barycentric ");
   print_point(b);
   // In case of division by 0 --> nan
-  if((fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1)))
+  if((fabs((b.x + b.y + b.z) - 1)) != (fabs((b.x + b.y + b.z) - 1))){
+    fprintf(stderr, "%f\n", tmp);
     b.z = 2;
+  }
   return b;
 }
 
@@ -395,6 +469,8 @@ float4 to_barycentric(triangle_cu t, point_cu p){
    @brief Detects collisions of triangle and point with
    precondition, that the point is on the same 
    plane as the point.
+
+   DEPRECATED --> new to_barycentric function
 **/
 bool collide(triangle_cu t, point_cu p){
   float4 b = to_barycentric(t, p);
@@ -422,8 +498,10 @@ point_cu collide(triangle_cu t, ray_cu r){
   pl.normal.y = (b3*c1 - b1*c3);
   pl.normal.z = (b1*c2 - b2*c1);
 
+  float4 b = to_barycentric(t, r);
+  // Maybe we can calculate intersection be barycentric coords
   point_cu p = intersection(pl, r);
-  if(collide(t, p)){
+  if(b.w == 1){
     return p;
   }
   else{
@@ -455,13 +533,24 @@ float collide(prism_cu pr, ray_cu r){
 
   unsigned i; 
   unsigned j = 0;
+  // test for collision on all triangles of an prism
   for(i = 0; i < 8; ++i){
     point_cu p = collide(triangles[i], r);
     if(p.x == 0 && p.y == 0 && p.z == 0 && p.w == 0)
+    // No Collision for this triangle
       continue;
-    intersections[j++] = p;
+    // Filter double Collision on edges or vertices
+    if(j != 0){
+      if(intersections[j-1].x != p.x || intersections[j-1].y != p.y || intersections[j-1].z != p.z){
+	intersections[j++] = p;
+      }
+    }
+    else{
+      intersections[j++] = p;
+    }
+
   }
-  if(j > 0)
+  if(j > 1)
     return distance(intersections[0], intersections[1]);
   else
     return 0;
@@ -507,14 +596,18 @@ point_cu intersection(plane_cu pl, ray_cu r){
   p3 = r.direction.z;
 
   // calculation of intersection
+  // this case for parallel rays, will be ignored for easier calculations
+  float tmp = (n1*p1 + n2*p2 + n3*p3);
+  if(tmp == 0)
+    return intersection_point;
+
   d = n1*a1 + n2*a2 + n3*a3;
-  t = (d - n1*x1 - n2*x2 - n3*x3) / (n1*p1 + n2*p2 + n3*p3);
+  t = (d - n1*x1 - n2*x2 - n3*x3) / tmp;
 
   intersection_point.x = x1 + t * p1;
   intersection_point.y = x2 + t * p2;
   intersection_point.z = x3 + t * p3;
   intersection_point.w = 1;
-
   return intersection_point;
 
 }
@@ -625,6 +718,19 @@ std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsig
     rays.push_back(ray);
   }
   return rays;
+}
+
+vector_cu crossproduct(vector_cu a, vector_cu b){
+  vector_cu c = {
+    a.y*b.z - a.z*b.y,
+    a.z*b.x - a.x*b.z,
+    a.x*b.y - a.y*b.x
+  };
+  return c;
+}
+
+float skalar_mul(vector_cu a, vector_cu b){
+  return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
 void print_point(point_cu p){
