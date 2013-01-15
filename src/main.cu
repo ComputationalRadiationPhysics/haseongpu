@@ -222,29 +222,29 @@ __device__ bool collide_gpu(prism_cu pr, ray_cu r){
   return has_collide;
 }
 
-__global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays, float4 *collisions){
-  // Cuda ids
-  //unsigned tid = threadIdx.x;
-  //unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
-  
-  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  // Local data
-  prism_cu prism = prisms[gid];
-  unsigned local_collisions = 0;
-  unsigned ray_i;
-
-  __syncthreads();
-  // Calculation
-  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-     local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
-  
-	       
-  }
-  __syncthreads();
-  collisions[gid].x = local_collisions;
-  
-}
+//__global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays, float4 *collisions){
+//  // Cuda ids
+//  //unsigned tid = threadIdx.x;
+//  //unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
+//  
+//  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//  // Local data
+//  prism_cu prism = prisms[gid];
+//  unsigned local_collisions = 0;
+//  unsigned ray_i;
+//
+//  __syncthreads();
+//  // Calculation
+//  for(ray_i = 0; ray_i < max_rays; ++ray_i){
+//     local_collisions += (1 * (int)collide_gpu(prism, rays[ray_i]));
+//  
+//	       
+//  }
+//  __syncthreads();
+//  collisions[gid].x = local_collisions;
+//  
+//}
 
 __device__ ray_cu generate_ray_gpu(point_cu vertex_point, prism_cu start_prism, curandState randomstate){
 	float u = curand_uniform(&randomstate);
@@ -281,7 +281,7 @@ __device__ prism_cu select_prism(int id, prism_cu prisms[]){
 	return prisms[0];
 }
 
-__device__ float propagate(ray_cu ray, prism_cu prisms[]){
+__device__ float propagate(ray_cu ray, prism_cu prisms[], const prism_cu startprism){
 	float vec_x = ray.direction.x - ray.P.x;
 	float vec_y = ray.direction.y - ray.P.y;
 	float vec_z = ray.direction.z - ray.P.z;
@@ -291,10 +291,45 @@ __device__ float propagate(ray_cu ray, prism_cu prisms[]){
 	vec_y /= distance_total;
 	vec_z /= distance_total;
 
-	for(;;){
-
-			
+	prism_cu current = startprism;
 	
+
+	for(;;){
+		//generate the triangle surfaces of the prism
+		const triangle_cu t1 = current.t1;
+		const triangle_cu t2 = { 
+			{t1.A.x, t1.A.y, t1.A.z + t1.A.w, 1},
+			{t1.B.x, t1.B.y, t1.B.z + t1.B.w, 1},
+			{t1.C.x, t1.C.y, t1.C.z + t1.C.w, 1}
+		};
+		
+		// OPTIMIZE: make use of the rectangles!
+		const triangle_cu surfaces[8] = {
+			t1,
+			t2,
+			{t1.A, t1.B, t2.A},
+			{t1.B, t2.B, t2.A},
+			{t1.B, t1.C, t2.C},
+			{t1.B, t2.B, t2.C},
+			{t1.A, t1.C, t2.C},
+			{t1.A, t2.A, t2.C}
+		};
+
+		int i_surface=0;
+		for(i_surface=0; i_surface<8 ; ++i_surface){
+			vector_cu AB = surface[i_surface].B - surface[i_surface].A;
+			vector_cu AC = surface[i_surface].C - surface[i_surface].A;
+			
+			plane_cu pl;
+			pl.P = surface[i_surface].A;
+			pl.normal.x = (b2*c3 - b3*c2);
+			pl.normal.y = (b3*c1 - b1*c3);
+			pl.normal.z = (b1*c2 - b2*c1);
+		
+		}
+
+
+		break;//TODO remove
 	}
 
 
@@ -319,11 +354,11 @@ __global__ void raytrace_step( curandState* globalState, vertex_cu vertex, prism
 
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	prism_cu startprism = select_prism(id, prisms);	
+	const prism_cu startprism = select_prism(id, prisms);	
 
 	ray_cu ray = generate_ray_gpu(vertex.P,startprism, localState); //TODO:verify
 
-	float gain = propagate(ray,prisms);
+	float gain = propagate(ray,prisms,startprism);
 	
 	//atomicAdd(&(vertex.G.x),gain);
 	
