@@ -228,32 +228,17 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
     return 0;
 }
 
-/**
-   @brief Kernel to initialize random numbers
- **/
-__global__ void init_random ( curandState * state, unsigned long seed )
-{
-    int id = threadIdx.x;
-    curand_init ( seed, id, 0, &state[id] );
-} 
-
-__global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays, point_cu *samples, const unsigned blocks_per_sample, curandState* globalState){
+__global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays_per_sample, point_cu *samples, const unsigned blocks_per_sample){
   // Cuda ids
   unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
-  //unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
-  // Random data
-  curandState localState = globalState[tid];
-  float rand_x = curand_uniform( &localState );
-  float rand_y = curand_uniform( &localState );
-  float rand_z = curand_uniform( &localState );
-  
   // Local data
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
   point_cu sample_point = samples[sample_i];
-  ray_cu ray = {sample_point, {rand_x, rand_y, rand_z, 0}};
+  ray_cu ray = rays[gid];
   
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
@@ -263,9 +248,9 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
     }
 	
   }
+  __syncthreads();
+  samples[0].w = 5;//sample_i;
 
-  globalState[tid] = localState; 
-  
 }
 
 //----------------------------------------------------
@@ -297,10 +282,10 @@ void print_plane(plane_cu pl);
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 1024;
-  const unsigned max_triangles = 10;
+  const unsigned max_rays = 256;
+  const unsigned max_triangles = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 3;
+  const unsigned depth  = 2;
   const unsigned max_prisms = length * length * depth * 2;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
@@ -312,49 +297,28 @@ int main(){
   // Generate testdata
   std::vector<prism_cu> prisms = generate_prisms(length, length, depth);
   std::vector<point_cu> samples = generate_samples(length, length, depth);
-  std::vector<ray_cu> rays = generate_rays(length, length, depth, max_rays);
+  std::vector<ray_cu> rays;// = generate_rays(length, length, depth, max_rays);
   std::vector<float> collisions(max_prisms, 0);
   std::vector<float> sample_data(samples.size(), 0);
-  std::vector<std::vector<ray_cu > > sample_rays(samples.size());
-  for(sample_i = 0; sample_i < samples.size(); ++sample_i) 
-    sample_rays[sample_i] = generate_sample_rays(length, length, depth, max_rays, samples[sample_i]);
+  for(sample_i = 0; sample_i < samples.size(); ++sample_i){
+    std::vector<ray_cu> sample_ray = generate_sample_rays(length, length, depth, max_rays, samples[sample_i]);
+    for(ray_i = 0; ray_i < sample_ray.size(); ++ray_i)
+      rays.push_back(sample_ray[ray_i]);
+  }
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-
-
-
-  /*
-    triangle_cu tr = {
-    {1, 1, 1, 1},
-    {3, 1, 1, 1},
-    {1, 3, 1, 1}};
-
-    triangle_cu tr2 = {
-    {1, 1, 1, 1},
-    {1, 1, 4, 1},
-    {1, 3, 1, 1}};
-
-    prism_cu pr = {tr};
-
-    ray_cu r = {
-    {0, 0.5, 0.5, 1},
-    {1, 0, 0, 0}};
-  */
 
   // CPU Raytracing
   cudaEventRecord(start, 0);
   if(use_cpu){
-    
+
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
-      std::vector<ray_cu> rays = sample_rays[sample_i];
-      for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+      for(ray_i = 0; ray_i < max_rays; ++ray_i){
 	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
-	  float distance = collide_prism(prisms[prism_i], rays[ray_i]);
-	  //print_point(rays[ray_i].P);
-	  //print_point(rays[ray_i].direction);
+	  float distance = collide_prism(prisms[prism_i], rays[sample_i * max_rays + ray_i]);
 	  if(distance > 0){
 	    fprintf(stdout, "CPU:Sample %d Ray %d hits on prism %d with distance %f\n", sample_i, ray_i, prism_i, distance);
-	    sample_data[sample_i] += distance * 1;
+	    sample_data[sample_i] += distance;
 	  }
 
 	}
@@ -363,9 +327,6 @@ int main(){
 
     }
 
-    for(sample_i = 0; sample_i < samples.size(); ++sample_i){
-      fprintf(stdout, "CPU: Sample %d with value %f \n", sample_i, sample_data[sample_i]);
-    }
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
@@ -381,22 +342,17 @@ int main(){
   int threads = 256;
   int blocks_per_sample = ceil(max_rays / threads);
   int blocks = blocks_per_sample * samples.size();
-  // For random number generation
-  dim3 tpb(threads,1,1);
-  curandState* devStates;
-  cudaMalloc ( &devStates, threads*sizeof( curandState ) );
-
   
   if(use_gpu){
 
     // Memory allocation on host
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, max_prisms * sizeof(prism_cu), cudaHostAllocDefault));
-    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, max_rays * sizeof(ray_cu), cudaHostAllocDefault));
+    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, samples.size() * max_rays * sizeof(ray_cu), cudaHostAllocDefault));
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_collisions, max_prisms * sizeof(float4), cudaHostAllocDefault));
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_samples, samples.size() * sizeof(point_cu), cudaHostAllocDefault));
 
     // Memory initialisation on host
-    for(ray_i = 0; ray_i < max_rays; ++ray_i){
+    for(ray_i = 0; ray_i < max_rays * samples.size(); ++ray_i){
       h_rays[ray_i] = rays[ray_i];
     }
 
@@ -404,50 +360,50 @@ int main(){
       h_collisions[prism_i].x = 0;
       h_prisms[prism_i] = prisms[prism_i];
     }
-    fprintf(stderr, "testpoint\n");
+
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
       h_samples[sample_i] = samples[sample_i];
     }
 
     // Memory allocation on device
-    CUDA_CHECK_RETURN(cudaMalloc(&d_rays, max_rays * sizeof(ray_cu)));
+    CUDA_CHECK_RETURN(cudaMalloc(&d_rays, samples.size() * max_rays * sizeof(ray_cu)));
     CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, max_prisms * sizeof(prism_cu)));
-    CUDA_CHECK_RETURN(cudaMalloc(&d_collisions, max_prisms * sizeof(float4)));
     CUDA_CHECK_RETURN(cudaMalloc(&d_samples, samples.size() * sizeof(point_cu)));
 
     // Copy data from host to device
     cudaEventRecord(start, 0);
-    CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
+    CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, samples.size() * max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, max_prisms * sizeof(prism_cu), cudaMemcpyHostToDevice));
-    CUDA_CHECK_RETURN(cudaMemcpy(d_collisions, h_collisions, max_prisms * sizeof(float4), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples.size() * sizeof(point_cu), cudaMemcpyHostToDevice));
 
-    // Start random generation kernel
-    init_random <<< 1, tpb >>> (devStates, time(NULL));
-    
-    // Start real kernel
-    trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_samples, blocks_per_sample, devStates);
+    // Start kernel
+    trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_samples, blocks_per_sample);
 
     // Copy data from device to host
     CUDA_CHECK_RETURN(cudaMemcpy(h_samples, d_samples, samples.size() * sizeof(point_cu), cudaMemcpyDeviceToHost));
+    CUDA_CHECK_RETURN(cudaMemcpy(h_rays, d_rays, samples.size() * max_rays * sizeof(ray_cu), cudaMemcpyDeviceToHost));
     
-
     // Evaluate device data
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtime_gpu, start, stop);
-    for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      if(h_collisions[prism_i].x > 0)
-	fprintf(stderr, "GPU: (%f, %f, %f, %f) collission on prism %d\n", h_collisions[prism_i].x, h_collisions[prism_i].y, h_collisions[prism_i].z, h_collisions[prism_i].w, prism_i);
+    for(sample_i = 0; sample_i < samples.size(); ++sample_i){
+      if((sample_data[sample_i] != h_samples[sample_i].w) && use_cpu && use_gpu){
+	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%.0f) != GPU(%.0f) on sample %d\n", sample_data[sample_i], h_samples[sample_i].w, sample_i);
+      }
+      else{
+	fprintf(stderr, "CPU: Sample %d with value %f \n", sample_i, sample_data[sample_i]);
+      }
 
     }
-    for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      if((h_collisions[prism_i].x != collisions[prism_i]) && use_cpu && use_gpu){
-	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%.0f) != GPU(%.0f) on prism %d\n",collisions[prism_i], h_collisions[prism_i].x, prism_i);
-      }
-    }
+
+  }
+  for(sample_i = 0; sample_i < samples.size(); ++sample_i){
+    	fprintf(stderr, "GPU: Sample %d with value %f \n", sample_i, h_samples[sample_i].w);
+
   }
 
+  // Print statistics
   fprintf(stderr, "\n");
   fprintf(stderr, "Prism             : %d\n", max_prisms);
   fprintf(stderr, "Triangles         : %d\n", max_prisms * 8);
