@@ -228,6 +228,16 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
     return 0;
 }
 
+__global__ void test(ray_cu* rays){
+  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
+  rays[gid].P.x = 5;
+  rays[gid].P.y = 5;
+  rays[gid].P.z = 5;
+  rays[511].P.x = 10;
+  __syncthreads();
+
+}
+
 __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays_per_sample, point_cu *samples, const unsigned blocks_per_sample){
   // Cuda ids
   unsigned tid = threadIdx.x;
@@ -240,16 +250,19 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
   point_cu sample_point = samples[sample_i];
   ray_cu ray = rays[gid];
   
-  __syncthreads();
-  for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-    float distance = collide_prism_gpu(prisms[prism_i], ray);
-    if(distance > 0){
-      sample_point.w += distance;
-    }
+  /* __syncthreads(); */
+  /* for(prism_i = 0; prism_i < max_prisms; ++prism_i){ */
+  /*   float distance = collide_prism_gpu(prisms[prism_i], ray); */
+  /*   if(distance > 0){ */
+  /*     sample_point.w += distance; */
+  /*   } */
 	
-  }
+  /* } */
   __syncthreads();
+  rays[gid].P.x = 5;
   samples[0].w = 5;//sample_i;
+  samples[0].x = 10;
+  samples[1].w = 5;//sample_i;
 
 }
 
@@ -311,13 +324,12 @@ int main(){
   // CPU Raytracing
   cudaEventRecord(start, 0);
   if(use_cpu){
-
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
       for(ray_i = 0; ray_i < max_rays; ++ray_i){
 	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
 	  float distance = collide_prism(prisms[prism_i], rays[sample_i * max_rays + ray_i]);
 	  if(distance > 0){
-	    fprintf(stdout, "CPU:Sample %d Ray %d hits on prism %d with distance %f\n", sample_i, ray_i, prism_i, distance);
+	    //fprintf(stdout, "CPU: Sample %d Ray %d hits on prism %d with distance %f\n", sample_i, ray_i, prism_i, distance);
 	    sample_data[sample_i] += distance;
 	  }
 
@@ -327,7 +339,6 @@ int main(){
 
     }
 
-
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtime_cpu, start, stop);
@@ -336,7 +347,6 @@ int main(){
   // GPU Raytracing
   ray_cu *h_rays, *d_rays;
   prism_cu *h_prisms, *d_prisms;
-  float4 *h_collisions, *d_collisions;
   point_cu *h_samples, *d_samples;
 
   int threads = 256;
@@ -348,7 +358,6 @@ int main(){
     // Memory allocation on host
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, max_prisms * sizeof(prism_cu), cudaHostAllocDefault));
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, samples.size() * max_rays * sizeof(ray_cu), cudaHostAllocDefault));
-    CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_collisions, max_prisms * sizeof(float4), cudaHostAllocDefault));
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_samples, samples.size() * sizeof(point_cu), cudaHostAllocDefault));
 
     // Memory initialisation on host
@@ -357,7 +366,6 @@ int main(){
     }
 
     for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-      h_collisions[prism_i].x = 0;
       h_prisms[prism_i] = prisms[prism_i];
     }
 
@@ -375,9 +383,10 @@ int main(){
     CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, samples.size() * max_rays * sizeof(ray_cu), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, max_prisms * sizeof(prism_cu), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples.size() * sizeof(point_cu), cudaMemcpyHostToDevice));
-
     // Start kernel
-    trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_samples, blocks_per_sample);
+    test<<<blocks, threads>>>(d_rays);
+
+    //trace_on_prisms<<<threads, blocks>>>(d_prisms, max_prisms, d_rays, max_rays, d_samples, blocks_per_sample);
 
     // Copy data from device to host
     CUDA_CHECK_RETURN(cudaMemcpy(h_samples, d_samples, samples.size() * sizeof(point_cu), cudaMemcpyDeviceToHost));
@@ -399,8 +408,13 @@ int main(){
 
   }
   for(sample_i = 0; sample_i < samples.size(); ++sample_i){
+	print_point(h_samples[sample_i]);
     	fprintf(stderr, "GPU: Sample %d with value %f \n", sample_i, h_samples[sample_i].w);
 
+  }
+
+  for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+    print_point(h_rays[ray_i].P);
   }
 
   // Print statistics
@@ -419,7 +433,6 @@ int main(){
   // Cleanup
   cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
-  cudaFreeHost(h_collisions);
   cudaFreeHost(h_samples);
 
   return 0;
@@ -723,6 +736,7 @@ std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsig
     ray.direction.x  =  sample.x - ray.P.x;
     ray.direction.y  =  sample.y - ray.P.y;
     ray.direction.z  =  sample.z - ray.P.z;
+    ray.P = sample;
     rays.push_back(ray);
   }
   return rays;
