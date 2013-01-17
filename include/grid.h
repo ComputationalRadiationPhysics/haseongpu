@@ -19,11 +19,9 @@ struct GridCell {
 };
 
 struct Grid {
-	int dimX;
-	int dimY;
-	int dimZ;
 	Aabb aabb;
 	GridCell* cellList;
+  int4 dimensions;
 };
 
 //***********
