@@ -2,26 +2,26 @@
 
 #ifndef GEOMETRIE_H
 #define GEOMETRIE_H
-point_cu  collide_triangle(triangle_cu t, ray_cu r);
-float  collide_prism(prism_cu pr, ray_cu r);
-float4 to_barycentric(triangle_cu t, ray_cu r);
-point_cu intersection(plane_cu p, ray_cu r);
-float distance(point_cu a, point_cu b);
-vector_cu crossproduct(vector_cu a, vector_cu b);
-float skalar_mul(vector_cu a, vector_cu b);
+PointCu  collide_triangle(TriangleCu t, RayCu r);
+float  collide_prism(PrismCu pr, RayCu r);
+float4 to_barycentric(TriangleCu t, RayCu r);
+PointCu intersection(PlaneCu p, RayCu r);
+float distance(PointCu a, PointCu b);
+VectorCu crossproduct(VectorCu a, VectorCu b);
+float skalar_mul(VectorCu a, VectorCu b);
 
 /**   
    @brief Calculates the barycentric coordinates of the triangle
           and the intersectionpoint of the ray and the triangle.
 	  Algorithm based on a paper. exact copy of pseudo code.
 
-   @return point_cu {0,0,0,0} if there is no intersection triangle/ray
-   @return point_cu {x,y,z,1} barycentric coordinates of intersection triangle/ray
+   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
+   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
  **/
-float4 to_barycentric(triangle_cu tr, ray_cu ray){
+float4 to_barycentric(TriangleCu tr, RayCu ray){
   float4 b = {0,0,0,0};
-  vector_cu e1, e2, q, s, r, ray_direction;
-  point_cu p0, p1, p2;
+  VectorCu e1, e2, q, s, r, ray_direction;
+  PointCu p0, p1, p2;
   float a, f, u, v, t;
 
 
@@ -78,11 +78,11 @@ float4 to_barycentric(triangle_cu tr, ray_cu ray){
    @brief Detects collisions of a triangle and a ray without
    a precondition.
    
-   @return point_cu {0,0,0,0} if there is no intersection triangle/ray
-   @return point_cu {x,y,z,1} barycentric coordinates of intersection triangle/ray
+   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
+   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
 **/
-point_cu collide_triangle(triangle_cu t, ray_cu r){
-  plane_cu pl;
+PointCu collide_triangle(TriangleCu t, RayCu r){
+  PlaneCu pl;
   float b1, b2, b3, c1, c2, c3;
 
   b1 = t.B.x - t.A.x;
@@ -100,12 +100,12 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
 
   float4 b = to_barycentric(t, r);
   // Maybe we can calculate intersection be barycentric coords
-  point_cu p = intersection(pl, r);
+  PointCu p = intersection(pl, r);
   if(b.w == 1 && p.w == 1){
     return p;
   }
   else{
-    point_cu no_inter = {0,0,0,0}; 
+    PointCu no_inter = {0,0,0,0}; 
     return no_inter;
   }
 
@@ -116,19 +116,19 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
    @return float intersection distance
    @return 0 if in case of no intersection
 **/
-float collide_prism(prism_cu pr, ray_cu r){
+float collide_prism(PrismCu pr, RayCu r){
   //bool has_collide;
-  point_cu first_intersection = {0, 0, 0, 0};
-  point_cu intersection_point = {0, 0, 0, 0};
-  point_cu A1 = pr.t1.A;
-  point_cu B1 = pr.t1.B;
-  point_cu C1 = pr.t1.C;
-  point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
-  point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
-  point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
+  PointCu first_intersection = {0, 0, 0, 0};
+  PointCu intersection_point = {0, 0, 0, 0};
+  PointCu A1 = pr.t1.A;
+  PointCu B1 = pr.t1.B;
+  PointCu C1 = pr.t1.C;
+  PointCu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
+  PointCu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
+  PointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
   float ray_distance = distance(r.P, r.direction);
 
-  triangle_cu triangles[8] = {
+  TriangleCu triangles[8] = {
     pr.t1,
     {A2, B2, C2},
     {A1, B1, A2},
@@ -189,8 +189,8 @@ float collide_prism(prism_cu pr, ray_cu r){
    d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
    d  = n~ * a~
 **/
-point_cu intersection(plane_cu pl, ray_cu r){
-  point_cu intersection_point = {0, 0, 0, 0};
+PointCu intersection(PlaneCu pl, RayCu r){
+  PointCu intersection_point = {0, 0, 0, 0};
 
   float t, d;
 
@@ -231,13 +231,13 @@ point_cu intersection(plane_cu pl, ray_cu r){
 
 }
 
-float distance(point_cu a, point_cu b){
+float distance(PointCu a, PointCu b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
   return fabs(d);
 }
 
-vector_cu crossproduct(vector_cu a, vector_cu b){
-  vector_cu c = {
+VectorCu crossproduct(VectorCu a, VectorCu b){
+  VectorCu c = {
     a.y*b.z - a.z*b.y,
     a.z*b.x - a.x*b.z,
     a.x*b.y - a.y*b.x
@@ -245,7 +245,7 @@ vector_cu crossproduct(vector_cu a, vector_cu b){
   return c;
 }
 
-float skalar_mul(vector_cu a, vector_cu b){
+float skalar_mul(VectorCu a, VectorCu b){
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 #endif /* GEOMETRIE_H */
