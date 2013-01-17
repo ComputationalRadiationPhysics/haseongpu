@@ -1,3 +1,6 @@
+#ifndef DATATYPES_H
+#define DATATYPES_H
+
 typedef float4 PointCu;
 typedef float4 VectorCu;
 
@@ -30,3 +33,5 @@ typedef struct RayCu {
   PointCu P;			// the random starting point. The ase_flux is saved as the 4th component
   VectorCu direction;  // the position of the vertexCu, where the ray is going to
 } RAY_CU;
+
+#endif /* DATATYPES_H */
