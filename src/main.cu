@@ -63,13 +63,17 @@ __device__ float skalar_mul_gpu(vector_cu a, vector_cu b){
 
 __device__ float4 to_barycentric_gpu(triangle_cu tr, ray_cu ray){
   float4 b = {0,0,0,0};
-  vector_cu e1, e2, q, s, r;
+  vector_cu e1, e2, q, s, r, ray_direction;
   point_cu p0, p1, p2;
   float a, f, u, v, t;
 
   p0 = tr.A;
   p1 = tr.B;
   p2 = tr.C;
+
+  ray_direction.x = ray.direction.x - ray.P.x;
+  ray_direction.y = ray.direction.y - ray.P.y;
+  ray_direction.z = ray.direction.z - ray.P.z;
 
   e1.x = p1.x - p0.x;
   e1.y = p1.y - p0.y;
@@ -79,7 +83,7 @@ __device__ float4 to_barycentric_gpu(triangle_cu tr, ray_cu ray){
   e2.y = p2.y - p0.y;
   e2.z = p2.z - p0.z;
 
-  q = crossproduct_gpu(ray.direction, e2);
+  q = crossproduct_gpu(ray_direction, e2);
   a = skalar_mul_gpu(e1, q);
   
   // a is to close to 0
@@ -98,7 +102,7 @@ __device__ float4 to_barycentric_gpu(triangle_cu tr, ray_cu ray){
     return b;
 
   r = crossproduct_gpu(s, e1);
-  v = f * skalar_mul_gpu(ray.direction, r);
+  v = f * skalar_mul_gpu(ray_direction, r);
   if( v < 0.0 || (u + v) > 1)
     return b;
   
@@ -133,9 +137,9 @@ __device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
   x2 = r.P.y;
   x3 = r.P.z;
 
-  p1 = r.direction.x;
-  p2 = r.direction.y;
-  p3 = r.direction.z;
+  p1 = r.direction.x - r.P.x;
+  p2 = r.direction.y - r.P.y;
+  p3 = r.direction.z - r.P.z;
 
   // calculation of intersection
   // this case for parallel rays, will be ignored for easier calculations
@@ -247,7 +251,7 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
   point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
   point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
   point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
-
+  float ray_distance = distance_gpu(r.P, r.direction);
   triangle_cu triangles[8] = {
     pr.t1,
     {A2, B2, C2},
@@ -270,7 +274,20 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
       else{
 	// Filter double collisions
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
+	  if(distance_gpu(r.P, first_intersection) < ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
+	    return distance_gpu(r.direction, first_intersection);
 
+	  if(distance_gpu(r.P, first_intersection) > ray_distance && distance_gpu(r.P, intersection_point) < ray_distance)
+	    return distance_gpu(r.direction, intersection_point);
+
+	  if(distance_gpu(r.direction, first_intersection) < ray_distance && distance_gpu(r.direction, intersection_point) > ray_distance)
+	    return distance_gpu(r.P, first_intersection);
+
+	  if(distance_gpu(r.direction, first_intersection) > ray_distance && distance_gpu(r.direction, intersection_point) < ray_distance)
+	    return distance_gpu(r.P, intersection_point);
+
+	  if(distance_gpu(r.P, first_intersection) > ray_distance || distance_gpu(r.direction, first_intersection) > ray_distance)
+	    return 0;
 
 	  return distance_gpu(first_intersection, intersection_point);
 	}
@@ -341,7 +358,7 @@ void print_plane(plane_cu pl);
 //----------------------------------------------------
 int main(){
   const unsigned max_rays = 10000;
-  const unsigned max_triangles = 338;
+  const unsigned max_triangles = 300;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 10;
   unsigned ray_i, prism_i, sample_i;
@@ -499,13 +516,18 @@ int main(){
  **/
 float4 to_barycentric(triangle_cu tr, ray_cu ray){
   float4 b = {0,0,0,0};
-  vector_cu e1, e2, q, s, r;
+  vector_cu e1, e2, q, s, r, ray_direction;
   point_cu p0, p1, p2;
-  float a, f, u, v, t, ray_direction;
+  float a, f, u, v, t;
+
 
   p0 = tr.A;
   p1 = tr.B;
   p2 = tr.C;
+  
+  ray_direction.x = ray.direction.x - ray.P.x;
+  ray_direction.y = ray.direction.y - ray.P.y;
+  ray_direction.z = ray.direction.z - ray.P.z;
 
   e1.x = p1.x - p0.x;
   e1.y = p1.y - p0.y;
@@ -515,7 +537,7 @@ float4 to_barycentric(triangle_cu tr, ray_cu ray){
   e2.y = p2.y - p0.y;
   e2.z = p2.z - p0.z;
 
-  q = crossproduct(ray.direction, e2);
+  q = crossproduct(ray_direction, e2);
   a = skalar_mul(e1, q);
   
   // a is to close to 0
@@ -534,7 +556,7 @@ float4 to_barycentric(triangle_cu tr, ray_cu ray){
     return b;
 
   r = crossproduct(s, e1);
-  v = f * skalar_mul(ray.direction, r);
+  v = f * skalar_mul(ray_direction, r);
   if( v < 0.0 || (u + v) > 1)
     return b;
   
@@ -592,6 +614,7 @@ float collide_prism(prism_cu pr, ray_cu r){
   point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
   point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
   point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
+  float ray_distance = distance(r.P, r.direction);
 
   triangle_cu triangles[8] = {
     pr.t1,
@@ -615,6 +638,21 @@ float collide_prism(prism_cu pr, ray_cu r){
       else{
 	// Filter double Collision on edges or vertices
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
+	  if(distance(r.P, first_intersection) < ray_distance && distance(r.P, intersection_point) > ray_distance)
+	    return distance(r.direction, first_intersection);
+
+	  if(distance(r.P, first_intersection) > ray_distance && distance(r.P, intersection_point) < ray_distance)
+	    return distance(r.direction, intersection_point);
+
+	  if(distance(r.direction, first_intersection) < ray_distance && distance(r.direction, intersection_point) > ray_distance)
+	    return distance(r.P, first_intersection);
+
+	  if(distance(r.direction, first_intersection) > ray_distance && distance(r.direction, intersection_point) < ray_distance)
+	    return distance(r.P, intersection_point);
+
+	  if(distance(r.P, first_intersection) > ray_distance || distance(r.direction, first_intersection) > ray_distance)
+	    return 0;
+
 	  return distance(first_intersection, intersection_point);
 	}
       }
@@ -661,9 +699,9 @@ point_cu intersection(plane_cu pl, ray_cu r){
   x2 = r.P.y;
   x3 = r.P.z;
 
-  p1 = r.direction.x;
-  p2 = r.direction.y;
-  p3 = r.direction.z;
+  p1 = r.direction.x - r.P.x;
+  p2 = r.direction.y - r.P.y;
+  p3 = r.direction.z - r.P.z;
 
   // calculation of intersection
   // this case for parallel rays, will be ignored for easier calculations
@@ -784,9 +822,9 @@ std::vector<ray_cu> generate_sample_rays(int height, int width, int level, unsig
   unsigned ray_i;
   for(ray_i = 0; ray_i < max_rays; ++ray_i){
     ray_cu ray = generate_ray(height, width, level);
-    ray.direction.x  =  sample.x - ray.P.x;
-    ray.direction.y  =  sample.y - ray.P.y;
-    ray.direction.z  =  sample.z - ray.P.z;
+    ray.direction.x  =  ray.P.x;
+    ray.direction.y  =  ray.P.y;
+    ray.direction.z  =  ray.P.z;
     ray.P = sample;
     rays.push_back(ray);
   }
