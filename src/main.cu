@@ -59,15 +59,15 @@ float distance(point a, point b);
 void  printPoint(point p);
 
 // New functions
-bool  collide(triangleCu t, pointCu p);
-bool  collide(triangleCu t, rayCu r);
-bool  collide(prismCu pr, rayCu r);
-float4 toBarycentric(triangleCu t, pointCu p);
-pointCu intersection(planeCu p, rayCu r);
-std::vector<triangleCu> generateTriangles(int height, int width, float level);
-std::vector<prismCu> generatePrisms(int height, int width, float level);
-std::vector<rayCu> generateRays(int height, int width, int level, unsigned maxRays);
-rayCu   generateRay(int height, int weight, int level);
+bool  collide(TriangleCu t, PointCu p);
+bool  collide(TriangleCu t, RayCu r);
+bool  collide(PrismCu pr, RayCu r);
+float4 toBarycentric(TriangleCu t, PointCu p);
+PointCu intersection(PlaneCu p, RayCu r);
+std::vector<TriangleCu> generateTriangles(int height, int width, float level);
+std::vector<PrismCu> generatePrisms(int height, int width, float level);
+std::vector<RayCu> generateRays(int height, int width, int level, unsigned maxRays);
+RayCu   generateRay(int height, int weight, int level);
 
 //----------------------------------------------------
 // Device Code
@@ -76,8 +76,8 @@ rayCu   generateRay(int height, int weight, int level);
 /**
   @brief Calculates A-B for 2 float4-based inputs
  **/
-__device__ pointCu subtractPoints(pointCu A, pointCu B){
-	pointCu C;
+__device__ PointCu subtractPoints(PointCu A, PointCu B){
+	PointCu C;
 	C.x = A.x - B.x;
 	C.y = A.y - B.y;
 	C.z = A.z - B.z;
@@ -85,7 +85,7 @@ __device__ pointCu subtractPoints(pointCu A, pointCu B){
 	return C;
 }
 
-__device__ rayCu generateRayGpu(pointCu vertexPoint, prismCu startPrism, curandState randomstate){
+__device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandState randomstate){
 	float u = curand_uniform(&randomstate);
 	float v = curand_uniform(&randomstate);
 	if((u+v) > 1){ //OPTIMIZE: remove if
@@ -94,9 +94,9 @@ __device__ rayCu generateRayGpu(pointCu vertexPoint, prismCu startPrism, curandS
 	}
 	const float w = 1-(u+v);
 
-	pointCu A = startPrism.t1.A;
-	pointCu B = startPrism.t1.B;
-	pointCu C = startPrism.t1.C;
+	PointCu A = startPrism.t1.A;
+	PointCu B = startPrism.t1.B;
+	PointCu C = startPrism.t1.C;
 
 	// Get x and y coordinates from the random barycentric values
 	const float xRand = u*A.x + v*B.x + w*C.x ;
@@ -108,18 +108,18 @@ __device__ rayCu generateRayGpu(pointCu vertexPoint, prismCu startPrism, curandS
 	float ase=0.f;
 
 	// Take the values to assemble a ray
-	rayCu r = {
+	RayCu r = {
 		{xRand, yRand, zRand, ase},
 		vertexPoint};
 	return r;
 }
 
-__device__ prismCu selectPrism(int id, prismCu prisms[]){
+__device__ PrismCu selectPrism(int id, PrismCu prisms[]){
 	//TODO
 	return prisms[0];
 }
 
-__device__ float propagate(rayCu ray, prismCu prisms[], prismCu startprism){
+__device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 	float gain = 1.f;
 	float vecX = ray.direction.x - ray.P.x;
 	float vecY = ray.direction.y - ray.P.y;
@@ -132,21 +132,21 @@ __device__ float propagate(rayCu ray, prismCu prisms[], prismCu startprism){
 	vecY /= distanceTotal;
 	vecZ /= distanceTotal;
 
-	prismCu current = startprism;
+	PrismCu current = startprism;
 
 
 	for(;;){
 		length = distance;
 		//generate the triangle surfaces of the prism
-		const triangleCu t1 = current.t1;
-		const triangleCu t2 = { 
+		const TriangleCu t1 = current.t1;
+		const TriangleCu t2 = { 
 			{t1.A.x, t1.A.y, t1.A.z + t1.A.w, 1},
 			{t1.B.x, t1.B.y, t1.B.z + t1.B.w, 1},
 			{t1.C.x, t1.C.y, t1.C.z + t1.C.w, 1}
 		};
 
 		// OPTIMIZE: make use of the rectangles!
-		const triangleCu surfaces[8] = {
+		const TriangleCu surfaces[8] = {
 			t1,
 			t2,
 			{t1.A, t1.B, t2.A},
@@ -161,10 +161,10 @@ __device__ float propagate(rayCu ray, prismCu prisms[], prismCu startprism){
 		float lengthHelp = 0.f;
 		for(i=0; i<8 ; ++i){ //OPTIMIZE: unroll, so that every surface can be optimized differently
 			// get the generating vectors for the plane
-			vectorCu AB = subtractPoints(surfaces[i].B, surfaces[i].A);
-			vectorCu AC = subtractPoints(surfaces[i].C, surfaces[i].A);
+			VectorCu AB = subtractPoints(surfaces[i].B, surfaces[i].A);
+			VectorCu AC = subtractPoints(surfaces[i].C, surfaces[i].A);
 
-			planeCu pl;
+			PlaneCu pl;
 			pl.P = surfaces[i].A;
 			// cross product of the vectors
 			pl.normal.x = AB.y*AC.z - AB.z*AC.y;
@@ -221,7 +221,7 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-__global__ void raytraceStep( curandState* globalState, vertexCu vertex, prismCu prisms[]) {
+__global__ void raytraceStep( curandState* globalState, VertexCu vertex, PrismCu prisms[]) {
 	int id = threadIdx.x + blockDim.x*blockIdx.x;
 	curandState localState = globalState[id];
 
@@ -230,9 +230,9 @@ __global__ void raytraceStep( curandState* globalState, vertexCu vertex, prismCu
 
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	const prismCu startprism = selectPrism(id, prisms);	
+	const PrismCu startprism = selectPrism(id, prisms);	
 
-	rayCu ray = generateRayGpu(vertex.P,startprism, localState); //TODO:verify
+	RayCu ray = generateRayGpu(vertex.P,startprism, localState); //TODO:verify
 
 	float gain = propagate(ray,prisms,startprism);
 
@@ -263,9 +263,9 @@ int main(){
 	curandState* devStates;
 
 	// Generate testdata
-	std::vector<vertexCu> vertices;
-	std::vector<prismCu> prisms = generatePrisms(length, length, depth);
-	std::vector<rayCu> rays = generateRays(length, length, depth, maxRays);
+	std::vector<VertexCu> vertices;
+	std::vector<PrismCu> prisms = generatePrisms(length, length, depth);
+	std::vector<RayCu> rays = generateRays(length, length, depth, maxRays);
 	std::vector<float> collisions(maxPrisms, 0);
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
@@ -291,8 +291,8 @@ int main(){
 	}
 
 	// GPU Raytracing
-	rayCu* hRays, *dRays;
-	prismCu* hPrisms, *dPrisms;
+	RayCu* hRays, *dRays;
+	PrismCu* hPrisms, *dPrisms;
 	float4* hCollisions, *dCollisions;
 	int threads = 256;
 	int blocks = ceil(maxPrisms / threads);
@@ -301,8 +301,8 @@ int main(){
 		//initialize memory
 		{
 			// Memory allocation on host
-			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hPrisms, maxPrisms * sizeof(prismCu), cudaHostAllocDefault));
-			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hRays, maxRays * sizeof(rayCu), cudaHostAllocDefault));
+			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hPrisms, maxPrisms * sizeof(PrismCu), cudaHostAllocDefault));
+			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hRays, maxRays * sizeof(RayCu), cudaHostAllocDefault));
 			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hCollisions, maxPrisms * sizeof(float4), cudaHostAllocDefault));
 
 			// Memory initialisation on host
@@ -315,14 +315,14 @@ int main(){
 
 
 			// Memory allocation on device
-			CUDA_CHECK_RETURN(cudaMalloc(&dRays, maxRays * sizeof(rayCu)));
-			CUDA_CHECK_RETURN(cudaMalloc(&dPrisms, maxPrisms * sizeof(prismCu)));
+			CUDA_CHECK_RETURN(cudaMalloc(&dRays, maxRays * sizeof(RayCu)));
+			CUDA_CHECK_RETURN(cudaMalloc(&dPrisms, maxPrisms * sizeof(PrismCu)));
 			CUDA_CHECK_RETURN(cudaMalloc(&dCollisions, maxPrisms * sizeof(float4)));
 
 			// Copy data from host to device
 			cudaEventRecord(start, 0);
-			CUDA_CHECK_RETURN(cudaMemcpy(dRays, hRays, maxRays * sizeof(rayCu), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, maxPrisms * sizeof(prismCu), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(dRays, hRays, maxRays * sizeof(RayCu), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, maxPrisms * sizeof(PrismCu), cudaMemcpyHostToDevice));
 			CUDA_CHECK_RETURN(cudaMemcpy(dCollisions, hCollisions, maxPrisms * sizeof(float4), cudaMemcpyHostToDevice));
 
 		}
@@ -388,7 +388,7 @@ int main(){
 // Auxillary function definition
 //----------------------------------------------------
 
-float4 toBarycentric(triangleCu t, pointCu p){
+float4 toBarycentric(TriangleCu t, PointCu p){
 	float x1,x2,x3, y1,y2,y3, x,y;
 	float4 b;
 
@@ -419,7 +419,7 @@ float4 toBarycentric(triangleCu t, pointCu p){
   precondition, that the point is on the same 
   plane as the point.
  **/
-bool collide(triangleCu t, pointCu p){
+bool collide(TriangleCu t, PointCu p){
 	float4 b = toBarycentric(t, p);
 	return (b.x > 0) && (b.x < 1) && (b.y > 0) && (b.y < 1) && (b.z > 0) && (b.z < 1) && (b.z == b.z);
 }
@@ -429,8 +429,8 @@ bool collide(triangleCu t, pointCu p){
   @brief Detects collisions of a triangle and a ray without
   a precondition.
  **/
-bool collide(triangleCu t, rayCu r){
-	planeCu pl;
+bool collide(TriangleCu t, RayCu r){
+	PlaneCu pl;
 	float b1, b2, b3, c1, c2, c3;
 
 	b1 = t.B.x;
@@ -449,16 +449,16 @@ bool collide(triangleCu t, rayCu r){
 	return collide(t, intersection(pl, r));
 }
 
-bool collide(prismCu pr, rayCu r){
+bool collide(PrismCu pr, RayCu r){
 	bool hasCollide;
-	pointCu A1 = pr.t1.A;
-	pointCu B1 = pr.t1.B;
-	pointCu C1 = pr.t1.C;
-	pointCu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
-	pointCu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
-	pointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
+	PointCu A1 = pr.t1.A;
+	PointCu B1 = pr.t1.B;
+	PointCu C1 = pr.t1.C;
+	PointCu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.w, 1};
+	PointCu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.w, 1};
+	PointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.w, 1};
 
-	triangleCu triangles[8] = {
+	TriangleCu triangles[8] = {
 		pr.t1,
 		{A2, B2, C2},
 		{A1, B1, A2},
@@ -495,8 +495,8 @@ bool collide(prismCu pr, rayCu r){
   d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
   d  = n~ * a~
  **/
-pointCu intersection(planeCu pl, rayCu r){
-	pointCu intersectionPoint = {0.0,0.0,0.0};
+PointCu intersection(PlaneCu pl, RayCu r){
+	PointCu intersectionPoint = {0.0,0.0,0.0};
 
 	float t, d;
 
@@ -537,16 +537,16 @@ float distance(point a, point b){
 	return fabs(d);
 }
 
-std::vector<triangleCu> generateTriangles(int height, int weight, float level){
+std::vector<TriangleCu> generateTriangles(int height, int weight, float level){
 	int h,w;
-	std::vector<triangleCu> triangles;
+	std::vector<TriangleCu> triangles;
 	for(h = 0; h < height; ++h){
 		for(w = 0; w < weight; ++w){
-			triangleCu t1 = {
+			TriangleCu t1 = {
 				{float(h), float(w), level, 1},
 				{float(h), float(w+1), level, 1},
 				{float(h+1), float(w), level, 1}};
-			triangleCu t2 = {
+			TriangleCu t2 = {
 				{float(h), float(w+1), level, 1},
 				{float(h+1), float(w+1), level, 1},
 				{float(h+1), float(w), level, 1}};
@@ -560,23 +560,23 @@ std::vector<triangleCu> generateTriangles(int height, int weight, float level){
 	return triangles;
 }
 
-std::vector<prismCu> generatePrisms(int height, int weight, float level){
+std::vector<PrismCu> generatePrisms(int height, int weight, float level){
 	int h,w,l;
-	std::vector<prismCu> prisms;
+	std::vector<PrismCu> prisms;
 	for(l = 0; l < level; ++l){
 		for(h = 0; h < height; ++h){
 			for(w = 0; w < weight; ++w){
-				triangleCu a1 = {
+				TriangleCu a1 = {
 					{float(h), float(w), l, l+1},
 					{float(h), float(w+1), l, l+1},
 					{float(h+1), float(w), l, l+1}};
-				triangleCu b1 = {
+				TriangleCu b1 = {
 					{float(h), float(w+1), l, 1+1},
 					{float(h+1), float(w+1), l, 1+1},
 					{float(h+1), float(w), l, 1+1}};
 
-				prismCu pr1 = {a1};
-				prismCu pr2 = {b1};
+				PrismCu pr1 = {a1};
+				PrismCu pr2 = {b1};
 
 				prisms.push_back(pr1);
 				prisms.push_back(pr2);
@@ -590,7 +590,7 @@ std::vector<prismCu> generatePrisms(int height, int weight, float level){
 	return prisms;
 }
 
-rayCu generateRay(const int heigth, const int width, const int level){
+RayCu generateRay(const int heigth, const int width, const int level){
 	float randHeigth = float(rand() % heigth) + (rand() / (float) RAND_MAX);
 	float randWidth  = float(rand() % width ) + (rand() / (float) RAND_MAX);
 	float rand_level  = float(rand() % level ) + (rand() / (float) RAND_MAX);
@@ -599,18 +599,18 @@ rayCu generateRay(const int heigth, const int width, const int level){
 	float dirY = (rand() / (float) RAND_MAX);
 	float dirZ = (rand() / (float) RAND_MAX);
 
-	rayCu r = {
+	RayCu r = {
 		{randHeigth, randWidth, rand_level, 1},
 		{dirX, dirY, dirZ, 0}};
 	return r;
 }
 
 
-std::vector<rayCu> generateRays(const int height, const int width, const int level, const unsigned maxRays){
-	std::vector<rayCu> rays;
+std::vector<RayCu> generateRays(const int height, const int width, const int level, const unsigned maxRays){
+	std::vector<RayCu> rays;
 	unsigned ray_i;
 	for(ray_i = 0; ray_i < maxRays; ++ray_i){
-		rayCu ray = generateRay(height, width, level);
+		RayCu ray = generateRay(height, width, level);
 		rays.push_back(ray);
 	}
 	return rays;
