@@ -178,8 +178,7 @@ __device__ point_cu collide_triangle_gpu(triangle_cu t, ray_cu r){
   float4 b = to_barycentric_gpu(t, r);
   // Maybe we can calculate intersection be barycentric coords
   point_cu p = intersection_gpu(pl, r);
-  // Can be reduced to return p;
-  if(b.w == 1){
+  if(b.w == 1 && p.w == 1){
     return p;
   }
   else{
@@ -187,13 +186,61 @@ __device__ point_cu collide_triangle_gpu(triangle_cu t, ray_cu r){
     return no_inter;
   }
 
-
-
 }
 
+/* __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){ */
+/*   //bool has_collide; */
+/*   point_cu intersections[2]; */
+/*   point_cu A1 = pr.t1.A; */
+/*   point_cu B1 = pr.t1.B; */
+/*   point_cu C1 = pr.t1.C; */
+/*   point_cu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1}; */
+/*   point_cu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1}; */
+/*   point_cu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1}; */
+
+/*   triangle_cu triangles[8] = { */
+/*     pr.t1, */
+/*     {A2, B2, C2}, */
+/*     {A1, B1, A2}, */
+/*     {B1, B2, A2}, */
+/*     {B1, C1, C2}, */
+/*     {B1, B2, C2}, */
+/*     {A1, C1, C2}, */
+/*     {A1, A2, C2}}; */
+
+/*   unsigned i;  */
+/*   unsigned j = 0; */
+/*   // test for collision on all triangles of an prism */
+/*   for(i = 0, j = 0; i < 8; ++i){ */
+/*     point_cu p = collide_triangle_gpu(triangles[i], r); */
+/*     if(p.w == 0) */
+/*     // No Collision for this triangle */
+/*       continue; */
+/*     // Filter double Collision on edges or vertices */
+/*     if(j != 0){ */
+/*       if(intersections[j-1].x != p.x || intersections[j-1].y != p.y || intersections[j-1].z != p.z){ */
+/* 	intersections[j++] = p; */
+/*       } */
+/*     } */
+/*     else{ */
+/*       intersections[j++] = p; */
+/*     } */
+
+/*   } */
+/*   //if(j > 1) */
+/*     return (j/2) * distance_gpu(intersections[0], intersections[1]); */
+/*     //else */
+/*     //return 0; */
+/* } */
+
+
+/**
+   @attention slower than commented collide_prism_gpu but more pretty
+**/
 __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
   //bool has_collide;
-  point_cu intersections[2];
+  point_cu first_intersection = {0, 0, 0, 0};
+  point_cu intersection_point = {0, 0, 0, 0};
   point_cu A1 = pr.t1.A;
   point_cu B1 = pr.t1.B;
   point_cu C1 = pr.t1.C;
@@ -211,29 +258,30 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
-  unsigned i; 
-  unsigned j = 0;
+
   // test for collision on all triangles of an prism
+  unsigned i; 
   for(i = 0; i < 8; ++i){
-    point_cu p = collide_triangle_gpu(triangles[i], r);
-    if(p.w == 0)
-    // No Collision for this triangle
-      continue;
-    // Filter double Collision on edges or vertices
-    if(j != 0){
-      if(intersections[j-1].x != p.x || intersections[j-1].y != p.y || intersections[j-1].z != p.z){
-	intersections[j++] = p;
+    intersection_point = collide_triangle_gpu(triangles[i], r);
+    if(intersection_point.w != 0){
+      if(first_intersection.w == 0){
+	first_intersection = intersection_point;
       }
-    }
-    else{
-      intersections[j++] = p;
+      else{
+	// Filter double collisions
+	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
+
+
+	  return distance_gpu(first_intersection, intersection_point);
+	}
+
+      }
+
     }
 
   }
-  if(j > 1)
-    return distance_gpu(intersections[0], intersections[1]);
-  else
-    return 0;
+
+  return 0;
 }
 
 __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray_cu* rays, const unsigned max_rays_per_sample, point_cu *samples, const unsigned blocks_per_sample){
@@ -253,7 +301,6 @@ __global__ void trace_on_prisms(prism_cu* prisms, const unsigned max_prisms, ray
     float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
     if(distance > 0){
       ray.P.w += distance;
-
     }
 	
   }
@@ -293,15 +340,15 @@ void print_plane(plane_cu pl);
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 256;
-  const unsigned max_triangles = 8;
+  const unsigned max_rays = 10000;
+  const unsigned max_triangles = 338;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 1;
+  const unsigned depth  = 10;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = true;
+  bool use_cpu = false;
   bool use_gpu = true;
 
   // Generate testdata
@@ -409,8 +456,6 @@ int main(){
 
     }
     
-
-
     for(ray_i = 0; ray_i < rays.size(); ++ray_i){
       if(fabs(ray_data[ray_i] - h_rays[ray_i].P.w) < 0.00001){
 	//fprintf(stderr, "CPU == GPU: Ray %d with value %f \n", ray_i, ray_data[ray_i]);
@@ -456,7 +501,7 @@ float4 to_barycentric(triangle_cu tr, ray_cu ray){
   float4 b = {0,0,0,0};
   vector_cu e1, e2, q, s, r;
   point_cu p0, p1, p2;
-  float a, f, u, v, t;
+  float a, f, u, v, t, ray_direction;
 
   p0 = tr.A;
   p1 = tr.B;
@@ -527,8 +572,7 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
   float4 b = to_barycentric(t, r);
   // Maybe we can calculate intersection be barycentric coords
   point_cu p = intersection(pl, r);
-  // Can be reduced to return p;
-  if(b.w == 1){
+  if(b.w == 1 && p.w == 1){
     return p;
   }
   else{
@@ -540,7 +584,8 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
 
 float collide_prism(prism_cu pr, ray_cu r){
   //bool has_collide;
-  point_cu intersections[2];
+  point_cu first_intersection = {0, 0, 0, 0};
+  point_cu intersection_point = {0, 0, 0, 0};
   point_cu A1 = pr.t1.A;
   point_cu B1 = pr.t1.B;
   point_cu C1 = pr.t1.C;
@@ -558,29 +603,27 @@ float collide_prism(prism_cu pr, ray_cu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
-  unsigned i; 
-  unsigned j = 0;
+
   // test for collision on all triangles of an prism
+  unsigned i; 
   for(i = 0; i < 8; ++i){
-    point_cu p = collide_triangle(triangles[i], r);
-    if(p.w == 0)
-    // No Collision for this triangle
-      continue;
-    // Filter double Collision on edges or vertices
-    if(j != 0){
-      if(intersections[j-1].x != p.x || intersections[j-1].y != p.y || intersections[j-1].z != p.z){
-	intersections[j++] = p;
+    intersection_point = collide_triangle(triangles[i], r);
+    if(intersection_point.w != 0){
+      if(first_intersection.w == 0){
+	first_intersection = intersection_point;
       }
-    }
-    else{
-      intersections[j++] = p;
+      else{
+	// Filter double Collision on edges or vertices
+	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
+	  return distance(first_intersection, intersection_point);
+	}
+      }
+
     }
 
   }
-  if(j > 1)
-    return distance(intersections[0], intersections[1]);
-  else
-    return 0;
+
+  return 0;
 }
 
 /**
