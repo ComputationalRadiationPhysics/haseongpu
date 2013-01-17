@@ -1,13 +1,12 @@
-// Libs
+// Libraies
 #include "stdio.h"
 #include "stdlib.h"
 #include "math.h"
 #include "vector_types.h"
 #include "assert.h"
 #include <vector>
-#include "curand_kernel.h"
 
-// User Header
+// User header files
 #include "geometrie.h"
 #include "datatypes.h"
 #include "generate_testdata.h"
@@ -329,7 +328,7 @@ void print_plane(plane_cu pl);
 //----------------------------------------------------
 int main(){
   const unsigned max_rays = 10000;
-  const unsigned max_triangles = 300;
+  const unsigned max_triangles = 600;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 10;
   unsigned ray_i, prism_i, sample_i;

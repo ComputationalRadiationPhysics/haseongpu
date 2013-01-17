@@ -10,8 +10,13 @@ float distance(point_cu a, point_cu b);
 vector_cu crossproduct(vector_cu a, vector_cu b);
 float skalar_mul(vector_cu a, vector_cu b);
 
-/**
-   @brief Algorithm based on a paper. exact copy of pseudo code.
+/**   
+   @brief Calculates the barycentric coordinates of the triangle
+          and the intersectionpoint of the ray and the triangle.
+	  Algorithm based on a paper. exact copy of pseudo code.
+
+   @return point_cu {0,0,0,0} if there is no intersection triangle/ray
+   @return point_cu {x,y,z,1} barycentric coordinates of intersection triangle/ray
  **/
 float4 to_barycentric(triangle_cu tr, ray_cu ray){
   float4 b = {0,0,0,0};
@@ -72,6 +77,9 @@ float4 to_barycentric(triangle_cu tr, ray_cu ray){
 /**
    @brief Detects collisions of a triangle and a ray without
    a precondition.
+   
+   @return point_cu {0,0,0,0} if there is no intersection triangle/ray
+   @return point_cu {x,y,z,1} barycentric coordinates of intersection triangle/ray
 **/
 point_cu collide_triangle(triangle_cu t, ray_cu r){
   plane_cu pl;
@@ -102,7 +110,12 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
   }
 
 }
-
+/**
+   @brief Detects collisions of a prism and ray
+   
+   @return float intersection distance
+   @return 0 if in case of no intersection
+**/
 float collide_prism(prism_cu pr, ray_cu r){
   //bool has_collide;
   point_cu first_intersection = {0, 0, 0, 0};
@@ -165,8 +178,7 @@ float collide_prism(prism_cu pr, ray_cu r){
 
 /**
    @brief Intersection calculates the intersection between a plane p
-   and a ray r. There is no detection for rays in the plane
-   or for parallel plane. 
+   and a ray r.
 
    It uses the normal of the plane to derive the coordinate form 
    of the plane. With the help of a coordinate form it is very
