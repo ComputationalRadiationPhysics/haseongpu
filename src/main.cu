@@ -113,10 +113,9 @@ __device__ float4 to_barycentric_gpu(triangle_cu tr, ray_cu ray){
 }
 
 __device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
-  point_cu intersection_point = {0.0,0.0,0.0};
+  point_cu intersection_point = {0, 0, 0, 0};
 
-  float t = 0;
-  float d = 0;
+  float t, d;
 
   // vector coordinates
   float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
@@ -139,16 +138,22 @@ __device__ point_cu intersection_gpu(plane_cu pl, ray_cu r){
   p3 = r.direction.z;
 
   // calculation of intersection
+  // this case for parallel rays, will be ignored for easier calculations
+  float tmp = (n1*p1 + n2*p2 + n3*p3);
+  if(tmp == 0)
+    return intersection_point;
+
   d = n1*a1 + n2*a2 + n3*a3;
-  t = (d - n1*x1 - n2*x2 - n3*x3) / (n1*p1 + n2*p2 + n3*p3);
+  t = (d - n1*x1 - n2*x2 - n3*x3) / tmp;
 
   intersection_point.x = x1 + t * p1;
   intersection_point.y = x2 + t * p2;
   intersection_point.z = x3 + t * p3;
-
+  intersection_point.w = 1;
   return intersection_point;
 
 }
+
 /**
    @brief Detects collisions of a triangle and a ray without
    a precondition.
@@ -173,6 +178,7 @@ __device__ point_cu collide_triangle_gpu(triangle_cu t, ray_cu r){
   float4 b = to_barycentric_gpu(t, r);
   // Maybe we can calculate intersection be barycentric coords
   point_cu p = intersection_gpu(pl, r);
+  // Can be reduced to return p;
   if(b.w == 1){
     return p;
   }
@@ -180,6 +186,8 @@ __device__ point_cu collide_triangle_gpu(triangle_cu t, ray_cu r){
     point_cu no_inter = {0,0,0,0}; 
     return no_inter;
   }
+
+
 
 }
 
@@ -208,7 +216,7 @@ __device__ float collide_prism_gpu(prism_cu pr, ray_cu r){
   // test for collision on all triangles of an prism
   for(i = 0; i < 8; ++i){
     point_cu p = collide_triangle_gpu(triangles[i], r);
-    if(p.x == 0 && p.y == 0 && p.z == 0 && p.w == 0)
+    if(p.w == 0)
     // No Collision for this triangle
       continue;
     // Filter double Collision on edges or vertices
@@ -285,8 +293,8 @@ void print_plane(plane_cu pl);
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 512;
-  const unsigned max_triangles = 32;
+  const unsigned max_rays = 256;
+  const unsigned max_triangles = 8;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const unsigned depth  = 1;
   unsigned ray_i, prism_i, sample_i;
@@ -387,7 +395,8 @@ int main(){
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtime_gpu, start, stop);
-    
+    }    
+  if(use_gpu && use_cpu){
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
       if(fabs(sample_data[sample_i] - h_samples[sample_i].w) < 0.1 && use_cpu && use_gpu){
 	fprintf(stderr, "CPU == GPU: Sample %d with value %f \n", sample_i, sample_data[sample_i]);
@@ -400,23 +409,24 @@ int main(){
 
     }
     
-  }
 
-  for(ray_i = 0; ray_i < rays.size(); ++ray_i){
-    if(fabs(ray_data[ray_i] - h_rays[ray_i].P.w) < 0.00001){
-      //fprintf(stderr, "CPU == GPU: Ray %d with value %f \n", ray_i, ray_data[ray_i]);
 
-    }
-    else{
-      fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%f) != GPU(%f) on ray %d\n", ray_data[ray_i], h_rays[ray_i].P.w, ray_i);
+    for(ray_i = 0; ray_i < rays.size(); ++ray_i){
+      if(fabs(ray_data[ray_i] - h_rays[ray_i].P.w) < 0.00001){
+	//fprintf(stderr, "CPU == GPU: Ray %d with value %f \n", ray_i, ray_data[ray_i]);
 
+      }
+      else{
+	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%f) != GPU(%f) on ray %d\n", ray_data[ray_i], h_rays[ray_i].P.w, ray_i);
+
+      }
     }
   }
 
   // Print statistics
   fprintf(stderr, "\n");
-  fprintf(stderr, "Prism             : %d\n", prisms.size());
-  fprintf(stderr, "Triangles         : %d\n", prisms.size() * 8);
+  fprintf(stderr, "Prism             : %d\n", (int)prisms.size());
+  fprintf(stderr, "Triangles         : %d\n", (int)prisms.size() * 8);
   fprintf(stderr, "Samples           : %d\n", (int)samples.size());
   fprintf(stderr, "Rays/Sample       : %d\n", max_rays);
   fprintf(stderr, "GPU Blocks        : %d\n", blocks);
@@ -424,6 +434,7 @@ int main(){
   fprintf(stderr, "GPU Blocks/Sample : %d\n", blocks_per_sample);
   fprintf(stderr, "Runtime_GPU       : %f s\n", runtime_gpu / 1000.0);
   fprintf(stderr, "Runtime_CPU       : %f s\n", runtime_cpu / 1000.0);
+  fprintf(stderr, "Speedup CPU/GPU   : %.1f\n", runtime_cpu / runtime_gpu);
   fprintf(stderr, "\n");
 
   // Cleanup
@@ -516,6 +527,7 @@ point_cu collide_triangle(triangle_cu t, ray_cu r){
   float4 b = to_barycentric(t, r);
   // Maybe we can calculate intersection be barycentric coords
   point_cu p = intersection(pl, r);
+  // Can be reduced to return p;
   if(b.w == 1){
     return p;
   }
@@ -551,7 +563,7 @@ float collide_prism(prism_cu pr, ray_cu r){
   // test for collision on all triangles of an prism
   for(i = 0; i < 8; ++i){
     point_cu p = collide_triangle(triangles[i], r);
-    if(p.x == 0 && p.y == 0 && p.z == 0 && p.w == 0)
+    if(p.w == 0)
     // No Collision for this triangle
       continue;
     // Filter double Collision on edges or vertices
@@ -586,7 +598,7 @@ float collide_prism(prism_cu pr, ray_cu r){
    d  = n~ * a~
 **/
 point_cu intersection(plane_cu pl, ray_cu r){
-  point_cu intersection_point = {0.0,0.0,0.0, 1};
+  point_cu intersection_point = {0, 0, 0, 0};
 
   float t, d;
 
