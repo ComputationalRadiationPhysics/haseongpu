@@ -5,6 +5,7 @@
 #include "assert.h"
 #include <vector>
 #include "curand_kernel.h"
+#include "datatypes.h"
 
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
@@ -49,42 +50,6 @@ typedef struct plane {
 } PLANE;
 
 //------------------------------------------
-typedef float4 pointCu;
-typedef float4 vectorCu;
-
-typedef struct triangleCu{
-	pointCu A;
-	pointCu B;
-	pointCu C;
-} TRIANGLE_CU;
-
-typedef struct prismCu{
-	triangleCu t1;
-	float height; //OPTIMIZE: The height could be stored as 4th parameter of one of the Triangle-coordinates?
-} PRISM_CU;
-
-typedef struct planeCu {
-	pointCu P;
-	vectorCu normal;
-} PLANE_CU;
-
-// Describes one vertex of the input-Mesh
-typedef struct vertexCu {
-	pointCu P;		// the Position
-	float4 G;		// The ASE-Gain in this Point (values from the rays are added)
-
-	// OPTIMIZE: distribute Writes of G over more than 1 position in this
-	// variable (e.g. through modulo thread-ID)
-	// -> could result in less concurrent write-operations
-	// Alternatively, save G in 4th coordinate of P
-} VERTEX_CU;
-
-typedef struct rayCu {
-	pointCu P;			// the random starting point
-	vectorCu direction;  // the position of the vertexCu, where the ray is going to
-	float phiAse;		// the accumulated ASE-Flux for this ray
-	// OPTIMIZE: ASE-Flux might be stored as 4th parameter of P or direction
-} RAY_CU;
 
 //----------------------------------------------------
 // Auxillary function declaration
@@ -138,15 +103,14 @@ __device__ rayCu generateRayGpu(pointCu vertexPoint, prismCu startPrism, curandS
 	const float yRand = u*A.y + v*B.y + w*C.y ;
 
 	// Take one of the given z-coordinates and add a random part of the prism height
-	const float zRand = A.z + curand_uniform(&randomstate) * startPrism.height;
+	const float zRand = A.z + curand_uniform(&randomstate) * startPrism.t1.A.w;
 
 	float ase=0.f;
 
 	// Take the values to assemble a ray
 	rayCu r = {
-		{xRand, yRand, zRand, 1},
-		vertexPoint,
-		ase};
+		{xRand, yRand, zRand, ase},
+		vertexPoint};
 	return r;
 }
 
@@ -272,7 +236,7 @@ __global__ void raytraceStep( curandState* globalState, vertexCu vertex, prismCu
 
 	float gain = propagate(ray,prisms,startprism);
 
-	//atomicAdd(&(vertex.G.x),gain);
+	//atomicAdd(&(vertex.P.w),gain);
 
 	globalState[id] = localState;
 }
