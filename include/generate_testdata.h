@@ -42,9 +42,9 @@ std::vector<PrismCu> generate_prisms(int height, int width, float level){
 	  {float(h), float(w+1), l, l+1},
 	  {float(h+1), float(w), l, l+1}};
 	TriangleCu b1 = {
-	  {float(h), float(w+1), l, 1+1},
-	  {float(h+1), float(w+1), l, 1+1},
-	  {float(h+1), float(w), l, 1+1}};
+	  {float(h), float(w+1), l, l+1},
+	  {float(h+1), float(w+1), l, l+1},
+	  {float(h+1), float(w), l, l+1}};
       
 	PrismCu pr1 = {a1};
 	PrismCu pr2 = {b1};

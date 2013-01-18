@@ -150,18 +150,13 @@ float collide_prism(PrismCu pr, RayCu r){
       else{
 	// Filter double Collision on edges or vertices
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
-	  if(distance(r.P, first_intersection) < ray_distance && distance(r.P, intersection_point) > ray_distance)
+
+	  if(distance(r.P, first_intersection) <= ray_distance && distance(r.P, intersection_point) > ray_distance)
 	    return distance(r.direction, first_intersection);
 
-	  if(distance(r.P, first_intersection) > ray_distance && distance(r.P, intersection_point) < ray_distance)
+	  if(distance(r.P, first_intersection) >= ray_distance && distance(r.P, intersection_point) < ray_distance)
 	    return distance(r.direction, intersection_point);
-
-	  if(distance(r.direction, first_intersection) < ray_distance && distance(r.direction, intersection_point) > ray_distance)
-	    return distance(r.P, first_intersection);
-
-	  if(distance(r.direction, first_intersection) > ray_distance && distance(r.direction, intersection_point) < ray_distance)
-	    return distance(r.P, intersection_point);
-
+	  
 	  if(distance(r.P, first_intersection) > ray_distance || distance(r.direction, first_intersection) > ray_distance)
 	    return 0;
 
@@ -223,6 +218,11 @@ PointCu intersection(PlaneCu pl, RayCu r){
   d = n1*a1 + n2*a2 + n3*a3;
   t = (d - n1*x1 - n2*x2 - n3*x3) / tmp;
 
+  // ignore intersections before the ray 
+  if(t < 0)
+    return intersection_point;
+
+  
   intersection_point.x = x1 + t * p1;
   intersection_point.y = x2 + t * p2;
   intersection_point.z = x3 + t * p3;

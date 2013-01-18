@@ -135,6 +135,10 @@ __device__ PointCu intersection_gpu(PlaneCu pl, RayCu r){
   if(tmp == 0)
     return intersection_point;
 
+  // ignore intersections before the ray 
+  if(t < 0)
+    return intersection_point;
+
   d = n1*a1 + n2*a2 + n3*a3;
   t = (d - n1*x1 - n2*x2 - n3*x3) / tmp;
 
@@ -261,17 +265,12 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
       else{
 	// Filter double collisions
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
-	  if(distance_gpu(r.P, first_intersection) < ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
+
+	  if(distance_gpu(r.P, first_intersection) <= ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
 	    return distance_gpu(r.direction, first_intersection);
 
-	  if(distance_gpu(r.P, first_intersection) > ray_distance && distance_gpu(r.P, intersection_point) < ray_distance)
+	  if(distance_gpu(r.P, first_intersection) >= ray_distance && distance_gpu(r.P, intersection_point) < ray_distance)
 	    return distance_gpu(r.direction, intersection_point);
-
-	  if(distance_gpu(r.direction, first_intersection) < ray_distance && distance_gpu(r.direction, intersection_point) > ray_distance)
-	    return distance_gpu(r.P, first_intersection);
-
-	  if(distance_gpu(r.direction, first_intersection) > ray_distance && distance_gpu(r.direction, intersection_point) < ray_distance)
-	    return distance_gpu(r.P, intersection_point);
 
 	  if(distance_gpu(r.P, first_intersection) > ray_distance || distance_gpu(r.direction, first_intersection) > ray_distance)
 	    return 0;
@@ -327,16 +326,16 @@ void print_plane(PlaneCu pl);
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 20000;
-  const unsigned max_triangles = 300;
+  const unsigned max_rays = 256;
+  const unsigned max_triangles = 8;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 10;
+  const unsigned depth  = 2;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = false;
-  bool use_gpu = true;
+  bool use_cpu = true;
+  bool use_gpu = false;
 
   // Generate testdata
   std::vector<PrismCu> prisms = generate_prisms(length, length, depth);
@@ -367,7 +366,15 @@ int main(){
 	  }
 
 	}
-
+	float d1 = distance(rays[sample_i * max_rays + ray_i].P, rays[sample_i * max_rays + ray_i].direction);
+	float d2 = ray_data[(sample_i * max_rays) + ray_i];
+	if(fabs(d1-d2) > 0.000001){
+	  fprintf(stderr, "\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, ray_i, d1, d2);
+	  
+	  fprintf(stderr, "Sample: ");print_point(rays[sample_i * max_rays + ray_i].P);
+	  fprintf(stderr, "Objective: ");print_point(rays[sample_i * max_rays + ray_i].direction);
+	}
+	//assert(fabs(d1 - d2) < 0.000001);
       }
 
     }
@@ -472,15 +479,13 @@ int main(){
   cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_samples);
-
+ 
   return 0;
 }
 
 //----------------------------------------------------
 // Auxillary function definition
 //----------------------------------------------------
-
-
 void print_point(PointCu p){
   fprintf(stderr, "Point (%f, %f, %f)\n",p.x, p.y, p.z);
 
