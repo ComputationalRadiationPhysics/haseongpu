@@ -143,19 +143,27 @@ __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 
 	PrismCu current = startprism;
 
+	int i=0;
+	float lengthHelp = 0.f;
+	float d = 0.f;
+	float nominator = 0.f;
+	float denominator = 0.f;
+	TriangleCu t1;
+	VectorCu AB,AC;
+	PlaneCu pl;
 
 	for(;;){
 		length = distance;
 		//generate the triangle surfaces of the prism
-		const TriangleCu t1 = current.t1;
-		const TriangleCu t2 = { 
+		t1 = current.t1;
+		TriangleCu t2 = { 
 			{t1.A.x, t1.A.y, t1.A.z + t1.A.w, 1},
 			{t1.B.x, t1.B.y, t1.B.z + t1.B.w, 1},
 			{t1.C.x, t1.C.y, t1.C.z + t1.C.w, 1}
 		};
 
 		// OPTIMIZE: make use of the rectangles!
-		const TriangleCu surfaces[8] = {
+		TriangleCu surfaces[8] = {
 			t1,
 			t2,
 			{t1.A, t1.B, t2.A},
@@ -166,14 +174,11 @@ __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 			{t1.A, t2.A, t2.C}
 		};
 
-		int i=0;
-		float lengthHelp = 0.f;
 		for(i=0; i<8 ; ++i){ //OPTIMIZE: unroll, so that every surface can be optimized differently
 			// get the generating vectors for the plane
-			VectorCu AB = subtractPoints(surfaces[i].B, surfaces[i].A);
-			VectorCu AC = subtractPoints(surfaces[i].C, surfaces[i].A);
+			AB = subtractPoints(surfaces[i].B, surfaces[i].A);
+			AC = subtractPoints(surfaces[i].C, surfaces[i].A);
 
-			PlaneCu pl;
 			pl.P = surfaces[i].A;
 			// cross product of the vectors
 			pl.normal.x = AB.y*AC.z - AB.z*AC.y;
@@ -181,9 +186,7 @@ __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 			pl.normal.z = AB.x*AC.y - AB.y*AC.x;
 
 			// direction * pl.normal
-			float denominator = (ray.direction.x * pl.normal.x) + (ray.direction.y * pl.normal.y) + (ray.direction.z * pl.normal.z);
-			float d = 0.f;
-			float nominator = 0.f;
+			denominator = (ray.direction.x * pl.normal.x) + (ray.direction.y * pl.normal.y) + (ray.direction.z * pl.normal.z);
 			if(denominator != 0.f) //OPTIMIZE: check if we have a lot of branch diversion, or if all threads behave the same
 			{
 				// A * pl.normal
@@ -205,6 +208,8 @@ __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 
 		// calculate values for next iteration
 		distance -= length;
+
+		
 		if(abs(distance) < SMALL)
 		{
 			break;
@@ -231,27 +236,28 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
 //__global__ void raytraceStep( curandState* globalState, VertexCu vertex, PrismCu prisms[], int prismCount) {
-__global__ void raytraceStep( VertexCu vertex, PrismCu prisms[], int prismCount) {
-	//int id = threadIdx.x + blockDim.x*blockIdx.x;
-	//curandState localState = globalState[id];
+__global__ void raytraceStep( curandState* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount) {
+	int id = threadIdx.x + blockDim.x*blockIdx.x;
+	curandState localState = globalState[id];
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
 
 
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	//PrismCu startprism = selectPrism(id, prisms, prismCount);	
+	PrismCu startprism = selectPrism(id, prisms, prismCount);	
 
-	//RayCu ray = generateRayGpu(vertex.P,startprism, localState); //@TODO:verify
-	//float initial_distance = distance(ray.P, ray.direction);
+	RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, localState); //@TODO:verify
+	float initial_distance = distance(ray.P, ray.direction);
 
-	//float gain = propagate(ray,prisms,startprism);
+	float gain = propagate(ray,prisms,startprism);
 
-	//assert(fabs(gain-initial_distance) > 0.001);
+	printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
+	//assert(fabs(gain-initial_distance) < 0.001);
 		
-	//atomicAdd(&(vertex.P.w),gain);
+	atomicAdd(&(vertices[vertex_index].P.w),gain);
 	//@TODO: find out, why atomic add won't compile
-	//globalState[id] = localState;
+	globalState[id] = localState;
 }
 
 
@@ -261,12 +267,7 @@ __global__ void raytraceStep( VertexCu vertex, PrismCu prisms[], int prismCount)
 int main(){
 
 	//Variable definitions
-	const unsigned maxRays = 100;
-	const unsigned maxTriangles = 100;
-	const unsigned maxVertices = 5;
-	const unsigned length = ceil(sqrt(maxTriangles / 2));
-	const unsigned depth  = 10;
-	const unsigned maxPrisms = length * length * depth * 2;
+	int threads = 16;
 	unsigned prism_i, vertex_i;
 	float runtimeGpu = 0.0;
 	float runtimeCpu = 0.0;
@@ -275,16 +276,15 @@ int main(){
 	curandState* devStates;
 
 	// Generate testdata
-	std::vector<VertexCu> vertices = generateSamples(length, length, depth);
-	std::vector<PrismCu> prisms = generatePrisms(length, length, depth);
+	std::vector<VertexCu> vertices = generateSamples(2, 2, 2);
+	std::vector<PrismCu> prisms = generatePrisms(2, 2, 2);
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 
 	// GPU Raytracing
 	PrismCu* hPrisms, *dPrisms;
 	VertexCu* hVertices, *dVertices;
-	int threads = 256;
-	int blocks = ceil(maxPrisms / threads);
+	int blocks = ceil(prisms.size() / float(threads));
 	if(useGpu){
 
 		//initialize memory
@@ -294,7 +294,7 @@ int main(){
 			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hVertices, vertices.size() * sizeof(VertexCu), cudaHostAllocDefault));
 
 			// Memory initialisation on host
-			for(prism_i = 0; prism_i < maxPrisms; ++prism_i){
+			for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
 				hPrisms[prism_i] = prisms[prism_i];
 			}
 			for(prism_i = 0; prism_i < vertices.size() ; ++prism_i){
@@ -308,51 +308,58 @@ int main(){
 			CUDA_CHECK_RETURN(cudaMalloc(&devStates, threads*blocks*sizeof( curandState )));
 
 			// Copy data from host to device
-			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, maxPrisms * sizeof(PrismCu), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, prisms.size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
 			CUDA_CHECK_RETURN(cudaMemcpy(dVertices, hVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyHostToDevice));
 		}
 
-
 		// Generating Random Numbers
-	//	setupKernel<<< threads, blocks >>> ( devStates, time(NULL) );
+		setupKernel<<< threads, blocks >>> ( devStates, time(NULL) );
 
 
+		fprintf(stderr, "\nbetween the kernel");
 		cudaEventRecord(start, 0);
 		// start the Kernels
-//		for(vertex_i = 0; vertex_i < maxVertices; ++vertex_i){
-//			raytraceStep<<< threads, blocks >>> ( devStates , vertices[vertex_i] , dPrisms, maxPrisms);
-//		}
-		fprintf(stderr, "\nbetween the kernel");
-		raytraceStep<<< threads, blocks >>> ( dVertices[0] , dPrisms, prisms.size() );
+		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
+			raytraceStep<<< threads, blocks >>> ( devStates, dVertices, vertex_i,  dPrisms, prisms.size() );
+		}
 
 		fprintf(stderr, "\nafter the kernel");
-		// Free memory on device
-		cudaFree(devStates);
+
+		CUDA_CHECK_RETURN(cudaMemcpy(hVertices, dVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyDeviceToHost));
+
+		fprintf(stderr, "\n");
+		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
+			fprintf(stderr, "Vertex %d:\t G=%.5f\n", vertex_i, hVertices[vertex_i].P.w);
+		}
+
 
 		// Evaluate device data
 		{
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
-		
-		
 		}
+		// Free memory on device
+		cudaFree(devStates);
 	}
 
 	// print statistics
 	{
 	fprintf(stderr, "\n");
-	fprintf(stderr, "Prism       : %d\n", maxPrisms);
-	fprintf(stderr, "Triangles   : %d\n", maxPrisms * 8);
-	fprintf(stderr, "Rays        : %d\n", maxRays);
+	fprintf(stderr, "Prism       : %d\n", prisms.size());
+	fprintf(stderr, "Triangles   : %d\n", prisms.size() * 8);
 	fprintf(stderr, "GPU Blocks  : %d\n", blocks);
 	fprintf(stderr, "GPU Threads : %d\n", threads);
 	fprintf(stderr, "Runtime_GPU : %f s\n", runtimeGpu / 1000.0);
 	fprintf(stderr, "Runtime_CPU : %f s\n", runtimeCpu / 1000.0);
 	fprintf(stderr, "\n");
 	}
-	// Cleanup
+	// Cleanup;
 	cudaFreeHost(hPrisms);
+	cudaFreeHost(hVertices);
+	cudaFree(dPrisms);
+	cudaFree(dVertices);
+	cudaDeviceReset();
 
 
 	return 0;
