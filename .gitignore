@@ -7,3 +7,6 @@ src/*.d
 src/*/*.d
 src/*/*.o
 src/*.out
+.cproject
+.project
+.settings/*

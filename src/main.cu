@@ -10,6 +10,7 @@
 #include <curand_mtgp32_host.h>
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
+#include <cuda_runtime_api.h>
 
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
@@ -539,6 +540,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices
 	//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
 	//assert(fabs(gain-initial_distance) < 0.001);
 
+
 	atomicAdd(&(vertices[vertex_index].P.w),gain);
 }
 
@@ -554,7 +556,7 @@ int main(){
 	double z_mesh = 0.0356;
 	double  *host_p_in, *host_n_x, *host_n_y;
 	int *host_forbidden, *host_n_p, *host_neighbors, *host_t_in;
-	/**
+	/*
 	  host_p_in = (double *)mxGetData(prhs[0]); //point coordinates in 2D . at first size_p x-values, then size_p y-values
 	  host_n_x = (double *)mxGetData(prhs[4]); //normals of the facets, x-components // probably size_t values?? //@TODO check this
 	  host_n_y = (double *)mxGetData(prhs[5]); //normals of the facets, y-components
@@ -567,7 +569,7 @@ int main(){
 	  size_p = (int )mxGetM(prhs[0]); //number of points
 	  z_mesh = (double)((double *)mxGetData(prhs[14]))[0];
 	  size_z = (int )mxGetN(prhs[2]); //number of meshing in z-direction
-	 **/
+	 */
 	//Variable definitions
 	int threads = 16;
 	unsigned prism_i, vertex_i;
