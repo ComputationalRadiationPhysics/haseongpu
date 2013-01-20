@@ -6,6 +6,10 @@
 #include <vector>
 #include "curand_kernel.h"
 #include "datatypes.h"
+/* include MTGP host helper functions */
+#include <curand_mtgp32_host.h>
+/* include MTGP pre-computed parameter sets */
+#include <curand_mtgp32dc_p_11213.h>
 
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
@@ -16,6 +20,13 @@
 		exit(1);							\
 	}								\
 }
+#define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
+	printf("Error at %s:%d\n",__FILE__,__LINE__); \
+	return EXIT_FAILURE;}} while(0)
+
+#define CURAND_CALL(x) do { if((x) != CURAND_STATUS_SUCCESS) { \
+	printf("Error at %s:%d\n",__FILE__,__LINE__); \
+	return EXIT_FAILURE;}} while(0)
 
 
 //----------------------------------------------------
@@ -87,9 +98,9 @@ __device__ PointCu subtractPoints(PointCu A, PointCu B){
 	return C;
 }
 
-__device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandState randomstate){
-	float u = curand_uniform(&randomstate);
-	float v = curand_uniform(&randomstate);
+__device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandStateMtgp32 *randomstate, int bid){
+	float u = curand_uniform(&randomstate[bid]);
+	float v = curand_uniform(&randomstate[bid]);
 	if((u+v) > 1){ //OPTIMIZE: remove if
 		u = 1-u;
 		v = 1-v;
@@ -105,7 +116,7 @@ __device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandS
 	const float yRand = u*A.y + v*B.y + w*C.y ;
 
 	// Take one of the given z-coordinates and add a random part of the prism height
-	const float zRand = A.z + curand_uniform(&randomstate) * startPrism.t1.A.w;
+	const float zRand = A.z + curand_uniform(&randomstate[bid]) * startPrism.t1.A.w;
 
 	float ase=0.f;
 
@@ -117,113 +128,358 @@ __device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandS
 }
 
 __device__ float distance(PointCu a, PointCu b){
-  float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
-  return fabs(d);
+	float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
+	return fabs(d);
 }
 
 __device__ PrismCu selectPrism(int id, PrismCu prisms[], int totalNumberOfPrisms){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
 	int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
 	int prism = id / threadsPerPrism;
+
 	return prisms[prism];
 }
 
+__device__ int selectTriangle(int id, int trianglesInOneLevel){
+	int totalNumberOfThreads = blockDim.x * gridDim.x;
+	int threadsPer2DTriangle = ceil( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
+	return id / threadsPer2DTriangle;
+
+}
+
+__device__ int selectLevel(int id, int totalNumberOfLevels){
+	int totalNumberOfThreads = blockDim.x * gridDim.x;
+	int threadsPerLevel = ceil( float(totalNumberOfThreads) / float(totalNumberOfLevels) );
+	return id / threadsPerLevel;
+}
+
 __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
-	float gain = 1.f;
-	float vecX = ray.direction.x - ray.P.x;
-	float vecY = ray.direction.y - ray.P.y;
-	float vecZ = ray.direction.z - ray.P.z;
+//	float gain = 1.f;
+//	float vecX = ray.direction.x - ray.P.x;
+//	float vecY = ray.direction.y - ray.P.y;
+//	float vecZ = ray.direction.z - ray.P.z;
+//
+//	float distanceTotal = sqrt(vecX*vecX+vecY*vecY+vecZ*vecZ);
+//	float distance = distanceTotal;
+//	float length = distanceTotal;
+//	vecX /= distanceTotal;
+//	vecY /= distanceTotal;
+//	vecZ /= distanceTotal;
+//
+//	PrismCu current = startprism;
+//
+//	int i=0;
+//	float lengthHelp = 0.f;
+//	float d = 0.f;
+//	float nominator = 0.f;
+//	float denominator = 0.f;
+//	TriangleCu t1;
+//	VectorCu AB,AC;
+//	PlaneCu pl;
+//
+//	for(;;){
+//		length = distance;
+//		//generate the triangle surfaces of the prism
+//		t1 = current.t1;
+//		TriangleCu t2 = { 
+//			{t1.A.x, t1.A.y, t1.A.z + t1.A.w, 1},
+//			{t1.B.x, t1.B.y, t1.B.z + t1.B.w, 1},
+//			{t1.C.x, t1.C.y, t1.C.z + t1.C.w, 1}
+//		};
+//
+//		// OPTIMIZE: make use of the rectangles!
+//		TriangleCu surfaces[8] = {
+//			t1,
+//			t2,
+//			{t1.A, t1.B, t2.A},
+//			{t1.B, t2.B, t2.A},
+//			{t1.B, t1.C, t2.C},
+//			{t1.B, t2.B, t2.C},
+//			{t1.A, t1.C, t2.C},
+//			{t1.A, t2.A, t2.C}
+//		};
+//
+//		for(i=0; i<8 ; ++i){ //OPTIMIZE: unroll, so that every surface can be optimized differently
+//			// get the generating vectors for the plane
+//			AB = subtractPoints(surfaces[i].B, surfaces[i].A);
+//			AC = subtractPoints(surfaces[i].C, surfaces[i].A);
+//
+//			pl.P = surfaces[i].A;
+//			// cross product of the vectors
+//			pl.normal.x = AB.y*AC.z - AB.z*AC.y;
+//			pl.normal.y = AB.z*AC.x - AB.x*AC.z;
+//			pl.normal.z = AB.x*AC.y - AB.y*AC.x;
+//
+//			// direction * pl.normal
+//			denominator = (ray.direction.x * pl.normal.x) + (ray.direction.y * pl.normal.y) + (ray.direction.z * pl.normal.z);
+//			if(denominator != 0.f) //OPTIMIZE: check if we have a lot of branch diversion, or if all threads behave the same
+//			{
+//				// A * pl.normal
+//				d = (surfaces[i].A.x * pl.normal.x) + (surfaces[i].A.y * pl.normal.y) + (surfaces[i].A.z * pl.normal.z);
+//				// d - (P * pl.normal)
+//				nominator = d - ((ray.P.x * pl.normal.x) + (ray.P.y * pl.normal.y) + (ray.P.z * pl.normal.y)); 
+//				lengthHelp = nominator/denominator;
+//				if(lengthHelp < length && lengthHelp > 0.f) //OPTIMIZE: most threads should do the same?
+//				{
+//					length = lengthHelp;
+//				}
+//			}
+//		}
+//
+//
+//		//with the new length, get the gain and add it
+//		// @TODO
+//		gain += length;
+//
+//		// calculate values for next iteration
+//		distance -= length;
+//
+//		
+//		if(abs(distance) < SMALL)
+//		{
+//			break;
+//		}
+//
+//		ray.P.x += length*vecX;
+//		ray.P.y += length*vecY;
+//		ray.P.z += length*vecZ;
+//
+//		//@TODO:
+//		// calculate the next PRISM (maybe with help of some neighbor-datastructure?
+//
+//	}
+//
+//
+//	return gain;
+	return 0;
+}
 
-	float distanceTotal = sqrt(vecX*vecX+vecY*vecY+vecZ*vecZ);
-	float distance = distanceTotal;
-	float length = distanceTotal;
-	vecX /= distanceTotal;
-	vecY /= distanceTotal;
-	vecZ /= distanceTotal;
+__device__ float naive_propagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int *forbidden, int z_mesh){
+	//    in first try no reflections
+	//    calculate the vector and make the the calculation, which surface would be the shortest to reach
+	//    then get the length, make the integration, get the information about the next cell out of the array
+	//    set the point to the surface (this surface is "forbidden" in the calculations)
+	//    proceed until you hit a the point or the surface
+	//    if you are closer then "small" stop and return the value
+	double vec_x, vec_y,vec_z, norm;
+	double distance, length, length_help, distance_total;
+	double gain=1;
+	double nominator, denominator;
+	int tri, cell_z; // the current triangle number and position concerning the z's
+	int decider; // which one is the shortest - info
+	int tri_next, cell_z_next, forb, forb_dump;
+	//	int ct; // used to read out cell_type 
 
-	PrismCu current = startprism;
 
-	int i=0;
-	float lengthHelp = 0.f;
-	float d = 0.f;
-	float nominator = 0.f;
-	float denominator = 0.f;
-	TriangleCu t1;
-	VectorCu AB,AC;
-	PlaneCu pl;
+	//    initial positions
+	tri = t_start;
+	cell_z = mesh_start;
 
-	for(;;){
+
+	//    definition of the vectors without reflections
+	vec_x = (x_dest - x_pos);
+	vec_y = (y_dest - y_pos);
+	vec_z = (z_dest - z_pos);
+
+	norm = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+
+	vec_x = vec_x/norm;
+	vec_y = vec_y/norm;
+	vec_z = vec_z/norm;
+
+	//    now calculate the length to travel
+	distance = sqrt((x_dest - x_pos)*(x_dest - x_pos)+(y_dest - y_pos)*(y_dest - y_pos)+(z_dest - z_pos)*(z_dest - z_pos));
+	distance_total = distance;
+	// does this make sense?
+	length = distance;
+
+	forb = -1;
+
+	//	mexPrintf("Propagation called");
+	//    mexEvalString("drawnow;");
+
+	//    the ray has to be set to be ALIVE before!
+	//    now do the unlimited for loop - break!!!
+	for(;;)
+	{
+
+		//	  mexPrintf("Propagation for part called\n\n");
+		//    mexEvalString("drawnow;");
+		//        definition for decider
+		//        0,1,2: int for the neighbors
+		//        3: hor plane up
+		//        4: hor plane down
+
+		//        at first set the decider = -1;
+		decider = -1;
 		length = distance;
-		//generate the triangle surfaces of the prism
-		t1 = current.t1;
-		TriangleCu t2 = { 
-			{t1.A.x, t1.A.y, t1.A.z + t1.A.w, 1},
-			{t1.B.x, t1.B.y, t1.B.z + t1.B.w, 1},
-			{t1.C.x, t1.C.y, t1.C.z + t1.C.w, 1}
-		};
 
-		// OPTIMIZE: make use of the rectangles!
-		TriangleCu surfaces[8] = {
-			t1,
-			t2,
-			{t1.A, t1.B, t2.A},
-			{t1.B, t2.B, t2.A},
-			{t1.B, t1.C, t2.C},
-			{t1.B, t2.B, t2.C},
-			{t1.A, t1.C, t2.C},
-			{t1.A, t2.A, t2.C}
-		};
 
-		for(i=0; i<8 ; ++i){ //OPTIMIZE: unroll, so that every surface can be optimized differently
-			// get the generating vectors for the plane
-			AB = subtractPoints(surfaces[i].B, surfaces[i].A);
-			AC = subtractPoints(surfaces[i].C, surfaces[i].A);
+		//		  read, which type of cell it is you are propagation in
+		//		ct = cell_type[tri]; //@TODO reimplement
 
-			pl.P = surfaces[i].A;
-			// cross product of the vectors
-			pl.normal.x = AB.y*AC.z - AB.z*AC.y;
-			pl.normal.y = AB.z*AC.x - AB.x*AC.z;
-			pl.normal.z = AB.x*AC.y - AB.y*AC.x;
+		//        mexPrintf("forb: %i\n",forb);
+		//        mexEvalString("drawnow;");
 
-			// direction * pl.normal
-			denominator = (ray.direction.x * pl.normal.x) + (ray.direction.y * pl.normal.y) + (ray.direction.z * pl.normal.z);
-			if(denominator != 0.f) //OPTIMIZE: check if we have a lot of branch diversion, or if all threads behave the same
+		//        try the triangle faces
+		//        remember the correlation between the normals and the points
+		//        n1: p1-2, n2: p1-3, n3:p2-3
+		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
+		//        as everything uses triangular "tubes/prisms", as well as n_z=0 in this case!
+		if (forb != 0){
+			denominator = n_x[tri]*vec_x + n_y[tri]*vec_y;
+			if (denominator != 0.0)
 			{
-				// A * pl.normal
-				d = (surfaces[i].A.x * pl.normal.x) + (surfaces[i].A.y * pl.normal.y) + (surfaces[i].A.z * pl.normal.z);
-				// d - (P * pl.normal)
-				nominator = d - ((ray.P.x * pl.normal.x) + (ray.P.y * pl.normal.y) + (ray.P.z * pl.normal.y)); 
-				lengthHelp = nominator/denominator;
-				if(lengthHelp < length && lengthHelp > 0.f) //OPTIMIZE: most threads should do the same?
+				nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
+				length_help = nominator/denominator;
+				if (length_help < length && length_help > 0.0)
 				{
-					length = lengthHelp;
+					length = length_help;
+					decider = 0;
+					forb_dump = (forbidden[tri]);
+
 				}
 			}
 		}
 
-
-		//with the new length, get the gain and add it
-		// @TODO
-		gain += length;
-
-		// calculate values for next iteration
-		distance -= length;
-
-		
-		if(abs(distance) < SMALL)
-		{
-			break;
+		if (forb != 1){
+			denominator = n_x[tri+N_cells]*vec_x + n_y[tri+N_cells]*vec_y;
+			if (denominator != 0.0)
+			{
+				nominator = (n_x[tri+N_cells]*p_in[n_p[tri+N_cells]] + n_y[tri+N_cells]*p_in[n_p[tri+N_cells]+size_p]) - (n_x[tri+N_cells]*x_pos + n_y[tri+N_cells]*y_pos);
+				length_help = nominator/denominator;
+				if (length_help < length && length_help > 0.0)
+				{
+					length = length_help;
+					decider = 1;
+					forb_dump = (forbidden[tri+N_cells]);
+				}
+			}
 		}
 
-		ray.P.x += length*vecX;
-		ray.P.y += length*vecY;
-		ray.P.z += length*vecZ;
+		if (forb !=2){
+			denominator = n_x[tri+2*N_cells]*vec_x + n_y[tri+2*N_cells]*vec_y;
+			if (denominator != 0.0)
+			{
+				nominator = (n_x[tri+2*N_cells]*p_in[n_p[tri+2*N_cells]] + n_y[tri+2*N_cells]*p_in[n_p[tri+2*N_cells]+size_p]) - (n_x[tri+2*N_cells]*x_pos + n_y[tri+2*N_cells]*y_pos);
+				length_help = nominator/denominator;
+				if (length_help < length && length_help > 0.0)
+				{
+					length = length_help;
+					decider = 2;
+					forb_dump = (forbidden[tri+2*N_cells]);
+				}
+			}
+		}
 
-		//@TODO:
-		// calculate the next PRISM (maybe with help of some neighbor-datastructure?
+		//        try the horizontal planes, which one is the shortest, n_x and n_y are zero!, n_z =1!
+		//        at first the upper plane
+		if (forb != 3){
+			denominator = z_pos*vec_z;
+			if (denominator != 0.0)
+			{
+				nominator = (cell_z+1)*z_mesh - z_pos;
+				length_help = nominator/denominator;
+				if (length_help < length && length_help > 0.0)
+				{
+					length = length_help;
+					decider = 3;
+					forb_dump = 4; // you are not allowed to go down in the next step
+				}
+			}
+		}
+
+		//        next is the lower plane
+		if (forb != 4){
+			denominator = z_pos*vec_z;
+
+			if (denominator != 0.0)
+			{
+				nominator = (cell_z)*z_mesh - z_pos;
+				length_help = nominator/denominator;
+				if (length_help < length && length_help > 0.0)
+				{
+					length = length_help;
+					decider = 4;
+					forb_dump = 3; // you are not allowed to go up in the next step
+				}
+			}
+		}
+
+		forb = forb_dump;
+
+
+		//        now make a switch to differ the different cases
+		//@TODO: include this into the if statements?
+		switch(decider){
+
+			case 0:
+				//                this is the case for the intersection with the first choice triangle-surface
+				tri_next = neighbors[tri];
+				cell_z_next = cell_z;
+				break;
+
+			case 1:
+				//                second triangle surface
+				tri_next = neighbors[tri+N_cells];
+				cell_z_next = cell_z;
+				break;
+
+			case 2:
+				//                third triangle surface
+				tri_next = neighbors[tri+2*N_cells];
+				cell_z_next = cell_z;
+				break;
+
+			case 3:
+				//                go one plane up
+				tri_next = tri;
+				cell_z_next = cell_z + 1;
+				break;
+
+			case 4:
+				//                go one plane down
+				tri_next = tri;
+				cell_z_next = cell_z - 1;
+				break;
+
+			default:
+				//                make an error statement
+				break;
+		}
+
+		//        now we know where to go, let's make the integration
+		//        take the beta_v[tri+cell_z*N_cells] 
+
+		//		  at this position do the decision whether it is a gain part or cladding
+		//		  it might be absorbing or amplifying, for the cladding only absorbing
+		//		  a simple "if then"
+
+		//		if (ct == clad_num){
+		//			gain = gain * exp(-clad_abs * length);
+		//		}
+		//		else {
+		//			gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+		//		}
+
+		gain += length; //@TODO replace with actual gain computation
+		distance -= length;
+
+
+		if (fabs(distance)< SMALL)
+			break;
+
+		//        now set the next cell
+		x_pos = x_pos + length*vec_x;
+		y_pos = y_pos + length*vec_y;
+		z_pos = z_pos + length*vec_z;
+
+		tri = tri_next;
+		cell_z = cell_z_next;      
 
 	}
 
+	gain /= (distance_total*distance_total);
 
 	return gain;
 }
@@ -235,37 +491,83 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-//__global__ void raytraceStep( curandState* globalState, VertexCu vertex, PrismCu prisms[], int prismCount) {
-__global__ void raytraceStep( curandState* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount) {
-	int id = threadIdx.x + blockDim.x*blockIdx.x;
-	curandState localState = globalState[id];
+__global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
+	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
 
 
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	PrismCu startprism = selectPrism(id, prisms, prismCount);	
+	//PrismCu startprism = selectPrism(id, prisms, prismCount);	
+	int starttriangle = selectTriangle(id,size_t); //@TODO: second parameter is number of 2D Triangles
+	int startlevel = selectLevel(id,size_z); //@TODO: second parameter is number of Levels 
 
-	RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, localState); //@TODO:verify
-	float initial_distance = distance(ray.P, ray.direction);
+	// the indices of the vertices of the starttriangle
+	int t_1 = t_in[starttriangle];
+	int t_2 = t_in[starttriangle+N_cells];
+	int t_3 = t_in[starttriangle+2*N_cells];
 
-	float gain = propagate(ray,prisms,startprism);
+	// random startpoint generation
+	float  u = curand_uniform(&globalState[blockIdx.x]);
+	float  v = curand_uniform(&globalState[blockIdx.x]);
 
-	printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
+	if((u+v)>1)
+	{
+		u = 1-u;
+		v = 1-v;
+	}
+
+	float w = 1-u-v;
+
+	// convert the random startpoint into coordinates
+	double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))*z_mesh;
+	double x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
+	double y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;
+
+	//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
+	//float initial_distance = distance(ray.P, ray.direction);
+
+	float gain = 0.;
+	//float gain = naive_propagation(x_rand, y_rand, z_rand, ray.direction.x, ray.direction.y, ray.direction.z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+	//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+
+	//printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
+
+	printf("Thread: %d\t RAND=%f\n",id,curand_uniform(&globalState[0]));
+
+	//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
 	//assert(fabs(gain-initial_distance) < 0.001);
-		
-	atomicAdd(&(vertices[vertex_index].P.w),gain);
-	//@TODO: find out, why atomic add won't compile
-	globalState[id] = localState;
-}
 
+	atomicAdd(&(vertices[vertex_index].P.w),gain);
+}
 
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
 int main(){
 
+	// Variables from the mexFunction 
+	double  *p_in, *n_x, *n_y;
+	int *forbidden, *n_p, *neighbors, *t_in;
+	int size_t=10, N_cells, size_p=10, size_z=2;
+	double z_mesh = 0.0356;
+	double  *host_p_in, *host_n_x, *host_n_y;
+	int *host_forbidden, *host_n_p, *host_neighbors, *host_t_in;
+	/**
+	  host_p_in = (double *)mxGetData(prhs[0]); //point coordinates in 2D . at first size_p x-values, then size_p y-values
+	  host_n_x = (double *)mxGetData(prhs[4]); //normals of the facets, x-components // probably size_t values?? //@TODO check this
+	  host_n_y = (double *)mxGetData(prhs[5]); //normals of the facets, y-components
+	  host_forbidden = (int *)mxGetData(prhs[11]);//are the correspondance of the face used in the previous triangle, which must not be tested (rounding errors)
+	  host_t_in = (int *)mxGetData(prhs[1]);  //association triangle-points - c-indexing-sytle!
+	  host_n_p = (int *)mxGetData(prhs[10]); // gives the Index to one of the points in p_in which is in the plane of the normals - c-indexing-sytle!
+	  host_neighbors = (int *)mxGetData(prhs[6]); //for each cell in t_in, its neighboring cell in plane geometry  - c-indexing-sytle!
+	  size_t = (int )mxGetM(prhs[1]); //number of triangles per sheet
+	  N_cells = size_t;
+	  size_p = (int )mxGetM(prhs[0]); //number of points
+	  z_mesh = (double)((double *)mxGetData(prhs[14]))[0];
+	  size_z = (int )mxGetN(prhs[2]); //number of meshing in z-direction
+	 **/
 	//Variable definitions
 	int threads = 16;
 	unsigned prism_i, vertex_i;
@@ -273,7 +575,8 @@ int main(){
 	float runtimeCpu = 0.0;
 	cudaEvent_t start, stop;
 	bool useGpu = true;
-	curandState* devStates;
+	curandStateMtgp32 *devMTGPStates;
+	mtgp32_kernel_params *devKernelParams;
 
 	// Generate testdata
 	std::vector<VertexCu> vertices = generateSamples(2, 2, 2);
@@ -305,22 +608,59 @@ int main(){
 			// Memory allocation on device
 			CUDA_CHECK_RETURN(cudaMalloc(&dPrisms, prisms.size() * sizeof(PrismCu)));
 			CUDA_CHECK_RETURN(cudaMalloc(&dVertices, vertices.size() * sizeof(PrismCu)));
-			CUDA_CHECK_RETURN(cudaMalloc(&devStates, threads*blocks*sizeof( curandState )));
+
+
+			// Memory allocation on device (mexFunction Variables)
+			CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * size_p * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_x, size_t * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_y, size_t * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&t_in, 3* size_t * sizeof(int)));
+
+
 
 			// Copy data from host to device
 			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, prisms.size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
 			CUDA_CHECK_RETURN(cudaMemcpy(dVertices, hVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyHostToDevice));
+
+
+			// Copy data from host to device (mex Function Variables)
+			CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * size_p * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, size_t * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, size_t * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(neighbors, host_neighbors, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(t_in ,host_t_in, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
 		}
 
 		// Generating Random Numbers
-		setupKernel<<< threads, blocks >>> ( devStates, time(NULL) );
+		//setupKernel<<< blocks, threads >>> ( devStates, time(NULL) );
+		/* Allocate space for prng states on device */
+		CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
+
+		/* Setup MTGP prng states */
+
+		/* Allocate space for MTGP kernel parameters */
+		CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
+
+		/* Reformat from predefined parameter sets to kernel format, */
+		/* and copy kernel parameters to device memory               */
+		CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
+
+		/* Initialize one state per thread block */
+		CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234));
+
+		/* State setup is complete */
 
 
 		fprintf(stderr, "\nbetween the kernel");
 		cudaEventRecord(start, 0);
 		// start the Kernels
 		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
-			raytraceStep<<< threads, blocks >>> ( devStates, dVertices, vertex_i,  dPrisms, prisms.size() );
+			raytraceStep<<< blocks, threads >>> ( devMTGPStates, dVertices, vertex_i,  dPrisms, prisms.size(),p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, size_t, size_z, forbidden, z_mesh, t_in);
 		}
 
 		fprintf(stderr, "\nafter the kernel");
@@ -335,35 +675,44 @@ int main(){
 
 		// Evaluate device data
 		{
-		cudaEventRecord(stop, 0);
-		cudaEventSynchronize(stop);
-		cudaEventElapsedTime(&runtimeGpu, start, stop);
+			cudaEventRecord(stop, 0);
+			cudaEventSynchronize(stop);
+			cudaEventElapsedTime(&runtimeGpu, start, stop);
 		}
 		// Free memory on device
-		cudaFree(devStates);
 	}
 
 	// print statistics
 	{
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Prism       : %d\n", prisms.size());
-	fprintf(stderr, "Triangles   : %d\n", prisms.size() * 8);
-	fprintf(stderr, "GPU Blocks  : %d\n", blocks);
-	fprintf(stderr, "GPU Threads : %d\n", threads);
-	fprintf(stderr, "Runtime_GPU : %f s\n", runtimeGpu / 1000.0);
-	fprintf(stderr, "Runtime_CPU : %f s\n", runtimeCpu / 1000.0);
-	fprintf(stderr, "\n");
+		fprintf(stderr, "\n");
+		fprintf(stderr, "Prism       : %d\n", prisms.size());
+		fprintf(stderr, "Triangles   : %d\n", prisms.size() * 8);
+		fprintf(stderr, "GPU Blocks  : %d\n", blocks);
+		fprintf(stderr, "GPU Threads : %d\n", threads);
+		fprintf(stderr, "Runtime_GPU : %f s\n", runtimeGpu / 1000.0);
+		fprintf(stderr, "Runtime_CPU : %f s\n", runtimeCpu / 1000.0);
+		fprintf(stderr, "\n");
 	}
 	// Cleanup;
-	cudaFreeHost(hPrisms);
-	cudaFreeHost(hVertices);
-	cudaFree(dPrisms);
-	cudaFree(dVertices);
-	cudaDeviceReset();
+	{
+		cudaFreeHost(hPrisms);
+		cudaFreeHost(hVertices);
+		cudaFree(dPrisms);
+		cudaFree(dVertices);
 
+		// Cleanup mex Variables
+		cudaFree(p_in);
+		cudaFree(n_x);
+		cudaFree(n_y);
+		cudaFree(neighbors);
+		cudaFree(forbidden);
+		cudaFree(n_p);
+		cudaDeviceReset();
+	}
 
 	return 0;
 }
+
 
 //----------------------------------------------------
 // Auxillary function definition
@@ -605,17 +954,17 @@ void printPoint(point p){
 
 }
 std::vector<VertexCu> generateSamples(int height, int width, int level){
-  std::vector<VertexCu> samplePoints;
-  int h,w,l;
-  for(l = 0; l <= level; ++l){
-    for(h = 0; h <= height; ++h){
-      for(w = 0; w <= width; ++w){
-	
-		  VertexCu p = {{float(h), float(w), float(l)}};
+	std::vector<VertexCu> samplePoints;
+	int h,w,l;
+	for(l = 0; l <= level; ++l){
+		for(h = 0; h <= height; ++h){
+			for(w = 0; w <= width; ++w){
 
-		  samplePoints.push_back(p);
-      }
-    }
-  }
-  return samplePoints;
+				VertexCu p = {{float(h), float(w), float(l)}};
+
+				samplePoints.push_back(p);
+			}
+		}
+	}
+	return samplePoints;
 }
