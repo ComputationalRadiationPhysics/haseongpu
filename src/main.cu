@@ -481,7 +481,7 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 
 	}
 
-	gain /= (distance_total*distance_total);
+	//gain /= (distance_total*distance_total); //@TODO implement again (comes from the formula!)
 
 	return gain;
 }
@@ -493,7 +493,7 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-__global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int host_size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
+__global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int level, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int host_size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
@@ -526,23 +526,33 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices
 	double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))*z_mesh;
 	double x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
 	double y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;
+	PointCu startpoint = {x_rand, y_rand, z_rand};
+
+
+	int endpoint_x = p_in[point2D];
+	int endpoint_y = p_in[size_p + point2D];
+	int endpoint_z = level*z_mesh;
+	PointCu endpoint = {endpoint_x, endpoint_y, endpoint_z};
 
 	//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
-	//float initial_distance = distance(ray.P, ray.direction);
+	float initial_distance = distance(startpoint, endpoint);
+
 
 	float gain = 0.;
-	//float gain = naive_propagation(x_rand, y_rand, z_rand, ray.direction.x, ray.direction.y, ray.direction.z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+	gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
 	//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
 
 	//printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
 
-	printf("Thread: %d\t RAND=%f\n",id,curand_uniform(&globalState[0]));
+	//printf("Thread: %d\t RAND=%f\t TRIANGLE=%d\n",id,curand_uniform(&globalState[0]),starttriangle);
+
+//	printf("\nThread: %d\t TRIANGLE=%d POINTS=%f   %f   %f",id,starttriangle,x_rand,y_rand,z_rand);
 
 	//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
 	//assert(fabs(gain-initial_distance) < 0.001);
 
 
-	atomicAdd(&(vertices[vertex_index].P.w),gain);
+	//atomicAdd(&(vertices[vertex_index].P.w),gain);
 }
 
 //----------------------------------------------------
@@ -576,7 +586,7 @@ int main(){
 	  size_z = (int )mxGetN(prhs[2]); //number of meshing in z-direction
 	 */
 	//Variable definitions
-	int threads = 16;
+	int threads = 256;
 	unsigned prism_i, vertex_i;
 	float runtimeGpu = 0.0;
 	float runtimeCpu = 0.0;
@@ -594,27 +604,27 @@ int main(){
 	// GPU Raytracing
 	PrismCu* hPrisms, *dPrisms;
 	VertexCu* hVertices, *dVertices;
-	int blocks = ceil(prisms.size() / float(threads));
+	int blocks = ceil(25600 / float(threads));
 	if(useGpu){
 
 		//initialize memory
 		{
 			// Memory allocation on host
-			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hPrisms, prisms.size() * sizeof(PrismCu), cudaHostAllocDefault));
-			CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hVertices, vertices.size() * sizeof(VertexCu), cudaHostAllocDefault));
+		//	CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hPrisms, prisms.size() * sizeof(PrismCu), cudaHostAllocDefault));
+		//	CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&hVertices, vertices.size() * sizeof(VertexCu), cudaHostAllocDefault));
 
 			// Memory initialisation on host
-			for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
-				hPrisms[prism_i] = prisms[prism_i];
-			}
-			for(prism_i = 0; prism_i < vertices.size() ; ++prism_i){
-				hVertices[prism_i] = vertices[prism_i];
-			}
+		//	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
+		//		hPrisms[prism_i] = prisms[prism_i];
+		//	}
+		//	for(prism_i = 0; prism_i < vertices.size() ; ++prism_i){
+		//		hVertices[prism_i] = vertices[prism_i];
+		//	}
 
 
 			// Memory allocation on device
-			CUDA_CHECK_RETURN(cudaMalloc(&dPrisms, prisms.size() * sizeof(PrismCu)));
-			CUDA_CHECK_RETURN(cudaMalloc(&dVertices, vertices.size() * sizeof(PrismCu)));
+			//CUDA_CHECK_RETURN(cudaMalloc(&dPrisms, prisms.size() * sizeof(PrismCu)));
+			//CUDA_CHECK_RETURN(cudaMalloc(&dVertices, vertices.size() * sizeof(PrismCu)));
 
 
 			// Memory allocation on device (mexFunction Variables)
@@ -629,8 +639,8 @@ int main(){
 
 
 			// Copy data from host to device
-			CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, prisms.size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(dVertices, hVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyHostToDevice));
+			//CUDA_CHECK_RETURN(cudaMemcpy(dPrisms, hPrisms, prisms.size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
+			//CUDA_CHECK_RETURN(cudaMemcpy(dVertices, hVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyHostToDevice));
 
 
 			// Copy data from host to device (mex Function Variables)
@@ -663,21 +673,21 @@ int main(){
 		/* State setup is complete */
 
 
-		fprintf(stderr, "\nbetween the kernel");
 		cudaEventRecord(start, 0);
 		// start the Kernels
-		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
-			raytraceStep<<< blocks, threads >>> ( devMTGPStates, dVertices, vertex_i,  dPrisms, prisms.size(),p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, host_size_t, size_z, forbidden, z_mesh, t_in);
+		for(int point2D = 0; point2D < size_p ; ++point2D){
+			for(int level = 0; level <= size_z; ++ level){
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, point2D, level, p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, host_size_t, size_z, forbidden, z_mesh, t_in);
+			}
 		}
 
-		fprintf(stderr, "\nafter the kernel");
 
-		CUDA_CHECK_RETURN(cudaMemcpy(hVertices, dVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyDeviceToHost));
+		//CUDA_CHECK_RETURN(cudaMemcpy(hVertices, dVertices, vertices.size() * sizeof(VertexCu), cudaMemcpyDeviceToHost));
 
 		fprintf(stderr, "\n");
-		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
-			fprintf(stderr, "Vertex %d:\t G=%.5f\n", vertex_i, hVertices[vertex_i].P.w);
-		}
+		//for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
+		//	fprintf(stderr, "Vertex %d:\t G=%.5f\n", vertex_i, hVertices[vertex_i].P.w);
+		//}
 
 
 		// Evaluate device data
@@ -692,20 +702,23 @@ int main(){
 	// print statistics
 	{
 		fprintf(stderr, "\n");
-		fprintf(stderr, "Prism       : %d\n", prisms.size());
-		fprintf(stderr, "Triangles   : %d\n", prisms.size() * 8);
-		fprintf(stderr, "GPU Blocks  : %d\n", blocks);
-		fprintf(stderr, "GPU Threads : %d\n", threads);
-		fprintf(stderr, "Runtime_GPU : %f s\n", runtimeGpu / 1000.0);
-		fprintf(stderr, "Runtime_CPU : %f s\n", runtimeCpu / 1000.0);
+		fprintf(stderr, "Vertices       : %d\n", size_p*(size_z+1));
+		fprintf(stderr, "Levels         : %d\n", size_z);
+		fprintf(stderr, "Prisms         : %d\n", N_cells*size_z);
+		fprintf(stderr, "Rays per Vertex: %d\n", threads*blocks);
+		fprintf(stderr, "Rays Total     : %d\n", threads*blocks*size_p*(size_z+1));
+		fprintf(stderr, "GPU Blocks     : %d\n", blocks);
+		fprintf(stderr, "GPU Threads    : %d\n", threads);
+		fprintf(stderr, "Runtime_GPU    : %f s\n", runtimeGpu / 1000.0);
+		fprintf(stderr, "Runtime_CPU    : %f s\n", runtimeCpu / 1000.0);
 		fprintf(stderr, "\n");
 	}
 	// Cleanup;
 	{
-		cudaFreeHost(hPrisms);
-		cudaFreeHost(hVertices);
-		cudaFree(dPrisms);
-		cudaFree(dVertices);
+//		cudaFreeHost(hPrisms);
+//		cudaFreeHost(hVertices);
+//		cudaFree(dPrisms);
+//		cudaFree(dVertices);
 
 		// Cleanup mex Variables
 		cudaFree(p_in);
