@@ -1,3 +1,4 @@
+// Libraies
 #include "stdio.h"
 #include "stdlib.h"
 #include "math.h"
@@ -7,7 +8,13 @@
 #include "curand_kernel.h"
 #include "datatypes.h"
 
+// User header files
+#include "geometrie.h"
+#include "datatypes.h"
+#include "generate_testdata.h"
+
 #define SMALL 1E-06
+
 #define CUDA_CHECK_RETURN(value) {				\
 	cudaError_t _mCudaStat = value;				\
 	if (_mCudaStat != cudaSuccess) {				\
@@ -18,7 +25,7 @@
 }
 
 //----------------------------------------------------
-// Structures
+// Device Code
 //----------------------------------------------------
 typedef struct point {
 	float x;
@@ -50,10 +57,9 @@ typedef struct plane {
 } PLANE;
 
 //------------------------------------------
-
-//----------------------------------------------------
-// Auxillary function declaration
-//----------------------------------------------------
+__device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
+  return a.x*b.x + a.y*b.y + a.z*b.z;
+}
 
 float distance(point a, point b);
 void  printPoint(point p);
@@ -97,7 +103,6 @@ __device__ rayCu generateRayGpu(pointCu vertexPoint, prismCu startPrism, curandS
 	pointCu A = startPrism.t1.A;
 	pointCu B = startPrism.t1.B;
 	pointCu C = startPrism.t1.C;
-
 	// Get x and y coordinates from the random barycentric values
 	const float xRand = u*A.x + v*B.x + w*C.x ;
 	const float yRand = u*A.y + v*B.y + w*C.y ;
@@ -209,8 +214,6 @@ __device__ float propagate(rayCu ray, prismCu prisms[], prismCu startprism){
 		// calculate the next PRISM (maybe with help of some neighbor-datastructure?
 
 	}
-
-
 	return gain;
 }
 
@@ -226,8 +229,6 @@ __global__ void raytraceStep( curandState* globalState, vertexCu vertex, prismCu
 	curandState localState = globalState[id];
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
-
-
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
 	const prismCu startprism = selectPrism(id, prisms);	
@@ -241,12 +242,18 @@ __global__ void raytraceStep( curandState* globalState, vertexCu vertex, prismCu
 	globalState[id] = localState;
 }
 
+//----------------------------------------------------
+// Auxillary function declaration
+//----------------------------------------------------
+// Debug functions
+void print_point(PointCu p);
+void print_vector(VectorCu v);
+void print_plane(PlaneCu pl);
 
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
 int main(){
-
 	//Variable definitions
 	const unsigned maxRays = 1000000;
 	const unsigned maxTriangles = 10000;
