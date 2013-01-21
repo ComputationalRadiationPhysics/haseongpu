@@ -10,6 +10,7 @@
 #include "geometrie.h"
 #include "datatypes.h"
 #include "generate_testdata.h"
+#include "print.h"
 
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
@@ -42,112 +43,128 @@ __device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-/**
-   @brief Calculates the barycentric coordinates of the triangle
-          and the intersectionpoint of the ray and the triangle.
+__device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
+				   PointCu rayObjective, //Richtungsvektor des Strahls
+				   PointCu p1, //1.Punkt des Dreiecks
+				   PointCu p2, //2.Punkt des Dreiecks
+				   PointCu p3) //3.Punkt des Dreiecks
+{
+  double s2; //2.barizentrische Koordinate des Dreiecks
+  double s3; //3.barizentrische Koordinate des Dreiecks
+  //1.barizentrische Koordinate des Dreiecks ergibt sich mit 1.-s2-s3
+  double t; //Geradenparameter
+  PointCu intersectionPoint = {0, 0, 0, 0};
 
-   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
-   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
- **/
-__device__ float4 to_barycentric_gpu(TriangleCu tr, RayCu ray){
-  float4 b = {0,0,0,0};
-  VectorCu e1, e2, q, s, r, ray_direction;
-  PointCu p0, p1, p2;
-  float a, f, u, v, t;
+  //Grenzwert fuer numerische Stabilitaet
+  const double eps = 1e-6; //empirischer Wert, bei Moeller/Trumbore 1e-6
 
-  p0 = tr.A;
-  p1 = tr.B;
-  p2 = tr.C;
+  //Variable fuer Determinante
+  double determinante;
 
-  ray_direction.x = ray.direction.x - ray.P.x;
-  ray_direction.y = ray.direction.y - ray.P.y;
-  ray_direction.z = ray.direction.z - ray.P.z;
+  //side12 und side13 sind Vektoren der Seiten
+  //cross ist eine Hilfsvariable
+  VectorCu side12, side13, rayDirection, cross;
 
-  e1.x = p1.x - p0.x;
-  e1.y = p1.y - p0.y;
-  e1.z = p1.z - p0.z;
+  //Berechnung von Vektoren der Seiten:
+  //1.Seite side12 von p1 nach p2
+  side12.x = p2.x - p1.x;
+  side12.y = p2.y - p1.y;
+  side12.z = p2.z - p1.z;
 
-  e2.x = p2.x - p0.x;
-  e2.y = p2.y - p0.y;
-  e2.z = p2.z - p0.z;
+  //2.Seite side13 von p1 nach p3
+  side13.x = p3.x - p1.x;
+  side13.y = p3.y - p1.y;
+  side13.z = p3.z - p1.z;
 
-  q = crossproduct_gpu(ray_direction, e2);
-  a = skalar_mul_gpu(e1, q);
-  
-  // a is to close to 0
-  if(fabs(a) < 0.0000001)
-    return b;
+  rayDirection.x = rayObjective.x - rayOrigin.x;
+  rayDirection.y = rayObjective.y - rayOrigin.y;
+  rayDirection.z = rayObjective.z - rayOrigin.z;
 
-  f = 1 / a;
-  
-  s.x = ray.P.x - p0.x;
-  s.y = ray.P.y - p0.y;
-  s.z = ray.P.z - p0.z;
+  //Gleichsetzen von Gereadengleichung und Ebenengleichung
+  //Modell:  sp=p1+s2*(p2-p1)+s3*(p3-p1)=rayOrigin+t*rayDirection
+  //Berechnung mit Cramerscher Regel zum Loesen des Gleichungssystems:
+  //s2*(p2-p1)+s3*(p3-p1)-t*rayDirection = rayOrigin-p1 -> zu bestimmende Parameter: s2,s3,-t 
 
-  u = f * skalar_mul_gpu(s, q);
+  //Kreuzprodukt von side13 und rayDirection
+  cross.x = side13.y * rayDirection.z - side13.z * rayDirection.y;
+  cross.y = side13.z * rayDirection.x - side13.x * rayDirection.z;
+  cross.z = side13.x * rayDirection.y - side13.y * rayDirection.x;
 
-  if(u < 0.0)
-    return b;
+  //Berechnung der Determinante mit Skalarprodukt
+  determinante = cross.x * side12.x + cross.y * side12.y + cross.z * side12.z;
 
-  r = crossproduct_gpu(s, e1);
-  v = f * skalar_mul_gpu(ray_direction, r);
-  if( v < 0.0 || (u + v) > 1)
-    return b;
-  
-  t = f * skalar_mul_gpu(e2, q);
-  
-  b.x = u;
-  b.y = v;
-  b.z = t;
-  b.w = 1;
 
-  return b;
-}
+  //Test auf Parallelitaet
+  //numerische Stabilitaet!!!
 
-__device__ PointCu intersection_gpu(PlaneCu pl, RayCu r){
-  PointCu intersection_point = {0, 0, 0, 0};
+  if (determinante > -eps && determinante < eps){
+    return intersectionPoint;
+  }
 
-  float t, d;
+  //Abstand Ursprung des Strahls zu p1
+  VectorCu p1_rayOrigin; //=rayOrigin-p1;
+  p1_rayOrigin.x = rayOrigin.x - p1.x;
+  p1_rayOrigin.y = rayOrigin.y - p1.y;
+  p1_rayOrigin.z = rayOrigin.z - p1.z;
 
-  // vector coordinates
-  float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
-  
-  // just get the coordinates from the structs
-  n1 = pl.normal.x;
-  n2 = pl.normal.y;
-  n3 = pl.normal.z;
+  //barizentrische Koordinaten
+  // sp=s1*p1+s2*p2+s3*p3
+  //2. barizentrische Koordinate s2
+  //=Skalarprodukt von p1_rayOrigin und cross
+  s2 = cross.x * p1_rayOrigin.x + cross.y * p1_rayOrigin.y + cross.z * p1_rayOrigin.z;
 
-  a1 = pl.P.x;
-  a2 = pl.P.y;
-  a3 = pl.P.z;
+  //Hilfsvariable
+  VectorCu tempcross;
+  //zunaenaehst Kreuzprodukt von rayDirection und side12
+  tempcross.x = rayDirection.y * side12.z - rayDirection.z * side12.y;
+  tempcross.y = rayDirection.z * side12.x - rayDirection.x * side12.z;
+  tempcross.z = rayDirection.x * side12.y - rayDirection.y * side12.x;
 
-  x1 = r.P.x;
-  x2 = r.P.y;
-  x3 = r.P.z;
+  //s3=Skalarprodukt von rayDirection und side12
+  //s3=(rayDirection x side12) *p1_rayOrigin
+  s3 = tempcross.x * p1_rayOrigin.x + tempcross.y * p1_rayOrigin.y + tempcross.z * p1_rayOrigin.z;
 
-  p1 = r.direction.x - r.P.x;
-  p2 = r.direction.y - r.P.y;
-  p3 = r.direction.z - r.P.z;
+  //Cramersche Regel -> Division durchfuehren
+  double invdet = 1. / determinante;
 
-  // calculation of intersection
-  // this case for parallel rays, will be ignored for easier calculations
-  float denominator = (n1*p1 + n2*p2 + n3*p3);
-  if(abs(denominator) <= 0.000001)
-    return intersection_point;
+  s2 = invdet*s2;
+  s3 = invdet*s3;
 
-  d = n1*a1 + n2*a2 + n3*a3;
-  t = (d - n1*x1 - n2*x2 - n3*x3) / denominator;
+  //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
+  //zunaechst Kreuzprodukt von side13 und side12
+  tempcross.x = side13.y * side12.z - side13.z * side12.y;
+  tempcross.y = side13.z * side12.x - side13.x * side12.z;
+  tempcross.z = side13.x * side12.y - side13.y * side12.x;
 
-  // ignore intersections before the ray 
-  if(t < 0)
-    return intersection_point;
+  //t ist dann das Skalarprodukt von tempcross und p1_rayOrigin
+  //t=(seite13,seite12) *p1_rayOrigin = -(seite12,seite13) *p1_rayOrigin
+  t = tempcross.x * p1_rayOrigin.x + tempcross.y * p1_rayOrigin.y + tempcross.z * p1_rayOrigin.z;
 
-  intersection_point.x = x1 + t * p1;
-  intersection_point.y = x2 + t * p2;
-  intersection_point.z = x3 + t * p3;
-  intersection_point.w = 1;
-  return intersection_point;
+  t = invdet*t;
 
+  //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
+
+  //Ueberschereitungstest fuer barizentrische Koordinaten
+  if (s2 < 0. || s2 > 1.) return intersectionPoint;
+
+  //Ueberschereitungstest fuer barizentrische Koordinaten
+  if (s3 < 0. || s3 > 1.) return intersectionPoint;
+
+  //0 <= s1=1-s2-s3 <= 1 -> s2+s3<1   (s2+s3>0 schon durchgefuehrt,da s2>0 s3>0)
+  if (s2 + s3 > 1.) return intersectionPoint;
+
+  //Test, ob Strahl in Richtung des Dreiecks zeigt:
+  if (t < 0.) return intersectionPoint;
+
+  //Schnittpunktberechnung
+
+  intersectionPoint.x = rayOrigin.x + t * rayDirection.x;
+  intersectionPoint.y = rayOrigin.y + t * rayDirection.y;
+  intersectionPoint.z = rayOrigin.z + t * rayDirection.z;
+  intersectionPoint.w = 1;
+
+  return intersectionPoint;
+ 
 }
 
 /**
@@ -155,32 +172,7 @@ __device__ PointCu intersection_gpu(PlaneCu pl, RayCu r){
    a precondition.
 **/
 __device__ PointCu collide_triangle_gpu(TriangleCu t, RayCu r){
-  PlaneCu pl;
-  float b1, b2, b3, c1, c2, c3;
-
-  b1 = t.B.x - t.A.x;
-  b2 = t.B.y - t.A.y;
-  b3 = t.B.z - t.A.z;
-
-  c1 = t.C.x - t.A.x;
-  c2 = t.C.y - t.A.y;
-  c3 = t.C.z - t.A.z;
-
-  pl.P = t.A;
-  pl.normal.x = (b2*c3 - b3*c2);
-  pl.normal.y = (b3*c1 - b1*c3);
-  pl.normal.z = (b1*c2 - b2*c1);
-
-  float4 b = to_barycentric_gpu(t, r);
-  // Maybe we can calculate intersection be barycentric coords
-  PointCu p = intersection_gpu(pl, r);
-  if(b.w == 1 && p.w == 1){
-    return p;
-  }
-  else{
-    PointCu no_inter = {0,0,0,0}; 
-    return no_inter;
-  }
+ return intersectionRayTriangleGPU(r.P, r.direction, t.A, t.B, t.C);
 
 }
 
@@ -265,7 +257,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
       else{
 	// Filter double collisions
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
-	  /*
+	  
 	  if(distance_gpu(r.P, first_intersection) <= ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
 	    return distance_gpu(r.direction, first_intersection);
 
@@ -274,7 +266,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
 	  
 	  if(distance_gpu(r.P, first_intersection) > ray_distance || distance_gpu(r.direction, first_intersection) > ray_distance)
 	    return 0;
-	  */
+
 	  return distance_gpu(first_intersection, intersection_point);
 	}
 
@@ -289,47 +281,46 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
 
 __global__ void trace_on_prisms(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample){
   // Cuda ids
-  unsigned tid = threadIdx.x;
+  //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
   unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Local data
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
-  PointCu sample_point = samples[sample_i];
   RayCu ray = rays[gid];
+  unsigned beta_per_ray = 1;
+  unsigned importance_per_prism = 1;
   
+  // Calculations
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
     float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
-    if(distance > 0){
-      ray.P.w += distance;
-    }
+
+    ray.P.w += distance * beta_per_ray;
     __syncthreads();	
   }
+  __syncthreads();
+
+  // Check Solution
+  if(fabs(ray.P.w - distance_gpu(ray.P, ray.direction)) > 0.00001){
+	  printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), ray.P.w);
+	  return;
+  }
+
+  // Copy data to global
   rays[gid].P.w = ray.P.w;
-  atomicAdd(&(samples[sample_i].w), ray.P.w);
-
-
+  atomicAdd(&(samples[sample_i].w), (ray.P.w * importance_per_prism));
 
 }
-
-//----------------------------------------------------
-// Auxillary function declaration
-//----------------------------------------------------
-// Debug functions
-void print_point(PointCu p);
-void print_vector(VectorCu v);
-void print_plane(PlaneCu pl);
-
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
 int main(){
   const unsigned max_rays = 256;
-  const unsigned max_triangles = 32;
+  const unsigned max_triangles = 8;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 2;
+  const unsigned depth  = 4;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
@@ -338,6 +329,7 @@ int main(){
   bool use_gpu = true;
 
   // Generate testdata
+  fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu> prisms = generate_prisms(length, length, depth);
   std::vector<PointCu> samples = generate_samples(length, length, depth);
   std::vector<RayCu> rays;
@@ -354,6 +346,7 @@ int main(){
   // CPU Raytracing
   cudaEventRecord(start, 0);
   if(use_cpu){
+    fprintf(stderr, "C Start CPU-Raytracing\n");
     for(sample_i = 0; sample_i < samples.size(); ++sample_i){
       for(ray_i = 0; ray_i < max_rays; ++ray_i){
 	for(prism_i = 0; prism_i < prisms.size(); ++prism_i){
@@ -374,7 +367,7 @@ int main(){
 	  fprintf(stderr, "Sample: ");print_point(rays[sample_i * max_rays + ray_i].P);
 	  fprintf(stderr, "Objective: ");print_point(rays[sample_i * max_rays + ray_i].direction);
 	}
-	//assert(fabs(d1 - d2) < 0.000001);
+
       }
 
     }
@@ -394,7 +387,7 @@ int main(){
   int blocks = blocks_per_sample * samples.size();
   
   if(use_gpu){
-
+    fprintf(stderr, "C Start GPU Raytracing\n");
     // Memory allocation on host
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, prisms.size() * sizeof(PrismCu), cudaHostAllocDefault));
     CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, samples.size() * max_rays * sizeof(RayCu), cudaHostAllocDefault));
@@ -483,22 +476,3 @@ int main(){
   return 0;
 }
 
-//----------------------------------------------------
-// Auxillary function definition
-//----------------------------------------------------
-void print_point(PointCu p){
-  fprintf(stderr, "Point (%f, %f, %f)\n",p.x, p.y, p.z);
-
-}
-
-void print_vector(VectorCu v){
-  fprintf(stderr, "Vector (%f, %f, %f)\n",v.x, v.y, v.z);
-
-}
-
-void print_plane(PlaneCu pl){
-  fprintf(stderr, "Plane: \n\t");
-  print_point(pl.P);
-  fprintf(stderr, "\t");
-  print_vector(pl.normal);
-}
