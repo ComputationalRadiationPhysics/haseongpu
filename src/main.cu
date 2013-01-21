@@ -11,6 +11,7 @@
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
+#include "testdata_1.h"
 
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
@@ -492,7 +493,7 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-__global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
+__global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices, int vertex_index, PrismCu* prisms, int prismCount, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int host_size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
@@ -501,7 +502,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, VertexCu* vertices
 	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
 	//PrismCu startprism = selectPrism(id, prisms, prismCount);	
-	int starttriangle = selectTriangle(id,size_t); //@TODO: second parameter is number of 2D Triangles
+	int starttriangle = selectTriangle(id,host_size_t); //@TODO: second parameter is number of 2D Triangles
 	int startlevel = selectLevel(id,size_z); //@TODO: second parameter is number of Levels 
 
 	// the indices of the vertices of the starttriangle
@@ -552,10 +553,14 @@ int main(){
 	// Variables from the mexFunction 
 	double  *p_in, *n_x, *n_y;
 	int *forbidden, *n_p, *neighbors, *t_in;
-	int size_t=10, N_cells, size_p=10, size_z=2;
-	double z_mesh = 0.0356;
-	double  *host_p_in, *host_n_x, *host_n_y;
-	int *host_forbidden, *host_n_p, *host_neighbors, *host_t_in;
+	//int size_t=10, N_cells, size_p=10, size_z=2;
+	int size_z = mesh_z;
+
+	int N_cells = host_size_t;
+	//double z_mesh = 0.0356;
+	//double  *host_p_in, *host_n_x, *host_n_y;
+	//int *host_forbidden, *host_n_p, *host_neighbors, *host_t_in;
+	
 	/*
 	  host_p_in = (double *)mxGetData(prhs[0]); //point coordinates in 2D . at first size_p x-values, then size_p y-values
 	  host_n_x = (double *)mxGetData(prhs[4]); //normals of the facets, x-components // probably size_t values?? //@TODO check this
@@ -564,8 +569,8 @@ int main(){
 	  host_t_in = (int *)mxGetData(prhs[1]);  //association triangle-points - c-indexing-sytle!
 	  host_n_p = (int *)mxGetData(prhs[10]); // gives the Index to one of the points in p_in which is in the plane of the normals - c-indexing-sytle!
 	  host_neighbors = (int *)mxGetData(prhs[6]); //for each cell in t_in, its neighboring cell in plane geometry  - c-indexing-sytle!
-	  size_t = (int )mxGetM(prhs[1]); //number of triangles per sheet
-	  N_cells = size_t;
+	  host_size_t = (int )mxGetM(prhs[1]); //number of triangles per sheet
+	  N_cells = host_size_t;
 	  size_p = (int )mxGetM(prhs[0]); //number of points
 	  z_mesh = (double)((double *)mxGetData(prhs[14]))[0];
 	  size_z = (int )mxGetN(prhs[2]); //number of meshing in z-direction
@@ -614,12 +619,12 @@ int main(){
 
 			// Memory allocation on device (mexFunction Variables)
 			CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * size_p * sizeof(double)));
-			CUDA_CHECK_RETURN(cudaMalloc(&n_x, size_t * sizeof(double)));
-			CUDA_CHECK_RETURN(cudaMalloc(&n_y, size_t * sizeof(double)));
-			CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* size_t * sizeof(int)));
-			CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* size_t * sizeof(int)));
-			CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* size_t * sizeof(int)));
-			CUDA_CHECK_RETURN(cudaMalloc(&t_in, 3* size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_x, host_size_t * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_y, host_size_t * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* host_size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* host_size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* host_size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&t_in, 3* host_size_t * sizeof(int)));
 
 
 
@@ -630,12 +635,12 @@ int main(){
 
 			// Copy data from host to device (mex Function Variables)
 			CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * size_p * sizeof(double), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, size_t * sizeof(double), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, size_t * sizeof(double), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(neighbors, host_neighbors, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
-			CUDA_CHECK_RETURN(cudaMemcpy(t_in ,host_t_in, 3* size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(neighbors, host_neighbors, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(t_in ,host_t_in, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
 		}
 
 		// Generating Random Numbers
@@ -662,7 +667,7 @@ int main(){
 		cudaEventRecord(start, 0);
 		// start the Kernels
 		for(vertex_i = 0; vertex_i < vertices.size(); ++vertex_i){
-			raytraceStep<<< blocks, threads >>> ( devMTGPStates, dVertices, vertex_i,  dPrisms, prisms.size(),p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, size_t, size_z, forbidden, z_mesh, t_in);
+			raytraceStep<<< blocks, threads >>> ( devMTGPStates, dVertices, vertex_i,  dPrisms, prisms.size(),p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, host_size_t, size_z, forbidden, z_mesh, t_in);
 		}
 
 		fprintf(stderr, "\nafter the kernel");
