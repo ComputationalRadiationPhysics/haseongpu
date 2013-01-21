@@ -168,61 +168,6 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
 }
 
 /**
-   @brief Detects collisions of a triangle and a ray without
-   a precondition.
-**/
-__device__ PointCu collide_triangle_gpu(TriangleCu t, RayCu r){
- return intersectionRayTriangleGPU(r.P, r.direction, t.A, t.B, t.C);
-
-}
-
-/* __device__ float collide_prism_gpu(PrismCu pr, RayCu r){ */
-/*   //bool has_collide; */
-/*   PointCu intersections[2]; */
-/*   PointCu A1 = pr.t1.A; */
-/*   PointCu B1 = pr.t1.B; */
-/*   PointCu C1 = pr.t1.C; */
-/*   PointCu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1}; */
-/*   PointCu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1}; */
-/*   PointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1}; */
-
-/*   TriangleCu triangles[8] = { */
-/*     pr.t1, */
-/*     {A2, B2, C2}, */
-/*     {A1, B1, A2}, */
-/*     {B1, B2, A2}, */
-/*     {B1, C1, C2}, */
-/*     {B1, B2, C2}, */
-/*     {A1, C1, C2}, */
-/*     {A1, A2, C2}}; */
-
-/*   unsigned i;  */
-/*   unsigned j = 0; */
-/*   // test for collision on all triangles of an prism */
-/*   for(i = 0, j = 0; i < 8; ++i){ */
-/*     PointCu p = collide_triangle_gpu(triangles[i], r); */
-/*     if(p.w == 0) */
-/*     // No Collision for this triangle */
-/*       continue; */
-/*     // Filter double Collision on edges or vertices */
-/*     if(j != 0){ */
-/*       if(intersections[j-1].x != p.x || intersections[j-1].y != p.y || intersections[j-1].z != p.z){ */
-/* 	intersections[j++] = p; */
-/*       } */
-/*     } */
-/*     else{ */
-/*       intersections[j++] = p; */
-/*     } */
-
-/*   } */
-/*   //if(j > 1) */
-/*     return (j/2) * distance_gpu(intersections[0], intersections[1]); */
-/*     //else */
-/*     //return 0; */
-/* } */
-
-
-/**
    @attention slower than commented collide_prism_gpu but more pretty
 **/
 __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
@@ -249,7 +194,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    intersection_point = collide_triangle_gpu(triangles[i], r);
+    intersection_point = intersectionRayTriangleGPU(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
     if(intersection_point.w != 0){
       if(first_intersection.w == 0){
 	first_intersection = intersection_point;
@@ -317,15 +262,15 @@ __global__ void trace_on_prisms(PrismCu* prisms, const unsigned max_prisms, RayC
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 256;
-  const unsigned max_triangles = 8;
+  const unsigned max_rays = 10000;
+  const unsigned max_triangles = 300;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 4;
+  const unsigned depth  = 10;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = true;
+  bool use_cpu = false;
   bool use_gpu = true;
 
   // Generate testdata

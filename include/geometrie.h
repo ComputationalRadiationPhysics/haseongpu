@@ -11,71 +11,13 @@ float distance(PointCu a, PointCu b);
 VectorCu crossproduct(VectorCu a, VectorCu b);
 float skalar_mul(VectorCu a, VectorCu b);
 
-/**   
-   @brief Calculates the barycentric coordinates of the triangle
-          and the intersectionpoint of the ray and the triangle.
-	  Algorithm based on a paper. exact copy of pseudo code.
-
+/**
+   @brief Detects collisions of a triangle and a ray without
+   a precondition.
+   
    @return PointCu {0,0,0,0} if there is no intersection triangle/ray
    @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
- **/
-float4 to_barycentric(TriangleCu tr, RayCu ray){
-  float4 b = {0,0,0,0};
-  VectorCu e1, e2, q, s, r, ray_direction;
-  PointCu p0, p1, p2;
-  float a, f, u, v, t;
-
-
-  p0 = tr.A;
-  p1 = tr.B;
-  p2 = tr.C;
-  
-  ray_direction.x = ray.direction.x - ray.P.x;
-  ray_direction.y = ray.direction.y - ray.P.y;
-  ray_direction.z = ray.direction.z - ray.P.z;
-
-  e1.x = p1.x - p0.x;
-  e1.y = p1.y - p0.y;
-  e1.z = p1.z - p0.z;
-
-  e2.x = p2.x - p0.x;
-  e2.y = p2.y - p0.y;
-  e2.z = p2.z - p0.z;
-
-  q = crossproduct(ray_direction, e2);
-  a = skalar_mul(e1, q);
-  
-  // a is to close to 0
-  if(fabs(a) < 0.000001)
-    return b;
-
-  f = 1 / a;
-  
-  s.x = ray.P.x - p0.x;
-  s.y = ray.P.y - p0.y;
-  s.z = ray.P.z - p0.z;
-
-  u = f * skalar_mul(s, q);
-
-  if(u < 0.0)
-    return b;
-
-  r = crossproduct(s, e1);
-  v = f * skalar_mul(ray_direction, r);
-  if( v < 0.0 || (u + v) > 1)
-    return b;
-  
-  //t = f * skalar_mul(e2, q);
-  t = 1 - u - v;
-  
-  b.x = u;
-  b.y = v;
-  b.z = t;
-  b.w = 1;
-  assert(fabs((u + v + t)-1) < 0.000001);
-  return b;
-}
-
+**/
 PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
 				PointCu rayObjective, //Richtungsvektor des Strahls
 				PointCu p1, //1.Punkt des Dreiecks
@@ -199,17 +141,7 @@ PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
   return intersectionPoint;
  
 }
-/**
-   @brief Detects collisions of a triangle and a ray without
-   a precondition.
-   
-   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
-   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
-**/
-PointCu collide_triangle(TriangleCu t, RayCu r){
-  return intersectionRayTriangle(r.P, r.direction, t.A, t.B, t.C);
 
-}
 /**
    @brief Detects collisions of a prism and ray
    
@@ -242,7 +174,7 @@ float collide_prism(PrismCu pr, RayCu r){
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    intersection_point = collide_triangle(triangles[i], r);
+    intersection_point = intersectionRayTriangle(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
     if(intersection_point.w != 0){
       if(first_intersection.w == 0){
 	first_intersection = intersection_point;
