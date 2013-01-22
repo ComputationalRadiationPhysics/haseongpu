@@ -20,17 +20,13 @@
 // Host Code
 //----------------------------------------------------
 int main(int argc, char **argv){
-  const unsigned max_rays = 1024;
-  const unsigned max_triangles = 8;
-  const unsigned depth  = 2;
+  const unsigned max_rays = 256;
+  const unsigned max_triangles = 2;
+  const unsigned depth  = 1;
   const unsigned length = ceil(sqrt(max_triangles / 2));
   const int threads = 256;
-  unsigned ray_i, prism_i, sample_i, i;
-  float runtime_gpu = 0.0;
-  float runtime_cpu = 0.0;
+  char* runmode = "";
   float runtime = 0.0;
-  bool use_cpu = true;
-  bool use_gpu = true;
   
   // Parse Commandline
   if(argc <= 1){
@@ -40,20 +36,6 @@ int main(int argc, char **argv){
     fprintf(stderr, "             bruteforce_gpu\n");
     return 0;
   }
-
-  /* for(i=1; i < argc; ++i){ */
-  /*   if(strncmp(argv[i], "--mode=", 6) == 0){ */
-  /*     if(strstr(argv[i], "bruteforce_cpu") != 0){ */
-  /* 	runtime_cpu = run_ase_bruteforce_cpu(samples, prisms, rays, ase_cpu); */
-  /*     }else */
-  /*     if(strstr(argv[i], "bruteforce_gpu") != 0){ */
-  /* 	runtime_gpu = run_ase_bruteforce_gpu(samples, prisms, rays, ase_gpu, threads); */
-  /*     } */
-
-
-  /*   } */
-       
-  /* } */
   
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
@@ -63,40 +45,19 @@ int main(int argc, char **argv){
   std::vector<float> *ase_cpu   = new std::vector<float>(samples->size(), 0);
   std::vector<float> *ase_gpu   = new std::vector<float>(samples->size(), 0);
   
-  // CPU Raytracing
-  if(use_cpu){
-    runtime_cpu = run_ase_bruteforce_cpu(samples, prisms, rays, ase_cpu);
-  }
-   
-  // GPU Raytracing
-  if(use_gpu){
-    runtime_gpu = run_ase_bruteforce_gpu(samples, prisms, rays, ase_gpu, threads);
-  }
-
-  // Evaluate device data
-  if(use_gpu && use_cpu){
-    for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-      if(fabs(ase_cpu->at(sample_i) - ase_gpu->at(sample_i)) < 0.1){
-  	fprintf(stderr, "CPU == GPU: Sample %d with value %f \n", sample_i, ase_cpu->at(sample_i));
-
+  unsigned i;
+  for(i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--mode=", 6) == 0){
+      if(strstr(argv[i], "bruteforce_cpu") != 0){
+  	runtime = run_ase_bruteforce_cpu(samples, prisms, rays, ase_cpu);
+      }else
+      if(strstr(argv[i], "bruteforce_gpu") != 0){
+  	runtime = run_ase_bruteforce_gpu(samples, prisms, rays, ase_gpu, threads);
       }
-      else{
-  	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%f) != GPU(%f) on sample %d\n", ase_cpu->at(sample_i), ase_gpu->at(sample_i), sample_i);
 
-      }
 
     }
-
-    /* for(ray_i = 0; ray_i < rays.size(); ++ray_i){ */
-    /*   if(fabs(ray_data[ray_i] - h_rays[ray_i].P.w) < 0.00001){ */
-    /* 	//fprintf(stderr, "CPU == GPU: Ray %d with value %f \n", ray_i, ray_data[ray_i]); */
-
-    /*   } */
-    /*   else{ */
-    /* 	fprintf(stderr, "\033[31;1m[Error]\033[m CPU(%f) != GPU(%f) on ray %d\n", ray_data[ray_i], h_rays[ray_i].P.w, ray_i); */
-
-    /*   } */
-    /* } */
+       
   }
 
   // Print statistics
@@ -110,20 +71,10 @@ int main(int argc, char **argv){
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads       : %d\n", threads);
   fprintf(stderr, "C GPU Blocks/Sample : %d\n", blocks_per_sample);
-  fprintf(stderr, "C Runtime_GPU       : %f s\n", runtime_gpu / 1000.0);
-  fprintf(stderr, "C Runtime_CPU       : %f s\n", runtime_cpu / 1000.0);
-  fprintf(stderr, "C Speedup CPU/GPU   : %.1f\n", runtime_cpu / runtime_gpu);
+  fprintf(stderr, "C Runmode           : %s \n", runmode);
+  fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
 
-
-
-
-
-  // Cleanup
-  /* cudaFreeHost(h_rays); */
-  /* cudaFreeHost(h_prisms); */
-  /* cudaFreeHost(h_samples); */
- 
   return 0;
 }
 

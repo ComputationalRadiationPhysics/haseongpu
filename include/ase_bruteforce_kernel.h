@@ -106,11 +106,17 @@ float run_ase_bruteforce_gpu(std::vector<PointCu> *samples, std::vector<PrismCu>
 
   CUDA_CHECK_RETURN(cudaMemcpy(h_samples, d_samples, samples->size() * sizeof(PointCu), cudaMemcpyDeviceToHost));
   CUDA_CHECK_RETURN(cudaMemcpy(h_rays, d_rays, rays->size() * sizeof(RayCu), cudaMemcpyDeviceToHost));
-    
+
+  // Cleanup data  
+  cudaFreeHost(h_rays);
+  cudaFreeHost(h_prisms);
+  cudaFreeHost(h_samples);
+ 
   // Copy data to vectors
-  for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-    ase->at(sample_i) = h_samples[sample_i].w;
-  }
+  /* for(sample_i = 0; sample_i < samples->size(); ++sample_i){ */
+  /*   ase->at(sample_i) = h_samples[sample_i].w; */
+  /*   fprintf(stderr, "ase_gpu: %f\n", h_samples[sample_i].w); */
+  /* } */
   
   return runtime_gpu;
 }
