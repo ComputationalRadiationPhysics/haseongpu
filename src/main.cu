@@ -262,15 +262,15 @@ __global__ void trace_on_prisms(PrismCu* prisms, const unsigned max_prisms, RayC
 // Host Code
 //----------------------------------------------------
 int main(){
-  const unsigned max_rays = 10000;
-  const unsigned max_triangles = 300;
+  const unsigned max_rays = 1000;
+  const unsigned max_triangles = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
-  const unsigned depth  = 10;
+  const unsigned depth  = 1;
   unsigned ray_i, prism_i, sample_i;
   float runtime_gpu = 0.0;
   float runtime_cpu = 0.0;
   cudaEvent_t start, stop;
-  bool use_cpu = false;
+  bool use_cpu = true;
   bool use_gpu = true;
 
   // Generate testdata
