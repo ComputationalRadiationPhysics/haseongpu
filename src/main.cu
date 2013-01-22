@@ -493,65 +493,66 @@ __global__ void setupKernel ( curandState * state, unsigned long seed ){
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-__global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int level, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int host_size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
+__global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int N_cells, int size_p, int host_size_t, int size_z, int *forbidden, double z_mesh, int* t_in) {
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
-
-
-	// this should give the same prism multiple times (so that every thread uses the same prism, which yields
-	// big benefits for the memory access (and caching!)
-	//PrismCu startprism = selectPrism(id, prisms, prismCount);	
-	int starttriangle = selectTriangle(id,host_size_t); //@TODO: second parameter is number of 2D Triangles
-	int startlevel = selectLevel(id,size_z); //@TODO: second parameter is number of Levels 
-
-	// the indices of the vertices of the starttriangle
-	int t_1 = t_in[starttriangle];
-	int t_2 = t_in[starttriangle+N_cells];
-	int t_3 = t_in[starttriangle+2*N_cells];
-
-	// random startpoint generation
-	float  u = curand_uniform(&globalState[blockIdx.x]);
-	float  v = curand_uniform(&globalState[blockIdx.x]);
-
-	if((u+v)>1)
-	{
-		u = 1-u;
-		v = 1-v;
-	}
-
-	float w = 1-u-v;
-
-	// convert the random startpoint into coordinates
-	double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))*z_mesh;
-	double x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
-	double y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;
-	PointCu startpoint = {x_rand, y_rand, z_rand};
-
 
 	int endpoint_x = p_in[point2D];
 	int endpoint_y = p_in[size_p + point2D];
 	int endpoint_z = level*z_mesh;
 	PointCu endpoint = {endpoint_x, endpoint_y, endpoint_z};
 
-	//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
-	float initial_distance = distance(startpoint, endpoint);
+	for (int i=0; i<iterations ; ++i){
+		// this should give the same prism multiple times (so that every thread uses the same prism, which yields
+		// big benefits for the memory access (and caching!)
+		//PrismCu startprism = selectPrism(id, prisms, prismCount);	
+		int starttriangle = selectTriangle(id,host_size_t); //@TODO: second parameter is number of 2D Triangles
+		int startlevel = selectLevel(id,size_z); //@TODO: second parameter is number of Levels 
+
+		// the indices of the vertices of the starttriangle
+		int t_1 = t_in[starttriangle];
+		int t_2 = t_in[starttriangle+N_cells];
+		int t_3 = t_in[starttriangle+2*N_cells];
+
+		// random startpoint generation
+		float  u = curand_uniform(&globalState[blockIdx.x]);
+		float  v = curand_uniform(&globalState[blockIdx.x]);
+
+		if((u+v)>1)
+		{
+			u = 1-u;
+			v = 1-v;
+		}
+
+		float w = 1-u-v;
+
+		// convert the random startpoint into coordinates
+		double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))*z_mesh;
+		double x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
+		double y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;
+		PointCu startpoint = {x_rand, y_rand, z_rand};
 
 
-	float gain = 0.;
-	gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
-	//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
 
-	//printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
-
-	//printf("Thread: %d\t RAND=%f\t TRIANGLE=%d\n",id,curand_uniform(&globalState[0]),starttriangle);
-
-//	printf("\nThread: %d\t TRIANGLE=%d POINTS=%f   %f   %f",id,starttriangle,x_rand,y_rand,z_rand);
-
-	//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
-	//assert(fabs(gain-initial_distance) < 0.001);
+		//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
+		float initial_distance = distance(startpoint, endpoint);
 
 
+		float gain = 0.;
+		gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+		//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+
+		//printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
+
+		//printf("Thread: %d\t RAND=%f\t TRIANGLE=%d\n",id,curand_uniform(&globalState[0]),starttriangle);
+
+		//	printf("\nThread: %d\t TRIANGLE=%d POINTS=%f   %f   %f",id,starttriangle,x_rand,y_rand,z_rand);
+
+		//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
+		//assert(fabs(gain-initial_distance) < 0.001);
+
+	}
 	//atomicAdd(&(vertices[vertex_index].P.w),gain);
 }
 
@@ -604,7 +605,11 @@ int main(){
 	// GPU Raytracing
 	PrismCu* hPrisms, *dPrisms;
 	VertexCu* hVertices, *dVertices;
-	int blocks = ceil(25600 / float(threads));
+	int rays_per_sample = 25600;
+	int rays_per_thread = ceil(rays_per_sample / float(threads));
+	int blocks = 200;
+	int iterations = ceil(rays_per_thread / float(blocks));
+
 	if(useGpu){
 
 		//initialize memory
@@ -669,6 +674,7 @@ int main(){
 
 		/* Initialize one state per thread block */
 		CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234));
+		
 
 		/* State setup is complete */
 
@@ -677,7 +683,8 @@ int main(){
 		// start the Kernels
 		for(int point2D = 0; point2D < size_p ; ++point2D){
 			for(int level = 0; level <= size_z; ++ level){
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, point2D, level, p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, host_size_t, size_z, forbidden, z_mesh, t_in);
+				cudaThreadSynchronize();
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, host_size_t, size_z, forbidden, z_mesh, t_in);
 			}
 		}
 
