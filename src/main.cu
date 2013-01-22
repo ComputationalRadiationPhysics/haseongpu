@@ -502,6 +502,8 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 	int endpoint_y = p_in[size_p + point2D];
 	int endpoint_z = level*z_mesh;
 	PointCu endpoint = {endpoint_x, endpoint_y, endpoint_z};
+		float gain = 0.;
+		float initial_distance = 50.;
 
 	for (int i=0; i<iterations ; ++i){
 		// this should give the same prism multiple times (so that every thread uses the same prism, which yields
@@ -536,10 +538,9 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 
 
 		//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
-		float initial_distance = distance(startpoint, endpoint);
+		initial_distance = distance(startpoint, endpoint);
 
 
-		float gain = 0.;
 		gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
 		//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
 
@@ -550,10 +551,12 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 		//	printf("\nThread: %d\t TRIANGLE=%d POINTS=%f   %f   %f",id,starttriangle,x_rand,y_rand,z_rand);
 
 		//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
-		//assert(fabs(gain-initial_distance) < 0.001);
+		assert(fabs(gain-1-initial_distance) < 0.001);
 
 	}
 	//atomicAdd(&(vertices[vertex_index].P.w),gain);
+	if(threadIdx.x == 255)
+		printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain-1,initial_distance);
 }
 
 //----------------------------------------------------
@@ -605,7 +608,7 @@ int main(){
 	// GPU Raytracing
 	PrismCu* hPrisms, *dPrisms;
 	VertexCu* hVertices, *dVertices;
-	int rays_per_sample = 25600;
+	unsigned rays_per_sample = 2560;
 	int rays_per_thread = ceil(rays_per_sample / float(threads));
 	int blocks = 200;
 	int iterations = ceil(rays_per_thread / float(blocks));
@@ -712,9 +715,10 @@ int main(){
 		fprintf(stderr, "Vertices       : %d\n", size_p*(size_z+1));
 		fprintf(stderr, "Levels         : %d\n", size_z);
 		fprintf(stderr, "Prisms         : %d\n", N_cells*size_z);
-		fprintf(stderr, "Rays per Vertex: %d\n", threads*blocks);
-		fprintf(stderr, "Rays Total     : %d\n", threads*blocks*size_p*(size_z+1));
+		fprintf(stderr, "Rays per Vertex: %d\n", rays_per_sample);
+		fprintf(stderr, "Rays Total     : %d\n", rays_per_sample*size_p*(size_z+1));
 		fprintf(stderr, "GPU Blocks     : %d\n", blocks);
+		fprintf(stderr, "iterations     : %d\n", iterations);
 		fprintf(stderr, "GPU Threads    : %d\n", threads);
 		fprintf(stderr, "Runtime_GPU    : %f s\n", runtimeGpu / 1000.0);
 		fprintf(stderr, "Runtime_CPU    : %f s\n", runtimeCpu / 1000.0);
