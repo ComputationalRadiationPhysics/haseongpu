@@ -1,12 +1,14 @@
 #include "datatypes.h"
+#include <vector>
+
 #ifndef GENERATE_TESTDATA_H
 #define GENERATE_TESTDATA_H
-std::vector<TriangleCu> generate_triangles(int length, int width, float level);
-std::vector<PrismCu> generate_prisms(int length, int width, float level);
-std::vector<RayCu> generate_rays(int length, int width, int level, unsigned max_rays);
-std::vector<PointCu> generate_samples(int length, int width, int level);
-std::vector<RayCu> generate_sample_rays(int length, int width, int level, unsigned max_rays, PointCu sample);
-RayCu   generate_ray(int length, int weight, int level);
+std::vector<TriangleCu> generate_triangles(int length, int width, float level); // not used
+std::vector<PrismCu> *generate_prisms(int length, int width, float level);
+std::vector<RayCu> generate_rays(int length, int width, int level, unsigned max_rays); // not used
+std::vector<PointCu> *generate_samples(int length, int width, int level);
+std::vector<RayCu> *generate_sample_rays(int length, int width, int level, unsigned max_rays, std::vector<PointCu> samples);
+RayCu generate_ray(int length, int weight, int level);
 
 std::vector<TriangleCu> generate_triangles(int length, int weight, float level){
   int h,w;
@@ -31,9 +33,9 @@ std::vector<TriangleCu> generate_triangles(int length, int weight, float level){
   return triangles;
 }
 
-std::vector<PrismCu> generate_prisms(int length, int width, float level){
+std::vector<PrismCu> *generate_prisms(int length, int width, float level){
   int h,w,l;
-  std::vector<PrismCu> prisms;
+  std::vector<PrismCu> *prisms = new std::vector<PrismCu>;
   for(l = 0; l < level; ++l){
     for(h = 0; h < length; ++h){
       for(w = 0; w < width; ++w){
@@ -49,8 +51,8 @@ std::vector<PrismCu> generate_prisms(int length, int width, float level){
 	PrismCu pr1 = {a1};
 	PrismCu pr2 = {b1};
 
-	prisms.push_back(pr1);
-	prisms.push_back(pr2);
+	prisms->push_back(pr1);
+	prisms->push_back(pr2);
 
       }
 
@@ -86,30 +88,33 @@ std::vector<RayCu> generate_rays(const int length, const int width, const int le
   return rays;
 }
 
-std::vector<PointCu> generate_samples(int length, int width, int level){
-  std::vector<PointCu> sample_points;
+std::vector<PointCu> *generate_samples(int length, int width, int level){
+  std::vector<PointCu> *sample_points = new std::vector<PointCu>;
   int h,w,l;
   for(l = 0; l <= level; ++l){
     for(h = 0; h <= length; ++h){
       for(w = 0; w <= width; ++w){
 	PointCu p = {float(h), float(w), float(l), 0};
-	sample_points.push_back(p);
+	sample_points->push_back(p);
       }
     }
   }
   return sample_points;
 }
 
-std::vector<RayCu> generate_sample_rays(int length, int width, int level, unsigned max_rays, PointCu sample){
-  std::vector<RayCu> rays;
-  unsigned ray_i;
-  for(ray_i = 0; ray_i < max_rays; ++ray_i){
-    RayCu ray = generate_ray(length, width, level);
-    ray.direction.x  =  ray.P.x;
-    ray.direction.y  =  ray.P.y;
-    ray.direction.z  =  ray.P.z;
-    ray.P = sample;
-    rays.push_back(ray);
+std::vector<RayCu> *generate_sample_rays(int length, int width, int level, unsigned max_rays, std::vector<PointCu> *samples){
+  std::vector<RayCu> *rays = new std::vector<RayCu>;
+  unsigned ray_i, sample_i;
+  for(sample_i = 0; sample_i < samples->size(); ++sample_i){
+    for(ray_i = 0; ray_i < max_rays; ++ray_i){
+      RayCu ray = generate_ray(length, width, level);
+      ray.direction.x  =  ray.P.x;
+      ray.direction.y  =  ray.P.y;
+      ray.direction.z  =  ray.P.z;
+      ray.P = samples->at(sample_i);
+      rays->push_back(ray);
+    }
+
   }
   return rays;
 }
