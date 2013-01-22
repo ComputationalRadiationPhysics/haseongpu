@@ -555,8 +555,8 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 
 	}
 	//atomicAdd(&(vertices[vertex_index].P.w),gain);
-	if(threadIdx.x == 255)
-		printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain-1,initial_distance);
+//	if(threadIdx.x == 255)
+//		printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain-1,initial_distance);
 }
 
 //----------------------------------------------------
@@ -569,6 +569,7 @@ int main(){
 	int *forbidden, *n_p, *neighbors, *t_in;
 	//int size_t=10, N_cells, size_p=10, size_z=2;
 	int size_z = mesh_z;
+	size_z = 20;
 
 	int N_cells = host_size_t;
 	//double z_mesh = 0.0356;
@@ -608,7 +609,7 @@ int main(){
 	// GPU Raytracing
 	PrismCu* hPrisms, *dPrisms;
 	VertexCu* hVertices, *dVertices;
-	unsigned rays_per_sample = 2560;
+	unsigned rays_per_sample = 10000000; //10^7
 	int rays_per_thread = ceil(rays_per_sample / float(threads));
 	int blocks = 200;
 	int iterations = ceil(rays_per_thread / float(blocks));
