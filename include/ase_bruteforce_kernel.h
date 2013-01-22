@@ -13,12 +13,10 @@
   }								\
 }
 
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample);
-
 
 __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample){
   // Cuda ids
-  //unsigned tid = threadIdx.x;
+  unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
   unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -34,31 +32,30 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
     float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
     ray.P.w += distance * beta_per_ray;
-    __syncthreads();	
+    __syncthreads();
   }
   __syncthreads();
 
   // Check Solution
-  /* if(fabs(ray.P.w - distance_gpu(ray.P, ray.direction)) > 0.00001){ */
-  /*   printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), ray.P.w); */
-  /*   return; */
-  /* } */
+  if(fabs(ray.P.w - distance_gpu(ray.P, ray.direction)) > 0.00001){
+    printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), ray.P.w);
+    return;
+  }
 
   // Copy data to global
   rays[gid].P.w = ray.P.w;
-  samples[sample_i].w = 5;
-  //atomicAdd(&(samples[sample_i].w), (ray.P.w * importance_per_prism));
+  atomicAdd(&(samples[sample_i].w), (ray.P.w * importance_per_prism));
 
 }
 
-float run_ase_bruteforce_gpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase, unsigned threads){
+float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase, unsigned threads){
   RayCu *h_rays, *d_rays;
   PrismCu *h_prisms, *d_prisms;
   PointCu *h_samples, *d_samples;
   float runtime_gpu = 0.0;
   cudaEvent_t start, stop;
 
-  int blocks_per_sample = ceil(rays->size() / threads);
+  int blocks_per_sample = ceil(rays->size() / (threads * samples->size()));
   int blocks = blocks_per_sample * samples->size();
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
@@ -95,9 +92,9 @@ float run_ase_bruteforce_gpu(std::vector<PointCu> *samples, std::vector<PrismCu>
   CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, prisms->size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples->size() * sizeof(PointCu), cudaMemcpyHostToDevice));
   cudaEventRecord(start, 0);
+  
   // Start kernel
-
-  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size(), d_samples, blocks_per_sample);
+  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);
@@ -107,16 +104,18 @@ float run_ase_bruteforce_gpu(std::vector<PointCu> *samples, std::vector<PrismCu>
   CUDA_CHECK_RETURN(cudaMemcpy(h_samples, d_samples, samples->size() * sizeof(PointCu), cudaMemcpyDeviceToHost));
   CUDA_CHECK_RETURN(cudaMemcpy(h_rays, d_rays, rays->size() * sizeof(RayCu), cudaMemcpyDeviceToHost));
 
+ 
+  // Copy data to vectors
+  for(sample_i = 0; sample_i < samples->size(); ++sample_i){
+    ase->at(sample_i) = h_samples[sample_i].w;
+
+  }
+
   // Cleanup data  
   cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_samples);
- 
-  // Copy data to vectors
-  /* for(sample_i = 0; sample_i < samples->size(); ++sample_i){ */
-  /*   ase->at(sample_i) = h_samples[sample_i].w; */
-  /*   fprintf(stderr, "ase_gpu: %f\n", h_samples[sample_i].w); */
-  /* } */
+
   
   return runtime_gpu;
 }

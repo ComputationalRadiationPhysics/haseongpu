@@ -1,11 +1,11 @@
-#include "geometrie.h"
+#include "geometry.h"
 #include "datatypes.h"
 #include <vector>
 
 #ifndef ASE_BRUTEFORCE_CPU
 #define ASE_BRUTEFORCE_CPU
 
-float run_ase_bruteforce_cpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase){
+float runAseBruteforceCpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase){
   unsigned ray_i, prism_i, sample_i;
   unsigned rays_per_sample = rays->size() / samples->size();
   float runtime_cpu = 0.0;
@@ -21,7 +21,7 @@ float run_ase_bruteforce_cpu(std::vector<PointCu> *samples, std::vector<PrismCu>
       for(prism_i = 0; prism_i < prisms->size(); ++prism_i){
 	float distance = fabs(collide_prism(prisms->at(prism_i), rays->at(sample_i * rays_per_sample + ray_i)));
 	if(distance > 0){
-	  fprintf(stdout, "CPU: Sample %d Ray %d hits on prism %d with distance %f\n", sample_i, ray_i, prism_i, distance);
+	  //fprintf(stdout, "CPU: Sample %d Ray %d hits on prism %d with distance %f\n", sample_i, ray_i, prism_i, distance);
 	  ase->at(sample_i) += distance;
 	  rays->at(sample_i * rays_per_sample + ray_i).P.w += distance;
 	    
