@@ -76,8 +76,8 @@ int main(int argc, char **argv){
   }
 
   // Print statistics
-  unsigned blocks_per_sample = ceil(rays->size() / (threads * samples->size()));
-  unsigned blocks = blocks_per_sample * samples->size();
+  unsigned blocksPerSample = ceil(rays->size() / (threads * samples->size()));
+  unsigned blocks = blocksPerSample * samples->size();
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
@@ -86,7 +86,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Rays/Sample       : %d\n", max_rays);
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads       : %d\n", threads);
-  fprintf(stderr, "C GPU Blocks/Sample : %d\n", blocks_per_sample);
+  fprintf(stderr, "C GPU Blocks/Sample : %d\n", blocksPerSample);
   fprintf(stderr, "C Runmode           : %s \n", runmode);
   fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
