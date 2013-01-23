@@ -1,3 +1,5 @@
+#include "datatypes.h"
+
 __device__ PointCu createPoint(float x, float y, float z, float w) {
   PointCu result;
 
