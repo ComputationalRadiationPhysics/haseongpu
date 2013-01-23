@@ -1,7 +1,7 @@
 #include "filtergrid.h"
 #include "geometry.h"
 
-int cellIdx(const Grid *grid, int i, int j, int k){
+__device__ int cellIdx(const Grid *grid, int i, int j, int k){
 	return k*grid->dim.x*grid->dim.y+j*grid->dim.x+i;
 }
 
