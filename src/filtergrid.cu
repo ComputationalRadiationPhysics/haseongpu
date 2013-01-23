@@ -1,4 +1,6 @@
 #include "filtergrid.h"
+#include "geometry.h"
+
 
 __global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
   int gx = threadIdx.x;
@@ -22,7 +24,7 @@ __global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
   p1.t1 = createTriangle(a, b, c);
   p2.t1 = createTriangle(b, c, d);
 
-  results[cellIdx(grid, gx, gy, gz)] = (collide_prism(p1, *ray) != 0) || (collide_prism(p2, *ray) != 0);
+  results[cellIdx(grid, gx, gy, gz)] = (collide_prism_gpu(p1, *ray) != 0) || (collide_prism_gpu(p2, *ray) != 0);
 }
 
 //PointCu* nearest(const Point *p, const PointCu *a, const PointCu *b) {
