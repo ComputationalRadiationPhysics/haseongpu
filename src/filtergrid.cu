@@ -1,6 +1,9 @@
 #include "filtergrid.h"
 #include "geometry.h"
 
+int cellIdx(const Grid *grid, int i, int j, int k){
+	return k*grid->dim.x*grid->dim.y+j*grid->dim.x+i;
+}
 
 __global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
   int gx = threadIdx.x;
@@ -26,6 +29,40 @@ __global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
 
   results[cellIdx(grid, gx, gy, gz)] = (collide_prism_gpu(p1, *ray) != 0) || (collide_prism_gpu(p2, *ray) != 0);
 }
+
+//int iIdx(const Grid *grid, float x){
+//	assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);
+//	
+//	return (x - grid->aabb.min.x)/(grid->aabb.max.x - grid->aabb.min.x) * grid->dim.x;
+//}
+//
+//int jIdx(const Grid *grid, float y){
+//	assert(y >= grid->aabb.min.y && y <= grid->aabb.max.y);
+//	
+//	return (y - grid->aabb.min.y)/(grid->aabb.max.y - grid->aabb.min.y) * grid->dim.y;
+//}
+//
+//int kIdx(const Grid *grid, float z){
+//	assert(z >= grid->aabb.min.z && z <= grid->aabb.max.z);
+//	
+//	return (z - grid->aabb.min.z)/(grid->aabb.max.z - grid->aabb.min.z) * grid->dim.z;
+//}
+//
+//void cellIdx2ijk(const Grid *grid, int cellIdx, int *i, int *j, int *k){
+//	
+//	int dimXdimY=grid->dim.x*grid->dim.y;
+//	int tmp;
+//	
+//	*k = cellIdx / dimXdimY;
+//	
+//	tmp=cellIdx - *k * dimXdimY;
+//	//*j = (cellIdx - *k * dimXdimY) / grid->dim.x;
+//	*j = tmp / grid->dim.x;
+//	
+//	//*i = cellIdx - *k * dimXdimY - *j* grid->dim.x;
+//	*i = tmp - *j * grid->dim.x;
+//}
+
 
 //PointCu* nearest(const Point *p, const PointCu *a, const PointCu *b) {
 //  if(a.w == -1) return b;
