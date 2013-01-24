@@ -18,5 +18,6 @@ all: octrace
 # build octrace
 octrace:  
 	$(NVCC) $(SRCS) -dc --include-path $(INCLUDES) $(NVCC_FLAGS)
-	$(NVCC) -arch=sm_30 *.o -o bin/octrace
+	$(NVCC) -arch=sm_30 *.o -dlink -o link.o
+	g++ *.o -o bin/octrace -lcudart
 	rm *.o
