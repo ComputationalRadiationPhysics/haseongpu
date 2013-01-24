@@ -17,6 +17,7 @@
 #include "geometry_gpu.h"
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
+#include "testdata.h"
 
 int main(int argc, char **argv){
   const unsigned rays_per_sample = 100000;
@@ -38,7 +39,8 @@ int main(int argc, char **argv){
   
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
-  std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
+  //std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
+  std::vector<PrismCu> *prisms  = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_t_in, host_number_of_triangles, host_z_mesh);
   std::vector<PointCu> *samples = generate_samples(length, length, depth);
   std::vector<RayCu> *rays      = generate_sample_rays(length, length, depth, rays_per_sample, samples);
   std::vector<float> *ase       = new std::vector<float>(samples->size(), 0);
