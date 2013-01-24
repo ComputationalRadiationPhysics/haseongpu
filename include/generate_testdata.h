@@ -112,6 +112,7 @@ std::vector<RayCu> *generate_sample_rays(int length, int width, int level, unsig
       ray.direction.y  =  ray.P.y;
       ray.direction.z  =  ray.P.z;
       ray.P = samples->at(sample_i);
+      ray.P.w = 0.f;
       rays->push_back(ray);
     }
 
