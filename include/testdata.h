@@ -37,6 +37,7 @@ int host_t_in[] = { 0,	2,	1,
 		    2,	4,	1,
 		    4,	3,	1 };
 unsigned host_number_of_triangles = 4;
+unsigned host_number_of_points = 5;
 int host_z_mesh = 1;
 int host_size_t = 4;
 int host_size_p = 5;

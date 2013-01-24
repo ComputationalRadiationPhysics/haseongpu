@@ -45,9 +45,9 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   // Calculations
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-    float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
-    raySumDistance += distance * beta_per_ray;
-    __syncthreads();
+    float distance = collide_prism_gpu(prisms[prism_i], ray);
+    raySumDistance += distance;
+    //__syncthreads();
   }
   __syncthreads();
 
@@ -58,7 +58,7 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   }
 
   // Copy data to global
-  atomicAdd(&(samples[sample_i].w), (raySumDistance * importance_per_prism));
+  atomicAdd(&(samples[sample_i].w), (raySumDistance));
 
 }
 

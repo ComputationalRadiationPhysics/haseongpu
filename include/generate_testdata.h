@@ -63,7 +63,25 @@ std::vector<PrismCu> *generate_prisms(int length, int width, float level){
   return prisms;
 }
 
-std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points, unsigned *triangles, numTriangles, unsigned thickness){
+std::vector<PointCu> *generateSampesFromTestdata(unsigned levels, double *points, unsigned numPoints){
+  std::vector<PointCu> *p = new std::vector<PointCu>;
+  unsigned level_i;
+  unsigned point_i; 
+  for(level_i = 0; level_i <= levels; ++level_i){
+    for(point_i = 0; point_i < numPoints; ++point_i){
+      PointCu point = {
+	points[point_i * 2],
+	points[point_i * 2 + 1],
+	level_i,
+	0};
+      p->push_back(point);
+    }
+
+  }
+  return p;
+}
+
+std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points, int *triangles, unsigned numTriangles, double thickness){
   std::vector<PrismCu> *prisms = new std::vector<PrismCu>;
   unsigned triangle_i;
   unsigned level_i;

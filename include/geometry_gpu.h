@@ -166,6 +166,7 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
   t = invdet*t;
 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
+  //bool hit = !(s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || t < 0. || s2 + s3 > 1.);
 
   //Ueberschereitungstest fuer barizentrische Koordinaten
   if (s2 < 0. || s2 > 1.) return intersectionPoint;
