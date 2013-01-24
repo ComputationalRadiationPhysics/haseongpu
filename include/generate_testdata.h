@@ -63,6 +63,44 @@ std::vector<PrismCu> *generate_prisms(int length, int width, float level){
   return prisms;
 }
 
+std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points, unsigned numPoints, unsigned *triangles, numTriangles, unsigned thickness){
+  std::vector<PrismCu> *prisms = new std::vector<PrismCu>;
+  unsigned triangle_i;
+  unsigned level_i;
+
+  for(level_i = 0; level_i < levels; ++level_i){
+  for(triangle_i = 0; triangle_i < numTriangles; ++triangle_i){
+    unsigned a = triangles[triangle_i * 3];
+    unsigned b = triangles[triangle_i * 3 + 1];
+    unsigned c = triangles[triangle_i * 3 + 2];
+
+    PointCu A = {
+      points[a * 2],
+      points[a * 2 + 1],
+      level_i,
+      thickness};
+
+    PointCu B = {
+      points[b * 2],
+      points[b * 2 + 1],
+      level_i,
+      thickness};
+
+    PointCu C = {
+      points[c * 2],
+      points[c * 2 + 1],
+      level_i,
+      thickness};
+
+    TriangleCu triangle = {A, B, C};
+    PrismCu prism = {triangle};
+    prisms->push_back(prism);
+  }
+  }
+
+  return prisms;
+}
+
 RayCu generate_ray(const int heigth, const int width, const int level){
   float rand_heigth = float(rand() % heigth) + (rand() / (float) RAND_MAX);
   float rand_width  = float(rand() % width ) + (rand() / (float) RAND_MAX);
@@ -119,5 +157,7 @@ std::vector<RayCu> *generate_sample_rays(int length, int width, int level, unsig
   }
   return rays;
 }
+
+
 
 #endif /* GENERATE_TESTDATA_H */
