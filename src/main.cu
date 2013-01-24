@@ -19,7 +19,7 @@
 #include "ase_bruteforce_cpu.h"
 
 int main(int argc, char **argv){
-  const unsigned max_rays = 10000;
+  const unsigned rays_per_sample = 100000;
   const unsigned max_triangles = 2;
   const unsigned depth  = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
@@ -40,7 +40,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
   std::vector<PointCu> *samples = generate_samples(length, length, depth);
-  std::vector<RayCu> *rays      = generate_sample_rays(length, length, depth, max_rays, samples);
+  std::vector<RayCu> *rays      = generate_sample_rays(length, length, depth, rays_per_sample, samples);
   std::vector<float> *ase       = new std::vector<float>(samples->size(), 0);
 
   // Run 
@@ -58,7 +58,7 @@ int main(int argc, char **argv){
 
       }
       else{
-	fprintf(stderr, "C Runmode is not know\n");
+	fprintf(stderr, "C Runmode is not known\n");
 	return 0;
 
       }
@@ -83,7 +83,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
   fprintf(stderr, "C Triangles         : %d\n", (int) prisms->size() * 8);
   fprintf(stderr, "C Samples           : %d\n", (int) samples->size());
-  fprintf(stderr, "C Rays/Sample       : %d\n", max_rays);
+  fprintf(stderr, "C Rays/Sample       : %d\n", rays_per_sample);
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads       : %d\n", threads);
   fprintf(stderr, "C GPU Blocks/Sample : %d\n", blocks_per_sample);

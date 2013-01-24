@@ -1,5 +1,6 @@
 #include "geometry_gpu.h"
 #include "datatypes.h"
+#include "curand_kernel.h"
 
 #ifndef ASE_BRUTEFORCE_KERNEL_H
 #define ASE_BRUTEFORCE_KERNEL_H
@@ -13,8 +14,14 @@
   }								\
 }
 
+__global__ void random_setup_kernel ( curandState * state, unsigned long seed )
+{
 
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample){
+  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
+  curand_init ( seed, gid, 0, &state[gid] );
+} 
+
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, curandState* globalState){
   // Cuda ids
   unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
@@ -23,28 +30,35 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   // Local data
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
-  RayCu ray = rays[gid];
+  //RayCu    ray = rays[gid];
   unsigned beta_per_ray = 1;
   unsigned importance_per_prism = 1;
-  
+  float    raySumDistance = 0.f;
+
+  // Random number generator
+  curandState localState = globalState[gid];
+  PrismCu     raySourcePrism = selectPrism(gid, prisms, max_prisms);
+  PointCu     sample = samples[sample_i];
+  RayCu       ray = generateRayGpu(sample, raySourcePrism, localState);
+  globalState[gid] = localState;
+
   // Calculations
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
     float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
-    ray.P.w += distance * beta_per_ray;
+    raySumDistance += distance * beta_per_ray;
     __syncthreads();
   }
   __syncthreads();
 
   // Check Solution
-  if(fabs(ray.P.w - distance_gpu(ray.P, ray.direction)) > 0.00001){
-    printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), ray.P.w);
+  if(fabs(raySumDistance - distance_gpu(ray.P, ray.direction)) > 0.00001){
+    printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), raySumDistance);
     return;
   }
 
   // Copy data to global
-  rays[gid].P.w = ray.P.w;
-  atomicAdd(&(samples[sample_i].w), (ray.P.w * importance_per_prism));
+  atomicAdd(&(samples[sample_i].w), (raySumDistance * importance_per_prism));
 
 }
 
@@ -54,13 +68,13 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   PointCu *h_samples, *d_samples;
   float runtime_gpu = 0.0;
   cudaEvent_t start, stop;
-
+  curandState *devStates;
   int blocks_per_sample = ceil(rays->size() / (threads * samples->size()));
   int blocks = blocks_per_sample * samples->size();
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  fprintf(stderr, "C Start GPU Raytracing\n");
+  fprintf(stderr, "C Copy Data to GPU\n");
   // Memory allocation on host
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, prisms->size() * sizeof(PrismCu), cudaHostAllocDefault));
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, rays->size() * sizeof(RayCu), cudaHostAllocDefault));
@@ -86,15 +100,20 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   CUDA_CHECK_RETURN(cudaMalloc(&d_rays, rays->size() * sizeof(RayCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, prisms->size() * sizeof(PrismCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_samples, samples->size() * sizeof(PointCu)));
-
+  CUDA_CHECK_RETURN(cudaMalloc ( &devStates, threads * blocks * sizeof(curandState)));
   // Copy data from host to device
   CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, rays->size() * sizeof(RayCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, prisms->size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples->size() * sizeof(PointCu), cudaMemcpyHostToDevice));
   cudaEventRecord(start, 0);
   
+  // Start random setup kernel
+  fprintf(stderr, "C Init GPU Random number\n");
+  random_setup_kernel <<< blocks, threads >>> ( devStates, time(NULL) );
+
   // Start kernel
-  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample);
+  fprintf(stderr, "C Start GPU Raytracing\n");
+  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample, devStates);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);

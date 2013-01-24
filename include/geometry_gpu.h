@@ -8,7 +8,45 @@ __device__ float    distance_gpu(PointCu a, PointCu b);
 __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b);
 __device__ float    skalar_mul_gpu(VectorCu a, VectorCu b);
 __device__ PointCu  intersectionRayTriangleGPU(PointCu rayOrigin, PointCu rayObjective, PointCu p1, PointCu p2,PointCu p3);
+__device__ RayCu    generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState);
+__device__ PrismCu  selectPrism(int id, PrismCu *prisms, int totalNumberOfPrisms);
 
+__device__ PrismCu selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
+  int totalNumberOfThreads = blockDim.x * gridDim.x;
+  int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
+  int prism = gid / threadsPerPrism;
+
+  return prisms[prism];
+}   
+
+__device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
+  float u = curand_uniform(&localState);
+  float v = curand_uniform(&localState);
+  if((u+v) > 1){ //OPTIMIZE: remove if
+    u = 1-u;
+    v = 1-v;
+  }
+  const float w = 1-(u+v);
+
+  PointCu A = startPrism.t1.A;
+  PointCu B = startPrism.t1.B;
+  PointCu C = startPrism.t1.C;
+
+  // Get x and y coordinates from the random barycentric values
+  const float xRand = u*A.x + v*B.x + w*C.x ;
+  const float yRand = u*A.y + v*B.y + w*C.y ;
+
+  // Take one of the given z-coordinates and add a random part of the prism height
+  const float zRand = A.z + curand_uniform(&localState) * startPrism.t1.A.w;
+
+  float ase=0.f;
+
+  // Take the values to assemble a ray
+  RayCu r = {
+    sample,
+    {xRand, yRand, zRand, ase}};
+  return r;
+}     
 
 __device__ float distance_gpu(PointCu a, PointCu b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
