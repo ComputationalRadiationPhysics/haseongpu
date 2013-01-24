@@ -13,6 +13,7 @@
 #include <cuda_runtime_api.h>
 #include "testdata_1.h"
 
+#define REAL_VALUES false
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
 	cudaError_t _mCudaStat = value;				\
@@ -46,15 +47,15 @@ __device__ PointCu subtractPoints(PointCu A, PointCu B){
 	return C;
 }
 
-__constant__ double *clad_abs;
-__constant__ double *N_tot;
-__constant__ double *sigma_e;
-__constant__ double *sigma_a;
-__constant__ int *clad_num;
-__constant__ double *z_mesh;
-__constant__ int *size_p;
-__constant__ int *N_cells;
-__constant__ int *mesh_z;
+__device__ double clad_abs;
+__device__ double N_tot;
+__device__ double sigma_e;
+__device__ double sigma_a;
+__device__ double z_mesh;
+__device__ int mesh_z;
+__device__ int clad_num;
+__device__ int size_p;
+__device__ int N_cells;
 
 
 __device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandStateMtgp32 *randomstate, int bid){
@@ -212,7 +213,7 @@ __device__ float propagate(RayCu ray, PrismCu prisms[], PrismCu startprism){
 	return 0;
 }
 
-__device__ float naive_propagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type){
+__device__ float naive_propagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
 	//    in first try no reflections
 	//    calculate the vector and make the the calculation, which surface would be the shortest to reach
 	//    then get the length, make the integration, get the information about the next cell out of the array
@@ -221,13 +222,18 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 	//    if you are closer then "small" stop and return the value
 	double vec_x, vec_y,vec_z, norm;
 	double distance, length, length_help, distance_total;
-	double gain=1;
 	double nominator, denominator;
+	double gain=1;
 	int tri, cell_z; // the current triangle number and position concerning the z's
 	int decider; // which one is the shortest - info
 	int tri_next, cell_z_next, forb, forb_dump;
 	int ct;
-	//	int ct; // used to read out cell_type 
+
+#if REAL_VALUES==true
+	gain=1;
+#else
+	gain=0;
+#endif
 
 
 	//    initial positions
@@ -275,7 +281,6 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 
 
 		//		  read, which type of cell it is you are propagation in
-		ct = cell_type[tri]; //@TODO reimplement
 
 		//        mexPrintf("forb: %i\n",forb);
 		//        mexEvalString("drawnow;");
@@ -289,7 +294,7 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 			denominator = n_x[tri]*vec_x + n_y[tri]*vec_y;
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+ *size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
+				nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+ size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
 				length_help = nominator/denominator;
 				if (length_help < length && length_help > 0.0)
 				{
@@ -302,31 +307,31 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 		}
 
 		if (forb != 1){
-			denominator = n_x[tri+ *N_cells]*vec_x + n_y[tri+ *N_cells]*vec_y;
+			denominator = n_x[tri+ N_cells]*vec_x + n_y[tri+ N_cells]*vec_y;
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[tri+ *N_cells]*p_in[n_p[tri+ *N_cells]] + n_y[tri+ *N_cells]*p_in[n_p[tri+ *N_cells]+ *size_p]) - (n_x[tri+ *N_cells]*x_pos + n_y[tri+ *N_cells]*y_pos);
+				nominator = (n_x[tri+ N_cells]*p_in[n_p[tri+ N_cells]] + n_y[tri+ N_cells]*p_in[n_p[tri+ N_cells]+ size_p]) - (n_x[tri+ N_cells]*x_pos + n_y[tri+ N_cells]*y_pos);
 				length_help = nominator/denominator;
 				if (length_help < length && length_help > 0.0)
 				{
 					length = length_help;
 					decider = 1;
-					forb_dump = (forbidden[tri+ *N_cells]);
+					forb_dump = (forbidden[tri+ N_cells]);
 				}
 			}
 		}
 
 		if (forb !=2){
-			denominator = n_x[tri+2* *N_cells]*vec_x + n_y[tri+2* *N_cells]*vec_y;
+			denominator = n_x[tri+2* N_cells]*vec_x + n_y[tri+2* N_cells]*vec_y;
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[tri+2* *N_cells]*p_in[n_p[tri+2*  *N_cells]] + n_y[tri+2* *N_cells]*p_in[n_p[tri+2* *N_cells]+ *size_p]) - (n_x[tri+2* *N_cells]*x_pos + n_y[tri+2* *N_cells]*y_pos);
+				nominator = (n_x[tri+2* N_cells]*p_in[n_p[tri+2*  N_cells]] + n_y[tri+2* N_cells]*p_in[n_p[tri+2* N_cells]+ size_p]) - (n_x[tri+2* N_cells]*x_pos + n_y[tri+2* N_cells]*y_pos);
 				length_help = nominator/denominator;
 				if (length_help < length && length_help > 0.0)
 				{
 					length = length_help;
 					decider = 2;
-					forb_dump = (forbidden[tri+2* *N_cells]);
+					forb_dump = (forbidden[tri+2* N_cells]);
 				}
 			}
 		}
@@ -337,7 +342,7 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 			denominator = z_pos*vec_z;
 			if (denominator != 0.0)
 			{
-				nominator = (cell_z+1)* *z_mesh - z_pos;
+				nominator = (cell_z+1)* z_mesh - z_pos;
 				length_help = nominator/denominator;
 				if (length_help < length && length_help > 0.0)
 				{
@@ -354,7 +359,7 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 
 			if (denominator != 0.0)
 			{
-				nominator = (cell_z)* *z_mesh - z_pos;
+				nominator = (cell_z)* z_mesh - z_pos;
 				length_help = nominator/denominator;
 				if (length_help < length && length_help > 0.0)
 				{
@@ -380,13 +385,13 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 
 			case 1:
 				//                second triangle surface
-				tri_next = neighbors[tri+ *N_cells];
+				tri_next = neighbors[tri+ N_cells];
 				cell_z_next = cell_z;
 				break;
 
 			case 2:
 				//                third triangle surface
-				tri_next = neighbors[tri+2* *N_cells];
+				tri_next = neighbors[tri+2* N_cells];
 				cell_z_next = cell_z;
 				break;
 
@@ -414,14 +419,20 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 		//		  it might be absorbing or amplifying, for the cladding only absorbing
 		//		  a simple "if then"
 
-		if (ct == *clad_num){
-		//	gain = gain * __expf(-(*clad_abs * length));
+#if REAL_VALUES==true
+
+		ct = cell_type[tri]; 
+		if (ct == clad_num){
+			gain = gain * exp((-1)*(clad_abs * length));
 		}
 		else {
-			//			gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+			gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
 		}
+#else
 
-		gain += length; //@TODO replace with actual gain computation
+		gain += length; 
+
+#endif
 		distance -= length;
 
 
@@ -438,35 +449,47 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 
 	}
 
-	//gain /= (distance_total*distance_total); //@TODO implement again (comes from the formula!)
-
+#if REAL_VALUES==true
+	gain /= (distance_total*distance_total); //@OPTIMIZE
+#endif
 	return gain;
 }
 
 
-__global__ void setupKernel ( double host_sigma_e ){
-	//sigma_e = host_sigma_e;	
-	printf("Sigma_e in setup=%f\tSigma_eHost=%f\n",sigma_e,host_sigma_e);
+__global__ void setupKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p ){
+	sigma_e = host_sigma_e;	
+	sigma_a = host_sigma_a;
+	clad_num = host_clad_num;
+	clad_abs = host_clad_abs;
+	N_tot = host_N_tot;
+	N_cells = host_N_cells;
+	z_mesh = host_z_mesh;
+	mesh_z = host_mesh_z;
+	size_p = host_size_p;
+	//printf("Sigma_e in setup=%f\tSigma_eHost=%f\n",sigma_e,host_sigma_e);
 	//int id = threadIdx.x + blockDim.x*blockIdx.x;
 	//	curand_init ( seed, id, 0, &state[id] );
 	//	// OPTIMIZE: Use MersenneTwister or even a better PRNG
 } 
 __global__ void testKernel (  ){
 	if(threadIdx.x == 0)
-		printf("Sigma_e=%.30f",*sigma_e);
+		printf("\nSigma_e=%.30f",sigma_e);
+	printf("\nSigma_a=%.30f",sigma_a);
+	printf("\nmesh_z=%d",mesh_z);
+	printf("\nz_mesh_=%.30f",z_mesh);
 } 
 
 // does the raytracing for a single ray (randomly generated) and a single (given) Vertex
-__global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t) {
+__global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
 	//OPTIMIZE: the Octree should/could produce a subset of the prism-array!
 
 	int endpoint_x = p_in[point2D];
-	int endpoint_y = p_in[ *size_p + point2D];
-	int endpoint_z = level* *z_mesh;
+	int endpoint_y = p_in[ size_p + point2D];
+	int endpoint_z = level* z_mesh;
 	PointCu endpoint = {endpoint_x, endpoint_y, endpoint_z};
-	float gain = 0.;
+	double gain = 0.;
 	float initial_distance = 50.;
 
 	for (int i=0; i<iterations ; ++i){
@@ -474,12 +497,12 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 		// big benefits for the memory access (and caching!)
 		//PrismCu startprism = selectPrism(id, prisms, prismCount);	
 		int starttriangle = selectTriangle(id,host_size_t); //@TODO: second parameter is number of 2D Triangles
-		int startlevel = selectLevel(id, *mesh_z); //@TODO: second parameter is number of Levels 
+		int startlevel = selectLevel(id, mesh_z); //@TODO: second parameter is number of Levels 
 
 		// the indices of the vertices of the starttriangle
 		int t_1 = t_in[starttriangle];
-		int t_2 = t_in[starttriangle+ *N_cells];
-		int t_3 = t_in[starttriangle+2* *N_cells];
+		int t_2 = t_in[starttriangle+ N_cells];
+		int t_3 = t_in[starttriangle+2* N_cells];
 
 		// random startpoint generation
 		float  u = curand_uniform(&globalState[blockIdx.x]);
@@ -494,33 +517,22 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 		float w = 1-u-v;
 
 		// convert the random startpoint into coordinates
-		double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))* *z_mesh;
+		double z_rand = (startlevel + curand_uniform(&globalState[blockIdx.x]))* z_mesh;
 		double x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
-		double y_rand = p_in[ *size_p + t_1]*u + p_in[ *size_p + t_2]*v + p_in[ *size_p + t_3]*w;
+		double y_rand = p_in[ size_p + t_1]*u + p_in[ size_p + t_2]*v + p_in[ size_p + t_3]*w;
 		PointCu startpoint = {x_rand, y_rand, z_rand};
-
-
 
 		//RayCu ray = generateRayGpu(vertices[vertex_index].P,startprism, globalState,blockIdx.x);
 		initial_distance = distance(startpoint, endpoint);
 
+		gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v); //@TODO: why is there a beta_v reference in the sequential-code?
 
-		gain = naive_propagation(x_rand, y_rand, z_rand, endpoint_x, endpoint_y, endpoint_z, starttriangle, startlevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type);
-		//float gain = naive_propagation(ray.P.x, ray.P.y, ray.P.z, ray.direction.x, ray.direction.y, ray.direction.z, startprism.t1, startprism.t1.A.w ,p_in, n_x, n_y, n_p, neighbors, N_cells, size_p, forbidden, z_mesh);
+		atomicAdd(&(phi[point2D + level*size_p]),float(gain)); //@TODO: importance-value 
 
-		//printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain,initial_distance);
-
-		//printf("Thread: %d\t RAND=%f\t TRIANGLE=%d\n",id,curand_uniform(&globalState[0]),starttriangle);
-
-		//	printf("\nThread: %d\t TRIANGLE=%d POINTS=%f   %f   %f",id,starttriangle,x_rand,y_rand,z_rand);
-
-		//@TODO: improve gain calculation (beta_v value, ImportanceSampling)
-		assert(fabs(gain-1-initial_distance) < 0.001);
-
+#if REAL_VALUES!=true
+		assert(fabs(gain-initial_distance) < 0.0001);
+#endif
 	}
-	//atomicAdd(&(vertices[vertex_index].P.w),gain);
-	//	if(threadIdx.x == 255)
-		printf("Thread: %d\t G=%.5f\t real_distance=%.5f\n",id,gain-1,initial_distance);
 }
 
 //----------------------------------------------------
@@ -529,13 +541,14 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, int point2D, int l
 int main(){
 
 	// Variables from the mexFunction 
-	double  *p_in, *n_x, *n_y;
-	int *forbidden, *n_p, *neighbors, *t_in;
-	int *cell_type;
+	double  *p_in, *n_x, *n_y, *beta_v;
+	float *phi;
+	int *forbidden, *n_p, *neighbors, *t_in, *cell_type;
 
 	//int size_t=10, N_cells, size_p=10, size_z=2;
-	
+
 	int host_N_cells = host_size_t;
+
 	//double z_mesh = 0.0356;
 	//double  *host_p_in, *host_n_x, *host_n_y;
 	//int *host_forbidden, *host_n_p, *host_neighbors, *host_t_in;
@@ -564,42 +577,39 @@ int main(){
 	bool useGpu = true;
 	curandStateMtgp32 *devMTGPStates;
 	mtgp32_kernel_params *devKernelParams;
+	float host_phi[host_size_p * (host_mesh_z +1)];
 
 	// Generate testdata
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 
 	// GPU Raytracing
-	unsigned rays_per_sample = 100000; //10^5
+	unsigned rays_per_sample = 100; //10^5
 	int rays_per_thread = ceil(rays_per_sample / float(threads));
 	int blocks = 200;
 	int iterations = ceil(rays_per_thread / float(blocks));
 
-	double *hsigma_e;
-	cudaMalloc((void **)&hsigma_e, sizeof(double));
-	*hsigma_e = host_sigma_e;
 	if(useGpu){
 
 		{
-			
-			//Create constant values on GPU
-			CUDA_CHECK_RETURN(cudaMemcpyToSymbol("sigma_e", &hsigma_e, sizeof(double *), cudaMemcpyHostToDevice));
-	//		setupKernel<<<1,1>>>(host_sigma_e);
-			
-			
-			cudaThreadSynchronize();
-			testKernel<<<1,1>>>();
-/*
-			cudaMemcpyToSymbol("sigma_a", &host_sigma_a, sizeof(double), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("clad_abs", &host_clad_abs, sizeof(double), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("clad_num", &host_clad_num, sizeof(int), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("N_tot", &host_N_tot, sizeof(double), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("N_cells", &host_N_cells, sizeof(int), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("z_mesh", &host_z_mesh, sizeof(double), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("mesh_z", &host_mesh_z, sizeof(int), cudaMemcpyHostToDevice);
-			cudaMemcpyToSymbol("size_p", &host_size_p, sizeof(int), cudaMemcpyHostToDevice);
 
-*/
+			//Create constant values on GPU
+			setupKernel<<<1,1>>>(host_sigma_e, host_sigma_a, host_clad_num, host_clad_abs, host_N_tot, host_N_cells, host_z_mesh, host_mesh_z, host_size_p);
+
+
+			cudaThreadSynchronize();
+			//testKernel<<<1,1>>>();
+			/*
+			   cudaMemcpyToSymbol("sigma_a", &host_sigma_a, sizeof(double), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("clad_abs", &host_clad_abs, sizeof(double), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("clad_num", &host_clad_num, sizeof(int), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("N_tot", &host_N_tot, sizeof(double), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("N_cells", &host_N_cells, sizeof(int), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("z_mesh", &host_z_mesh, sizeof(double), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("mesh_z", &host_mesh_z, sizeof(int), cudaMemcpyHostToDevice);
+			   cudaMemcpyToSymbol("size_p", &host_size_p, sizeof(int), cudaMemcpyHostToDevice);
+
+			 */
 
 			// Memory allocation on device (mexFunction Variables)
 			CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * host_size_p * sizeof(double)));
@@ -609,6 +619,9 @@ int main(){
 			CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* host_size_t * sizeof(int)));
 			CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* host_size_t * sizeof(int)));
 			CUDA_CHECK_RETURN(cudaMalloc(&t_in, 3* host_size_t * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&cell_type,host_size_t * host_mesh_z * sizeof(int)));
+			CUDA_CHECK_RETURN(cudaMalloc(&beta_v,host_size_t * host_mesh_z * sizeof(double)));
+			CUDA_CHECK_RETURN(cudaMalloc(&phi,host_size_p * (host_mesh_z +1) * sizeof(float)));
 
 			// Copy data from host to device (mex Function Variables)
 			CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * host_size_p * sizeof(double), cudaMemcpyHostToDevice));
@@ -618,8 +631,11 @@ int main(){
 			CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
 			CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
 			CUDA_CHECK_RETURN(cudaMemcpy(t_in ,host_t_in, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(cell_type,host_cell_type, host_size_t *  host_mesh_z * sizeof(int), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(beta_v, host_beta_v, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
+			CUDA_CHECK_RETURN(cudaMemcpy(phi, host_phi, host_size_p * (host_mesh_z+1) * sizeof(float), cudaMemcpyHostToDevice));
 		}
-/*
+
 		// Generating Random Numbers
 		// Allocate space for prng states on device 
 		CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
@@ -637,19 +653,26 @@ int main(){
 		CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234));
 
 		// State setup is complete 
-*/
-		
+
+
 		cudaEventRecord(start, 0);
 		// start the Kernels
-		/*
+
 		for(int point2D = 0; point2D < host_size_p ; ++point2D){
 			for(int level = 0; level <= host_mesh_z; ++ level){
 				cudaThreadSynchronize();
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, forbidden, t_in, cell_type, host_size_t);
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, forbidden, t_in, cell_type, host_size_t, beta_v);
 			}
 		}
 
-		*/
+		cudaThreadSynchronize();
+		CUDA_CHECK_RETURN(cudaMemcpy(host_phi, phi, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
+		
+		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
+			printf("\nPhi_ase= %.20f", host_phi[i] / rays_per_sample);
+		
+		}
+
 
 		fprintf(stderr, "\n");
 
@@ -664,7 +687,7 @@ int main(){
 
 	// print statistics
 	//{
-/*
+
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Vertices       : %d\n", host_size_p * (host_mesh_z+1));
 	fprintf(stderr, "Levels         : %d\n", host_mesh_z);
@@ -673,7 +696,7 @@ int main(){
 	fprintf(stderr, "Rays Total     : %d\n", rays_per_sample * host_size_p * (host_mesh_z+1));
 	fprintf(stderr, "GPU Blocks     : %d\n", blocks);
 	fprintf(stderr, "iterations     : %d\n", iterations);
-	fprintf(stderr, "GPU Threads    : %d\n", threads);
+	fprintf(stderr, "GPU Threads    : %d\n", threads*blocks);
 	fprintf(stderr, "Runtime_GPU    : %f s\n", runtimeGpu / 1000.0);
 	fprintf(stderr, "\n");
 	//	}
@@ -686,10 +709,10 @@ int main(){
 		cudaFree(neighbors);
 		cudaFree(forbidden);
 		cudaFree(n_p);
+		cudaFree(beta_v);
 
-		cudaDeviceReset();
 	}
-*/
+
 	cudaDeviceReset();
 	return 0;
 }
