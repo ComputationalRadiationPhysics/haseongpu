@@ -313,7 +313,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
 
-		gain += double(naivePropagation(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v); 
+		gain += double(naivePropagation(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v)); 
 	}
 
 	// do the multiplication just at the end of all iterations
