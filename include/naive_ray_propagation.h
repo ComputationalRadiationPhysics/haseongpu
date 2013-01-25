@@ -13,7 +13,7 @@
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
-#include "testdata.h"
+#include "testdata_transposed.h"
 
 #define TEST_VALUES true
 #define SMALL 1E-06
@@ -346,7 +346,7 @@ float runNaiveRayPropagation(std::vector<double> *ase){
 	cudaEventCreate(&stop);
 
 	// GPU Raytracing
-	unsigned raysPerSample = 512000; //
+	unsigned raysPerSample = 5120000; //
 	int threads = 256;
 	int blocks = 200;
 	int iterations = float(raysPerSample) / (blocks * threads);
