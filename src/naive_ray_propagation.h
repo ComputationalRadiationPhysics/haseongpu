@@ -442,8 +442,8 @@ float runNaiveRayPropagation(std::vector<double> *ase){
 
 		CUDA_CHECK_RETURN(cudaMemcpy(host_phi, phi, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
 		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
-			fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
-			ase->push_back(double(double(host_phi[i]) / rays_per_sample));
+			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
+			ase->at(i) = (double(double(host_phi[i]) / rays_per_sample));
 		}
 	}
 

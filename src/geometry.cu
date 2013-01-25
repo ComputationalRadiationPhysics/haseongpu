@@ -1,35 +1,41 @@
 #include "datatypes.h"
+#include "curand_kernel.h"
+__device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
+  float u = curand_uniform(&localState);
+  float v = curand_uniform(&localState);
+  if((u+v) > 1){ //OPTIMIZE: remove if
+    u = 1-u;
+    v = 1-v;
+  }
+  const float w = 1-(u+v);
 
-__device__ PointCu createPoint(float x, float y, float z, float w) {
-  PointCu result;
+  PointCu A = startPrism.t1.A;
+  PointCu B = startPrism.t1.B;
+  PointCu C = startPrism.t1.C;
 
-  result.x = x;
-  result.y = y;
-  result.z = z;
-  result.w = w;
+  // Get x and y coordinates from the random barycentric values
+  const float xRand = u*A.x + v*B.x + w*C.x ;
+  const float yRand = u*A.y + v*B.y + w*C.y ;
 
-  return result;
-}
+  // Take one of the given z-coordinates and add a random part of the prism height
+  const float zRand = A.z + curand_uniform(&localState) * startPrism.t1.A.w;
 
-__device__ VectorCu createVector(PointCu a, PointCu b) {
-  VectorCu result;
+  float ase=0.f;
 
-  result.x = b.x - a.x;
-  result.y = b.x - a.x;
-  result.z = b.x - a.x;
-  
-  return result;
-}
+  // Take the values to assemble a ray
+  RayCu r = {
+    sample,
+    {xRand, yRand, zRand, ase}};
+  return r;
+}    
 
-__device__ TriangleCu createTriangle(PointCu a, PointCu b, PointCu c) {
-  TriangleCu result;
+__device__ PrismCu selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
+  int totalNumberOfThreads = blockDim.x * gridDim.x;
+  int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
+  int prism = gid / threadsPerPrism;
 
-  result.A = a;
-  result.B = b;
-  result.C = c;
-
-  return result;
-}
+  return prisms[prism];
+}   
 
 __device__ float distance_gpu(PointCu a, PointCu b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));

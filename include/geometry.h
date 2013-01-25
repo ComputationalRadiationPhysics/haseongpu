@@ -1,8 +1,9 @@
+#ifndef GEOMETRIE_H
+#define GEOMETRIE_H
+
 #include "datatypes.h"
 #include "print.h"
 
-#ifndef GEOMETRIE_H
-#define GEOMETRIE_H
 PointCu  collide_triangle(TriangleCu t, RayCu r);
 float  collide_prism(PrismCu pr, RayCu r);
 float4 to_barycentric(TriangleCu t, RayCu r);
