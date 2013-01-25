@@ -19,7 +19,6 @@ all: octrace
 
 # build octrace
 octrace:
-	$(NVCC) $(SRCS) -dc --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
-	$(NVCC) $(ARCH) *.o -dlink -o link.o
-	g++ *.o -o bin/octrace -lcudart
-	rm *.o
+	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
+	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
+	g++ bin/*.o -o bin/octrace -lcudart
