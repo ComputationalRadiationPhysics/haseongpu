@@ -1,29 +1,77 @@
 #include "datatypes.h"
-#include "print.h"
 
-#ifndef GEOMETRIE_H
-#define GEOMETRIE_H
-PointCu  collide_triangle(TriangleCu t, RayCu r);
-float  collide_prism(PrismCu pr, RayCu r);
-float4 to_barycentric(TriangleCu t, RayCu r);
-PointCu intersection(PlaneCu p, RayCu r);
-float distance(PointCu a, PointCu b);
-VectorCu crossproduct(VectorCu a, VectorCu b);
-float skalar_mul(VectorCu a, VectorCu b);
+#ifndef GEOMETRY_GPU_H
+#define GEOMETRY_GPU_H
 
-/**
-   @brief Detects collisions of a triangle and a ray without
-   a precondition.
-   
-   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
-   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
-**/
-PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
-				PointCu rayObjective, //Richtungsvektor des Strahls
-				PointCu p1, //1.Punkt des Dreiecks
-				PointCu p2, //2.Punkt des Dreiecks
-				PointCu p3) //3.Punkt des Dreiecks
-				{
+__device__ float    collide_prism_gpu(PrismCu pr, RayCu r);
+__device__ float    distance_gpu(PointCu a, PointCu b);
+__device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b);
+__device__ float    skalar_mul_gpu(VectorCu a, VectorCu b);
+__device__ PointCu  intersectionRayTriangleGPU(PointCu rayOrigin, PointCu rayObjective, PointCu p1, PointCu p2,PointCu p3);
+__device__ RayCu    generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState);
+__device__ PrismCu  selectPrism(int id, PrismCu *prisms, int totalNumberOfPrisms);
+
+__device__ PrismCu selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
+  int totalNumberOfThreads = blockDim.x * gridDim.x;
+  int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
+  int prism = gid / threadsPerPrism;
+
+  return prisms[prism];
+}   
+
+__device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
+  float u = curand_uniform(&localState);
+  float v = curand_uniform(&localState);
+  if((u+v) > 1){ //OPTIMIZE: remove if
+    u = 1-u;
+    v = 1-v;
+  }
+  const float w = 1-(u+v);
+
+  PointCu A = startPrism.t1.A;
+  PointCu B = startPrism.t1.B;
+  PointCu C = startPrism.t1.C;
+
+  // Get x and y coordinates from the random barycentric values
+  const float xRand = u*A.x + v*B.x + w*C.x ;
+  const float yRand = u*A.y + v*B.y + w*C.y ;
+
+  // Take one of the given z-coordinates and add a random part of the prism height
+  const float zRand = A.z + curand_uniform(&localState) * startPrism.t1.A.w;
+
+  float ase=0.f;
+
+  // Take the values to assemble a ray
+  RayCu r = {
+    sample,
+    {xRand, yRand, zRand, ase}};
+  return r;
+}     
+
+__device__ float distance_gpu(PointCu a, PointCu b){
+  float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
+  return fabs(d);
+}
+__device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b){
+  VectorCu c = {
+    a.y*b.z - a.z*b.y,
+    a.z*b.x - a.x*b.z,
+    a.x*b.y - a.y*b.x
+  };
+  return c;
+}
+
+
+__device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
+  return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+__device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
+				   PointCu rayObjective, //Richtungsvektor des Strahls
+				   PointCu p1, //1.Punkt des Dreiecks
+				   PointCu p2, //2.Punkt des Dreiecks
+				   PointCu p3) //3.Punkt des Dreiecks
+{
   double s2; //2.barizentrische Koordinate des Dreiecks
   double s3; //3.barizentrische Koordinate des Dreiecks
   //1.barizentrische Koordinate des Dreiecks ergibt sich mit 1.-s2-s3
@@ -118,6 +166,7 @@ PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
   t = invdet*t;
 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
+  //bool hit = !(s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || t < 0. || s2 + s3 > 1.);
 
   //Ueberschereitungstest fuer barizentrische Koordinaten
   if (s2 < 0. || s2 > 1.) return intersectionPoint;
@@ -132,7 +181,6 @@ PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
   if (t < 0.) return intersectionPoint;
 
   //Schnittpunktberechnung
-
   intersectionPoint.x = rayOrigin.x + t * rayDirection.x;
   intersectionPoint.y = rayOrigin.y + t * rayDirection.y;
   intersectionPoint.z = rayOrigin.z + t * rayDirection.z;
@@ -143,12 +191,9 @@ PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
 }
 
 /**
-   @brief Detects collisions of a prism and ray
-   
-   @return float intersection distance
-   @return 0 if in case of no intersection
+   @attention slower than commented collide_prism_gpu but more pretty
 **/
-float collide_prism(PrismCu pr, RayCu r){
+__device__ float collide_prism_gpu(PrismCu pr, RayCu r){
   //bool has_collide;
   PointCu first_intersection = {0, 0, 0, 0};
   PointCu intersection_point = {0, 0, 0, 0};
@@ -158,8 +203,7 @@ float collide_prism(PrismCu pr, RayCu r){
   PointCu A2 = {pr.t1.A.x, pr.t1.A.y, pr.t1.A.z + pr.t1.A.w, 1};
   PointCu B2 = {pr.t1.B.x, pr.t1.B.y, pr.t1.B.z + pr.t1.B.w, 1};
   PointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
-  float ray_distance = distance(r.P, r.direction);
-
+  float ray_distance = distance_gpu(r.P, r.direction);
   TriangleCu triangles[8] = {
     pr.t1,
     {A2, B2, C2},
@@ -170,30 +214,30 @@ float collide_prism(PrismCu pr, RayCu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
-
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    intersection_point = intersectionRayTriangle(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
+    intersection_point = intersectionRayTriangleGPU(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
     if(intersection_point.w != 0){
       if(first_intersection.w == 0){
 	first_intersection = intersection_point;
       }
       else{
-	// Filter double Collision on edges or vertices
+	// Filter double collisions
 	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
-
-	  if(distance(r.P, first_intersection) <= ray_distance && distance(r.P, intersection_point) > ray_distance)
-	    return distance(r.direction, first_intersection);
-
-	  if(distance(r.P, first_intersection) >= ray_distance && distance(r.P, intersection_point) < ray_distance)
-	    return distance(r.direction, intersection_point);
 	  
-	  if(distance(r.P, first_intersection) > ray_distance || distance(r.direction, first_intersection) > ray_distance)
+	  if(distance_gpu(r.P, first_intersection) <= ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
+	    return distance_gpu(r.direction, first_intersection);
+
+	  if(distance_gpu(r.P, first_intersection) >= ray_distance && distance_gpu(r.P, intersection_point) < ray_distance)
+	    return distance_gpu(r.direction, intersection_point);
+	  
+	  if(distance_gpu(r.P, first_intersection) > ray_distance || distance_gpu(r.direction, first_intersection) > ray_distance)
 	    return 0;
 
-	  return distance(first_intersection, intersection_point);
+	  return distance_gpu(first_intersection, intersection_point);
 	}
+
       }
 
     }
@@ -202,81 +246,4 @@ float collide_prism(PrismCu pr, RayCu r){
 
   return 0;
 }
-
-/**
-   @brief Intersection calculates the intersection between a plane p
-   and a ray r.
-
-   It uses the normal of the plane to derive the coordinate form 
-   of the plane. With the help of a coordinate form it is very
-   easy to get the intersection point between a ray and a plane.
-
-   ray   g: y~ = x~ + t*p~
-   plane E: y~ = a~ + r*b~ + s*c~
-   d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
-   d  = n~ * a~
-**/
-PointCu intersection(PlaneCu pl, RayCu r){
-  PointCu intersection_point = {0, 0, 0, 0};
-
-  float t, d;
-
-  // vector coordinates
-  float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
-  
-  // just get the coordinates from the structs
-  n1 = pl.normal.x;
-  n2 = pl.normal.y;
-  n3 = pl.normal.z;
-
-  a1 = pl.P.x;
-  a2 = pl.P.y;
-  a3 = pl.P.z;
-
-  x1 = r.P.x;
-  x2 = r.P.y;
-  x3 = r.P.z;
-
-  p1 = r.direction.x - r.P.x;
-  p2 = r.direction.y - r.P.y;
-  p3 = r.direction.z - r.P.z;
-
-  // calculation of intersection
-  // this case for parallel rays, will be ignored for easier calculations
-  float denominator = (n1*p1 + n2*p2 + n3*p3);
-  if(fabs(denominator) <= 0.000001)
-    return intersection_point;
-
-  d = n1*a1 + n2*a2 + n3*a3;
-  t = (d - n1*x1 - n2*x2 - n3*x3) / denominator;
-
-  // ignore intersections before the ray 
-  if(t < 0)
-    return intersection_point;
-
-  intersection_point.x = x1 + t * p1;
-  intersection_point.y = x2 + t * p2;
-  intersection_point.z = x3 + t * p3;
-  intersection_point.w = 1;
-  return intersection_point;
-
-}
-
-float distance(PointCu a, PointCu b){
-  float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
-  return fabs(d);
-}
-
-VectorCu crossproduct(VectorCu a, VectorCu b){
-  VectorCu c = {
-    a.y*b.z - a.z*b.y,
-    a.z*b.x - a.x*b.z,
-    a.x*b.y - a.y*b.x
-  };
-  return c;
-}
-
-float skalar_mul(VectorCu a, VectorCu b){
-  return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-#endif /* GEOMETRIE_H */
+#endif /* GEOMETRY_GPU_H */
