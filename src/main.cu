@@ -7,9 +7,10 @@
 #include "string.h"
 #include <vector>
 #include "curand_kernel.h"
-#include "datatypes.h"
+
 
 // User header files
+#include "datatypes.h"
 #include "geometry.h"
 #include "datatypes.h"
 #include "generate_testdata.h"
@@ -17,11 +18,12 @@
 #include "geometry_gpu.h"
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
-#include "testdata.h"
+#include "testdata_transposed.h"
 #include "naive_ray_propagation.h"
+#include "buildgrid.h"
 
 int main(int argc, char **argv){
-  const unsigned rays_per_sample = 100000;
+  const unsigned rays_per_sample = 1000;
   const unsigned max_triangles = 2;
   const unsigned depth  = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
@@ -48,6 +50,7 @@ int main(int argc, char **argv){
   std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
   
+
   // Run 
   unsigned i;
   for(i=1; i < argc; ++i){
@@ -79,7 +82,7 @@ int main(int argc, char **argv){
   // Print Solution
   unsigned sample_i;
   fprintf(stderr, "C Solutions\n");
-  for(sample_i = 0; sample_i < samples->size(); ++sample_i){
+  for(sample_i = 0; sample_i < ase->size(); ++sample_i){
     fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
 
   }

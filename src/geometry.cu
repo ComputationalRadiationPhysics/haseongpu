@@ -67,7 +67,7 @@ __device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-__device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
+__device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
 				   PointCu rayObjective, //Richtungsvektor des Strahls
 				   PointCu p1, //1.Punkt des Dreiecks
 				   PointCu p2, //2.Punkt des Dreiecks
@@ -77,7 +77,7 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
   double s3; //3.barizentrische Koordinate des Dreiecks
   //1.barizentrische Koordinate des Dreiecks ergibt sich mit 1.-s2-s3
   double t; //Geradenparameter
-  PointCu intersectionPoint = {0, 0, 0, 0};
+  //PointCu intersectionPoint = {0, 0, 0, 0};
 
   //Grenzwert fuer numerische Stabilitaet
   const double eps = 1e-6; //empirischer Wert, bei Moeller/Trumbore 1e-6
@@ -122,7 +122,7 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
   //numerische Stabilitaet!!!
 
   if (determinante > -eps && determinante < eps){
-    return intersectionPoint;
+    return -1.;
   }
 
   //Abstand Ursprung des Strahls zu p1
@@ -169,24 +169,24 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
 
   //Ueberschereitungstest fuer barizentrische Koordinaten
-  if (s2 < 0. || s2 > 1.) return intersectionPoint;
+  if (s2 < 0. || s2 > 1.) return -1.;
 
   //Ueberschereitungstest fuer barizentrische Koordinaten
-  if (s3 < 0. || s3 > 1.) return intersectionPoint;
+  if (s3 < 0. || s3 > 1.) return -1.;
 
   //0 <= s1=1-s2-s3 <= 1 -> s2+s3<1   (s2+s3>0 schon durchgefuehrt,da s2>0 s3>0)
-  if (s2 + s3 > 1.) return intersectionPoint;
+  if (s2 + s3 > 1.) return -1.;
 
   //Test, ob Strahl in Richtung des Dreiecks zeigt:
-  if (t < 0.) return intersectionPoint;
+  // if (t < 0.) return 0;
 
   //Schnittpunktberechnung
-  intersectionPoint.x = rayOrigin.x + t * rayDirection.x;
-  intersectionPoint.y = rayOrigin.y + t * rayDirection.y;
-  intersectionPoint.z = rayOrigin.z + t * rayDirection.z;
-  intersectionPoint.w = 1;
+  /* intersectionPoint.x = rayOrigin.x + t * rayDirection.x; */
+  /* intersectionPoint.y = rayOrigin.y + t * rayDirection.y; */
+  /* intersectionPoint.z = rayOrigin.z + t * rayDirection.z; */
+  /* intersectionPoint.w = 1; */
 
-  return intersectionPoint;
+  return t;
  
 }
 
@@ -195,8 +195,10 @@ __device__ PointCu intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des 
 **/
 __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
   //bool has_collide;
-  PointCu first_intersection = {0, 0, 0, 0};
-  PointCu intersection_point = {0, 0, 0, 0};
+  /* PointCu first_intersection = {0, 0, 0, 0}; */
+  /* PointCu intersection_point = {0, 0, 0, 0}; */
+  double t1 = 0.;
+  double t2 = 0.;
   PointCu A1 = pr.t1.A;
   PointCu B1 = pr.t1.B;
   PointCu C1 = pr.t1.C;
@@ -214,28 +216,33 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
+  float4 rayDirection;
+  bool firstIntersectionFound = false;
+  rayDirection.x = r.direction.x - r.P.x;
+  rayDirection.y = r.direction.y - r.P.y;
+  rayDirection.z = r.direction.z - r.P.z;
+  float absRay = rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z;
+  absRay = sqrtf(absRay);
+
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    intersection_point = intersectionRayTriangleGPU(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
-    if(intersection_point.w != 0){
-      if(first_intersection.w == 0){
-	first_intersection = intersection_point;
+    t1 = intersectionRayTriangleGPU(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
+
+    if(t1 >= 0.){
+      if(!firstIntersectionFound){
+	firstIntersectionFound= true;
+	t2 = t1;
       }
       else{
 	// Filter double collisions
-	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
-	  
-	  if(distance_gpu(r.P, first_intersection) <= ray_distance && distance_gpu(r.P, intersection_point) > ray_distance)
-	    return distance_gpu(r.direction, first_intersection);
+	if(fabs(t2 - t1) > 0.0000001){
+	   if(t1 > 1. && t2 > 1.)
+	    return 0.;
+	   if(t1>1.) t1=1.;
+	   if(t2>1.) t2=1.;
 
-	  if(distance_gpu(r.P, first_intersection) >= ray_distance && distance_gpu(r.P, intersection_point) < ray_distance)
-	    return distance_gpu(r.direction, intersection_point);
-	  
-	  if(distance_gpu(r.P, first_intersection) > ray_distance || distance_gpu(r.direction, first_intersection) > ray_distance)
-	    return 0;
-
-	  return distance_gpu(first_intersection, intersection_point);
+	  return fabs(t2 - t1) * absRay; 
 	}
 
       }
@@ -244,39 +251,5 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
 
   }
 
-  return 0;
-}
-
-__global__ void trace_on_prisms(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample){
-  // Cuda ids
-  //unsigned tid = threadIdx.x;
-  unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
-  unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
-
-  // Local data
-  unsigned prism_i;
-  unsigned sample_i = bid / blocks_per_sample;
-  RayCu ray = rays[gid];
-  unsigned beta_per_ray = 1;
-  unsigned importance_per_prism = 1;
-  
-  // Calculations
-  __syncthreads();
-  for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-    float distance = fabs(collide_prism_gpu(prisms[prism_i], ray));
-    ray.P.w += distance * beta_per_ray;
-    __syncthreads();	
-  }
-  __syncthreads();
-
-  // Check Solution
-  /* if(fabs(ray.P.w - distance_gpu(ray.P, ray.direction)) > 0.00001){ */
-  /*   printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), ray.P.w); */
-  /*   return; */
-  /* } */
-
-  // Copy data to global
-  rays[gid].P.w = ray.P.w;
-  //atomicAdd(&(samples[sample_i].w), (ray.P.w * importance_per_prism));
-
+  return 0.;
 }
