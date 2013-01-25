@@ -1,5 +1,17 @@
 #include "datatypes.h"
+#include "geometry_gpu.h"
 #include "curand_kernel.h"
+
+__device__ PointCu addVectorToPoint(PointCu p, VectorCu v) {
+  PointCu result;
+
+  result.x = p.x + v.x;
+  result.y = p.y + v.y;
+  result.z = p.z + v.z;
+
+  return result;
+}
+
 __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
   float u = curand_uniform(&localState);
   float v = curand_uniform(&localState);
