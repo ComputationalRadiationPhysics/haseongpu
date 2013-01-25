@@ -313,12 +313,13 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
 
-		float gainTemp = naivePropagation(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v); 
-		gain +=double(gainTemp) * beta_v[startTriangle + N_cells*startLevel]; //@TODO: why is there a beta_v reference in the sequential-code?
-
-
-
+		gain += double(naivePropagation(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v); 
 	}
+
+	// do the multiplication just at the end of all iterations
+	// (gives better numeric behaviour)
+	gain *=  beta_v[startTriangle + N_cells*startLevel]; //@TODO: why is there a beta_v reference in the sequential-code?
+
 	atomicAdd(&(phi[point2D + level*size_p]),float(gain)); //@TODO: importance-value 
 }
 
@@ -346,7 +347,7 @@ float runNaiveRayPropagation(std::vector<double> *ase){
 	cudaEventCreate(&stop);
 
 	// GPU Raytracing
-	unsigned raysPerSample = 5120000; //
+	unsigned raysPerSample = 102400000; //
 	int threads = 256;
 	int blocks = 200;
 	int iterations = float(raysPerSample) / (blocks * threads);
