@@ -18,6 +18,7 @@
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
 #include "testdata.h"
+#include "naive_ray_propagation.h"
 
 int main(int argc, char **argv){
   const unsigned rays_per_sample = 100000;
@@ -61,7 +62,11 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Bruteforce GPU");
 
       }
-      else{
+      else if(strstr(argv[i], "naive_ray_propagation") != 0){
+	runtime = runNaiveRayPropagation(ase);
+	strcpy(runmode, "Naive Ray Propagation GPU");
+	  }
+	  else{
 	fprintf(stderr, "C Runmode is not known\n");
 	return 0;
 

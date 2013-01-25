@@ -36,6 +36,7 @@ int host_t_in[] = { 0,	2,	1,
 		    3,	0,	1,
 		    2,	4,	1,
 		    4,	3,	1 };
+
 double host_z_mesh = 1;
 unsigned host_size_t = 4;
 unsigned host_size_p = 5;
