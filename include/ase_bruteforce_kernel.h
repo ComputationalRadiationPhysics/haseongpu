@@ -1,6 +1,7 @@
 #include "geometry_gpu.h"
 #include "datatypes.h"
 #include "curand_kernel.h"
+#include "buildgrid.h"
 
 #ifndef ASE_BRUTEFORCE_KERNEL_H
 #define ASE_BRUTEFORCE_KERNEL_H
@@ -23,7 +24,7 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
 
 __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
   // Cuda ids
-  unsigned tid = threadIdx.x;
+  //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
   unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -31,12 +32,12 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   const double sigma_e = 2.4E-20;
   const double sigma_a = 1.16E-21;
   const double N_tot   = 2.76E20;
-  const double clad_abs = 5.5;
-  const int clad_num = 3;
+  //const double clad_abs = 5.5;
+  //const int clad_num = 3;
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
   //RayCu    ray = rays[gid];
-  double importance_per_prism = 1;
+  //double importance_per_prism = 1;
   double raySumDistance = 0.f;
   double gain = 1;
   double beta = 0;
@@ -114,6 +115,10 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
     h_betas[beta_i] = betas->at(beta_i);
   }
 
+  /* Grid grid; */
+  /* int4 dimGrid = {1, 1, 1, 0}; */
+  /* prepareGrid(&grid, dimGrid, h_prisms, prisms->size()); */
+
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&d_rays, rays->size() * sizeof(RayCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, prisms->size() * sizeof(PrismCu)));
@@ -157,7 +162,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_samples);
   cudaFreeHost(h_betas);
-
+  cudaDeviceReset();
   
   return runtime_gpu;
 }
