@@ -1,3 +1,5 @@
+#ifndef NAIVE_KERNEL_H
+#define NAIVE_KERNEL_H
 #include "stdio.h"
 #include "stdlib.h"
 #include "math.h"
@@ -13,7 +15,7 @@
 #include <cuda_runtime_api.h>
 #include "testdata_1.h"
 
-#define REAL_VALUES true
+#define REAL_VALUES true 
 #define SMALL 1E-06
 #define CUDA_CHECK_RETURN(value) {				\
 	cudaError_t _mCudaStat = value;				\
@@ -35,18 +37,6 @@
 // Device Code
 //----------------------------------------------------
 
-/**
-  @brief Calculates A-B for 2 float4-based inputs
- **/
-__device__ PointCu subtractPoints(PointCu A, PointCu B){
-	PointCu C;
-	C.x = A.x - B.x;
-	C.y = A.y - B.y;
-	C.z = A.z - B.z;
-	C.w = A.w - B.w;
-	return C;
-}
-
 __device__ double clad_abs;
 __device__ double N_tot;
 __device__ double sigma_e;
@@ -58,46 +48,9 @@ __device__ int size_p;
 __device__ int N_cells;
 
 
-__device__ RayCu generateRayGpu(PointCu vertexPoint, PrismCu startPrism, curandStateMtgp32 *randomstate, int bid){
-	float u = curand_uniform(&randomstate[bid]);
-	float v = curand_uniform(&randomstate[bid]);
-	if((u+v) > 1){ //OPTIMIZE: remove if
-		u = 1-u;
-		v = 1-v;
-	}
-	const float w = 1-(u+v);
-
-	PointCu A = startPrism.t1.A;
-	PointCu B = startPrism.t1.B;
-	PointCu C = startPrism.t1.C;
-
-	// Get x and y coordinates from the random barycentric values
-	const float xRand = u*A.x + v*B.x + w*C.x ;
-	const float yRand = u*A.y + v*B.y + w*C.y ;
-
-	// Take one of the given z-coordinates and add a random part of the prism height
-	const float zRand = A.z + curand_uniform(&randomstate[bid]) * startPrism.t1.A.w;
-
-	float ase=0.f;
-
-	// Take the values to assemble a ray
-	RayCu r = {
-		{xRand, yRand, zRand, ase},
-		vertexPoint};
-	return r;
-}
-
 __device__ float distance(PointCu a, PointCu b){
 	float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
 	return fabs(d);
-}
-
-__device__ PrismCu selectPrism(int id, PrismCu prisms[], int totalNumberOfPrisms){
-	int totalNumberOfThreads = blockDim.x * gridDim.x;
-	int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
-	int prism = id / threadsPerPrism;
-
-	return prisms[prism];
 }
 
 __device__ int selectTriangle(int id, int trianglesInOneLevel){
@@ -120,16 +73,13 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 	//    proceed until you hit a the point or the surface
 	//    if you are closer then "small" stop and return the value
 	double vec_x, vec_y,vec_z;
-	double distance, length, length_help, distance_total;
+	double distance, length, length_help;
 	double nominator, denominator;
 	double gain=1;
 	int tri, cell_z; // the current triangle number and position concerning the z's
 	int tri_next, cell_z_next, forb, forb_dump;
 	int offset;
 
-#if REAL_VALUES==false
-	gain=0;
-#endif
 
 	//    initial positions
 	tri = t_start;
@@ -146,7 +96,11 @@ __device__ float naive_propagation(double x_pos, double y_pos, double z_pos, dou
 	vec_y = vec_y/distance;
 	vec_z = vec_z/distance;
 
-	distance_total = distance;
+#if REAL_VALUES==true
+	double distance_total = distance;
+#else
+	gain=0;
+#endif
 
 	forb = -1;
 
@@ -383,21 +337,10 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	atomicAdd(&(phi[point2D + level*size_p]),float(gain)); //@TODO: importance-value 
 }
 
-__global__ void rayTraceMaster( curandStateMtgp32* globalState, float* phi, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
-	for(int point2D = 0; point2D < size_p ; ++point2D){
-			for(int level = 0; level <= mesh_z; ++ level){
-
-				//raytraceStep<<< 200, 256 >>> ( globalState, phi, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, forbidden, t_in, cell_type, host_size_t, beta_v);
-			}
-		}
-
-	
-
-}
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-int main(){
+float runNaiveKernel(std::vector<double> *ase){
 
 	// Variables from the mexFunction 
 	double  *p_in, *n_x, *n_y, *beta_v;
@@ -406,22 +349,6 @@ int main(){
 
 	int host_N_cells = host_size_t;
 
-	/*
-	   host_p_in = (double *)mxGetData(prhs[0]); //point coordinates in 2D . at first size_p x-values, then size_p y-values
-	   host_n_x = (double *)mxGetData(prhs[4]); //normals of the facets, x-components // probably size_t values?? 
-	   host_n_y = (double *)mxGetData(prhs[5]); //normals of the facets, y-components
-	   host_forbidden = (int *)mxGetData(prhs[11]);//are the correspondance of the face used in the previous triangle, which must not be tested (rounding errors)
-	   host_t_in = (int *)mxGetData(prhs[1]);  //association triangle-points - c-indexing-sytle!
-	   host_n_p = (int *)mxGetData(prhs[10]); // gives the Index to one of the points in p_in which is in the plane of the normals - c-indexing-sytle!
-	   host_neighbors = (int *)mxGetData(prhs[6]); //for each cell in t_in, its neighboring cell in plane geometry  - c-indexing-sytle!
-	   host_size_t = (int )mxGetM(prhs[1]); //number of triangles per sheet
-	   N_cells = host_size_t;
-	   size_p = (int )mxGetM(prhs[0]); //number of points
-	   z_mesh = (double)((double *)mxGetData(prhs[14]))[0];
-	   size_z = (int )mxGetN(prhs[2]); //number of meshing in z-direction
-	   host_clad_abs = (double)(cladabs[0]);
-
-	 */
 	//Variable definitions
 	float runtimeGpu = 0.0;
 	cudaEvent_t start, stop;
@@ -522,7 +449,8 @@ int main(){
 
 		CUDA_CHECK_RETURN(cudaMemcpy(host_phi, phi, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
 		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
-			fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
+	//		fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
+			ase->push_back(host_phi[i]/rays_per_sample);
 		}
 	}
 
@@ -539,6 +467,7 @@ int main(){
 	}
 
 	// print statistics
+	/*
 	{
 
 		fprintf(stderr, "\n\n");
@@ -553,9 +482,9 @@ int main(){
 		fprintf(stderr, "Runtime_GPU    : %f s\n", runtimeGpu / 1000.0);
 		fprintf(stderr, "\n");
 	}
-
+	*/
 	cudaDeviceReset();
-	return 0;
+	return runtimeGpu;
 }
 
-
+#endif
