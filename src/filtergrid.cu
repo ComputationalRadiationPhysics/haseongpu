@@ -1,34 +1,34 @@
 #include "filtergrid.h"
-#include "geometry.h"
+#include "geometry_gpu.h"
 
 __device__ int cellIdx(const Grid *grid, int i, int j, int k){
 	return k*grid->dim.x*grid->dim.y+j*grid->dim.x+i;
 }
 
-__global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
-  int gx = threadIdx.x;
-  int gy = threadIdx.y;
-  int gz = threadIdx.z;
-
-  PointCu a, b, c, d;
-  PrismCu p1, p2;
-
-  VectorCu gridAabbDim = createVector(grid->aabb.min, grid->aabb.max);
-  VectorCu cellDim;
-  cellDim.x = gridAabbDim.x / grid->dim.x;
-  cellDim.y = gridAabbDim.y / grid->dim.y;
-  cellDim.z = gridAabbDim.z / grid->dim.z;
-
-  a = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
-  b = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
-  c = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
-  d = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
-
-  p1.t1 = createTriangle(a, b, c);
-  p2.t1 = createTriangle(b, c, d);
-
-  results[cellIdx(grid, gx, gy, gz)] = (collide_prism_gpu(p1, *ray) != 0) || (collide_prism_gpu(p2, *ray) != 0);
-}
+//__global__ void filter(const Grid *grid, const RayCu *ray, char *results) {
+//  int gx = threadIdx.x;
+//  int gy = threadIdx.y;
+//  int gz = threadIdx.z;
+//
+//  PointCu a, b, c, d;
+//  PrismCu p1, p2;
+//
+//  VectorCu gridAabbDim = createVector(grid->aabb.min, grid->aabb.max);
+//  VectorCu cellDim;
+//  cellDim.x = gridAabbDim.x / grid->dim.x;
+//  cellDim.y = gridAabbDim.y / grid->dim.y;
+//  cellDim.z = gridAabbDim.z / grid->dim.z;
+//
+//  a = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
+//  b = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
+//  c = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
+//  d = createPoint(gx*cellDim.x, gy*cellDim.y, gz*cellDim.z, cellDim.z);
+//
+//  p1.t1 = createTriangle(a, b, c);
+//  p2.t1 = createTriangle(b, c, d);
+//
+//  results[cellIdx(grid, gx, gy, gz)] = (collide_prism_gpu(p1, *ray) != 0) || (collide_prism_gpu(p2, *ray) != 0);
+//}
 
 //int iIdx(const Grid *grid, float x){
 //	assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);

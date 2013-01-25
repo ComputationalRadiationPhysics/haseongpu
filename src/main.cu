@@ -18,6 +18,7 @@
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
 #include "testdata.h"
+#include "naive_ray_propagation.h"
 
 int main(int argc, char **argv){
   const unsigned rays_per_sample = 100000;
@@ -44,7 +45,7 @@ int main(int argc, char **argv){
   //std::vector<PointCu> *samples = generate_samples(length, length, depth);
   std::vector<PointCu> *samples = generateSampesFromTestdata(host_z_mesh, host_p_in, host_number_of_points);
   std::vector<RayCu> *rays      = generate_sample_rays(length, length, depth, rays_per_sample, samples);
-  std::vector<float> *ase       = new std::vector<float>(samples->size(), 0);
+  std::vector<double> *ase       = new std::vector<double>(samples->size(), 0);
 
   // Run 
   unsigned i;
@@ -60,7 +61,11 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Bruteforce GPU");
 
       }
-      else{
+      else if(strstr(argv[i], "naive_ray_propagation") != 0){
+	runtime = runNaiveRayPropagation(ase);
+	strcpy(runmode, "Naive Ray Propagation GPU");
+	  }
+	  else{
 	fprintf(stderr, "C Runmode is not known\n");
 	return 0;
 

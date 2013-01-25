@@ -1,5 +1,5 @@
-#ifndef TESTDATA_1_H
-#define TESTDATA_1_H
+#ifndef TESTDATA_H
+#define TESTDATA_H
 double host_p_in[]= {   -1, -1,
 			0,	0,
 			1, -1,
@@ -38,10 +38,10 @@ int host_t_in[] = { 0,	2,	1,
 		    4,	3,	1 };
 unsigned host_number_of_triangles = 4;
 unsigned host_number_of_points = 5;
-int host_z_mesh = 1;
+double host_z_mesh = 1;
 int host_size_t = 4;
 int host_size_p = 5;
-double host_mesh_z = 1;
+int host_mesh_z = 1;
 	
 double host_clad_abs = 5.5;
 int host_clad_num = 3;

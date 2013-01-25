@@ -1,7 +1,9 @@
-#include "datatypes.h"
-
 #ifndef GEOMETRY_GPU_H
 #define GEOMETRY_GPU_H
+
+#include "datatypes.h"
+#include "curand_kernel.h"
+
 
 __device__ float    collide_prism_gpu(PrismCu pr, RayCu r);
 __device__ float    distance_gpu(PointCu a, PointCu b);

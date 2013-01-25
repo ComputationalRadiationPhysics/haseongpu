@@ -13,18 +13,11 @@
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
-#include "testdata_1.h"
+#include "testdata.h"
 
 #define REAL_VALUES true 
 #define SMALL 1E-06
-#define CUDA_CHECK_RETURN(value) {				\
-	cudaError_t _mCudaStat = value;				\
-	if (_mCudaStat != cudaSuccess) {				\
-		fprintf(stderr, "Error %s at line %d in file %s\n",	\
-				cudaGetErrorString(_mCudaStat), __LINE__, __FILE__);	\
-		exit(1);							\
-	}								\
-}
+
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
@@ -48,10 +41,10 @@ __device__ int size_p;
 __device__ int N_cells;
 
 
-__device__ float distance(PointCu a, PointCu b){
-	float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
-	return fabs(d);
-}
+//__device__ float distance(PointCu a, PointCu b){
+//	float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
+//	return fabs(d);
+//}
 
 __device__ int selectTriangle(int id, int trianglesInOneLevel){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
@@ -340,7 +333,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-float runNaiveKernel(std::vector<double> *ase){
+float runNaiveRayPropagation(std::vector<double> *ase){
 
 	// Variables from the mexFunction 
 	double  *p_in, *n_x, *n_y, *beta_v;
@@ -449,8 +442,8 @@ float runNaiveKernel(std::vector<double> *ase){
 
 		CUDA_CHECK_RETURN(cudaMemcpy(host_phi, phi, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
 		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
-	//		fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
-			ase->push_back(host_phi[i]/rays_per_sample);
+			fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, host_phi[i] / rays_per_sample);
+			ase->push_back(double(double(host_phi[i]) / rays_per_sample));
 		}
 	}
 
