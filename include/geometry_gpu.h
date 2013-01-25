@@ -4,7 +4,7 @@
 #include "datatypes.h"
 #include "curand_kernel.h"
 
-
+__device__ PointCu addVectorToPoint(PointCu p, VectorCu v);
 __device__ float    collide_prism_gpu(PrismCu pr, RayCu r);
 __device__ float    distance_gpu(PointCu a, PointCu b);
 __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b);
