@@ -40,12 +40,13 @@ int main(int argc, char **argv){
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   //std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
-  std::vector<PrismCu> *prisms  = generatePrismsFromTestdata(host_z_mesh, host_p_in, host_t_in, host_number_of_triangles, host_mesh_z);
+  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_t_in, host_size_t, host_mesh_z);
   //std::vector<PointCu> *samples = generate_samples(length, length, depth);
-  std::vector<PointCu> *samples = generateSampesFromTestdata(host_z_mesh, host_p_in, host_number_of_points);
-  std::vector<RayCu> *rays      = generate_sample_rays(length, length, depth, rays_per_sample, samples);
-  std::vector<float> *ase       = new std::vector<float>(samples->size(), 0);
-
+  std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
+  std::vector<RayCu>      *rays = generate_sample_rays(length, length, depth, rays_per_sample, samples);
+  std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
+  std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
+  
   // Run 
   unsigned i;
   for(i=1; i < argc; ++i){
@@ -56,7 +57,7 @@ int main(int argc, char **argv){
 
       }
       else if(strstr(argv[i], "bruteforce_gpu") != 0){
-  	runtime = runAseBruteforceGpu(samples, prisms, rays, ase, threads);
+  	runtime = runAseBruteforceGpu(samples, prisms, rays, betas, ase, threads);
 	strcpy(runmode, "Bruteforce GPU");
 
       }
@@ -74,7 +75,7 @@ int main(int argc, char **argv){
   unsigned sample_i;
   fprintf(stderr, "C Solutions\n");
   for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-    fprintf(stderr, "C ASE PHI of sample %d: %f\n", sample_i, ase->at(sample_i));
+    fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
 
   }
 

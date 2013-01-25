@@ -63,7 +63,7 @@ std::vector<PrismCu> *generate_prisms(int length, int width, float level){
   return prisms;
 }
 
-std::vector<PointCu> *generateSampesFromTestdata(unsigned levels, double *points, unsigned numPoints){
+std::vector<PointCu> *generateSamplesFromTestdata(unsigned levels, double *points, unsigned numPoints){
   std::vector<PointCu> *p = new std::vector<PointCu>;
   unsigned level_i;
   unsigned point_i; 
@@ -87,36 +87,48 @@ std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points
   unsigned level_i;
 
   for(level_i = 0; level_i < levels; ++level_i){
-  for(triangle_i = 0; triangle_i < numTriangles; ++triangle_i){
-    unsigned a = triangles[triangle_i * 3];
-    unsigned b = triangles[triangle_i * 3 + 1];
-    unsigned c = triangles[triangle_i * 3 + 2];
+    for(triangle_i = 0; triangle_i < numTriangles; ++triangle_i){
+      unsigned a = triangles[triangle_i * 3];
+      unsigned b = triangles[triangle_i * 3 + 1];
+      unsigned c = triangles[triangle_i * 3 + 2];
 
-    PointCu A = {
-      points[a * 2],
-      points[a * 2 + 1],
-      level_i,
-      thickness};
+      PointCu A = {
+	points[a * 2],
+	points[a * 2 + 1],
+	level_i,
+	thickness};
 
-    PointCu B = {
-      points[b * 2],
-      points[b * 2 + 1],
-      level_i,
-      thickness};
+      PointCu B = {
+	points[b * 2],
+	points[b * 2 + 1],
+	level_i,
+	thickness};
 
-    PointCu C = {
-      points[c * 2],
-      points[c * 2 + 1],
-      level_i,
-      thickness};
+      PointCu C = {
+	points[c * 2],
+	points[c * 2 + 1],
+	level_i,
+	thickness};
 
-    TriangleCu triangle = {A, B, C};
-    PrismCu prism = {triangle};
-    prisms->push_back(prism);
+      TriangleCu triangle = {A, B, C};
+      PrismCu prism = {triangle};
+      prisms->push_back(prism);
+    }
   }
-  }
-
+  
   return prisms;
+}
+
+std::vector<double> *generateBetasFromTestdata(double* betaValues, unsigned numBetaValue){
+  std::vector<double> *betas = new std::vector<double>;
+  
+  unsigned beta_i;
+  for(beta_i = 0; beta_i < numBetaValue; ++beta_i){
+    betas->push_back(betaValues[beta_i]);
+  }
+
+  return betas;
+
 }
 
 RayCu generate_ray(const int heigth, const int width, const int level){

@@ -5,7 +5,7 @@
 #ifndef ASE_BRUTEFORCE_CPU
 #define ASE_BRUTEFORCE_CPU
 
-float runAseBruteforceCpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase){
+float runAseBruteforceCpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<double> *ase){
   unsigned ray_i, prism_i, sample_i;
   unsigned rays_per_sample = rays->size() / samples->size();
   float runtime_cpu = 0.0;
