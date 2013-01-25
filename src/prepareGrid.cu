@@ -8,9 +8,9 @@ void prepareGrid(Grid *d_grid, int4 dimGrid, const PrismCu *prisms, int numPrism
 	Grid grid;
 	
 	//set dimensions of the grid
-	grid->dim.x=dimGrid.x;
-	grid->dim.y=dimGrid.y;
-	grid->dim.z=dimGrid.z;
+	grid.dim.x=dimGrid.x;
+	grid.dim.y=dimGrid.y;
+	grid.dim.z=dimGrid.z;
 	
 	
 	//array with BoudningBoxes for prisms
@@ -20,7 +20,7 @@ void prepareGrid(Grid *d_grid, int4 dimGrid, const PrismCu *prisms, int numPrism
 	calcAabbs(prisms, aabbs, numPrisms);
 	
 	//build  and fill grid on Host
-	buildGrid(grid, aabbs, numPrisms);
+	buildGrid(&grid, aabbs, numPrisms);
 	
 	//copy grid to GPU
 	copyGrid2GPU(&grid,d_grid);
