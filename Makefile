@@ -6,7 +6,8 @@ DATE="`date +%y%m%d%H%M%S`"
 
 # compiler, linker, archiver
 NVCC = nvcc
-NVCC_FLAGS = --ptxas-options=-v --use_fast_math --include-path include
+#NVCC_FLAGS = --ptxas-options=-v --use_fast_math --include-path include
+NVCC_FLAGS = --use_fast_math --include-path include
 ARCH = -arch=sm_30
 # --maxrregcount=40
 
