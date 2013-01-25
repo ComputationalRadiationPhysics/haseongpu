@@ -3,7 +3,6 @@ bin/*
 *.swp
 *~
 include/*.o
-*.o
 src/*.o
 src/*.d
 src/*/*.d
@@ -12,3 +11,4 @@ src/*.out
 .cproject
 .project
 .settings/*
+#*#
