@@ -21,19 +21,26 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
   curand_init ( seed, gid, 0, &state[gid] );
 } 
 
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, curandState* globalState){
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
   // Cuda ids
   unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
   unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Local data
+  const double sigma_e = 2.4E-20;
+  const double sigma_a = 1.16E-21;
+  const double N_tot   = 2.76E20;
+  const double clad_abs = 5.5;
+  const int clad_num = 3;
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
   //RayCu    ray = rays[gid];
-  unsigned beta_per_ray = 1;
-  unsigned importance_per_prism = 1;
-  float    raySumDistance = 0.f;
+  double importance_per_prism = 1;
+  double raySumDistance = 0.f;
+  double gain = 1;
+  double beta = 0;
+  double distance = 0;
 
   // Random number generator
   curandState localState = globalState[gid];
@@ -45,27 +52,32 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   // Calculations
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-    float distance = collide_prism_gpu(prisms[prism_i], ray);
+    distance = collide_prism_gpu(prisms[prism_i], ray);
+    beta = betas[prism_i];
     raySumDistance += distance;
-    //__syncthreads();
+    gain *= exp(distance * N_tot * (beta *(sigma_e + sigma_a) - sigma_a));
+    __syncthreads();
   }
   __syncthreads();
 
-  // Check Solution
+  gain /= (raySumDistance * raySumDistance);
+
+  // Check Solution (only without betamultiplay valid)
   if(fabs(raySumDistance - distance_gpu(ray.P, ray.direction)) > 0.00001){
     printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), raySumDistance);
     return;
   }
 
   // Copy data to global
-  atomicAdd(&(samples[sample_i].w), (raySumDistance));
+  atomicAdd(&(samples[sample_i].w), (gain));
 
 }
 
-float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<float> *ase, unsigned threads){
+float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<double> *betas, std::vector<double> *ase,unsigned threads){
   RayCu *h_rays, *d_rays;
   PrismCu *h_prisms, *d_prisms;
   PointCu *h_samples, *d_samples;
+  double *h_betas, *d_betas;
   float runtime_gpu = 0.0;
   cudaEvent_t start, stop;
   curandState *devStates;
@@ -79,6 +91,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, prisms->size() * sizeof(PrismCu), cudaHostAllocDefault));
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, rays->size() * sizeof(RayCu), cudaHostAllocDefault));
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_samples, samples->size() * sizeof(PointCu), cudaHostAllocDefault));
+  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_betas, betas->size() * sizeof(double), cudaHostAllocDefault));
 
   // Memory initialisation on host
   unsigned ray_i;
@@ -96,15 +109,24 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
     h_samples[sample_i] = samples->at(sample_i);
   }
 
+  unsigned beta_i;
+  for(beta_i = 0; beta_i < betas->size(); ++beta_i){
+    h_betas[beta_i] = betas->at(beta_i);
+  }
+
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&d_rays, rays->size() * sizeof(RayCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, prisms->size() * sizeof(PrismCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_samples, samples->size() * sizeof(PointCu)));
-  CUDA_CHECK_RETURN(cudaMalloc ( &devStates, threads * blocks * sizeof(curandState)));
+  CUDA_CHECK_RETURN(cudaMalloc(&d_betas, betas->size() * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&devStates, threads * blocks * sizeof(curandState)));
+
+
   // Copy data from host to device
   CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, rays->size() * sizeof(RayCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, prisms->size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples->size() * sizeof(PointCu), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(d_betas, h_betas, betas->size() * sizeof(double), cudaMemcpyHostToDevice));
   cudaEventRecord(start, 0);
   
   // Start random setup kernel
@@ -113,7 +135,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
   // Start kernel
   fprintf(stderr, "C Start GPU Raytracing\n");
-  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample, devStates);
+  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample, d_betas, devStates);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);
@@ -124,9 +146,9 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   CUDA_CHECK_RETURN(cudaMemcpy(h_rays, d_rays, rays->size() * sizeof(RayCu), cudaMemcpyDeviceToHost));
 
  
-  // Copy data to vectors
+  // Copy data to vectors and scale by number of rays per sample
   for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-    ase->at(sample_i) = h_samples[sample_i].w;
+    ase->at(sample_i) = (h_samples[sample_i].w  * samples->size())/ rays->size();
 
   }
 
@@ -134,6 +156,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_samples);
+  cudaFreeHost(h_betas);
 
   
   return runtime_gpu;
