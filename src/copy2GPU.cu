@@ -1,11 +1,6 @@
-#include <iostream>
+#include "buildgrid.h"
+
 #include <cstdio>
-#include <cassert>
-
-#include "grid.h"
-
-using std::endl;
-using std::cout;
 
 #define CUDA_CHECK(cmd) {cudaError_t error = cmd; if(error!=cudaSuccess){printf("<%s>:%i ",__FILE__,__LINE__); printf("[CUDA] Error: %s\n", cudaGetErrorString(error));}}
 /*start kernel, wait for finish and check errors*/
@@ -42,4 +37,6 @@ void copyGrid2GPU(const Grid *grid, Grid *d_grid)
 	//copy dim and aabb
 	d_grid->dim=grid->dim;
 	d_grid->aabb=grid->aabb;
+	
+	delete [] cellListtmp;
 }
