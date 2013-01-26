@@ -23,7 +23,7 @@
 #include "buildgrid.h"
 
 int main(int argc, char **argv){
-  const unsigned rays_per_sample = 1000;
+  const unsigned rays_per_sample = 10000;
   const unsigned max_triangles = 2;
   const unsigned depth  = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));
@@ -43,7 +43,7 @@ int main(int argc, char **argv){
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   //std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
-  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_t_in, host_size_t, host_mesh_z);
+  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_size_p, host_t_in, host_size_t, host_mesh_z);
   //std::vector<PointCu> *samples = generate_samples(length, length, depth);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
   std::vector<RayCu>      *rays = generate_sample_rays(length, length, depth, rays_per_sample, samples);

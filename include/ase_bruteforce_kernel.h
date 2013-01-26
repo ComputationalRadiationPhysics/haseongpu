@@ -53,10 +53,10 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   globalState[gid] = localState;
 
   // Precalculation
-  absRayDistance   = distance_gpu(ray.P, ray.direction)
-  rayDirection.x = r.direction.x - r.P.x;
-  rayDirection.y = r.direction.y - r.P.y;
-  rayDirection.z = r.direction.z - r.P.z;
+  absRayDistance = distance_gpu(ray.P, ray.direction);
+  rayDirection.x = ray.direction.x - ray.P.x;
+  rayDirection.y = ray.direction.y - ray.P.y;
+  rayDirection.z = ray.direction.z - ray.P.z;
 
   // Calculations
   __syncthreads();

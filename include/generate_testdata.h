@@ -70,8 +70,8 @@ std::vector<PointCu> *generateSamplesFromTestdata(unsigned levels, double *point
   for(level_i = 0; level_i <= levels; ++level_i){
     for(point_i = 0; point_i < numPoints; ++point_i){
       PointCu point = {
-	points[point_i * 2],
-	points[point_i * 2 + 1],
+	points[point_i],
+	points[numPoints + point_i],
 	level_i,
 	0};
       p->push_back(point);
@@ -81,32 +81,32 @@ std::vector<PointCu> *generateSamplesFromTestdata(unsigned levels, double *point
   return p;
 }
 
-std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points, int *triangles, unsigned numTriangles, double thickness){
+std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, double *points, unsigned numPoints, int *triangles, unsigned numTriangles, double thickness){
   std::vector<PrismCu> *prisms = new std::vector<PrismCu>;
   unsigned triangle_i;
   unsigned level_i;
 
   for(level_i = 0; level_i < levels; ++level_i){
     for(triangle_i = 0; triangle_i < numTriangles; ++triangle_i){
-      unsigned a = triangles[triangle_i * 3];
-      unsigned b = triangles[triangle_i * 3 + 1];
-      unsigned c = triangles[triangle_i * 3 + 2];
+      unsigned a = triangles[triangle_i];
+      unsigned b = triangles[numTriangles + triangle_i];
+      unsigned c = triangles[2 * numTriangles + triangle_i];
 
       PointCu A = {
-	points[a * 2],
-	points[a * 2 + 1],
+	points[a],
+	points[numPoints + a],
 	level_i,
 	thickness};
 
       PointCu B = {
-	points[b * 2],
-	points[b * 2 + 1],
+	points[b],
+	points[numPoints + b],
 	level_i,
 	thickness};
 
       PointCu C = {
-	points[c * 2],
-	points[c * 2 + 1],
+	points[c],
+	points[numPoints + c],
 	level_i,
 	thickness};
 

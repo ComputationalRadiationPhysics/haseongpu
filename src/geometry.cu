@@ -76,7 +76,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   double s2; //2.barizentrische Koordinate des Dreiecks
   double s3; //3.barizentrische Koordinate des Dreiecks
   //1.barizentrische Koordinate des Dreiecks ergibt sich mit 1.-s2-s3
-  double t; //Geradenparameter
+  double t = 0.; //Geradenparameter
   //PointCu intersectionPoint = {0, 0, 0, 0};
 
   //Grenzwert fuer numerische Stabilitaet
@@ -87,7 +87,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
   //side12 und side13 sind Vektoren der Seiten
   //cross ist eine Hilfsvariable
-  VectorCu side12, side13, cross;
+  VectorCu side12, side13, cross, p1_rayOrigin, tempcross;
 
   //Berechnung von Vektoren der Seiten:
   //1.Seite side12 von p1 nach p2
@@ -106,13 +106,10 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   //s2*(p2-p1)+s3*(p3-p1)-t*rayDirection = rayOrigin-p1 -> zu bestimmende Parameter: s2,s3,-t 
 
   //Kreuzprodukt von side13 und rayDirection
-  cross.x = side13.y * rayDirection.z - side13.z * rayDirection.y;
-  cross.y = side13.z * rayDirection.x - side13.x * rayDirection.z;
-  cross.z = side13.x * rayDirection.y - side13.y * rayDirection.x;
-
+  cross = crossproduct_gpu(side13, rayDirection);
+  
   //Berechnung der Determinante mit Skalarprodukt
-  determinante = cross.x * side12.x + cross.y * side12.y + cross.z * side12.z;
-
+  determinante = skalar_mul_gpu(cross, side12);
 
   //Test auf Parallelitaet
   //numerische Stabilitaet!!!
@@ -122,7 +119,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   }
 
   //Abstand Ursprung des Strahls zu p1
-  VectorCu p1_rayOrigin; //=rayOrigin-p1;
+ 
   p1_rayOrigin.x = rayOrigin.x - p1.x;
   p1_rayOrigin.y = rayOrigin.y - p1.y;
   p1_rayOrigin.z = rayOrigin.z - p1.z;
@@ -131,18 +128,14 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   // sp=s1*p1+s2*p2+s3*p3
   //2. barizentrische Koordinate s2
   //=Skalarprodukt von p1_rayOrigin und cross
-  s2 = cross.x * p1_rayOrigin.x + cross.y * p1_rayOrigin.y + cross.z * p1_rayOrigin.z;
+  s2 = skalar_mul_gpu(cross, p1_rayOrigin);
 
-  //Hilfsvariable
-  VectorCu tempcross;
   //zunaenaehst Kreuzprodukt von rayDirection und side12
-  tempcross.x = rayDirection.y * side12.z - rayDirection.z * side12.y;
-  tempcross.y = rayDirection.z * side12.x - rayDirection.x * side12.z;
-  tempcross.z = rayDirection.x * side12.y - rayDirection.y * side12.x;
+  tempcross = crossproduct_gpu(rayDirection, side12);
 
   //s3=Skalarprodukt von rayDirection und side12
   //s3=(rayDirection x side12) *p1_rayOrigin
-  s3 = tempcross.x * p1_rayOrigin.x + tempcross.y * p1_rayOrigin.y + tempcross.z * p1_rayOrigin.z;
+  s3 = skalar_mul_gpu(tempcross, p1_rayOrigin);
 
   //Cramersche Regel -> Division durchfuehren
   double invdet = 1. / determinante;
@@ -150,45 +143,24 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   s2 = invdet*s2;
   s3 = invdet*s3;
 
+  //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
+  //Ueberschereitungstest fuer barizentrische Koordinaten
+  if (s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || s2 + s3 > 1.) return -1.;
+
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
-  tempcross.x = side13.y * side12.z - side13.z * side12.y;
-  tempcross.y = side13.z * side12.x - side13.x * side12.z;
-  tempcross.z = side13.x * side12.y - side13.y * side12.x;
+  tempcross = crossproduct_gpu(side13, side12);
 
   //t ist dann das Skalarprodukt von tempcross und p1_rayOrigin
   //t=(seite13,seite12) *p1_rayOrigin = -(seite12,seite13) *p1_rayOrigin
-  t = tempcross.x * p1_rayOrigin.x + tempcross.y * p1_rayOrigin.y + tempcross.z * p1_rayOrigin.z;
-
+  t = skalar_mul_gpu(tempcross, p1_rayOrigin);
   t = invdet*t;
-
-  //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
-
-  //Ueberschereitungstest fuer barizentrische Koordinaten
-  if (s2 < 0. || s2 > 1.) return -1.;
-
-  //Ueberschereitungstest fuer barizentrische Koordinaten
-  if (s3 < 0. || s3 > 1.) return -1.;
-
-  //0 <= s1=1-s2-s3 <= 1 -> s2+s3<1   (s2+s3>0 schon durchgefuehrt,da s2>0 s3>0)
-  if (s2 + s3 > 1.) return -1.;
-
-  //Test, ob Strahl in Richtung des Dreiecks zeigt:
-  // if (t < 0.) return 0;
-
-  //Schnittpunktberechnung
-  /* intersectionPoint.x = rayOrigin.x + t * rayDirection.x; */
-  /* intersectionPoint.y = rayOrigin.y + t * rayDirection.y; */
-  /* intersectionPoint.z = rayOrigin.z + t * rayDirection.z; */
-  /* intersectionPoint.w = 1; */
 
   return t;
  
 }
 
-/**
-   @attention slower than commented collide_prism_gpu but more pretty
-**/
+
 __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance){
   double t1 = 0.;
   double t2 = 0.;
@@ -214,7 +186,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, d
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    t1 = intersectionRayTriangleGPU(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
+    t1 = intersectionRayTriangleGPU(r.P, rayDirection, triangles[i].A, triangles[i].B, triangles[i].C);
 
     if(t1 >= 0.){
       if(!firstIntersectionFound){
