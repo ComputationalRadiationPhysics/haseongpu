@@ -37,6 +37,7 @@ int main(int argc, char **argv){
     fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n");
     fprintf(stderr, "C Runmodes : bruteforce_cpu\n");
     fprintf(stderr, "             bruteforce_gpu\n");
+    fprintf(stderr, "             naive_ray_propagation\n");
     return 0;
   }
   
