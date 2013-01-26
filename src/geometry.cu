@@ -145,7 +145,9 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
   //Ueberschereitungstest fuer barizentrische Koordinaten
-  if (s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || s2 + s3 > 1.) return -1.;
+  //if (s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || s2 + s3 > 1.) return -1.;
+  //s2 > 1. und s3 > 1. sind bereits enthalten in s2 + s3 > 1.
+  if (s2 < 0. || s3 < 0. || s2 + s3 > 1.) return -1.;
 
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
