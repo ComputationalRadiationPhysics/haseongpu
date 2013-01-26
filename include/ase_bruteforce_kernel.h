@@ -38,10 +38,12 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   unsigned sample_i = bid / blocks_per_sample;
   //RayCu    ray = rays[gid];
   //double importance_per_prism = 1;
-  double raySumDistance = 0.f;
+  double sumRayDistance = 0.f;
   double gain = 1;
   double beta = 0;
   double distance = 0;
+  double absRayDistance = 0;
+  VectorCu rayDirection;
 
   // Random number generator
   curandState localState = globalState[gid];
@@ -50,22 +52,28 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   RayCu       ray = generateRayGpu(sample, raySourcePrism, localState);
   globalState[gid] = localState;
 
+  // Precalculation
+  absRayDistance   = distance_gpu(ray.P, ray.direction)
+  rayDirection.x = r.direction.x - r.P.x;
+  rayDirection.y = r.direction.y - r.P.y;
+  rayDirection.z = r.direction.z - r.P.z;
+
   // Calculations
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
-    distance = collide_prism_gpu(prisms[prism_i], ray);
+    distance = collide_prism_gpu(prisms[prism_i], ray, rayDirection, absRayDistance);
     beta = betas[prism_i];
-    raySumDistance += distance;
+    sumRayDistance += distance;
     gain *= exp(distance * N_tot * (beta *(sigma_e + sigma_a) - sigma_a));
     __syncthreads();
   }
   __syncthreads();
 
-  gain /= (raySumDistance * raySumDistance);
+  gain /= (sumRayDistance * sumRayDistance);
 
   // Check Solution (only without betamultiplay valid)
-  if(fabs(raySumDistance - distance_gpu(ray.P, ray.direction)) > 0.00001){
-    printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, distance_gpu(ray.P, ray.direction), raySumDistance);
+  if(fabs(sumRayDistance - absRayDistance) > 0.00001){
+    printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, absRayDistance, sumRayDistance);
     return;
   }
 

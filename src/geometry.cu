@@ -68,10 +68,10 @@ __device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
 }
 
 __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
-				   PointCu rayObjective, //Richtungsvektor des Strahls
-				   PointCu p1, //1.Punkt des Dreiecks
-				   PointCu p2, //2.Punkt des Dreiecks
-				   PointCu p3) //3.Punkt des Dreiecks
+					     VectorCu rayDirection,
+					     PointCu p1, //1.Punkt des Dreiecks
+					     PointCu p2, //2.Punkt des Dreiecks
+					     PointCu p3) //3.Punkt des Dreiecks
 {
   double s2; //2.barizentrische Koordinate des Dreiecks
   double s3; //3.barizentrische Koordinate des Dreiecks
@@ -87,7 +87,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
   //side12 und side13 sind Vektoren der Seiten
   //cross ist eine Hilfsvariable
-  VectorCu side12, side13, rayDirection, cross;
+  VectorCu side12, side13, cross;
 
   //Berechnung von Vektoren der Seiten:
   //1.Seite side12 von p1 nach p2
@@ -99,10 +99,6 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   side13.x = p3.x - p1.x;
   side13.y = p3.y - p1.y;
   side13.z = p3.z - p1.z;
-
-  rayDirection.x = rayObjective.x - rayOrigin.x;
-  rayDirection.y = rayObjective.y - rayOrigin.y;
-  rayDirection.z = rayObjective.z - rayOrigin.z;
 
   //Gleichsetzen von Gereadengleichung und Ebenengleichung
   //Modell:  sp=p1+s2*(p2-p1)+s3*(p3-p1)=rayOrigin+t*rayDirection
@@ -193,10 +189,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 /**
    @attention slower than commented collide_prism_gpu but more pretty
 **/
-__device__ float collide_prism_gpu(PrismCu pr, RayCu r){
-  //bool has_collide;
-  /* PointCu first_intersection = {0, 0, 0, 0}; */
-  /* PointCu intersection_point = {0, 0, 0, 0}; */
+__device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance){
   double t1 = 0.;
   double t2 = 0.;
   PointCu A1 = pr.t1.A;
@@ -216,14 +209,8 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
     {A1, C1, C2},
     {A1, A2, C2}};
 
-  float4 rayDirection;
-  bool firstIntersectionFound = false;
-  rayDirection.x = r.direction.x - r.P.x;
-  rayDirection.y = r.direction.y - r.P.y;
-  rayDirection.z = r.direction.z - r.P.z;
-  float absRay = rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z;
-  absRay = sqrtf(absRay);
 
+  bool firstIntersectionFound = false;
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
@@ -242,7 +229,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r){
 	   if(t1>1.) t1=1.;
 	   if(t2>1.) t2=1.;
 
-	  return fabs(t2 - t1) * absRay; 
+	  return fabs(t2 - t1) * absRayDistance; 
 	}
 
       }
