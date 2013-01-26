@@ -128,7 +128,7 @@ void buildGrid(Grid *grid, const Aabb *aabbs, int numAabbs) {
     //loop over grid cells
     for(l=0;l<numCells;++l){
         grid->cellList[l].length = cellLists[l].size();
-        grid->cellList[l].prismIdxList=new int[grid->cellList->length];
+        grid->cellList[l].prismIdxList=new int[grid->cellList[l].length];
         //set pointer to array begin
         p=grid->cellList[l].prismIdxList;
         //copy
