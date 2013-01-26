@@ -23,7 +23,7 @@
 #include "buildgrid.h"
 
 int main(int argc, char **argv){
-  const unsigned rays_per_sample = 10000;
+  const unsigned rays_per_sample = 100000;
   const unsigned max_triangles = 2;
   const unsigned depth  = 2;
   const unsigned length = ceil(sqrt(max_triangles / 2));

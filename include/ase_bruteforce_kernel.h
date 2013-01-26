@@ -40,7 +40,6 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   //double importance_per_prism = 1;
   double sumRayDistance = 0.f;
   double gain = 1;
-  double beta = 0;
   double distance = 0;
   double absRayDistance = 0;
   VectorCu rayDirection;
@@ -62,14 +61,14 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   __syncthreads();
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
     distance = collide_prism_gpu(prisms[prism_i], ray, rayDirection, absRayDistance);
-    beta = betas[prism_i];
     sumRayDistance += distance;
-    gain *= exp(distance * N_tot * (beta *(sigma_e + sigma_a) - sigma_a));
+    gain *= exp(distance * N_tot * (betas[prism_i] *(sigma_e + sigma_a) - sigma_a));
     __syncthreads();
   }
+  gain /= (sumRayDistance * sumRayDistance);
   __syncthreads();
 
-  gain /= (sumRayDistance * sumRayDistance);
+
 
   // Check Solution (only without betamultiplay valid)
   if(fabs(sumRayDistance - absRayDistance) > 0.00001){

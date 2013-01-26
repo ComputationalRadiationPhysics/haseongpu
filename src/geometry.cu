@@ -162,8 +162,6 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
 
 __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance){
-  double t1 = 0.;
-  double t2 = 0.;
   PointCu A1 = pr.t1.A;
   PointCu B1 = pr.t1.B;
   PointCu C1 = pr.t1.C;
@@ -181,27 +179,36 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, d
     {A1, C1, C2},
     {A1, A2, C2}};
 
+  double t[8];
+
+  t[0] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[0].A, triangles[0].B, triangles[0].C);
+  t[1] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[1].A, triangles[1].B, triangles[1].C);
+  t[2] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[2].A, triangles[2].B, triangles[2].C);
+  t[3] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[3].A, triangles[3].B, triangles[3].C);
+  t[4] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[4].A, triangles[4].B, triangles[4].C);
+  t[5] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[5].A, triangles[5].B, triangles[5].C);
+  t[6] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[6].A, triangles[6].B, triangles[6].C);
+  t[7] = intersectionRayTriangleGPU(r.P, rayDirection, triangles[7].A, triangles[7].B, triangles[7].C);
+
 
   bool firstIntersectionFound = false;
   // test for collision on all triangles of an prism
   unsigned i; 
   for(i = 0; i < 8; ++i){
-    t1 = intersectionRayTriangleGPU(r.P, rayDirection, triangles[i].A, triangles[i].B, triangles[i].C);
-
-    if(t1 >= 0.){
+    if(t[i] >= 0.){
       if(!firstIntersectionFound){
 	firstIntersectionFound= true;
-	t2 = t1;
+	t[0] = t[i];
       }
       else{
 	// Filter double collisions
-	if(fabs(t2 - t1) > 0.0000001){
-	   if(t1 > 1. && t2 > 1.)
+	if(fabs(t[0] - t[i]) > 0.0000001){
+	   if(t[i] > 1. && t[0] > 1.)
 	    return 0.;
-	   if(t1>1.) t1=1.;
-	   if(t2>1.) t2=1.;
+	   if(t[i]>1.) t[i] = 1.;
+	   if(t[0]>1.) t[0] = 1.;
 
-	  return fabs(t2 - t1) * absRayDistance; 
+	  return fabs(t[0] - t[i]) * absRayDistance; 
 	}
 
       }
