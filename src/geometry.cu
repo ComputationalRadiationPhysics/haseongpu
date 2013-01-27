@@ -1,19 +1,18 @@
-#include "datatypes.h"
 #include "geometry.h"
 
 /**
-   @brief Detects collisions of a triangle and a ray without
-   a precondition.
-   
-   @return PointCu {0,0,0,0} if there is no intersection triangle/ray
-   @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
-**/
+  @brief Detects collisions of a triangle and a ray without
+  a precondition.
+
+  @return PointCu {0,0,0,0} if there is no intersection triangle/ray
+  @return PointCu {x,y,z,1} barycentric coordinates of intersection triangle/ray
+ **/
 PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
-				PointCu rayObjective, //Richtungsvektor des Strahls
-				PointCu p1, //1.Punkt des Dreiecks
-				PointCu p2, //2.Punkt des Dreiecks
-				PointCu p3) //3.Punkt des Dreiecks
-				{
+    PointCu rayObjective, //Richtungsvektor des Strahls
+    PointCu p1, //1.Punkt des Dreiecks
+    PointCu p2, //2.Punkt des Dreiecks
+    PointCu p3) //3.Punkt des Dreiecks
+{
   double s2; //2.barizentrische Koordinate des Dreiecks
   double s3; //3.barizentrische Koordinate des Dreiecks
   //1.barizentrische Koordinate des Dreiecks ergibt sich mit 1.-s2-s3
@@ -129,15 +128,15 @@ PointCu intersectionRayTriangle(PointCu rayOrigin, //Ursprung des Strahls
   intersectionPoint.w = 1;
 
   return intersectionPoint;
- 
+
 }
 
 /**
-   @brief Detects collisions of a prism and ray
-   
-   @return float intersection distance
-   @return 0 if in case of no intersection
-**/
+  @brief Detects collisions of a prism and ray
+
+  @return float intersection distance
+  @return 0 if in case of no intersection
+ **/
 float collide_prism(PrismCu pr, RayCu r){
   //bool has_collide;
   PointCu first_intersection = {0, 0, 0, 0};
@@ -167,23 +166,23 @@ float collide_prism(PrismCu pr, RayCu r){
     intersection_point = intersectionRayTriangle(r.P, r.direction, triangles[i].A, triangles[i].B, triangles[i].C);
     if(intersection_point.w != 0){
       if(first_intersection.w == 0){
-	first_intersection = intersection_point;
+        first_intersection = intersection_point;
       }
       else{
-	// Filter double Collision on edges or vertices
-	if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
+        // Filter double Collision on edges or vertices
+        if(first_intersection.x != intersection_point.x || first_intersection.y != intersection_point.y || first_intersection.z != intersection_point.z){
 
-	  if(distance(r.P, first_intersection) <= ray_distance && distance(r.P, intersection_point) > ray_distance)
-	    return distance(r.direction, first_intersection);
+          if(distance(r.P, first_intersection) <= ray_distance && distance(r.P, intersection_point) > ray_distance)
+            return distance(r.direction, first_intersection);
 
-	  if(distance(r.P, first_intersection) >= ray_distance && distance(r.P, intersection_point) < ray_distance)
-	    return distance(r.direction, intersection_point);
-	  
-	  if(distance(r.P, first_intersection) > ray_distance || distance(r.direction, first_intersection) > ray_distance)
-	    return 0;
+          if(distance(r.P, first_intersection) >= ray_distance && distance(r.P, intersection_point) < ray_distance)
+            return distance(r.direction, intersection_point);
 
-	  return distance(first_intersection, intersection_point);
-	}
+          if(distance(r.P, first_intersection) > ray_distance || distance(r.direction, first_intersection) > ray_distance)
+            return 0;
+
+          return distance(first_intersection, intersection_point);
+        }
       }
 
     }
@@ -194,18 +193,18 @@ float collide_prism(PrismCu pr, RayCu r){
 }
 
 /**
-   @brief Intersection calculates the intersection between a plane p
-   and a ray r.
+  @brief Intersection calculates the intersection between a plane p
+  and a ray r.
 
-   It uses the normal of the plane to derive the coordinate form 
-   of the plane. With the help of a coordinate form it is very
-   easy to get the intersection point between a ray and a plane.
+  It uses the normal of the plane to derive the coordinate form 
+  of the plane. With the help of a coordinate form it is very
+  easy to get the intersection point between a ray and a plane.
 
-   ray   g: y~ = x~ + t*p~
-   plane E: y~ = a~ + r*b~ + s*c~
-   d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
-   d  = n~ * a~
-**/
+  ray   g: y~ = x~ + t*p~
+  plane E: y~ = a~ + r*b~ + s*c~
+  d  = n1*(x1+t*p1) + n2*(x2+t*p2) + n3*(x3+t*p3)
+  d  = n~ * a~
+ **/
 PointCu intersection(PlaneCu pl, RayCu r){
   PointCu intersection_point = {0, 0, 0, 0};
 
@@ -213,7 +212,7 @@ PointCu intersection(PlaneCu pl, RayCu r){
 
   // vector coordinates
   float n1, n2, n3, x1, x2, x3, p1, p2, p3, a1, a2, a3;
-  
+
   // just get the coordinates from the structs
   n1 = pl.normal.x;
   n2 = pl.normal.y;

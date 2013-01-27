@@ -58,6 +58,9 @@ double host_sigma_a = 1.16E-21;
 
 int host_cell_type[] = { 1,1,1,1} ;
 
+double host_center_x[] = { 0, -0.666666666666667, 0.666666666666667, 0};
+double host_center_y[] = { -0.666666666666667, 0,  0, 0.666666666666667};
+int host_surface[] = { 1,1,1,1};
 
 
 #endif
