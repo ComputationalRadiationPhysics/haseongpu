@@ -22,7 +22,7 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
   curand_init ( seed, gid, 0, &state[gid] );
 } 
 
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, RayCu* rays, const unsigned max_rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
   // Cuda ids
   //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
@@ -62,51 +62,48 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   for(prism_i = 0; prism_i < max_prisms; ++prism_i){
     distance = collide_prism_gpu(prisms[prism_i], ray, rayDirection, absRayDistance);
     sumRayDistance += distance;
-    gain *= exp(distance * N_tot * (betas[prism_i] *(sigma_e + sigma_a) - sigma_a));
+    gain *= exp(N_tot * (betas[prism_i] * (sigma_e + sigma_a) - sigma_a) * distance);
     __syncthreads();
   }
-  gain /= (sumRayDistance * sumRayDistance);
+  gain /= (absRayDistance * absRayDistance);
   __syncthreads();
 
 
 
-  // Check Solution (only without betamultiplay valid)
+  // Check Solution 
   if(fabs(sumRayDistance - absRayDistance) > 0.00001){
     printf("\033[31;1m[Error]\033[m Sample %d Ray %d with wrong distance real_distance(%f) != sum_distance(%f)\n", sample_i, gid, absRayDistance, sumRayDistance);
     return;
   }
 
   // Copy data to global
-  atomicAdd(&(samples[sample_i].w), (gain));
+  // Cant explain multiplication by 0.007 but is done in original code
+  atomicAdd(&(samples[sample_i].w), (gain * 0.007));
 
 }
 
-float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<RayCu> *rays, std::vector<double> *betas, std::vector<double> *ase,unsigned threads){
-  RayCu *h_rays, *d_rays;
+float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<double> *betas, std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &rays_total){
   PrismCu *h_prisms, *d_prisms;
   PointCu *h_samples, *d_samples;
   double *h_betas, *d_betas;
   float runtime_gpu = 0.0;
   cudaEvent_t start, stop;
   curandState *devStates;
-  int blocks_per_sample = ceil(rays->size() / (threads * samples->size()));
-  int blocks = blocks_per_sample * samples->size();
+  threads = 256;
+  const unsigned rays_per_sample = ceil(rays_total / (float)samples->size());
+  const int blocks_per_sample = ceil(rays_per_sample / (float)threads);
+  blocks = blocks_per_sample * samples->size();
+  rays_total = blocks * threads;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
   fprintf(stderr, "C Copy Data to GPU\n");
   // Memory allocation on host
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_prisms, prisms->size() * sizeof(PrismCu), cudaHostAllocDefault));
-  CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_rays, rays->size() * sizeof(RayCu), cudaHostAllocDefault));
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_samples, samples->size() * sizeof(PointCu), cudaHostAllocDefault));
   CUDA_CHECK_RETURN(cudaHostAlloc( (void**)&h_betas, betas->size() * sizeof(double), cudaHostAllocDefault));
 
   // Memory initialisation on host
-  unsigned ray_i;
-  for(ray_i = 0; ray_i < rays->size(); ++ray_i){
-    h_rays[ray_i] = rays->at(ray_i);
-  }
-
   unsigned prism_i;
   for(prism_i = 0; prism_i < prisms->size(); ++prism_i){
     h_prisms[prism_i] = prisms->at(prism_i);
@@ -127,7 +124,6 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   /* prepareGrid(&grid, dimGrid, h_prisms, prisms->size()); */
 
   // Memory allocation on device
-  CUDA_CHECK_RETURN(cudaMalloc(&d_rays, rays->size() * sizeof(RayCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, prisms->size() * sizeof(PrismCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_samples, samples->size() * sizeof(PointCu)));
   CUDA_CHECK_RETURN(cudaMalloc(&d_betas, betas->size() * sizeof(double)));
@@ -135,7 +131,6 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
 
   // Copy data from host to device
-  CUDA_CHECK_RETURN(cudaMemcpy(d_rays, h_rays, rays->size() * sizeof(RayCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_prisms, h_prisms, prisms->size() * sizeof(PrismCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_samples, h_samples, samples->size() * sizeof(PointCu), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(d_betas, h_betas, betas->size() * sizeof(double), cudaMemcpyHostToDevice));
@@ -147,7 +142,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
   // Start kernel
   fprintf(stderr, "C Start GPU Raytracing\n");
-  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), d_rays, rays->size() / samples->size(), d_samples, blocks_per_sample, d_betas, devStates);
+  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, devStates);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);
@@ -155,17 +150,15 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   cudaEventElapsedTime(&runtime_gpu, start, stop);
 
   CUDA_CHECK_RETURN(cudaMemcpy(h_samples, d_samples, samples->size() * sizeof(PointCu), cudaMemcpyDeviceToHost));
-  CUDA_CHECK_RETURN(cudaMemcpy(h_rays, d_rays, rays->size() * sizeof(RayCu), cudaMemcpyDeviceToHost));
 
  
   // Copy data to vectors and scale by number of rays per sample
   for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-    ase->at(sample_i) = (h_samples[sample_i].w  * samples->size())/ rays->size();
+    ase->at(sample_i) = h_samples[sample_i].w  / rays_per_sample; 
 
   }
 
   // Cleanup data  
-  cudaFreeHost(h_rays);
   cudaFreeHost(h_prisms);
   cudaFreeHost(h_samples);
   cudaFreeHost(h_betas);

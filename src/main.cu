@@ -23,46 +23,34 @@
 #include "buildgrid.h"
 
 int main(int argc, char **argv){
-  const unsigned rays_per_sample = 100000;
-  const unsigned max_triangles = 2;
-  const unsigned depth  = 2;
-  const unsigned length = ceil(sqrt(max_triangles / 2));
-  const int threads = 256;
+  unsigned rays_total;
   char runmode[20];
   float runtime = 0.0;
-  
+  unsigned blocks = 0;
+  unsigned threads = 0;
   // Parse Commandline
   if(argc <= 1){
     fprintf(stderr, "C No commandline arguments found\n");
     fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n");
-    fprintf(stderr, "C Runmodes : bruteforce_cpu\n");
-    fprintf(stderr, "             bruteforce_gpu\n");
-    fprintf(stderr, "             naive_ray_propagation <totalNumberOfRays>\n");
+    fprintf(stderr, "C Runmodes : bruteforce_gpu\n");
+    fprintf(stderr, "             naive_ray_propagation\n");
     return 0;
   }
   
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
-  //std::vector<PrismCu> *prisms  = generate_prisms(length, length, depth);
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_size_p, host_t_in, host_size_t, host_mesh_z);
-  //std::vector<PointCu> *samples = generate_samples(length, length, depth);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
-  std::vector<RayCu>      *rays = generate_sample_rays(length, length, depth, rays_per_sample, samples);
   std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-  
+  rays_total = (unsigned)pow(2,10);
 
   // Run 
   unsigned i;
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
-      if(strstr(argv[i], "bruteforce_cpu") != 0){
-  	runtime = runAseBruteforceCpu(samples, prisms, rays, ase);
-	strcpy(runmode, "Bruteforce CPU");
-
-      }
-      else if(strstr(argv[i], "bruteforce_gpu") != 0){
-  	runtime = runAseBruteforceGpu(samples, prisms, rays, betas, ase, threads);
+      if(strstr(argv[i], "bruteforce_gpu") != 0){
+  	runtime = runAseBruteforceGpu(samples, prisms, betas, ase, threads, blocks, rays_total);
 	strcpy(runmode, "Bruteforce GPU");
 
       }
@@ -77,7 +65,7 @@ int main(int argc, char **argv){
       }
 
     }
-       
+
   }
 
   // Print Solution
@@ -89,17 +77,15 @@ int main(int argc, char **argv){
   }
 
   // Print statistics
-  unsigned blocksPerSample = ceil(rays->size() / (threads * samples->size()));
-  unsigned blocks = blocksPerSample * samples->size();
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
-  fprintf(stderr, "C Triangles         : %d\n", (int) prisms->size() * 8);
   fprintf(stderr, "C Samples           : %d\n", (int) samples->size());
-  fprintf(stderr, "C Rays/Sample       : %d\n", rays_per_sample);
+  fprintf(stderr, "C Rays/Sample       : %d\n", rays_total / samples->size());
+  fprintf(stderr, "C Rays Total        : %d\n", rays_total);
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
-  fprintf(stderr, "C GPU Threads       : %d\n", threads);
-  fprintf(stderr, "C GPU Blocks/Sample : %d\n", blocksPerSample);
+  fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
+  fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
   fprintf(stderr, "C Runmode           : %s \n", runmode);
   fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
