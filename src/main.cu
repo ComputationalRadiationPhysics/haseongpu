@@ -24,7 +24,7 @@
 
 int main(int argc, char **argv){
   unsigned rays_total;
-  char runmode[20];
+  char runmode[100];
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
