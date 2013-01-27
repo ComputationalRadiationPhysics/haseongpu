@@ -157,7 +157,7 @@ __device__ float naivePropagation(double x_pos, double y_pos, double z_pos, doub
 
 		if (forb !=2){
 			offset = tri+2*N_cells;
-			denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
+		denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
 			if (denominator != 0.0)
 			{
 				nominator = (n_x[offset]*p_in[n_p[offset]] + n_y[offset]*p_in[n_p[offset]+ size_p]) - (n_x[offset]*x_pos + n_y[offset]*y_pos);
@@ -434,7 +434,25 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-float runNaiveRayPropagation(std::vector<double> *ase){
+float runNaiveRayPropagation(const char* raysIn, std::vector<double> *ase){
+	// GPU Raytracing
+	unsigned totalNumberOfRays = atoi(raysIn);
+	fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
+	unsigned raysPerSample = ceil(totalNumberOfRays/(host_size_t * (host_mesh_z+1)));
+	//unsigned raysPerSample = 102400; //
+	int threads = 256;
+	int blocks = 200;
+	int iterations = ceil(float(raysPerSample) / (blocks * threads));
+	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
+	fprintf(stderr, "interations=%d\n",iterations);
+		
+	raysPerSample = threads * blocks * iterations;
+	totalNumberOfRays = raysPerSample * (host_size_t * (host_mesh_z+1));
+	//assert(raysPerSample == threads*blocks*iterations);
+
+	fprintf(stderr, "After Normalization:\n");
+	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
+	fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
 
 	// Variables from the mexFunction 
 	double  *p_in, *n_x, *n_y, *beta_v;
@@ -469,13 +487,6 @@ float runNaiveRayPropagation(std::vector<double> *ase){
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 
-	// GPU Raytracing
-	unsigned raysPerSample = 102400; //
-	int threads = 256;
-	int blocks = 200;
-	int iterations = float(raysPerSample) / (blocks * threads);
-	// rays_per_sample = threads * blocks * iterations
-	assert(raysPerSample = threads*blocks*iterations);
 
 	// Allocate Memory and initialize Global Variables
 	{
