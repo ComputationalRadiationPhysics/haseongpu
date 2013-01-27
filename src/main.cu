@@ -24,7 +24,7 @@
 
 int main(int argc, char **argv){
   unsigned rays_total;
-  char runmode[20];
+  char runmode[100];
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
@@ -43,27 +43,30 @@ int main(int argc, char **argv){
   std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
   std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-  rays_total = (unsigned)pow(2,10);
+  rays_total = (unsigned)pow(2,17);
 
   // Run 
   unsigned i;
+ for(i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--rays=", 6) == 0){
+      const char* pos = strrchr(argv[i],'=');
+      rays_total = atoi(pos+1);
+    }
+  }
+
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
   	runtime = runAseBruteforceGpu(samples, prisms, betas, ase, threads, blocks, rays_total);
 	strcpy(runmode, "Bruteforce GPU");
-
+	break;
       }
       else if(strstr(argv[i], "naive_ray_propagation") != 0){
-	runtime = runNaiveRayPropagation(ase,threads,blocks,rays_total);
+	runtime = runNaiveRayPropagation(ase,threads, blocks, rays_total);
 	strcpy(runmode, "Naive Ray Propagation GPU");
-	  }
-	  else{
-	fprintf(stderr, "C Runmode is not known\n");
-	return 0;
-
+	break;
       }
-
+    
     }
 
   }

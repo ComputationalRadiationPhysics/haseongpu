@@ -36,8 +36,6 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   //const int clad_num = 3;
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
-  //RayCu    ray = rays[gid];
-  //double importance_per_prism = 1;
   double sumRayDistance = 0.f;
   double gain = 1;
   double distance = 0;
