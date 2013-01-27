@@ -31,7 +31,7 @@ int main(int argc, char **argv){
   // Parse Commandline
   if(argc <= 1){
     fprintf(stderr, "C No commandline arguments found\n");
-    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n");
+    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays]\n");
     fprintf(stderr, "C Runmodes : bruteforce_gpu\n");
     fprintf(stderr, "             naive_ray_propagation\n");
     return 0;
@@ -39,7 +39,7 @@ int main(int argc, char **argv){
   
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
-  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_size_p, host_t_in, host_size_t, host_mesh_z);
+  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_size_p, host_t_in, host_size_t, host_z_mesh);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
   std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);

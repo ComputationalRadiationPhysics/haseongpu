@@ -44,9 +44,9 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
 
   // Random number generator
   curandState localState = globalState[gid];
-  PrismCu     raySourcePrism = selectPrism(gid, prisms, max_prisms);
+  unsigned  raySourcePrism_i = selectPrism(gid, prisms, max_prisms);
   PointCu     sample = samples[sample_i];
-  RayCu       ray = generateRayGpu(sample, raySourcePrism, localState);
+  RayCu       ray = generateRayGpu(sample, prisms[raySourcePrism_i], localState);
   globalState[gid] = localState;
 
   // Precalculation
@@ -76,7 +76,7 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
 
   // Copy data to global
   // Cant explain multiplication by 0.007 but is done in original code
-  atomicAdd(&(samples[sample_i].w), (gain * 0.007));
+  atomicAdd(&(samples[sample_i].w), (gain * betas[raySourcePrism_i]));
 
 }
 
@@ -88,10 +88,12 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
   cudaEvent_t start, stop;
   curandState *devStates;
   threads = 256;
-  const unsigned rays_per_sample = ceil(rays_total / (float)samples->size());
+  unsigned rays_per_sample = ceil(rays_total / (float)samples->size());
   const int blocks_per_sample = ceil(rays_per_sample / (float)threads);
   blocks = blocks_per_sample * samples->size();
   rays_total = blocks * threads;
+  rays_per_sample = rays_total / samples->size();
+
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -152,7 +154,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
  
   // Copy data to vectors and scale by number of rays per sample
   for(sample_i = 0; sample_i < samples->size(); ++sample_i){
-    ase->at(sample_i) = h_samples[sample_i].w  / rays_per_sample; 
+    ase->at(sample_i) = (h_samples[sample_i].w  / (rays_per_sample * 4.0f * 3.14159)) ; 
 
   }
 

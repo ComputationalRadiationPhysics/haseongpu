@@ -41,12 +41,12 @@ __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState 
   return r;
 }    
 
-__device__ PrismCu selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
+__device__ unsigned selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
   int totalNumberOfThreads = blockDim.x * gridDim.x;
   int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
-  int prism = gid / threadsPerPrism;
+  unsigned prism = gid / threadsPerPrism;
 
-  return prisms[prism];
+  return prism;
 }   
 
 __device__ float distance_gpu(PointCu a, PointCu b){

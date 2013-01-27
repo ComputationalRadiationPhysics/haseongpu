@@ -10,7 +10,7 @@ __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b);
 __device__ float    skalar_mul_gpu(VectorCu a, VectorCu b);
 __device__ double  intersectionRayTriangleGPU(PointCu rayOrigin, VectorCu rayDirection, PointCu p1, PointCu p2,PointCu p3);
 __device__ RayCu    generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState);
-__device__ PrismCu  selectPrism(int id, PrismCu *prisms, int totalNumberOfPrisms);
+__device__ unsigned  selectPrism(int id, PrismCu *prisms, int totalNumberOfPrisms);
 
 
 #endif /* GEOMETRY_GPU_H */
