@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <assert.h>
+#include <math.h>
+
 #include "filtergrid.h"
 #include "geometry_gpu.h"
 
@@ -30,24 +34,24 @@ __device__ int cellIdx(const Grid *grid, int i, int j, int k){
 //  results[cellIdx(grid, gx, gy, gz)] = (collide_prism_gpu(p1, *ray) != 0) || (collide_prism_gpu(p2, *ray) != 0);
 //}
 
-//int iIdx(const Grid *grid, float x){
-//	assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);
-//	
-//	return (x - grid->aabb.min.x)/(grid->aabb.max.x - grid->aabb.min.x) * grid->dim.x;
-//}
-//
-//int jIdx(const Grid *grid, float y){
-//	assert(y >= grid->aabb.min.y && y <= grid->aabb.max.y);
-//	
-//	return (y - grid->aabb.min.y)/(grid->aabb.max.y - grid->aabb.min.y) * grid->dim.y;
-//}
-//
-//int kIdx(const Grid *grid, float z){
-//	assert(z >= grid->aabb.min.z && z <= grid->aabb.max.z);
-//	
-//	return (z - grid->aabb.min.z)/(grid->aabb.max.z - grid->aabb.min.z) * grid->dim.z;
-//}
-//
+__device__ int iIdx(const Grid *grid, float x){
+	assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);
+	
+	return (x - grid->aabb.min.x)/(grid->aabb.max.x - grid->aabb.min.x) * grid->dim.x;
+}
+
+__device__ int jIdx(const Grid *grid, float y){
+	assert(y >= grid->aabb.min.y && y <= grid->aabb.max.y);
+	
+	return (y - grid->aabb.min.y)/(grid->aabb.max.y - grid->aabb.min.y) * grid->dim.y;
+}
+
+__device__ int kIdx(const Grid *grid, float z){
+	assert(z >= grid->aabb.min.z && z <= grid->aabb.max.z);
+	
+	return (z - grid->aabb.min.z)/(grid->aabb.max.z - grid->aabb.min.z) * grid->dim.z;
+}
+
 //void cellIdx2ijk(const Grid *grid, int cellIdx, int *i, int *j, int *k){
 //	
 //	int dimXdimY=grid->dim.x*grid->dim.y;
@@ -63,39 +67,53 @@ __device__ int cellIdx(const Grid *grid, int i, int j, int k){
 //	*i = tmp - *j * grid->dim.x;
 //}
 
-__device__ PointCu* nearest(PointCu p, PointCu *a, PointCu *b) {
-  if(b->w == -1 || distance_gpu(p, *a) < distance_gpu(p, *b)) return a;
-  return b;
+__device__ PointCu calcPointOnRay(const RayCu *ray, float t) {
+  PointCu p;
+
+  p.x = ray->P.x + t*ray->direction.x;
+  p.y = ray->P.y + t*ray->direction.y;
+  p.z = ray->P.z + t*ray->direction.z;
+  
+  return p;
 }
 
-__device__ int round(int number, int cellsize, float dir) {
-  if(number % cellsize == 0) {
-    if(dir > 0) return (number+cellsize);
-    else if(dir < 0) return (number-cellsize);
-    else return number;
-  } else {
-    int mod = number % cellsize;
-    if(dir > 0) return number + (cellsize - mod);
-    else return number - (cellsize + mod);
+__device__ bool nextIntersection(const Grid *grid, const RayCu *ray, float *t, PointCu p) {
+  float4 nextTs;
+  nextTs.x = 0; nextTs.y = 0; nextTs.z = 0; // mark as invalid
+
+  int step, next;
+  float nextCoord, nextT;
+  if(ray->direction.x != 0 && grid->dim.x != 0) {
+    if(ray->direction.x > 0) step = 1;
+    else step = -1;
+    next = iIdx(grid, p.x) + step;
+    nextCoord = ((float)next)/grid->dim.x * (grid->aabb.max.x - grid->aabb.min.x) + grid->aabb.min.x;
+    nextT = (nextCoord - ray->P.x) / ray->direction.x;
+    nextTs.x = nextT;
   }
-}
+  if(ray->direction.y != 0 && grid->dim.y != 0) {
+    if(ray->direction.y > 0) step = 1;
+    else step = -1;
+    next = jIdx(grid, p.y) + step;
+    nextCoord = ((float)next)/grid->dim.y * (grid->aabb.max.y - grid->aabb.min.y) + grid->aabb.min.y;
+    nextT = (nextCoord - ray->P.y) / ray->direction.y;
+    nextTs.y = nextT;
+  }
+  if(ray->direction.z != 0 && grid->dim.z != 0) {
+    if(ray->direction.z > 0) step = 1;
+    else step = -1;
+    next = kIdx(grid, p.z) + step;
+    nextCoord = ((float)next)/grid->dim.z * (grid->aabb.max.z - grid->aabb.min.z) + grid->aabb.min.z;
+    nextT = (nextCoord - ray->P.z) / ray->direction.z;
+    nextTs.z = nextT;
+  }
 
-__device__ bool nextIntersection(const RayCu *ray, PointCu p, int4 dim, PointCu *result) {
-  PointCu end = addVectorToPoint(ray->P, ray->direction);
-  if(end.x == p.x && end.y == p.y && end.z == p.z) return false;
-  PointCu x, y, z;
-
-  x.w = 0; y.w = 0; z.w = 0; // mark as invalid
-
-  x.x = round(p.x);
-  if(x.x != p.x) x.w = 1;
-  y.y = round(p.y);
-  if(x.x != p.x) y.w = 1;
-  x.x = round(p.z);
-  if(z.z != p.z) z.w = 1;
-
-  result = nearest(p, nearest(p, &x, &y), &z);
-  if(nearest(p, result, &end) == &end) return false; // check if result is more far than end
+  if(nextTs.x <= *t) nextTs.x = 1.1;
+  if(nextTs.y <= *t) nextTs.y = 1.1;
+  if(nextTs.z <= *t) nextTs.z = 1.1;
+  *t = fmin(nextTs.x, fmin(nextTs.y, nextTs.z));
+  if(*t > 1) return false;
+  
   return true;
 }
 
@@ -121,6 +139,13 @@ __device__ int* cuRealloc(int *old, int *size) {
   return res;
 }
 
+__device__ bool isDuplicate(int *a, int length, int o) {
+  for(int i=0; i<length; ++i) {
+    if(a[i] == o) return true;
+  }
+  return false;
+}
+
 __device__ void addPrismsToResult(const GridCell *cell, int* results, int *results_count, int *results_size) {
   int limit = *results_count + cell->length;
   if(limit >= *results_size) {
@@ -128,25 +153,32 @@ __device__ void addPrismsToResult(const GridCell *cell, int* results, int *resul
     results = cuRealloc(results, results_size);
   }
 
-  for(int i=0; i<cell->length; ++i)
-    results[*results_count + i] = cell->prismIdxList[i];
-
-  *results_count += cell->length;
+  int added = 0;
+  for(int i=0; i<cell->length; ++i) {
+    int current = cell->prismIdxList[i];
+    if(!isDuplicate(results, *results_count, current)) {
+      printf("save %i to %i\n", current, *results_count + i);
+      results[*results_count + added] = current;
+      added++;
+    }
+  }
+  *results_count += added;
 }
 
-__device__ int filter(const Grid *grid, const RayCu *ray, int* results) {
-  results = (int*) malloc(256 * sizeof(int));
+__device__ int* filter(const Grid *grid, const RayCu *ray, int* result_size) {
+  int *results = (int*) malloc(256 * sizeof(int));
   int results_count = 0;
   int results_size = 256;
 
-  PointCu p = ray->P;
-  PointCu res;
-  while(nextIntersection(ray, p, grid->dim, &res)) {
+  float t = 0;
+  PointCu p;
+  do {
+    p = calcPointOnRay(ray, t);
     int4 cellpos = calcCellpos(grid, p);
     GridCell cell = grid->cellList[cellIdx(grid, cellpos.x, cellpos.y, cellpos.z)];
     addPrismsToResult(&cell, results, &results_count, &results_size); // uses sometimes realloc and changes results, results_count and results_size
-    p = res;
-  }
+  } while(nextIntersection(grid, ray, &t, p)); // changes t, but not p (is being done in next loop)
 
-  return results_count;
+  *result_size = results_count;
+  return results;
 }
