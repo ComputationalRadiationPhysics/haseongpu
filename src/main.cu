@@ -37,7 +37,7 @@ int main(int argc, char **argv){
     fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n");
     fprintf(stderr, "C Runmodes : bruteforce_cpu\n");
     fprintf(stderr, "             bruteforce_gpu\n");
-    fprintf(stderr, "             naive_ray_propagation\n");
+    fprintf(stderr, "             naive_ray_propagation <totalNumberOfRays>\n");
     return 0;
   }
   
@@ -67,7 +67,7 @@ int main(int argc, char **argv){
 
       }
       else if(strstr(argv[i], "naive_ray_propagation") != 0){
-	runtime = runNaiveRayPropagation(ase);
+	runtime = runNaiveRayPropagation(argv[i+1],ase);
 	strcpy(runmode, "Naive Ray Propagation GPU");
 	  }
 	  else{
