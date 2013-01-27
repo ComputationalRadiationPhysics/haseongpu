@@ -22,7 +22,7 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
   curand_init ( seed, gid, 0, &state[gid] );
 } 
 
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, const unsigned rays_per_sample, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
   // Cuda ids
   //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
@@ -82,15 +82,18 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
 
 }
 
-float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, unsigned rays_per_sample, std::vector<double> *betas, std::vector<double> *ase,unsigned threads){
+float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<double> *betas, std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &rays_total){
   PrismCu *h_prisms, *d_prisms;
   PointCu *h_samples, *d_samples;
   double *h_betas, *d_betas;
   float runtime_gpu = 0.0;
   cudaEvent_t start, stop;
   curandState *devStates;
-  int blocks_per_sample = rays_per_sample / threads;
-  int blocks = blocks_per_sample * samples->size();
+  threads = 256;
+  const unsigned rays_per_sample = ceil(rays_total / (float)samples->size());
+  const int blocks_per_sample = ceil(rays_per_sample / (float)threads);
+  blocks = blocks_per_sample * samples->size();
+  rays_total = blocks * threads;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -139,7 +142,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
   // Start kernel
   fprintf(stderr, "C Start GPU Raytracing\n");
-  ase_bruteforce_kernel<<<blocks, threads>>>(d_prisms, prisms->size(), rays_per_sample, d_samples, blocks_per_sample, d_betas, devStates);
+  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, devStates);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);
