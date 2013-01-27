@@ -437,16 +437,16 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &totalNumberOfRays){
 	// GPU Raytracing
 	fprintf(stderr, "initial totalNumberOfRays=%d\n",totalNumberOfRays);
-	unsigned raysPerSample = ceil(totalNumberOfRays/(host_size_t * (host_mesh_z+1)));
+	unsigned raysPerSample = ceil(totalNumberOfRays/float(host_size_p * (host_mesh_z+1)));
 	//unsigned raysPerSample = 102400; //
 	threads = 256;
 	blocks = 200;
-	int iterations = ceil(float(raysPerSample) / (blocks * threads));
+	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
 	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	fprintf(stderr, "interations=%d\n",iterations);
 		
 	raysPerSample = threads * blocks * iterations;
-	totalNumberOfRays = raysPerSample * (host_size_t * (host_mesh_z+1));
+	totalNumberOfRays = unsigned(raysPerSample * (host_size_p * (host_mesh_z+1)));
 	//assert(raysPerSample == threads * blocks * iterations);
 
 	fprintf(stderr, "After Normalization:\n");
