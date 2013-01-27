@@ -6,6 +6,6 @@
 /**
  * @brief filter all geometric objects by whether they "might" be hit by the ray
  **/
-__device__ int filter(const Grid *grid, const RayCu *ray, int* results);
+__device__ int* filter(const Grid *grid, const RayCu *ray, int* result_size);
 
 #endif /* FILTERGRID_H */
