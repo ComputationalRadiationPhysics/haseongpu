@@ -434,21 +434,20 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-float runNaiveRayPropagation(const char* raysIn, std::vector<double> *ase){
+float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &totalNumberOfRays){
 	// GPU Raytracing
-	unsigned totalNumberOfRays = atoi(raysIn);
-	fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
+	fprintf(stderr, "initial totalNumberOfRays=%d\n",totalNumberOfRays);
 	unsigned raysPerSample = ceil(totalNumberOfRays/(host_size_t * (host_mesh_z+1)));
 	//unsigned raysPerSample = 102400; //
-	int threads = 256;
-	int blocks = 200;
+	threads = 256;
+	blocks = 200;
 	int iterations = ceil(float(raysPerSample) / (blocks * threads));
 	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	fprintf(stderr, "interations=%d\n",iterations);
 		
 	raysPerSample = threads * blocks * iterations;
 	totalNumberOfRays = raysPerSample * (host_size_t * (host_mesh_z+1));
-	//assert(raysPerSample == threads*blocks*iterations);
+	//assert(raysPerSample == threads * blocks * iterations);
 
 	fprintf(stderr, "After Normalization:\n");
 	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
@@ -568,7 +567,7 @@ float runNaiveRayPropagation(const char* raysIn, std::vector<double> *ase){
 		random_setup_kernel <<< blocks, threads >>> ( devStates, time(NULL) );
 		cudaThreadSynchronize();
 
-		importanceKernel<<< blocks*iterations, threads>>>(devStates, p_in, n_x, n_y, n_p, neighbors, forbidden, cell_type, host_size_t, beta_v, importance, N_rays, center_x, center_y, surface, blocks*threads*iterations*host_size_p*(host_mesh_z+1) );
+		importanceKernel<<< blocks * iterations, threads>>>(devStates, p_in, n_x, n_y, n_p, neighbors, forbidden, cell_type, host_size_t, beta_v, importance, N_rays, center_x, center_y, surface, blocks * threads * iterations * host_size_p * (host_mesh_z+1) );
 #endif
 	// start the Kernels
 	{
@@ -635,7 +634,7 @@ float runNaiveRayPropagation(const char* raysIn, std::vector<double> *ase){
 	   fprintf(stderr, "Rays Total     : %d\n", raysPerSample * host_size_p * (host_mesh_z+1));
 	   fprintf(stderr, "GPU Blocks     : %d\n", blocks);
 	   fprintf(stderr, "iterations     : %d\n", iterations);
-	   fprintf(stderr, "GPU Threads    : %d\n", threads*blocks);
+	   fprintf(stderr, "GPU Threads    : %d\n", threads * blocks);
 	   fprintf(stderr, "Runtime_GPU    : %f s\n", runtimeGpu / 1000.0);
 	   fprintf(stderr, "\n");
 	*/

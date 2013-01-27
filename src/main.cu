@@ -67,7 +67,7 @@ int main(int argc, char **argv){
 
       }
       else if(strstr(argv[i], "naive_ray_propagation") != 0){
-	runtime = runNaiveRayPropagation(argv[i+1],ase);
+	runtime = runNaiveRayPropagation(ase,threads,blocks,rays_total);
 	strcpy(runmode, "Naive Ray Propagation GPU");
 	  }
 	  else{
