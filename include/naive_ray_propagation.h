@@ -15,8 +15,9 @@
 #include <cuda_runtime_api.h>
 #include "testdata_transposed.h"
 
-#define TEST_VALUES true
+#define TEST_VALUES false 
 #define USE_IMPORTANCE false
+#define DIVIDE_PI true
 #define SMALL 1E-06
 
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
@@ -220,7 +221,7 @@ __device__ float naivePropagation(double x_pos, double y_pos, double z_pos, doub
 			gain *= exp((-1)*(clad_abs * length));
 		}
 		else {
-			gain *= exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+			gain *= exp(length* N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a));
 		}
 #if TEST_VALUES==true
 		testDistance += length;
@@ -602,7 +603,11 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 #endif
 		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
 			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
+#if DIVIDE_PI==true
+			ase->at(i) = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
+#else
 			ase->at(i) = (double(double(hostPhi[i]) / raysPerSample));
+#endif
 		}
 	}
 
