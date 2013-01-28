@@ -35,19 +35,19 @@ __device__ int cellIdx(const Grid *grid, int i, int j, int k){
 //}
 
 __device__ int iIdx(const Grid *grid, float x){
-	assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);
+	//assert(x >= grid->aabb.min.x && x <= grid->aabb.max.x);
 	
 	return (x - grid->aabb.min.x)/(grid->aabb.max.x - grid->aabb.min.x) * grid->dim.x;
 }
 
 __device__ int jIdx(const Grid *grid, float y){
-	assert(y >= grid->aabb.min.y && y <= grid->aabb.max.y);
+	//assert(y >= grid->aabb.min.y && y <= grid->aabb.max.y);
 	
 	return (y - grid->aabb.min.y)/(grid->aabb.max.y - grid->aabb.min.y) * grid->dim.y;
 }
 
 __device__ int kIdx(const Grid *grid, float z){
-	assert(z >= grid->aabb.min.z && z <= grid->aabb.max.z);
+	//assert(z >= grid->aabb.min.z && z <= grid->aabb.max.z);
 	
 	return (z - grid->aabb.min.z)/(grid->aabb.max.z - grid->aabb.min.z) * grid->dim.z;
 }
