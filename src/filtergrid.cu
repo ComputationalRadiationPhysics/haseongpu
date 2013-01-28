@@ -146,7 +146,7 @@ __device__ bool isDuplicate(int *a, int length, int o) {
   return false;
 }
 
-__device__ void addPrismsToResult(const GridCell *cell, int* results, int *results_count, int *results_size) {
+__device__ int* addPrismsToResult(const GridCell *cell, int* results, int *results_count, int *results_size) {
   int limit = *results_count + cell->length;
   if(limit >= *results_size) {
     while(limit >= *results_size) *results_size += 256;
@@ -157,12 +157,12 @@ __device__ void addPrismsToResult(const GridCell *cell, int* results, int *resul
   for(int i=0; i<cell->length; ++i) {
     int current = cell->prismIdxList[i];
     if(!isDuplicate(results, *results_count, current)) {
-      printf("save %i to %i\n", current, *results_count + i);
       results[*results_count + added] = current;
       added++;
     }
   }
   *results_count += added;
+  return results;
 }
 
 __device__ int* filter(const Grid *grid, const RayCu *ray, int* result_size) {
@@ -176,7 +176,7 @@ __device__ int* filter(const Grid *grid, const RayCu *ray, int* result_size) {
     p = calcPointOnRay(ray, t);
     int4 cellpos = calcCellpos(grid, p);
     GridCell cell = grid->cellList[cellIdx(grid, cellpos.x, cellpos.y, cellpos.z)];
-    addPrismsToResult(&cell, results, &results_count, &results_size); // uses sometimes realloc and changes results, results_count and results_size
+    results = addPrismsToResult(&cell, results, &results_count, &results_size); // uses sometimes realloc and changes results, results_count and results_size
   } while(nextIntersection(grid, ray, &t, p)); // changes t, but not p (is being done in next loop)
 
   *result_size = results_count;
