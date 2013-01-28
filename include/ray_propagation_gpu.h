@@ -1,5 +1,5 @@
-#ifndef NAIVE_KERNEL_H
-#define NAIVE_KERNEL_H
+#ifndef RAY_PROPAGATION_GPU_KERNEL_H
+#define RAY_PROPAGATION_GPU_KERNEL_H
 #include "stdio.h"
 #include "stdlib.h"
 #include "math.h"
@@ -56,7 +56,7 @@ __device__ int selectLevel(int id, int totalNumberOfLevels){
 	return id / threadsPerLevel;
 }
 
-__device__ float naivePropagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
+__device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
 	//    in first try no reflections
 	//    calculate the vector and make the the calculation, which surface would be the shortest to reach
 	//    then get the length, make the integration, get the information about the next cell out of the array
@@ -245,11 +245,6 @@ __device__ float naivePropagation(double x_pos, double y_pos, double z_pos, doub
 	}
 
 #if TEST_VALUES==true
-		//printf("\n\nG=%f\tdistance=%f\n",gainTemp,initialDistance);
-		//if(fabs(distance_total-testDistance) > 0.001){
-			//printf("\nTHREAD=%d\tstartTriangle=%d\tstartLevel=%d\tSamplePoint=%d\tSampleLevel=%d\n",id,startTriangle,startLevel,point2D,level);
-			//printf("G=%f\tdistance=%f\n",gainTemp,initialDistance);
-		//}
 	assert(fabs(distance_total-testDistance) < 0.000001);
 #endif
 
@@ -343,7 +338,7 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
 
 
 
-__global__ void setupKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p ){
+__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p ){
 	sigma_e = host_sigma_e;	
 	sigma_a = host_sigma_a;
 	clad_num = host_clad_num;
@@ -419,12 +414,12 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
 
-		gain += double(naivePropagation(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v)); 
+		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
-	gain *=  beta_v[startTriangle + N_cells*startLevel]; //@TODO: why is there a beta_v reference in the sequential-code?
+	gain *=  beta_v[startTriangle + N_cells*startLevel];
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*size_p]),float(gain*importance[startTriangle + N_cells*startLevel]));  
 #else
@@ -435,31 +430,87 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &totalNumberOfRays){
-	// GPU Raytracing
-	fprintf(stderr, "initial totalNumberOfRays=%d\n",totalNumberOfRays);
+float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &totalNumberOfRays)
+{
+	/** GPU Kernel Variables
+	 * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
+	 * and the number of blocks as well (200 is the maximum for the standard
+	 * Mersenne Twister implementaion). Therefore, the number of rays per sample
+	 * are fixed to be k*200*256.
+	 * That means, sometimes we have to increase the number of rays a little.
+	 *
+	 * \var iterations is used to give every thread k iterations (to simulate k rays)
+	 *
+	 * note that every samplepoint receives the exact same number of rays.
+	 */
 	unsigned raysPerSample = ceil(totalNumberOfRays/float(host_size_p * (host_mesh_z+1)));
-	//unsigned raysPerSample = 102400; //
 	threads = 256;
 	blocks = 200;
 	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
-	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
-	fprintf(stderr, "interations=%d\n",iterations);
-		
+	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
+	//fprintf(stderr, "interations=%d\n",iterations);
 	raysPerSample = threads * blocks * iterations;
 	totalNumberOfRays = unsigned(raysPerSample * (host_size_p * (host_mesh_z+1)));
-	//assert(raysPerSample == threads * blocks * iterations);
+	//fprintf(stderr, "After Normalization:\n");
+	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
+	//fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
+#if TEST_VALUES==true
+	assert(raysPerSample == threads * blocks * iterations);
+#endif
 
-	fprintf(stderr, "After Normalization:\n");
-	fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
-	fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
 
-	// Variables from the mexFunction 
+	/** Variables for the device
+	 * These are on-GPU representations of the input parameters
+	 * of variable size.
+	 *
+	 * other input parameters are put to the GPU by the setupGlobalVariablesKernel
+	 */
 	double  *p_in, *n_x, *n_y, *beta_v;
 	float *phi;
 	int *forbidden, *n_p, *neighbors, *t_in, *cell_type;
 
 
+	/** Variables for benchmarking and results
+	 * \var hostPhi will contain the ASE-Flux integral (not normalized)
+	 */
+	float runtimeGpu = 0.0;
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	float hostPhi[host_size_p * (host_mesh_z +1)];
+	for(int i=0;i<host_size_p*(host_mesh_z+1);++i){
+			hostPhi[i] = 0.;
+	}
+
+
+	/** The Mersenne Twister PRNG
+	 * These calls are more or less directly from the curand
+	 * \var devMTGPStates the current randomness states of each block (may not exceed 200!)
+	 *
+	 */
+	curandStateMtgp32 *devMTGPStates;
+	{
+		/**Allocate space for PRNG states on device */
+		CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
+
+		/** Allocate space for MTGP kernel parameters */
+		mtgp32_kernel_params *devKernelParams;
+		CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
+
+		/**Reformat from predefined parameter sets to kernel format,
+		 * and copy kernel parameters to device memory */
+		CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
+
+		/** Initialize one state per thread block */
+		/** \TODO initialize with time */
+		CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234));
+	}
+
+/** Parameters for Importance Sampling
+ * These are conditionally compiled
+ * \var devStates is for the random number generator (not the Mersenne Twister!)
+ * \var center_* describes the center of a triangle
+ */
 #if USE_IMPORTANCE==true
 	curandState *devStates;
 	int *N_rays, *surface;
@@ -474,39 +525,18 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 	}
 #endif
 
-	int host_N_cells = host_size_t;
-
-	//Variable definitions
-	float runtimeGpu = 0.0;
-	cudaEvent_t start, stop;
-	curandStateMtgp32 *devMTGPStates;
-	mtgp32_kernel_params *devKernelParams;
-	float hostPhi[host_size_p * (host_mesh_z +1)];
-
-	// Generate testdata
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
 
 
-	// Allocate Memory and initialize Global Variables
+	/** Allocation of memory on the GPU and setting of global GPU-variables
+	 *
+	 */
 	{
-		//Clear host memory
-		for(int i=0;i<host_size_p*(host_mesh_z+1);++i){
-			hostPhi[i] = 0.;
-		}
-
 		//Create constant values on GPU
-		setupKernel<<<1,1>>>(host_sigma_e, host_sigma_a, host_clad_num, host_clad_abs, host_N_tot, host_N_cells, host_z_mesh, host_mesh_z, host_size_p); //@OPTIMIZE: initialize the constants as constants...
-
-		// Start random setup kernel
-		fprintf(stderr, "C Init GPU Random number\n");
-
+		setupGlobalVariablesKernel<<<1,1>>>(host_sigma_e, host_sigma_a, host_clad_num, host_clad_abs, host_N_tot, host_size_t, host_z_mesh, host_mesh_z, host_size_p); //@OPTIMIZE: initialize the constants as constants...
 
 		cudaThreadSynchronize();
 
-		//testKernel<<<1,1>>>();
-
-		// Memory allocation on device (mexFunction Variables)
+		// Memory allocation on device
 		CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * host_size_p * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&n_x, host_size_t * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&n_y, host_size_t * sizeof(double)));
@@ -517,7 +547,8 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 		CUDA_CHECK_RETURN(cudaMalloc(&cell_type,host_size_t * host_mesh_z * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&beta_v,host_size_t * host_mesh_z * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&phi,host_size_p * (host_mesh_z +1) * sizeof(float)));
-#if USE_IMPORTANCE==true
+
+#if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
 		CUDA_CHECK_RETURN(cudaMalloc(&importance,host_size_p * (host_mesh_z +1) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&center_x,host_size_t * (host_mesh_z) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&center_y,host_size_t * (host_mesh_z) * sizeof(double)));
@@ -527,7 +558,7 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 
 #endif
 
-		// Copy data from host to device (mex Function Variables)
+		/// Copy data from host to device
 		CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * host_size_p * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
@@ -538,7 +569,8 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 		CUDA_CHECK_RETURN(cudaMemcpy(cell_type,host_cell_type, host_size_t *  host_mesh_z * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(beta_v, host_beta_v, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, host_size_p * (host_mesh_z+1) * sizeof(float), cudaMemcpyHostToDevice));
-#if USE_IMPORTANCE==true
+
+#if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
 		CUDA_CHECK_RETURN(cudaMemcpy(importance, host_importance, host_size_p * (host_mesh_z+1) * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(center_x, host_center_x, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(center_y, host_center_y, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
@@ -547,21 +579,6 @@ float runNaiveRayPropagation(std::vector<double> *ase, unsigned &threads, unsign
 #endif
 	}
 
-	// Generating Random Numbers
-	{
-		// Allocate space for prng states on device 
-		CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
-
-		// Allocate space for MTGP kernel parameters 
-		CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
-
-		// Reformat from predefined parameter sets to kernel format, 
-		// and copy kernel parameters to device memory               
-		CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
-
-		// Initialize one state per thread block //@TODO initialize with time
-		CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234)); 
-	}
 
 #if USE_IMPORTANCE==true
 		fprintf(stderr, "\nStarting the Importance Sampling\n");

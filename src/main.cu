@@ -19,7 +19,7 @@
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
 #include "testdata_transposed.h"
-#include "naive_ray_propagation.h"
+#include "ray_propagation_gpu.h"
 #include "buildgrid.h"
 
 int main(int argc, char **argv){
@@ -33,7 +33,7 @@ int main(int argc, char **argv){
     fprintf(stderr, "C No commandline arguments found\n");
     fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays]\n");
     fprintf(stderr, "C Runmodes : bruteforce_gpu\n");
-    fprintf(stderr, "             naive_ray_propagation\n");
+    fprintf(stderr, "             ray_propagation_gpu\n");
     return 0;
   }
   
@@ -61,8 +61,8 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Bruteforce GPU");
 	break;
       }
-      else if(strstr(argv[i], "naive_ray_propagation") != 0){
-	runtime = runNaiveRayPropagation(ase,threads, blocks, rays_total);
+      else if(strstr(argv[i], "ray_propagation_gpu") != 0){
+	runtime = runRayPropagationGpu(ase,threads, blocks, rays_total);
 	strcpy(runmode, "Naive Ray Propagation GPU");
 	break;
       }
