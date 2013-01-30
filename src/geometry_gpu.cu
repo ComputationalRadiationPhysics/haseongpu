@@ -91,7 +91,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
   //side12 und side13 sind Vektoren der Seiten
   //cross ist eine Hilfsvariable
-  VectorCu side12, side13, cross, p1_rayOrigin, tempcross;
+  VectorCu side12, side13, cross, p1_rayOrigin;
 
   //Berechnung von Vektoren der Seiten:
   //1.Seite side12 von p1 nach p2
@@ -144,11 +144,11 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   if (s2 < 0.|| s2 > 1.) return -1.;
   
   //zunaenaehst Kreuzprodukt von rayDirection und side12
-  tempcross = crossproduct_gpu(rayDirection, side12);
+  cross = crossproduct_gpu(rayDirection, side12);
 
   //s3=Skalarprodukt von rayDirection und side12
   //s3=(rayDirection x side12) *p1_rayOrigin
-  s3 = skalar_mul_gpu(tempcross, p1_rayOrigin);
+  s3 = skalar_mul_gpu(cross, p1_rayOrigin);
   
   s3 = invdet*s3;
 
@@ -160,11 +160,11 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
-  tempcross = crossproduct_gpu(side13, side12);
+  cross = crossproduct_gpu(side13, side12);
 
   //t ist dann das Skalarprodukt von tempcross und p1_rayOrigin
   //t=(seite13,seite12) *p1_rayOrigin = -(seite12,seite13) *p1_rayOrigin
-  t = skalar_mul_gpu(tempcross, p1_rayOrigin);
+  t = skalar_mul_gpu(cross, p1_rayOrigin);
   t = invdet*t;
 
   return t;
@@ -173,7 +173,7 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
 
 
-
+//siehe auch Moeller/Trumbore - "Fast, Minimum Storage Ray/Triangle Intersection"
 __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des Strahls
     VectorCu rayDirection,
     PointCu p1, //1.Punkt des Dreiecks
@@ -194,7 +194,7 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
 
   //side12 und side13 sind Vektoren der Seiten
   //cross ist eine Hilfsvariable
-  VectorCu side12, side13, cross, p1_rayOrigin, tempcross;
+  VectorCu side12, side13, cross, p1_rayOrigin;
 
   //Berechnung von Vektoren der Seiten:
   //1.Seite side12 von p1 nach p2
@@ -240,15 +240,18 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
   //Cramersche Regel -> Division durchfuehren
   double invdet = 1. / determinante;
 
+  //Cramersche Regel -> Division
   s2 = invdet*s2;
+  
+  //Teste baryzentrische Koordinate
   if (s2 < 0. || s2 > 1.) return -1.;
 
   //zunaenaehst Kreuzprodukt von rayDirection und side12
-  tempcross = crossproduct_gpu(rayDirection, side12);
+  cross = crossproduct_gpu(rayDirection, side12);
 
   //s3=Skalarprodukt von rayDirection und side12
   //s3=(rayDirection x side12) *p1_rayOrigin
-  s3 = skalar_mul_gpu(tempcross, p1_rayOrigin);
+  s3 = skalar_mul_gpu(cross, p1_rayOrigin);
 
   
   s3 = invdet*s3;
@@ -258,11 +261,11 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
 
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
-  tempcross = crossproduct_gpu(side13, side12);
+  cross = crossproduct_gpu(side13, side12);
 
   //t ist dann das Skalarprodukt von tempcross und p1_rayOrigin
   //t=(seite13,seite12) *p1_rayOrigin = -(seite12,seite13) *p1_rayOrigin
-  t = skalar_mul_gpu(tempcross, p1_rayOrigin);
+  t = skalar_mul_gpu(cross, p1_rayOrigin);
   t = invdet*t;
 
   return t;
