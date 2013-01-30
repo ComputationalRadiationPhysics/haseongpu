@@ -67,6 +67,10 @@ __device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
+
+
+
+//siehe auch Moeller/Trumbore - "Fast, Minimum Storage Ray/Triangle Intersection"
 __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
     VectorCu rayDirection,
     PointCu p1, //1.Punkt des Dreiecks
@@ -130,24 +134,29 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   //=Skalarprodukt von p1_rayOrigin und cross
   s2 = skalar_mul_gpu(cross, p1_rayOrigin);
 
+  //Cramersche Regel -> Division durchfuehren
+  double invdet = 1. / determinante;
+  
+  //Cramersche Regel -> Division
+  s2 = invdet*s2;
+
+  //Test der baryzentrischen Koordinate
+  if (s2 < 0.|| s2 > 1.) return -1.;
+  
   //zunaenaehst Kreuzprodukt von rayDirection und side12
   tempcross = crossproduct_gpu(rayDirection, side12);
 
   //s3=Skalarprodukt von rayDirection und side12
   //s3=(rayDirection x side12) *p1_rayOrigin
   s3 = skalar_mul_gpu(tempcross, p1_rayOrigin);
-
-  //Cramersche Regel -> Division durchfuehren
-  double invdet = 1. / determinante;
-
-  s2 = invdet*s2;
+  
   s3 = invdet*s3;
 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
   //Ueberschereitungstest fuer barizentrische Koordinaten
   //if (s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1. || s2 + s3 > 1.) return -1.;
   //s2 > 1. und s3 > 1. sind bereits enthalten in s2 + s3 > 1.
-  if (s2 < 0. || s3 < 0. || s2 + s3 > 1.) return -1.;
+  if (s3 < 0. || s2 + s3 > 1.) return -1.;
 
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
@@ -161,6 +170,9 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   return t;
 
 }
+
+
+
 
 __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des Strahls
     VectorCu rayDirection,
@@ -225,6 +237,12 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
   //=Skalarprodukt von p1_rayOrigin und cross
   s2 = skalar_mul_gpu(cross, p1_rayOrigin);
 
+  //Cramersche Regel -> Division durchfuehren
+  double invdet = 1. / determinante;
+
+  s2 = invdet*s2;
+  if (s2 < 0. || s2 > 1.) return -1.;
+
   //zunaenaehst Kreuzprodukt von rayDirection und side12
   tempcross = crossproduct_gpu(rayDirection, side12);
 
@@ -232,14 +250,11 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
   //s3=(rayDirection x side12) *p1_rayOrigin
   s3 = skalar_mul_gpu(tempcross, p1_rayOrigin);
 
-  //Cramersche Regel -> Division durchfuehren
-  double invdet = 1. / determinante;
-
-  s2 = invdet*s2;
+  
   s3 = invdet*s3;
 
   //Test,ob der Schnittpunkt innerhalb des Dreiecks liegt:
-  if (s2 < 0. || s2 > 1. || s3 < 0. || s3 > 1.) return -1.;
+  if (s3 < 0. || s3 > 1.) return -1.;
 
   //weitere Verwendung der Hilfsvariable fuer Berechnung des Geradenparameters t
   //zunaechst Kreuzprodukt von side13 und side12
