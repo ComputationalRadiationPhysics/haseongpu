@@ -337,8 +337,12 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
 #endif
 
 
-
-__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p ){
+/**
+ * Initializes the global variables of the GPU with the correct values.
+ * All those values are from the original propagation-function which we ported.
+ */
+__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p )
+{
 	sigma_e = host_sigma_e;	
 	sigma_a = host_sigma_a;
 	clad_num = host_clad_num;
@@ -364,6 +368,10 @@ __global__ void importanceKernel( curandState *globalState, double *p_in, double
 }
 #endif
 
+/**
+ * Prints some of the global device variables.
+ * Is only used for testing
+ */
 __global__ void testKernel (  ){
 	printf("\nSigma_e=%.30f",sigma_e);
 	printf("\nSigma_a=%.30f",sigma_a);
@@ -372,7 +380,20 @@ __global__ void testKernel (  ){
 } 
 
 
-// does the raytracing for a single ray (randomly generated) and a single (given) Vertex
+/**
+ * Does the raytracing for a single Sample point (in a defined level).
+ * This Kernel has to be started for each sample point with the same value for iterations
+ * and the same number of blocks/threads.
+ *
+ * \var globalState the state of the mersenneTwister PRNG
+ * 		(has a maximum of 200 positions!)
+ * \var phi points to a memory region which is initialized with 0
+ * 		(can hold one value for each sample point)
+ * \var point2D the index of the current sample point (points to p_in)
+ * \var level the level of the current sample point (how deep we are through the material)
+ * \var iterations the number rays which are computed by this thread
+ * 		(always for the same combination of startprism+samplepoint
+ */
 #if USE_IMPORTANCE==true
 __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v, double *importance) {
 #else
@@ -413,7 +434,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* z_mesh;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
-
+		__synchronizeThreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 
@@ -463,6 +484,15 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	 * These are on-GPU representations of the input parameters
 	 * of variable size.
 	 *
+	 * \var p_in: coordinates of the sample-points of one layer (first all x-coordinates, then all y-coordinates)
+	 * \var n_*: values of the normal-vectors for the 3 rectangular sides of each prism (described in 2D)
+	 * \var beta_v: the beta values of the prisms
+	 * \var phi: the accumulated ASE-Flux for each sample point
+	 * \var forbidden: the side of the prism through which the ray "entered" the prism
+	 * \var n_p: the points where the normals (n_x,n_y) start
+	 * \var neighbors: indices to the adjacent triangles in t_in
+	 * \var t_in: indices of the points which are considered to be a triangle (A points start from 0, B points from size_t, C points from size_t*2)
+	 * \var cell_type: determines which cell type we are looking at.
 	 * other input parameters are put to the GPU by the setupGlobalVariablesKernel
 	 */
 	double  *p_in, *n_x, *n_y, *beta_v;
