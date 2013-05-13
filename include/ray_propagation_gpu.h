@@ -44,6 +44,7 @@ __device__ int N_cells;
 
 
 
+
 __device__ int selectTriangle(int id, int trianglesInOneLevel){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
 	int threadsPer2DTriangle = ceil( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
@@ -56,13 +57,35 @@ __device__ int selectLevel(int id, int totalNumberOfLevels){
 	return id / threadsPerLevel;
 }
 
+/**
+ * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
+ *
+ * @params x_pos		the x-coordinate where the ray starts
+ *         y_pos		the y-coordinate where the ray starts
+ *         z_pos		the z-coordinate where the ray starts
+ *         x_dest		the destination of the ray (x-coordinate)
+ *         y_dest		the destination of the ray (y-coordinate)
+ *         z_dest		the destination of the ray (z-coordinate)
+ *         t_start		the index of the triangle, in which the ray starts
+ *         mesh_start	the level of the mesh (the slice) in which the ray starts
+ *		   p_in			coordinates of the sample-points of one layer (first all x-coordinates, then all y-coordinates)
+ *		   n_x			x-coordinates for the normal-vectors for the 3 rectangular sides of each prism
+ *		   n_y			y-coordinates for the normal-vectors for the 3 rectangular sides of each prism
+ *		   n_p			indices of the points where the normal-vectors start	
+ *		   neighbors	indices of the adjacent triangles	
+ *		   forbidden	sides of the new triangles which are forbidden, after coming from an adjacent triangle
+ *		   cell_type	contains the material-constant for each cell/prism
+ *		   beta_v		contains the beta-values for each cell/prism
+ *
+ */
 __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
 	//    in first try no reflections
-	//    calculate the vector and make the the calculation, which surface would be the shortest to reach
+	//
+	//    create the vector between both points and calculate which surface would be the shortest to reach.
 	//    then get the length, make the integration, get the information about the next cell out of the array
 	//    set the point to the surface (this surface is "forbidden" in the calculations)
 	//    proceed until you hit a the point or the surface
-	//    if you are closer then "small" stop and return the value
+	
 	double vec_x, vec_y,vec_z;
 	double distance, length, length_help;
 	double nominator, denominator;
@@ -79,55 +102,50 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	tri = t_start;
 	cell_z = mesh_start;
 
-	//    definition of the vectors without reflections
+	// direction-vector (without reflections)
 	vec_x = (x_dest - x_pos);
 	vec_y = (y_dest - y_pos);
 	vec_z = (z_dest - z_pos);
 
-	distance = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+	// total distance to travel
+	distance_total = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
 
-	vec_x = vec_x/distance;
-	vec_y = vec_y/distance;
-	vec_z = vec_z/distance;
+	// normalized direction-vector
+	vec_x = vec_x/distance_total;
+	vec_y = vec_y/distance_total;
+	vec_z = vec_z/distance_total;
 
-	double distance_total = distance;
+	// remaining distance to travel
+	double distance_remaining = distance_total;
 
+	// at the beginning, all surfaces are possible
 	forb = -1;
 
-	//	mexPrintf("Propagation called");
-	//    mexEvalString("drawnow;");
-
-	//    the ray has to be set to be ALIVE before!
-	//    now do the unlimited for loop - break!!!
 	for(;;)
 	{
+		// the length of the ray-part inside the current prism. We try to minimize this value
+		length = distance_remaining;
 
-		//	  mexPrintf("Propagation for part called\n\n");
-		//    mexEvalString("drawnow;");
 		//        definition for decider
 		//        0,1,2: int for the neighbors
 		//        3: hor plane up
 		//        4: hor plane down
-
-		length = distance;
-
-
-		//		  read, which type of cell it is you are propagation in
-
-		//        mexPrintf("forb: %i\n",forb);
-		//        mexEvalString("drawnow;");
-
 		//        try the triangle faces
 		//        remember the correlation between the normals and the points
 		//        n1: p1-2, n2: p1-3, n3:p2-3
 		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
-		//        as everything uses triangular "tubes/prisms", as well as n_z=0 in this case!
+		//        as everything uses triangular "prisms", as well as n_z=0 in this case!
+		
+		// forb describes the surface, from which the ray enters the prism.
+		// this surface is no suitable candidate, since the length would be 0!
 		if (forb != 0){
 			denominator = n_x[tri]*vec_x + n_y[tri]*vec_y;
+			// see if we intersect at all
 			if (denominator != 0.0)
 			{
 				nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+ size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
 				length_help = nominator/denominator;
+				// if we found a new smallest length, use it
 				if (length_help < length && length_help > 0.0)
 				{
 					length = length_help;
@@ -139,7 +157,9 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 			}
 		}
 
+		// see forb !=0 case
 		if (forb != 1){
+			//offset, since the 3 rectangular surfaces are stored at different positions in the array
 			offset = tri+N_cells;
 			denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
 			if (denominator != 0.0)
@@ -156,6 +176,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 			}
 		}
 
+		// see forb !=0 case
 		if (forb !=2){
 			offset = tri+2*N_cells;
 		denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
@@ -191,7 +212,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 				}
 			}
 
-			//        next is the lower plane
+			// next is the lower plane
 			if (forb != 4){
 				nominator = (cell_z)* z_mesh - z_pos;
 				length_help = nominator/denominator;
@@ -206,16 +227,17 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 			}
 		}
 
+		// set the new forbidden surface
 		forb = forb_dump;
 
 		// switch is now directly included into the if-statements
-
-		//        now we know where to go, let's make the integration
-		//        take the beta_v[tri+cell_z*N_cells] 
-
-		//		  at this position do the decision whether it is a gain part or cladding
-		//		  it might be absorbing or amplifying, for the cladding only absorbing
-		//		  a simple "if then"
+		//
+		// now we know where to go, let's make the integration
+		// take the beta_v[tri+cell_z*N_cells] 
+		//
+		// at this position do the decision whether it is a gain part or cladding
+		// it might be absorbing or amplifying, for the cladding only absorbing
+		// a simple "if then"
 
 		if (cell_type[tri] == clad_num){
 			gain *= exp((-1)*(clad_abs * length));
@@ -227,14 +249,15 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 		testDistance += length;
 #endif
 
+		// the remaining distance is decreased by the length we travelled through the prism
+		distance_remaining -= length;
 
-		distance -= length;
 
-
-		if (fabs(distance)< SMALL)
+		// if the distance between the destination and our current position is small enough, we are done
+		if (fabs(distance_remaining)< SMALL)
 			break;
 
-		//        now set the next cell
+		// now set the next cell and position
 		x_pos = x_pos + length*vec_x;
 		y_pos = y_pos + length*vec_y;
 		z_pos = z_pos + length*vec_z;
@@ -434,7 +457,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* z_mesh;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
-		__synchronizeThreads();
+		__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 
