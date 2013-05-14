@@ -7,8 +7,8 @@ if [ "$1" = "" ] ; then
 fi
 
 INPUT="$1"
-if [ $(echo "$INPUT" | grep -c *.mat) -ne 1 ] ; then
-	echo '"$INPUT" is no valid *.mat file!'
+if [ "$(echo "$INPUT" | grep -c '.*.mat')" = "0" ] ; then
+	echo "$INPUT" is no valid *.mat file!
 	exit 1
 fi
 
@@ -17,13 +17,14 @@ if [ $(echo "$INPUT" | grep -c -e ".*/") -ne 1 ] ; then
 	exit 1
 fi
 
-FOLDER="$(echo $INPUT | grep -e '.*/')"
-FILE="$(echo $INPUT | grep -e '/.*.mat' | cut -c 2-)"
+FOLDER="$(echo $INPUT | grep -o -e '.*/')"
+FILE="$(echo $INPUT | grep -o -e '/.*.mat' | cut -c 2-)"
+
+
+rm -f ${FOLDER}*.txt
+rm -f ${FOLDER}raw_input.zip
+octave --silent --eval "parse_mat('$FOLDER','$FILE')" 1>/dev/null
 
 cd $FOLDER
-
-rm *.txt
-rm raw_input.zip
-octave -qf --eval parse_mat("$FILE")
 zip raw_input.zip *.txt 1>/dev/null
 rm *.txt

@@ -1,7 +1,7 @@
-
-function parse_mat (file)
+function parse_mat (folder,file)
 format long
 save_precision(50)
+cd(folder)
 load(file)
 
 x=fopen("p_in.txt","w")
