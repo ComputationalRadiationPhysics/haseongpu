@@ -1,8 +1,8 @@
-load("save_30.mat")
+
+function parse_mat (file)
 format long
 save_precision(50)
-
-
+load(file)
 
 x=fopen("p_in.txt","w")
 fprintf(x,'%d\n',p)
@@ -103,4 +103,4 @@ fclose(x)
 %fprintf(x,'%.50f\n',y_center)
 %fclose(x)
 
-
+endfunction
