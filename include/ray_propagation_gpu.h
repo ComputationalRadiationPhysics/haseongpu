@@ -102,7 +102,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	//    proceed until you hit a the point or the surface
 	
 	double vec_x, vec_y,vec_z;
-	double distance, length, length_help;
+	double distance_remaining, length, length_help, distance_total;
 	double nominator, denominator;
 	double gain=1.;
 	int tri, cell_z; // the current triangle number and position concerning the z's
@@ -131,7 +131,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	vec_z = vec_z/distance_total;
 
 	// remaining distance to travel
-	double distance_remaining = distance_total;
+	distance_remaining = distance_total;
 
 	// at the beginning, all surfaces are possible
 	forb = -1;

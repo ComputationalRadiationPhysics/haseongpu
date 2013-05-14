@@ -12,6 +12,16 @@ __device__ PointCu addVectorToPoint(PointCu p, VectorCu v) {
   return result;
 }
 
+/** 
+ * @brief Generates a ray from random position in startPrism to a sample point
+ * 
+ * @params sample     Point where the ray starts from
+ *         startPrism Prism within the direction point will show
+ *         localState State for random number generation
+ *
+ * @return random ray from sample point to random point within prism
+ *
+ */
 __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
   float u = curand_uniform(&localState);
   float v = curand_uniform(&localState);
@@ -41,6 +51,20 @@ __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState 
   return r;
 }    
 
+/**
+ * @brief Selects a prism depending on gid of thread
+ *
+ * @params gid                 Global ID of thread
+ *         prisms              Array of prisms
+ *         totalNumberOfPrisms Total number of prisms
+ *
+ * @return ID of prism in Array of prisms
+ *
+ * Its used to get a sequenz of threads starting from the
+ * same prism. This will hopefully increase speed because
+ * of better Caching.
+ *
+ */
 __device__ unsigned selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
   int totalNumberOfThreads = blockDim.x * gridDim.x;
   int threadsPerPrism = ceil( float(totalNumberOfThreads) / float(totalNumberOfPrisms) );
@@ -49,10 +73,28 @@ __device__ unsigned selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrism
   return prism;
 }   
 
+/**
+ * @brief Calculates distance between two vectors
+ * 
+ * @params a First point
+ *         b Second point
+ * 
+ * @return Solution of distance calculation
+ *
+ */
 __device__ float distance_gpu(PointCu a, PointCu b){
   float d = sqrt(pow((b.x - a.x), 2) + pow((b.y - a.y),2) + pow((b.z - a.z),2));
   return fabs(d);
 }
+
+/**
+ * @brief Calculates crossproduct between two vectors
+ * 
+ * @params a First vector
+ *         b Second vector
+ * 
+ * @return Solution of crossproduct computation
+ */
 __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b){
   VectorCu c = {
     a.y*b.z - a.z*b.y,
@@ -62,15 +104,31 @@ __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b){
   return c;
 }
 
-
+/**
+ * @brief Calculates skalar multiplication
+ *
+ * @params a First vector
+ *         b Second vector
+ *
+ * @return Solution of skalar multiplication
+ */
 __device__ float skalar_mul_gpu(VectorCu a, VectorCu b){
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-
-
-
-//siehe auch Moeller/Trumbore - "Fast, Minimum Storage Ray/Triangle Intersection"
+/**
+ * @brief Calculates intersection between a ray and a triangle
+ *
+ * @params rayOrigin    Starting point of the ray
+ *         rayDirection Direction vector of ray
+ *         p1           First point of rectangle
+ *         p2           Second point of rectangle
+ *         p3           Third point of rectangle
+ * 
+ * @return t > 0 is ratio of intersection to total ray distance
+ *           0 in case of no intersection
+ *
+ */
 __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des Strahls
     VectorCu rayDirection,
     PointCu p1, //1.Punkt des Dreiecks
@@ -123,7 +181,6 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
   }
 
   //Abstand Ursprung des Strahls zu p1
-
   p1_rayOrigin.x = rayOrigin.x - p1.x;
   p1_rayOrigin.y = rayOrigin.y - p1.y;
   p1_rayOrigin.z = rayOrigin.z - p1.z;
@@ -171,9 +228,19 @@ __device__ double intersectionRayTriangleGPU(PointCu rayOrigin, //Ursprung des S
 
 }
 
-
-
-//siehe auch Moeller/Trumbore - "Fast, Minimum Storage Ray/Triangle Intersection"
+/**
+ * @brief Calculates intersection between a ray and a rectangle
+ *
+ * @params rayOrigin    Starting point of the ray
+ *         rayDirection Direction vector of ray
+ *         p1           First point of rectangle
+ *         p2           Second point of rectangle
+ *         p3           Third point of rectangle
+ * 
+ * @return t > 0 is ratio of intersection to total ray distance
+ *           0 in case of no intersection
+ *
+ */
 __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des Strahls
     VectorCu rayDirection,
     PointCu p1, //1.Punkt des Dreiecks
@@ -272,8 +339,20 @@ __device__ double intersectionRayRectangleGPU(PointCu rayOrigin, //Ursprung des 
 
 }
 
-
+/**
+ * @brief Calculates intersection distance for a ray and a prism 
+ *
+ * @params pr             Prism you want to intersect
+ *         r              Ray you want to check for intersection
+ *         rayDirection   Precalculated direction vector of ray
+ *         absRayDistance Precalculated total distance of ray
+ * 
+ * @return distance 0 if there is no intersection
+ *                  > 0 if there is intersection
+ * 
+ */
 __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance){
+  // Get prism vertices
   PointCu A1 = pr.t1.A;
   PointCu B1 = pr.t1.B;
   PointCu C1 = pr.t1.C;
@@ -282,6 +361,7 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, d
   PointCu C2 = {pr.t1.C.x, pr.t1.C.y, pr.t1.C.z + pr.t1.C.w, 1};
   double t[5];
 
+  // Calculate intersections for every plane of prism (triangle, rectangle)
   t[0] = intersectionRayTriangleGPU(r.P, rayDirection, A1, B1, C1);
   t[1] = intersectionRayTriangleGPU(r.P, rayDirection, A2, B2, C2);
   t[2] = intersectionRayRectangleGPU(r.P, rayDirection, A1, C1, A2);
@@ -289,16 +369,20 @@ __device__ float collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, d
   t[4] = intersectionRayRectangleGPU(r.P, rayDirection, C1, B1, C2);
 
   bool firstIntersectionFound = false;
-  // test for collision on all triangles of an prism
+  // Test for collision on all triangles of an prism
+  // Need to find 2 intersections to calculate the
+  // distance between them
   unsigned i; 
   for(i = 0; i < 5; ++i){
     if(t[i] >= 0.){
+      // Just take the first intersection
       if(!firstIntersectionFound){
         firstIntersectionFound= true;
         t[0] = t[i];
       }
       else{
-        // Filter double collisions
+        // Filter double collisions on triangle / rectangle borders
+	// and "search" for the second one
         if(fabs(t[0] - t[i]) > 0.0000001){
           if(t[i] > 1. && t[0] > 1.)
             return 0.;
