@@ -15,7 +15,7 @@
 #include <cuda_runtime_api.h>
 #include "testdata_transposed.h"
 
-#define TEST_VALUES false 
+#define TEST_VALUES true
 #define USE_IMPORTANCE false
 #define DIVIDE_PI true
 #define SMALL 1E-06
@@ -94,7 +94,7 @@ __device__ int selectLevel(int id, int totalNumberOfLevels){
  *
  */
 __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
-	//    in first try no reflections
+	//    no reflections
 	//
 	//    create the vector between both points and calculate which surface would be the shortest to reach.
 	//    then get the length, make the integration, get the information about the next cell out of the array
@@ -606,8 +606,8 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 
 		// Memory allocation on device
 		CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * host_size_p * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&n_x, host_size_t * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&n_y, host_size_t * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&n_x, 3 * host_size_t * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&n_y, 3 * host_size_t * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* host_size_t * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* host_size_t * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* host_size_t * sizeof(int)));
@@ -628,8 +628,8 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 
 		/// Copy data from host to device
 		CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * host_size_p * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, host_size_t * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, 3 * host_size_t * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, 3 * host_size_t * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(neighbors, host_neighbors, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
