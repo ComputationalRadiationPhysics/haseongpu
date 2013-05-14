@@ -660,6 +660,7 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 		fprintf(stderr, "\nStarting the Naive Propagation\n");
 		cudaEventRecord(start, 0);
 
+		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < host_size_p ; ++point2D){
 			for(int level = 0; level <= host_mesh_z; ++ level){
 				cudaThreadSynchronize();
