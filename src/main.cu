@@ -25,13 +25,14 @@
 int main(int argc, char **argv){
   unsigned rays_total;
   char runmode[100];
+  char experimentLocation[256];
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
   // Parse Commandline
   if(argc <= 1){
     fprintf(stderr, "C No commandline arguments found\n");
-    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays]\n");
+    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays] --experiment=[location to .zip]\n");
     fprintf(stderr, "C Runmodes : bruteforce_gpu\n");
     fprintf(stderr, "             ray_propagation_gpu\n");
     return 0;
@@ -54,7 +55,15 @@ int main(int argc, char **argv){
     }
   }
 
-  for(i=1; i < argc; ++i){
+ // Parse location of experiement .zip file
+ for(i=1; i < argc; ++i){
+   if(strncmp(argv[i], "--experiment=", 12) == 0){
+     memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
+   } 
+ }
+ 
+
+ for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)

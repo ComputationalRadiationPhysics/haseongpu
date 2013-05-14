@@ -19,5 +19,5 @@ echo
 
 echo "Executing..."
 echo
-#./bin/octrace --mode=bruteforce_gpu --rays=256
-./bin/octrace --mode=ray_propagation_gpu --rays=256
+./bin/octrace --mode=bruteforce_gpu --rays=1000000
+#./bin/octrace --mode=ray_propagation_gpu --rays=256
