@@ -44,13 +44,28 @@ __device__ int N_cells;
 
 
 
-
+/**
+ * @brief	select a triangle based on the global id and the total number of threads
+ *
+ * @params	id the id of the thread: threadIdx.x + blockIdx.x * blockDim.x;
+ *			trianglesInOneLevel number of triangles in a slice of the mesh
+ *
+ * @long	given t threads, p triangles, there are q=(t/p) threads per triangle.
+ *			the triangle-space will be partitioned as follows: (1 .. i .. q),(q+1 .. j .. 2*q) ... 
+ *			where i or j are thread-ids.
+ */
 __device__ int selectTriangle(int id, int trianglesInOneLevel){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
 	int threadsPer2DTriangle = ceil( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
 	return id / threadsPer2DTriangle;
 }
 
+/**
+ * @brief	select a level (a slice of the mesh) based on the global id and the total number of slices
+ *
+ * @params	id the id of the thread: threadIdx.x + blockIdx.x * blockDim.x;
+ *			totalNumberOfLevels number of slices of the mesh
+ */
 __device__ int selectLevel(int id, int totalNumberOfLevels){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
 	int threadsPerLevel = ceil( float(totalNumberOfThreads) / float(totalNumberOfLevels) );
@@ -645,6 +660,7 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 		fprintf(stderr, "\nStarting the Naive Propagation\n");
 		cudaEventRecord(start, 0);
 
+		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < host_size_p ; ++point2D){
 			for(int level = 0; level <= host_mesh_z; ++ level){
 				cudaThreadSynchronize();
