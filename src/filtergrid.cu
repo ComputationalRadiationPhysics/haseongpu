@@ -88,7 +88,7 @@ __device__ bool nextIntersection(const Grid *grid, const RayCu *ray, float *t, P
   return true;
 }
 
-__device__ DynIntSet filter(const Grid *grid, const RayCu *ray, size_t* results_count) {
+__device__ DynIntSet filter(const Grid *grid, const RayCu *ray) {
   DynIntSet results(256); // dynamically growing array with unique entries
 
   float t = 0;
