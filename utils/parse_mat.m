@@ -1,8 +1,8 @@
-load("save_30.mat")
+function parse_mat (folder,file)
 format long
 save_precision(50)
-
-
+cd(folder)
+load(file)
 
 x=fopen("p_in.txt","w")
 fprintf(x,'%d\n',p)
@@ -32,9 +32,16 @@ x=fopen("t_in.txt","w")
 fprintf(x,'%d\n',t_int)
 fclose(x)
 
+% thickness of one slice!
 x=fopen("z_mesh.txt","w")
-fprintf(x,'%d\n',z_mesh)
+fprintf(x,'%f.20\n',z_mesh)
 fclose(x)
+
+% number of slices
+x=fopen("mesh_z.txt","w")
+fprintf(x,'%d\n',mesh_z)
+fclose(x)
+
 
 x=fopen("size_t.txt","w")
 fprintf(x,'%d\n',rows(t_int))
@@ -96,4 +103,4 @@ fclose(x)
 %fprintf(x,'%.50f\n',y_center)
 %fclose(x)
 
-
+endfunction
