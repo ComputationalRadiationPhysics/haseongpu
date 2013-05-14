@@ -12,6 +12,16 @@ __device__ PointCu addVectorToPoint(PointCu p, VectorCu v) {
   return result;
 }
 
+/** 
+ * @brief Generates a ray from random position in startPrism to a sample point
+ * 
+ * @params sample     Point where the ray starts from
+ *         startPrism Prism within the direction point will show
+ *         localState State for random number generation
+ *
+ * @return random ray from sample point to random point within prism
+ *
+ */
 __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState localState){
   float u = curand_uniform(&localState);
   float v = curand_uniform(&localState);
@@ -42,7 +52,17 @@ __device__ RayCu generateRayGpu(PointCu sample, PrismCu startPrism, curandState 
 }    
 
 /**
- * @brief Selects a prism, so  
+ * @brief Selects a prism depending on gid of thread
+ *
+ * @params gid                 Global ID of thread
+ *         prisms              Array of prisms
+ *         totalNumberOfPrisms Total number of prisms
+ *
+ * @return ID of prism in Array of prisms
+ *
+ * Its used to get a sequenz of threads starting from the
+ * same prism. This will hopefully increase speed because
+ * of better Caching.
  *
  */
 __device__ unsigned selectPrism(int gid, PrismCu *prisms, int totalNumberOfPrisms){
