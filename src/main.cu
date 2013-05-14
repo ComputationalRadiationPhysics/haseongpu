@@ -57,11 +57,13 @@ int main(int argc, char **argv){
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
+	// threads and blocks will be set in the following function (by reference)
   	runtime = runAseBruteforceGpu(samples, prisms, betas, ase, threads, blocks, rays_total);
 	strcpy(runmode, "Bruteforce GPU");
 	break;
       }
       else if(strstr(argv[i], "ray_propagation_gpu") != 0){
+	// threads and blocks will be set in the following function (by reference)
 	runtime = runRayPropagationGpu(ase,threads, blocks, rays_total);
 	strcpy(runmode, "Naive Ray Propagation GPU");
 	break;
