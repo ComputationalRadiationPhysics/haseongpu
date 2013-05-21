@@ -19,5 +19,6 @@ src/*.out
 .#*
 */.#*
 */*/.#*
-
+octrace.e*
+octrace.o*
 

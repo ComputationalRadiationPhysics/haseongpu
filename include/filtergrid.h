@@ -9,4 +9,5 @@
  **/
 __device__ DynIntSet* filter(const Grid *grid, const RayCu *ray);
 
+
 #endif /* FILTERGRID_H */
