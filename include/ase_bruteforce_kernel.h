@@ -2,6 +2,8 @@
 #include "datatypes.h"
 #include "curand_kernel.h"
 #include "buildgrid.h"
+#include "filtergrid.h"
+#include "dynintset.h"
 
 #ifndef ASE_BRUTEFORCE_KERNEL_H
 #define ASE_BRUTEFORCE_KERNEL_H
@@ -37,7 +39,7 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
  * calculated the ase phi.
  *
  */
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState, Grid* grid){
   // Cuda ids
   //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
@@ -69,6 +71,14 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
   rayDirection.x = ray.direction.x - ray.P.x;
   rayDirection.y = ray.direction.y - ray.P.y;
   rayDirection.z = ray.direction.z - ray.P.z;
+
+  //DynIntSet *set = filter(grid, &ray);
+
+  return;
+  /* for(prism_i = 0; prism_i < set->getFillSize(); ++prism_i){ */
+  /*   printf(" INDEX: %d\n", (*set)[prism_i]); */
+  /* } */
+  /* printf(" FILL SIZE: %d", set->getFillSize()); */
 
   // Calculations
   __syncthreads();
@@ -164,9 +174,9 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
     h_betas[beta_i] = betas->at(beta_i);
   }
 
-  /* Grid grid; */
-  /* int4 dimGrid = {1, 1, 1, 0}; */
-  /* prepareGrid(&grid, dimGrid, h_prisms, prisms->size()); */
+  Grid *grid = 0;
+  int4 dimGrid = {1, 1, 1, 0};
+  prepareGrid(grid, dimGrid, h_prisms, prisms->size());
 
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&d_prisms, prisms->size() * sizeof(PrismCu)));
@@ -187,7 +197,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
   // Start kernel
   fprintf(stderr, "C Start GPU Raytracing\n");
-  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, devStates);
+  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, devStates, grid);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);

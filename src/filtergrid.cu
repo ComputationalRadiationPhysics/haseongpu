@@ -88,8 +88,8 @@ __device__ bool nextIntersection(const Grid *grid, const RayCu *ray, float *t, P
   return true;
 }
 
-__device__ DynIntSet filter(const Grid *grid, const RayCu *ray) {
-  DynIntSet results(256); // dynamically growing array with unique entries
+__device__ DynIntSet* filter(const Grid *grid, const RayCu *ray) {
+  DynIntSet* results = new DynIntSet(256); // dynamically growing array with unique entries
 
   float t = 0;
   PointCu p;
@@ -97,7 +97,7 @@ __device__ DynIntSet filter(const Grid *grid, const RayCu *ray) {
     p = calcPointOnRay(ray, t);
     int4 cellpos = calcCellpos(grid, p);
     GridCell cell = grid->cellList[cellIdx(grid, cellpos.x, cellpos.y, cellpos.z)];
-    results.push(cell.prismIdxList, cell.length);
+    results->push(cell.prismIdxList, cell.length);
   } while(nextIntersection(grid, ray, &t, p)); // changes t, but not p (is being done in next loop)
 
   return results;
