@@ -39,7 +39,7 @@ int main(int argc, char **argv){
   std::vector<double> * n_y = new std::vector<double>;
   //std::vector<double> * yOfNormals = new std::vector<double>;
   std::vector<unsigned> * cell_types = new std::vector<unsigned>;
-  //std::vector<unsigned> * cell_types = new std::vector<unsigned>;
+  //std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
   std::vector<unsigned> * t_in = new std::vector<unsigned>;
   //std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
   std::vector<int> * forbidden = new std::vector<int>;
@@ -52,8 +52,8 @@ int main(int argc, char **argv){
   //std::vector<int> * points = new std::vector<int>;
   float clad_abs = 0;
   //float cladAbsorption = 0;
-  float cladNumber = 0;
-  //float clad_num = 0;
+  float clad_num = 0;
+  //float cladNumber = 0;
   float n_tot = 0;
   //float nTot = 0;
   float sigma_a = 0;

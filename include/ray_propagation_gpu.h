@@ -13,7 +13,7 @@
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
-#include "testdata_transposed.h"
+//#include "testdata_transposed.h"
 
 #define TEST_VALUES true
 #define USE_IMPORTANCE false
@@ -32,15 +32,15 @@
 // Device Code
 //----------------------------------------------------
 
-__device__ double clad_abs;
-__device__ double N_tot;
-__device__ double sigma_e;
-__device__ double sigma_a;
-__device__ double z_mesh;
-__device__ int mesh_z;
-__device__ int clad_num;
-__device__ int size_p;
-__device__ int N_cells;
+__device__ double cladAbsorption;
+__device__ double nTot;
+__device__ double sigmaE;
+__device__ double sigmaA;
+__device__ double thicknessOfPrism;
+__device__ int numberOfLevels;
+__device__ int cladNumber;
+__device__ int numberOfPoints;
+__device__ int numberOfTriangles;
 
 
 
@@ -93,7 +93,23 @@ __device__ int selectLevel(int id, int totalNumberOfLevels){
  *		   beta_v		contains the beta-values for each cell/prism
  *
  */
-__device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start,  double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, double* beta_v){
+__device__ float rayPropagationGpu(
+		double xPos,
+		double yPos,
+		double zPos,
+		double xDestination,
+		double yDestination,
+		double zDestination,
+		int firstTriangle,
+		int firstLevel,
+		double *points,
+		double *xOfNormals,
+		double *yOfNormals,
+		int *positionsOfNormalVectors,
+		int *neighbors,
+		int *forbidden,
+		int* cellTypes,
+		double* betaValues){
 	//    no reflections
 	//
 	//    create the vector between both points and calculate which surface would be the shortest to reach.
@@ -102,7 +118,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	//    proceed until you hit a the point or the surface
 	
 	double vec_x, vec_y,vec_z;
-	double distance_remaining, length, length_help, distance_total;
+	double distanceRemaining, length, lengthHelp, distanceTotal;
 	double nominator, denominator;
 	double gain=1.;
 	int tri, cell_z; // the current triangle number and position concerning the z's
@@ -114,24 +130,24 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 
 
 	//    initial positions
-	tri = t_start;
-	cell_z = mesh_start;
+	tri = firstTriangle;
+	cell_z = firstLevel;
 
 	// direction-vector (without reflections)
-	vec_x = (x_dest - x_pos);
-	vec_y = (y_dest - y_pos);
-	vec_z = (z_dest - z_pos);
+	vec_x = (xDestination - xPos);
+	vec_y = (yDestination - yPos);
+	vec_z = (zDestination - zPos);
 
 	// total distance to travel
-	distance_total = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+	distanceTotal = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
 
 	// normalized direction-vector
-	vec_x = vec_x/distance_total;
-	vec_y = vec_y/distance_total;
-	vec_z = vec_z/distance_total;
+	vec_x = vec_x/distanceTotal;
+	vec_y = vec_y/distanceTotal;
+	vec_z = vec_z/distanceTotal;
 
 	// remaining distance to travel
-	distance_remaining = distance_total;
+	distanceRemaining = distanceTotal;
 
 	// at the beginning, all surfaces are possible
 	forb = -1;
@@ -139,7 +155,7 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	for(;;)
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
-		length = distance_remaining;
+		length = distanceRemaining;
 
 		//        definition for decider
 		//        0,1,2: int for the neighbors
@@ -154,16 +170,16 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 		// forb describes the surface, from which the ray enters the prism.
 		// this surface is no suitable candidate, since the length would be 0!
 		if (forb != 0){
-			denominator = n_x[tri]*vec_x + n_y[tri]*vec_y;
+			denominator = xOfNormals[tri]*vec_x + yOfNormals[tri]*vec_y;
 			// see if we intersect at all
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+ size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
-				length_help = nominator/denominator;
+				nominator = (xOfNormals[tri]*points[positionsOfNormalVectors[tri]] + yOfNormals[tri]*points[positionsOfNormalVectors[tri]+ numberOfPoints]) - (xOfNormals[tri]*xPos + yOfNormals[tri]*yPos);
+				lengthHelp = nominator/denominator;
 				// if we found a new smallest length, use it
-				if (length_help < length && length_help > 0.0)
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
-					length = length_help;
+					length = lengthHelp;
 					forb_dump = (forbidden[tri]);	
 					tri_next = neighbors[tri];
 					cell_z_next = cell_z;
@@ -175,15 +191,15 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 		// see forb !=0 case
 		if (forb != 1){
 			//offset, since the 3 rectangular surfaces are stored at different positions in the array
-			offset = tri+N_cells;
-			denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
+			offset = tri+numberOfTriangles;
+			denominator = xOfNormals[offset]*vec_x + yOfNormals[offset]*vec_y;
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[offset]*p_in[n_p[offset]] + n_y[offset]*p_in[n_p[offset]+ size_p]) - (n_x[offset]*x_pos + n_y[offset]*y_pos);
-				length_help = nominator/denominator;
-				if (length_help < length && length_help > 0.0)
+				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
+				lengthHelp = nominator/denominator;
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
-					length = length_help;
+					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
 					tri_next = neighbors[offset];
 					cell_z_next = cell_z;
@@ -193,15 +209,15 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 
 		// see forb !=0 case
 		if (forb !=2){
-			offset = tri+2*N_cells;
-		denominator = n_x[offset]*vec_x + n_y[offset]*vec_y;
+			offset = tri+2*numberOfTriangles;
+		denominator = xOfNormals[offset]*vec_x + yOfNormals[offset]*vec_y;
 			if (denominator != 0.0)
 			{
-				nominator = (n_x[offset]*p_in[n_p[offset]] + n_y[offset]*p_in[n_p[offset]+ size_p]) - (n_x[offset]*x_pos + n_y[offset]*y_pos);
-				length_help = nominator/denominator;
-				if (length_help < length && length_help > 0.0)
+				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
+				lengthHelp = nominator/denominator;
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
-					length = length_help;
+					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
 					tri_next = neighbors[offset];
 					cell_z_next = cell_z;
@@ -210,15 +226,15 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 		}
 
 		// if-structure "optimized"
-		denominator = z_pos*vec_z;
+		denominator = zPos*vec_z;
 		if (denominator != 0.0){
 			if (forb != 3){
 				{
-					nominator = (cell_z+1)* z_mesh - z_pos;
-					length_help = nominator/denominator;
-					if (length_help < length && length_help > 0.0)
+					nominator = (cell_z+1)* thicknessOfPrism - zPos;
+					lengthHelp = nominator/denominator;
+					if (lengthHelp < length && lengthHelp > 0.0)
 					{
-						length = length_help;
+						length = lengthHelp;
 						//decider = 3;
 						forb_dump = 4; // you are not allowed to go down in the next step
 						tri_next = tri;
@@ -229,11 +245,11 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 
 			// next is the lower plane
 			if (forb != 4){
-				nominator = (cell_z)* z_mesh - z_pos;
-				length_help = nominator/denominator;
-				if (length_help < length && length_help > 0.0)
+				nominator = (cell_z)* thicknessOfPrism - zPos;
+				lengthHelp = nominator/denominator;
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
-					length = length_help;
+					length = lengthHelp;
 					//decider = 4;
 					forb_dump = 3; // you are not allowed to go up in the next step
 					tri_next = tri;
@@ -248,34 +264,34 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 		// switch is now directly included into the if-statements
 		//
 		// now we know where to go, let's make the integration
-		// take the beta_v[tri+cell_z*N_cells] 
+		// take the betaValues[tri+cell_z*N_cells]
 		//
 		// at this position do the decision whether it is a gain part or cladding
 		// it might be absorbing or amplifying, for the cladding only absorbing
 		// a simple "if then"
 
-		if (cell_type[tri] == clad_num){
-			gain *= exp((-1)*(clad_abs * length));
+		if (cellTypes[tri] == cladNumber){
+			gain *= exp((-1)*(cladAbsorption * length));
 		}
 		else {
-			gain *= exp(length* N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a));
+			gain *= exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
 #if TEST_VALUES==true
 		testDistance += length;
 #endif
 
 		// the remaining distance is decreased by the length we travelled through the prism
-		distance_remaining -= length;
+		distanceRemaining -= length;
 
 
 		// if the distance between the destination and our current position is small enough, we are done
-		if (fabs(distance_remaining)< SMALL)
+		if (fabs(distanceRemaining)< SMALL)
 			break;
 
 		// now set the next cell and position
-		x_pos = x_pos + length*vec_x;
-		y_pos = y_pos + length*vec_y;
-		z_pos = z_pos + length*vec_z;
+		xPos = xPos + length*vec_x;
+		yPos = yPos + length*vec_y;
+		zPos = zPos + length*vec_z;
 
 		tri = tri_next;
 		cell_z = cell_z_next;      
@@ -283,10 +299,10 @@ __device__ float rayPropagationGpu(double x_pos, double y_pos, double z_pos, dou
 	}
 
 #if TEST_VALUES==true
-	assert(fabs(distance_total-testDistance) < 0.000001);
+	assert(fabs(distanceTotal-testDistance) < 0.000001);
 #endif
 
-	return gain/(distance_total*distance_total);
+	return gain/(distanceTotal*distanceTotal);
 }
 
 #if USE_IMPORTANCE==true
@@ -308,36 +324,36 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
 
 //    use the routine "propagation"!, test: no reflections, just exponential
     x_pos = p_in[point];
-    y_pos = p_in[point+size_p];
-    z_pos = mesh_start * z_mesh;
+    y_pos = p_in[point+numberOfPoints];
+    z_pos = mesh_start * thicknessOfPrism;
 
-    for (i_t=0;i_t<N_cells;i_t++)
+    for (i_t=0;i_t<numberOfTriangles;i_t++)
     {
 
-        for (i_z=0;i_z<(mesh_z-1);i_z++) //remember the definition differences MatLab/C for indices
+        for (i_z=0;i_z<(numberOfLevels-1);i_z++) //remember the definition differences MatLab/C for indices
         {
 //            at this point replace the following routine with propagation(...)
 //            later expand this with the beta/tau values...
-			prop = naivePropagation(center_x[i_t], center_y[i_t], z_mesh*(i_z+0.5),  x_pos, y_pos, z_pos, i_t, i_z, p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v);
+			prop = naivePropagation(center_x[i_t], center_y[i_t], thicknessOfPrism*(i_z+0.5),  x_pos, y_pos, z_pos, i_t, i_z, p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v);
 			// Propagation vom Zentrum jedes Prismas zu jedem Samplepunkt 
 			//
 //			prop = propagation(center_x[i_t], center_y[i_t], z_mesh*(i_z+0.5), x_pos, y_pos, z_pos, i_t, i_z);
-            importance[i_t + i_z*N_cells] = beta_v[i_t+i_z*N_cells]*(prop);
-            sum_phi += importance[i_t + i_z*N_cells];
+            importance[i_t + i_z*numberOfTriangles] = beta_v[i_t+i_z*numberOfTriangles]*(prop);
+            sum_phi += importance[i_t + i_z*numberOfTriangles];
 
         }
         surf_tot += surface[i_t];
     }
 
 //    now calculate the number of rays
-    for (i_t=0;i_t<N_cells;i_t++)
+    for (i_t=0;i_t<numberOfTriangles;i_t++)
     {
-        for (i_z=0;i_z<(mesh_z-1);i_z++) //remember the definition differences MatLab/C for indices
+        for (i_z=0;i_z<(numberOfLevels-1);i_z++) //remember the definition differences MatLab/C for indices
         {
 //            this is the amount of the sampled rays out of the cells
-            N_rays[i_t + i_z*N_cells] = (int)(floor(importance[i_t + i_z*N_cells]/sum_phi*NumRays));
+            N_rays[i_t + i_z*numberOfTriangles] = (int)(floor(importance[i_t + i_z*numberOfTriangles]/sum_phi*NumRays));
 
-            Rays_dump +=  N_rays[i_t + i_z*N_cells];
+            Rays_dump +=  N_rays[i_t + i_z*numberOfTriangles];
         }
     }
 
@@ -347,8 +363,8 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
     {
         for (i_r=0;i_r<rays_left;i_r++)
         {
-            rand_t = (int )(curand_uniform(&localstate)*N_cells);
-            rand_z = (int )(curand_uniform(&localstate)*(mesh_z-1));
+            rand_t = (int )(curand_uniform(&localstate)*numberOfTriangles);
+            rand_z = (int )(curand_uniform(&localstate)*(numberOfLevels-1));
             N_rays[rand_t + rand_z*N_cells]++;
         }
     }
@@ -357,17 +373,17 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
 //    dividing this number with the new amount of rays gives the final importance weight for this area!
     for (i_t=0;i_t<N_cells;i_t++)
     {
-        for (i_z=0;i_z<(mesh_z-1);i_z++) //remember the definition differences MatLab/C for indices
+        for (i_z=0;i_z<(numberOfLevels-1);i_z++) //remember the definition differences MatLab/C for indices
         {
 //            this is the amount of the sampled rays out of the cells
-            if (N_rays[i_t + i_z*N_cells]>0)
+            if (N_rays[i_t + i_z*numberOfTriangles]>0)
             {
-                importance[i_t + i_z*N_cells] = NumRays*surface[i_t]/surf_tot/N_rays[i_t + i_z*N_cells];
-//                importance[i_t + i_z*N_cells] = NumRays*surface[i_t]/surf_tot;
+                importance[i_t + i_z*numberOfTriangles] = NumRays*surface[i_t]/surf_tot/N_rays[i_t + i_z*N_cells];
+//                importance[i_t + i_z*numberOfTriangles] = NumRays*surface[i_t]/surf_tot;
             }
             else
             {
-                importance[i_t + i_z*N_cells] = 0; // case of beta of this point == 0 e.g.
+                importance[i_t + i_z*numberOfTriangles] = 0; // case of beta of this point == 0 e.g.
             }
         }
     }
@@ -381,23 +397,23 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
  */
 __global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p )
 {
-	sigma_e = host_sigma_e;	
-	sigma_a = host_sigma_a;
-	clad_num = host_clad_num;
-	clad_abs = host_clad_abs;
-	N_tot = host_N_tot;
-	N_cells = host_N_cells;
-	z_mesh = host_z_mesh;
-	mesh_z = host_mesh_z;
+	sigmaE = host_sigma_e;	
+	sigmaA = host_sigma_a;
+	cladNumber = host_clad_num;
+	cladAbsorption = host_clad_abs;
+	nTot = host_N_tot;
+	numberOfTriangles = host_N_cells;
+	thicknessOfPrism = host_z_mesh;
+	numberOfLevels = host_mesh_z;
 	size_p = host_size_p;
 	//printf("Sigma_e in setup=%f\tSigma_eHost=%f\n",sigma_e,host_sigma_e);
 } 
 
 #if USE_IMPORTANCE==true
-__global__ void importanceKernel( curandState *globalState, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, int host_size_t, double* beta_v, double *importance, int *N_rays, double *center_x, double *center_y, int *surface, int NumRays) {
+__global__ void importanceKernel( curandState *globalState, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* cell_type, int hostNumberOfTriangles, double* beta_v, double *importance, int *N_rays, double *center_x, double *center_y, int *surface, int NumRays) {
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
-	for(int i=0; i< host_size_t; ++i){
-		for(int j=0; j< mesh_z; ++j){
+	for(int i=0; i< hostNumberOfTriangles; ++i){
+		for(int j=0; j< numberOfLevels; ++j){
 			importf(globalState[id], i,j, importance, N_rays, p_in, n_x, n_y, n_p, neighbors, forbidden, cell_type, beta_v, center_x, center_y,surface, NumRays);
 
 		}
@@ -411,10 +427,10 @@ __global__ void importanceKernel( curandState *globalState, double *p_in, double
  * Is only used for testing
  */
 __global__ void testKernel (  ){
-	printf("\nSigma_e=%.30f",sigma_e);
-	printf("\nSigma_a=%.30f",sigma_a);
-	printf("\nmesh_z=%d",mesh_z);
-	printf("\nz_mesh_=%.30f",z_mesh);
+	printf("\nSigma_e=%.30f",sigmaE);
+	printf("\nSigma_a=%.30f",sigmaA);
+	printf("\nmesh_z=%d",numberOfLevels);
+	printf("\nz_mesh_=%.30f",thicknessOfPrism);
 } 
 
 
@@ -433,7 +449,7 @@ __global__ void testKernel (  ){
  * 		(always for the same combination of startprism+samplepoint
  */
 #if USE_IMPORTANCE==true
-__global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v, double *importance) {
+__global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int hostNumberOfTriangles, double* beta_v, double *importance) {
 #else
 __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
 #endif
@@ -441,18 +457,18 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	double gain = 0.;
 	const int endPointX = p_in[point2D];
 	const int endPointY = p_in[ size_p + point2D];
-	const int endPointZ = level* z_mesh;
+	const int endPointZ = level* thicknessOfPrism;
 
 
 	// this should give the same start values multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
 	const int startTriangle = selectTriangle(id,host_size_t); 
-	const int startLevel = selectLevel(id, mesh_z); 
+	const int startLevel = selectLevel(id, numberOfLevels);
 
 	// the indices of the vertices of the starttriangle
 	const int t1 = t_in[startTriangle];
-	const int t2 = t_in[startTriangle+ N_cells];
-	const int t3 = t_in[startTriangle+2*N_cells];
+	const int t2 = t_in[startTriangle+ numberOfTriangles];
+	const int t3 = t_in[startTriangle+2*numberOfTriangles];
 
 	// do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
 	for (int i=0; i<iterations ; ++i){
@@ -469,18 +485,18 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double w = 1-u-v;
 
 		// convert the random startpoint into coordinates
-		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* z_mesh;
+		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
-		double yRand = p_in[ size_p + t1]*u + p_in[ size_p + t2]*v + p_in[ size_p + t3]*w;
+		double yRand = p_in[ numberOfPoints + t1]*u + p_in[ numberOfPoints + t2]*v + p_in[ numberOfPoints + t3]*w;
 		__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
-	gain *=  beta_v[startTriangle + N_cells*startLevel];
+	gain *=  beta_v[startTriangle + numberOfTriangles*startLevel];
 #if USE_IMPORTANCE==true
-	atomicAdd(&(phi[point2D + level*size_p]),float(gain*importance[startTriangle + N_cells*startLevel]));  
+	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
 	atomicAdd(&(phi[point2D + level*size_p]),float(gain)); 
 #endif
@@ -502,14 +518,19 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	 *
 	 * note that every samplepoint receives the exact same number of rays.
 	 */
-	unsigned raysPerSample = ceil(totalNumberOfRays/float(host_size_p * (host_mesh_z+1)));
+	
+	//TODO: as parameters
+	int hostNumberOfPoints;
+	int hostNumberOfLevels;
+	
+	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels+1)));
 	threads = 256;
 	blocks = 200;
 	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "interations=%d\n",iterations);
 	raysPerSample = threads * blocks * iterations;
-	totalNumberOfRays = unsigned(raysPerSample * (host_size_p * (host_mesh_z+1)));
+	totalNumberOfRays = unsigned(raysPerSample * (hostNumberOfPoints * (hostNumberOfLevels+1)));
 	//fprintf(stderr, "After Normalization:\n");
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
@@ -533,9 +554,9 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	 * \var cell_type: determines which cell type we are looking at.
 	 * other input parameters are put to the GPU by the setupGlobalVariablesKernel
 	 */
-	double  *p_in, *n_x, *n_y, *beta_v;
+	double  *points, *xOfNormals, *yOfNormals, *betaValues;
 	float *phi;
-	int *forbidden, *n_p, *neighbors, *t_in, *cell_type;
+	int *forbidden, *positionsOfNormalVectors, *neighbors, *triangleIndices, *cellTypes;
 
 
 	/** Variables for benchmarking and results
@@ -545,8 +566,8 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-	float hostPhi[host_size_p * (host_mesh_z +1)];
-	for(int i=0;i<host_size_p*(host_mesh_z+1);++i){
+	float hostPhi[hostNumberOfPoints * (hostNumberOfLevels +1)];
+	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels+1);++i){
 			hostPhi[i] = 0.;
 	}
 
@@ -583,12 +604,12 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	curandState *devStates;
 	int *N_rays, *surface;
 	double *center_x, *center_y, *importance;
-	double host_importance[host_size_p * (host_mesh_z+1)];
-	int host_N_rays[host_size_t * host_mesh_z];
-	for(int i=0;i<host_size_p*(host_mesh_z+1);++i){
+	double host_importance[hostNumberOfPoints * (hostNumberOfLevels+1)];
+	int host_N_rays[hostNumberOfTriangles * hostNumberOfLevels];
+	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels+1);++i){
 		host_importance[i] = 0.;
 	}
-	for(int i=0;i<host_size_t*host_mesh_z;++i){
+	for(int i=0;i<hostNumberOfTriangles*hostNumberOfLevels;++i){
 		host_N_rays[i] = 0;
 	}
 #endif
@@ -600,50 +621,50 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	 */
 	{
 		//Create constant values on GPU
-		setupGlobalVariablesKernel<<<1,1>>>(host_sigma_e, host_sigma_a, host_clad_num, host_clad_abs, host_N_tot, host_size_t, host_z_mesh, host_mesh_z, host_size_p); //@OPTIMIZE: initialize the constants as constants...
+		setupGlobalVariablesKernel<<<1,1>>>(hostSigmaE, hostSigmaA, hostCladNumber, hostCladAbsorption, hostNTot, hostNumberOfTriangles, hostThicknessOfPrism, hostNumberOfLevels, hostNumberOfPoints); //@OPTIMIZE: initialize the constants as constants...
 
 		cudaThreadSynchronize();
 
 		// Memory allocation on device
-		CUDA_CHECK_RETURN(cudaMalloc(&p_in, 2 * host_size_p * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&n_x, 3 * host_size_t * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&n_y, 3 * host_size_t * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* host_size_t * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* host_size_t * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&n_p, 3* host_size_t * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&t_in, 3* host_size_t * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&cell_type,host_size_t * host_mesh_z * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&beta_v,host_size_t * host_mesh_z * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&phi,host_size_p * (host_mesh_z +1) * sizeof(float)));
+		CUDA_CHECK_RETURN(cudaMalloc(&points, 2 * hostNumberOfPoints * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&xOfNormals, 3 * hostNumberOfTriangles * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&yOfNormals, 3 * hostNumberOfTriangles * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&neighbors, 3* hostNumberOfTriangles * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3* hostNumberOfTriangles * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&positionsOfNormalVectors, 3* hostNumberOfTriangles * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&triangleIndices, 3* hostNumberOfTriangles * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&cellTypes,hostNumberOfTriangles * hostNumberOfLevels * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&betaValues,hostNumberOfTriangles * hostNumberOfLevels * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&phi,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(float)));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
-		CUDA_CHECK_RETURN(cudaMalloc(&importance,host_size_p * (host_mesh_z +1) * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&center_x,host_size_t * (host_mesh_z) * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&center_y,host_size_t * (host_mesh_z) * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&N_rays,host_size_p * (host_mesh_z +1) * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&surface,host_size_p * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&importance,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&center_x,hostNumberOfTriangles * (hostNumberOfLevels) * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&center_y,hostNumberOfTriangles * (hostNumberOfLevels) * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&N_rays,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&surface,hostNumberOfPoints * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&devStates, iterations * threads * blocks * sizeof(curandState)));
 
 #endif
 
 		/// Copy data from host to device
-		CUDA_CHECK_RETURN(cudaMemcpy(p_in, host_p_in, 2 * host_size_p * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(n_x, host_n_x, 3 * host_size_t * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(n_y, host_n_y, 3 * host_size_t * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(neighbors, host_neighbors, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(forbidden,host_forbidden, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(n_p ,host_n_p, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(t_in ,host_t_in, 3* host_size_t * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(cell_type,host_cell_type, host_size_t *  host_mesh_z * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(beta_v, host_beta_v, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, host_size_p * (host_mesh_z+1) * sizeof(float), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(points, hostPoints, 2 * hostNumberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(xOfNormals, hostXOfNormals, 3 * hostNumberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(yOfNormals, hostyOfNormals, 3 * hostNumberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(neighbors, hostNeighbors, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(forbidden,hostForbidden, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(positionsOfNormalVectors ,hostPositionsOfNormalVectors, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(triangleIndices ,hostTriangleIndices, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(cellTypes,hostCellTypes, hostNumberOfTriangles *  hostNumberOfLevels * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(betaValues, hostBetaValues, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(float), cudaMemcpyHostToDevice));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
-		CUDA_CHECK_RETURN(cudaMemcpy(importance, host_importance, host_size_p * (host_mesh_z+1) * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(center_x, host_center_x, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(center_y, host_center_y, host_size_t * host_mesh_z * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(N_rays, host_N_rays, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(surface, host_surface, host_size_p * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(importance, host_importance, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(center_x, host_center_x, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(center_y, host_center_y, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(N_rays, host_N_rays, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(surface, host_surface, hostNumberOfPoints * sizeof(int), cudaMemcpyHostToDevice));
 #endif
 	}
 
@@ -653,7 +674,7 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 		random_setup_kernel <<< blocks, threads >>> ( devStates, time(NULL) );
 		cudaThreadSynchronize();
 
-		importanceKernel<<< blocks * iterations, threads>>>(devStates, p_in, n_x, n_y, n_p, neighbors, forbidden, cell_type, host_size_t, beta_v, importance, N_rays, center_x, center_y, surface, blocks * threads * iterations * host_size_p * (host_mesh_z+1) );
+		importanceKernel<<< blocks * iterations, threads>>>(devStates, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, cellTypes, hostNumberOfTriangles, betaValues, importance, N_rays, center_x, center_y, surface, blocks * threads * iterations * hostNumberOfPoints * (hostNumberOfLevels+1) );
 #endif
 	// start the Kernels
 	{
@@ -661,13 +682,13 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 		cudaEventRecord(start, 0);
 
 		// start a new kernel for every(!) sample point of our mesh
-		for(int point2D = 0; point2D < host_size_p ; ++point2D){
-			for(int level = 0; level <= host_mesh_z; ++ level){
+		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
+			for(int level = 0; level <= hostNumberOfLevels; ++ level){
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, forbidden, t_in, cell_type, host_size_t, beta_v, importance);
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
 #else
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, p_in, n_x, n_y, n_p, neighbors, forbidden, t_in, cell_type, host_size_t, beta_v);
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues);
 
 #endif
 			}
@@ -682,12 +703,12 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 		cudaEventSynchronize(stop);
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
 
-		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
 #if USE_IMPORTANCE==true
-		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, host_size_p * (host_mesh_z+1) * sizeof(double), cudaMemcpyDeviceToHost));
-		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, host_size_p * (host_mesh_z+1) * sizeof(int), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(double), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
-		for(int i=0; i< host_size_p*(host_mesh_z+1); ++i){
+		for(int i=0; i< hostNumberOfPoints*(hostNumberOfLevels+1); ++i){
 			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
 #if DIVIDE_PI==true
 			ase->at(i) = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
@@ -699,13 +720,13 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 
 	// Free memory on device
 	{
-		cudaFree(p_in);
-		cudaFree(n_x);
-		cudaFree(n_y);
+		cudaFree(points);
+		cudaFree(xOfNormals);
+		cudaFree(yOfNormals);
 		cudaFree(neighbors);
 		cudaFree(forbidden);
-		cudaFree(n_p);
-		cudaFree(beta_v);
+		cudaFree(positionsOfNormalVectors);
+		cudaFree(betaValues);
 #if USE_IMPORTANCE==true
 		cudaFree(importance);
 		cudaFree(N_rays);
