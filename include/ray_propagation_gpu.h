@@ -504,24 +504,24 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 
 double* doubleVectorToArray(std::vector<double> *input){
 	double* output;
-	output = malloc(sizeof(double) * input->size());
-	for(int i=0; i< intput->size(); ++i){
+	output = (double*) malloc(sizeof(double) * input->size());
+	for(int i=0; i< input->size(); ++i){
 		output[i] = input->at(i);	
 	}
 	return output;
 }
 int* intVectorToArray(std::vector<int> *input){
 	int* output;
-	output = malloc(sizeof(int) * input->size());
-	for(int i=0; i< intput->size(); ++i){
+	output = (int*) malloc(sizeof(int) * input->size());
+	for(int i=0; i< input->size(); ++i){
 		output[i] = input->at(i);	
 	}
 	return output;
 }
 unsigned* unsignedVectorToArray(std::vector<unsigned> *input){
 	unsigned* output;
-	output = malloc(sizeof(unsigned) * input->size());
-	for(int i=0; i< intput->size(); ++i){
+	output = (unsigned*) malloc(sizeof(unsigned) * input->size());
+	for(int i=0; i< input->size(); ++i){
 		output[i] = input->at(i);	
 	}
 	return output;
@@ -576,7 +576,7 @@ float runRayPropagationGpu(
 	unsigned* hostTriangleIndices = unsignedVectorToArray(triangleIndicesVector);
 	int* hostForbidden = intVectorToArray(forbiddenVector);
 	int* hostNeighbors = intVectorToArray(neighborsVector);
-	int* hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectors);
+	int* hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectorsVector);
 	int* hostPoints = intVectorToArray(pointsVector);
 
 
@@ -708,7 +708,7 @@ float runRayPropagationGpu(
 		/// Copy data from host to device
 		CUDA_CHECK_RETURN(cudaMemcpy(points, hostPoints, 2 * hostNumberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(xOfNormals, hostXOfNormals, 3 * hostNumberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(yOfNormals, hostyOfNormals, 3 * hostNumberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(yOfNormals, hostYOfNormals, 3 * hostNumberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(neighbors, hostNeighbors, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(forbidden,hostForbidden, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(positionsOfNormalVectors ,hostPositionsOfNormalVectors, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
