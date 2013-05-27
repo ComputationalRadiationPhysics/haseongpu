@@ -32,42 +32,23 @@ int main(int argc, char **argv){
   unsigned threads = 0;
   
   // Experimentdata
-
-  //std::vector<double> * betas = new std::vector<double>;
   std::vector<double> * betaValues = new std::vector<double>;
-  //std::vector<double> * n_x = new std::vector<double>;
   std::vector<double> * xOfNormals = new std::vector<double>;
-  //std::vector<double> * n_y = new std::vector<double>;
   std::vector<double> * yOfNormals = new std::vector<double>;
-  //std::vector<unsigned> * cell_types = new std::vector<unsigned>;
   std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
-  //std::vector<unsigned> * t_in = new std::vector<unsigned>;
   std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
-  //std::vector<int> * forbidden = new std::vector<int>;
   std::vector<int> * forbidden = new std::vector<int>;
-  //std::vector<int> * neighbors = new std::vector<int>;
   std::vector<int> * neighbors = new std::vector<int>;
-  //std::vector<int> * n_p = new std::vector<int>;
   std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
-  //std::vector<int> * p_in = new std::vector<int>;
   std::vector<int> * points = new std::vector<int>;
-  //float clad_abs = 0;
   float cladAbsorption = 0;
-  //float clad_num = 0;
   float cladNumber = 0;
-  //float n_tot = 0;
   float nTot = 0;
-  //float sigma_a = 0;
   float sigmaA = 0;
-  //float sigma_e = 0;
   float sigmaE = 0;
-  //unsigned size_p = 0;
   unsigned numberOfPoints = 0;
-  //unsigned numberOfTriangles = 0;
   unsigned numberOfTriangles = 0;
-  //unsigned mesh_z = 0;
   unsigned numberOfLevels = 0;
-  //float z_mesh = 1;
   float thicknessOfPrism = 1;
 
   // Parse Commandline
@@ -95,7 +76,7 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, n_x, n_y, cell_types, triangleIndices, forbidden, neighbors, n_p, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
@@ -126,7 +107,18 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
-  	runtime = runAseBruteforceGpu(samples, prisms, betaValues, ase, threads, blocks, rays_total);
+  	runtime = runAseBruteforceGpu(samples, 
+				      prisms, 
+				      betaValues, 
+				      ase,
+				      cladAbsorption,
+				      cladNumber,
+				      nTot,
+				      sigmaA,
+				      sigmaE,
+				      threads, 
+				      blocks, 
+				      raysTotal);
 	strcpy(runmode, "Bruteforce GPU");
 	break;
       }
