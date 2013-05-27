@@ -150,6 +150,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples,
   cudaEvent_t start, stop;
   curandState *devStates;
 
+  fprintf(stderr, "C Rays total: %d\n", rays_total);
   // Calculation of problem size (threads, blocks, blocks_per_sample)
   threads = 256;
   unsigned rays_per_sample = ceil(rays_total / (float)samples->size());
@@ -157,6 +158,13 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples,
   blocks = blocks_per_sample * samples->size();
   rays_total = blocks * threads;
   rays_per_sample = rays_total / samples->size();
+
+  fprintf(stderr, "C Rays total: %d\n", rays_total);
+  fprintf(stderr, "C Rays per Sample: %d\n", rays_per_sample);
+  fprintf(stderr, "C Rays total: %d\n", rays_total);
+  fprintf(stderr, "C Blocks per sample: %d\n", blocks_per_sample);
+  fprintf(stderr, "C Sample size: %d\n", samples->size());
+  fprintf(stderr, "C Blocks: %d\n", blocks);
 
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
