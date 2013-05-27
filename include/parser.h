@@ -45,15 +45,15 @@ int parse(std::string location,
     location.append("/");
 
   // Parse every file for its own
-  parse_beta_v(location, betas);
-  parse_cell_type(location, cell_types);
-  parse_forbidden(location, forbidden);
-  parse_neighbors(location, neighbors);
-  parse_n_p(location, n_p);
-  parse_n_x(location, n_x);
-  parse_n_y(location, n_y);
-  parse_p_in(location, p_in);
-  parse_t_in(location, t_in);
+  if(parse_beta_v(location, betas)) return 1;
+  if(parse_cell_type(location, cell_types)) return 1;
+  if(parse_forbidden(location, forbidden)) return 1;
+  if(parse_neighbors(location, neighbors)) return 1;
+  if(parse_n_p(location, n_p)) return 1;
+  if(parse_n_x(location, n_x)) return 1;
+  if(parse_n_y(location, n_y)) return 1;
+  if(parse_p_in(location, p_in)) return 1;
+  if(parse_t_in(location, t_in)) return 1;
   
   (*clad_abs) = parse_clad_abs(location);
   (*clad_num) = parse_clad_num(location);
@@ -63,6 +63,9 @@ int parse(std::string location,
   (*size_p) = parse_size_p(location);
   (*size_t) = parse_size_t(location);
   (*mesh_z) = parse_mesh_z(location);
+
+  if(!((*clad_abs) && *(clad_num)  && (*n_tot) && (*sigma_a) && *(sigma_e) && (*size_p) && (*size_t) && (*mesh_z)))
+    return 1;
 
   return 0;
 } 
@@ -130,7 +133,7 @@ float parse_clad_abs(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return  0;
+    return  0.0;
   }
 
   return number;
@@ -154,7 +157,7 @@ float parse_clad_num(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0.0;
   }
 
   return number;
@@ -240,7 +243,7 @@ float parse_n_tot(std::string root){
   std::ifstream fileStream; 
   float number = 0;
   
-  fileStream.open(root.append("N_tot.txt").c_str());
+  fileStream.open(root.append("n_tot.txt").c_str());
   if(fileStream.is_open()){
     if(fileStream.good()){
       std::getline(fileStream, line);
@@ -250,7 +253,7 @@ float parse_n_tot(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0.0;
   }
 
   return number;
@@ -344,7 +347,7 @@ float parse_sigma_a(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0.0;
   }
 
   return number;
@@ -368,7 +371,7 @@ float parse_sigma_e(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0.0;
   }
 
   return number;
@@ -392,7 +395,7 @@ unsigned parse_size_p(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0;
   }
 
   return number;
@@ -465,7 +468,7 @@ unsigned parse_mesh_z(std::string root){
   }
   else{
     fprintf(stderr, "Can't open file %s \n", root.c_str());
-    return NULL;
+    return 0;
   }
 
   return number;

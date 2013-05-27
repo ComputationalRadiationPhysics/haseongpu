@@ -32,7 +32,7 @@ int main(int argc, char **argv){
   unsigned threads = 0;
   
   // Experimentdata
-  std::vector<double> * beta_v = new std::vector<double>;
+  std::vector<double> * betas = new std::vector<double>;
   std::vector<double> * n_x = new std::vector<double>;
   std::vector<double> * n_y = new std::vector<double>;
   std::vector<unsigned> * cell_types = new std::vector<unsigned>;
@@ -76,29 +76,29 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, beta_v, n_x, n_y, cell_types, t_in, forbidden, neighbors, n_p, p_in, &clad_abs, &clad_num, &n_tot, &sigma_a, &sigma_e, &size_p, &numberOfTriangles, &mesh_z)){
+  if(parse(experimentLocation, betas, n_x, n_y, cell_types, t_in, forbidden, neighbors, n_p, p_in, &clad_abs, &clad_num, &n_tot, &sigma_a, &sigma_e, &size_p, &numberOfTriangles, &mesh_z)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
+
+  // Debug
+  /*
   fprintf(stderr, "clad_abs: %f\n", clad_abs);
   fprintf(stderr, "clad_num: %f\n", clad_num);
-  fprintf(stderr, "n_tot: %f\n", n_tot);
+  fprintf(stderr, "n_tot: %e\n", n_tot);
   fprintf(stderr, "sigma_a: %e\n", sigma_a);
   fprintf(stderr, "sigma_e: %e\n", sigma_e);
   fprintf(stderr, "size_p: %d\n", size_p);
   fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
   fprintf(stderr, "mesh_z: %d\n", mesh_z);
-
-
   fprintf(stderr, "cell types size: %d\n", cell_types->size());
   fprintf(stderr, "p_in size: %d\n", p_in->size());
-  return 0;
+  */
 
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(mesh_z, p_in, size_p, t_in, numberOfTriangles, z_mesh);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(mesh_z, p_in, size_p);
-  std::vector<double>    *betas = generateBetasFromTestdata(beta_v, mesh_z * numberOfTriangles);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
   rays_total = (unsigned)pow(2,17);
 
