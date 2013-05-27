@@ -395,7 +395,7 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
  * Initializes the global variables of the GPU with the correct values.
  * All those values are from the original propagation-function which we ported.
  */
-__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int host_size_p )
+__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
 {
 	sigmaE = host_sigma_e;	
 	sigmaA = host_sigma_a;
@@ -405,7 +405,7 @@ __global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_si
 	numberOfTriangles = host_N_cells;
 	thicknessOfPrism = host_z_mesh;
 	numberOfLevels = host_mesh_z;
-	size_p = host_size_p;
+	numberOfPoints = hostNumberOfPoints;
 	//printf("Sigma_e in setup=%f\tSigma_eHost=%f\n",sigma_e,host_sigma_e);
 } 
 
@@ -456,7 +456,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 	double gain = 0.;
 	const int endPointX = p_in[point2D];
-	const int endPointY = p_in[ size_p + point2D];
+	const int endPointY = p_in[ numberOfPoints + point2D];
 	const int endPointZ = level* thicknessOfPrism;
 
 
@@ -498,14 +498,61 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
-	atomicAdd(&(phi[point2D + level*size_p]),float(gain)); 
+	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain)); 
 #endif
+}
+
+double* doubleVectorToArray(std::vector<double> *input){
+	double* output;
+	output = malloc(sizeof(double) * input->size());
+	for(int i=0; i< intput->size(); ++i){
+		output[i] = input->at(i);	
+	}
+	return output;
+}
+int* intVectorToArray(std::vector<int> *input){
+	int* output;
+	output = malloc(sizeof(int) * input->size());
+	for(int i=0; i< intput->size(); ++i){
+		output[i] = input->at(i);	
+	}
+	return output;
+}
+unsigned* unsignedVectorToArray(std::vector<unsigned> *input){
+	unsigned* output;
+	output = malloc(sizeof(unsigned) * input->size());
+	for(int i=0; i< intput->size(); ++i){
+		output[i] = input->at(i);	
+	}
+	return output;
 }
 
 //----------------------------------------------------
 // Host Code
 //----------------------------------------------------
-float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &totalNumberOfRays)
+float runRayPropagationGpu(
+		std::vector<double> *ase, 
+		unsigned &threads, 
+		unsigned &blocks, 
+		unsigned &totalNumberOfRays,
+		std::vector<double> *betaValuesVector,
+		std::vector<double> *xOfNormalsVector,
+		std::vector<double> *yOfNormalsVector,
+		std::vector<unsigned> *cellTypesVector,
+		std::vector<unsigned> *triangleIndicesVector,
+		std::vector<int> *forbiddenVector,
+		std::vector<int> *neighborsVector,
+		std::vector<int> *positionsOfNormalVectorsVector,
+		std::vector<int> *pointsVector,
+		float hostCladAbsorption,
+		float hostCladNumber,
+		float hostNTot,
+		float hostSigmaA,
+		float hostSigmaE,
+		unsigned hostNumberOfPoints,
+		unsigned hostNumberOfTriangles,
+		unsigned hostNumberOfLevels,
+		float hostThicknessOfPrism)
 {
 	/** GPU Kernel Variables
 	 * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
@@ -519,9 +566,20 @@ float runRayPropagationGpu(std::vector<double> *ase, unsigned &threads, unsigned
 	 * note that every samplepoint receives the exact same number of rays.
 	 */
 	
-	//TODO: as parameters
-	int hostNumberOfPoints;
-	int hostNumberOfLevels;
+	//
+	
+
+	double* hostBetaValues = doubleVectorToArray(betaValuesVector);
+	double* hostXOfNormals = doubleVectorToArray(xOfNormalsVector);
+	double* hostYOfNormals = doubleVectorToArray(xOfNormalsVector);
+	unsigned* hostCellTypes = unsignedVectorToArray(cellTypesVector);
+	unsigned* hostTriangleIndices = unsignedVectorToArray(triangleIndicesVector);
+	int* hostForbidden = intVectorToArray(forbiddenVector);
+	int* hostNeighbors = intVectorToArray(neighborsVector);
+	int* hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectors);
+	int* hostPoints = intVectorToArray(pointsVector);
+
+
 	
 	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels+1)));
 	threads = 256;
