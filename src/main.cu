@@ -33,41 +33,36 @@ int main(int argc, char **argv){
   
   // Experimentdata
 
-  std::vector<double> * betas = new std::vector<double>;
-  //std::vector<double> * betaValues = new std::vector<double>;
+  std::vector<double> * betaValues = new std::vector<double>;
   std::vector<double> * n_x = new std::vector<double>;
   //std::vector<double> * xOfNormals = new std::vector<double>;
   std::vector<double> * n_y = new std::vector<double>;
   //std::vector<double> * yOfNormals = new std::vector<double>;
   std::vector<unsigned> * cell_types = new std::vector<unsigned>;
   //std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
-  std::vector<unsigned> * t_in = new std::vector<unsigned>;
-  //std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
+  std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
   std::vector<int> * forbidden = new std::vector<int>;
   //std::vector<int> * forbidden = new std::vector<int>;
   std::vector<int> * neighbors = new std::vector<int>;
   //std::vector<int> * neighbors = new std::vector<int>;
   std::vector<int> * n_p = new std::vector<int>;
   //std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
-  std::vector<int> * p_in = new std::vector<int>;
-  //std::vector<int> * points = new std::vector<int>;
-  float clad_abs = 0;
-  //float cladAbsorption = 0;
-  float clad_num = 0;
-  //float cladNumber = 0;
-  float n_tot = 0;
+  std::vector<int> * points = new std::vector<int>;
+  float cladAbsorption = 0;
+  float cladNumber = 0;
+  float nTot = 0;
   //float nTot = 0;
-  float sigma_a = 0;
+  float sigmaA = 0;
   //float sigmaA = 0;
-  float sigma_e = 0;
+  float sigmaE = 0;
   //float sigmaE = 0;
-  unsigned size_p = 0;
+  unsigned numberOfPoints = 0;
   //unsigned numberOfPoints = 0;
   unsigned numberOfTriangles = 0;
   //unsigned numberOfTriangles = 0;
-  unsigned mesh_z = 0;
+  unsigned numberOfLevels = 0;
   //unsigned numberOfLevels = 0;
-  float z_mesh = 1;
+  float thicknessOfPrism = 1;
   //float thicknessOfPrism = 1;
 
   // Parse Commandline
@@ -95,29 +90,29 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betas, n_x, n_y, cell_types, t_in, forbidden, neighbors, n_p, p_in, &clad_abs, &clad_num, &n_tot, &sigma_a, &sigma_e, &size_p, &numberOfTriangles, &mesh_z)){
+  if(parse(experimentLocation, betaValues, n_x, n_y, cell_types, triangleIndices, forbidden, neighbors, n_p, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
 
   // Debug
   /*
-  fprintf(stderr, "clad_abs: %f\n", clad_abs);
-  fprintf(stderr, "clad_num: %f\n", clad_num);
-  fprintf(stderr, "n_tot: %e\n", n_tot);
-  fprintf(stderr, "sigma_a: %e\n", sigma_a);
-  fprintf(stderr, "sigma_e: %e\n", sigma_e);
-  fprintf(stderr, "size_p: %d\n", size_p);
+  fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
+  fprintf(stderr, "cladNumber: %f\n", cladNumber);
+  fprintf(stderr, "nTot: %e\n", nTot);
+  fprintf(stderr, "sigmaA: %e\n", sigmaA);
+  fprintf(stderr, "sigmaE: %e\n", sigmaE);
+  fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
   fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
-  fprintf(stderr, "mesh_z: %d\n", mesh_z);
+  fprintf(stderr, "numberOfLevels: %d\n", numberOfLevels);
   fprintf(stderr, "cell types size: %d\n", cell_types->size());
-  fprintf(stderr, "p_in size: %d\n", p_in->size());
+  fprintf(stderr, "points size: %d\n", points->size());
   */
 
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
-  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(mesh_z, p_in, size_p, t_in, numberOfTriangles, z_mesh);
-  std::vector<PointCu> *samples = generateSamplesFromTestdata(mesh_z, p_in, size_p);
+  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
+  std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
   rays_total = (unsigned)pow(2,17);
 
@@ -126,7 +121,7 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
-  	runtime = runAseBruteforceGpu(samples, prisms, betas, ase, threads, blocks, rays_total);
+  	runtime = runAseBruteforceGpu(samples, prisms, betaValues, ase, threads, blocks, rays_total);
 	strcpy(runmode, "Bruteforce GPU");
 	break;
       }
