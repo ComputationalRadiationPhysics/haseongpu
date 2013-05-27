@@ -27,4 +27,4 @@ octave --silent --eval "parse_mat('$FOLDER','$FILE')" 1>/dev/null
 
 cd $FOLDER
 zip raw_input.zip *.txt 1>/dev/null
-rm *.txt
+rm -f *.txt

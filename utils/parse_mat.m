@@ -61,7 +61,7 @@ x=fopen("clad_num.txt","w")
 fprintf(x,'3\n')
 fclose(x)
 
-x=fopen("N_tot.txt","w")
+x=fopen("n_tot.txt","w")
 fprintf(x,'%f\n',N_tot)
 fclose(x)
 
