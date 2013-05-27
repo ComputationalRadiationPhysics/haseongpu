@@ -39,18 +39,23 @@ __global__ void random_setup_kernel ( curandState * state, unsigned long seed )
  * calculated the ase phi.
  *
  */
-__global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms, PointCu *samples, const unsigned blocks_per_sample, const double *betas, curandState* globalState){
+__global__ void ase_bruteforce_kernel(PrismCu* prisms, 
+				      const unsigned max_prisms, 
+				      PointCu *samples, 
+				      const unsigned blocks_per_sample, 
+				      const double *betas, 
+				      const float cladAbsorption,
+				      const float cladNumber,
+				      const float nTot,
+				      const float sigmaA,
+				      const float sigmaE,
+				      curandState* globalState){
   // Cuda ids
   //unsigned tid = threadIdx.x;
   unsigned bid = blockIdx.x + blockIdx.y * gridDim.x;
   unsigned gid = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Local data
-  const double sigma_e = 2.4E-20;
-  const double sigma_a = 1.16E-21;
-  const double N_tot   = 2.76E20;
-  //const double clad_abs = 5.5;
-  //const int clad_num = 3;
   unsigned prism_i;
   unsigned sample_i = bid / blocks_per_sample;
   double sumRayDistance = 0.f;
@@ -80,7 +85,7 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
     // Sum up distance to check the result
     sumRayDistance += distance;
     // Calculate the gain (has to be done for every cycle ?) 
-    gain *= exp(N_tot * (betas[prism_i] * (sigma_e + sigma_a) - sigma_a) * distance);
+    gain *= exp(nTot * (betas[prism_i] * (sigmaE + sigmaA) - sigmaA) * distance);
     __syncthreads();
   }
   gain /= (absRayDistance * absRayDistance);
@@ -125,7 +130,19 @@ __global__ void ase_bruteforce_kernel(PrismCu* prisms, const unsigned max_prisms
  * finally just some postcalculations.
  *
  */
-float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *prisms, std::vector<double> *betas, std::vector<double> *ase, unsigned &threads, unsigned &blocks, unsigned &rays_total){
+float runAseBruteforceGpu(std::vector<PointCu> *samples, 
+			  std::vector<PrismCu> *prisms, 
+			  std::vector<double> *betas, 
+			  std::vector<double> *ase,
+			  float cladAbsorption,
+			  float cladNumber,
+			  float nTot,
+			  float sigmaA,
+			  float sigmaE,
+			  unsigned &threads, 
+			  unsigned &blocks, 
+			  unsigned &rays_total){
+
   PrismCu *h_prisms, *d_prisms;
   PointCu *h_samples, *d_samples;
   double *h_betas, *d_betas;
@@ -185,7 +202,7 @@ float runAseBruteforceGpu(std::vector<PointCu> *samples, std::vector<PrismCu> *p
 
   // Start kernel
   fprintf(stderr, "C Start GPU Raytracing\n");
-  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, devStates);
+  ase_bruteforce_kernel<<< blocks, threads >>>(d_prisms, prisms->size(), d_samples, blocks_per_sample, d_betas, cladAbsorption, cladNumber, nTot, sigmaA, sigmaE, devStates);
 
   // Copy data from device to host
   cudaEventRecord(stop, 0);
