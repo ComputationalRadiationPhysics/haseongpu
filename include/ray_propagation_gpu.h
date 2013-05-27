@@ -809,6 +809,17 @@ float runRayPropagationGpu(
 	   fprintf(stderr, "\n");
 	*/
 	   }
+	{
+		cudaFreeHost(hostBetaValues);
+		cudaFreeHost(hostXOfNormals);
+		cudaFreeHost(hostYOfNormals);
+		cudaFreeHost(hostCellTypes);
+		cudaFreeHost(hostTriangleIndices);
+		cudaFreeHost(hostForbidden);
+		cudaFreeHost(hostNeighbors);
+		cudaFreeHost(hostPositionsOfNormalVectors);
+		cudaFreeHost(hostPoints);
+	}
 	cudaDeviceReset();
 	return runtimeGpu;
 }
