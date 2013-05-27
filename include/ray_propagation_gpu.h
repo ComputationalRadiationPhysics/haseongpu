@@ -454,6 +454,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
 #endif
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
+	printf("K %d\n ",id);
 	double gain = 0.;
 	const int endPointX = p_in[point2D];
 	const int endPointY = p_in[ numberOfPoints + point2D];
@@ -470,8 +471,10 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	const int t2 = t_in[startTriangle+ numberOfTriangles];
 	const int t3 = t_in[startTriangle+2*numberOfTriangles];
 
+
 	// do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
 	for (int i=0; i<iterations ; ++i){
+		printf("K %d iteration %d/%d\n ",id,i,iterations);
 		// random startpoint generation
 		double u = curand_uniform(&globalState[blockIdx.x]);
 		double v = curand_uniform(&globalState[blockIdx.x]);
@@ -568,6 +571,7 @@ float runRayPropagationGpu(
 	
 	//
 	
+	fprintf(stderr, "\nConverting Vectors to Arrays\n");
 
 	double* hostBetaValues = doubleVectorToArray(betaValuesVector);
 	double* hostXOfNormals = doubleVectorToArray(xOfNormalsVector);
@@ -579,8 +583,14 @@ float runRayPropagationGpu(
 	int* hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectorsVector);
 	int* hostPoints = intVectorToArray(pointsVector);
 
+	
+	for(int i=0; i<30; ++i){
+		//fprintf(stderr, "\nHostPoints[%d] = %d\n",i,hostPoints[i]);
+	}
+
 
 	
+	fprintf(stderr, "\nCalculating optimal number of Rays\n");
 	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels+1)));
 	threads = 256;
 	blocks = 200;
@@ -596,6 +606,8 @@ float runRayPropagationGpu(
 	assert(raysPerSample == threads * blocks * iterations);
 #endif
 
+	fprintf(stderr, "(%d per Sample)\n",raysPerSample);
+	
 
 	/** Variables for the device
 	 * These are on-GPU representations of the input parameters
@@ -637,6 +649,7 @@ float runRayPropagationGpu(
 	 */
 	curandStateMtgp32 *devMTGPStates;
 	{
+		fprintf(stderr, "\nInitializing Mersenne Twister PRNG\n");
 		/**Allocate space for PRNG states on device */
 		CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
 
@@ -678,6 +691,7 @@ float runRayPropagationGpu(
 	 *
 	 */
 	{
+		fprintf(stderr, "\nFilling the device Variables\n");
 		//Create constant values on GPU
 		setupGlobalVariablesKernel<<<1,1>>>(hostSigmaE, hostSigmaA, hostCladNumber, hostCladAbsorption, hostNTot, hostNumberOfTriangles, hostThicknessOfPrism, hostNumberOfLevels, hostNumberOfPoints); //@OPTIMIZE: initialize the constants as constants...
 
@@ -742,17 +756,22 @@ float runRayPropagationGpu(
 		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
 			for(int level = 0; level <= hostNumberOfLevels; ++ level){
-				cudaThreadSynchronize();
+				fprintf(stderr, "\nSampling point %d/%d\n",(point2D+1)*(level+1),hostNumberOfPoints*hostNumberOfLevels);
+				//cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
 #else
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues);
 
+				fprintf(stderr, "Sampling point %d/%d done\n",point2D*level,hostNumberOfPoints*hostNumberOfLevels);
+				break;
 #endif
 			}
+			if(point2D==100) break;
 		}
 
-		cudaThreadSynchronize();
+		fprintf(stderr, "\nNaive Propagation done\n");
+		//cudaThreadSynchronize();
 	}
 
 	// Evaluate device data
