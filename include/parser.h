@@ -4,15 +4,15 @@
 #include <cstdlib> /* atof */
 #include <vector> 
 
-std::vector<double>* parse_beta_v(std::string root);
-std::vector<unsigned>* parse_cell_type(std::string root);
-std::vector<int>* parse_forbidden(std::string root);
-std::vector<int>* parse_neighbors(std::string root);
-std::vector<int>* parse_n_p(std::string root);
-std::vector<double>* parse_n_x(std::string root);
-std::vector<double>* parse_n_y(std::string root);
-std::vector<int>* parse_p_in(std::string root);
-std::vector<unsigned>* parse_t_in(std::string root);
+int parse_beta_v(std::string root, std::vector<double>* betas);
+int parse_cell_type(std::string root, std::vector<unsigned>* cell_types);
+int parse_forbidden(std::string root, std::vector<int>* forbidden);
+int parse_neighbors(std::string root, std::vector<int>* neighbors);
+int parse_n_p(std::string root, std::vector<int>* n_p);
+int parse_n_x(std::string root, std::vector<double>* );
+int parse_n_y(std::string root, std::vector<double>* );
+int parse_p_in(std::string root, std::vector<int>* );
+int parse_t_in(std::string root, std::vector<unsigned>* );
 float parse_clad_abs(std::string root);
 float parse_clad_num(std::string root);
 float parse_n_tot(std::string root);
@@ -22,38 +22,55 @@ unsigned parse_size_p(std::string root);
 unsigned parse_size_t(std::string root);
 unsigned parse_mesh_z(std::string root);
 
-int parse(std::string location){
+int parse(std::string location, 
+	  std::vector<double> * betas,
+	  std::vector<double> * n_x,
+	  std::vector<double> * n_y,
+	  std::vector<unsigned> * cell_types,
+	  std::vector<unsigned> * t_in,
+	  std::vector<int> * forbidden,
+	  std::vector<int> * neighbors,
+	  std::vector<int> * n_p,
+	  std::vector<int> * p_in,
+	  float *clad_abs,
+	  float *clad_num,
+	  float *n_tot,
+	  float *sigma_a,
+	  float *sigma_e,
+	  unsigned *size_p,
+	  unsigned *size_t,
+	  unsigned *mesh_z){
   
   if(location[location.size()-1] != '/')
     location.append("/");
 
-  std::vector<double> * betas = parse_beta_v(location);
-  std::vector<unsigned> * cell_types = parse_cell_type(location);
-  std::vector<int> * forbidden  = parse_forbidden(location);
-  std::vector<int> * neighbors  = parse_neighbors(location);
-  std::vector<int> * n_p = parse_n_p(location);
-  std::vector<double> * n_x = parse_n_x(location);
-  std::vector<double> * n_y = parse_n_y(location);
-  std::vector<int> * p_in = parse_p_in(location);
-  std::vector<unsigned> * t_in = parse_t_in(location);
+  // Parse every file for its own
+  parse_beta_v(location, betas);
+  parse_cell_type(location, cell_types);
+  parse_forbidden(location, forbidden);
+  parse_neighbors(location, neighbors);
+  parse_n_p(location, n_p);
+  parse_n_x(location, n_x);
+  parse_n_y(location, n_y);
+  parse_p_in(location, p_in);
+  parse_t_in(location, t_in);
   
-  float clad_abs = parse_clad_abs(location);
-  float clad_num = parse_clad_num(location);
-  float n_tot = parse_n_tot(location);
-  float sigma_a = parse_sigma_a(location);
-  float sigma_e = parse_sigma_e(location);
-  unsigned size_p = parse_size_p(location);
-  unsigned size_t = parse_size_t(location);
-  unsigned mesh_z = parse_mesh_z(location);
-  
+  (*clad_abs) = parse_clad_abs(location);
+  (*clad_num) = parse_clad_num(location);
+  (*n_tot) = parse_n_tot(location);
+  (*sigma_a) = parse_sigma_a(location);
+  (*sigma_e) = parse_sigma_e(location);
+  (*size_p) = parse_size_p(location);
+  (*size_t) = parse_size_t(location);
+  (*mesh_z) = parse_mesh_z(location);
+
   return 0;
 } 
 
 /* Parse beta_v.txt */
-std::vector<double>* parse_beta_v(std::string root){
+int parse_beta_v(std::string root, std::vector<double>* betas){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<double>* betas = new std::vector<double>();
   double number = 0;
   
   fileStream.open(root.append("beta_v.txt").c_str());
@@ -66,18 +83,17 @@ std::vector<double>* parse_beta_v(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return betas;
+  return 0;
 }
 
 /* Parse cell_type.txt */
-std::vector<unsigned>* parse_cell_type(std::string root){
+int parse_cell_type(std::string root, std::vector<unsigned>* cell_types){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<unsigned>* cell_types = new std::vector<unsigned>();
   unsigned number = 0;
   
   fileStream.open(root.append("cell_type.txt").c_str());
@@ -90,11 +106,11 @@ std::vector<unsigned>* parse_cell_type(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return cell_types;
+  return 0;
 
 }
 
@@ -113,8 +129,8 @@ float parse_clad_abs(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return  0;
   }
 
   return number;
@@ -137,7 +153,7 @@ float parse_clad_num(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
@@ -147,10 +163,9 @@ float parse_clad_num(std::string root){
 }
 
 /* Parse forbidden.txt */
-std::vector<int>* parse_forbidden(std::string root){
+int parse_forbidden(std::string root, std::vector<int>* forbidden){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<int>* forbidden = new std::vector<int>();
   unsigned number = 0;
   
   fileStream.open(root.append("forbidden.txt").c_str());
@@ -163,19 +178,18 @@ std::vector<int>* parse_forbidden(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return forbidden;
+  return 0;
 
 }
 
 /* Parse neighbors.txt */
-std::vector<int>* parse_neighbors(std::string root){
+int parse_neighbors(std::string root, std::vector<int>* neighbors){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<int>* neighbors = new std::vector<int>();
   unsigned number = 0;
   
   fileStream.open(root.append("neighbors.txt").c_str());
@@ -188,19 +202,18 @@ std::vector<int>* parse_neighbors(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return neighbors;
+  return 0;
 
 }
 
 /* Parse n_p.txt */
-std::vector<int>* parse_n_p(std::string root){
+int parse_n_p(std::string root, std::vector<int>* n_p){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<int>* n_p = new std::vector<int>();
   unsigned number = 0;
   
   fileStream.open(root.append("n_p.txt").c_str());
@@ -213,11 +226,11 @@ std::vector<int>* parse_n_p(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return n_p;
+  return 0;
 
 }
 
@@ -236,7 +249,7 @@ float parse_n_tot(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
@@ -246,10 +259,9 @@ float parse_n_tot(std::string root){
 }
 
 /* Parse n_x.txt */
-std::vector<double>* parse_n_x(std::string root){
+int parse_n_x(std::string root, std::vector<double>* n_x){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<double>* n_x = new std::vector<double>();
   double number = 0;
   
   fileStream.open(root.append("n_x.txt").c_str());
@@ -262,18 +274,17 @@ std::vector<double>* parse_n_x(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return n_x;
+  return 0;
 }
 
 /* Parse n_y.txt */
-std::vector<double>* parse_n_y(std::string root){
+int parse_n_y(std::string root, std::vector<double>* n_y){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<double>* n_y = new std::vector<double>();
   double number = 0;
   
   fileStream.open(root.append("n_y.txt").c_str());
@@ -286,18 +297,17 @@ std::vector<double>* parse_n_y(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return n_y;
+  return 0;
 }
 
 /* Parse p_in.txt */
-std::vector<int>* parse_p_in(std::string root){
+int parse_p_in(std::string root, std::vector<int>* p_in){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<int>* p_in = new std::vector<int>();
   unsigned number = 0;
   
   fileStream.open(root.append("p_in.txt").c_str());
@@ -310,11 +320,11 @@ std::vector<int>* parse_p_in(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return p_in;
+  return 0;
 
 }
 
@@ -333,7 +343,7 @@ float parse_sigma_a(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
@@ -357,7 +367,7 @@ float parse_sigma_e(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
@@ -381,7 +391,7 @@ unsigned parse_size_p(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
@@ -405,8 +415,8 @@ unsigned parse_size_t(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 0;
   }
 
   return number;
@@ -416,10 +426,9 @@ unsigned parse_size_t(std::string root){
 
 
 /* Parse t_in.txt */
-std::vector<unsigned>* parse_t_in(std::string root){
+int parse_t_in(std::string root, std::vector<unsigned>* t_in){
   std::string line;
   std::ifstream fileStream; 
-  std::vector<unsigned>* t_in = new std::vector<unsigned>();
   unsigned number = 0;
   
   fileStream.open(root.append("t_in.txt").c_str());
@@ -432,11 +441,11 @@ std::vector<unsigned>* parse_t_in(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
-    return NULL;
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    return 1;
   }
 
-  return t_in;
+  return 0;
 
 }
 
@@ -455,7 +464,7 @@ unsigned parse_mesh_z(std::string root){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s", root.c_str());
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
     return NULL;
   }
 
