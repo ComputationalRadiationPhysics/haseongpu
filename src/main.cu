@@ -100,7 +100,7 @@ int main(int argc, char **argv){
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-  raysTotal = (unsigned)pow(2,17);
+  //raysTotal = (unsigned)pow(2,17);
 
   // Run Experiment
   for(i=1; i < argc; ++i){
