@@ -21,6 +21,7 @@
 #include "testdata_transposed.h"
 #include "ray_propagation_gpu.h"
 #include "buildgrid.h"
+#include "parser.h"
 
 int main(int argc, char **argv){
   unsigned rays_total;
@@ -29,6 +30,27 @@ int main(int argc, char **argv){
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
+  
+  // Experimentdata
+  std::vector<double> * beta_v = new std::vector<double>;
+  std::vector<double> * n_x = new std::vector<double>;
+  std::vector<double> * n_y = new std::vector<double>;
+  std::vector<unsigned> * cell_types = new std::vector<unsigned>;
+  std::vector<unsigned> * t_in = new std::vector<unsigned>;
+  std::vector<int> * forbidden = new std::vector<int>;
+  std::vector<int> * neighbors = new std::vector<int>;
+  std::vector<int> * n_p = new std::vector<int>;
+  std::vector<int> * p_in = new std::vector<int>;
+  float clad_abs = 0;
+  float clad_num = 0;
+  float n_tot = 0;
+  float sigma_a = 0;
+  float sigma_e = 0;
+  unsigned size_p = 0;
+  unsigned numberOfTriangles = 0;
+  unsigned mesh_z = 0;
+  float z_mesh = 1;
+
   // Parse Commandline
   if(argc <= 1){
     fprintf(stderr, "C No commandline arguments found\n");
@@ -38,32 +60,50 @@ int main(int argc, char **argv){
     return 0;
   }
   
-  // Generate testdata
-  fprintf(stderr, "C Generate Testdata\n");
-  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(host_mesh_z, host_p_in, host_size_p, host_t_in, host_size_t, host_z_mesh);
-  std::vector<PointCu> *samples = generateSamplesFromTestdata(host_mesh_z, host_p_in, host_size_p);
-  std::vector<double>    *betas = generateBetasFromTestdata(host_beta_v, host_mesh_z * host_size_t);
-  std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-  rays_total = (unsigned)pow(2,17);
-
-  // Run 
+  // Parse number of rays
   unsigned i;
- for(i=1; i < argc; ++i){
+  for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--rays=", 6) == 0){
       const char* pos = strrchr(argv[i],'=');
       rays_total = atoi(pos+1);
     }
   }
 
- // Parse location of experiement .zip file
- for(i=1; i < argc; ++i){
-   if(strncmp(argv[i], "--experiment=", 12) == 0){
-     memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
-   } 
- }
- 
+  // Parse location of experiements
+  for(i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--experiment=", 12) == 0){
+      memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
+    } 
+  }
 
- for(i=1; i < argc; ++i){
+  if(parse(experimentLocation, beta_v, n_x, n_y, cell_types, t_in, forbidden, neighbors, n_p, p_in, &clad_abs, &clad_num, &n_tot, &sigma_a, &sigma_e, &size_p, &numberOfTriangles, &mesh_z)){
+    fprintf(stderr, "C Had problems while parsing experiment data\n");
+    return 1;
+  }
+  fprintf(stderr, "clad_abs: %f\n", clad_abs);
+  fprintf(stderr, "clad_num: %f\n", clad_num);
+  fprintf(stderr, "n_tot: %f\n", n_tot);
+  fprintf(stderr, "sigma_a: %e\n", sigma_a);
+  fprintf(stderr, "sigma_e: %e\n", sigma_e);
+  fprintf(stderr, "size_p: %d\n", size_p);
+  fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
+  fprintf(stderr, "mesh_z: %d\n", mesh_z);
+
+
+  fprintf(stderr, "cell types size: %d\n", cell_types->size());
+  fprintf(stderr, "p_in size: %d\n", p_in->size());
+  return 0;
+
+  // Generate testdata
+  fprintf(stderr, "C Generate Testdata\n");
+  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(mesh_z, p_in, size_p, t_in, numberOfTriangles, z_mesh);
+  std::vector<PointCu> *samples = generateSamplesFromTestdata(mesh_z, p_in, size_p);
+  std::vector<double>    *betas = generateBetasFromTestdata(beta_v, mesh_z * numberOfTriangles);
+  std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
+  rays_total = (unsigned)pow(2,17);
+
+  // Run Experiment
+  for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "bruteforce_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
