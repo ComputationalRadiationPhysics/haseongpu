@@ -18,7 +18,7 @@
 #include "geometry_gpu.h"
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
-#include "testdata_transposed.h"
+//#include "testdata_transposed.h"
 #include "ray_propagation_gpu.h"
 #include "buildgrid.h"
 #include "parser.h"

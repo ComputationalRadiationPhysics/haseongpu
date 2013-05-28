@@ -28,6 +28,8 @@
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
 
+
+
 //----------------------------------------------------
 // Device Code
 //----------------------------------------------------
@@ -56,8 +58,8 @@ __device__ int numberOfTriangles;
  */
 __device__ int selectTriangle(int id, int trianglesInOneLevel){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
-	int threadsPer2DTriangle = ceil( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
-	return id / threadsPer2DTriangle;
+	int threadsPer2DTriangle = floor( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
+	return min(id / threadsPer2DTriangle, trianglesInOneLevel);
 }
 
 /**
@@ -69,7 +71,7 @@ __device__ int selectTriangle(int id, int trianglesInOneLevel){
 __device__ int selectLevel(int id, int totalNumberOfLevels){
 	int totalNumberOfThreads = blockDim.x * gridDim.x;
 	int threadsPerLevel = ceil( float(totalNumberOfThreads) / float(totalNumberOfLevels) );
-	return id / threadsPerLevel;
+	return min(id / threadsPerLevel,totalNumberOfLevels-1);
 }
 
 /**
@@ -109,7 +111,8 @@ __device__ float rayPropagationGpu(
 		int *neighbors,
 		int *forbidden,
 		int* cellTypes,
-		double* betaValues){
+		double* betaValues,
+		int id){
 	//    no reflections
 	//
 	//    create the vector between both points and calculate which surface would be the shortest to reach.
@@ -143,7 +146,6 @@ __device__ float rayPropagationGpu(
 
 	// total distance to travel
 	distanceTotal = sqrt(fabs(vec_x*vec_x)+fabs(vec_y*vec_y)+fabs(vec_z*vec_z));
-	//printf("distanceTotal: %.40e\n",distanceTotal);
 	// normalized direction-vector
 	vec_x = vec_x/distanceTotal;
 	vec_y = vec_y/distanceTotal;
@@ -154,11 +156,13 @@ __device__ float rayPropagationGpu(
 
 	// at the beginning, all surfaces are possible
 	forb = -1;
+	int block=0;
+	//if(id==1)
+	//	printf("##################################################################################");
 	for(;;)
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
 		length = distanceRemaining;
-
 		//        definition for decider
 		//        0,1,2: int for the neighbors
 		//        3: hor plane up
@@ -171,7 +175,6 @@ __device__ float rayPropagationGpu(
 		
 		// forb describes the surface, from which the ray enters the prism.
 		// this surface is no suitable candidate, since the length would be 0!
-/*
 		if (forb != 0){
 			denominator = xOfNormals[tri]*vec_x + yOfNormals[tri]*vec_y;
 			// see if we intersect at all
@@ -279,7 +282,7 @@ __device__ float rayPropagationGpu(
 		else {
 			gain *= exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
-*/
+
 #if TEST_VALUES==true
 		testDistance += length;
 #endif
@@ -288,12 +291,15 @@ __device__ float rayPropagationGpu(
 		distanceRemaining -= length;
 
 
+//		if(id==2)
+	//	printf("length: %e     distanceRemaining: %e\n",length,distanceRemaining);
 		//printf("distanceRemaining: %.40e   %f \n",distanceRemaining);
-		distanceRemaining=0.0;
+		//distanceRemaining=0.0;
 		// if the distance between the destination and our current position is small enough, we are done
-		if (distanceRemaining < 10.0 ){
+		if (fabs(distanceRemaining) < SMALL){
 			break;
 		}
+		if(id>201) break;
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
 		yPos = yPos + length*vec_y;
@@ -305,9 +311,9 @@ __device__ float rayPropagationGpu(
 	}
 
 #if TEST_VALUES==true
-	assert(fabs(distanceTotal-testDistance) < 0.000001);
+	assert(fabs(distanceTotal-testDistance) < 0.01);
 #endif
-
+	
 	return gain/(distanceTotal*distanceTotal);
 }
 
@@ -462,8 +468,6 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 	//printf("K %d\n ",id);
 	double gain = 0.;
-	//TODO:REMOVE
-	gain=id;
 	const int endPointX = p_in[point2D];
 	const int endPointY = p_in[ numberOfPoints + point2D];
 	const int endPointZ = level* thicknessOfPrism;
@@ -474,6 +478,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	const int startTriangle = selectTriangle(id,host_size_t); 
 	const int startLevel = selectLevel(id, numberOfLevels);
 
+	if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
 	// the indices of the vertices of the starttriangle
 	const int t1 = t_in[startTriangle];
 	const int t2 = t_in[startTriangle+ numberOfTriangles];
@@ -499,12 +504,12 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ numberOfPoints + t1]*u + p_in[ numberOfPoints + t2]*v + p_in[ numberOfPoints + t3]*w;
-		printf("u: %.40e\n",p_in[numberOfPoints+t1]);
+		//printf("u: %.40e\n",p_in[numberOfPoints+t1]);
 		//printf("v: %.40e\n",p_in [ numberOfPoints + t2]*v);
 		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
 		//printf("yRand: %.40e\n",yRand);
 		__syncthreads();
-		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
+		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v,id));
 	}
 	
 
@@ -512,6 +517,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	// (gives better numeric behaviour)
 	
 	gain *=  beta_v[startTriangle + numberOfTriangles*startLevel];
+//	if(gain<0) printf("GAIN < 0! id=%d, gain=%e\n",id,gain);
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
@@ -766,7 +772,7 @@ float runRayPropagationGpu(
 		unsigned kernelcount=0;
 		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
-			for(int level = 0; level <= hostNumberOfLevels; ++level){
+			for(int level = 0; level < hostNumberOfLevels; ++level){
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
