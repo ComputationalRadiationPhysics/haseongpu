@@ -21,7 +21,7 @@ INCLUDES = include
 
 all: octrace
 
-bin/%.o: src/%.cu
+bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 
 octrace: $(OBJS) Makefile
