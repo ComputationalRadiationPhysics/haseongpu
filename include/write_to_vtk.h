@@ -3,7 +3,7 @@
 #include <vector> /* vector */
 
 
-int writeToVtk(std::vector<int>* points, 
+int writeToVtk(std::vector<double>* points, 
 	       unsigned numberOfPoints,  
 	       std::vector<unsigned>* triangleIndices, 
 	       unsigned numberOfTriangles, 
