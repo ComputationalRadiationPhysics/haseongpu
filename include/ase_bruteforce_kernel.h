@@ -1,9 +1,4 @@
-#include "geometry_gpu.h"
 #include "datatypes.h"
-#include "curand_kernel.h"
-#include "buildgrid.h"
-#include "filtergrid.h"
-#include "dynintset.h"
 
 #ifndef ASE_BRUTEFORCE_KERNEL_H
 #define ASE_BRUTEFORCE_KERNEL_H
