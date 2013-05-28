@@ -5,7 +5,7 @@ cd(folder)
 load(file)
 
 x=fopen("p_in.txt","w")
-fprintf(x,'%d\n',p)
+fprintf(x,'%.50f\n',p)
 fclose(x)
 
 x=fopen("n_x.txt","w")

@@ -31,6 +31,7 @@ int main(int argc, char **argv){
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
+  bool silent = false;
   
   // Experimentdata
   std::vector<double> * betaValues = new std::vector<double>;
@@ -74,6 +75,13 @@ int main(int argc, char **argv){
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--experiment=", 12) == 0){
       memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
+    } 
+  }
+
+  // check if we want no output
+  for(i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--silent", 7) == 0){
+		silent=true;
     } 
   }
 
@@ -157,7 +165,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Solutions\n");
   for(sample_i = 0; sample_i < ase->size(); ++sample_i){
     fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
-
+	if(silent){
+		if(sample_i >= 10) break;
+	}
   }
 
   // Print statistics
