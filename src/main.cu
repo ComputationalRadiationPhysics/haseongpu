@@ -22,6 +22,7 @@
 #include "ray_propagation_gpu.h"
 #include "buildgrid.h"
 #include "parser.h"
+#include "write_to_vtk.h"
 
 int main(int argc, char **argv){
   unsigned raysTotal;
@@ -40,7 +41,7 @@ int main(int argc, char **argv){
   std::vector<int> * forbidden = new std::vector<int>;
   std::vector<int> * neighbors = new std::vector<int>;
   std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
-  std::vector<int> * points = new std::vector<int>;
+  std::vector<double> * points = new std::vector<double>;
   float cladAbsorption = 0;
   float cladNumber = 0;
   float nTot = 0;
@@ -82,25 +83,21 @@ int main(int argc, char **argv){
   }
 
   // Debug
-  /*
-  fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
-  fprintf(stderr, "cladNumber: %f\n", cladNumber);
-  fprintf(stderr, "nTot: %e\n", nTot);
-  fprintf(stderr, "sigmaA: %e\n", sigmaA);
-  fprintf(stderr, "sigmaE: %e\n", sigmaE);
-  fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
-  fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
-  fprintf(stderr, "numberOfLevels: %d\n", numberOfLevels);
-  fprintf(stderr, "cell types size: %d\n", cell_types->size());
-  fprintf(stderr, "points size: %d\n", points->size());
-  */
+  // fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
+  // fprintf(stderr, "cladNumber: %f\n", cladNumber);
+  // fprintf(stderr, "nTot: %e\n", nTot);
+  // fprintf(stderr, "sigmaA: %e\n", sigmaA);
+  // fprintf(stderr, "sigmaE: %e\n", sigmaE);
+  // fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
+  // fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
+  // fprintf(stderr, "numberOfLevels: %d\n\n", numberOfLevels);
 
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-  //raysTotal = (unsigned)pow(2,17);
+
 
   // Run Experiment
   for(i=1; i < argc; ++i){
@@ -176,6 +173,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Runmode           : %s \n", runmode);
   fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
+
+  // Write experiment data to vtk
+  writeToVtk(points, numberOfPoints, triangleIndices, numberOfTriangles, numberOfLevels, ase);
 
   return 0;
 }
