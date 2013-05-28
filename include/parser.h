@@ -11,7 +11,7 @@ int parse_neighbors(std::string root, std::vector<int>* neighbors);
 int parse_n_p(std::string root, std::vector<int>* n_p);
 int parse_n_x(std::string root, std::vector<double>* );
 int parse_n_y(std::string root, std::vector<double>* );
-int parse_p_in(std::string root, std::vector<int>* );
+int parse_p_in(std::string root, std::vector<double>* );
 int parse_t_in(std::string root, std::vector<unsigned>* );
 float parse_clad_abs(std::string root);
 float parse_clad_num(std::string root);
@@ -31,7 +31,7 @@ int parse(std::string location,
 	  std::vector<int> * forbidden,
 	  std::vector<int> * neighbors,
 	  std::vector<int> * n_p,
-	  std::vector<int> * p_in,
+	  std::vector<double> * p_in,
 	  float *clad_abs,
 	  float *clad_num,
 	  float *n_tot,
@@ -169,7 +169,7 @@ float parse_clad_num(std::string root){
 int parse_forbidden(std::string root, std::vector<int>* forbidden){
   std::string line;
   std::ifstream fileStream; 
-  unsigned number = 0;
+  int number = 0;
   
   fileStream.open(root.append("forbidden.txt").c_str());
   if(fileStream.is_open()){
@@ -193,7 +193,7 @@ int parse_forbidden(std::string root, std::vector<int>* forbidden){
 int parse_neighbors(std::string root, std::vector<int>* neighbors){
   std::string line;
   std::ifstream fileStream; 
-  unsigned number = 0;
+  int number = 0;
   
   fileStream.open(root.append("neighbors.txt").c_str());
   if(fileStream.is_open()){
@@ -217,7 +217,7 @@ int parse_neighbors(std::string root, std::vector<int>* neighbors){
 int parse_n_p(std::string root, std::vector<int>* n_p){
   std::string line;
   std::ifstream fileStream; 
-  unsigned number = 0;
+  int number = 0;
   
   fileStream.open(root.append("n_p.txt").c_str());
   if(fileStream.is_open()){
@@ -308,16 +308,16 @@ int parse_n_y(std::string root, std::vector<double>* n_y){
 }
 
 /* Parse p_in.txt */
-int parse_p_in(std::string root, std::vector<int>* p_in){
+int parse_p_in(std::string root, std::vector<double>* p_in){
   std::string line;
   std::ifstream fileStream; 
-  unsigned number = 0;
+  double number = 0;
   
   fileStream.open(root.append("p_in.txt").c_str());
   if(fileStream.is_open()){
     while(fileStream.good()){
       std::getline(fileStream, line);
-      number = atoi(line.c_str());
+      number = atof(line.c_str());
       p_in->push_back(number);
     }
 
