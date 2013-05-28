@@ -1,4 +1,4 @@
-#include "ray_propagation_gpu.h"
+//#include "ray_propagation_gpu.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "math.h"
@@ -17,6 +17,14 @@
 #define DIVIDE_PI true
 #define SMALL 1E-06
 
+#define CUDA_CHECK_RETURN(value) {				\
+  cudaError_t _m_cudaStat = value;				\
+  if (_m_cudaStat != cudaSuccess) {				\
+    fprintf(stderr, "Error %s at line %d in file %s\n",	\
+    cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);	\
+    exit(1);							\
+  }								\
+}
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
@@ -25,7 +33,15 @@
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
 
-
+__device__ double cladAbsorption;
+__device__ double nTot;
+__device__ double sigmaE;
+__device__ double sigmaA;
+__device__ double thicknessOfPrism;
+__device__ int numberOfLevels;
+__device__ int cladNumber;
+__device__ int numberOfPoints;
+__device__ int numberOfTriangles;
 
 /**
  * @brief	select a triangle based on the global id and the total number of threads
@@ -846,4 +862,3 @@ float runRayPropagationGpu(
 	return runtimeGpu;
 }
 
-#endif
