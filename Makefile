@@ -25,7 +25,7 @@ bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 
 octrace: $(OBJS) Makefile
-	rm bin/link.o
+	if [ -f bin/link.o ]; then rm bin/link.o; fi;
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	g++ bin/*.o -o bin/octrace -lcudart
 
