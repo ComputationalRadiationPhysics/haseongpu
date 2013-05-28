@@ -15,7 +15,7 @@
 #include <cuda_runtime_api.h>
 //#include "testdata_transposed.h"
 
-#define TEST_VALUES true
+#define TEST_VALUES false
 #define USE_IMPORTANCE false
 #define DIVIDE_PI true
 #define SMALL 1E-06
@@ -137,10 +137,13 @@ __device__ float rayPropagationGpu(
 	vec_x = (xDestination - xPos);
 	vec_y = (yDestination - yPos);
 	vec_z = (zDestination - zPos);
+	//printf("vec_x: %.40e\n",vec_x);
+	//printf("vec_y: %.40e\n",vec_y);
+	//printf("vec_z: %.40e\n",vec_z);
 
 	// total distance to travel
-	distanceTotal = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
-
+	distanceTotal = sqrt(fabs(vec_x*vec_x)+fabs(vec_y*vec_y)+fabs(vec_z*vec_z));
+	//printf("distanceTotal: %.40e\n",distanceTotal);
 	// normalized direction-vector
 	vec_x = vec_x/distanceTotal;
 	vec_y = vec_y/distanceTotal;
@@ -151,7 +154,6 @@ __device__ float rayPropagationGpu(
 
 	// at the beginning, all surfaces are possible
 	forb = -1;
-
 	for(;;)
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
@@ -169,6 +171,7 @@ __device__ float rayPropagationGpu(
 		
 		// forb describes the surface, from which the ray enters the prism.
 		// this surface is no suitable candidate, since the length would be 0!
+/*
 		if (forb != 0){
 			denominator = xOfNormals[tri]*vec_x + yOfNormals[tri]*vec_y;
 			// see if we intersect at all
@@ -276,6 +279,7 @@ __device__ float rayPropagationGpu(
 		else {
 			gain *= exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
+*/
 #if TEST_VALUES==true
 		testDistance += length;
 #endif
@@ -284,10 +288,12 @@ __device__ float rayPropagationGpu(
 		distanceRemaining -= length;
 
 
+		//printf("distanceRemaining: %.40e   %f \n",distanceRemaining);
+		distanceRemaining=0.0;
 		// if the distance between the destination and our current position is small enough, we are done
-		if (fabs(distanceRemaining)< SMALL)
+		if (distanceRemaining < 10.0 ){
 			break;
-
+		}
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
 		yPos = yPos + length*vec_y;
@@ -454,8 +460,10 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
 #endif
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
-	printf("K %d\n ",id);
+	//printf("K %d\n ",id);
 	double gain = 0.;
+	//TODO:REMOVE
+	gain=id;
 	const int endPointX = p_in[point2D];
 	const int endPointY = p_in[ numberOfPoints + point2D];
 	const int endPointZ = level* thicknessOfPrism;
@@ -472,9 +480,9 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	const int t3 = t_in[startTriangle+2*numberOfTriangles];
 
 
+	
 	// do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
 	for (int i=0; i<iterations ; ++i){
-		printf("K %d iteration %d/%d\n ",id,i,iterations);
 		// random startpoint generation
 		double u = curand_uniform(&globalState[blockIdx.x]);
 		double v = curand_uniform(&globalState[blockIdx.x]);
@@ -491,18 +499,25 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ numberOfPoints + t1]*u + p_in[ numberOfPoints + t2]*v + p_in[ numberOfPoints + t3]*w;
+		printf("u: %.40e\n",p_in[numberOfPoints+t1]);
+		//printf("v: %.40e\n",p_in [ numberOfPoints + t2]*v);
+		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
+		//printf("yRand: %.40e\n",yRand);
 		__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
+	
 
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
+	
 	gain *=  beta_v[startTriangle + numberOfTriangles*startLevel];
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain)); 
 #endif
+	return;
 }
 
 double* doubleVectorToArray(std::vector<double> *input){
@@ -546,7 +561,7 @@ float runRayPropagationGpu(
 		std::vector<int> *forbiddenVector,
 		std::vector<int> *neighborsVector,
 		std::vector<int> *positionsOfNormalVectorsVector,
-		std::vector<int> *pointsVector,
+		std::vector<double> *pointsVector,
 		float hostCladAbsorption,
 		float hostCladNumber,
 		float hostNTot,
@@ -581,13 +596,7 @@ float runRayPropagationGpu(
 	int* hostForbidden = intVectorToArray(forbiddenVector);
 	int* hostNeighbors = intVectorToArray(neighborsVector);
 	int* hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectorsVector);
-	int* hostPoints = intVectorToArray(pointsVector);
-
-	
-	for(int i=0; i<30; ++i){
-		//fprintf(stderr, "\nHostPoints[%d] = %d\n",i,hostPoints[i]);
-	}
-
+	double* hostPoints = doubleVectorToArray(pointsVector);
 
 	
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
@@ -696,6 +705,7 @@ float runRayPropagationGpu(
 		setupGlobalVariablesKernel<<<1,1>>>(hostSigmaE, hostSigmaA, hostCladNumber, hostCladAbsorption, hostNTot, hostNumberOfTriangles, hostThicknessOfPrism, hostNumberOfLevels, hostNumberOfPoints); //@OPTIMIZE: initialize the constants as constants...
 
 		cudaThreadSynchronize();
+		testKernel<<<1,1>>>();
 
 		// Memory allocation on device
 		CUDA_CHECK_RETURN(cudaMalloc(&points, 2 * hostNumberOfPoints * sizeof(double)));
@@ -753,38 +763,43 @@ float runRayPropagationGpu(
 		fprintf(stderr, "\nStarting the Naive Propagation\n");
 		cudaEventRecord(start, 0);
 
+		unsigned kernelcount=0;
 		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
-			for(int level = 0; level <= hostNumberOfLevels; ++ level){
-				fprintf(stderr, "\nSampling point %d/%d\n",(point2D+1)*(level+1),hostNumberOfPoints*hostNumberOfLevels);
-				//cudaThreadSynchronize();
+			for(int level = 0; level <= hostNumberOfLevels; ++level){
+				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
 #else
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues);
 
-				fprintf(stderr, "Sampling point %d/%d done\n",point2D*level,hostNumberOfPoints*hostNumberOfLevels);
-				break;
+				fprintf(stderr, "Sampling point %d done\n",kernelcount);
+				kernelcount++;
 #endif
 			}
-			if(point2D==100) break;
 		}
 
 		fprintf(stderr, "\nNaive Propagation done\n");
-		//cudaThreadSynchronize();
+		cudaThreadSynchronize();
 	}
+
 
 	// Evaluate device data
 	{
+		fprintf(stderr, "\nStopping the Timer\n");
 		cudaEventRecord(stop, 0);
+		fprintf(stderr, "\n1\n");
 		cudaEventSynchronize(stop);
+		fprintf(stderr, "\n2\n");
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
+		fprintf(stderr, "\nRetrieving ASE Data\n");
 
 		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
 #if USE_IMPORTANCE==true
 		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(double), cudaMemcpyDeviceToHost));
 		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
+		fprintf(stderr, "done\n");
 		for(int i=0; i< hostNumberOfPoints*(hostNumberOfLevels+1); ++i){
 			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
 #if DIVIDE_PI==true
@@ -793,7 +808,9 @@ float runRayPropagationGpu(
 			ase->at(i) = (double(double(hostPhi[i]) / raysPerSample));
 #endif
 		}
+		fprintf(stderr, "\nValues in Vector\n");
 	}
+		fprintf(stderr, "\nFreeing Memory\n");
 
 	// Free memory on device
 	{
@@ -839,6 +856,7 @@ float runRayPropagationGpu(
 		cudaFreeHost(hostPositionsOfNormalVectors);
 		cudaFreeHost(hostPoints);
 	}
+		fprintf(stderr, "done\n");
 	cudaDeviceReset();
 	return runtimeGpu;
 }
