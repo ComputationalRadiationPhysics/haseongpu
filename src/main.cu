@@ -185,7 +185,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data to vtk
-  writeToVtk(points, numberOfPoints, triangleIndices, numberOfTriangles, numberOfLevels, ase);
+  writeToVtk(points, numberOfPoints, triangleIndices, numberOfTriangles, numberOfLevels, thicknessOfPrism, ase);
 
   return 0;
 }
