@@ -7,7 +7,8 @@ int writeToVtk(std::vector<double>* points,
 	       unsigned numberOfPoints,  
 	       std::vector<unsigned>* triangleIndices, 
 	       unsigned numberOfTriangles, 
-	       unsigned numberOfLevels, 
+	       unsigned numberOfLevels,
+	       float thicknessOfPrism,
 	       std::vector<double>* ase){
 
   std::cerr << "C Write experiment data to vtk-file" << std::endl;
@@ -24,7 +25,7 @@ int writeToVtk(std::vector<double>* points,
   vtkFile << "POINTS " << points->size() <<  " float" << std::endl;
   for(unsigned level_i=0; level_i <= numberOfLevels; ++level_i){
     for(unsigned point_i=0; point_i < numberOfPoints; ++point_i){
-      vtkFile << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i << std::endl;
+      vtkFile << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i * thicknessOfPrism << std::endl;
 
     }
 
@@ -34,7 +35,7 @@ int writeToVtk(std::vector<double>* points,
   vtkFile << "CELLS" << " " << (numberOfLevels-1) * numberOfTriangles << " " << (numberOfLevels-1) * numberOfTriangles * 7 << std::endl;
   for(unsigned level_i=0; level_i < numberOfLevels; ++level_i){
     for(unsigned triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-      vtkFile << level_i * numberOfPoints + triangleIndices->at(triangle_i) << " "
+      vtkFile << "6 " << level_i * numberOfPoints + triangleIndices->at(triangle_i) << " "
 	      << level_i * numberOfPoints + triangleIndices->at(numberOfTriangles + triangle_i) << " "
 	      << level_i * numberOfPoints + triangleIndices->at(2 * numberOfTriangles + triangle_i) << " "
 	      << level_i+1 * numberOfPoints + triangleIndices->at(triangle_i) << " "

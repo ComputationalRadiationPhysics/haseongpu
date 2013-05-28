@@ -70,7 +70,7 @@ std::vector<PointCu> *generateSamplesFromTestdata(unsigned levels, std::vector<d
   unsigned level_i;
   unsigned point_i; 
 
-  for(level_i = 0; level_i <= levels; ++level_i){
+  for(level_i = 0; level_i < levels; ++level_i){
     for(point_i = 0; point_i < numPoints; ++point_i){
       PointCu point = {
   	points->at(point_i),
@@ -88,7 +88,7 @@ std::vector<PrismCu> *generatePrismsFromTestdata(unsigned levels, std::vector<do
   std::vector<PrismCu> *prisms = new std::vector<PrismCu>;
   unsigned triangle_i;
   unsigned level_i;
-  for(level_i = 0; level_i < levels; ++level_i){
+  for(level_i = 0; level_i < levels-1; ++level_i){
     for(triangle_i = 0; triangle_i < numTriangles; ++triangle_i){
       unsigned a = triangles->at(triangle_i);
       unsigned b = triangles->at(numTriangles + triangle_i);
