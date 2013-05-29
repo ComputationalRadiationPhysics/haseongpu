@@ -153,7 +153,6 @@ __device__ float rayPropagationGpu(
 
 	// at the beginning, all surfaces are possible
 	forb = -1;
-	int block=0;
 	for(;;)
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
@@ -294,7 +293,7 @@ __device__ float rayPropagationGpu(
 		if (fabs(distanceRemaining) < SMALL){
 			break;
 		}
-		if(id>201) break;
+		if(id > 9000) break;
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
 		yPos = yPos + length*vec_y;
@@ -473,7 +472,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	const int startTriangle = selectTriangle(id,host_size_t); 
 	const int startLevel = selectLevel(id, numberOfLevels);
 
-	if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
+	//if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
 	// the indices of the vertices of the starttriangle
 	const int t1 = t_in[startTriangle];
 	const int t2 = t_in[startTriangle+ numberOfTriangles];
@@ -503,7 +502,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		//printf("v: %.40e\n",p_in [ numberOfPoints + t2]*v);
 		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
 		//printf("yRand: %.40e\n",yRand);
-		__syncthreads();
+		//__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v,id));
 	}
 	
@@ -601,14 +600,14 @@ float runRayPropagationGpu(
 
 	
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
-	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels+1)));
+	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels)));
 	threads = 256;
 	blocks = 200;
 	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "interations=%d\n",iterations);
 	raysPerSample = threads * blocks * iterations;
-	totalNumberOfRays = unsigned(raysPerSample * (hostNumberOfPoints * (hostNumberOfLevels+1)));
+	totalNumberOfRays = unsigned(raysPerSample * (hostNumberOfPoints * (hostNumberOfLevels)));
 	//fprintf(stderr, "After Normalization:\n");
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
@@ -643,11 +642,13 @@ float runRayPropagationGpu(
 	 * \var hostPhi will contain the ASE-Flux integral (not normalized)
 	 */
 	float runtimeGpu = 0.0;
+	fprintf(stderr, "Initializing Timer\n");
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-	float hostPhi[hostNumberOfPoints * (hostNumberOfLevels +1)];
-	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels+1);++i){
+	fprintf(stderr, "Initializing ASE-Values with 0\n");
+	float hostPhi[hostNumberOfPoints * (hostNumberOfLevels)];
+	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels);++i){
 			hostPhi[i] = 0.;
 	}
 
@@ -685,9 +686,9 @@ float runRayPropagationGpu(
 	curandState *devStates;
 	int *N_rays, *surface;
 	double *center_x, *center_y, *importance;
-	double host_importance[hostNumberOfPoints * (hostNumberOfLevels+1)];
+	double host_importance[hostNumberOfPoints * (hostNumberOfLevels)];
 	int host_N_rays[hostNumberOfTriangles * hostNumberOfLevels];
-	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels+1);++i){
+	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels);++i){
 		host_importance[i] = 0.;
 	}
 	for(int i=0;i<hostNumberOfTriangles*hostNumberOfLevels;++i){
@@ -718,13 +719,13 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMalloc(&triangleIndices, 3* hostNumberOfTriangles * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&cellTypes,hostNumberOfTriangles * hostNumberOfLevels * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&betaValues,hostNumberOfTriangles * hostNumberOfLevels * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&phi,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(float)));
+		CUDA_CHECK_RETURN(cudaMalloc(&phi,hostNumberOfPoints * (hostNumberOfLevels) * sizeof(float)));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
-		CUDA_CHECK_RETURN(cudaMalloc(&importance,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&importance,hostNumberOfPoints * (hostNumberOfLevels) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&center_x,hostNumberOfTriangles * (hostNumberOfLevels) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&center_y,hostNumberOfTriangles * (hostNumberOfLevels) * sizeof(double)));
-		CUDA_CHECK_RETURN(cudaMalloc(&N_rays,hostNumberOfPoints * (hostNumberOfLevels +1) * sizeof(int)));
+		CUDA_CHECK_RETURN(cudaMalloc(&N_rays,hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&surface,hostNumberOfPoints * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&devStates, iterations * threads * blocks * sizeof(curandState)));
 
@@ -740,13 +741,13 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMemcpy(triangleIndices ,hostTriangleIndices, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(cellTypes,hostCellTypes, hostNumberOfTriangles *  hostNumberOfLevels * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(betaValues, hostBetaValues, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(float), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(float), cudaMemcpyHostToDevice));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
-		CUDA_CHECK_RETURN(cudaMemcpy(importance, host_importance, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(importance, host_importance, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(center_x, host_center_x, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(center_y, host_center_y, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(N_rays, host_N_rays, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(N_rays, host_N_rays, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(surface, host_surface, hostNumberOfPoints * sizeof(int), cudaMemcpyHostToDevice));
 #endif
 	}
@@ -766,8 +767,10 @@ float runRayPropagationGpu(
 
 		unsigned kernelcount=0;
 		// start a new kernel for every(!) sample point of our mesh
-		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
-			for(int level = 0; level < hostNumberOfLevels; ++level){
+		//for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
+		//	for(int level = 0; level < hostNumberOfLevels; ++level){
+		int point2D=0;
+		int level=0;
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
@@ -777,8 +780,8 @@ float runRayPropagationGpu(
 				fprintf(stderr, "Sampling point %d done\n",kernelcount);
 				kernelcount++;
 #endif
-			}
-		}
+		//	}
+		//}
 
 		fprintf(stderr, "\nNaive Propagation done\n");
 		cudaThreadSynchronize();
@@ -795,13 +798,13 @@ float runRayPropagationGpu(
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
 		fprintf(stderr, "\nRetrieving ASE Data\n");
 
-		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
 #if USE_IMPORTANCE==true
-		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(double), cudaMemcpyDeviceToHost));
-		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels+1) * sizeof(int), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(double), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
 		fprintf(stderr, "done\n");
-		for(int i=0; i< hostNumberOfPoints*(hostNumberOfLevels+1); ++i){
+		for(int i=0; i< hostNumberOfPoints*(hostNumberOfLevels); ++i){
 			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
 #if DIVIDE_PI==true
 			ase->at(i) = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
