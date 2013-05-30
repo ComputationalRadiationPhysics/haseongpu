@@ -153,6 +153,7 @@ __device__ float rayPropagationGpu(
 
 	// at the beginning, all surfaces are possible
 	forb = -1;
+	int loopbreaker=0;
 	for(;;)
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
@@ -293,7 +294,12 @@ __device__ float rayPropagationGpu(
 		if (fabs(distanceRemaining) < SMALL){
 			break;
 		}
-		if(id > 9000) break;
+		if(loopbreaker>600){
+			break;
+		}else{
+			loopbreaker++;
+		}
+		//if(id > 100) break;
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
 		yPos = yPos + length*vec_y;

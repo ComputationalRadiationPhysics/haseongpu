@@ -1,6 +1,7 @@
 #include <iostream> /* cerr */
 #include <fstream> /* ofstream */
 #include <vector> /* vector */
+#include <iomanip> /* std::setprecision() */
 
 
 int writeToVtk(std::vector<double>* points, 
@@ -22,7 +23,7 @@ int writeToVtk(std::vector<double>* points,
 
   // Write point data
   vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
-  vtkFile << "POINTS " << (points->size())*(numberOfLevels->size()) <<  " float" << std::endl;
+  vtkFile << "POINTS " << (points->size())*numberOfLevels <<  " float" << std::endl;
   for(unsigned level_i=0; level_i < numberOfLevels; ++level_i){
     for(unsigned point_i=0; point_i < numberOfPoints; ++point_i){
       vtkFile << std::fixed << std::setprecision(6) << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i * thicknessOfPrism << std::endl;
@@ -33,7 +34,7 @@ int writeToVtk(std::vector<double>* points,
 
   // Write prism data
   vtkFile << "CELLS" << " " << (numberOfLevels-1) * numberOfTriangles << " " << (numberOfLevels-1) * numberOfTriangles * 7 << std::endl;
-  for(unsigned level_i=0; level_i < i(numberOfLevels-1); ++level_i){
+  for(unsigned level_i=0; level_i < (numberOfLevels-1); ++level_i){
     for(unsigned triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
       vtkFile << "6 " 
 		  << level_i * numberOfPoints + triangleIndices->at(triangle_i) << " "
