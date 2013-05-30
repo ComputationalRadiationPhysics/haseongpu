@@ -34,7 +34,7 @@ fclose(x)
 
 % thickness of one slice!
 x=fopen("z_mesh.txt","w")
-fprintf(x,'%f.20\n',z_mesh)
+fprintf(x,'%.50f\n',z_mesh)
 fclose(x)
 
 % number of slices
@@ -62,7 +62,7 @@ fprintf(x,'3\n')
 fclose(x)
 
 x=fopen("n_tot.txt","w")
-fprintf(x,'%f\n',N_tot)
+fprintf(x,'%.50f\n',N_tot)
 fclose(x)
 
 x=fopen("beta_v.txt","w")
@@ -103,4 +103,4 @@ fclose(x)
 %fprintf(x,'%.50f\n',y_center)
 %fclose(x)
 
-endfunction
+end 
