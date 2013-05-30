@@ -23,7 +23,7 @@ int writeToVtk(std::vector<double>* points,
 
   // Write point data
   vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
-  vtkFile << "POINTS " << (points->size())*numberOfLevels <<  " float" << std::endl;
+  vtkFile << "POINTS " << numberOfPoints*numberOfLevels <<  " float" << std::endl;
   for(unsigned level_i=0; level_i < numberOfLevels; ++level_i){
     for(unsigned point_i=0; point_i < numberOfPoints; ++point_i){
       vtkFile << std::fixed << std::setprecision(6) << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i * thicknessOfPrism << std::endl;
