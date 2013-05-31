@@ -37,6 +37,7 @@ int parse(std::string location,
 	  float *n_tot,
 	  float *sigma_a,
 	  float *sigma_e,
+	  float *z_mesh,
 	  unsigned *size_p,
 	  unsigned *size_t,
 	  unsigned *mesh_z){
@@ -505,6 +506,32 @@ unsigned parse_mesh_z(std::string root){
     fprintf(stderr, "Can't open file %s \n", root.c_str());
     fileStream.close();
     return 0;
+  }
+
+  fileStream.close();
+  return number;
+
+
+}
+
+/* Parse z_mesh.txt */
+float parse_z_mesh(std::string root){
+  std::string line;
+  std::ifstream fileStream; 
+  float number = 0;
+  
+  fileStream.open(root.append("z_mesh.txt").c_str());
+  if(fileStream.is_open()){
+    if(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 0.0;
   }
 
   fileStream.close();

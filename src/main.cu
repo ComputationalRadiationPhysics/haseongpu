@@ -85,7 +85,7 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
