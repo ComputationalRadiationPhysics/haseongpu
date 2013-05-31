@@ -18,6 +18,7 @@ float parse_clad_num(std::string root);
 float parse_n_tot(std::string root);
 float parse_sigma_a(std::string root);
 float parse_sigma_e(std::string root);
+float parse_z_mesh(std::string root);
 unsigned parse_size_p(std::string root);
 unsigned parse_size_t(std::string root);
 unsigned parse_mesh_z(std::string root);
@@ -67,8 +68,9 @@ int parse(std::string location,
   (*size_p) = parse_size_p(location);
   (*size_t) = parse_size_t(location);
   (*mesh_z) = parse_mesh_z(location);
+  (*z_mesh) = parse_z_mesh(location);
 
-  if(!((*clad_abs) && *(clad_num)  && (*n_tot) && (*sigma_a) && *(sigma_e) && (*size_p) && (*size_t) && (*mesh_z)))
+  if(!((*clad_abs) && *(clad_num)  && (*n_tot) && (*sigma_a) && *(sigma_e) && (*size_p) && (*size_t) && (*mesh_z) && (*z_mesh)))
     return 1;
 
   return 0;

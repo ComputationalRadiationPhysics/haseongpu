@@ -56,7 +56,7 @@ int writeToVtk(std::vector<double>* points,
 
   // Write ase phi
   vtkFile << "POINT_DATA " << numberOfLevels * numberOfPoints << std::endl;
-  vtkFile << "SCALARS scalars float 1 " << std::endl;
+  vtkFile << "SCALARS scalars float 1" << std::endl;
   vtkFile << "LOOKUP_TABLE default" << std::endl;
 
   for(unsigned ase_i=0; ase_i < numberOfLevels * numberOfPoints; ++ase_i){
