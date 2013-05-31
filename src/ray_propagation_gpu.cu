@@ -12,7 +12,7 @@
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
 
-#define TEST_VALUES false
+#define TEST_VALUES true
 #define USE_IMPORTANCE false
 #define DIVIDE_PI true
 #define SMALL 1E-06
@@ -178,7 +178,7 @@ __device__ float rayPropagationGpu(
 				nominator = (xOfNormals[tri]*points[positionsOfNormalVectors[tri]] + yOfNormals[tri]*points[positionsOfNormalVectors[tri]+ numberOfPoints]) - (xOfNormals[tri]*xPos + yOfNormals[tri]*yPos);
 				lengthHelp = nominator/denominator;
 				// if we found a new smallest length, use it
-				if (lengthHelp < length && lengthHelp > 0.0)
+				if (lengthHelp < length && lengthHelp > SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[tri]);	
@@ -198,7 +198,7 @@ __device__ float rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > 0.0)
+				if (lengthHelp < length && lengthHelp > SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
@@ -216,7 +216,7 @@ __device__ float rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > 0.0)
+				if (lengthHelp < length && lengthHelp > SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
@@ -233,7 +233,7 @@ __device__ float rayPropagationGpu(
 				{
 					nominator = (cell_z+1)* thicknessOfPrism - zPos;
 					lengthHelp = nominator/denominator;
-					if (lengthHelp < length && lengthHelp > 0.0)
+					if (lengthHelp < length && lengthHelp > SMALL)
 					{
 						length = lengthHelp;
 						//decider = 3;
@@ -278,12 +278,11 @@ __device__ float rayPropagationGpu(
 			gain *= exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
 
-#if TEST_VALUES==true
-		testDistance += length;
-#endif
 
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
+		
+
 
 
 //		if(id==2)
@@ -294,11 +293,15 @@ __device__ float rayPropagationGpu(
 		if (fabs(distanceRemaining) < SMALL){
 			break;
 		}
-		if(loopbreaker>600){
-			break;
+#if TEST_VALUES==true
+		testDistance += length;
+		if(loopbreaker>500){
+			printf("Loopbreaker reached. firstTriangle: %d, level: %d, id: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,id,length,distanceTotal,testDistance,distanceRemaining);
+			return 0.;
 		}else{
 			loopbreaker++;
 		}
+#endif
 		//if(id > 100) break;
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
@@ -439,10 +442,13 @@ __global__ void importanceKernel( curandState *globalState, double *p_in, double
  * Is only used for testing
  */
 __global__ void testKernel (  ){
-	printf("\nSigma_e=%.30f",sigmaE);
-	printf("\nSigma_a=%.30f",sigmaA);
-	printf("\nmesh_z=%d",numberOfLevels);
-	printf("\nz_mesh_=%.30f",thicknessOfPrism);
+	printf("\nSigmaE=%.6e",sigmaE);
+	printf("\nSigmaA=%.6e",sigmaA);
+	printf("\nNumberOfLevels=%d",numberOfLevels);
+	printf("\nNumberOfPoints=%d",numberOfPoints);
+	printf("\nthicknessOfPrism_=%.6e",thicknessOfPrism);
+	printf("\nnumberOfTriangles=%d",numberOfTriangles);
+	printf("\nnTot=%.6e",nTot);
 } 
 
 
@@ -508,7 +514,7 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 		//printf("v: %.40e\n",p_in [ numberOfPoints + t2]*v);
 		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
 		//printf("yRand: %.40e\n",yRand);
-		//__syncthreads();
+		__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v,id));
 	}
 	
@@ -773,10 +779,10 @@ float runRayPropagationGpu(
 
 		unsigned kernelcount=0;
 		// start a new kernel for every(!) sample point of our mesh
-		//for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
-		//	for(int level = 0; level < hostNumberOfLevels; ++level){
-		int point2D=0;
-		int level=0;
+		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
+			for(int level = 0; level < hostNumberOfLevels; ++level){
+		//int point2D=0;
+		//int level=0;
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
@@ -786,8 +792,8 @@ float runRayPropagationGpu(
 				fprintf(stderr, "Sampling point %d done\n",kernelcount);
 				kernelcount++;
 #endif
-		//	}
-		//}
+			}
+		}
 
 		fprintf(stderr, "\nNaive Propagation done\n");
 		cudaThreadSynchronize();
