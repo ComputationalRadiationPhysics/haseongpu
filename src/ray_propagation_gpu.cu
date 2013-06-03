@@ -14,7 +14,7 @@
 
 #define TEST_VALUES true
 #define USE_IMPORTANCE false
-#define DIVIDE_PI false
+#define DIVIDE_PI true
 #define SMALL 1E-06
 #define VERY_SMALL 1E-15
 
@@ -276,10 +276,7 @@ __device__ float rayPropagationGpu(
 			gain *= exp((-1)*(cladAbsorption * length));
 		}
 		else {
-
-			float oldgain = gain;
-			float multiplicator = (float) exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
-			gain *= multiplicator;
+			gain *= (float) exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
 
 
@@ -324,7 +321,7 @@ __device__ float rayPropagationGpu(
 #endif
 	
 	gain /=(distanceTotal*distanceTotal);
-	if(gain < 0) printf("Gain < 0 in propagation!");
+	//if(gain < 0) printf("Gain < 0 in propagation!");
 	return gain;
 }
 
@@ -511,12 +508,13 @@ __global__ void raytraceStep(
 	// this should give the same start values multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
 
-	//TODO: replace with prism-based selection!!
-	//const int startTriangle = selectTriangle(id,host_size_t); 
-	//const int startLevel = selectLevel(id, numberOfLevels);
+//	const int startTriangle = selectTriangle(id,host_size_t); 
+//	const int startLevel = selectLevel(id, numberOfLevels);
 	const unsigned startPrism = id/threadsPerPrism;
-	const int startTriangle = startPrism/(numberOfLevels-1);
-	const int startLevel = (int) ceil(float(startPrism)/float(startTriangle+1));
+	const int startLevel = (startPrism)/numberOfTriangles;
+//	const int startTriangle = startPrism/(startLevel+1);
+	const int startTriangle=(startPrism-(numberOfTriangles*startLevel));
+	//const int startLevel = (int) ceil(float(startPrism)/float(startTriangle+1));
 
 	//if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
 	// the indices of the vertices of the starttriangle
@@ -562,8 +560,8 @@ __global__ void raytraceStep(
 	double oldgain =gain;
 	double multiplicator = beta_v[startTriangle + numberOfTriangles*startLevel];
 	gain *= multiplicator;
-	if(point2D==0 && level==0)
-	if(multiplicator<0 ) printf("multi < 0!,pos2 id=%d, gain=%e, starttriangle=%d, startlevel=%d\n",id,gain,startTriangle,startLevel);
+	//if(point2D==0 && level==0)
+	//if(multiplicator<0 ) printf("multi < 0!,pos2 id=%d, gain=%e, starttriangle=%d, startlevel=%d\n",id,gain,startTriangle,startLevel);
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
@@ -652,21 +650,20 @@ float runRayPropagationGpu(
 
 	
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
-	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels)));
 	threads = 256;
 	blocks = 200;
-	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
-	iterations = 10;
+	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels)));
+	unsigned hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
+	unsigned hostThreadsPerPrism = threads*blocks/hostNumberOfPrisms; //9
+	unsigned raysPerIterationPerSample = hostThreadsPerPrism*hostNumberOfPrisms; //48600
+	int iterations = ceil(float(raysPerSample) / raysPerIterationPerSample);
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "interations=%d\n",iterations);
-	raysPerSample = threads * blocks * iterations;
+	raysPerSample = raysPerIterationPerSample * iterations;
 	totalNumberOfRays = unsigned(raysPerSample * (hostNumberOfPoints * (hostNumberOfLevels)));
 	//fprintf(stderr, "After Normalization:\n");
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "totalNumberOfRays=%d\n",totalNumberOfRays);
-#if TEST_VALUES==true
-	assert(raysPerSample == threads * blocks * iterations);
-#endif
 
 	fprintf(stderr, "(%d per Sample)\n",raysPerSample);
 	
@@ -822,8 +819,6 @@ float runRayPropagationGpu(
 		// start a new kernel for every(!) sample point of our mesh
 		for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
 			for(int level = 0; level < hostNumberOfLevels; ++level){
-		//int point2D=0;
-		//int level=0;
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
