@@ -495,6 +495,12 @@ __global__ void raytraceStep(
 		double* beta_v) {
 #endif
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
+	unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
+	unsigned threadsPerPrism = blockDim.x * gridDim.x/numberOfPrisms; //9
+	// break, if we have more threads than we need
+	if(id >= threadsPerPrism*numberOfPrisms) // id >= 48600
+		return;
+
 	//printf("K %d\n ",id);
 	double gain = 0.;
 	const int endPointX = p_in[point2D];
@@ -504,8 +510,13 @@ __global__ void raytraceStep(
 
 	// this should give the same start values multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	const int startTriangle = selectTriangle(id,host_size_t); 
-	const int startLevel = selectLevel(id, numberOfLevels);
+
+	//TODO: replace with prism-based selection!!
+	//const int startTriangle = selectTriangle(id,host_size_t); 
+	//const int startLevel = selectLevel(id, numberOfLevels);
+	const unsigned startPrism = id/threadsPerPrism;
+	const int startTriangle = startPrism/(numberOfLevels-1);
+	const int startLevel = (int) ceil(float(startPrism)/float(startTriangle+1));
 
 	//if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
 	// the indices of the vertices of the starttriangle
