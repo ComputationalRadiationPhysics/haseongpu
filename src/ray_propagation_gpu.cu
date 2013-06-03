@@ -14,8 +14,9 @@
 
 #define TEST_VALUES true
 #define USE_IMPORTANCE false
-#define DIVIDE_PI true
+#define DIVIDE_PI false
 #define SMALL 1E-06
+#define VERY_SMALL 1E-15
 
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
@@ -33,11 +34,11 @@
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
 
-__device__ double cladAbsorption;
-__device__ double nTot;
-__device__ double sigmaE;
-__device__ double sigmaA;
-__device__ double thicknessOfPrism;
+__device__ float cladAbsorption;
+__device__ float nTot;
+__device__ float sigmaE;
+__device__ float sigmaA;
+__device__ float thicknessOfPrism;
 __device__ int numberOfLevels;
 __device__ int cladNumber;
 __device__ int numberOfPoints;
@@ -142,7 +143,7 @@ __device__ float rayPropagationGpu(
 	//printf("vec_z: %.40e\n",vec_z);
 
 	// total distance to travel
-	distanceTotal = sqrt(fabs(vec_x*vec_x)+fabs(vec_y*vec_y)+fabs(vec_z*vec_z));
+	distanceTotal = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
 	// normalized direction-vector
 	vec_x = vec_x/distanceTotal;
 	vec_y = vec_y/distanceTotal;
@@ -178,7 +179,7 @@ __device__ float rayPropagationGpu(
 				nominator = (xOfNormals[tri]*points[positionsOfNormalVectors[tri]] + yOfNormals[tri]*points[positionsOfNormalVectors[tri]+ numberOfPoints]) - (xOfNormals[tri]*xPos + yOfNormals[tri]*yPos);
 				lengthHelp = nominator/denominator;
 				// if we found a new smallest length, use it
-				if (lengthHelp < length && lengthHelp > SMALL)
+				if (lengthHelp < length && lengthHelp > VERY_SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[tri]);	
@@ -198,7 +199,7 @@ __device__ float rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > SMALL)
+				if (lengthHelp < length && lengthHelp > VERY_SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
@@ -216,7 +217,7 @@ __device__ float rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > SMALL)
+				if (lengthHelp < length && lengthHelp > VERY_SMALL)
 				{
 					length = lengthHelp;
 					forb_dump = (forbidden[offset]);
@@ -233,7 +234,7 @@ __device__ float rayPropagationGpu(
 				{
 					nominator = (cell_z+1)* thicknessOfPrism - zPos;
 					lengthHelp = nominator/denominator;
-					if (lengthHelp < length && lengthHelp > SMALL)
+					if (lengthHelp < length && lengthHelp > 0.0)
 					{
 						length = lengthHelp;
 						//decider = 3;
@@ -275,7 +276,10 @@ __device__ float rayPropagationGpu(
 			gain *= exp((-1)*(cladAbsorption * length));
 		}
 		else {
-			gain *= exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
+
+			float oldgain = gain;
+			float multiplicator = (float) exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
+			gain *= multiplicator;
 		}
 
 
@@ -290,9 +294,6 @@ __device__ float rayPropagationGpu(
 		//printf("distanceRemaining: %.40e   %f \n",distanceRemaining);
 		//distanceRemaining=0.0;
 		// if the distance between the destination and our current position is small enough, we are done
-		if (fabs(distanceRemaining) < SMALL){
-			break;
-		}
 #if TEST_VALUES==true
 		testDistance += length;
 		if(loopbreaker>500){
@@ -302,6 +303,9 @@ __device__ float rayPropagationGpu(
 			loopbreaker++;
 		}
 #endif
+		if (fabs(distanceRemaining) < SMALL){
+			break;
+		}
 		//if(id > 100) break;
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
@@ -314,10 +318,14 @@ __device__ float rayPropagationGpu(
 	}
 
 #if TEST_VALUES==true
-	assert(fabs(distanceTotal-testDistance) < 0.01);
+	if(fabs(distanceTotal-testDistance) > 0.01)
+		printf("Distance too big! firstTriangle: %d, level: %d, id: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,id,length,distanceTotal,testDistance,distanceRemaining);
+	//assert(fabs(distanceTotal-testDistance) < 0.01);
 #endif
 	
-	return gain/(distanceTotal*distanceTotal);
+	gain /=(distanceTotal*distanceTotal);
+	if(gain < 0) printf("Gain < 0 in propagation!");
+	return gain;
 }
 
 #if USE_IMPORTANCE==true
@@ -410,7 +418,7 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
  * Initializes the global variables of the GPU with the correct values.
  * All those values are from the original propagation-function which we ported.
  */
-__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
+__global__ void setupGlobalVariablesKernel ( float host_sigma_e, float host_sigma_a, int host_clad_num, int host_clad_abs, float host_N_tot, int host_N_cells, float host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
 {
 	sigmaE = host_sigma_e;	
 	sigmaA = host_sigma_a;
@@ -469,7 +477,22 @@ __global__ void testKernel (  ){
 #if USE_IMPORTANCE==true
 __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int hostNumberOfTriangles, double* beta_v, double *importance) {
 #else
-__global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int point2D, int level, int iterations, double *p_in, double *n_x, double *n_y, int *n_p, int *neighbors, int *forbidden, int* t_in, int* cell_type, int host_size_t, double* beta_v) {
+__global__ void raytraceStep(
+		curandStateMtgp32* globalState, 
+		float* phi, 
+		int point2D, 
+		int level, 
+		int iterations, 
+		double *p_in, 
+		double *n_x, 
+		double *n_y, 
+		int *n_p, 
+		int *neighbors, 
+		int *forbidden, 
+		int* t_in, 
+		int* cell_type, 
+		int host_size_t, 
+		double* beta_v) {
 #endif
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 	//printf("K %d\n ",id);
@@ -519,11 +542,17 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 	}
 	
 
+	//if(point2D==0 && level==0)
+	//if(gain<0) printf("GAIN < 0! id=%d, gain=%e\n",id,gain);
+
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
 	
-	gain *=  beta_v[startTriangle + numberOfTriangles*startLevel];
-//	if(gain<0) printf("GAIN < 0! id=%d, gain=%e\n",id,gain);
+	double oldgain =gain;
+	double multiplicator = beta_v[startTriangle + numberOfTriangles*startLevel];
+	gain *= multiplicator;
+	if(point2D==0 && level==0)
+	if(multiplicator<0 ) printf("multi < 0!,pos2 id=%d, gain=%e, starttriangle=%d, startlevel=%d\n",id,gain,startTriangle,startLevel);
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
@@ -616,6 +645,7 @@ float runRayPropagationGpu(
 	threads = 256;
 	blocks = 200;
 	int iterations = ceil(float(raysPerSample) / float(blocks * threads));
+	iterations = 10;
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "interations=%d\n",iterations);
 	raysPerSample = threads * blocks * iterations;
@@ -752,7 +782,7 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMemcpy(positionsOfNormalVectors ,hostPositionsOfNormalVectors, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(triangleIndices ,hostTriangleIndices, 3* hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(cellTypes,hostCellTypes, hostNumberOfTriangles *  hostNumberOfLevels * sizeof(int), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(betaValues, hostBetaValues, hostNumberOfTriangles * hostNumberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(betaValues, hostBetaValues, hostNumberOfTriangles * (hostNumberOfLevels-1) * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(phi, hostPhi, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(float), cudaMemcpyHostToDevice));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
@@ -789,7 +819,8 @@ float runRayPropagationGpu(
 #else
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues);
 
-				fprintf(stderr, "Sampling point %d done\n",kernelcount);
+				if(kernelcount % 200 == 0)
+					fprintf(stderr, "Sampling point %d done\n",kernelcount);
 				kernelcount++;
 #endif
 			}
@@ -804,22 +835,24 @@ float runRayPropagationGpu(
 	{
 		fprintf(stderr, "\nStopping the Timer\n");
 		cudaEventRecord(stop, 0);
-		fprintf(stderr, "\n1\n");
 		cudaEventSynchronize(stop);
-		fprintf(stderr, "\n2\n");
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
 		fprintf(stderr, "\nRetrieving ASE Data\n");
 
-		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phi, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(float), cudaMemcpyDeviceToHost));
 #if USE_IMPORTANCE==true
 		CUDA_CHECK_RETURN(cudaMemcpy(host_importance, importance, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(double), cudaMemcpyDeviceToHost));
 		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
 		fprintf(stderr, "done\n");
-		for(int i=0; i< hostNumberOfPoints*(hostNumberOfLevels); ++i){
+		for(int i=0; i< hostNumberOfPoints*hostNumberOfLevels; ++i){
 			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
 #if DIVIDE_PI==true
+			//if(hostPhi[i] < 0)
+				//printf("<0 for i=%d\n",i);
 			ase->at(i) = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
+			//if(ase->at(i) < 0)
+				//printf("ase <0 for i=%d\n",i);
 #else
 			ase->at(i) = (double(double(hostPhi[i]) / raysPerSample));
 #endif
