@@ -612,6 +612,7 @@ float runRayPropagationGpu(
 		std::vector<int> *neighborsVector,
 		std::vector<int> *positionsOfNormalVectorsVector,
 		std::vector<double> *pointsVector,
+		std::vector<double> *betaCellsVector,
 		float hostCladAbsorption,
 		float hostCladNumber,
 		float hostNTot,
@@ -620,7 +621,8 @@ float runRayPropagationGpu(
 		unsigned hostNumberOfPoints,
 		unsigned hostNumberOfTriangles,
 		unsigned hostNumberOfLevels,
-		float hostThicknessOfPrism)
+		float hostThicknessOfPrism,
+		float hostCrystalFluorescence)
 {
 	/** GPU Kernel Variables
 	 * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
@@ -851,17 +853,11 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
 		fprintf(stderr, "done\n");
-		for(int i=0; i< hostNumberOfPoints*hostNumberOfLevels; ++i){
-			//fprintf(stderr, "\nPhi_ase[%d]= %.10f",i, hostPhi[i] / raysPerSample);
-#if DIVIDE_PI==true
-			//if(hostPhi[i] < 0)
-				//printf("<0 for i=%d\n",i);
-			ase->at(i) = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
-			//if(ase->at(i) < 0)
-				//printf("ase <0 for i=%d\n",i);
-#else
-			ase->at(i) = (double(double(hostPhi[i]) / raysPerSample));
-#endif
+		for(int i=0; i< hostNumberOfPoints*hostNumberOfLevels;++i){
+			//TODO: check, if index of BetaCells correct (or should be transposed etc)
+			hostPhi[i] = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
+			double gain_local = -(hostNTot*hostSigmaA - hostNTot*(betaCellsVector->at(i))*(hostSigmaA*hostSigmaE));
+			ase->at(i) = gain_local*hostPhi[i] / hostCrystalFluorescence;
 		}
 		fprintf(stderr, "\nValues in Vector\n");
 	}

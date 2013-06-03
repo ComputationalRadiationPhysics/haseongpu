@@ -12,6 +12,7 @@ int parse_n_p(std::string root, std::vector<int>* n_p);
 int parse_n_x(std::string root, std::vector<double>* );
 int parse_n_y(std::string root, std::vector<double>* );
 int parse_p_in(std::string root, std::vector<double>* );
+int parse_beta_cell(std::string root, std::vector<double>* );
 int parse_t_in(std::string root, std::vector<unsigned>* );
 float parse_clad_abs(std::string root);
 float parse_clad_num(std::string root);
@@ -22,6 +23,7 @@ float parse_z_mesh(std::string root);
 unsigned parse_size_p(std::string root);
 unsigned parse_size_t(std::string root);
 unsigned parse_mesh_z(std::string root);
+float parse_tfluo(std::string root);
 
 int parse(std::string location, 
 	  std::vector<double> * betas,
@@ -33,6 +35,7 @@ int parse(std::string location,
 	  std::vector<int> * neighbors,
 	  std::vector<int> * n_p,
 	  std::vector<double> * p_in,
+	  std::vector<double> * beta_cell,
 	  float *clad_abs,
 	  float *clad_num,
 	  float *n_tot,
@@ -41,7 +44,8 @@ int parse(std::string location,
 	  float *z_mesh,
 	  unsigned *size_p,
 	  unsigned *size_t,
-	  unsigned *mesh_z){
+	  unsigned *mesh_z,
+	  float * tfluo){
 
   if(location[location.size()-1] == 'w')
     location.erase(location.size()-1, 1);
@@ -58,6 +62,7 @@ int parse(std::string location,
   if(parse_n_x(location, n_x)) return 1;
   if(parse_n_y(location, n_y)) return 1;
   if(parse_p_in(location, p_in)) return 1;
+  if(parse_beta_cell(location, beta_cell)) return 1;
   if(parse_t_in(location, t_in)) return 1;
   
   (*clad_abs) = parse_clad_abs(location);
@@ -69,8 +74,9 @@ int parse(std::string location,
   (*size_t) = parse_size_t(location);
   (*mesh_z) = parse_mesh_z(location);
   (*z_mesh) = parse_z_mesh(location);
+  (*tfluo)  = parse_tfluo(location);
 
-  if(!((*clad_abs) && *(clad_num)  && (*n_tot) && (*sigma_a) && *(sigma_e) && (*size_p) && (*size_t) && (*mesh_z) && (*z_mesh)))
+  if(!((*clad_abs) && *(clad_num)  && (*n_tot) && (*sigma_a) && *(sigma_e) && (*size_p) && (*size_t) && (*mesh_z) && (*z_mesh) && (*tfluo)))
     return 1;
 
   return 0;
@@ -359,6 +365,31 @@ int parse_p_in(std::string root, std::vector<double>* p_in){
 
 }
 
+/* Parse beta_cell.txt */
+int parse_beta_cell(std::string root, std::vector<double>* beta_cell){
+  std::string line;
+  std::ifstream fileStream; 
+  double number = 0;
+  
+  fileStream.open(root.append("beta_cell.txt").c_str());
+  if(fileStream.is_open()){
+    while(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+      beta_cell->push_back(number);
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 1;
+  }
+
+  fileStream.close();
+  return 0;
+
+}
 /* Parse sigma_a.txt */
 float parse_sigma_a(std::string root){
   std::string line;
@@ -523,6 +554,32 @@ float parse_z_mesh(std::string root){
   float number = 0;
   
   fileStream.open(root.append("z_mesh.txt").c_str());
+  if(fileStream.is_open()){
+    if(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 0.0;
+  }
+
+  fileStream.close();
+  return number;
+
+
+}
+
+/* Parse tfluo.txt */
+float parse_tfluo(std::string root){
+  std::string line;
+  std::ifstream fileStream; 
+  float number = 0;
+  
+  fileStream.open(root.append("tfluo.txt").c_str());
   if(fileStream.is_open()){
     if(fileStream.good()){
       std::getline(fileStream, line);

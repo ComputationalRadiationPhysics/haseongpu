@@ -77,6 +77,10 @@ x=fopen("sigma_e.txt","w")
 fprintf(x,'%.50f\n',laser.s_ems)
 fclose(x)
 
+x=fopen("tfluo.txt","w")
+fprintf(x,'%.50f\n',crystal.tfluo)
+fclose(x)
+
 % fixed
 x=fopen("cell_type.txt","w")
 fprintf(x,'%d\n',ones(1,rows(sorted_int)))
@@ -87,9 +91,9 @@ fclose(x)
 %fprintf(x,'%.50f\n',NumRays)
 %fclose(x)
 
-%x=fopen("beta_cell.txt","w")
-%fprintf(x,'%.50f\n',beta_cell)
-%fclose(x)
+x=fopen("beta_cell.txt","w")
+fprintf(x,'%.50f\n',beta_cell)
+fclose(x)
 
 %x=fopen("surface.txt","w")
 %fprintf(x,'%.50f\n',surface)
