@@ -16,7 +16,7 @@
 #define USE_IMPORTANCE false
 #define DIVIDE_PI true
 #define SMALL 1E-06
-#define VERY_SMALL 1E-15
+#define VERY_SMALL 1E-14
 
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
@@ -34,43 +34,16 @@
 	printf("Error at %s:%d\n",__FILE__,__LINE__); \
 	return EXIT_FAILURE;}} while(0)
 
-__device__ float cladAbsorption;
-__device__ float nTot;
-__device__ float sigmaE;
-__device__ float sigmaA;
-__device__ float thicknessOfPrism;
+__device__ double cladAbsorption;
+__device__ double nTot;
+__device__ double sigmaE;
+__device__ double sigmaA;
+__device__ double thicknessOfPrism;
 __device__ int numberOfLevels;
 __device__ int cladNumber;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
-/**
- * @brief	select a triangle based on the global id and the total number of threads
- *
- * @params	id the id of the thread: threadIdx.x + blockIdx.x * blockDim.x;
- *			trianglesInOneLevel number of triangles in a slice of the mesh
- *
- * @long	given t threads, p triangles, there are q=(t/p) threads per triangle.
- *			the triangle-space will be partitioned as follows: (1 .. i .. q),(q+1 .. j .. 2*q) ... 
- *			where i or j are thread-ids.
- */
-__device__ int selectTriangle(int id, int trianglesInOneLevel){
-	int totalNumberOfThreads = blockDim.x * gridDim.x;
-	int threadsPer2DTriangle = floor( float(totalNumberOfThreads) / float(trianglesInOneLevel) );
-	return min(id / threadsPer2DTriangle, trianglesInOneLevel);
-}
-
-/**
- * @brief	select a level (a slice of the mesh) based on the global id and the total number of slices
- *
- * @params	id the id of the thread: threadIdx.x + blockIdx.x * blockDim.x;
- *			totalNumberOfLevels number of slices of the mesh
- */
-__device__ int selectLevel(int id, int totalNumberOfLevels){
-	int totalNumberOfThreads = blockDim.x * gridDim.x;
-	int threadsPerLevel = ceil( float(totalNumberOfThreads) / float(totalNumberOfLevels) );
-	return min(id / threadsPerLevel,totalNumberOfLevels-1);
-}
 
 /**
  * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
@@ -93,7 +66,7 @@ __device__ int selectLevel(int id, int totalNumberOfLevels){
  *		   beta_v		contains the beta-values for each cell/prism
  *
  */
-__device__ float rayPropagationGpu(
+__device__ double rayPropagationGpu(
 		double xPos,
 		double yPos,
 		double zPos,
@@ -109,8 +82,7 @@ __device__ float rayPropagationGpu(
 		int *neighbors,
 		int *forbidden,
 		int* cellTypes,
-		double* betaValues,
-		int id){
+		double* betaValues){
 	//    no reflections
 	//
 	//    create the vector between both points and calculate which surface would be the shortest to reach.
@@ -138,9 +110,6 @@ __device__ float rayPropagationGpu(
 	vec_x = (xDestination - xPos);
 	vec_y = (yDestination - yPos);
 	vec_z = (zDestination - zPos);
-	//printf("vec_x: %.40e\n",vec_x);
-	//printf("vec_y: %.40e\n",vec_y);
-	//printf("vec_z: %.40e\n",vec_z);
 
 	// total distance to travel
 	distanceTotal = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
@@ -276,7 +245,7 @@ __device__ float rayPropagationGpu(
 			gain *= exp((-1)*(cladAbsorption * length));
 		}
 		else {
-			gain *= (float) exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
+			gain *= (double) exp(length* nTot*(betaValues[tri+cell_z*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
 		}
 
 
@@ -284,26 +253,20 @@ __device__ float rayPropagationGpu(
 		distanceRemaining -= length;
 		
 
-
-
-//		if(id==2)
-	//	printf("length: %e     distanceRemaining: %e\n",length,distanceRemaining);
-		//printf("distanceRemaining: %.40e   %f \n",distanceRemaining);
-		//distanceRemaining=0.0;
-		// if the distance between the destination and our current position is small enough, we are done
 #if TEST_VALUES==true
 		testDistance += length;
 		if(loopbreaker>500){
-			printf("Loopbreaker reached. firstTriangle: %d, level: %d, id: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,id,length,distanceTotal,testDistance,distanceRemaining);
+			printf("Loopbreaker reached. firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
 			return 0.;
 		}else{
 			loopbreaker++;
 		}
 #endif
+		// if the distance between the destination and our current position is small enough, we are done
 		if (fabs(distanceRemaining) < SMALL){
 			break;
 		}
-		//if(id > 100) break;
+
 		// now set the next cell and position
 		xPos = xPos + length*vec_x;
 		yPos = yPos + length*vec_y;
@@ -315,13 +278,11 @@ __device__ float rayPropagationGpu(
 	}
 
 #if TEST_VALUES==true
-	if(fabs(distanceTotal-testDistance) > 0.01)
-		printf("Distance too big! firstTriangle: %d, level: %d, id: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,id,length,distanceTotal,testDistance,distanceRemaining);
-	//assert(fabs(distanceTotal-testDistance) < 0.01);
+	if(fabs(distanceTotal-testDistance) > SMALL)
+		printf("Distance too big! firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
 #endif
 	
 	gain /=(distanceTotal*distanceTotal);
-	//if(gain < 0) printf("Gain < 0 in propagation!");
 	return gain;
 }
 
@@ -415,7 +376,7 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
  * Initializes the global variables of the GPU with the correct values.
  * All those values are from the original propagation-function which we ported.
  */
-__global__ void setupGlobalVariablesKernel ( float host_sigma_e, float host_sigma_a, int host_clad_num, int host_clad_abs, float host_N_tot, int host_N_cells, float host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
+__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
 {
 	sigmaE = host_sigma_e;	
 	sigmaA = host_sigma_a;
@@ -494,11 +455,11 @@ __global__ void raytraceStep(
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
 	unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
 	unsigned threadsPerPrism = blockDim.x * gridDim.x/numberOfPrisms; //9
+
 	// break, if we have more threads than we need
 	if(id >= threadsPerPrism*numberOfPrisms) // id >= 48600
 		return;
 
-	//printf("K %d\n ",id);
 	double gain = 0.;
 	const int endPointX = p_in[point2D];
 	const int endPointY = p_in[ numberOfPoints + point2D];
@@ -507,23 +468,15 @@ __global__ void raytraceStep(
 
 	// this should give the same start values multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-
-//	const int startTriangle = selectTriangle(id,host_size_t); 
-//	const int startLevel = selectLevel(id, numberOfLevels);
 	const unsigned startPrism = id/threadsPerPrism;
 	const int startLevel = (startPrism)/numberOfTriangles;
-//	const int startTriangle = startPrism/(startLevel+1);
 	const int startTriangle=(startPrism-(numberOfTriangles*startLevel));
-	//const int startLevel = (int) ceil(float(startPrism)/float(startTriangle+1));
 
-	//if(id==51200) printf("id=%d startLevel=%d startTriangle=%d\n",id,startLevel,startTriangle);
 	// the indices of the vertices of the starttriangle
 	const int t1 = t_in[startTriangle];
 	const int t2 = t_in[startTriangle+ numberOfTriangles];
 	const int t3 = t_in[startTriangle+2*numberOfTriangles];
 
-
-	
 	// do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
 	for (int i=0; i<iterations ; ++i){
 		// random startpoint generation
@@ -547,7 +500,7 @@ __global__ void raytraceStep(
 		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
 		//printf("yRand: %.40e\n",yRand);
 		__syncthreads();
-		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v,id));
+		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 	
 
@@ -557,9 +510,7 @@ __global__ void raytraceStep(
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
 	
-	double oldgain =gain;
-	double multiplicator = beta_v[startTriangle + numberOfTriangles*startLevel];
-	gain *= multiplicator;
+	gain *= beta_v[startTriangle + numberOfTriangles*startLevel];
 	//if(point2D==0 && level==0)
 	//if(multiplicator<0 ) printf("multi < 0!,pos2 id=%d, gain=%e, starttriangle=%d, startlevel=%d\n",id,gain,startTriangle,startLevel);
 #if USE_IMPORTANCE==true
@@ -654,11 +605,11 @@ float runRayPropagationGpu(
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
 	threads = 256;
 	blocks = 200;
-	unsigned raysPerSample = ceil(totalNumberOfRays/float(hostNumberOfPoints * (hostNumberOfLevels)));
+	unsigned raysPerSample = ceil(totalNumberOfRays/double(hostNumberOfPoints * (hostNumberOfLevels)));
 	unsigned hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
 	unsigned hostThreadsPerPrism = threads*blocks/hostNumberOfPrisms; //9
 	unsigned raysPerIterationPerSample = hostThreadsPerPrism*hostNumberOfPrisms; //48600
-	int iterations = ceil(float(raysPerSample) / raysPerIterationPerSample);
+	int iterations = ceil(double(raysPerSample) / raysPerIterationPerSample);
 	//fprintf(stderr, "raysPerSample=%d\n",raysPerSample);
 	//fprintf(stderr, "interations=%d\n",iterations);
 	raysPerSample = raysPerIterationPerSample * iterations;
@@ -700,6 +651,7 @@ float runRayPropagationGpu(
 	cudaEventCreate(&stop);
 	fprintf(stderr, "Initializing ASE-Values with 0\n");
 	float hostPhi[hostNumberOfPoints * (hostNumberOfLevels)];
+	
 	for(int i=0;i<hostNumberOfPoints*(hostNumberOfLevels);++i){
 			hostPhi[i] = 0.;
 	}
@@ -853,11 +805,14 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMemcpy(host_N_rays, N_rays, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(int), cudaMemcpyDeviceToHost));
 #endif
 		fprintf(stderr, "done\n");
-		for(int i=0; i< hostNumberOfPoints*hostNumberOfLevels;++i){
-			//TODO: check, if index of BetaCells correct (or should be transposed etc)
-			hostPhi[i] = (double(double(hostPhi[i]) / (raysPerSample * 4.0f * 3.14159)));
-			double gain_local = -(hostNTot*hostSigmaA - hostNTot*(betaCellsVector->at(i))*(hostSigmaA*hostSigmaE));
-			ase->at(i) = gain_local*hostPhi[i] / hostCrystalFluorescence;
+		for(int i=0; i< hostNumberOfPoints;++i){
+			for(int j=0 ; j<hostNumberOfLevels ; ++j)
+			{
+				int pos = i*hostNumberOfLevels+j;
+				hostPhi[pos] =float( (double(hostPhi[pos]) / (raysPerSample * 4.0f * 3.14159)));
+				double gain_local = double(hostNTot)*(betaCellsVector->at(pos))*double(hostSigmaE+hostSigmaA)-double(hostNTot*hostSigmaA);
+				ase->at(pos) = gain_local*hostPhi[pos] / double(hostCrystalFluorescence);
+			}
 		}
 		fprintf(stderr, "\nValues in Vector\n");
 	}
