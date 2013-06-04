@@ -873,7 +873,8 @@ float runRayPropagationGpu(
 	
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
 	threads = 256;
-	blocks = 200;
+	// TODO: change number of blocks/threads dynamically to allow more flexible number of rays
+	blocks = 200; // increase up to 200
 	unsigned raysPerSample = ceil(totalNumberOfRays/double(hostNumberOfPoints * (hostNumberOfLevels)));
 	unsigned hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
 	unsigned hostThreadsPerPrism = threads*blocks/hostNumberOfPrisms; //9
