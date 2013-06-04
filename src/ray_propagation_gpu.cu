@@ -13,9 +13,9 @@
 #include <cuda_runtime_api.h>
 
 #define TEST_VALUES true
-#define USE_IMPORTANCE true
+#define USE_IMPORTANCE false
 #define SMALL 1E-06
-#define VERY_SMALL 1E-14
+#define VERY_SMALL 0.0
 
 #define CUDA_CHECK_RETURN(value) {				\
   cudaError_t _m_cudaStat = value;				\
@@ -399,6 +399,7 @@ __device__ double rayPropagationGpu(
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
 		length = distanceRemaining;
+		lengthHelp=0;
 		//        definition for decider
 		//        0,1,2: int for the neighbors
 		//        3: hor plane up
@@ -419,7 +420,7 @@ __device__ double rayPropagationGpu(
 				nominator = (xOfNormals[triangleCurrent]*points[positionsOfNormalVectors[triangleCurrent]] + yOfNormals[triangleCurrent]*points[positionsOfNormalVectors[triangleCurrent]+ numberOfPoints]) - (xOfNormals[triangleCurrent]*xPos + yOfNormals[triangleCurrent]*yPos);
 				lengthHelp = nominator/denominator;
 				// if we found a new smallest length, use it
-				if (lengthHelp < length && lengthHelp > VERY_SMALL)
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
 					length = lengthHelp;
 					forbiddenNext = (forbidden[triangleCurrent]);
@@ -439,7 +440,7 @@ __device__ double rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > VERY_SMALL)
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
 					length = lengthHelp;
 					forbiddenNext = (forbidden[offset]);
@@ -457,7 +458,7 @@ __device__ double rayPropagationGpu(
 			{
 				nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
 				lengthHelp = nominator/denominator;
-				if (lengthHelp < length && lengthHelp > VERY_SMALL)
+				if (lengthHelp < length && lengthHelp > 0.0)
 				{
 					length = lengthHelp;
 					forbiddenNext = (forbidden[offset]);
@@ -504,7 +505,7 @@ __device__ double rayPropagationGpu(
 			gain *= exp((-1)*(cladAbsorption * length));
 		}
 		else {
-			gain *= (double) exp(length* nTot*(betaValues[triangleCurrent+levelCurrent*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA));
+			gain *= (double) exp(nTot * (betaValues[triangleCurrent+levelCurrent*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA)*length);
 		}
 
 
@@ -567,7 +568,7 @@ __device__ void importf(
 {
     int RaysDump=0, raysLeft;
     double sumPhi=0.0, surfaceTotal=0.0;
-    double distance, xPos, yPos, zPos;
+    double xPos, yPos, zPos;
     double prop;
 
 //    calculate the gain from the centers of each of the boxes to the observed point
@@ -591,7 +592,7 @@ __device__ void importf(
         {
 //            at this point replace the following routine with propagation(...)
 //            later expand this with the beta/tau values...
-			prop = rayPropagationGpu(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], thicknessOfPrism*(i_z+0.5),  xPos, yPos, zPos, i_t, i_z, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden , cellTypes, beta_v);
+			prop = rayPropagationGpu(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], thicknessOfPrism*(i_z+0.5),  xPos, yPos, zPos, i_t, i_z, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues);
 			// Propagation vom Zentrum jedes Prismas zu jedem Samplepunkt 
 			//
 //			prop = propagation(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], z_mesh*(i_z+0.5), x_pos, y_pos, z_pos, i_t, i_z);
@@ -622,20 +623,20 @@ __device__ void importf(
         {
             int rand_t = (int )(curand_uniform(&localstate)*numberOfTriangles);
             int rand_z = (int )(curand_uniform(&localstate)*(numberOfLevels-1));
-            numberOfImportantRays[rand_t + rand_z*N_cells]++;
+            numberOfImportantRays[rand_t + rand_z*numberOfTriangles]++;
         }
     }
 
 //    now think about the mount of rays which would come out of this volume(surface)
 //    dividing this number with the new amount of rays gives the final importance weight for this area!
-    for (int i_t=0;i_t<N_cells;i_t++)
+    for (int i_t=0;i_t<numberOfTriangles;i_t++)
     {
         for (int i_z=0;i_z<(numberOfLevels-1);i_z++) //remember the definition differences MatLab/C for indices
         {
 //            this is the amount of the sampled rays out of the cells
             if (numberOfImportantRays[i_t + i_z*numberOfTriangles]>0)
             {
-                importance[i_t + i_z*numberOfTriangles] = totalNumberOfRays*surface[i_t]/surfaceTotal/numberOfImportantRays[i_t + i_z*N_cells];
+                importance[i_t + i_z*numberOfTriangles] = totalNumberOfRays*surface[i_t]/surfaceTotal/numberOfImportantRays[i_t + i_z*numberOfTriangles];
 //                importance[i_t + i_z*numberOfTriangles] = NumRays*surface[i_t]/surf_tot;
             }
             else
@@ -724,7 +725,7 @@ __global__ void testKernel (
 	printf("\nnumberOfTriangles=%d",numberOfTriangles);
 	printf("\nnTot=%.6e",nTot);
 	printf("\ncladAbsorption=%.6e",cladAbsorption);
-	printf("\ncladNumber=%.6e\n\n",cladNumber);
+	printf("\ncladNumber=%d\n\n",cladNumber);
 
 	unsigned limit = 5;
 	for(int i=0;i<limit;++i){
@@ -743,7 +744,7 @@ __global__ void testKernel (
 	printf("\n\n");
 
 	for(int i=0;i<limit;++i){
-		printf("positionsOfNormalVectors[%d]: %e\n",i,positionsOfNormalVectors[i]);
+		printf("positionsOfNormalVectors[%d]: %d\n",i,positionsOfNormalVectors[i]);
 	}
 	printf("\n\n");
 
@@ -845,7 +846,11 @@ __global__ void raytraceStep(
 	if(startPrism != (startTriangle+(startLevel*numberOfTriangles))){
 		printf("StartTriangle/StartLevel incorrect!");
 	}
+	//if(startPrism == 5399){
+	//	printf("startprism: %d, id=%d, threadsPerPrism=%d\n",startPrism,id,threadsPerPrism);
+	//}
 #endif
+
 
 	// the indices of the vertices of the starttriangle
 	int t1 = triangleIndices[startTriangle];
@@ -959,7 +964,7 @@ float runRayPropagationGpu(
 
 	double* hostBetaValues = doubleVectorToArray(betaValuesVector);
 	double* hostXOfNormals = doubleVectorToArray(xOfNormalsVector);
-	double* hostYOfNormals = doubleVectorToArray(xOfNormalsVector);
+	double* hostYOfNormals = doubleVectorToArray(yOfNormalsVector);
 	unsigned* hostCellTypes = unsignedVectorToArray(cellTypesVector);
 	unsigned* hostTriangleIndices = unsignedVectorToArray(triangleIndicesVector);
 	int* hostForbidden = intVectorToArray(forbiddenVector);
@@ -969,12 +974,16 @@ float runRayPropagationGpu(
 
 	
 	fprintf(stderr, "\nCalculating optimal number of Rays\n");
-	threads = 256;
+	threads = 128;
 	// TODO: change number of blocks/threads dynamically to allow more flexible number of rays
-	blocks = 200; // increase up to 200
-	unsigned raysPerSample = ceil(totalNumberOfRays/double(hostNumberOfPoints * (hostNumberOfLevels)));
+	blocks = 50; // increase up to 200
+	unsigned raysPerSample = ceil(double(totalNumberOfRays)/double(hostNumberOfPoints * (hostNumberOfLevels)));
 	unsigned hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
-	unsigned hostThreadsPerPrism = threads*blocks/hostNumberOfPrisms; //9
+	unsigned hostThreadsPerPrism = (threads*blocks)/hostNumberOfPrisms; //9
+	if(hostThreadsPerPrism < 1){
+		fprintf(stderr,"\n\nNot enough threads/blocks!\n\n");
+		return 1;
+	}
 	unsigned raysPerIterationPerSample = hostThreadsPerPrism*hostNumberOfPrisms; //48600
 	unsigned iterations = ceil(double(raysPerSample) / raysPerIterationPerSample);
 	raysPerSample = raysPerIterationPerSample * iterations;
@@ -1092,7 +1101,7 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMalloc(&positionsOfNormalVectors, 3* hostNumberOfTriangles * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&triangleIndices, 3* hostNumberOfTriangles * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&cellTypes,hostNumberOfTriangles * hostNumberOfLevels * sizeof(int)));
-		CUDA_CHECK_RETURN(cudaMalloc(&betaValues,hostNumberOfTriangles * hostNumberOfLevels * sizeof(double)));
+		CUDA_CHECK_RETURN(cudaMalloc(&betaValues,hostNumberOfTriangles * (hostNumberOfLevels-1) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&phiASE,hostNumberOfPoints * hostNumberOfLevels * sizeof(float)));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
@@ -1127,11 +1136,12 @@ float runRayPropagationGpu(
 	}
 
 
+		fprintf(stderr, "hostCrystalFluorescence: %e\n",hostCrystalFluorescence);
 		testKernel<<<1,1>>>(points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues);
 
 #if USE_IMPORTANCE==true
 		fprintf(stderr, "\nStarting the Importance Sampling\n");
-		random_setup_kernel <<< blocks, threads >>> ( devStates, time(NULL) );
+		//random_setup_kernel <<< blocks, threads >>> ( devStates, time(NULL) );
 		cudaThreadSynchronize();
 
 		importanceKernel<<< blocks * iterations, threads>>>(devStates, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, cellTypes, hostNumberOfTriangles, betaValues, importance, numberOfImportantRays, xOfTriangleCenter, yOfTriangleCenter, surface, totalNumberOfRays);
@@ -1152,11 +1162,10 @@ float runRayPropagationGpu(
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phiASE, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues, importance);
 #else
 				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phiASE, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues);
-
+#endif
 				if(kernelcount % 200 == 0)
 					fprintf(stderr, "Sampling point %d done\n",kernelcount);
 				kernelcount++;
-#endif
 			}
 		}
 
@@ -1173,7 +1182,7 @@ float runRayPropagationGpu(
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
 		fprintf(stderr, "\nRetrieving ASE Data\n");
 
-		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phiASE, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(float), cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaMemcpy(hostPhi, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
 		fprintf(stderr, "done\n");
 		for(int i=0; i< hostNumberOfPoints;++i){
 			for(int j=0 ; j<hostNumberOfLevels ; ++j)
@@ -1181,7 +1190,7 @@ float runRayPropagationGpu(
 				int pos = i*hostNumberOfLevels+j;
 				hostPhi[pos] =float( (double(hostPhi[pos]) / (raysPerSample * 4.0f * 3.14159)));
 				double gain_local = double(hostNTot)*(betaCellsVector->at(pos))*double(hostSigmaE+hostSigmaA)-double(hostNTot*hostSigmaA);
-				ase->at(pos) = gain_local*hostPhi[pos] / double(hostCrystalFluorescence);
+				ase->at(pos) = gain_local*hostPhi[pos]/hostCrystalFluorescence;
 			}
 		}
 		fprintf(stderr, "\nValues in Vector\n");
@@ -1200,8 +1209,8 @@ float runRayPropagationGpu(
 #if USE_IMPORTANCE==true
 		cudaFree(importance);
 		cudaFree(numberOfImportantRays);
-		cudaFree(center_x);
-		cudaFree(center_y);
+		cudaFree(xOfTriangleCenter);
+		cudaFree(yOfTriangleCenter);
 #endif
 	}
 

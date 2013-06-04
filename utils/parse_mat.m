@@ -1,5 +1,5 @@
 function parse_mat (folder,file)
-format long
+format long;
 cd(folder);
 load(file);
 
