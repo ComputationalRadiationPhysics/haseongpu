@@ -44,6 +44,277 @@ __device__ int cladNumber;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
+__device__ double propagationOld(
+		double x_pos, 
+		double y_pos, 
+		double z_pos, 
+		double x_dest, 
+		double y_dest, 
+		double z_dest, 
+		int t_start, 
+		int mesh_start, 
+		double *p_in,
+		double *n_x,
+		double *n_y,
+		int *n_p,
+		int *neighbors,
+		int *forbidden,
+		int *cell_type,
+		double *beta_v){
+//    in first try no reflections
+//    calculate the vector and make the the calculation, which surface would be the shortest to reach
+//    then get the length, make the integration, get the information about the next cell out of the array
+//    set the point to the surface (this surface is "forbidden" in the calculations)
+//    proceed until you hit a the point or the surface
+//    if you are closer then "small" stop and return the value
+    double vec_x, vec_y,vec_z, norm;
+    double distance, length, length_help, distance_total;
+    double gain=1;
+    double nominator, denominator;
+    int tri, cell_z; // the current triangle number and position concerning the z's
+    int decider; // which one is the shortest - info
+    int tri_next, cell_z_next, forb, forb_dump;
+	int ct; // used to read out cell_type 
+	int size_p = numberOfPoints;
+	int N_cells = numberOfTriangles;
+	double z_mesh = thicknessOfPrism;
+	double sigma_a = sigmaA;
+	double sigma_e = sigmaE;
+	double clad_num = cladNumber;
+	double clad_abs = cladAbsorption;
+	double N_tot = nTot;
+	
+    
+    
+//    initial positions
+    tri = t_start;
+    cell_z = mesh_start;
+    
+    
+//    definition of the vectors without reflections
+    vec_x = (x_dest - x_pos);
+    vec_y = (y_dest - y_pos);
+    vec_z = (z_dest - z_pos);
+    
+    norm = sqrt(vec_x*vec_x+vec_y*vec_y+vec_z*vec_z);
+    
+    vec_x = vec_x/norm;
+    vec_y = vec_y/norm;
+    vec_z = vec_z/norm;
+    
+//    now calculate the length to travel
+    distance = sqrt((x_dest - x_pos)*(x_dest - x_pos)+(y_dest - y_pos)*(y_dest - y_pos)+(z_dest - z_pos)*(z_dest - z_pos));
+    distance_total = distance;
+	// does this make sense?
+    length = distance;
+    
+    forb = -1;
+	
+//	mexPrintf("Propagation called");
+//    mexEvalString("drawnow;");
+    
+//    the ray has to be set to be ALIVE before!
+//    now do the unlimited for loop - break!!!
+    for(;;)
+    {
+	
+//	  mexPrintf("Propagation for part called\n\n");
+//    mexEvalString("drawnow;");
+//        definition for decider
+//        0,1,2: int for the neighbors
+//        3: hor plane up
+//        4: hor plane down
+        
+//        at first set the decider = -1;
+        decider = -1;
+        length = distance;
+		
+		
+//		  read, which type of cell it is you are propagation in
+		ct = cell_type[tri];
+        
+//        mexPrintf("forb: %i\n",forb);
+//        mexEvalString("drawnow;");
+        
+//        try the triangle faces
+//        remember the correlation between the normals and the points
+//        n1: p1-2, n2: p1-3, n3:p2-3
+//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
+//        as everything uses triangular "tubes/prisms", as well as n_z=0 in this case!
+        if (forb != 0){
+            nominator = (n_x[tri]*p_in[n_p[tri]] + n_y[tri]*p_in[n_p[tri]+size_p]) - (n_x[tri]*x_pos + n_y[tri]*y_pos);
+            denominator = n_x[tri]*vec_x + n_y[tri]*vec_y;
+            if (denominator != 0.0)
+            {
+                length_help = nominator/denominator;
+                if (length_help < length && length_help > VERY_SMALL)
+                {
+                    length = length_help;
+                    decider = 0;
+                    forb_dump = (forbidden[tri]);
+                }
+            }
+        }
+        
+        if (forb != 1){
+            nominator = (n_x[tri+N_cells]*p_in[n_p[tri+N_cells]] + n_y[tri+N_cells]*p_in[n_p[tri+N_cells]+size_p]) - (n_x[tri+N_cells]*x_pos + n_y[tri+N_cells]*y_pos);
+            denominator = n_x[tri+N_cells]*vec_x + n_y[tri+N_cells]*vec_y;
+            if (denominator != 0.0)
+            {
+                length_help = nominator/denominator;
+                if (length_help < length && length_help > VERY_SMALL)
+                {
+                    length = length_help;
+                    decider = 1;
+                    forb_dump = (forbidden[tri+N_cells]);
+                }
+            }
+        }
+        
+        if (forb !=2){
+            nominator = (n_x[tri+2*N_cells]*p_in[n_p[tri+2*N_cells]] + n_y[tri+2*N_cells]*p_in[n_p[tri+2*N_cells]+size_p]) - (n_x[tri+2*N_cells]*x_pos + n_y[tri+2*N_cells]*y_pos);
+            denominator = n_x[tri+2*N_cells]*vec_x + n_y[tri+2*N_cells]*vec_y;
+            if (denominator != 0.0)
+            {
+                length_help = nominator/denominator;
+                if (length_help < length && length_help > VERY_SMALL)
+                {
+                    length = length_help;
+                    decider = 2;
+                    forb_dump = (forbidden[tri+2*N_cells]);
+                }
+            }
+        }
+        
+//        try the horizontal planes, which one is the shortest, n_x and n_y are zero!, n_z =1!
+//        at first the upper plane
+        if (forb != 3){
+            nominator = (cell_z+1)*z_mesh - z_pos;
+            denominator = z_pos*vec_z;
+            if (denominator != 0.0)
+            {
+                length_help = nominator/denominator;
+                if (length_help < length && length_help > VERY_SMALL)
+                {
+                    length = length_help;
+                    decider = 3;
+                    forb_dump = 4; // you are not allowed to go down in the next step
+                }
+            }
+        }
+        
+//        next is the lower plane
+        if (forb != 4){
+            nominator = (cell_z)*z_mesh - z_pos;
+            denominator = z_pos*vec_z;
+            
+            if (denominator != 0.0)
+            {
+                length_help = nominator/denominator;
+                if (length_help < length && length_help > VERY_SMALL)
+                {
+                    length = length_help;
+                    decider = 4;
+                    forb_dump = 3; // you are not allowed to go up in the next step
+                }
+            }
+        }
+        
+        forb = forb_dump;
+		
+        
+//        now make a switch to differ the different cases
+        switch(decider){
+                
+            case 0:
+//                this is the case for the intersection with the first choice triangle-surface
+                tri_next = neighbors[tri];
+                cell_z_next = cell_z;
+                break;
+                
+            case 1:
+//                second triangle surface
+                tri_next = neighbors[tri+N_cells];
+                cell_z_next = cell_z;
+                break;
+                
+            case 2:
+//                third triangle surface
+                tri_next = neighbors[tri+2*N_cells];
+                cell_z_next = cell_z;
+                break;
+                
+            case 3:
+//                go one plane up
+                tri_next = tri;
+                cell_z_next = cell_z + 1;
+                break;
+                
+            case 4:
+//                go one plane down
+                tri_next = tri;
+                cell_z_next = cell_z - 1;
+                break;
+                
+            default:
+//                make an error statement
+                break;
+        }
+        
+//        now we know where to go, let's make the integration
+//        take the beta_v[tri+cell_z*N_cells] 
+
+//		  at this position do the decision whether it is a gain part or cladding
+//		  it might be absorbing or amplifying, for the cladding only absorbing
+//		  a simple "if then"
+
+		if (ct == clad_num){
+			gain = gain * exp(-clad_abs * length);
+		}
+		else {
+			gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+		}
+//        gain = LineIntegralMCRK4_S(3, tri, cell_z, gain, length);
+        
+//        after integration make the propagation
+        
+//        mexPrintf("Distance: %f, Length: %f\n",distance, length);
+//        mexPrintf("decider: %i, forbidden: %i\n",decider, forb);
+//        mexPrintf("vec_x: %f, vec_y: %f, vec_z: %f\n", vec_x, vec_y, vec_z);
+//        mexPrintf("current_x: %f current_y: %f current_z: %f\n", x_pos, y_pos, z_pos);
+//        mexPrintf("tri: %i, tri_next: %i, cell_z: %i, cell_next: %i\n", tri, tri_next, cell_z, cell_z_next);
+//        mexEvalString("drawnow;");
+//        str=mxCreateString("Press a key");
+//        mexCallMATLAB(1,&dump,1,&str,"input"); 
+//        str and dump should be defined to be a *mxArray and don't forget to kill them at the end
+        
+        distance -= length;
+        
+//        return 1;
+//        
+        
+        x_pos = x_pos + length*vec_x;
+        y_pos = y_pos + length*vec_y;
+        z_pos = z_pos + length*vec_z;
+        
+        if (abs(distance)< SMALL)
+        {
+            break;
+        }
+        
+        
+//        now set the next cell
+        tri = tri_next;
+        cell_z = cell_z_next;      
+        
+//        break;
+//        now we should make the integration routine
+    }
+    
+    gain /= (distance_total*distance_total);
+
+    return gain;
+}
 
 /**
  * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
@@ -376,7 +647,16 @@ __device__ void importf(curandState localstate, int point, int mesh_start, doubl
  * Initializes the global variables of the GPU with the correct values.
  * All those values are from the original propagation-function which we ported.
  */
-__global__ void setupGlobalVariablesKernel ( double host_sigma_e, double host_sigma_a, int host_clad_num, int host_clad_abs, double host_N_tot, int host_N_cells, double host_z_mesh, int host_mesh_z, int hostNumberOfPoints )
+__global__ void setupGlobalVariablesKernel ( 
+		double host_sigma_e,
+		double host_sigma_a, 
+		int host_clad_num, 
+		double host_clad_abs, 
+		double host_N_tot, 
+		int host_N_cells, 
+		double host_z_mesh, 
+		int host_mesh_z, 
+		int hostNumberOfPoints )
 {
 	sigmaE = host_sigma_e;	
 	sigmaA = host_sigma_a;
@@ -438,9 +718,9 @@ __global__ void raytraceStep( curandStateMtgp32* globalState, float* phi, int po
 __global__ void raytraceStep(
 		curandStateMtgp32* globalState, 
 		float* phi, 
-		int point2D, 
-		int level, 
-		int iterations, 
+		const int point2D, 
+		const int level, 
+		const int iterations, 
 		double *p_in, 
 		double *n_x, 
 		double *n_y, 
@@ -449,15 +729,13 @@ __global__ void raytraceStep(
 		int *forbidden, 
 		int* t_in, 
 		int* cell_type, 
-		int host_size_t, 
 		double* beta_v) {
 #endif
 	int id = threadIdx.x + blockIdx.x * blockDim.x;
-	unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
-	unsigned threadsPerPrism = blockDim.x * gridDim.x/numberOfPrisms; //9
-
+	const unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
+	const unsigned threadsPerPrism = blockDim.x * gridDim.x/numberOfPrisms;
 	// break, if we have more threads than we need
-	if(id >= threadsPerPrism*numberOfPrisms) // id >= 48600
+	if(id >= threadsPerPrism*numberOfPrisms)
 		return;
 
 	double gain = 0.;
@@ -468,14 +746,14 @@ __global__ void raytraceStep(
 
 	// this should give the same start values multiple times (so that every thread uses the same prism, which yields
 	// big benefits for the memory access (and caching!)
-	const unsigned startPrism = id/threadsPerPrism;
-	const int startLevel = (startPrism)/numberOfTriangles;
-	const int startTriangle=(startPrism-(numberOfTriangles*startLevel));
+	unsigned startPrism = id/threadsPerPrism;
+	int startLevel = (startPrism)/numberOfTriangles;
+	int startTriangle=(startPrism-(numberOfTriangles*startLevel));
 
 	// the indices of the vertices of the starttriangle
-	const int t1 = t_in[startTriangle];
-	const int t2 = t_in[startTriangle+ numberOfTriangles];
-	const int t3 = t_in[startTriangle+2*numberOfTriangles];
+	int t1 = t_in[startTriangle];
+	int t2 = t_in[startTriangle+ numberOfTriangles];
+	int t3 = t_in[startTriangle+2*numberOfTriangles];
 
 	// do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
 	for (int i=0; i<iterations ; ++i){
@@ -488,31 +766,22 @@ __global__ void raytraceStep(
 			u = 1-u;
 			v = 1-v;
 		}
-
 		double w = 1-u-v;
 
 		// convert the random startpoint into coordinates
 		double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
 		double xRand = p_in[t1]*u + p_in[t2]*v + p_in[t3]*w;
 		double yRand = p_in[ numberOfPoints + t1]*u + p_in[ numberOfPoints + t2]*v + p_in[ numberOfPoints + t3]*w;
-		//printf("u: %.40e\n",p_in[numberOfPoints+t1]);
-		//printf("v: %.40e\n",p_in [ numberOfPoints + t2]*v);
-		//printf("w: %.40e\n",p_in [ numberOfPoints + t3]*w);
-		//printf("yRand: %.40e\n",yRand);
+
 		__syncthreads();
 		gain += double(rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
+	//	gain += double(propagationOld(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,p_in, n_x, n_y, n_p, neighbors, forbidden , cell_type, beta_v));
 	}
 	
 
-	//if(point2D==0 && level==0)
-	//if(gain<0) printf("GAIN < 0! id=%d, gain=%e\n",id,gain);
-
 	// do the multiplication just at the end of all iterations
 	// (gives better numeric behaviour)
-	
 	gain *= beta_v[startTriangle + numberOfTriangles*startLevel];
-	//if(point2D==0 && level==0)
-	//if(multiplicator<0 ) printf("multi < 0!,pos2 id=%d, gain=%e, starttriangle=%d, startlevel=%d\n",id,gain,startTriangle,startLevel);
 #if USE_IMPORTANCE==true
 	atomicAdd(&(phi[point2D + level*numberOfPoints]),float(gain*importance[startTriangle + numberOfTriangles*startLevel]));
 #else
@@ -565,7 +834,7 @@ float runRayPropagationGpu(
 		std::vector<double> *pointsVector,
 		std::vector<double> *betaCellsVector,
 		float hostCladAbsorption,
-		float hostCladNumber,
+		int hostCladNumber,
 		float hostNTot,
 		float hostSigmaA,
 		float hostSigmaE,
@@ -708,7 +977,16 @@ float runRayPropagationGpu(
 	{
 		fprintf(stderr, "\nFilling the device Variables\n");
 		//Create constant values on GPU
-		setupGlobalVariablesKernel<<<1,1>>>(hostSigmaE, hostSigmaA, hostCladNumber, hostCladAbsorption, hostNTot, hostNumberOfTriangles, hostThicknessOfPrism, hostNumberOfLevels, hostNumberOfPoints); //@OPTIMIZE: initialize the constants as constants...
+		setupGlobalVariablesKernel<<<1,1>>>(
+				double(hostSigmaE), 
+				double(hostSigmaA),
+				hostCladNumber,
+				double(hostCladAbsorption),
+				double(hostNTot), 
+				hostNumberOfTriangles, 
+				double(hostThicknessOfPrism),
+				hostNumberOfLevels, 
+				hostNumberOfPoints); //@OPTIMIZE: initialize the constants as constants...
 
 		cudaThreadSynchronize();
 		testKernel<<<1,1>>>();
@@ -775,9 +1053,9 @@ float runRayPropagationGpu(
 			for(int level = 0; level < hostNumberOfLevels; ++level){
 				cudaThreadSynchronize();
 #if USE_IMPORTANCE==true
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues, importance);
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues, importance);
 #else
-				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, hostNumberOfTriangles, betaValues);
+				raytraceStep<<< blocks, threads >>> ( devMTGPStates, phi, point2D, level, iterations, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues);
 
 				if(kernelcount % 200 == 0)
 					fprintf(stderr, "Sampling point %d done\n",kernelcount);

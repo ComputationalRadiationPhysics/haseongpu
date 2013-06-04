@@ -45,7 +45,7 @@ int main(int argc, char **argv){
   std::vector<double> * points = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
   float cladAbsorption = 0;
-  float cladNumber = 0;
+  unsigned cladNumber = 0;
   float nTot = 0;
   float sigmaA = 0;
   float sigmaE = 0;
@@ -94,7 +94,7 @@ int main(int argc, char **argv){
 
   // Debug
   // fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
-  // fprintf(stderr, "cladNumber: %f\n", cladNumber);
+  // fprintf(stderr, "cladNumber: %d\n", cladNumber);
   // fprintf(stderr, "nTot: %e\n", nTot);
   // fprintf(stderr, "sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "sigmaE: %e\n", sigmaE);
@@ -119,7 +119,7 @@ int main(int argc, char **argv){
 				      betaValues, 
 				      ase,
 				      cladAbsorption,
-				      cladNumber,
+				      float(cladNumber),
 				      nTot,
 				      sigmaA,
 				      sigmaE,
