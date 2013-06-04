@@ -15,7 +15,7 @@ int parse_p_in(std::string root, std::vector<double>* );
 int parse_beta_cell(std::string root, std::vector<double>* );
 int parse_t_in(std::string root, std::vector<unsigned>* );
 float parse_clad_abs(std::string root);
-float parse_clad_num(std::string root);
+unsigned parse_clad_num(std::string root);
 float parse_n_tot(std::string root);
 float parse_sigma_a(std::string root);
 float parse_sigma_e(std::string root);
@@ -37,7 +37,7 @@ int parse(std::string location,
 	  std::vector<double> * p_in,
 	  std::vector<double> * beta_cell,
 	  float *clad_abs,
-	  float *clad_num,
+	  unsigned *clad_num,
 	  float *n_tot,
 	  float *sigma_a,
 	  float *sigma_e,
@@ -160,10 +160,10 @@ float parse_clad_abs(std::string root){
 }
 
 /* Parse clad_num.txt */
-float parse_clad_num(std::string root){
+unsigned parse_clad_num(std::string root){
   std::string line;
   std::ifstream fileStream; 
-  float number = 0;
+  unsigned number = 0;
   
   fileStream.open(root.append("clad_num.txt").c_str());
   if(fileStream.is_open()){
