@@ -102,6 +102,8 @@ int main(int argc, char **argv){
   // fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
   // fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
   // fprintf(stderr, "numberOfLevels: %d\n\n", numberOfLevels);
+  fprintf(stderr, "surface size %d", surfaces->size());
+
 
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
