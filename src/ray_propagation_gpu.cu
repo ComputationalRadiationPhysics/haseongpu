@@ -990,7 +990,7 @@ float runRayPropagationGpu(
 	// GPU
 	double  *points, *xOfNormals, *yOfNormals, *betaValues;
 	float *phiASE;
-	int *forbidden, *positionsOfNormalVectors, *neighbors, *triangleIndices, *cellTypes, surfacesNormalized;
+	int *forbidden, *positionsOfNormalVectors, *neighbors, *triangleIndices, *cellTypes, *surfacesNormalized;
 	curandStateMtgp32 *devMTGPStates;
 	mtgp32_kernel_params *devKernelParams;
 	// Importance
@@ -1100,6 +1100,7 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMalloc(&cellTypes,hostNumberOfTriangles * hostNumberOfLevels * sizeof(int)));
 		CUDA_CHECK_RETURN(cudaMalloc(&betaValues,hostNumberOfTriangles * (hostNumberOfLevels-1) * sizeof(double)));
 		CUDA_CHECK_RETURN(cudaMalloc(&phiASE,hostNumberOfPoints * hostNumberOfLevels * sizeof(float)));
+		CUDA_CHECK_RETURN(cudaMalloc(&surfacesNormalized,hostNumberOfTriangles * sizeof(float)));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
 		CUDA_CHECK_RETURN(cudaMalloc(&importance,hostNumberOfPoints * hostNumberOfLevels * sizeof(double)));
@@ -1122,7 +1123,7 @@ float runRayPropagationGpu(
 		CUDA_CHECK_RETURN(cudaMemcpy(cellTypes,hostCellTypes, hostNumberOfTriangles * hostNumberOfLevels * sizeof(int), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(betaValues, hostBetaValues, hostNumberOfTriangles * (hostNumberOfLevels-1) * sizeof(double), cudaMemcpyHostToDevice));
 		CUDA_CHECK_RETURN(cudaMemcpy(phiASE, hostPhiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyHostToDevice));
-		CUDA_CHECK_RETURN(cudaMemcpy(surfacesNormalized,hostSurfacesNormalized,hostNumberOfTriangles * sizeof(float),cudaMemcpyHostToDevice));
+		CUDA_CHECK_RETURN(cudaMemcpy(surfacesNormalized, hostSurfacesNormalized, hostNumberOfTriangles * sizeof(float),cudaMemcpyHostToDevice));
 
 #if USE_IMPORTANCE==true /// This part only appears if we compile with the importance sampling
 		CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPoints * (hostNumberOfLevels) * sizeof(double), cudaMemcpyHostToDevice));
@@ -1176,11 +1177,11 @@ float runRayPropagationGpu(
 		cudaEventSynchronize(stop);
 		cudaEventElapsedTime(&runtimeGpu, start, stop);
 		CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
+		int raysPerSampleNormalized = hostThreadsPerPrism * surfacesNormalizedSum * (hostNumberOfLevels-1);
 		for(int i=0; i< hostNumberOfPoints;++i){
 			for(int j=0 ; j<hostNumberOfLevels ; ++j)
 			{
 				int pos = i*hostNumberOfLevels+j;
-				int raysPerSampleNormalized = blocks*threads*raysPerThread*surfacesNormalizedSum;
 				hostPhiASE[pos] = float( (double(hostPhiASE[pos]) / (raysPerSampleNormalized * 4.0f * 3.14159)));
 				double gain_local = double(hostNTot)*(betaCellsVector->at(pos))*double(hostSigmaE+hostSigmaA)-double(hostNTot*hostSigmaA);
 				dndtAse->at(pos) = gain_local*hostPhiASE[pos]/hostCrystalFluorescence;
