@@ -14,6 +14,7 @@ int parse_n_y(std::string root, std::vector<double>* );
 int parse_p_in(std::string root, std::vector<double>* );
 int parse_beta_cell(std::string root, std::vector<double>* );
 int parse_t_in(std::string root, std::vector<unsigned>* );
+int parse_surface(std::string root, std::vector<float>* surface);
 float parse_clad_abs(std::string root);
 unsigned parse_clad_num(std::string root);
 float parse_n_tot(std::string root);
@@ -36,6 +37,7 @@ int parse(std::string location,
 	  std::vector<int> * n_p,
 	  std::vector<double> * p_in,
 	  std::vector<double> * beta_cell,
+	  std::vector<float> * surface,
 	  float *clad_abs,
 	  unsigned *clad_num,
 	  float *n_tot,
@@ -51,7 +53,6 @@ int parse(std::string location,
     location.erase(location.size()-1, 1);
   else if(location[location.size()-1] != '/')
     location.append("/");
-    
 
   // Parse every file for its own
   if(parse_beta_v(location, betas)) return 1;
@@ -64,7 +65,8 @@ int parse(std::string location,
   if(parse_p_in(location, p_in)) return 1;
   if(parse_beta_cell(location, beta_cell)) return 1;
   if(parse_t_in(location, t_in)) return 1;
-  
+  if(parse_surface(location, surface)) return 1;
+
   (*clad_abs) = parse_clad_abs(location);
   (*clad_num) = parse_clad_num(location);
   (*n_tot) = parse_n_tot(location);
@@ -597,4 +599,29 @@ float parse_tfluo(std::string root){
   return number;
 
 
+}
+
+/* Parse surface.txt */
+int parse_surface(std::string root, std::vector<float>* surface){
+  std::string line;
+  std::ifstream fileStream; 
+  float number = 0;
+  
+  fileStream.open(root.append("surface.txt").c_str());
+  if(fileStream.is_open()){
+    while(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+      surface->push_back(number);
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 1;
+  }
+
+  fileStream.close();
+  return 0;
 }
