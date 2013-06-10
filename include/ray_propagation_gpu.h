@@ -17,6 +17,7 @@ float runRayPropagationGpu(
 		std::vector<int> *positionsOfNormalVectorsVector,
 		std::vector<double> *pointsVector,
 		std::vector<double> *betaCellsVector,
+		std::vector<float> *surfacesVector,
 		float hostCladAbsorption,
 		int hostCladNumber,
 		float hostNTot,

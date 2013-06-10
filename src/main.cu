@@ -149,6 +149,7 @@ int main(int argc, char **argv){
 			positionsOfNormalVectors,
 			points,
 			betaCells,
+			surfaces,
 			cladAbsorption,
 			cladNumber,
 			nTot,
