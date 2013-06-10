@@ -44,6 +44,7 @@ int main(int argc, char **argv){
   std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
   std::vector<double> * points = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
+  std::vector<float> * surfaces = new std::vector<float>;
   float cladAbsorption = 0;
   unsigned cladNumber = 0;
   float nTot = 0;
@@ -87,7 +88,7 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, betaCells, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
