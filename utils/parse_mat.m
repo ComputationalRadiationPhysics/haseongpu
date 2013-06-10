@@ -97,9 +97,9 @@ x=fopen('beta_cell.txt','w');
 fprintf(x,'%.50f\n',beta_cell);
 fclose(x);
 
-%x=fopen('surface.txt','w')
-%fprintf(x,'%.50f\n',surface)
-%fclose(x)
+x=fopen('surface.txt','w')
+fprintf(x,'%.50f\n',surface)
+fclose(x)
 
 %x=fopen('x_center.txt','w')
 %fprintf(x,'%.50f\n',x_center)
