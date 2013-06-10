@@ -43,8 +43,9 @@ int main(int argc, char **argv){
   std::vector<int> * neighbors = new std::vector<int>;
   std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
   std::vector<double> * points = new std::vector<double>;
+  std::vector<double> * betaCells = new std::vector<double>;
   float cladAbsorption = 0;
-  float cladNumber = 0;
+  unsigned cladNumber = 0;
   float nTot = 0;
   float sigmaA = 0;
   float sigmaE = 0;
@@ -52,6 +53,7 @@ int main(int argc, char **argv){
   unsigned numberOfTriangles = 0;
   unsigned numberOfLevels = 0;
   float thicknessOfPrism = 1;
+  float crystalFluorescence = 0;
 
   // Parse Commandline
   if(argc <= 1){
@@ -85,14 +87,14 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &numberOfPoints, &numberOfTriangles, &numberOfLevels)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, betaCells, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
 
   // Debug
   // fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
-  // fprintf(stderr, "cladNumber: %f\n", cladNumber);
+  // fprintf(stderr, "cladNumber: %d\n", cladNumber);
   // fprintf(stderr, "nTot: %e\n", nTot);
   // fprintf(stderr, "sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "sigmaE: %e\n", sigmaE);
@@ -117,7 +119,7 @@ int main(int argc, char **argv){
 				      betaValues, 
 				      ase,
 				      cladAbsorption,
-				      cladNumber,
+				      float(cladNumber),
 				      nTot,
 				      sigmaA,
 				      sigmaE,
@@ -143,6 +145,7 @@ int main(int argc, char **argv){
 			neighbors,
 			positionsOfNormalVectors,
 			points,
+			betaCells,
 			cladAbsorption,
 			cladNumber,
 			nTot,
@@ -151,7 +154,8 @@ int main(int argc, char **argv){
 			numberOfPoints,
 			numberOfTriangles,
 			numberOfLevels,
-			thicknessOfPrism);
+			thicknessOfPrism,
+			crystalFluorescence);
 	strcpy(runmode, "Naive Ray Propagation GPU");
 	break;
       }

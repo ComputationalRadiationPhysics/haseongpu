@@ -16,14 +16,16 @@ float runRayPropagationGpu(
 		std::vector<int> *neighborsVector,
 		std::vector<int> *positionsOfNormalVectorsVector,
 		std::vector<double> *pointsVector,
+		std::vector<double> *betaCellsVector,
 		float hostCladAbsorption,
-		float hostCladNumber,
+		int hostCladNumber,
 		float hostNTot,
 		float hostSigmaA,
 		float hostSigmaE,
 		unsigned hostNumberOfPoints,
 		unsigned hostNumberOfTriangles,
 		unsigned hostNumberOfLevels,
-		float hostThicknessOfPrism);
+		float hostThicknessOfPrism,
+		float hostCrystalFluorescence);
 
 #endif

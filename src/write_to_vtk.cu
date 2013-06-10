@@ -1,6 +1,7 @@
 #include <iostream> /* cerr */
 #include <fstream> /* ofstream */
 #include <vector> /* vector */
+#include <iomanip> /* std::setprecision() */
 
 
 int writeToVtk(std::vector<double>* points, 
@@ -22,10 +23,10 @@ int writeToVtk(std::vector<double>* points,
 
   // Write point data
   vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
-  vtkFile << "POINTS " << points->size() <<  " float" << std::endl;
-  for(unsigned level_i=0; level_i <= numberOfLevels; ++level_i){
+  vtkFile << "POINTS " << numberOfPoints*numberOfLevels <<  " float" << std::endl;
+  for(unsigned level_i=0; level_i < numberOfLevels; ++level_i){
     for(unsigned point_i=0; point_i < numberOfPoints; ++point_i){
-      vtkFile << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i * thicknessOfPrism << std::endl;
+      vtkFile << std::fixed << std::setprecision(6) << points->at(point_i) << " " << points->at(point_i + numberOfPoints) << " " << level_i * thicknessOfPrism << std::endl;
 
     }
 
@@ -33,14 +34,15 @@ int writeToVtk(std::vector<double>* points,
 
   // Write prism data
   vtkFile << "CELLS" << " " << (numberOfLevels-1) * numberOfTriangles << " " << (numberOfLevels-1) * numberOfTriangles * 7 << std::endl;
-  for(unsigned level_i=0; level_i < numberOfLevels; ++level_i){
+  for(unsigned level_i=0; level_i < (numberOfLevels-1); ++level_i){
     for(unsigned triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-      vtkFile << "6 " << level_i * numberOfPoints + triangleIndices->at(triangle_i) << " "
+      vtkFile << "6 " 
+		  << level_i * numberOfPoints + triangleIndices->at(triangle_i) << " "
 	      << level_i * numberOfPoints + triangleIndices->at(numberOfTriangles + triangle_i) << " "
 	      << level_i * numberOfPoints + triangleIndices->at(2 * numberOfTriangles + triangle_i) << " "
-	      << level_i+1 * numberOfPoints + triangleIndices->at(triangle_i) << " "
-	      << level_i+1 * numberOfPoints + triangleIndices->at(numberOfTriangles + triangle_i) << " "
-	      << level_i+1 * numberOfPoints + triangleIndices->at(2 * numberOfTriangles + triangle_i) << std::endl;
+	      << (level_i+1) * numberOfPoints + triangleIndices->at(triangle_i) << " "
+	      << (level_i+1) * numberOfPoints + triangleIndices->at(numberOfTriangles + triangle_i) << " "
+	      << (level_i+1) * numberOfPoints + triangleIndices->at(2 * numberOfTriangles + triangle_i) << std::endl;
 	
     }
 
@@ -54,11 +56,11 @@ int writeToVtk(std::vector<double>* points,
 
   // Write ase phi
   vtkFile << "POINT_DATA " << numberOfLevels * numberOfPoints << std::endl;
-  vtkFile << "SCALARS scalars float 1 " << std::endl;
+  vtkFile << "SCALARS scalars float 1" << std::endl;
   vtkFile << "LOOKUP_TABLE default" << std::endl;
 
   for(unsigned ase_i=0; ase_i < numberOfLevels * numberOfPoints; ++ase_i){
-    vtkFile << ase->at(ase_i) << std::endl;
+    vtkFile << std::fixed << std::setprecision(6) << ase->at(ase_i) << std::endl;
   }
   
   vtkFile.close();
