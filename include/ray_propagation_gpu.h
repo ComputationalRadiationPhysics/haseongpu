@@ -3,7 +3,7 @@
 #include <vector>
 
 float runRayPropagationGpu(
-		std::vector<double> *ase, 
+		std::vector<double> *dndtAse, 
 		unsigned &threads, 
 		unsigned &blocks, 
 		unsigned &totalNumberOfRays,
