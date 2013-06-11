@@ -101,12 +101,12 @@ x=fopen('surface.txt','w')
 fprintf(x,'%.50f\n',surface)
 fclose(x)
 
-%x=fopen('x_center.txt','w')
-%fprintf(x,'%.50f\n',x_center)
-%fclose(x)
+x=fopen('x_center.txt','w')
+fprintf(x,'%.50f\n',x_center)
+fclose(x)
 
-%x=fopen('y_center.txt','w')
-%fprintf(x,'%.50f\n',y_center)
-%fclose(x)
+x=fopen('y_center.txt','w')
+fprintf(x,'%.50f\n',y_center)
+fclose(x)
 
 end 
