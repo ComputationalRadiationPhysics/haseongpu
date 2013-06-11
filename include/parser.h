@@ -621,7 +621,6 @@ int parse_surface(std::string root, std::vector<float>* surface){
     fileStream.close();
     return 1;
   }
-
   fileStream.close();
   return 0;
 }
