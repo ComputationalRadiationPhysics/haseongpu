@@ -9,8 +9,10 @@ int parse_cell_type(std::string root, std::vector<unsigned>* cell_types);
 int parse_forbidden(std::string root, std::vector<int>* forbidden);
 int parse_neighbors(std::string root, std::vector<int>* neighbors);
 int parse_n_p(std::string root, std::vector<int>* n_p);
-int parse_n_x(std::string root, std::vector<double>* );
-int parse_n_y(std::string root, std::vector<double>* );
+int parse_n_x(std::string root, std::vector<double>* n_x);
+int parse_n_y(std::string root, std::vector<double>* n_y);
+int parse_x_center(std::string root, std::vector<double>* x_center);
+int parse_y_center(std::string root, std::vector<double>* y_center);
 int parse_p_in(std::string root, std::vector<double>* );
 int parse_beta_cell(std::string root, std::vector<double>* );
 int parse_t_in(std::string root, std::vector<unsigned>* );
@@ -38,6 +40,8 @@ int parse(std::string location,
 	  std::vector<double> * p_in,
 	  std::vector<double> * beta_cell,
 	  std::vector<float> * surface,
+	  std::vector<double> * x_center,
+	  std::vector<double> * y_center,
 	  float *clad_abs,
 	  unsigned *clad_num,
 	  float *n_tot,
@@ -61,6 +65,8 @@ int parse(std::string location,
   if(parse_neighbors(location, neighbors)) return 1;
   if(parse_n_p(location, n_p)) return 1;
   if(parse_n_x(location, n_x)) return 1;
+  if(parse_x_center(location, x_center)) return 1;
+  if(parse_x_center(location, y_center)) return 1;
   if(parse_n_y(location, n_y)) return 1;
   if(parse_p_in(location, p_in)) return 1;
   if(parse_beta_cell(location, beta_cell)) return 1;
@@ -621,6 +627,56 @@ int parse_surface(std::string root, std::vector<float>* surface){
     fileStream.close();
     return 1;
   }
+  fileStream.close();
+  return 0;
+}
+
+/* Parse x_center.txt */
+int parse_x_center(std::string root, std::vector<double>* x_center){
+  std::string line;
+  std::ifstream fileStream; 
+  double number = 0;
+  
+  fileStream.open(root.append("x_center.txt").c_str());
+  if(fileStream.is_open()){
+    while(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+      x_center->push_back(number);
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 1;
+  }
+
+  fileStream.close();
+  return 0;
+}
+
+/* Parse y_center.txt */
+int parse_y_center(std::string root, std::vector<double>* y_center){
+  std::string line;
+  std::ifstream fileStream; 
+  double number = 0;
+  
+  fileStream.open(root.append("y_center.txt").c_str());
+  if(fileStream.is_open()){
+    while(fileStream.good()){
+      std::getline(fileStream, line);
+      number = atof(line.c_str());
+      y_center->push_back(number);
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", root.c_str());
+    fileStream.close();
+    return 1;
+  }
+
   fileStream.close();
   return 0;
 }

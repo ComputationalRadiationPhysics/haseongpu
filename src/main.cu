@@ -18,7 +18,6 @@
 #include "geometry_gpu.h"
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
-//#include "testdata_transposed.h"
 #include "ray_propagation_gpu.h"
 #include "buildgrid.h"
 #include "parser.h"
@@ -45,6 +44,9 @@ int main(int argc, char **argv){
   std::vector<double> * points = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
   std::vector<float> * surfaces = new std::vector<float>;
+  std::vector<double> *xOfTriangleCenter = new std::vector<double>;
+  std::vector<double> *yOfTriangleCenter = new std::vector<double>;
+
   float cladAbsorption = 0;
   unsigned cladNumber = 0;
   float nTot = 0;
@@ -88,7 +90,10 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
+	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter
+	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
+	   &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
@@ -150,6 +155,8 @@ int main(int argc, char **argv){
 			points,
 			betaCells,
 			surfaces,
+			xOfTriangleCenterVector,
+			yOfTriangleCenterVector,
 			cladAbsorption,
 			cladNumber,
 			nTot,
