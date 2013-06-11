@@ -91,9 +91,9 @@ int main(int argc, char **argv){
   }
 
   if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
-	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter
+	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter,
 	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
-	   &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
+	   &numberOfPoints, &numberOfTriangles, &numberOfLevels, &crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
@@ -155,8 +155,8 @@ int main(int argc, char **argv){
 			points,
 			betaCells,
 			surfaces,
-			xOfTriangleCenterVector,
-			yOfTriangleCenterVector,
+			xOfTriangleCenter,
+			yOfTriangleCenter,
 			cladAbsorption,
 			cladNumber,
 			nTot,
