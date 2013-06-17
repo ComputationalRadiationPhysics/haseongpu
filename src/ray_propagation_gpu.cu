@@ -1081,9 +1081,15 @@ float runRayPropagationGpu(
     return 1;
   }
 
-  memset(hostPhiASE, 0.0, hostNumberOfPoints * hostNumberOfLevels * sizeof(float)); 
-  memset(hostImportance, 0.0, hostNumberOfPoints * hostNumberOfLevels * sizeof(double));
-  memset(hostNumberOfImportantRays, 0 , hostNumberOfPrisms * sizeof(int));
+  for(int i=0; i < hostNumberOfPoints * hostNumberOfLevels; ++i){
+    hostPhiASE[i] = 0.0;
+
+  }
+
+  for(int i=0; i < hostNumberOfPrisms; ++i){
+    hostNumberOfImportantRays[i] = 1;
+    hostImportance[i] = 1.0;
+  }
 
   //TODO: remove
   surfacesVector->pop_back();
@@ -1113,25 +1119,6 @@ float runRayPropagationGpu(
     /** \TODO initialize with time */
     CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, 1234));
   }
-
-  // Importance sampling
-// #if USE_IMPORTANCE==true
-//   fprintf(stderr, "\nStarting the Importance Sampling\n");
-//   for(int point = 0; point < hostNumberOfTriangles; ++point){
-//     for(int level = 0; level < hostNumberOfLevels; ++level){
-//       importf(point, level, hostImportance, hostNumberOfImportantRays, 
-// 	      hostPoints, hostXOfNormals, hostYOfNormals, hostPositionsOfNormalVectors, 
-// 	      hostNeighbors, hostForbidden, hostCellTypes, hostBetaValues, 
-// 	      hostXOfTriangleCenter, hostYOfTriangleCenter, hostSurfaces, hostRaysPerSample,
-// 	      hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, hostThicknessOfPrism,
-// 	      hostSigmaA, hostSigmaE, hostCladNumber, hostCladAbsorption,hostNTot
-// 	      );
-
-//     }
-
-//   }
-// #endif
-
 
 
 
@@ -1197,6 +1184,7 @@ float runRayPropagationGpu(
     for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
       for(int level = 0; level < hostNumberOfLevels; ++level){
 	cudaThreadSynchronize();
+	// Importance for one sample
 	importf(point2D, level, hostImportance, hostNumberOfImportantRays, 
 		hostPoints, hostXOfNormals, hostYOfNormals, hostPositionsOfNormalVectors, 
 		hostNeighbors, hostForbidden, hostCellTypes, hostBetaValues, 
@@ -1204,7 +1192,10 @@ float runRayPropagationGpu(
 		hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, hostThicknessOfPrism,
 		hostSigmaA, hostSigmaE, hostCladNumber, hostCladAbsorption,hostNTot
 		);
+	CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(numberOfImportantRays, hostNumberOfImportantRays, hostNumberOfPrisms * sizeof(int), cudaMemcpyHostToDevice));
 
+	// Calculate for one sample
 	raytraceStep<<< blocks, threads >>> ( devMTGPStates, phiASE, point2D, level, hostRaysPerThread, 
 					      points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
 					      neighbors, forbidden, triangleIndices, cellTypes, betaValues, importance, 
