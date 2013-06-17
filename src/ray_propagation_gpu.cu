@@ -447,9 +447,9 @@ __global__ void raytraceStep(
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   const unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
-  const unsigned threadsPerPrism = blockDim.x * gridDim.x/numberOfPrisms;
+  const unsigned threadsPerPrism = blockDim.x * gridDim.x / numberOfPrisms;
   // break, if we have more threads than we need
-  if(id >= threadsPerPrism*numberOfPrisms)
+  if(id >= threadsPerPrism * numberOfPrisms)
     return;
 
   double gain = 0.;
@@ -460,7 +460,7 @@ __global__ void raytraceStep(
 
   // this should give the same start values multiple times (so that every thread uses the same prism, which yields
   // big benefits for the memory access (and caching!)
-  unsigned startPrism = id/threadsPerPrism;
+  unsigned startPrism = id % numberOfPrisms;
   int startLevel = (startPrism)/numberOfTriangles;
   int startTriangle = (startPrism-(numberOfTriangles*startLevel));
 
@@ -876,12 +876,12 @@ void importf(int point,
 
   }
 
-  // Calculate number of rays/triangle
+  // Calculate number of rays/prism
   for (int i_t=0; i_t < numberOfTriangles; ++i_t){
     for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
       numberOfImportantRays[i_t + i_z*numberOfTriangles] = (int)(floor(importance[i_t + i_z * numberOfTriangles] / sumPhi * raysPerSample));
       raysDump +=  numberOfImportantRays[i_t + i_z*numberOfTriangles];
-	  
+      //fprintf(stderr, "[%d][%d] i: %.20f n: %d\n", i_z, i_t, importance[i_t + i_z*numberOfTriangles], numberOfImportantRays[i_t + i_z*numberOfTriangles]);
     }
 
   }
@@ -907,6 +907,7 @@ void importf(int point,
   	importance[i_t + i_z*numberOfTriangles] = 0; 
 
       }
+
 
     }
 
@@ -978,7 +979,7 @@ float runRayPropagationGpu(
 			   std::vector<double> *dndtAse, 
 			   unsigned &threads, 
 			   unsigned &blocks, 
-			   unsigned &totalNumberOfRays,
+			   unsigned &hostRaysPerSample,
 			   std::vector<double> *betaValuesVector,
 			   std::vector<double> *xOfNormalsVector,
 			   std::vector<double> *yOfNormalsVector,
@@ -1021,10 +1022,7 @@ float runRayPropagationGpu(
   double* hostPoints;
   float* hostSurfaces;
   // TMP CALC
-  unsigned hostRaysPerSample;
   unsigned hostNumberOfPrisms;
-  unsigned hostThreadsPerPrism;
-  unsigned hostRaysPerIterationPerSample;
   unsigned hostRaysPerThread;
   cudaEvent_t start, stop;
   float runtimeGpu;
@@ -1045,7 +1043,7 @@ float runRayPropagationGpu(
 	
   // Variables defintions
   threads = 120;
-  blocks = 45;  // TODO: change number of blocks/threads dynamically to allow more flexible number of rays (increase up to 200)
+  blocks = 90;  // TODO: change number of blocks/threads dynamically to allow more flexible number of rays (increase up to 200)
   hostBetaValues = doubleVectorToArray(betaValuesVector);
   hostXOfNormals = doubleVectorToArray(xOfNormalsVector);
   hostYOfNormals = doubleVectorToArray(yOfNormalsVector);
@@ -1058,13 +1056,11 @@ float runRayPropagationGpu(
   hostSurfaces =  (float*) &(surfacesVector[0]);
   hostPositionsOfNormalVectors = intVectorToArray(positionsOfNormalVectorsVector);
   hostPoints = doubleVectorToArray(pointsVector);
-  hostRaysPerSample = ceil(double(totalNumberOfRays)/double(hostNumberOfPoints * (hostNumberOfLevels)));
   hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
-  hostThreadsPerPrism = (threads*blocks)/hostNumberOfPrisms; 
-  hostRaysPerIterationPerSample = hostThreadsPerPrism*hostNumberOfPrisms;
-  hostRaysPerThread = ceil(double(hostRaysPerSample) / hostRaysPerIterationPerSample);
-  hostRaysPerSample = hostRaysPerIterationPerSample * hostRaysPerThread;
-  totalNumberOfRays = unsigned(hostRaysPerSample * (hostNumberOfPoints * (hostNumberOfLevels)));
+
+  hostRaysPerThread = ceil(double(hostRaysPerSample) /  (blocks * threads));
+  hostRaysPerSample = threads * blocks * hostRaysPerThread;
+  
   runtimeGpu = 0.0;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
@@ -1074,12 +1070,6 @@ float runRayPropagationGpu(
   surfacesNormalizedSum=0;
   double hostImportance[hostNumberOfPrisms];
   int hostNumberOfImportantRays[hostNumberOfPrisms];
-
-  // Init host variables
-  if(hostThreadsPerPrism < 1){
-    fprintf(stderr,"\n\nNot enough threads/blocks!\n\n");
-    return 1;
-  }
 
   for(int i=0; i < hostNumberOfPoints * hostNumberOfLevels; ++i){
     hostPhiASE[i] = 0.0;
@@ -1182,7 +1172,8 @@ float runRayPropagationGpu(
 		
     // Every Kernel calculates one sample point
     for(int point2D = 0; point2D < hostNumberOfPoints ; ++point2D){
-      for(int level = 0; level < hostNumberOfLevels; ++level){
+      //for(int level = 0; level < hostNumberOfLevels; ++level){
+       for(int level = 0; level < 1; ++level){
 	cudaThreadSynchronize();
 	// Importance for one sample
 	importf(point2D, level, hostImportance, hostNumberOfImportantRays, 
@@ -1217,7 +1208,7 @@ float runRayPropagationGpu(
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&runtimeGpu, start, stop);
     CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
-    int raysPerSampleNormalized = hostThreadsPerPrism * surfacesNormalizedSum * (hostNumberOfLevels-1) * hostRaysPerThread;
+    //int raysPerSampleNormalized = hostThreadsPerPrism * surfacesNormalizedSum * (hostNumberOfLevels-1) * hostRaysPerThread;
     for(int i=0; i< hostNumberOfPoints;++i){
       for(int j=0 ; j<hostNumberOfLevels ; ++j)
 	{
