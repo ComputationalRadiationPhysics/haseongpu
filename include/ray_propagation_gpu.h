@@ -6,7 +6,7 @@ float runRayPropagationGpu(
 		std::vector<double> *dndtAse, 
 		unsigned &threads, 
 		unsigned &blocks, 
-		unsigned &totalNumberOfRays,
+		unsigned &hostRaysPerSample,
 		std::vector<double> *betaValuesVector,
 		std::vector<double> *xOfNormalsVector,
 		std::vector<double> *yOfNormalsVector,

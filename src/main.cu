@@ -25,6 +25,7 @@
 
 int main(int argc, char **argv){
   unsigned raysTotal;
+  unsigned raysPerSample;
   char runmode[100];
   char experimentLocation[256];
   float runtime = 0.0;
@@ -71,7 +72,7 @@ int main(int argc, char **argv){
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--rays=", 6) == 0){
       const char* pos = strrchr(argv[i],'=');
-      raysTotal = atoi(pos+1);
+      raysPerSample = atoi(pos+1);
     }
   }
 
@@ -140,7 +141,7 @@ int main(int argc, char **argv){
 			ase,
 			threads, 
 			blocks, 
-			raysTotal,
+			raysPerSample,
 			betaValues,
 			xOfNormals,
 			yOfNormals,
@@ -164,7 +165,7 @@ int main(int argc, char **argv){
 			numberOfLevels,
 			thicknessOfPrism,
 			crystalFluorescence);
-	strcpy(runmode, "Naive Ray Propagation GPU");
+	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
     
@@ -186,9 +187,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
-  fprintf(stderr, "C Samples           : %d\n", (int) samples->size());
-  fprintf(stderr, "C Rays/Sample       : %d\n", raysTotal / samples->size());
-  fprintf(stderr, "C Rays Total        : %d\n", raysTotal);
+  fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
+  fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
+  fprintf(stderr, "C Rays Total        : %d\n", raysPerSample * ase->size());
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
