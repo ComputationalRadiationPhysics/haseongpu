@@ -66,7 +66,7 @@ int parse(std::string location,
   if(parse_n_p(location, n_p)) return 1;
   if(parse_n_x(location, n_x)) return 1;
   if(parse_x_center(location, x_center)) return 1;
-  if(parse_x_center(location, y_center)) return 1;
+  if(parse_y_center(location, y_center)) return 1;
   if(parse_n_y(location, n_y)) return 1;
   if(parse_p_in(location, p_in)) return 1;
   if(parse_beta_cell(location, beta_cell)) return 1;
@@ -110,7 +110,7 @@ int parse_beta_v(std::string root, std::vector<double>* betas){
     fileStream.close();
     return 1;
   }
-
+  betas->pop_back();
   fileStream.close();
   return 0;
 }
@@ -135,7 +135,8 @@ int parse_cell_type(std::string root, std::vector<unsigned>* cell_types){
     fileStream.close();
     return 1;
   }
-
+  
+  cell_types->pop_back();
   fileStream.close();
   return 0;
 
@@ -161,6 +162,7 @@ float parse_clad_abs(std::string root){
     return  0.0;
   }
 
+  
   fileStream.close();
   return number;
 
@@ -214,6 +216,7 @@ int parse_forbidden(std::string root, std::vector<int>* forbidden){
     return 1;
   }
 
+  forbidden->pop_back();
   fileStream.close();
   return 0;
 
@@ -240,6 +243,7 @@ int parse_neighbors(std::string root, std::vector<int>* neighbors){
     return 1;
   }
 
+  neighbors->pop_back();
   fileStream.close();
   return 0;
 
@@ -266,6 +270,7 @@ int parse_n_p(std::string root, std::vector<int>* n_p){
     return 1;
   }
 
+  n_p->pop_back();
   fileStream.close();
   return 0;
 
@@ -318,6 +323,7 @@ int parse_n_x(std::string root, std::vector<double>* n_x){
     return 1;
   }
 
+  n_x->pop_back();
   fileStream.close();
   return 0;
 }
@@ -343,6 +349,7 @@ int parse_n_y(std::string root, std::vector<double>* n_y){
     return 1;
   }
 
+  n_y->pop_back();
   fileStream.close();
   return 0;
 }
@@ -368,6 +375,7 @@ int parse_p_in(std::string root, std::vector<double>* p_in){
     return 1;
   }
 
+  p_in->pop_back();
   fileStream.close();
   return 0;
 
@@ -394,6 +402,7 @@ int parse_beta_cell(std::string root, std::vector<double>* beta_cell){
     return 1;
   }
 
+  beta_cell->pop_back();
   fileStream.close();
   return 0;
 
@@ -524,6 +533,7 @@ int parse_t_in(std::string root, std::vector<unsigned>* t_in){
     return 1;
   }
   
+  t_in->pop_back();
   fileStream.close();
   return 0;
 
@@ -627,6 +637,8 @@ int parse_surface(std::string root, std::vector<float>* surface){
     fileStream.close();
     return 1;
   }
+
+  surface->pop_back();
   fileStream.close();
   return 0;
 }
@@ -652,6 +664,7 @@ int parse_x_center(std::string root, std::vector<double>* x_center){
     return 1;
   }
 
+  x_center->pop_back();
   fileStream.close();
   return 0;
 }
@@ -677,6 +690,7 @@ int parse_y_center(std::string root, std::vector<double>* y_center){
     return 1;
   }
 
+  y_center->pop_back();
   fileStream.close();
   return 0;
 }
