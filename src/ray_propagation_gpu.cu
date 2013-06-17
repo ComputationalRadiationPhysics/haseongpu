@@ -443,7 +443,9 @@ __global__ void raytraceStep(
 			     double* betaValues,
 			     double* importance,
 			     int* numberOfImportantRays,
-			     int* surfacesNormalized) {
+			     int* surfacesNormalized,
+				 unsigned* indicesOfPrisms,
+				 unsigned raysPerSample) {
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   const unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
@@ -460,63 +462,68 @@ __global__ void raytraceStep(
 
   // this should give the same start values multiple times (so that every thread uses the same prism, which yields
   // big benefits for the memory access (and caching!)
-  unsigned startPrism = id/threadsPerPrism;
-  int startLevel = (startPrism)/numberOfTriangles;
-  int startTriangle = (startPrism-(numberOfTriangles*startLevel));
+//  unsigned startPrism = id/threadsPerPrism;
+
+  for (int i=0; i < 9999 ; ++i){
+	  int rayNumber = id+blockDim.x*gridDim.x * i;
+	  if(rayNumber >= raysPerSample){
+		  return;
+	  }
+	  int startPrism = indicesOfPrisms[rayNumber];
+
+	  int startLevel = (startPrism)/numberOfTriangles;
+	  int startTriangle = (startPrism-(numberOfTriangles*startLevel));
+
 
 #if TEST_VALUES==true
-  if(startPrism != (startTriangle+(startLevel*numberOfTriangles))){
-    printf("StartTriangle/StartLevel incorrect!");
-  }
-  if(startTriangle >= 600){
-	
-    printf("StartTriangle/StartLevel incorrect!");
-  }
-  //if(startPrism == 5399){
-  //	printf("startprism: %d, id=%d, threadsPerPrism=%d\n",startPrism,id,threadsPerPrism);
-  //}
+	  if(startPrism != (startTriangle+(startLevel*numberOfTriangles))){
+		  printf("StartTriangle/StartLevel incorrect!");
+	  }
+	  if(startTriangle >= 600){
+
+		  printf("StartTriangle/StartLevel incorrect!");
+	  }
 #endif
 
-  // the indices of the vertices of the starttriangle
-  int t1 = triangleIndices[startTriangle];
-  int t2 = triangleIndices[startTriangle+ numberOfTriangles];
-  int t3 = triangleIndices[startTriangle+2*numberOfTriangles];
+	  // the indices of the vertices of the starttriangle
+	  int t1 = triangleIndices[startTriangle];
+	  int t2 = triangleIndices[startTriangle+ numberOfTriangles];
+	  int t3 = triangleIndices[startTriangle+2*numberOfTriangles];
 
-  // do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
-  for (int i=0; i < numberOfImportantRays[startPrism]; ++i){
-    //for (int i=0; i<blah; ++i){
-    // random startpoint generation
-    double u = curand_uniform(&globalState[blockIdx.x]);
-    double v = curand_uniform(&globalState[blockIdx.x]);
+	  // do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
+	  //for (int i=0; i<blah; ++i){
+	  // random startpoint generation
+	  double u = curand_uniform(&globalState[blockIdx.x]);
+	  double v = curand_uniform(&globalState[blockIdx.x]);
 
-    if((u+v)>1)
-      {
-	u = 1-u;
-	v = 1-v;
-      }
-    double w = 1-u-v;
+	  if((u+v)>1)
+	  {
+		  u = 1-u;
+		  v = 1-v;
+	  }
+	  double w = 1-u-v;
 
-    // convert the random startpoint into coordinates
-    double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
-    double xRand = points[t1]*u + points[t2]*v + points[t3]*w;
-    double yRand = points[ numberOfPoints + t1]*u + points[ numberOfPoints + t2]*v + points[ numberOfPoints + t3]*w;
+	  // convert the random startpoint into coordinates
+	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x]))* thicknessOfPrism;
+	  double xRand = points[t1]*u + points[t2]*v + points[t3]*w;
+	  double yRand = points[ numberOfPoints + t1]*u + points[ numberOfPoints + t2]*v + points[ numberOfPoints + t3]*w;
 
-    __syncthreads();
-    gain += rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
-			      startTriangle, startLevel ,points, xOfNormals, yOfNormals, 
-			      positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues);
-    //gain += double(propagationOld(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues));
-  }
+	  __syncthreads();
+	  gain += rayPropagationGpu(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
+			  startTriangle, startLevel ,points, xOfNormals, yOfNormals, 
+			  positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues);
+	  //gain += double(propagationOld(xRand, yRand, zRand, endPointX, endPointY, endPointZ, startTriangle, startLevel ,points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues));
 	
 
-  // do the multiplication just at the end of all raysPerThread
-  // (gives better numeric behaviour)
-  gain *= betaValues[startPrism];///surfacesNormalized[startTriangle];
+	  // do the multiplication just at the end of all raysPerThread
+	  // (gives better numeric behaviour)
+	  gain *= betaValues[startPrism];///surfacesNormalized[startTriangle];
 #if USE_IMPORTANCE==true
-  atomicAdd(&(phiASE[point2D + level*numberOfPoints]), float(gain * importance[startPrism]));
+	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]), float(gain * importance[startPrism]));
 #else
-  atomicAdd(&(phiASE[point2D + level*numberOfPoints]),float(gain));
+	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]),float(gain));
 #endif
+  }
   return;
 }
 
@@ -1042,6 +1049,7 @@ float runRayPropagationGpu(
   mtgp32_kernel_params *devKernelParams;
   int *numberOfImportantRays;
   double *importance;
+  unsigned *indicesOfPrisms;
 	
   // Variables defintions
   threads = 120;
@@ -1074,6 +1082,7 @@ float runRayPropagationGpu(
   surfacesNormalizedSum=0;
   double hostImportance[hostNumberOfPrisms];
   int hostNumberOfImportantRays[hostNumberOfPrisms];
+  int hostIndicesOfPrisms[hostRaysPerSample];
 
   // Init host variables
   if(hostThreadsPerPrism < 1){
@@ -1167,6 +1176,7 @@ float runRayPropagationGpu(
     // Memory importance sampling
     CUDA_CHECK_RETURN(cudaMalloc(&importance, hostNumberOfPrisms * sizeof(double)));
     CUDA_CHECK_RETURN(cudaMalloc(&numberOfImportantRays, hostNumberOfPrisms * sizeof(int)));
+    CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(int)));
 
     /// Copy data from host to device
     CUDA_CHECK_RETURN(cudaMemcpy(points, hostPoints, 2 * hostNumberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
@@ -1205,10 +1215,22 @@ float runRayPropagationGpu(
 		hostSigmaA, hostSigmaE, hostCladNumber, hostCladAbsorption,hostNTot
 		);
 
+	int index=0;
+	for(int currentPrism=0;currentPrism<hostNumberOfPrisms;++currentPrism){
+		for(int k=0;k<hostNumberOfImportantRays[currentPrism];++k){
+			indicesOfPrisms[index]=currentPrism;
+			index++;
+		}
+	}
+
+    CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(int), cudaMemcpyHostToDevice));
+
+
+
 	raytraceStep<<< blocks, threads >>> ( devMTGPStates, phiASE, point2D, level, hostRaysPerThread, 
 					      points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
 					      neighbors, forbidden, triangleIndices, cellTypes, betaValues, importance, 
-					      numberOfImportantRays, surfacesNormalized );
+					      numberOfImportantRays, surfacesNormalized,indicesOfPrisms,hostRaysPerSample );
 
 	if(kernelcount % 200 == 0)
 	  fprintf(stderr, "Sampling point %d done\n",kernelcount);
