@@ -18,7 +18,6 @@
 #include "geometry_gpu.h"
 #include "ase_bruteforce_kernel.h"
 #include "ase_bruteforce_cpu.h"
-//#include "testdata_transposed.h"
 #include "ray_propagation_gpu.h"
 #include "buildgrid.h"
 #include "parser.h"
@@ -26,6 +25,7 @@
 
 int main(int argc, char **argv){
   unsigned raysTotal;
+  unsigned raysPerSample;
   char runmode[100];
   char experimentLocation[256];
   float runtime = 0.0;
@@ -45,6 +45,8 @@ int main(int argc, char **argv){
   std::vector<double> * points = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
   std::vector<float> * surfaces = new std::vector<float>;
+  std::vector<double> *xOfTriangleCenter = new std::vector<double>;
+  std::vector<double> *yOfTriangleCenter = new std::vector<double>;
   float cladAbsorption = 0;
   unsigned cladNumber = 0;
   float nTot = 0;
@@ -70,7 +72,7 @@ int main(int argc, char **argv){
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--rays=", 6) == 0){
       const char* pos = strrchr(argv[i],'=');
-      raysTotal = atoi(pos+1);
+      raysPerSample = atoi(pos+1);
     }
   }
 
@@ -88,7 +90,10 @@ int main(int argc, char **argv){
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, &numberOfPoints, &numberOfTriangles, &numberOfLevels,&crystalFluorescence)){
+  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
+	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter,
+	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
+	   &numberOfPoints, &numberOfTriangles, &numberOfLevels, &crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
@@ -136,7 +141,7 @@ int main(int argc, char **argv){
 			ase,
 			threads, 
 			blocks, 
-			raysTotal,
+			raysPerSample,
 			betaValues,
 			xOfNormals,
 			yOfNormals,
@@ -148,6 +153,8 @@ int main(int argc, char **argv){
 			points,
 			betaCells,
 			surfaces,
+			xOfTriangleCenter,
+			yOfTriangleCenter,
 			cladAbsorption,
 			cladNumber,
 			nTot,
@@ -158,7 +165,7 @@ int main(int argc, char **argv){
 			numberOfLevels,
 			thicknessOfPrism,
 			crystalFluorescence);
-	strcpy(runmode, "Naive Ray Propagation GPU");
+	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
     
@@ -180,9 +187,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
-  fprintf(stderr, "C Samples           : %d\n", (int) samples->size());
-  fprintf(stderr, "C Rays/Sample       : %d\n", raysTotal / samples->size());
-  fprintf(stderr, "C Rays Total        : %d\n", raysTotal);
+  fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
+  fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
+  fprintf(stderr, "C Rays Total        : %d\n", raysPerSample * ase->size());
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
