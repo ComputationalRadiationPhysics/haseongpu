@@ -461,7 +461,7 @@ __global__ void raytraceStep(
   // this should give the same start values multiple times (so that every thread uses the same prism, which yields
   // big benefits for the memory access (and caching!)
   unsigned startPrism = id % numberOfPrisms;
-  int startLevel = (startPrism)/numberOfTriangles;
+  int startLevel = (startPrism) / numberOfTriangles;
   int startTriangle = (startPrism-(numberOfTriangles*startLevel));
 
 #if TEST_VALUES==true
