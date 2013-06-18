@@ -28,6 +28,56 @@ unsigned parse_size_t(std::string root);
 unsigned parse_mesh_z(std::string root);
 float parse_tfluo(std::string root);
 
+
+template <class T>
+int fileToVector(std::string filename, std::vector<T> *v){
+  std::string line;
+  std::ifstream fileStream; 
+  T value = 0.0;
+
+  fileStream.open(filename.c_str());
+  if(fileStream.is_open()){
+    while(fileStream.good()){
+      std::getline(fileStream, line);
+      value = (T) atof(line.c_str());
+      v->push_back(value);
+    }
+
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", filename.c_str());
+    fileStream.close();
+    return 1;
+  }
+  v->pop_back();
+  fileStream.close();
+  return 0;
+  
+}
+
+template <class T>
+int fileToValue(std::string filename, T &value){
+  std::string line;
+  std::ifstream fileStream; 
+
+  fileStream.open(filename.c_str());
+  if(fileStream.is_open()){
+      std::getline(fileStream, line);
+      value = (T) atof(line.c_str());
+  }
+  else{
+    fprintf(stderr, "Can't open file %s \n", filename.c_str());
+    fileStream.close();
+    return 1;
+  }
+  fileStream.close();
+  return 0;
+  
+}
+
+
+
+
 int parse(std::string location, 
 	  std::vector<double> * betas,
 	  std::vector<double> * n_x,
@@ -95,7 +145,7 @@ int parse_beta_v(std::string root, std::vector<double>* betas){
   std::string line;
   std::ifstream fileStream; 
   double number = 0;
-  
+
   fileStream.open(root.append("beta_v.txt").c_str());
   if(fileStream.is_open()){
     while(fileStream.good()){

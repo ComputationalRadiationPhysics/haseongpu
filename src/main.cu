@@ -7,7 +7,7 @@
 #include "string.h"
 #include <vector>
 #include "curand_kernel.h"
-
+#include <iostream>
 
 // User header files
 #include "datatypes.h"
@@ -83,37 +83,92 @@ int main(int argc, char **argv){
     } 
   }
 
-  // check if we want no output
+  // Check if we want no output
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--silent", 7) == 0){
 		silent=true;
     } 
   }
+  std::string root("asdfasfdhhlajhsdlfjahsldf");
 
+  std::cerr << "root: " << root << std::endl;
+
+  // Parse experiment data from txt files
   if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
-	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter,
-	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
-	   &numberOfPoints, &numberOfTriangles, &numberOfLevels, &crystalFluorescence)){
+  	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter,
+  	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
+  	   &numberOfPoints, &numberOfTriangles, &numberOfLevels, &crystalFluorescence)){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
+  std::cerr << "root: " << root << std::endl;
+  std::cerr << "experimentLocation: " << experimentLocation << std::endl;
+  
+  // Add slash at the end, if missing
+  // if(root[root.size()-1] == 'w')
+  //   root.erase(root.size()-1, 1);
+  // else if(root[root.size()-1] != '/')
+  //   root.append("/");
+
+  //surfaces->clear();
+  // if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
+  // if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
+  // if(fileToVector(root + "cell_type.txt", cellTypes)) return 1;
+  // if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
+  // if(fileToVector(root + "neighbors.txt", neighbors)) return 1;
+  // if(fileToVector(root + "n_x.txt", xOfNormals)) return 1;
+  // if(fileToVector(root + "n_y.txt", yOfNormals)) return 1;
+  // if(fileToVector(root + "x_center.txt", xOfTriangleCenter)) return 1;
+  // if(fileToVector(root + "y_center.txt", yOfTriangleCenter)) return 1;
+  // if(fileToVector(root + "p_in.txt", points)) return 1;
+  // if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
+  // if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
+
+  //if(fileToVector(root + "surface.txt", surfaces)) return 1;
+  // if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
+  // if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
+  // if(fileToValue(root + "n_tot.txt", nTot)) return 1;
+  // if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
+  // if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
+  // if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
+  // if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
+  // if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
+  // if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
+  // if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
   // Debug
-  // fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
-  // fprintf(stderr, "cladNumber: %d\n", cladNumber);
-  // fprintf(stderr, "nTot: %e\n", nTot);
-  // fprintf(stderr, "sigmaA: %e\n", sigmaA);
-  // fprintf(stderr, "sigmaE: %e\n", sigmaE);
-  // fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
-  // fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
-  // fprintf(stderr, "numberOfLevels: %d\n\n", numberOfLevels);
+  // for(int i=0; i < points->size(); ++i){
+  //   fprintf(stderr, "points: %f\n", points->at(i));
+  // }
+  // fprintf(stderr, "points->size(): %d", points->size());  
+  fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
+  fprintf(stderr, "cladNumber: %d\n", cladNumber);
+  fprintf(stderr, "nTot: %e\n", nTot);
+  fprintf(stderr, "sigmaA: %e\n", sigmaA);
+  fprintf(stderr, "sigmaE: %e\n", sigmaE);
+  fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
+  fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
+  fprintf(stderr, "numberOfLevels: %d\n\n", numberOfLevels);
+
+  // Test vectors
+  assert(numberOfPoints == (points->size() / 2));
+  assert(numberOfTriangles == triangleIndices->size() / 3);
+  assert(positionsOfNormalVectors->size() == numberOfTriangles * 3);
+  assert(yOfTriangleCenter->size() == numberOfTriangles);
+  assert(xOfTriangleCenter->size() == numberOfTriangles);
+  assert(surfaces->size() == numberOfTriangles);
+  assert(betaValues->size() == numberOfTriangles * (numberOfLevels-1));
+  assert(xOfNormals->size() == numberOfTriangles * 3);
+  assert(yOfNormals->size() == numberOfTriangles * 3);
+  assert(triangleIndices->size() == numberOfTriangles * 3);
+  assert(forbidden->size() == numberOfTriangles * 3);
+  assert(neighbors->size() == numberOfTriangles * 3);
 
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
   std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
-
 
   // Run Experiment
   for(i=1; i < argc; ++i){
