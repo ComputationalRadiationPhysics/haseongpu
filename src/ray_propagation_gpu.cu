@@ -301,38 +301,7 @@ __global__ void setupGlobalVariablesKernel (
   thicknessOfPrism = hostThicknessOfPrism;
   numberOfLevels = hostNumberOfLevels;
   numberOfPoints = hostNumberOfPoints;
-  //printf("Sigma_e in setup=%f\tSigma_eHost=%f\n",sigma_e,host_sigma_e);
 } 
-
-// __global__ void importanceKernel(
-// 		curandState *globalState,
-// 		double *points,
-// 		double *xOfNormals,
-// 		double *yOfNormals,
-// 		int *positionsOfNormalVectors,
-// 		int *neighbors,
-// 		int *forbidden,
-// 		int* cell_type,
-// 		int hostNumberOfTriangles,
-// 		double* betaValues,
-// 		double *importance,
-// 		int *numberOfImportantRays,
-// 		double *xOfTriangleCenter,
-// 		double *yOfTriangleCenter,
-// 		int *surface,
-// 		int totalNumberOfRays) {
-
-// 	int id = threadIdx.x + blockIdx.x * blockDim.x;
-// 	for(int i=0; i< hostNumberOfTriangles; ++i){
-// 		for(int j=0; j< numberOfLevels; ++j){
-// 			importf(globalState[id], i,j, importance, numberOfImportantRays, points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, cell_type, betaValues, xOfTriangleCenter, yOfTriangleCenter,surface, totalNumberOfRays);
-
-// 		}
-
-// 	}
-
-// }
-
 
 /**
  * Prints some of the global device variables.
@@ -447,11 +416,6 @@ __global__ void raytraceStep(curandStateMtgp32* globalState,
 			     unsigned raysPerSample) {
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
-  const unsigned numberOfPrisms = (numberOfTriangles * (numberOfLevels-1));
-  const unsigned threadsPerPrism = blockDim.x * gridDim.x / numberOfPrisms;
-  // break, if we have more threads than we need
-  if(id >= threadsPerPrism * numberOfPrisms)
-    return;
 
   double gain = 0.;
   const int endPointX = points[point2D];
@@ -459,15 +423,16 @@ __global__ void raytraceStep(curandStateMtgp32* globalState,
   const int endPointZ = level * thicknessOfPrism;
 
 
-  // this should give the same start values multiple times (so that every thread uses the same prism, which yields
-  // big benefits for the memory access (and caching!)
-  for (int i=0; i < 9999 ; ++i){
+  // on thread can compute multiple rays
+  for (int i=0; ; ++i){
+	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
 	  int rayNumber = id + (blockDim.x*gridDim.x * i);
 	  if(rayNumber >= raysPerSample){
 		  return;
 	  }
-	  int startPrism = indicesOfPrisms[rayNumber];
 
+	  // get a new prism to start from
+	  int startPrism = indicesOfPrisms[rayNumber];
 	  int startLevel = (startPrism)/numberOfTriangles;
 	  int startTriangle = (startPrism-(numberOfTriangles*startLevel));
 
@@ -486,8 +451,6 @@ __global__ void raytraceStep(curandStateMtgp32* globalState,
 	  int t2 = triangleIndices[startTriangle + numberOfTriangles];
 	  int t3 = triangleIndices[startTriangle + 2 * numberOfTriangles];
 
-	  // do all this multiple times (we can't have more than 200 blocks due to restrictions of the Mersenne Twister)
-	  //for (int i=0; i<blah; ++i){
 	  // random startpoint generation
 	  double u = curand_uniform(&globalState[blockIdx.x]);
 	  double v = curand_uniform(&globalState[blockIdx.x]);
@@ -516,7 +479,6 @@ __global__ void raytraceStep(curandStateMtgp32* globalState,
 	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]),float(gain));
 #endif
   }
-  return;
 }
 
 /*********************************************************************************************
@@ -1043,8 +1005,8 @@ float runRayPropagationGpu(
   unsigned *indicesOfPrisms;
 	
   // Variables defintions
-  threads = 120;
-  blocks = 90;  // TODO: change number of blocks/threads dynamically to allow more flexible number of rays (increase up to 200)
+  threads = 128; //OPTIMIZE: find perfect number of threads
+  blocks = 200;
   hostBetaValues = (double*) &(betaValuesVector->at(0));
   hostXOfNormals = (double*) &(xOfNormalsVector->at(0));
   hostYOfNormals = (double*) &(yOfNormalsVector->at(0));
