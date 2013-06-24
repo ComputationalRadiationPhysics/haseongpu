@@ -89,9 +89,7 @@ int main(int argc, char **argv){
 		silent=true;
     } 
   }
-  std::string root("asdfasfdhhlajhsdlfjahsldf");
-
-  std::cerr << "root: " << root << std::endl;
+  std::string root(experimentLocation);
 
   // Parse experiment data from txt files
   if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
@@ -101,14 +99,12 @@ int main(int argc, char **argv){
     fprintf(stderr, "C Had problems while parsing experiment data\n");
     return 1;
   }
-  std::cerr << "root: " << root << std::endl;
-  std::cerr << "experimentLocation: " << experimentLocation << std::endl;
   
   // Add slash at the end, if missing
-  // if(root[root.size()-1] == 'w')
-  //   root.erase(root.size()-1, 1);
-  // else if(root[root.size()-1] != '/')
-  //   root.append("/");
+  if(root[root.size()-1] == 'w')
+    root.erase(root.size()-1, 1);
+  else if(root[root.size()-1] != '/')
+    root.append("/");
 
   //surfaces->clear();
   // if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
@@ -123,18 +119,18 @@ int main(int argc, char **argv){
   // if(fileToVector(root + "p_in.txt", points)) return 1;
   // if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
   // if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
+  // if(fileToVector(root + "surface.txt", surfaces)) return 1;
 
-  //if(fileToVector(root + "surface.txt", surfaces)) return 1;
-  // if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
-  // if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
-  // if(fileToValue(root + "n_tot.txt", nTot)) return 1;
-  // if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
-  // if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
-  // if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
-  // if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
-  // if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
-  // if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
-  // if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
+  if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
+  if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
+  if(fileToValue(root + "n_tot.txt", nTot)) return 1;
+  if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
+  if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
+  if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
+  if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
+  if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
+  if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
+  if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
   // Debug
   // for(int i=0; i < points->size(); ++i){
@@ -163,12 +159,12 @@ int main(int argc, char **argv){
   assert(triangleIndices->size() == numberOfTriangles * 3);
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
-
+  assert((numberOfTriangles * (numberOfLevels-1)) <= raysPerSample);
   // Generate testdata
   fprintf(stderr, "C Generate Testdata\n");
   std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
   std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
-  std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
+  std::vector<double>      *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
 
   // Run Experiment
   for(i=1; i < argc; ++i){
