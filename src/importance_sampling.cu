@@ -15,15 +15,12 @@ double propagateRayHost (double x_pos,
 			 int *n_p,
 			 int *neighbors,
 			 int *forbidden,
-			 unsigned *cell_type,
 			 double *beta_v,
 			 unsigned numberOfPoints,
 			 unsigned numberOfTriangles,
 			 float thicknessOfPrism,
 			 float sigmaA,
 			 float sigmaE,
-			 int cladNumber,
-			 float cladAbsorption,
 			 float nTot
 			 ){
   //    in first try no reflections
@@ -39,14 +36,11 @@ double propagateRayHost (double x_pos,
   int tri, cell_z; // the current triangle number and position concerning the z's
   int decider; // which one is the shortest - info
   int tri_next, cell_z_next, forb, forb_dump;
-  int ct; // used to read out cell_type 
   unsigned size_p = numberOfPoints;
   unsigned N_cells = numberOfTriangles;
   float z_mesh = thicknessOfPrism;
   float sigma_a = sigmaA;
   float sigma_e = sigmaE;
-  int clad_num = cladNumber;
-  float clad_abs = cladAbsorption;
   float N_tot = nTot;
 
 	
@@ -94,9 +88,6 @@ double propagateRayHost (double x_pos,
       length = distance;
 		
 		
-      //		  read, which type of cell it is you are propagation in
-      ct = cell_type[tri];
-        
       //        mexPrintf("forb: %i\n",forb);
       //        mexEvalString("drawnow;");
         
@@ -232,12 +223,8 @@ double propagateRayHost (double x_pos,
       //		  it might be absorbing or amplifying, for the cladding only absorbing
       //		  a simple "if then"
 
-      if (ct == clad_num){
-	gain = gain * exp(-clad_abs * length);
-      }
-      else {
-	gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
-      }
+      gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+
       //        gain = LineIntegralMCRK4_S(3, tri, cell_z, gain, length);
         
       //        after integration make the propagation
@@ -302,7 +289,6 @@ void importanceSampling(int point,
 	     int *positionsOfNormalVectors,
 	     int *neighbors,
 	     int *forbidden,
-	     unsigned *cellTypes,
 	     double *betaValues,
 	     double *xOfTriangleCenter,
 	     double *yOfTriangleCenter,
@@ -314,8 +300,6 @@ void importanceSampling(int point,
 	     float thicknessOfPrism,
 	     float sigmaA,
 	     float sigmaE,
-	     int cladNumber,
-	     float cladAbsorption,
 	     float nTot
 	     )
 {
@@ -339,9 +323,9 @@ void importanceSampling(int point,
       prop = propagateRayHost(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
       			       thicknessOfPrism * (i_z+0.5),  xPos, yPos, zPos, i_t, i_z, 
       			       points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
-      			       neighbors, forbidden , cellTypes, betaValues,
+      			       neighbors, forbidden, betaValues,
       			       numberOfPoints, numberOfTriangles, thicknessOfPrism,
-      			       sigmaA, sigmaE, cladNumber, cladAbsorption, nTot
+      			       sigmaA, sigmaE, nTot
       			       );
 
       importance[i_t + i_z * numberOfTriangles] = betaValues[i_t + i_z * numberOfTriangles]*(prop);

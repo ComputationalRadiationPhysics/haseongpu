@@ -61,7 +61,6 @@ float calcDndtAse(
 		  std::vector<double> *betaValuesVector,
 		  std::vector<double> *xOfNormalsVector,
 		  std::vector<double> *yOfNormalsVector,
-		  std::vector<unsigned> *cellTypesVector,
 		  std::vector<unsigned> *triangleIndicesVector,
 		  std::vector<int> *forbiddenVector,
 		  std::vector<int> *neighborsVector,
@@ -71,8 +70,6 @@ float calcDndtAse(
 		  std::vector<float> *surfacesVector,
 		  std::vector<double> *xOfTriangleCenterVector,
 		  std::vector<double> *yOfTriangleCenterVector,
-		  float hostCladAbsorption,
-		  unsigned hostCladNumber,
 		  float hostNTot,
 		  float hostSigmaA,
 		  float hostSigmaE,
@@ -97,7 +94,7 @@ float calcDndtAse(
   // GPU
   double  *points, *xOfNormals, *yOfNormals, *betaValues;
   float *phiASE;
-  int *forbidden, *positionsOfNormalVectors, *neighbors, *triangleIndices, *cellTypes, *surfacesNormalized;
+  int *forbidden, *positionsOfNormalVectors, *neighbors, *triangleIndices;
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;
   double *importance;
@@ -159,8 +156,6 @@ float calcDndtAse(
     //Create constant values on GPU
     setupGlobalVariablesKernel<<<1,1>>>(double(hostSigmaE), 
 					double(hostSigmaA),
-					hostCladNumber,
-					double(hostCladAbsorption),
 					double(hostNTot), 
 					hostNumberOfTriangles, 
 					double(hostThicknessOfPrism),
@@ -177,7 +172,6 @@ float calcDndtAse(
     CUDA_CHECK_RETURN(cudaMalloc(&forbidden, 3 * hostNumberOfTriangles * sizeof(int)));
     CUDA_CHECK_RETURN(cudaMalloc(&positionsOfNormalVectors, 3 * hostNumberOfTriangles * sizeof(int)));
     CUDA_CHECK_RETURN(cudaMalloc(&triangleIndices, 3 * hostNumberOfTriangles * sizeof(int)));
-    CUDA_CHECK_RETURN(cudaMalloc(&cellTypes, hostNumberOfTriangles * sizeof(int)));
     CUDA_CHECK_RETURN(cudaMalloc(&betaValues, hostNumberOfPrisms * sizeof(double)));
     CUDA_CHECK_RETURN(cudaMalloc(&phiASE, hostNumberOfSamples * sizeof(float)));
     CUDA_CHECK_RETURN(cudaMalloc(&importance, hostNumberOfPrisms * sizeof(double)));
@@ -191,14 +185,13 @@ float calcDndtAse(
     CUDA_CHECK_RETURN(cudaMemcpy(forbidden, (int*) &(forbiddenVector->at(0)), 3 * hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(positionsOfNormalVectors, (int*) &(positionsOfNormalVectorsVector->at(0)), 3 * hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(triangleIndices, (unsigned*) &(triangleIndicesVector->at(0)), 3 * hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
-    CUDA_CHECK_RETURN(cudaMemcpy(cellTypes, (unsigned*) &(cellTypesVector->at(0)), hostNumberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(betaValues, (double*) &(betaValuesVector->at(0)), hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(phiASE, hostPhiASE, hostNumberOfSamples * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
   }
 
   //fprintf(stderr, "C hostCrystalFluorescence: %e\n",hostCrystalFluorescence);
-  // testKernel<<<1,1>>>(points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices, cellTypes, betaValues,surface);
+  // testKernel<<<1,1>>>(points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices,  betaValues,surface);
 
   // Start Kernels
   {
@@ -228,13 +221,12 @@ float calcDndtAse(
 			   (int*) &(positionsOfNormalVectorsVector->at(0)), 
 			   (int*) &(neighborsVector->at(0)), 
 			   (int*) &(forbiddenVector->at(0)), 
-			   (unsigned*) &(cellTypesVector->at(0)), 
 			   (double*) &(betaValuesVector->at(0)), 
 			   (double*) &(xOfTriangleCenterVector->at(0)),
 			   (double*) &(yOfTriangleCenterVector->at(0)), 
 			   (float*) &(surfacesVector->at(0)), 
 			   hostRaysPerSample,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
-			   hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostCladNumber, hostCladAbsorption,hostNTot);
+			   hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
 
 	CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
 
@@ -254,8 +246,8 @@ float calcDndtAse(
 	cudaDeviceSynchronize();
 	calcSamplePhiAse<<< blocks, threads >>> ( devMTGPStates, phiASE, point_i, level_i, hostRaysPerThread, 
 					      points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
-					      neighbors, forbidden, triangleIndices, cellTypes, betaValues, importance, 
-					      surfacesNormalized,indicesOfPrisms,hostRaysPerSample );
+					      neighbors, forbidden, triangleIndices, betaValues, importance, 
+					      indicesOfPrisms,hostRaysPerSample );
 
 
 	if(kernelcount % 200 == 0)

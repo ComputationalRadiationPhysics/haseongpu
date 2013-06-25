@@ -22,7 +22,6 @@ int main(int argc, char **argv){
   std::vector<double> * betaValues = new std::vector<double>;
   std::vector<double> * xOfNormals = new std::vector<double>;
   std::vector<double> * yOfNormals = new std::vector<double>;
-  std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
   std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
   std::vector<int> * forbidden = new std::vector<int>;
   std::vector<int> * neighbors = new std::vector<int>;
@@ -32,8 +31,6 @@ int main(int argc, char **argv){
   std::vector<float> * surfaces = new std::vector<float>;
   std::vector<double> *xOfTriangleCenter = new std::vector<double>;
   std::vector<double> *yOfTriangleCenter = new std::vector<double>;
-  float cladAbsorption = 0;
-  unsigned cladNumber = 0;
   float nTot = 0;
   float sigmaA = 0;
   float sigmaE = 0;
@@ -86,7 +83,6 @@ int main(int argc, char **argv){
 
   if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
   if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
-  if(fileToVector(root + "cell_type.txt", cellTypes)) return 1;
   if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
   if(fileToVector(root + "neighbors.txt", neighbors)) return 1;
   if(fileToVector(root + "n_x.txt", xOfNormals)) return 1;
@@ -98,8 +94,6 @@ int main(int argc, char **argv){
   if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
   if(fileToVector(root + "surface.txt", surfaces)) return 1;
 
-  if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
-  if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
   if(fileToValue(root + "n_tot.txt", nTot)) return 1;
   if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
   if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
@@ -110,8 +104,6 @@ int main(int argc, char **argv){
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
   // Debug
-  // fprintf(stderr, "C cladAbsorption: %f\n", cladAbsorption);
-  // fprintf(stderr, "C cladNumber: %d\n", cladNumber);
   // fprintf(stderr, "C nTot: %e\n", nTot);
   // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
@@ -150,7 +142,6 @@ int main(int argc, char **argv){
 			betaValues,
 			xOfNormals,
 			yOfNormals,
-			cellTypes,
 			triangleIndices,
 			forbidden,
 			neighbors,
@@ -160,8 +151,6 @@ int main(int argc, char **argv){
 			surfaces,
 			xOfTriangleCenter,
 			yOfTriangleCenter,
-			cladAbsorption,
-			cladNumber,
 			nTot,
 			sigmaA,
 			sigmaE,
