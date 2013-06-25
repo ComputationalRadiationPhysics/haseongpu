@@ -53,14 +53,14 @@ fprintf(x,'%d\n',a);
 fclose(x);
 
 % fixed
-x=fopen('clad_abs.txt','w');
-fprintf(x,'5.5\n');
-fclose(x);
+%x=fopen('clad_abs.txt','w');
+%fprintf(x,'5.5\n');
+%fclose(x);
 
 %fixed
-x=fopen('clad_num.txt','w');
-fprintf(x,'3\n');
-fclose(x);
+%x=fopen('clad_num.txt','w');
+%fprintf(x,'3\n');
+%fclose(x);
 
 x=fopen('n_tot.txt','w');
 fprintf(x,'%.50f\n',N_tot);
@@ -83,10 +83,10 @@ fprintf(x,'%.50f\n',crystal.tfluo);
 fclose(x);
 
 % fixed
-x=fopen('cell_type.txt','w');
-[a,b] = size(sorted_int);
-fprintf(x,'%d\n',ones(1,a));
-fclose(x);
+%x=fopen('cell_type.txt','w');
+%[a,b] = size(sorted_int);
+%fprintf(x,'%d\n',ones(1,a));
+%fclose(x);
 
 
 %x=fopen('NumRays.txt','w')
