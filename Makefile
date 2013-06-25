@@ -6,7 +6,7 @@ DATE="`date +%y%m%d%H%M%S`"
 
 # compiler, linker, archiver
 NVCC = nvcc
-#NVCC_FLAGS = --ptxas-options=-v --use_fast_math --include-path include
+NVCC_FLAGS = --ptxas-options=-v --use_fast_math
 #NVCC_FLAGS = --use_fast_math --include-path include
 ARCH = -arch=sm_20
 #ARCH = -arch=sm_35
@@ -23,7 +23,7 @@ INCLUDES = include
 all: octrace
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
-	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) 
+	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 
 octrace: $(OBJS) Makefile
 	rm -f bin/link.o
