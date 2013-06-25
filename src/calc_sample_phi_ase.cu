@@ -13,49 +13,141 @@ __device__ int numberOfLevels;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
+__device__ double checkSurface(int levelCurrent, double zPos, double zVec, double length){
+	double denominator = zPos*zVec;
+	if (denominator != 0.0){
+		double nominator = levelCurrent * thicknessOfPrism - zPos;
+		double lengthTmp = nominator/denominator;
+		if (lengthTmp < length && lengthTmp > 0.0){
+			return lengthTmp;
+		}
+	}
+	return 0;
+}
 
-__device__ int getNextEdge(Triangle triangle,  Point point, Point destinationPoint, int forbiddenEdge){
+__device__ double checkEdge(Triangle triangle, int edge, Ray ray, double length){
+  double denominator = triangle.edges[edge].normal.dir.x * ray.dir.x +  triangle.edges[edge].normal.dir.y * ray.dir.y;
+  if (denominator != 0.0)
+    {
+      double nominator =	  
+	triangle.edges[edge].normal.dir.x * triangle.edges[edge].normal.p.x
+	+ triangle.edges[edge].normal.dir.y * triangle.edges[edge].normal.p.y
+	- triangle.edges[edge].normal.dir.x * ray.p.x 
+	- triangle.edges[edge].normal.dir.y * ray.p.y; 
+
+      double lengthTmp = nominator/denominator;
+
+      if(lengthTmp < length && lengthTmp > 0.0){
+	return lengthTmp;
+      }
+    }
   return 0;
+}
+
+__device__ int getNextEdge(Triangle triangle,  Ray ray, unsigned level, double length, int forbiddenEdge){
+  int edge = -1;
+  // Check 3 edges of triangle
+  for(int edge_i = 0; edge_i < 3; ++edge_i){
+    if(edge_i != forbiddenEdge){
+      double lengthTmp = checkEdge(triangle, edge_i, ray, length);
+      if(lengthTmp){
+	length = lengthTmp;
+	edge = edge_i;
+      }
+    }
+  }
+  
+  // check the upper surface
+  if (forbiddenEdge != 3){
+    double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, length);
+    if(lengthTmp){
+      length = lengthTmp;
+      edge = 3;
+    }
+  }
+
+  // check the lower surface
+  if (forbiddenEdge != 4){
+    double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, length);
+    if (lengthTmp){
+      length = lengthTmp;
+      edge = 4;
+    }
+  }
+  return edge;
+}
+
+__device__ unsigned getNextLevel(unsigned level, int edge){
+  switch(edge){
+  case 3:
+    return ++level;
+  case 4:
+    return --level;
+  default:
+    return level;
+  }
 
 }
 
-__device__ double calcTriangleIntersection(Triangle triangle, Point point, Point destinationPoint, Edge edge){
-  return 0;
+__device__ double calcTriangleIntersection(Triangle triangle, Ray ray, int edge, int length, unsigned level){
+  switch(edge){
+  case 0:
+  case 1:
+  case 2:
+    return checkEdge(triangle, edge, ray, length);
+  case 3:
+  case 4:
+    return checkSurface(level + 1, ray.p.z, ray.dir.z, length);
+
+  }
 
 }
 
-__device__ Point calcNextPoint(Point point, Point destinationPoint, double length){
-  return {0,0,0,0};
+__device__ Ray calcNextRay(Ray ray, double length){
+  ray.p.x = ray.p.x + ray.length * ray.dir.x;
+  ray.p.y = ray.p.y + ray.length * ray.dir.y;
+  ray.p.z = ray.p.z + ray.length * ray.dir.z;
+  ray.length = ray.length - length;
+
+  return ray;
 
 }
 
-__device__ double calcPrismGain(Triangle triangle, Point edgePoint, double length){
-  // return (double) exp(nTot * (triangle.betaValues[(int)edgePoint[2]] * ( sigmaE + sigmaA ) - sigmaA ) * length);
-  return 0;
+__device__ double calcPrismGain(Triangle triangle, unsigned level, double length){
+  return (double) exp(nTot * (triangle.betaValues[level] * ( sigmaE + sigmaA ) - sigmaA ) * length);
+ 
 
 }
 
-__device__ double propagateRayDeviceNew(normalRay ray, Triangle startTriangle, Triangle *triangles){
-  double distanceRemaining = 0;
+__device__ Ray normalizeRay(Ray ray, double distance){
+  ray.dir.x = ray.dir.x / distance;
+  ray.dir.y = ray.dir.y / distance;
+  ray.dir.z = ray.dir.z / distance;
+
+  return ray;
+}
+
+__device__ double propagateRayDeviceNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles){
   double distanceTotal = ray.length;
+  double distanceRemaining = distanceTotal;
   double length = 0;
   double gain = 1;
-
+  
   Triangle nextTriangle = startTriangle;
-  Point nextPoint = ray.point;
+  Ray nextRay = normalizeRay(ray, distanceTotal);
   int nextForbiddenEdge = -1;
   int nextEdge = -1;
+  unsigned nextLevel = startLevel;
 
-  distanceRemaining = distanceTotal;
-  
   while(fabs(distanceRemaining) < SMALL){
-    nextEdge          = getNextEdge(nextTriangle,  ray, nextForbiddenEdge);
-    length            = calcTriangleIntersection(nextTriangle, nextPoint, destinationPoint, nextTriangle.edges[nextEdge]);
-    nextPoint         = calcNextPoint(nextPoint, destinationPoint, length);
+    nextEdge          = getNextEdge(nextTriangle, nextRay, nextLevel, distanceRemaining, nextForbiddenEdge);
+    nextLevel         = getNextLevel(nextLevel, nextEdge);
+    length            = calcTriangleIntersection(nextTriangle, nextRay, nextEdge, distanceRemaining, nextLevel);
+    nextRay           = calcNextRay(nextRay, length);
     nextForbiddenEdge = nextTriangle.edges[nextEdge].forbidden;
     nextTriangle      = *(nextTriangle.edges[nextEdge].neighbor);
 
-    gain *= calcPrismGain(nextTriangle, nextPoint, length);
+    gain *= calcPrismGain(nextTriangle, nextLevel, length);
     distanceRemaining -= length;
 
   }

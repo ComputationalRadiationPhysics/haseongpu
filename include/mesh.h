@@ -18,6 +18,23 @@ struct NormalRay {
   __host__ __device__ void normalize();
 };
 
+struct Point {
+  double x;
+  double y;
+  double z;
+
+};
+
+typedef Point Vector;
+
+struct Ray {
+  Point p;
+  Vector dir;
+  unsigned length;
+  
+};
+
+
 struct Triangle;
 
 struct Edge {
