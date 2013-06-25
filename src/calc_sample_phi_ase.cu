@@ -66,11 +66,11 @@ __device__ double propagateRayDevice(
 		double xPos,
 		double yPos,
 		double zPos,
-		double xDestination,
-		double yDestination,
-		double zDestination,
-		int firstTriangle,
-		int firstLevel,
+		const double xDestination,
+		const double yDestination,
+		const double zDestination,
+		const int firstTriangle,
+		const int firstLevel,
 		double *points,
 		double *xOfNormals,
 		double *yOfNormals,
@@ -79,7 +79,7 @@ __device__ double propagateRayDevice(
 		int *forbidden,
 		double* betaValues){
 
-	double xVec, yVec,zVec;
+	double xVec, yVec, zVec;
 	double distanceTotal, distanceRemaining, length;
 	double gain=1.;
 	int triangleCurrent, levelCurrent, forbiddenCurrent; // for the current iteration
@@ -121,19 +121,15 @@ __device__ double propagateRayDevice(
 		//        0,1,2: int for the neighbors
 		//        3: hor plane up
 		//        4: hor plane down
-		//        try the triangle faces
-		//        remember the correlation between the normals and the points
 		//        n1: p1-2, n2: p1-3, n3:p2-3
 		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
-		//        as everything uses triangular "prisms", as well as n_z=0 in this case!
-
 		// forb describes the surface, from which the ray enters the prism.
 		// this surface is no suitable candidate, since the length would be 0!
 
 		levelNext = levelCurrent;
 
 		// check the 3 edges
-		for (int i = 0; i<3 ; ++i){
+		for (unsigned i = 0; i<3 ; ++i){
 			if (forbiddenCurrent != i){
 				offset = triangleCurrent + i * numberOfTriangles;
 				double lengthHelp = checkSide(offset, xOfNormals[offset], yOfNormals[offset], points, xPos, yPos, length, xVec, yVec, positionsOfNormalVectors);
@@ -172,32 +168,32 @@ __device__ double propagateRayDevice(
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
 
+		// now set the next cell and position
+		xPos = xPos + length*xVec;
+		yPos = yPos + length*yVec;
+		zPos = zPos + length*zVec;
+		triangleCurrent = triangleNext;
+		levelCurrent = levelNext;
+
+		// set the new forbidden surface
+		forbiddenCurrent = forbiddenNext;
 
 #if TEST_VALUES==true
 		testDistance += length;
 		if(loopbreaker>500){
-			printf("Loopbreaker reached. firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
+			printf("Loopbreaker reached.\n");
 			return 0.;
 		}else{
 			loopbreaker++;
 		}
 #endif
 
-		// now set the next cell and position
-		xPos = xPos + length*xVec;
-		yPos = yPos + length*yVec;
-		zPos = zPos + length*zVec;
-
-		triangleCurrent = triangleNext;
-		levelCurrent = levelNext;
-		// set the new forbidden surface
-		forbiddenCurrent = forbiddenNext;
 
 	}
 
 #if TEST_VALUES==true
 	if(fabs(distanceTotal - testDistance) > SMALL)
-		printf("Distance too big! firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
+		printf("Distance too big!\n");
 #endif
 
 	return gain /= (distanceTotal * distanceTotal);

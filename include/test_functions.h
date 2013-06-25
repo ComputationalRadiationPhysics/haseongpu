@@ -5,12 +5,24 @@ __global__ void testKernel (
 			    double *points,
 			    double *xOfNormals,
 			    double *yOfNormals,
-			    int *positionsOfNormalVectors,
 			    int *neighbors,
 			    int *forbidden,
+			    int *positionsOfNormalVectors,
 			    int* triangleIndices,
-			    int* cellTypes,
 			    double* betaValues,
-			    float *surfaces);
+					float *phiAse,
+					double *importance,
+					unsigned *indicesOfPrisms,
+					float hostNTot,
+					float hostSigmaA,
+					float hostSigmaE,
+					unsigned hostNumberOfPoints,
+					unsigned hostNumberOfTriangles,
+					unsigned hostNumberOfLevels,
+					float hostThicknessOfPrism,
+					float hostCrystalFluorescence,
+					unsigned limit
+					);
+
 
 #endif /* test_functions_H */

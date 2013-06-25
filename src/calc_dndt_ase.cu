@@ -15,9 +15,6 @@
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
 
-#define TEST_VALUES true
-#define SMALL 1E-06
-#define VERY_SMALL 0.0
 #define SEED 1234
 
 /** GPU Kernel Variables
@@ -152,8 +149,6 @@ float calcDndtAse(
   CUDA_CHECK_RETURN(cudaMemcpy(phiASE, hostPhiASE, hostNumberOfSamples * sizeof(float), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
 
-  // Print experiment data
-  // testKernel<<<1,1>>>(points, xOfNormals, yOfNormals, positionsOfNormalVectors, neighbors, forbidden, triangleIndices,  betaValues,surface);
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
@@ -187,11 +182,24 @@ float calcDndtAse(
       CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
+
+
       // Start Kernel
       calcSamplePhiAse<<< blocks, threads >>> ( devMTGPStates, phiASE, point_i, level_i, hostRaysPerThread, 
 						points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
 						neighbors, forbidden, triangleIndices, betaValues, importance, 
 						indicesOfPrisms,hostRaysPerSample );
+
+			if(kernelcount==0)
+			{
+				// Print experiment data
+				testKernel<<<1,1>>>(points,	xOfNormals, yOfNormals,
+														neighbors, forbidden, positionsOfNormalVectors,
+														triangleIndices, betaValues, phiASE, importance,
+														indicesOfPrisms, hostNTot, hostSigmaA, hostSigmaE,
+														hostNumberOfPoints, hostNumberOfTriangles, hostNumberOfLevels,
+														hostThicknessOfPrism,	hostCrystalFluorescence, 5);
+			}
 
 
       if(kernelcount % 200 == 0)
