@@ -22,4 +22,5 @@ src/*.out
 octrace.e*
 octrace.o*
 utils/testdata_2/*.txt
+utils/start_experiment.sh
 *.vtk
