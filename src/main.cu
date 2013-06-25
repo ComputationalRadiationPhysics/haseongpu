@@ -5,7 +5,7 @@
 #include <vector> /* vector */
 
 // User header files
-#include <ray_propagation_gpu.h>
+#include <calc_dndt_ase.h>
 #include <parser.h>
 #include <write_to_vtk.h>
 
@@ -142,7 +142,7 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
-	runtime = runRayPropagationGpu(
+	runtime = calcDndtAse(
 			ase,
 			threads, 
 			blocks, 

@@ -1,4 +1,4 @@
-#include "print.h"
+#include "print_geometry.h"
 
 void print_point(PointCu p){
   fprintf(stderr, "Point (%f, %f, %f, %f)\n",p.x, p.y, p.z, p.w);

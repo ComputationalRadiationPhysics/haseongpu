@@ -2,7 +2,7 @@
 #define RAY_PROPAGATION_GPU_KERNEL_H
 #include <vector>
 
-float runRayPropagationGpu(
+float calcDndtAse(
 		std::vector<double> *dndtAse, 
 		unsigned &threads, 
 		unsigned &blocks, 
