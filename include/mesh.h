@@ -1,34 +1,54 @@
 #ifndef MESH_H
 #define MESH_H 
 
-typedef float4 Point;
+#include<vector>
 
-struct Vector : float4 {
-  __host__ __device__ float length();
-  __host__ __device__ void normalize();
+struct TwoDimPoint {
+  double x;
+  double y;
 };
 
-struct Ray : Point {
-  Vector dir;
+typedef TwoDimPoint TwoDimDir;
 
-  __host__ __device__ float length();
+struct NormalRay {
+  TwoDimPoint p;
+  TwoDimDir dir;
+
+  __host__ __device__ double length();
   __host__ __device__ void normalize();
 };
 
 struct Triangle;
 
 struct Edge {
-  Ray normal;
+  NormalRay normal;
   Triangle *neighbor; // index in global triangle list
+  int forbidden;
 };
 
 struct Triangle {
-  Point A;
-  Point B;
-  Point C;
+  TwoDimPoint A;
+  TwoDimPoint B;
+  TwoDimPoint C;
 
   double *betaValues; // array of betaValues, one for each prism/level above the triangle
   Edge edges[3]; // edges of the triangle size: 3
+  TwoDimPoint center;
+  float surface;
+};
+
+class Mesh {
+  Triangle *triangles;
+  unsigned numberOfTriangles;
+
+  public:
+
+  ~Mesh();
+
+  static Mesh parse(std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
+
+  void copyToGpu();
+  void copyFromGpu();
 };
 
 #endif /* MESH_H */
