@@ -12,6 +12,35 @@ __device__ int numberOfLevels;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
+__device__ double checkSide(int offset, double xN, double yN, double *points, double xPos, double yPos, double length, double xVec, double yVec,int *positionsOfNormalVectors){
+	double denominator = xN * xVec + yN * yVec;
+	if (denominator != 0.0)
+	{
+		double nominator =	  xN * points[ positionsOfNormalVectors[offset] ]
+							+ yN * points[ positionsOfNormalVectors[offset] + numberOfPoints ]
+							- xN * xPos 
+							- yN * yPos;
+
+		double lengthHelp = nominator/denominator;
+
+		if(lengthHelp < length && lengthHelp > 0.0){
+			return lengthHelp;
+		}
+	}
+	return 0;
+}
+
+__device__ double checkTop(int levelCurrent, double zPos, double zVec, double length){
+	double denominator = zPos*zVec;
+	if (denominator != 0.0){
+		double nominator = levelCurrent * thicknessOfPrism - zPos;
+		double lengthHelp = nominator/denominator;
+		if (lengthHelp < length && lengthHelp > 0.0){
+			return lengthHelp;
+		}
+	}
+	return 0;
+}
 /**
  * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
  *
@@ -34,207 +63,144 @@ __device__ int numberOfTriangles;
  *
  */
 __device__ double propagateRayDevice(
-				    double xPos,
-				    double yPos,
-				    double zPos,
-				    double xDestination,
-				    double yDestination,
-				    double zDestination,
-				    int firstTriangle,
-				    int firstLevel,
-				    double *points,
-				    double *xOfNormals,
-				    double *yOfNormals,
-				    int *positionsOfNormalVectors,
-				    int *neighbors,
-				    int *forbidden,
-				    double* betaValues){
-  //    no reflections
-  //
-  //    create the vector between both points and calculate which surface would be the shortest to reach.
-  //    then get the length, make the integration, get the information about the next cell out of the array
-  //    set the point to the surface (this surface is "forbidden" in the calculations)
-  //    proceed until you hit a the point or the surface
-	
-  double xVec, yVec,zVec;
-  double distanceRemaining, length, lengthHelp, distanceTotal;
-  double nominator, denominator;
-  double gain=1.;
-  int triangleCurrent, levelCurrent; // the current triangle number and position concerning the z's
-  int triangleNext, levelNext, forbiddenCurrent, forbiddenNext;
-  int offset;
+		double xPos,
+		double yPos,
+		double zPos,
+		double xDestination,
+		double yDestination,
+		double zDestination,
+		int firstTriangle,
+		int firstLevel,
+		double *points,
+		double *xOfNormals,
+		double *yOfNormals,
+		int *positionsOfNormalVectors,
+		int *neighbors,
+		int *forbidden,
+		double* betaValues){
+
+	double xVec, yVec,zVec;
+	double distanceTotal, distanceRemaining, length;
+	double gain=1.;
+	int triangleCurrent, levelCurrent, forbiddenCurrent; // for the current iteration
+	int triangleNext, levelNext, forbiddenNext;		// for the next iteration
+	int offset;
 #if TEST_VALUES==true
-  double testDistance = 0;
-  int loopbreaker = 0;
+	double testDistance = 0;
+	int loopbreaker = 0;
 #endif
 
+	// initial positions
+	triangleCurrent = firstTriangle;
+	levelCurrent = firstLevel;
 
-  //    initial positions
-  triangleCurrent = firstTriangle;
-  levelCurrent = firstLevel;
+	// direction-vector (without reflections)
+	xVec = (xDestination - xPos);
+	yVec = (yDestination - yPos);
+	zVec = (zDestination - zPos);
 
-  // direction-vector (without reflections)
-  xVec = (xDestination - xPos);
-  yVec = (yDestination - yPos);
-  zVec = (zDestination - zPos);
+	// total distance to travel
+	distanceTotal = sqrt(xVec*xVec + yVec*yVec + zVec*zVec);
 
-  // total distance to travel
-  distanceTotal = sqrt(xVec*xVec+yVec*yVec+zVec*zVec);
-  // normalized direction-vector
-  xVec = xVec/distanceTotal;
-  yVec = yVec/distanceTotal;
-  zVec = zVec/distanceTotal;
+	// normalized direction-vector
+	xVec = xVec / distanceTotal;
+	yVec = yVec / distanceTotal;
+	zVec = zVec / distanceTotal;
 
-  // remaining distance to travel
-  distanceRemaining = distanceTotal;
+	// remaining distance to travel
+	distanceRemaining = distanceTotal;
 
-  // at the beginning, all surfaces are possible
-  forbiddenCurrent = -1;
+	// at the beginning, all surfaces are possible
+	forbiddenCurrent = -1;
 
-  for(;;)
-    {
-      // the length of the ray-part inside the current prism. We try to minimize this value
-      length = distanceRemaining;
-      lengthHelp=0;
-      //        definition for decider
-      //        0,1,2: int for the neighbors
-      //        3: hor plane up
-      //        4: hor plane down
-      //        try the triangle faces
-      //        remember the correlation between the normals and the points
-      //        n1: p1-2, n2: p1-3, n3:p2-3
-      //        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
-      //        as everything uses triangular "prisms", as well as n_z=0 in this case!
-		
-      // forb describes the surface, from which the ray enters the prism.
-      // this surface is no suitable candidate, since the length would be 0!
-      if (forbiddenCurrent != 0){
-	denominator = xOfNormals[triangleCurrent]*xVec + yOfNormals[triangleCurrent]*yVec;
-	// see if we intersect at all
-	if (denominator != 0.0)
-	  {
-	    nominator = (xOfNormals[triangleCurrent]*points[positionsOfNormalVectors[triangleCurrent]] + yOfNormals[triangleCurrent]*points[positionsOfNormalVectors[triangleCurrent]+ numberOfPoints]) - (xOfNormals[triangleCurrent]*xPos + yOfNormals[triangleCurrent]*yPos);
-	    lengthHelp = nominator/denominator;
-	    // if we found a new smallest length, use it
-	    if (lengthHelp < length && lengthHelp > 0.0)
-	      {
-		length = lengthHelp;
-		forbiddenNext = (forbidden[triangleCurrent]);
-		triangleNext = neighbors[triangleCurrent];
+	while(fabs(distanceRemaining) > SMALL)
+	{
+		// the length of the ray-part inside the current prism. We try to minimize this value
+		length = distanceRemaining;
+		//        definition for decider
+		//        0,1,2: int for the neighbors
+		//        3: hor plane up
+		//        4: hor plane down
+		//        try the triangle faces
+		//        remember the correlation between the normals and the points
+		//        n1: p1-2, n2: p1-3, n3:p2-3
+		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
+		//        as everything uses triangular "prisms", as well as n_z=0 in this case!
+
+		// forb describes the surface, from which the ray enters the prism.
+		// this surface is no suitable candidate, since the length would be 0!
+
 		levelNext = levelCurrent;
 
-	      }
-	  }
-      }
+		// check the 3 edges
+		for (int i = 0; i<3 ; ++i){
+			if (forbiddenCurrent != i){
+				offset = triangleCurrent + i * numberOfTriangles;
+				double lengthHelp = checkSide(offset, xOfNormals[offset], yOfNormals[offset], points, xPos, yPos, length, xVec, yVec, positionsOfNormalVectors);
+				if(lengthHelp){
+					length = lengthHelp;
+					forbiddenNext = (forbidden[offset]);
+					triangleNext = neighbors[offset];
+				}
+			}
+		}
 
-      // see forbiddenCurrent !=0 case
-      if (forbiddenCurrent != 1){
-	//offset, since the 3 rectangular surfaces are stored at different positions in the array
-	offset = triangleCurrent+numberOfTriangles;
-	denominator = xOfNormals[offset]*xVec + yOfNormals[offset]*yVec;
-	if (denominator != 0.0)
-	  {
-	    nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
-	    lengthHelp = nominator/denominator;
-	    if (lengthHelp < length && lengthHelp > 0.0)
-	      {
-		length = lengthHelp;
-		forbiddenNext = (forbidden[offset]);
-		triangleNext = neighbors[offset];
-		levelNext = levelCurrent;
-	      }
-	  }
-      }
+		// check the upper plane
+		if (forbiddenCurrent != 3){
+			double lengthHelp = checkTop(levelCurrent+1, zPos, zVec, length);
+			if(lengthHelp){
+				length = lengthHelp;
+				forbiddenNext = 4; // you are not allowed to go down in the next step
+				triangleNext = triangleCurrent;
+				levelNext = levelCurrent + 1;
+			}
+		}
 
-      // see forbiddenCurrent !=0 case
-      if (forbiddenCurrent !=2){
-	offset = triangleCurrent+2*numberOfTriangles;
-	denominator = xOfNormals[offset]*xVec + yOfNormals[offset]*yVec;
-	if (denominator != 0.0)
-	  {
-	    nominator = (xOfNormals[offset]*points[positionsOfNormalVectors[offset]] + yOfNormals[offset]*points[positionsOfNormalVectors[offset]+ numberOfPoints]) - (xOfNormals[offset]*xPos + yOfNormals[offset]*yPos);
-	    lengthHelp = nominator/denominator;
-	    if (lengthHelp < length && lengthHelp > 0.0)
-	      {
-		length = lengthHelp;
-		forbiddenNext = (forbidden[offset]);
-		triangleNext = neighbors[offset];
-		levelNext = levelCurrent;
-	      }
-	  }
-      }
+		// check the lower plane
+		if (forbiddenCurrent != 4){
+			double lengthHelp = checkTop(levelCurrent, zPos, zVec, length);
+			if (lengthHelp){
+				length = lengthHelp;
+				forbiddenNext = 3; // you are not allowed to go up in the next step
+				triangleNext = triangleCurrent;
+				levelNext = levelCurrent - 1;
+			}
+		}
 
-      // if-structure "optimized"
-      denominator = zPos*zVec;
-      if (denominator != 0.0){
-	if (forbiddenCurrent != 3){
-	  {
-	    nominator = (levelCurrent+1)* thicknessOfPrism - zPos;
-	    lengthHelp = nominator/denominator;
-	    if (lengthHelp < length && lengthHelp > 0.0)
-	      {
-		length = lengthHelp;
-		//decider = 3;
-		forbiddenNext = 4; // you are not allowed to go down in the next step
-		triangleNext = triangleCurrent;
-		levelNext = levelCurrent + 1;
-	      }
-	  }
+		gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
+
+		// the remaining distance is decreased by the length we travelled through the prism
+		distanceRemaining -= length;
+
+
+#if TEST_VALUES==true
+		testDistance += length;
+		if(loopbreaker>500){
+			printf("Loopbreaker reached. firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
+			return 0.;
+		}else{
+			loopbreaker++;
+		}
+#endif
+
+		// now set the next cell and position
+		xPos = xPos + length*xVec;
+		yPos = yPos + length*yVec;
+		zPos = zPos + length*zVec;
+
+		triangleCurrent = triangleNext;
+		levelCurrent = levelNext;
+		// set the new forbidden surface
+		forbiddenCurrent = forbiddenNext;
+
 	}
 
-	// next is the lower plane
-	if (forbiddenCurrent != 4){
-	  nominator = (levelCurrent)* thicknessOfPrism - zPos;
-	  lengthHelp = nominator/denominator;
-	  if (lengthHelp < length && lengthHelp > 0.0)
-	    {
-	      length = lengthHelp;
-	      //decider = 4;
-	      forbiddenNext = 3; // you are not allowed to go up in the next step
-	      triangleNext = triangleCurrent;
-	      levelNext = levelCurrent - 1;
-	    }
-	}
-      }
-
-      gain *= (double) exp(nTot * (betaValues[triangleCurrent+levelCurrent*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA)*length);
-
-      // the remaining distance is decreased by the length we travelled through the prism
-      distanceRemaining -= length;
-		
-
 #if TEST_VALUES==true
-      testDistance += length;
-      if(loopbreaker>500){
-	printf("Loopbreaker reached. firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
-	return 0.;
-      }else{
-	loopbreaker++;
-      }
+	if(fabs(distanceTotal - testDistance) > SMALL)
+		printf("Distance too big! firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
 #endif
-      // if the distance between the destination and our current position is small enough, we are done
-      if (fabs(distanceRemaining) < SMALL){
-	break;
-      }
 
-      // now set the next cell and position
-      xPos = xPos + length*xVec;
-      yPos = yPos + length*yVec;
-      zPos = zPos + length*zVec;
-
-      triangleCurrent = triangleNext;
-      levelCurrent = levelNext;
-      // set the new forbidden surface
-      forbiddenCurrent = forbiddenNext;
-
-    }
-
-#if TEST_VALUES==true
-  if(fabs(distanceTotal-testDistance) > SMALL)
-    printf("Distance too big! firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
-#endif
-	
-  return gain /= (distanceTotal*distanceTotal);
+	return gain /= (distanceTotal * distanceTotal);
 }
 
 
@@ -301,6 +267,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 
   // on thread can compute multiple rays
   for (int i=0; ; ++i){
+
 	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
 	  int rayNumber = id + (blockDim.x*gridDim.x * i);
 	  if(rayNumber >= raysPerSample){
@@ -309,15 +276,14 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 
 	  // get a new prism to start from
 	  int startPrism = indicesOfPrisms[rayNumber];
-	  int startLevel = (startPrism)/numberOfTriangles;
-	  int startTriangle = (startPrism-(numberOfTriangles*startLevel));
+	  int startLevel = startPrism/numberOfTriangles;
+	  int startTriangle = startPrism - (numberOfTriangles * startLevel);
 
 #if TEST_VALUES==true
-	  if(startPrism != (startTriangle+(startLevel*numberOfTriangles))){
+	  if(startPrism != (startTriangle + (startLevel * numberOfTriangles))){
 		  printf("StartTriangle/StartLevel incorrect!");
 	  }
 	  if(startTriangle >= 600){
-
 		  printf("StartTriangle/StartLevel incorrect!");
 	  }
 #endif
@@ -340,18 +306,18 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 
 	  // convert the random startpoint into coordinates
 	  double xRand = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
-	  double yRand = (points[ numberOfPoints + t1] * u) + (points[ numberOfPoints + t2] * v) + (points[ numberOfPoints + t3] * w);
+	  double yRand = (points[numberOfPoints + t1] * u) + (points[numberOfPoints + t2] * v) + (points[numberOfPoints + t3] * w);
 	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 
 	  __syncthreads();
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
-				   startTriangle, startLevel , points, xOfNormals, yOfNormals, 
-				   positionsOfNormalVectors, neighbors, forbidden ,  betaValues);
+				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
+				   positionsOfNormalVectors, neighbors, forbidden,  betaValues);
 
 	  gain *= betaValues[startPrism];
 	  gain *= importance[startPrism];
 
-	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]), float(gain));
+	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(gain));
   }
 }
