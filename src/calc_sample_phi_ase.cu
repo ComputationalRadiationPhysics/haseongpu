@@ -4,13 +4,11 @@
 #define TEST_VALUES true
 #define SMALL 1E-06
 
-__device__ double cladAbsorption;
 __device__ double nTot;
 __device__ double sigmaE;
 __device__ double sigmaA;
 __device__ double thicknessOfPrism;
 __device__ int numberOfLevels;
-__device__ int cladNumber;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
@@ -50,7 +48,6 @@ __device__ double propagateRayDevice(
 				    int *positionsOfNormalVectors,
 				    int *neighbors,
 				    int *forbidden,
-				    int* cellTypes,
 				    double* betaValues){
   //    no reflections
   //
@@ -200,13 +197,7 @@ __device__ double propagateRayDevice(
 	}
       }
 
-      if (cellTypes[triangleCurrent] == cladNumber){
-	gain *= exp((-1)*(cladAbsorption * length));
-      }
-      else {
-	gain *= (double) exp(nTot * (betaValues[triangleCurrent+levelCurrent*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA)*length);
-      }
-
+      gain *= (double) exp(nTot * (betaValues[triangleCurrent+levelCurrent*numberOfTriangles]*(sigmaE + sigmaA)-sigmaA)*length);
 
       // the remaining distance is decreased by the length we travelled through the prism
       distanceRemaining -= length;
@@ -255,8 +246,6 @@ __device__ double propagateRayDevice(
 __global__ void setupGlobalVariablesKernel ( 
 					    double hostSigmaE,
 					    double hostSigmaA, 
-					    int hostCladNum, 
-					    double hostCladAbs, 
 					    double hostNTot, 
 					    int hostNumberOfTriangles, 
 					    double hostThicknessOfPrism, 
@@ -265,8 +254,6 @@ __global__ void setupGlobalVariablesKernel (
 {
   sigmaE = hostSigmaE;	
   sigmaA = hostSigmaA;
-  cladNumber = hostCladNum;
-  cladAbsorption = hostCladAbs;
   nTot = hostNTot;
   numberOfTriangles = hostNumberOfTriangles;
   thicknessOfPrism = hostThicknessOfPrism;
@@ -301,10 +288,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 			     int *neighbors,
 			     int *forbidden,
 			     int* triangleIndices,
-			     int* cellTypes,
 			     double* betaValues,
 			     double* importance,
-			     int* surfacesNormalized,
 			     unsigned* indicesOfPrisms,
 			     unsigned raysPerSample) {
 
@@ -362,8 +347,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
 				   startTriangle, startLevel , points, xOfNormals, yOfNormals, 
-				   positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues);
-	  
+				   positionsOfNormalVectors, neighbors, forbidden ,  betaValues);
+
 	  gain *= betaValues[startPrism];
 	  gain *= importance[startPrism];
 

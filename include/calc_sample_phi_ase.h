@@ -16,18 +16,14 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 int *neighbors,
 				 int *forbidden,
 				 int* triangleIndices,
-				 int* cellTypes,
 				 double* betaValues,
 				 double* importance,
-				 int* surfacesNormalized,
 				 unsigned* indicesOfPrisms,
 				 unsigned raysPerSample);
 
 __global__ void setupGlobalVariablesKernel ( 
 					    double hostSigmaE,
 					    double hostSigmaA, 
-					    int hostCladNum, 
-					    double hostCladAbs, 
 					    double hostNTot, 
 					    int hostNumberOfTriangles, 
 					    double hostThicknessOfPrism, 
