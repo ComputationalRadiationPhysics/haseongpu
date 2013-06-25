@@ -1,5 +1,6 @@
 #include <curand_kernel.h> /* curand_uniform */
 #include <stdio.h> /* printf */
+#include <mesh.h>
 
 #define TEST_VALUES true
 #define SMALL 1E-06
@@ -11,6 +12,57 @@ __device__ double thicknessOfPrism;
 __device__ int numberOfLevels;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
+
+__device__ int getNextEdge(Triangle triangle,  Point point, Point destinationPoint, int forbiddenEdge){
+  return 0;
+
+}
+
+__device__ double calcTriangleIntersection(Triangle triangle, Point point, Point destinationPoint, Edge edge){
+  return 0;
+
+}
+
+__device__ Point calcNextPoint(Point point, Point destinationPoint, double length){
+  return {0,0,0,0};
+
+}
+
+__device__ double calcPrismGain(Triangle triangle, Point edgePoint, double length){
+  // return (double) exp(nTot * (triangle.betaValues[(int)edgePoint[2]] * ( sigmaE + sigmaA ) - sigmaA ) * length);
+  return 0;
+
+}
+
+__device__ double propagateRayDeviceNew(normalRay ray, Triangle startTriangle, Triangle *triangles){
+  double distanceRemaining = 0;
+  double distanceTotal = ray.length;
+  double length = 0;
+  double gain = 1;
+
+  Triangle nextTriangle = startTriangle;
+  Point nextPoint = ray.point;
+  int nextForbiddenEdge = -1;
+  int nextEdge = -1;
+
+  distanceRemaining = distanceTotal;
+  
+  while(fabs(distanceRemaining) < SMALL){
+    nextEdge          = getNextEdge(nextTriangle,  ray, nextForbiddenEdge);
+    length            = calcTriangleIntersection(nextTriangle, nextPoint, destinationPoint, nextTriangle.edges[nextEdge]);
+    nextPoint         = calcNextPoint(nextPoint, destinationPoint, length);
+    nextForbiddenEdge = nextTriangle.edges[nextEdge].forbidden;
+    nextTriangle      = *(nextTriangle.edges[nextEdge].neighbor);
+
+    gain *= calcPrismGain(nextTriangle, nextPoint, length);
+    distanceRemaining -= length;
+
+  }
+
+  return gain /= (distanceTotal * distanceTotal);
+
+};
+
 
 /**
  * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
