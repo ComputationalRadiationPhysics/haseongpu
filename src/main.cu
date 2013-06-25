@@ -1,31 +1,16 @@
 // Libraries
-#include "stdio.h"
-#include "stdlib.h"
-#include "math.h"
-#include "vector_types.h"
-#include "assert.h"
-#include "string.h"
-#include <vector>
-#include "curand_kernel.h"
-
+#include <stdio.h> /* fprintf, memcpy, strstr, strcmp */
+#include <assert.h> /* assert */
+#include <string> /* string */
+#include <vector> /* vector */
 
 // User header files
-#include "datatypes.h"
-#include "geometry.h"
-#include "datatypes.h"
-#include "generate_testdata.h"
-#include "print.h"
-#include "geometry_gpu.h"
-#include "ase_bruteforce_kernel.h"
-#include "ase_bruteforce_cpu.h"
-#include "ray_propagation_gpu.h"
-#include "buildgrid.h"
-#include "parser.h"
-#include "write_to_vtk.h"
+#include <ray_propagation_gpu.h>
+#include <parser.h>
+#include <write_to_vtk.h>
 
 int main(int argc, char **argv){
-  unsigned raysTotal;
-  unsigned raysPerSample;
+  unsigned raysPerSample = 0;
   char runmode[100];
   char experimentLocation[256];
   float runtime = 0.0;
@@ -83,59 +68,79 @@ int main(int argc, char **argv){
     } 
   }
 
-  // check if we want no output
+  // Check if we want no output
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--silent", 7) == 0){
 		silent=true;
     } 
   }
 
-  if(parse(experimentLocation, betaValues, xOfNormals, yOfNormals, cellTypes, triangleIndices, 
-	   forbidden, neighbors, positionsOfNormalVectors, points, betaCells, surfaces, xOfTriangleCenter, yOfTriangleCenter,
-	   &cladAbsorption, &cladNumber, &nTot, &sigmaA, &sigmaE, &thicknessOfPrism, 
-	   &numberOfPoints, &numberOfTriangles, &numberOfLevels, &crystalFluorescence)){
-    fprintf(stderr, "C Had problems while parsing experiment data\n");
-    return 1;
-  }
+  // Parse experimentdata
+  std::string root(experimentLocation);
+  
+  // Add slash at the end, if missing
+  if(root[root.size()-1] == 'w')
+    root.erase(root.size()-1, 1);
+  else if(root[root.size()-1] != '/')
+    root.append("/");
+
+  if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
+  if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
+  if(fileToVector(root + "cell_type.txt", cellTypes)) return 1;
+  if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
+  if(fileToVector(root + "neighbors.txt", neighbors)) return 1;
+  if(fileToVector(root + "n_x.txt", xOfNormals)) return 1;
+  if(fileToVector(root + "n_y.txt", yOfNormals)) return 1;
+  if(fileToVector(root + "x_center.txt", xOfTriangleCenter)) return 1;
+  if(fileToVector(root + "y_center.txt", yOfTriangleCenter)) return 1;
+  if(fileToVector(root + "p_in.txt", points)) return 1;
+  if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
+  if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
+  if(fileToVector(root + "surface.txt", surfaces)) return 1;
+
+  if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
+  if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
+  if(fileToValue(root + "n_tot.txt", nTot)) return 1;
+  if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
+  if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
+  if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
+  if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
+  if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
+  if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
+  if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
   // Debug
-  // fprintf(stderr, "cladAbsorption: %f\n", cladAbsorption);
-  // fprintf(stderr, "cladNumber: %d\n", cladNumber);
-  // fprintf(stderr, "nTot: %e\n", nTot);
-  // fprintf(stderr, "sigmaA: %e\n", sigmaA);
-  // fprintf(stderr, "sigmaE: %e\n", sigmaE);
-  // fprintf(stderr, "numberOfPoints: %d\n", numberOfPoints);
-  // fprintf(stderr, "numberOfTriangles: %d\n", numberOfTriangles); 
-  // fprintf(stderr, "numberOfLevels: %d\n\n", numberOfLevels);
+  // fprintf(stderr, "C cladAbsorption: %f\n", cladAbsorption);
+  // fprintf(stderr, "C cladNumber: %d\n", cladNumber);
+  // fprintf(stderr, "C nTot: %e\n", nTot);
+  // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
+  // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
+  // fprintf(stderr, "C numberOfPoints: %d\n", numberOfPoints);
+  // fprintf(stderr, "C numberOfTriangles: %d\n", numberOfTriangles); 
+  // fprintf(stderr, "C numberOfLevels: %d\n\n", numberOfLevels);
 
-  // Generate testdata
-  fprintf(stderr, "C Generate Testdata\n");
-  std::vector<PrismCu>  *prisms = generatePrismsFromTestdata(numberOfLevels, points, numberOfPoints, triangleIndices, numberOfTriangles, thicknessOfPrism);
-  std::vector<PointCu> *samples = generateSamplesFromTestdata(numberOfLevels, points, numberOfPoints);
-  std::vector<double>      *ase = new std::vector<double>(samples->size(), 0);
+  // Test vectors
+  assert(numberOfPoints == (points->size() / 2));
+  assert(numberOfTriangles == triangleIndices->size() / 3);
+  assert(positionsOfNormalVectors->size() == numberOfTriangles * 3);
+  assert(yOfTriangleCenter->size() == numberOfTriangles);
+  assert(xOfTriangleCenter->size() == numberOfTriangles);
+  assert(surfaces->size() == numberOfTriangles);
+  assert(betaValues->size() == numberOfTriangles * (numberOfLevels-1));
+  assert(xOfNormals->size() == numberOfTriangles * 3);
+  assert(yOfNormals->size() == numberOfTriangles * 3);
+  assert(triangleIndices->size() == numberOfTriangles * 3);
+  assert(forbidden->size() == numberOfTriangles * 3);
+  assert(neighbors->size() == numberOfTriangles * 3);
+  assert((numberOfTriangles * (numberOfLevels-1)) <= raysPerSample);
 
+  // Solution vector
+  std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
 
   // Run Experiment
   for(i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
-      if(strstr(argv[i], "bruteforce_gpu") != 0){
-	// threads and blocks will be set in the following function (by reference)
-  	runtime = runAseBruteforceGpu(samples, 
-				      prisms, 
-				      betaValues, 
-				      ase,
-				      cladAbsorption,
-				      float(cladNumber),
-				      nTot,
-				      sigmaA,
-				      sigmaE,
-				      threads, 
-				      blocks, 
-				      raysTotal);
-	strcpy(runmode, "Bruteforce GPU");
-	break;
-      }
-      else if(strstr(argv[i], "ray_propagation_gpu") != 0){
+      if(strstr(argv[i], "ray_propagation_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
 	runtime = runRayPropagationGpu(
 			ase,
@@ -178,15 +183,15 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Solutions\n");
   for(sample_i = 0; sample_i < ase->size(); ++sample_i){
     fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
-	if(silent){
-		if(sample_i >= 10) break;
-	}
+  	if(silent){
+  		if(sample_i >= 10) break;
+  	}
   }
 
   // Print statistics
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
-  fprintf(stderr, "C Prism             : %d\n", (int) prisms->size());
+  fprintf(stderr, "C Prism             : %d\n", (int) numberOfPoints * (numberOfLevels-1));
   fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
   fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
   fprintf(stderr, "C Rays Total        : %d\n", raysPerSample * ase->size());

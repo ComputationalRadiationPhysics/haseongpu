@@ -21,7 +21,7 @@ float runRayPropagationGpu(
 		std::vector<double> *xOfTriangleCenterVector,
 		std::vector<double> *yOfTriangleCenterVector,
 		float hostCladAbsorption,
-		int hostCladNumber,
+		unsigned hostCladNumber,
 		float hostNTot,
 		float hostSigmaA,
 		float hostSigmaE,
