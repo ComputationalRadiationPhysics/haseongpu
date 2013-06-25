@@ -1,6 +1,8 @@
-/* include MTGP pre-computed parameter sets */
-#include <curand_kernel.h>
-#include <stdio.h>
+#include <curand_kernel.h> /* curand_uniform */
+#include <stdio.h> /* printf */
+
+#define TEST_VALUES true
+#define SMALL 1E-06
 
 __device__ double cladAbsorption;
 __device__ double nTot;
@@ -11,10 +13,6 @@ __device__ int numberOfLevels;
 __device__ int cladNumber;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
-
-#define TEST_VALUES true
-#define SMALL 1E-06
-#define VERY_SMALL 0.0
 
 /**
  * @brief Propagate a ray between 2 points and calculate the resulting ASE-Flux at the Destination
@@ -311,8 +309,6 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 			     unsigned raysPerSample) {
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  double gain = 0.;
   const int endPointX = points[point2D];
   const int endPointY = points[numberOfPoints + point2D];
   const int endPointZ = level * thicknessOfPrism;
@@ -358,21 +354,19 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  double w = 1-u-v;
 
 	  // convert the random startpoint into coordinates
-	  double zRand = (startLevel +0.5) * thicknessOfPrism; //(startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 	  double xRand = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
 	  double yRand = (points[ numberOfPoints + t1] * u) + (points[ numberOfPoints + t2] * v) + (points[ numberOfPoints + t3] * w);
+	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 
 	  __syncthreads();
-	  gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
+	  // propagate the ray
+	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
 				   startTriangle, startLevel , points, xOfNormals, yOfNormals, 
 				   positionsOfNormalVectors, neighbors, forbidden , cellTypes, betaValues);
-
-	  gain *= betaValues[startPrism];
-
-	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]), float(gain * importance[startPrism]));
-	  //atomicAdd(&(phiASE[point2D + level*numberOfPoints]), importance[startPrism]);
-	  //atomicAdd(&(phiASE[point2D + level*numberOfPoints]), 0.1);
-	  //atomicAdd(&(phiASE[point2D + level*numberOfPoints]), gain);
 	  
+	  gain *= betaValues[startPrism];
+	  gain *= importance[startPrism];
+
+	  atomicAdd(&(phiASE[point2D + level*numberOfPoints]), float(gain));
   }
 }
