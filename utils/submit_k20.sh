@@ -1,6 +1,6 @@
 #!/bin/bash
-#PBS -q k20
-#PBS -l nodes=1:ppn=8
+#PBS -q k20f
+#PBS -l nodes=1:ppn=2
 #PBS -l walltime=0:10:00
 #PBS -N octrace
 
@@ -10,14 +10,13 @@ module load ~/own.modules
 export -n MODULES_NO_OUTPUT
 
 uname -a
+
 echo
 cd ~/octrace
 
-echo "Compiling..."
-echo
-#mpicc -o lasttest rechn.c
+make
 
 echo "Executing..."
 echo
-./bin/octrace --mode=bruteforce_gpu --rays=256
+./bin/octrace --mode=bruteforce_gpu --rays=256 --experiment=/home/zenker64/octrace/utils/testdata_2
 #./bin/octrace --mode=ray_propagation_gpu --rays=256

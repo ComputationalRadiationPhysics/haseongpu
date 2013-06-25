@@ -2,7 +2,7 @@
 #define RAY_PROPAGATION_GPU_KERNEL_H
 #include <vector>
 
-float runRayPropagationGpu(
+float calcDndtAse(
 		std::vector<double> *dndtAse, 
 		unsigned &threads, 
 		unsigned &blocks, 
@@ -10,7 +10,6 @@ float runRayPropagationGpu(
 		std::vector<double> *betaValuesVector,
 		std::vector<double> *xOfNormalsVector,
 		std::vector<double> *yOfNormalsVector,
-		std::vector<unsigned> *cellTypesVector,
 		std::vector<unsigned> *triangleIndicesVector,
 		std::vector<int> *forbiddenVector,
 		std::vector<int> *neighborsVector,
@@ -20,8 +19,6 @@ float runRayPropagationGpu(
 		std::vector<float> *surfacesVector,
 		std::vector<double> *xOfTriangleCenterVector,
 		std::vector<double> *yOfTriangleCenterVector,
-		float hostCladAbsorption,
-		unsigned hostCladNumber,
 		float hostNTot,
 		float hostSigmaA,
 		float hostSigmaE,
