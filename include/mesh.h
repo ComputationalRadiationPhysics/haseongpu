@@ -15,6 +15,13 @@ struct Ray : Point {
   __host__ __device__ void normalize();
 };
 
+struct Triangle;
+
+struct Edge {
+  Ray normal;
+  Triangle *neighbor; // index in global triangle list
+};
+
 struct Triangle {
   Point A;
   Point B;
@@ -22,11 +29,6 @@ struct Triangle {
 
   double *betaValues; // array of betaValues, one for each prism/level above the triangle
   Edge edges[3]; // edges of the triangle size: 3
-};
-
-struct Edge {
-  Ray normal;
-  Triangle *neighbor; // index in global triangle list
 };
 
 #endif /* MESH_H */
