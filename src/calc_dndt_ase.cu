@@ -16,6 +16,41 @@
 #include <cuda_runtime_api.h>
 
 #define SEED 1234
+#define MIN_COMPUTE_CAPABILITY 2
+
+
+/** Queries the devices to find the one with the highest Compute Capability
+ * and sets it as our current device. 
+ * Will result in a visible error and terminate program execution, 
+ * if no suitable device is detected
+ */
+int getCorrectDevice(int verbose){
+  int count = 0, candidate = -1;
+  unsigned minCapability = MIN_COMPUTE_CAPABILITY;
+  cudaDeviceProp prop;
+
+  CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
+  
+  for(int i=0; i<count; ++i){
+    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
+    if(prop.major >= minCapability){
+      minCapability = prop.major;
+      candidate = i;
+    }
+  }
+
+  if(candidate == -1){
+    fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
+    exit(1);
+  }else{
+    if(verbose > 0){
+      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, candidate) );
+      fprintf(stderr,"\nC using CUDA device: %s (Compute Capability %d.%d)\n", prop.name, prop.major, prop.minor); 
+    }
+    CUDA_CHECK_RETURN( cudaSetDevice(candidate) );
+  }
+  return candidate;
+}
 
 /** GPU Kernel Variables
  * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
@@ -40,30 +75,30 @@
  * other input parameters are put to the GPU by the setupGlobalVariablesKernel
  */
 float calcDndtAse(
-		  std::vector<double> *dndtAse, 
-		  unsigned &threads, 
-		  unsigned &blocks, 
-		  unsigned &hostRaysPerSample,
-		  std::vector<double> *betaValuesVector,
-		  std::vector<double> *xOfNormalsVector,
-		  std::vector<double> *yOfNormalsVector,
-		  std::vector<unsigned> *triangleIndicesVector,
-		  std::vector<int> *forbiddenVector,
-		  std::vector<int> *neighborsVector,
-		  std::vector<int> *positionsOfNormalVectorsVector,
-		  std::vector<double> *pointsVector,
-		  std::vector<double> *betaCellsVector,
-		  std::vector<float> *surfacesVector,
-		  std::vector<double> *xOfTriangleCenterVector,
-		  std::vector<double> *yOfTriangleCenterVector,
-		  float hostNTot,
-		  float hostSigmaA,
-		  float hostSigmaE,
-		  unsigned hostNumberOfPoints,
-		  unsigned hostNumberOfTriangles,
-		  unsigned hostNumberOfLevels,
-		  float hostThicknessOfPrism,
-		  float hostCrystalFluorescence)
+      std::vector<double> *dndtAse, 
+      unsigned &threads, 
+      unsigned &blocks, 
+      unsigned &hostRaysPerSample,
+      std::vector<double> *betaValuesVector,
+      std::vector<double> *xOfNormalsVector,
+      std::vector<double> *yOfNormalsVector,
+      std::vector<unsigned> *triangleIndicesVector,
+      std::vector<int> *forbiddenVector,
+      std::vector<int> *neighborsVector,
+      std::vector<int> *positionsOfNormalVectorsVector,
+      std::vector<double> *pointsVector,
+      std::vector<double> *betaCellsVector,
+      std::vector<float> *surfacesVector,
+      std::vector<double> *xOfTriangleCenterVector,
+      std::vector<double> *yOfTriangleCenterVector,
+      float hostNTot,
+      float hostSigmaA,
+      float hostSigmaE,
+      unsigned hostNumberOfPoints,
+      unsigned hostNumberOfTriangles,
+      unsigned hostNumberOfLevels,
+      float hostThicknessOfPrism,
+      float hostCrystalFluorescence)
 {
   // Variable declarations
   // CPU
@@ -85,7 +120,7 @@ float calcDndtAse(
   mtgp32_kernel_params *devKernelParams;
   double *importance;
   unsigned *indicesOfPrisms;
-	
+  
   // Variables defintions
   threads = 50; //OPTIMIZE: find perfect number of threads
   blocks = 200;
@@ -107,6 +142,9 @@ float calcDndtAse(
   for(int i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
   for(int i=0; i < hostNumberOfPrisms; ++i)hostImportance[i] = 1.0;
 
+  // check, if we run on the correct machine / select a good device
+  getCorrectDevice(1);
+
   // Init mersenne twister PRNG
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
@@ -117,12 +155,12 @@ float calcDndtAse(
   //@OPTIMIZE: initialize the constants as constants...
   //@OPTIMIZE: call by value, not global variable
   setupGlobalVariablesKernel<<<1,1>>>(double(hostSigmaE), 
-				      double(hostSigmaA),
-				      double(hostNTot), 
-				      hostNumberOfTriangles, 
-				      double(hostThicknessOfPrism),
-				      hostNumberOfLevels, 
-				      hostNumberOfPoints); 
+              double(hostSigmaA),
+              double(hostNTot), 
+              hostNumberOfTriangles, 
+              double(hostThicknessOfPrism),
+              hostNumberOfLevels, 
+              hostNumberOfPoints); 
 
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&points, 2 * hostNumberOfPoints * sizeof(double)));
@@ -157,25 +195,25 @@ float calcDndtAse(
     for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
       // Importance for one sample
       importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
-			 (double*) &(pointsVector->at(0)), 
-			 (double*) &(xOfNormalsVector->at(0)), 
-			 (double*) &(yOfNormalsVector->at(0)),
-			 (int*) &(positionsOfNormalVectorsVector->at(0)), 
-			 (int*) &(neighborsVector->at(0)), 
-			 (int*) &(forbiddenVector->at(0)), 
-			 (double*) &(betaValuesVector->at(0)), 
-			 (double*) &(xOfTriangleCenterVector->at(0)),
-			 (double*) &(yOfTriangleCenterVector->at(0)), 
-			 (float*) &(surfacesVector->at(0)), 
-			 hostRaysPerSample,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
-			 hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
+       (double*) &(pointsVector->at(0)), 
+       (double*) &(xOfNormalsVector->at(0)), 
+       (double*) &(yOfNormalsVector->at(0)),
+       (int*) &(positionsOfNormalVectorsVector->at(0)), 
+       (int*) &(neighborsVector->at(0)), 
+       (int*) &(forbiddenVector->at(0)), 
+       (double*) &(betaValuesVector->at(0)), 
+       (double*) &(xOfTriangleCenterVector->at(0)),
+       (double*) &(yOfTriangleCenterVector->at(0)), 
+       (float*) &(surfacesVector->at(0)), 
+       hostRaysPerSample,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
+       hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
 
       // Prism scheduling for gpu threads
       for(int prism_i=0, absoluteRay=0; prism_i < hostNumberOfPrisms; ++prism_i){
-	for(int ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
-	  hostIndicesOfPrisms[absoluteRay++] = prism_i;
-	  assert(absoluteRay <= hostRaysPerSample);
-	}
+  for(int ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
+    hostIndicesOfPrisms[absoluteRay++] = prism_i;
+    assert(absoluteRay <= hostRaysPerSample);
+  }
       }
 
       // Copy dynamic sample date to device
@@ -186,24 +224,24 @@ float calcDndtAse(
 
       // Start Kernel
       calcSamplePhiAse<<< blocks, threads >>> ( devMTGPStates, phiASE, point_i, level_i, hostRaysPerThread, 
-						points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
-						neighbors, forbidden, triangleIndices, betaValues, importance, 
-						indicesOfPrisms,hostRaysPerSample );
+            points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
+            neighbors, forbidden, triangleIndices, betaValues, importance, 
+            indicesOfPrisms,hostRaysPerSample );
 
-			if(kernelcount==0)
-			{
-				// Print experiment data
-				testKernel<<<1,1>>>(points,	xOfNormals, yOfNormals,
-														neighbors, forbidden, positionsOfNormalVectors,
-														triangleIndices, betaValues, phiASE, importance,
-														indicesOfPrisms, hostNTot, hostSigmaA, hostSigmaE,
-														hostNumberOfPoints, hostNumberOfTriangles, hostNumberOfLevels,
-														hostThicknessOfPrism,	hostCrystalFluorescence, 5);
-			}
+      if(kernelcount==0)
+      {
+        // Print experiment data
+        testKernel<<<1,1>>>(points, xOfNormals, yOfNormals,
+                            neighbors, forbidden, positionsOfNormalVectors,
+                            triangleIndices, betaValues, phiASE, importance,
+                            indicesOfPrisms, hostNTot, hostSigmaA, hostSigmaE,
+                            hostNumberOfPoints, hostNumberOfTriangles, hostNumberOfLevels,
+                            hostThicknessOfPrism, hostCrystalFluorescence, 5);
+      }
 
 
       if(kernelcount % 200 == 0)
-	fprintf(stderr, "C Sampling point %d done\n",kernelcount);
+  fprintf(stderr, "C Sampling point %d done\n",kernelcount);
       kernelcount++;
     }
   }
@@ -219,7 +257,7 @@ float calcDndtAse(
     hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
     double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
-      	
+        
   }
 
   // Free Memory
