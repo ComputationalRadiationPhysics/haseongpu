@@ -193,7 +193,10 @@ __device__ double propagateRayDevice(
 
 #if TEST_VALUES==true
 	if(fabs(distanceTotal - testDistance) > SMALL)
-		printf("Distance too big!\n");
+		printf("Distance wrong!\n");
+	if(fabs(xPos - xDestination) > SMALL) printf("X Coordinate wrong!\n");
+	if(fabs(yPos - yDestination) > SMALL) printf("Y Coordinate wrong!\n");
+	if(fabs(zPos - zDestination) > SMALL) printf("Z Coordinate wrong!\n");
 #endif
 
 	return gain /= (distanceTotal * distanceTotal);
