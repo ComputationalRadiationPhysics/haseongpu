@@ -168,7 +168,21 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
-    
+      else if(strstr(argv[i], "ray_propagation_gpu_new") != 0){
+	// threads and blocks will be set in the following function (by reference)
+	runtime = calcDndtAse(threads, 
+			      blocks, 
+			      raysPerSample,
+			      dMesh,
+			      betaCells,
+			      nTot,
+			      sigmaA,
+			      sigmaE,
+			      crystalFluorescence);
+	strcpy(runmode, "Ray Propagation New GPU");
+	break;
+      }
+
     }
 
   }

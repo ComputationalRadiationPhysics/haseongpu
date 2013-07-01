@@ -53,17 +53,16 @@ int getCorrectDevice(int verbose){
   return candidate;
 }
 
-float calcDndtAseNew(       
-		     unsigned &threads, 
-		     unsigned &blocks, 
-		     unsigned &hostRaysPerSample,
-		     Mesh mesh,
-		     std::vector<double> *betaCellsVector,
-		     float nTot,
-		     float sigmaA,
-		     float sigmaE,
-		     float crystalFluorescence,
-		     std::vector<double> *dndtAse){
+float calcDndtAseNew (unsigned &threads, 
+		      unsigned &blocks, 
+		      unsigned &hostRaysPerSample,
+		      Mesh mesh,
+		      std::vector<double> *betaCellsVector,
+		      float nTot,
+		      float sigmaA,
+		      float sigmaE,
+		      float crystalFluorescence,
+		      std::vector<double> *dndtAse){
 
 
   // Variable declaration
@@ -156,7 +155,7 @@ float calcDndtAseNew(
   cudaEventElapsedTime(&runtimeGpu, start, stop);
 
   // Calculate dndt Ase
-  for(int sample_i=0; sample_i < mesh.numberOfSamples; ++sample_i){
+  for(int sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
     hostPhiAse[sample_i] = float( (double(hostPhiAse[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
     double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(sigmaE + sigmaA) - double(nTot * sigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiAse[sample_i] / crystalFluorescence;

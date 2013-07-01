@@ -1,6 +1,19 @@
 #ifndef RAY_PROPAGATION_GPU_KERNEL_H
 #define RAY_PROPAGATION_GPU_KERNEL_H
 #include <vector>
+#include <mesh.h>
+
+float calcDndtAseNew (unsigned &threads, 
+		      unsigned &blocks, 
+		      unsigned &hostRaysPerSample,
+		      Mesh mesh,
+		      std::vector<double> *betaCellsVector,
+		      float nTot,
+		      float sigmaA,
+		      float sigmaE,
+		      float crystalFluorescence,
+		      std::vector<double> *dndtAse);
+
 
 float calcDndtAse(
 		std::vector<double> *dndtAse, 
