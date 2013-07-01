@@ -9,6 +9,8 @@
 #include <parser.h>
 #include <write_to_vtk.h>
 
+#include "mesh.h"
+
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   char runmode[100];
@@ -125,6 +127,10 @@ int main(int argc, char **argv){
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
   assert((numberOfTriangles * (numberOfLevels-1)) <= raysPerSample);
+
+  Mesh hMesh;
+  Mesh dMesh;
+  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
 
   // Solution vector
   std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
