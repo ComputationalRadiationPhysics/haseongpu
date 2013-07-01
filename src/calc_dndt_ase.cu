@@ -14,10 +14,9 @@
 /* include MTGP pre-computed parameter sets */
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
+#include <mesh.h>
 
 #define TEST_VALUES true
-#define SMALL 1E-06
-#define VERY_SMALL 0.0
 #define SEED 1234
 
 /** GPU Kernel Variables
@@ -108,7 +107,7 @@ float calcDndtAse(
   for(int i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
   for(int i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
   for(int i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
-  for(int i=0; i < hostNumberOfPrisms; ++i)hostImportance[i] = 1.0;
+  for(int i=0; i < hostNumberOfPrisms; ++i) hostImportance[i] = 1.0;
 
   // Init mersenne twister PRNG
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
@@ -193,7 +192,6 @@ float calcDndtAse(
 						neighbors, forbidden, triangleIndices, betaValues, importance, 
 						indicesOfPrisms,hostRaysPerSample );
 
-
       if(kernelcount % 200 == 0)
 	fprintf(stderr, "C Sampling point %d done\n",kernelcount);
       kernelcount++;
@@ -223,7 +221,6 @@ float calcDndtAse(
   cudaFree(positionsOfNormalVectors);
   cudaFree(betaValues);
   cudaFree(importance);
-
 
   cudaDeviceReset();
   return runtimeGpu;

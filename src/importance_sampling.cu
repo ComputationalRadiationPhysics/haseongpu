@@ -1,5 +1,81 @@
-#define SMALL 1E-06
-#define VERY_SMALL 0.0
+#include <mesh.h>
+#include <propagate_ray.h>
+#include <geometry.h>
+
+// ##############################################################
+// # Reconstruction                                             #
+// ##############################################################
+void importanceSamplingNew(Point samplePoint, Triangle *triangles, unsigned numberOfLevels, unsigned numberOfTriangles, unsigned raysPerSample, double sigmaA, double sigmaE, double nTot, float thickness, double *importance, unsigned *raysPerPrism){
+  int raysLeft;
+  int raysDump;
+  double sumPhi;
+  double surfaceTotal;
+  double gain;
+  Ray ray;
+  Point startPoint;
+  Triangle startTriangle;
+
+  // Calculate importance by propagation from trianglecenter to every other center
+  for(unsigned triangle_i = 0; triangle_i < numberOfTriangles; ++triangle_i){
+    for(unsigned level_i = 0; level_i < numberOfLevels - 1; ++level_i){
+      startTriangle = triangles[triangle_i];
+      startPoint.x = startTriangle.center.x;
+      startPoint.y = startTriangle.center.y;
+      startPoint.z = (level_i + 0.5) * thickness;
+      ray = generateRay(startPoint, samplePoint);
+      gain = propagateRay(ray, level_i, triangles[triangle_i], triangles, sigmaA, sigmaE, nTot, thickness);
+
+      importance[triangle_i + level_i * numberOfTriangles] = startTriangle.betaValues[level_i] * gain;
+      sumPhi += importance[triangle_i + level_i * numberOfTriangles];
+
+    }
+    surfaceTotal += triangles[triangle_i].surface;
+  }
+
+  // Calculate number of rays/prism
+  for(unsigned triangle_i = 0; triangle_i < numberOfTriangles; ++triangle_i){
+    for(unsigned level_i = 0; level_i < numberOfLevels - 1; ++level_i){
+      raysPerPrism[triangle_i + level_i * numberOfTriangles] =  (unsigned)(floor(importance[triangle_i + level_i * numberOfTriangles] / sumPhi * raysPerSample));
+      raysDump +=  raysPerPrism[triangle_i + level_i * numberOfTriangles];
+    }
+
+  }
+
+  raysLeft = raysPerSample - raysDump;
+
+  // TODO What happens with random failure ?
+  // TODO Distribute the remaining rays randomly
+  for (int i_r=0; i_r < raysLeft; i_r++){
+    int rand_t = (int )(rand() % numberOfTriangles);
+    int rand_z = (int )(rand() % (numberOfLevels-1));
+    raysPerPrism[rand_t + rand_z * numberOfTriangles]++;
+
+  }
+
+
+  //  Now think about the mount of rays which would come out of this volume(surface)
+  //  dividing this number with the new amount of rays gives the final importance weight for this area!
+  for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
+    for (int level_i=0; level_i<(numberOfLevels-1); ++level_i){
+      if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
+  	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
+
+      }
+      else{
+  	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
+
+      }
+
+    }
+
+  }
+
+}
+
+
+// #################################################
+// # Old Code                                      #
+// #################################################
 
 double propagateRayHost (double x_pos, 
 			 double y_pos, 

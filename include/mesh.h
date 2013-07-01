@@ -3,6 +3,9 @@
 
 #include<vector>
 
+#define SMALL 1E-06
+#define VERY_SMALL 0.0
+
 struct TwoDimPoint {
   double x;
   double y;

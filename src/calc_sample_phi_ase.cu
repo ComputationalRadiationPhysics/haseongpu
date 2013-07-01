@@ -1,157 +1,21 @@
 #include <curand_kernel.h> /* curand_uniform */
 #include <stdio.h> /* printf */
 #include <mesh.h>
-#include <geometry_gpu.h>
+#include <geometry.h>
+#include <propagate_ray.h> /* propagateRay */
 
-#define TEST_VALUES true
-#define SMALL 1E-06
+ __device__ double nTot; 
+ __device__ double sigmaE; 
+ __device__ double sigmaA; 
+ __device__ double thicknessOfPrism; 
+ __device__ int numberOfLevels; 
+ __device__ int numberOfPoints; 
+ __device__ int numberOfTriangles; 
 
-__device__ double nTot;
-__device__ double sigmaE;
-__device__ double sigmaA;
-__device__ double thicknessOfPrism;
-__device__ int numberOfLevels;
-__device__ int numberOfPoints;
-__device__ int numberOfTriangles;
 
 // ##############################################################
 // # Reconstruction                                             #
 // ##############################################################
-__device__ double checkSurface(int currentLevel, double zPos, double zVec, double length){
-	double denominator = zPos * zVec;
-	if (denominator != 0.0){
-		double nominator = currentLevel * thicknessOfPrism - zPos;
-		double lengthTmp = nominator/denominator;
-		if (lengthTmp < length && lengthTmp > 0.0){
-			return lengthTmp;
-		}
-	}
-	return 0;
-}
-
-__device__ double checkEdge(Triangle triangle, int edge, Ray ray, double length){
-  double denominator = triangle.edges[edge].normal.dir.x * ray.dir.x +  triangle.edges[edge].normal.dir.y * ray.dir.y;
-  if (denominator != 0.0)
-    {
-      double nominator =	  
-	triangle.edges[edge].normal.dir.x * triangle.edges[edge].normal.p.x
-	+ triangle.edges[edge].normal.dir.y * triangle.edges[edge].normal.p.y
-	- triangle.edges[edge].normal.dir.x * ray.p.x 
-	- triangle.edges[edge].normal.dir.y * ray.p.y; 
-
-      double lengthTmp = nominator/denominator;
-
-      if(lengthTmp < length && lengthTmp > 0.0){
-	return lengthTmp;
-      }
-    }
-  return 0;
-}
-
-__device__ int getNextEdge(Triangle triangle,  Ray ray, unsigned level, double length, int forbiddenEdge){
-  int edge = -1;
-  // Check 3 edges of triangle
-  for(int edge_i = 0; edge_i < 3; ++edge_i){
-    if(edge_i != forbiddenEdge){
-      double lengthTmp = checkEdge(triangle, edge_i, ray, length);
-      if(lengthTmp){
-	length = lengthTmp;
-	edge = edge_i;
-      }
-    }
-  }
-  
-  // check the upper surface
-  if (forbiddenEdge != 3){
-    double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, length);
-    if(lengthTmp){
-      length = lengthTmp;
-      edge = 3;
-    }
-  }
-
-  // check the lower surface
-  if (forbiddenEdge != 4){
-    double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, length);
-    if (lengthTmp){
-      length = lengthTmp;
-      edge = 4;
-    }
-  }
-  return edge;
-}
-
-__device__ unsigned getNextLevel(unsigned level, int edge){
-  switch(edge){
-  case 3:
-    return ++level;
-  case 4:
-    return --level;
-  default:
-    return level;
-  }
-
-}
-
-__device__ double calcTriangleIntersection(Triangle triangle, Ray ray, int edge, int length, unsigned level){
-  switch(edge){
-  case 0:
-  case 1:
-  case 2:
-    return checkEdge(triangle, edge, ray, length);
-  case 3:
-  case 4:
-    return checkSurface(level + 1, ray.p.z, ray.dir.z, length);
-
-  }
-  return 0;
-
-}
-
-__device__ Ray calcNextRay(Ray ray, double length){
-  ray.p.x = ray.p.x + ray.length * ray.dir.x;
-  ray.p.y = ray.p.y + ray.length * ray.dir.y;
-  ray.p.z = ray.p.z + ray.length * ray.dir.z;
-  ray.length = ray.length - length;
-
-  return ray;
-
-}
-
-__device__ double calcPrismGain(Triangle triangle, unsigned level, double length){
-  return (double) exp(nTot * (triangle.betaValues[level] * ( sigmaE + sigmaA ) - sigmaA ) * length);
- 
-}
-
-__device__ double propagateRayDeviceNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles){
-  double distanceTotal = ray.length;
-  double distanceRemaining = distanceTotal;
-  double length = 0;
-  double gain = 1;
-  
-  Triangle nextTriangle = startTriangle;
-  Ray nextRay = normalizeRay(ray, distanceTotal);
-  int nextForbiddenEdge = -1;
-  int nextEdge = -1;
-  unsigned nextLevel = startLevel;
-
-  while(fabs(distanceRemaining) < SMALL){
-    nextEdge          = getNextEdge(nextTriangle, nextRay, nextLevel, distanceRemaining, nextForbiddenEdge);
-    nextLevel         = getNextLevel(nextLevel, nextEdge);
-    length            = calcTriangleIntersection(nextTriangle, nextRay, nextEdge, distanceRemaining, nextLevel);
-    nextRay           = calcNextRay(nextRay, length);
-    nextForbiddenEdge = nextTriangle.edges[nextEdge].forbidden;
-    nextTriangle      = *(nextTriangle.edges[nextEdge].neighbor);
-
-    gain *= calcPrismGain(nextTriangle, nextLevel, length);
-    distanceRemaining -= length;
-
-  }
-
-  return gain /= (distanceTotal * distanceTotal);
-
-}
-
 __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
   Point startPoint;
   double u = curand_uniform(&globalState[blockIdx.x]);
@@ -173,7 +37,7 @@ __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thi
 }
 
 
-__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Triangle* triangles, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, unsigned numberOfTriangles, float phiAse) {
+__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Triangle* triangles, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, unsigned numberOfTriangles, float *phiAse) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   // One thread can compute multiple rays
@@ -199,13 +63,15 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 
 	  // propagate the ray
 	  __syncthreads();
-	  double gain = propagateRayDeviceNew(ray, startLevel, startTriangle, triangles);
+	  double gain = propagateRay(ray, startLevel, startTriangle, triangles, sigmaA, sigmaE, nTot, thicknessOfPrism );
 
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];
 
-	  atomicAdd(&phiAse, float(gain));
+	  atomicAdd(phiAse, float(gain));
+
   }
+
 }
 
 // ##############################################################
