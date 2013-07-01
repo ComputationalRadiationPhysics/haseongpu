@@ -53,6 +53,82 @@ int getCorrectDevice(int verbose){
   return candidate;
 }
 
+float calcDndtAseNew(       
+		     unsigned &threads, 
+		     unsigned &blocks, 
+		     unsigned &hostRaysPerSample,
+		     Mesh mesh,
+		     float nTot,
+		     float sigmaA,
+		     float sigmaE,
+		     float crystalFluorescence,
+		     std::vector<double> *dndtAse){
+
+
+  // Variable declaration
+  // CPU
+  double *hostImportance;
+  unsigned *hostRaysPerPrism;
+  cudaEvent_t start, stop;
+  float runtimeGpu;
+  unsigned kernelcount;
+  unsigned *hostIndicesOfPrisms;
+  float *hostPhiAse;
+
+  // GPU
+  float phiASE;
+  curandStateMtgp32 *devMTGPStates;
+  mtgp32_kernel_params *devKernelParams;
+  double *importance;
+  unsigned *indicesOfPrisms;
+
+  //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
+  threads = 256; 
+  blocks = 200;
+
+  hostPhiAse = (float*) malloc(mesh.numberOfSamples * sizeof(float));
+  hostImportance = (double*) malloc(mesh.numberOfPrisms * sizeof(double));
+  hostRaysPerPrism = (unsigned*) malloc(mesh.numberOfPrisms * sizeof(unsigned));
+  hostIndicesOfPrisms = (unsigned*) malloc(hostRaysPerSample * sizeof(unsigned));
+
+  runtimeGpu = 0.0;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  kernelcount = 0;
+
+  for(int i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
+  for(int i=0; i < mesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
+  for(int i=0; i < mesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
+  for(int i=0; i < mesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
+
+  // check, if we run on the correct machine / select a good device
+  getCorrectDevice(1);
+
+  // Init mersenne twister PRNG
+  CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
+  CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
+  CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
+  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, SEED));
+
+  fprintf(stderr, "\nC Start Phi Ase calculation\n");
+  cudaEventRecord(start, 0);
+  for(unsigned sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
+    Point sample;// = mesh.samples[sample_i];
+    importanceSamplingNew(sample, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
+
+    // Prism scheduling for gpu threads
+    for(int prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
+      for(int ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
+	hostIndicesOfPrisms[absoluteRay++] = prism_i;
+	assert(absoluteRay <= hostRaysPerSample);
+  }
+      }
+
+
+  }
+
+}
+
 /** GPU Kernel Variables
  * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
  * and the number of blocks as well (200 is the maximum for the standard

@@ -37,8 +37,10 @@ __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thi
 }
 
 
-__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Triangle* triangles, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, unsigned numberOfTriangles, float *phiAse) {
+__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Mesh mesh, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, float *phiAse) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
+  Triangle *triangles = mesh.triangles;
+  unsigned numberOfTriangles = mesh.numberOfTriangles;
 
   // One thread can compute multiple rays
   for (int i=0; ; ++i){

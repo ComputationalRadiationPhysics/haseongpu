@@ -3,6 +3,15 @@
 
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
+#include <mesh.h>
+
+__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, 
+				    Point samplePoint, 
+				    Mesh mesh,
+				    unsigned* indicesOfPrisms, 
+				    double* importance,
+				    unsigned raysPerSample, 
+				    float *phiAse);
 
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 float* phiASE,

@@ -5,7 +5,12 @@
 // ##############################################################
 // # Reconstruction                                             #
 // ##############################################################
-void importanceSamplingNew(Point samplePoint, Triangle *triangles, unsigned numberOfLevels, unsigned numberOfTriangles, unsigned raysPerSample, double sigmaA, double sigmaE, double nTot, float thickness, double *importance, unsigned *raysPerPrism){
+void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample, double sigmaA, double sigmaE, double nTot,  double *importance, unsigned *raysPerPrism){
+  Triangle *triangles = mesh.triangles;
+  unsigned numberOfLevels = mesh.numberOfLevels;
+  unsigned numberOfTriangles = mesh.numberOfTriangles;
+  float thickness = mesh.thickness;
+
   int raysLeft;
   int raysDump;
   double sumPhi;
@@ -23,7 +28,7 @@ void importanceSamplingNew(Point samplePoint, Triangle *triangles, unsigned numb
       startPoint.y = startTriangle.center.y;
       startPoint.z = (level_i + 0.5) * thickness;
       ray = generateRay(startPoint, samplePoint);
-      gain = propagateRay(ray, level_i, triangles[triangle_i], triangles, sigmaA, sigmaE, nTot, thickness);
+      gain = propagateRay(ray, level_i, startTriangle, triangles, sigmaA, sigmaE, nTot, thickness);
 
       importance[triangle_i + level_i * numberOfTriangles] = startTriangle.betaValues[level_i] * gain;
       sumPhi += importance[triangle_i + level_i * numberOfTriangles];
@@ -56,7 +61,7 @@ void importanceSamplingNew(Point samplePoint, Triangle *triangles, unsigned numb
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
   for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-    for (int level_i=0; level_i<(numberOfLevels-1); ++level_i){
+    for (int level_i=0; level_i < numberOfLevels; ++level_i){
       if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
   	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
 
