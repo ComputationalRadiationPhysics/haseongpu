@@ -42,7 +42,7 @@ struct Triangle;
 
 struct Edge {
   NormalRay normal;
-  Triangle *neighbor; // index in global triangle list
+  Triangle *neighbor;
   int forbidden;
 };
 
@@ -57,18 +57,14 @@ struct Triangle {
   float surface;
 };
 
-class Mesh {
-  Triangle *triangles;
+struct Mesh {
+  struct Triangle *triangles;
   unsigned numberOfTriangles;
-
-  public:
+  unsigned numberOfLevels;
 
   ~Mesh();
 
-  static Mesh parse(std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
-
-  void copyToGpu();
-  void copyFromGpu();
+  static void parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
 };
 
 #endif /* MESH_H */

@@ -134,11 +134,11 @@ __device__ double propagateRayDevice(
 		double xPos,
 		double yPos,
 		double zPos,
-		double xDestination,
-		double yDestination,
-		double zDestination,
-		int firstTriangle,
-		int firstLevel,
+		const double xDestination,
+		const double yDestination,
+		const double zDestination,
+		const int firstTriangle,
+		const int firstLevel,
 		double *points,
 		double *xOfNormals,
 		double *yOfNormals,
@@ -147,7 +147,7 @@ __device__ double propagateRayDevice(
 		int *forbidden,
 		double* betaValues){
 
-	double xVec, yVec,zVec;
+	double xVec, yVec, zVec;
 	double distanceTotal, distanceRemaining, length;
 	double gain=1.;
 	int triangleCurrent, levelCurrent, forbiddenCurrent; // for the current iteration
@@ -189,19 +189,15 @@ __device__ double propagateRayDevice(
 		//        0,1,2: int for the neighbors
 		//        3: hor plane up
 		//        4: hor plane down
-		//        try the triangle faces
-		//        remember the correlation between the normals and the points
 		//        n1: p1-2, n2: p1-3, n3:p2-3
 		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
-		//        as everything uses triangular "prisms", as well as n_z=0 in this case!
-
 		// forb describes the surface, from which the ray enters the prism.
 		// this surface is no suitable candidate, since the length would be 0!
 
 		levelNext = levelCurrent;
 
 		// check the 3 edges
-		for (int i = 0; i<3 ; ++i){
+		for (unsigned i = 0; i<3 ; ++i){
 			if (forbiddenCurrent != i){
 				offset = triangleCurrent + i * numberOfTriangles;
 				double lengthHelp = checkSide(offset, xOfNormals[offset], yOfNormals[offset], points, xPos, yPos, length, xVec, yVec, positionsOfNormalVectors);
@@ -240,32 +236,35 @@ __device__ double propagateRayDevice(
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
 
+		// now set the next cell and position
+		xPos = xPos + length*xVec;
+		yPos = yPos + length*yVec;
+		zPos = zPos + length*zVec;
+		triangleCurrent = triangleNext;
+		levelCurrent = levelNext;
+
+		// set the new forbidden surface
+		forbiddenCurrent = forbiddenNext;
 
 #if TEST_VALUES==true
 		testDistance += length;
 		if(loopbreaker>500){
-			printf("Loopbreaker reached. firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
+			printf("Loopbreaker reached.\n");
 			return 0.;
 		}else{
 			loopbreaker++;
 		}
 #endif
 
-		// now set the next cell and position
-		xPos = xPos + length*xVec;
-		yPos = yPos + length*yVec;
-		zPos = zPos + length*zVec;
-
-		triangleCurrent = triangleNext;
-		levelCurrent = levelNext;
-		// set the new forbidden surface
-		forbiddenCurrent = forbiddenNext;
 
 	}
 
 #if TEST_VALUES==true
 	if(fabs(distanceTotal - testDistance) > SMALL)
-		printf("Distance too big! firstTriangle: %d, level: %d, length: %f, distanceTotal:%f, testDistance%f, distanceRemaining:%f\n",firstTriangle,firstLevel,length,distanceTotal,testDistance,distanceRemaining);
+		printf("Distance wrong!\n");
+	if(fabs(xPos - xDestination) > SMALL) printf("X Coordinate wrong!\n");
+	if(fabs(yPos - yDestination) > SMALL) printf("Y Coordinate wrong!\n");
+	if(fabs(zPos - zDestination) > SMALL) printf("Z Coordinate wrong!\n");
 #endif
 
 	return gain /= (distanceTotal * distanceTotal);
@@ -331,7 +330,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   const int endPointX = points[point2D];
   const int endPointY = points[numberOfPoints + point2D];
   const int endPointZ = level * thicknessOfPrism;
-
+  __shared__ double threadGain[256]; //MUST be the same as number of threads
+  threadGain[threadIdx.x] = 0.;
 
   // One thread can compute multiple rays
   for (int i=0; ; ++i){
@@ -339,7 +339,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
 	  int rayNumber = id + (blockDim.x*gridDim.x * i);
 	  if(rayNumber >= raysPerSample){
-		  return;
+		  break;
 	  }
 
 	  // get a new prism to start from
@@ -377,7 +377,6 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  double yRand = (points[numberOfPoints + t1] * u) + (points[numberOfPoints + t2] * v) + (points[numberOfPoints + t3] * w);
 	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 
-	  __syncthreads();
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
 				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
@@ -386,6 +385,22 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  gain *= betaValues[startPrism];
 	  gain *= importance[startPrism];
 
-	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(gain));
+	  threadGain[threadIdx.x] += gain;
+  }
+
+  // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
+  __syncthreads();
+  unsigned i = blockDim.x/2;
+  while(i != 0){
+	if(threadIdx.x < i){
+	  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+	}
+	__syncthreads();
+	i /= 2;
+  }
+
+  // thread 0 writes it to the global memory
+  if(threadIdx.x == 0){
+	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[0]));
   }
 }
