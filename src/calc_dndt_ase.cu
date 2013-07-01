@@ -122,7 +122,7 @@ float calcDndtAse(
   unsigned *indicesOfPrisms;
   
   // Variables defintions
-  threads = 50; //OPTIMIZE: find perfect number of threads
+  threads = 256; //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
   blocks = 200;
   hostNumberOfPrisms = (hostNumberOfTriangles * (hostNumberOfLevels-1));
   hostNumberOfSamples = hostNumberOfPoints * hostNumberOfLevels;

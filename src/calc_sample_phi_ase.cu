@@ -262,7 +262,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   const int endPointX = points[point2D];
   const int endPointY = points[numberOfPoints + point2D];
   const int endPointZ = level * thicknessOfPrism;
-
+  __shared__ double threadGain[256]; //MUST be the same as number of threads
+  threadGain[threadIdx.x] = 0.;
 
   // on thread can compute multiple rays
   for (int i=0; ; ++i){
@@ -270,7 +271,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
 	  int rayNumber = id + (blockDim.x*gridDim.x * i);
 	  if(rayNumber >= raysPerSample){
-		  return;
+		  break;
 	  }
 
 	  // get a new prism to start from
@@ -308,7 +309,6 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  double yRand = (points[numberOfPoints + t1] * u) + (points[numberOfPoints + t2] * v) + (points[numberOfPoints + t3] * w);
 	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 
-	  __syncthreads();
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
 				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
@@ -317,6 +317,22 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  gain *= betaValues[startPrism];
 	  gain *= importance[startPrism];
 
-	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(gain));
+	  threadGain[threadIdx.x] += gain;
+  }
+
+  // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
+  __syncthreads();
+  unsigned i = blockDim.x/2;
+  while(i != 0){
+	if(threadIdx.x < i){
+	  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+	}
+	__syncthreads();
+	i /= 2;
+  }
+
+  // thread 0 writes it to the global memory
+  if(threadIdx.x == 0){
+	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[0]));
   }
 }
