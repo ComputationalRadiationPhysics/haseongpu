@@ -58,6 +58,7 @@ float calcDndtAseNew(
 		     unsigned &blocks, 
 		     unsigned &hostRaysPerSample,
 		     Mesh mesh,
+		     std::vector<double> *betaCellsVector,
 		     float nTot,
 		     float sigmaA,
 		     float sigmaE,
@@ -74,9 +75,10 @@ float calcDndtAseNew(
   unsigned kernelcount;
   unsigned *hostIndicesOfPrisms;
   float *hostPhiAse;
+  float *hostPhiAseTmp;
 
   // GPU
-  float phiASE;
+  float *phiAse;
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;
   double *importance;
@@ -110,10 +112,16 @@ float calcDndtAseNew(
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, SEED));
 
+  // Memory allocation on device
+  CUDA_CHECK_RETURN(cudaMalloc(&phiAse, sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&importance, mesh.numberOfPrisms * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
+
+  // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
   for(unsigned sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
-    Point sample;// = mesh.samples[sample_i];
+    Point sample  = mesh.samples[sample_i];
     importanceSamplingNew(sample, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
 
     // Prism scheduling for gpu threads
@@ -121,11 +129,43 @@ float calcDndtAseNew(
       for(int ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
 	hostIndicesOfPrisms[absoluteRay++] = prism_i;
 	assert(absoluteRay <= hostRaysPerSample);
-  }
       }
 
+    }
+    // Copy dynamic sample date to device
+    CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, mesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
+    CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
+    // Start Kernel
+    calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse);
+  
+    // Copy back phiAse
+    CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
+    hostPhiAse[sample_i] = *hostPhiAseTmp;
+
+    if(kernelcount % 200 == 0){
+      fprintf(stderr, "C Sampling point %d done\n",kernelcount);
+      kernelcount++;
+    }
+  
   }
+
+  // Stop time
+  cudaEventRecord(stop, 0);
+  cudaEventSynchronize(stop);
+  cudaEventElapsedTime(&runtimeGpu, start, stop);
+
+  // Calculate dndt Ase
+  for(int sample_i=0; sample_i < mesh.numberOfSamples; ++sample_i){
+    hostPhiAse[sample_i] = float( (double(hostPhiAse[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
+    double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(sigmaE + sigmaA) - double(nTot * sigmaA);
+    dndtAse->at(sample_i) = gain_local * hostPhiAse[sample_i] / crystalFluorescence;
+        
+  }
+
+  // Free Memory
+  cudaDeviceReset();
+  return runtimeGpu;
 
 }
 

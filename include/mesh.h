@@ -61,6 +61,10 @@ struct Mesh {
   struct Triangle *triangles;
   unsigned numberOfTriangles;
   unsigned numberOfLevels;
+  unsigned numberOfPrisms;
+  unsigned numberOfPoints;
+  unsigned numberOfSamples;
+  float thickness;
 
   ~Mesh();
 
