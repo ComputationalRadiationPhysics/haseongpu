@@ -10,14 +10,12 @@ void NormalRay::normalize() {
   p.y = p.y/l;
 }
 
-std::vector<TwoDimPoint> parsePoints(std::vector<double> *points, int numPoints) {
-  std::vector<TwoDimPoint> p;
+TwoDimPoint* parsePoints(std::vector<double> *points, int numPoints) {
+  TwoDimPoint *p = new TwoDimPoint[numPoints];
 
   for(unsigned i=0; i < numPoints; ++i) {
-    TwoDimPoint point;
-    point.x = points->at(i);
-    point.y = points->at(numPoints + i);
-    p.push_back(point);
+    p[i].x = points->at(i);
+    p[i].y = points->at(numPoints + i);
   }
 
   return p;
@@ -27,13 +25,31 @@ Mesh::~Mesh() {
   if(!triangles) delete triangles;
 }
 
-void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces) {
+void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces) {
   hMesh->numberOfTriangles = numberOfTriangles;
   dMesh->numberOfTriangles = numberOfTriangles;
   hMesh->numberOfLevels = numberOfLevels;
   dMesh->numberOfLevels = numberOfLevels;
+  hMesh->numberOfSamples = numberOfPoints*numberOfLevels;
+  dMesh->numberOfSamples = numberOfPoints*numberOfLevels;
+  hMesh->numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
+  dMesh->numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
 
-  std::vector<TwoDimPoint> points = parsePoints(pointXY, numberOfPoints);
+  TwoDimPoint *points = parsePoints(pointXY, numberOfPoints);
+
+  hMesh->samples = new Point[numberOfPoints * numberOfLevels];
+  for(unsigned l=0; l<numberOfLevels; ++l) {
+    for(unsigned i=0; i<numberOfPoints; ++i) {
+      Point p;
+      p.x = points[i].x;
+      p.y = points[i].y;
+      p.z = l*thicknessOfPrism;
+      hMesh->samples[l*numberOfPoints + i] = p;
+    }
+  }
+
+  cudaMalloc((void**) &dMesh->samples, numberOfPoints*sizeof(points));
+  cudaMemcpy(dMesh->samples, hMesh->samples, numberOfPoints*sizeof(points), cudaMemcpyHostToDevice);
 
   hMesh->triangles = new Triangle[numberOfTriangles];
   Triangle *trianglesForDevice = new Triangle[numberOfTriangles];
@@ -41,9 +57,9 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
 
   for(unsigned i=0; i<numberOfTriangles; ++i) {
     Triangle triangle;
-    triangle.A = points.at( triangleIndices->at(i) );
-    triangle.B = points.at( triangleIndices->at(numberOfTriangles + i) );
-    triangle.C = points.at( triangleIndices->at(2*numberOfTriangles + i) );
+    triangle.A = points[triangleIndices->at(i)];
+    triangle.B = points[triangleIndices->at(numberOfTriangles + i)];
+    triangle.C = points[triangleIndices->at(2*numberOfTriangles + i)];
 
     TwoDimPoint center = {xOfTriangleCenter->at(i), yOfTriangleCenter->at(i)};
     triangle.center = center;
@@ -54,7 +70,7 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
 
     for(unsigned e=0; e<3; ++e) {
       NormalRay normal;
-      normal.p = points.at( positionsOfNormalVectors->at(e*numberOfTriangles + i) );
+      normal.p = points[positionsOfNormalVectors->at(e*numberOfTriangles + i)];
       normal.dir.x = xOfNormals->at( e*numberOfTriangles + i );
       normal.dir.y = yOfNormals->at( e*numberOfTriangles + i );
 
