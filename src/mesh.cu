@@ -24,55 +24,58 @@ std::vector<TwoDimPoint> parsePoints(std::vector<double> *points, int numPoints)
 }
 
 Mesh::~Mesh() {
+  if(!triangles) delete triangles;
 }
 
-Mesh Mesh::parse(std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces) {
-  Mesh mesh;
+void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces) {
+  hMesh->numberOfTriangles = numberOfTriangles;
+  dMesh->numberOfTriangles = numberOfTriangles;
+  hMesh->numberOfLevels = numberOfLevels;
+  dMesh->numberOfLevels = numberOfLevels;
 
   std::vector<TwoDimPoint> points = parsePoints(pointXY, numberOfPoints);
 
-  std::vector<Triangle> triangles;
+  hMesh->triangles = new Triangle[numberOfTriangles];
+  Triangle *trianglesForDevice = new Triangle[numberOfTriangles];
+  cudaMalloc((void**) &dMesh->triangles, numberOfTriangles*sizeof(Triangle));
+
   for(unsigned i=0; i<numberOfTriangles; ++i) {
     Triangle triangle;
-
     triangle.A = points.at( triangleIndices->at(i) );
     triangle.B = points.at( triangleIndices->at(numberOfTriangles + i) );
     triangle.C = points.at( triangleIndices->at(2*numberOfTriangles + i) );
 
-    TwoDimPoint center;
-    center.x = xOfTriangleCenter->at(i);
-    center.y = yOfTriangleCenter->at(i);
+    TwoDimPoint center = {xOfTriangleCenter->at(i), yOfTriangleCenter->at(i)};
     triangle.center = center;
     triangle.surface = surfaces->at(i);
 
-    triangles.push_back(triangle);
-  }
+    hMesh->triangles[i] = triangle;
+    trianglesForDevice[i] = triangle;
 
-  // iterate again, because now all triangles are there (for the neighbor-pointer)
-  for(unsigned i=0; i<triangles.size(); ++i) {
-    Triangle *triangle = &triangles[i];
     for(unsigned e=0; e<3; ++e) {
-      Edge edge;
-
       NormalRay normal;
       normal.p = points.at( positionsOfNormalVectors->at(e*numberOfTriangles + i) );
       normal.dir.x = xOfNormals->at( e*numberOfTriangles + i );
       normal.dir.y = yOfNormals->at( e*numberOfTriangles + i );
+
+      Edge edge;
       edge.normal = normal;
       edge.forbidden = forbidden->at( e*numberOfTriangles + i);
-      edge.neighbor = &(triangles[ neighbors->at( e*triangles.size() + i)]);
 
-      triangle->edges[i] = edge;
+      edge.neighbor = &hMesh->triangles[neighbors->at( e*numberOfTriangles + i)];
+      hMesh->triangles[i].edges[e] = edge;
+
+      edge.neighbor = &dMesh->triangles[neighbors->at( e*numberOfTriangles + i)];
+      trianglesForDevice[i].edges[e] = edge;
     }
+
+    hMesh->triangles[i].betaValues = new double[numberOfLevels-1];
+    for(unsigned l=0; l<(numberOfLevels-1); ++l) {
+      hMesh->triangles[i].betaValues[l] = betaValues->at(l*numberOfTriangles + i);
+    }
+    cudaMalloc((void**) &trianglesForDevice[i].betaValues, (numberOfLevels-1)*sizeof(double));
+    cudaMemcpy(trianglesForDevice[i].betaValues, hMesh->triangles[i].betaValues, (numberOfLevels-1)*sizeof(double), cudaMemcpyHostToDevice);
   }
 
-  return mesh;
-}
-
-void Mesh::copyToGpu() {
-
-}
-
-void Mesh::copyFromGpu() {
-
+  cudaMemcpy(dMesh->triangles, trianglesForDevice, numberOfTriangles*sizeof(Triangle), cudaMemcpyHostToDevice);
 }
