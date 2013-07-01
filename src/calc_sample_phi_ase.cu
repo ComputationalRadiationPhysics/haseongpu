@@ -1,6 +1,7 @@
 #include <curand_kernel.h> /* curand_uniform */
 #include <stdio.h> /* printf */
 #include <mesh.h>
+#include <geometry_gpu.h>
 
 #define TEST_VALUES true
 #define SMALL 1E-06
@@ -13,10 +14,13 @@ __device__ int numberOfLevels;
 __device__ int numberOfPoints;
 __device__ int numberOfTriangles;
 
-__device__ double checkSurface(int levelCurrent, double zPos, double zVec, double length){
-	double denominator = zPos*zVec;
+// ##############################################################
+// # Reconstruction                                             #
+// ##############################################################
+__device__ double checkSurface(int currentLevel, double zPos, double zVec, double length){
+	double denominator = zPos * zVec;
 	if (denominator != 0.0){
-		double nominator = levelCurrent * thicknessOfPrism - zPos;
+		double nominator = currentLevel * thicknessOfPrism - zPos;
 		double lengthTmp = nominator/denominator;
 		if (lengthTmp < length && lengthTmp > 0.0){
 			return lengthTmp;
@@ -100,6 +104,7 @@ __device__ double calcTriangleIntersection(Triangle triangle, Ray ray, int edge,
     return checkSurface(level + 1, ray.p.z, ray.dir.z, length);
 
   }
+  return 0;
 
 }
 
@@ -116,15 +121,6 @@ __device__ Ray calcNextRay(Ray ray, double length){
 __device__ double calcPrismGain(Triangle triangle, unsigned level, double length){
   return (double) exp(nTot * (triangle.betaValues[level] * ( sigmaE + sigmaA ) - sigmaA ) * length);
  
-
-}
-
-__device__ Ray normalizeRay(Ray ray, double distance){
-  ray.dir.x = ray.dir.x / distance;
-  ray.dir.y = ray.dir.y / distance;
-  ray.dir.z = ray.dir.z / distance;
-
-  return ray;
 }
 
 __device__ double propagateRayDeviceNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles){
@@ -154,9 +150,67 @@ __device__ double propagateRayDeviceNew(Ray ray, unsigned startLevel, Triangle s
 
   return gain /= (distanceTotal * distanceTotal);
 
-};
+}
+
+__device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
+  Point startPoint;
+  double u = curand_uniform(&globalState[blockIdx.x]);
+  double v = curand_uniform(&globalState[blockIdx.x]);
+
+  if((u+v)>1)
+    {
+      u = 1-u;
+      v = 1-v;
+    }
+  double w = 1-u-v;
+
+  // convert the random startpoint into coordinates
+  startPoint.x = (triangle.A.x * u) + (triangle.B.x * v) + (triangle.C.x * w);
+  startPoint.y = (triangle.A.y * u) + (triangle.B.y * v) + (triangle.C.y * w);
+  startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
+
+  return startPoint;
+}
 
 
+__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Triangle* triangles, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, unsigned numberOfTriangles, float phiAse) {
+  int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  // One thread can compute multiple rays
+  for (int i=0; ; ++i){
+	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
+	  int rayNumber = id + (blockDim.x*gridDim.x * i);
+	  if(rayNumber >= raysPerSample){
+		  return;
+	  }
+
+	  // TODO check indices on new structs
+	  // Get triangle prism to start from
+	  int startPrism = indicesOfPrisms[rayNumber];
+	  int startLevel = startPrism/numberOfTriangles;
+	  int startTriangle_i = startPrism - (numberOfTriangles * startLevel);
+	  Triangle startTriangle = triangles[startTriangle_i];
+
+	  // Random startpoint generation
+	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, thicknessOfPrism, globalState);
+
+	  // Ray generation
+	  Ray ray = generateRay(startPoint, samplePoint);
+
+	  // propagate the ray
+	  __syncthreads();
+	  double gain = propagateRayDeviceNew(ray, startLevel, startTriangle, triangles);
+
+	  gain *= startTriangle.betaValues[startLevel];
+	  gain *= importance[startPrism];
+
+	  atomicAdd(&phiAse, float(gain));
+  }
+}
+
+// ##############################################################
+// # OLD CODE                                                   #
+// ##############################################################
 
 __device__ double checkSide(int offset, double xN, double yN, double *points, double xPos, double yPos, double length, double xVec, double yVec,int *positionsOfNormalVectors){
 	double denominator = xN * xVec + yN * yVec;
@@ -413,7 +467,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   const int endPointZ = level * thicknessOfPrism;
 
 
-  // on thread can compute multiple rays
+  // One thread can compute multiple rays
   for (int i=0; ; ++i){
 
 	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)

@@ -1,7 +1,39 @@
 #include "datatypes.h"
+#include "mesh.h"
 #include "geometry_gpu.h"
 #include "curand_kernel.h"
 
+__device__ Vector direction(Point startPoint, Point endPoint){
+  Vector v = {endPoint.x - startPoint.x, endPoint.y - startPoint.y, endPoint.z - startPoint.z};
+  return v;
+}
+
+__device__ float distance(Point startPoint, Point endPoint){
+  float d = sqrt(pow((endPoint.x - startPoint.x), 2) + pow((endPoint.y - startPoint.y),2) + pow((endPoint.z - startPoint.z),2));
+  return fabs(d);
+
+}
+
+__device__ Ray generateRay(Point startPoint, Point endPoint){
+  Ray ray;
+  ray.p = startPoint;
+  ray.dir = direction(startPoint, endPoint);
+  ray.length = distance(startPoint, endPoint);
+  return ray;
+
+}
+
+__device__ Ray normalizeRay(Ray ray, double distance){
+  ray.dir.x = ray.dir.x / distance;
+  ray.dir.y = ray.dir.y / distance;
+  ray.dir.z = ray.dir.z / distance;
+
+  return ray;
+}
+
+// ######################################################
+// # Old functions                                      #
+// ######################################################
 __device__ PointCu addVectorToPoint(PointCu p, VectorCu v) {
   PointCu result;
 

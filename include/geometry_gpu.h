@@ -3,7 +3,14 @@
 
 #include "datatypes.h"
 #include "curand_kernel.h"
+#include "mesh.h"
 
+__device__ Vector direction(Point startPoint, Point endPoint);
+__device__ float distance(Point startPoint, Point endPoint);
+__device__ Ray generateRay(Point startPoint, Point endPoint);
+__device__ Ray normalizeRay(Ray ray, double distance);
+
+// Old functions
 __device__ float    collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance);
 __device__ float    distance_gpu(PointCu a, PointCu b);
 __device__ VectorCu crossproduct_gpu(VectorCu a, VectorCu b);
