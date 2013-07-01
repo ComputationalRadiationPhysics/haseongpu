@@ -130,7 +130,7 @@ int main(int argc, char **argv){
 
   Mesh hMesh;
   Mesh dMesh;
-  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
+  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
 
   // Solution vector
   std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
