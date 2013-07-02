@@ -1,7 +1,7 @@
 #ifndef importance_sampling_H
 #define importance_sampling_H
 
-void importanceSampling(int point,
+unsigned importanceSampling(int point,
 	     int startLevel,
 	     double *importance,
 	     unsigned *numberOfImportantRays,
