@@ -66,11 +66,11 @@ __device__ double propagateRayDevice(
 		double xPos,
 		double yPos,
 		double zPos,
-		const double xDestination,
-		const double yDestination,
-		const double zDestination,
-		const int firstTriangle,
-		const int firstLevel,
+		double xDestination,
+		double yDestination,
+		double zDestination,
+		int firstTriangle,
+		int firstLevel,
 		double *points,
 		double *xOfNormals,
 		double *yOfNormals,
@@ -163,8 +163,9 @@ __device__ double propagateRayDevice(
 			}
 		}
 
-		gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
+		//gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
 
+		gain += length;
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
 
@@ -243,8 +244,8 @@ __global__ void setupGlobalVariablesKernel (
  */
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 			     float* phiASE,
-			     const int point2D,
-			     const int level,
+			     int point2D,
+			     int level,
 			     const int raysPerThread,
 			     double *points,
 			     double *xOfNormals,
@@ -259,9 +260,9 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 			     unsigned raysPerSample) {
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
-  const int endPointX = points[point2D];
-  const int endPointY = points[numberOfPoints + point2D];
-  const int endPointZ = level * thicknessOfPrism;
+  double endPointX = points[point2D];
+  double endPointY = points[numberOfPoints + point2D];
+  double endPointZ = level * thicknessOfPrism;
   __shared__ double threadGain[256]; //MUST be the same as number of threads
   threadGain[threadIdx.x] = 0.;
 
@@ -294,8 +295,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  int t3 = triangleIndices[startTriangle + 2 * numberOfTriangles];
 
 	  // random startpoint generation
-	  double u = curand_uniform(&globalState[blockIdx.x]);
-	  double v = curand_uniform(&globalState[blockIdx.x]);
+	  double u = 0.333;//curand_uniform(&globalState[blockIdx.x]);
+	  double v = 0.333;//curand_uniform(&globalState[blockIdx.x]);
 
 	  if((u+v)>1)
 	  {
@@ -307,32 +308,39 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  // convert the random startpoint into coordinates
 	  double xRand = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
 	  double yRand = (points[numberOfPoints + t1] * u) + (points[numberOfPoints + t2] * v) + (points[numberOfPoints + t3] * w);
-	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
+	  //double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
+	  double zRand = (startLevel + 0.5) * thicknessOfPrism;
 
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 
 				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
 				   positionsOfNormalVectors, neighbors, forbidden,  betaValues);
 
-	  gain *= betaValues[startPrism];
-	  gain *= importance[startPrism];
+	  //gain *= betaValues[startPrism];
+	  //gain *= importance[startPrism];
+	  
+	  threadGain[threadIdx.x] += startPrism;
 
-	  threadGain[threadIdx.x] += gain;
+	  if(startPrism==2){
+		printf("ray%d start(%f, %f, %f) gain=%f imp=%f betaV=%f\n",id,raysPerSample,xRand,yRand,zRand,gain,importance[startPrism],betaValues[startPrism]);
+		//threadGain[threadIdx.x] += endPointX;
+	  }
   }
 
   // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
-  __syncthreads();
-  unsigned i = blockDim.x/2;
-  while(i != 0){
-	if(threadIdx.x < i){
-	  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
-	}
-	__syncthreads();
-	i /= 2;
-  }
+  //__syncthreads();
+  //unsigned i = blockDim.x/2;
+  //while(i != 0){
+  //  if(threadIdx.x < i){
+  //    threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+  //  }
+  //  __syncthreads();
+  //  i /= 2;
+  //}
 
-  // thread 0 writes it to the global memory
-  if(threadIdx.x == 0){
-	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[0]));
-  }
+  //// thread 0 writes it to the global memory
+  //if(threadIdx.x == 0){
+  //    atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[0]));
+  //}
+  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[threadIdx.x]));
 }

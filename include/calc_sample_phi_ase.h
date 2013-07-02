@@ -6,8 +6,8 @@
 
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 float* phiASE,
-				 const int point2D,
-				 const int level,
+				 int point2D,
+				 int level,
 				 const int raysPerThread,
 				 double *points,
 				 double *xOfNormals,

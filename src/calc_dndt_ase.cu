@@ -52,6 +52,20 @@ int getCorrectDevice(int verbose){
   return candidate;
 }
 
+void printIntermediateValues(unsigned size, double *importance, float *phi, std::vector<double> *dndtAse, int iteration){
+  fprintf(stderr,"###### ITERATION: %d ##########\n",iteration);
+//  for(int i=0; i<size; ++i){
+//    fprintf(stderr, "Importance[%d]: %f\n",i,importance[i]);
+//  }
+  for(int i=0; i<size; ++i){
+    fprintf(stderr, "hostPhi[%d]: %f\n",i,phi[i]);
+  }
+//  for(int i=0; i<size; ++i){
+//    fprintf(stderr, "dndtAse[%d]: %f\n",i,dndtAse->at(i));
+//  }
+
+}
+
 /** GPU Kernel Variables
  * The idea is, that the number of threads is fixed (to maximize GPU occupancy)
  * and the number of blocks as well (200 is the maximum for the standard
@@ -191,57 +205,67 @@ float calcDndtAse(
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
-  for(int point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
-    for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
-      // Importance for one sample
-      importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
-       (double*) &(pointsVector->at(0)), 
-       (double*) &(xOfNormalsVector->at(0)), 
-       (double*) &(yOfNormalsVector->at(0)),
-       (int*) &(positionsOfNormalVectorsVector->at(0)), 
-       (int*) &(neighborsVector->at(0)), 
-       (int*) &(forbiddenVector->at(0)), 
-       (double*) &(betaValuesVector->at(0)), 
-       (double*) &(xOfTriangleCenterVector->at(0)),
-       (double*) &(yOfTriangleCenterVector->at(0)), 
-       (float*) &(surfacesVector->at(0)), 
-       hostRaysPerSample,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
-       hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
+  //for(int point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
+    //for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
+    int point_i = 1;
+    int level_i = 0;{{
+    // Importance for one sample
+      unsigned realRaysPerSample = importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
+          (double*) &(pointsVector->at(0)), 
+          (double*) &(xOfNormalsVector->at(0)), 
+          (double*) &(yOfNormalsVector->at(0)),
+          (int*) &(positionsOfNormalVectorsVector->at(0)), 
+          (int*) &(neighborsVector->at(0)), 
+          (int*) &(forbiddenVector->at(0)), 
+          (double*) &(betaValuesVector->at(0)), 
+          (double*) &(xOfTriangleCenterVector->at(0)),
+          (double*) &(yOfTriangleCenterVector->at(0)), 
+          (float*) &(surfacesVector->at(0)), 
+          hostRaysPerSample,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
+          hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
 
       // Prism scheduling for gpu threads
-      for(int prism_i=0, absoluteRay=0; prism_i < hostNumberOfPrisms; ++prism_i){
-  for(int ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
-    hostIndicesOfPrisms[absoluteRay++] = prism_i;
-    assert(absoluteRay <= hostRaysPerSample);
-  }
+      int absoluteRay=0;
+      for(int prism_i=0; prism_i < hostNumberOfPrisms; ++prism_i){
+        for(int ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
+          hostIndicesOfPrisms[absoluteRay++] = prism_i;
+          assert(absoluteRay <= realRaysPerSample);
+        }
       }
+      assert(absoluteRay==realRaysPerSample);
 
       // Copy dynamic sample date to device
       CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostNumberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
-      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
+      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, realRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
 
-
+      for(int print_i=0;print_i< 36;print_i++){
+        //fprintf(stderr,"Prism %d: %d rays hostImportance=%f\n",print_i,hostNumberOfImportantRays[print_i],hostImportance[print_i]);
+      }
       // Start Kernel
       calcSamplePhiAse<<< blocks, threads >>> ( devMTGPStates, phiASE, point_i, level_i, hostRaysPerThread, 
-            points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
-            neighbors, forbidden, triangleIndices, betaValues, importance, 
-            indicesOfPrisms,hostRaysPerSample );
+          points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
+          neighbors, forbidden, triangleIndices, betaValues, importance, 
+          indicesOfPrisms,realRaysPerSample );
 
-      if(kernelcount==0)
-      {
-        // Print experiment data
-        testKernel<<<1,1>>>(points, xOfNormals, yOfNormals,
-                            neighbors, forbidden, positionsOfNormalVectors,
-                            triangleIndices, betaValues, phiASE, importance,
-                            indicesOfPrisms, hostNTot, hostSigmaA, hostSigmaE,
-                            hostNumberOfPoints, hostNumberOfTriangles, hostNumberOfLevels,
-                            hostThicknessOfPrism, hostCrystalFluorescence, 5);
-      }
+     // if(kernelcount==0)
+     // {
+     //   // Print experiment data
+     //   testKernel<<<1,1>>>(points, xOfNormals, yOfNormals,
+     //       neighbors, forbidden, positionsOfNormalVectors,
+     //       triangleIndices, betaValues, phiASE, importance,
+     //       indicesOfPrisms, hostNTot, hostSigmaA, hostSigmaE,
+     //       hostNumberOfPoints, hostNumberOfTriangles, hostNumberOfLevels,
+     //       hostThicknessOfPrism, hostCrystalFluorescence, 5);
+     // }
 
+      //if(level_i==0){
+  //CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
+      //printIntermediateValues(10, hostImportance, hostPhiASE, dndtAse,point_i);
+      //}
 
       if(kernelcount % 200 == 0)
-  fprintf(stderr, "C Sampling point %d done\n",kernelcount);
+        fprintf(stderr, "C Sampling point %d done\n",kernelcount);
       kernelcount++;
     }
   }
@@ -254,11 +278,12 @@ float calcDndtAse(
   // Calculate dndt Ase
   CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
   for(int sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
-    hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
+    hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159))); //should be divided by realRaysPerSample for each samplepoint!
     double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
-        
+
   }
+
 
   // Free Memory
   cudaFree(points);
