@@ -163,9 +163,9 @@ __device__ double propagateRayDevice(
 			}
 		}
 
-		//gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
+		gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
 
-		gain += length;
+		//gain += length;
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
 
@@ -316,31 +316,31 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
 				   positionsOfNormalVectors, neighbors, forbidden,  betaValues);
 
-	  //gain *= betaValues[startPrism];
-	  //gain *= importance[startPrism];
+	  gain *= betaValues[startPrism];
+	  gain *= importance[startPrism];
 	  
-	  threadGain[threadIdx.x] += startPrism;
+	  threadGain[threadIdx.x] += gain;
 
-	  if(startPrism==2){
-		printf("ray%d start(%f, %f, %f) gain=%f imp=%f betaV=%f\n",id,raysPerSample,xRand,yRand,zRand,gain,importance[startPrism],betaValues[startPrism]);
+	  if(startPrism==602){
+		//printf("ray%d start(%f, %f, %f) gain=%f imp=%f betaV=%f\n",id,raysPerSample,xRand,yRand,zRand,gain,importance[startPrism],betaValues[startPrism]);
 		//threadGain[threadIdx.x] += endPointX;
 	  }
+	  //atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(gain * betaValues[startPrism] * importance[startPrism]));
   }
 
   // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
-  //__syncthreads();
-  //unsigned i = blockDim.x/2;
-  //while(i != 0){
-  //  if(threadIdx.x < i){
-  //    threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
-  //  }
-  //  __syncthreads();
-  //  i /= 2;
-  //}
+  __syncthreads();
+  unsigned i = blockDim.x/2;
+  while(i != 0){
+    if(threadIdx.x < i){
+      threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+    }
+    __syncthreads();
+    i /= 2;
+  }
 
-  //// thread 0 writes it to the global memory
-  //if(threadIdx.x == 0){
-  //    atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[0]));
-  //}
-  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[threadIdx.x]));
+  // thread 0 writes it to the global memory
+  if(threadIdx.x == 0){
+    atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[threadIdx.x]));
+  }
 }

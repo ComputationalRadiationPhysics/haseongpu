@@ -196,6 +196,29 @@ unsigned importanceSampling(int point,
   // Calculate importance by propagation from trianglecenter to every other center
   for (int i_t=0; i_t < numberOfTriangles; ++i_t){
     for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
+      //if(i_t+i_z==0){ 
+      //  fprintf(stderr,"\n");
+      //  fprintf(stderr,"xOfTriangleCenter[%d] %f\n",i_t,xOfTriangleCenter[i_t]);
+      //  fprintf(stderr,"yOfTriangleCenter[%d] %f\n",i_t,yOfTriangleCenter[i_t]);
+      //  fprintf(stderr,"zCoordinate: %f\n",thicknessOfPrism*(i_z+0.5));
+      //  fprintf(stderr,"xPos(destination): %f\n",xPos);
+      //  fprintf(stderr,"yPos(destination): %f\n",yPos);
+      //  fprintf(stderr,"zPos(destination): %f\n",zPos);
+      //  fprintf(stderr,"StartTriangle: %d\n",i_t);
+      //  fprintf(stderr,"StartLevel: %f\n",i_z);
+      //  fprintf(stderr,"Points[0]: %f\n",points[0]);
+      //  fprintf(stderr,"xOfNormals[0]: %f\n",xOfNormals[0]);
+      //  fprintf(stderr,"yOfNormals[0]: %f\n",yOfNormals[0]);
+      //  fprintf(stderr,"positionsOfNormalVectors[0]: %d\n",positionsOfNormalVectors[0]);
+      //  fprintf(stderr,"neighbors[0]: %d\n",neighbors[0]);
+      //  fprintf(stderr,"forbidden[0] %d\n",forbidden[0]);
+      //  fprintf(stderr,"numberOfPoints: %d\n",numberOfPoints);
+      //  fprintf(stderr,"numberOfTriangles: %d\n",numberOfTriangles);
+      //  fprintf(stderr,"thicknessOfPrism: %f\n",thicknessOfPrism);
+      //  fprintf(stderr,"sigmaA: %e\n",sigmaA);
+      //  fprintf(stderr,"sigmaE: %e \n",sigmaE);
+      //  fprintf(stderr,"nTot: %f\n",nTot);
+      //}
       prop = propagateRayHost(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
           thicknessOfPrism * (i_z+0.5),  xPos, yPos, zPos, i_t, i_z, 
           points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
@@ -204,8 +227,7 @@ unsigned importanceSampling(int point,
           sigmaA, sigmaE, nTot
           );
 
-      if(i_t+i_z==0) fprintf(stderr,"prop: %f\n",prop);
-      // TODO debug here and stuff
+      //if(i_t+i_z==0) fprintf(stderr,"prop: %f betaValues: %f\n\n",prop,betaValues[i_t + i_z*numberOfTriangles]);
       importance[i_t + i_z * numberOfTriangles] = betaValues[i_t + i_z * numberOfTriangles]*(prop);
       sumPhi += importance[i_t + i_z * numberOfTriangles];
 

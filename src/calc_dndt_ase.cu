@@ -205,10 +205,10 @@ float calcDndtAse(
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
-  //for(int point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
-    //for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
-    int point_i = 1;
-    int level_i = 0;{{
+  for(int point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
+    for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
+    //int point_i = 1;
+    //int level_i = 0;{{
     // Importance for one sample
       unsigned realRaysPerSample = importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
           (double*) &(pointsVector->at(0)), 
@@ -267,22 +267,26 @@ float calcDndtAse(
       if(kernelcount % 200 == 0)
         fprintf(stderr, "C Sampling point %d done\n",kernelcount);
       kernelcount++;
+      // Calculate dndt Ase
+      CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
+      int sample_i=point_i+level_i*hostNumberOfPoints;
+      hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (realRaysPerSample * 4.0f * 3.14159))); //should be divided by realRaysPerSample for each samplepoint!
+      double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
+      dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
     }
   }
+
 
   // Stop time
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);
   cudaEventElapsedTime(&runtimeGpu, start, stop);
+ // for(int sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
+ //   hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (4.0f * 3.14159))); //should be divided by realRaysPerSample for each samplepoint!
+ //   double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
+ //   dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
 
-  // Calculate dndt Ase
-  CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
-  for(int sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
-    hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159))); //should be divided by realRaysPerSample for each samplepoint!
-    double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
-    dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
-
-  }
+ // }
 
 
   // Free Memory

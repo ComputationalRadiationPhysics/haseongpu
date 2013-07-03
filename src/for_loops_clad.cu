@@ -168,35 +168,29 @@ float forLoopsClad(
 
 
   int count = 0;
-//  for(i=0;i<size_p;i++)
-  i=1;
+  for(i=0;i<size_p;i++)
   {
       printf("Doing job on point %li of %i\n",i,size_p);
       p_cx = p_in[i];
       p_cy = p_in[size_p+i];
       
-      //for(iz=0;iz<mesh_z;iz++)
-      iz=0;
+      for(iz=0;iz<mesh_z;iz++)
       {
           p_cz = iz*z_mesh;
+          int realNumRays = 0;
           importf(i,iz,importance,N_rays,1);
-          for(int print_i=0;print_i<36;print_i++){
-            //printf("Prism %d: %d rays Importance=%f\n",print_i,N_rays[print_i],importance[print_i]);
-          }
-          
+
           for(j=0;j<N_cells;j++)
           {
-              if (j>35) break;
+              //if (j>35) break;
               
               t_1 = t_in[j];
               t_2 = t_in[N_cells + j];
               t_3 = t_in[2*N_cells + j];
                   
-              //for(k=0;k<(mesh_z-1);k++)
-              k=0;
+              for(k=0;k<(mesh_z-1);k++)
               {
-                  
-                  phi[i+iz*(size_p)] = 0;
+                  realNumRays+=N_rays[j+k*N_cells]; 
                   for(l=0;l<N_rays[j+k*N_cells];l++)
                   {
 //                        generate the random numbers in the triangle and the z-coordinate
@@ -215,18 +209,16 @@ float forLoopsClad(
                       y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;                      
                     
                       gain = propagation(x_rand, y_rand, z_rand, p_cx, p_cy, p_cz, j, k, 1);
-                      phi[i+iz*(size_p)] += gain;;
 
                       //gain *= beta_v[j+k*N_cells];
                       //gain *= importance[j+k*N_cells];
-                      //if(j+k+l==0)
-                       // phi[i+iz*(size_p)] += p_cx;
+                      phi[i+iz*(size_p)] += gain * beta_v[j+k*N_cells] * importance[j+k*N_cells];
                   
                   } // rays loop end
-                  if(N_rays[j+k*N_cells]>0){
-                //    printf("\n-> Prism %d SUM=%f\n",j+k*N_cells,phi[i+iz*size_p]);
-                //    printf("   %d rays start(%f, %f, %f) gain=%f imp=%f beta_v=%f\n",
-                 //       N_rays[j+k*N_cells],x_rand,y_rand,z_rand,gain,importance[j+k*N_cells],beta_v[j+k*N_cells]);
+                  if(k==1 && j < 36 && N_rays[j+k*N_cells]>0){
+    //                printf("\n-> Prism %d SUM=%f\n",j+k*N_cells,phi[i+iz*size_p]);
+    //                printf("   %d rays start(%f, %f, %f) gain=%f imp=%f beta_v=%f\n",
+    //                    N_rays[j+k*N_cells],x_rand,y_rand,z_rand,gain,importance[j+k*N_cells],beta_v[j+k*N_cells]);
                   }
               }//mesh_z loop end
           }//N_cells  loop end
@@ -235,7 +227,7 @@ float forLoopsClad(
           //  printIntermediateData(10,importance,phi,dndtAse,count);
           //  count ++;
           //}
-//          phi[i+iz*(size_p)] = phi[i+iz*(size_p)]/NumRays;
+          phi[i+iz*(size_p)] = phi[i+iz*(size_p)]/realNumRays;
 
       }//iz llop end
   }//size_p loop end
@@ -300,6 +292,29 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
     
     forb = -1;
 	
+            //if(t_start+mesh_start==0){
+            //  printf("\n");
+            //  printf("center_x[%d] %f\n",x_pos);
+            //  printf("center_y[%d] %f\n",y_pos);
+            //  printf("z_coord %f\n",z_pos);
+            //  printf("x_pos(dest) %f\n",x_dest);
+            //  printf("y_pos(dest) %f\n",y_dest);
+            //  printf("z_pos(dest) %f\n",z_dest);
+            //  printf("t_start %f\n",t_start);
+            //  printf("mesh_start %f\n",mesh_start);
+            //  printf("p_in[0] %f\n",p_in[0]);
+            //  printf("n_x[0] %f\n",n_x[0]);
+            //  printf("n_y[0] %f\n",n_y[0]);
+            //  printf("n_p[0] %d\n",n_p[0]);
+            //  printf("neighbors[0] %d \n", neighbors[0]);
+            //  printf("forbidden[0] %d \n", forbidden[0]);
+            //  printf("size_p %d\n",size_p);
+            //  printf("N_cells %d\n",N_cells);
+            //  printf("z_mesh %f\n",z_mesh);
+            //  printf("sigma_a %f\n", sigma_a);
+            //  printf("sigma_e %f\n", sigma_e);
+            //  printf("N_tot %f\n",N_tot);
+            //}
 //	mexPrintf("Propagation called");
 //    mexEvalString("drawnow;");
     
@@ -456,8 +471,8 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
 //		  it might be absorbing or amplifying, for the cladding only absorbing
 //		  a simple "if then"
 
-			//gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
-        gain+=length;
+			gain = gain * exp(N_tot*(beta_v[tri+cell_z*N_cells]*(sigma_e + sigma_a)-sigma_a)*length);
+        //gain+=length;
 //        gain = LineIntegralMCRK4_S(3, tri, cell_z, gain, length);
         
 //        after integration make the propagation
@@ -530,10 +545,35 @@ void importf(int point, int mesh_start, double *importance, int *N_rays, int N_r
         {
 //            at this point replace the following routine with propagation(...)
 //            later expand this with the beta/tau values...
+          //  if(i_z+i_t==0){
+          //    printf("\n");
+          //    printf("center_x[%d] %f\n",i_t,center_x[i_t]);
+          //    printf("center_y[%d] %f\n",i_t,center_y[i_t]);
+          //    printf("z_coord %f\n",z_mesh*(i_z+0.5));
+          //    printf("x_pos(dest) %f\n",x_pos);
+          //    printf("y_pos(dest) %f\n",y_pos);
+          //    printf("z_pos(dest) %f\n",z_pos);
+          //    printf("i_t %f\n",i_t);
+          //    printf("i_z %f\n",i_z);
+          //    printf("p_in[0] %f\n",p_in[0]);
+          //    printf("n_x[0] %f\n",n_x[0]);
+          //    printf("n_y[0] %f\n",n_y[0]);
+          //    printf("n_p[0] %d\n",n_p[0]);
+          //    printf("neighbors[0] %d \n", neighbors[0]);
+          //    printf("forbidden[0] %d \n", forbidden[0]);
+          //    printf("size_p %d\n",size_p);
+          //    printf("N_cells %d\n",N_cells);
+          //    printf("z_mesh %f\n",z_mesh);
+          //    printf("sigma_a %.20e\n", sigma_a);
+          //    printf("sigma_e %.20e\n", sigma_e);
+          //    printf("N_tot %f\n",N_tot);
+          //  }
             prop = propagation(center_x[i_t], center_y[i_t], z_mesh*(i_z+0.5), x_pos, y_pos, z_pos, i_t, i_z, N_reflections);
             importance[i_t + i_z*N_cells] = beta_v[i_t+i_z*N_cells]*(prop);
             sum_phi += importance[i_t + i_z*N_cells];
-            if(i_z+i_t==0) printf("prop: %f",prop);
+            if(i_z+i_t==0){
+          //    fprintf(stderr,"prop: %f beta_v: %f\n\n",prop, beta_v[i_t+i_z*N_cells]);
+            }
             
         }
         surf_tot += surface_new[i_t];
