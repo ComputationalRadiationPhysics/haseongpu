@@ -117,15 +117,6 @@ __device__ double propagateRayDevice(
 	{
 		// the length of the ray-part inside the current prism. We try to minimize this value
 		length = distanceRemaining;
-		//        definition for decider
-		//        0,1,2: int for the neighbors
-		//        3: hor plane up
-		//        4: hor plane down
-		//        n1: p1-2, n2: p1-3, n3:p2-3
-		//        the third coordinate (z) of the particpating points for the surfaces can be set to be z=0, 
-		// forb describes the surface, from which the ray enters the prism.
-		// this surface is no suitable candidate, since the length would be 0!
-
 		levelNext = levelCurrent;
 
 		// check the 3 edges
@@ -165,18 +156,16 @@ __device__ double propagateRayDevice(
 
 		gain *= (double) exp(nTot * (betaValues[triangleCurrent + (levelCurrent * numberOfTriangles)] * (sigmaE + sigmaA) - sigmaA) * length);
 
-		//gain += length;
 		// the remaining distance is decreased by the length we travelled through the prism
 		distanceRemaining -= length;
 
 		// now set the next cell and position
-		xPos = xPos + length*xVec;
-		yPos = yPos + length*yVec;
-		zPos = zPos + length*zVec;
+		xPos += length * xVec;
+		yPos += length * yVec;
+		zPos += length * zVec;
+
 		triangleCurrent = triangleNext;
 		levelCurrent = levelNext;
-
-		// set the new forbidden surface
 		forbiddenCurrent = forbiddenNext;
 
 #if TEST_VALUES==true
@@ -188,8 +177,6 @@ __device__ double propagateRayDevice(
 			loopbreaker++;
 		}
 #endif
-
-
 	}
 
 #if TEST_VALUES==true
@@ -239,14 +226,12 @@ __global__ void setupGlobalVariablesKernel (
  * 		(can hold one value for each sample point)
  * \var point2D the index of the current sample point (points to p_in)
  * \var level the level of the current sample point (how deep we are through the material)
- * \var raysPerThread the number rays which are computed by this thread
  * 		(always for the same combination of startprism+samplepoint
  */
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 			     float* phiASE,
 			     int point2D,
 			     int level,
-			     const int raysPerThread,
 			     double *points,
 			     double *xOfNormals,
 			     double *yOfNormals,
@@ -280,15 +265,6 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  int startLevel = startPrism/numberOfTriangles;
 	  int startTriangle = startPrism - (numberOfTriangles * startLevel);
 
-#if TEST_VALUES==true
-	  if(startPrism != (startTriangle + (startLevel * numberOfTriangles))){
-		  printf("StartTriangle/StartLevel incorrect!");
-	  }
-	  if(startTriangle >= 600){
-		  printf("StartTriangle/StartLevel incorrect!");
-	  }
-#endif
-
 	  // Get triangle vertex indicies
 	  int t1 = triangleIndices[startTriangle];
 	  int t2 = triangleIndices[startTriangle + numberOfTriangles];
@@ -316,31 +292,22 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				   startTriangle, startLevel, points, xOfNormals, yOfNormals, 
 				   positionsOfNormalVectors, neighbors, forbidden,  betaValues);
 
-	  gain *= betaValues[startPrism];
-	  gain *= importance[startPrism];
-	  
-	  threadGain[threadIdx.x] += gain;
-
-	  if(startPrism==602){
-		//printf("ray%d start(%f, %f, %f) gain=%f imp=%f betaV=%f\n",id,raysPerSample,xRand,yRand,zRand,gain,importance[startPrism],betaValues[startPrism]);
-		//threadGain[threadIdx.x] += endPointX;
-	  }
-	  //atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(gain * betaValues[startPrism] * importance[startPrism]));
+	  threadGain[threadIdx.x] += gain * betaValues[startPrism] * importance[startPrism];
   }
 
   // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
   __syncthreads();
   unsigned i = blockDim.x/2;
   while(i != 0){
-    if(threadIdx.x < i){
-      threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
-    }
-    __syncthreads();
-    i /= 2;
+	  if(threadIdx.x < i){
+		  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+	  }
+	  __syncthreads();
+	  i /= 2;
   }
 
   // thread 0 writes it to the global memory
   if(threadIdx.x == 0){
-    atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[threadIdx.x]));
+	  atomicAdd(&(phiASE[point2D + (level * numberOfPoints)]), float(threadGain[threadIdx.x]));
   }
 }
