@@ -222,12 +222,12 @@ unsigned importanceSampling(int point,
 
   // TODO What happens with random failure ?
   // Distribute the remaining rays randomly
-  //  for (int i_r=0; i_r < raysLeft; i_r++){
-  //    int rand_t = (int )(rand() % numberOfTriangles);
-  //    int rand_z = (int )(rand() % (numberOfLevels-1));
-  //    numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
-  //
-  //  }
+    for (int i_r=0; i_r < raysLeft; i_r++){
+      int rand_t = (int )(rand() % numberOfTriangles);
+      int rand_z = (int )(rand() % (numberOfLevels-1));
+      numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
+  
+    }
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
@@ -241,5 +241,6 @@ unsigned importanceSampling(int point,
       }
     }
   }
-  return raysDump;
+  //return raysDump;
+  return raysPerSample;
 }

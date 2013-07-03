@@ -582,15 +582,15 @@ void importf(int point, int mesh_start, double *importance, int *N_rays, int N_r
     
     rays_left = NumRays-Rays_dump;
 //    distribute the remaining not distributed rays randomly
-  //  if ((rays_left)>0)
-  //  {
-  //      for (i_r=0;i_r<rays_left;i_r++)
-  //      {
-  //          rand_t = (int )(genrand_real3()*N_cells);
-  //          rand_z = (int )(genrand_real3()*(mesh_z-1));
-  //          N_rays[rand_t + rand_z*N_cells]++;
-  //      }
-  //  }
+    if ((rays_left)>0)
+    {
+      for (i_r=0;i_r<rays_left;i_r++)
+      {
+        rand_t = (int )(genrand_real3()*N_cells);
+        rand_z = (int )(genrand_real3()*(mesh_z-1));
+        N_rays[rand_t + rand_z*N_cells]++;
+      }
+    }
     
 //    now think about the mount of rays which would come out of this volume(surface)
 //    dividing this number with the new amount of rays gives the final importance weight for this area!
