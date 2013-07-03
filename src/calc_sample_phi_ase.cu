@@ -271,8 +271,8 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  int t3 = triangleIndices[startTriangle + 2 * numberOfTriangles];
 
 	  // random startpoint generation
-	  double u = 0.333;//curand_uniform(&globalState[blockIdx.x]);
-	  double v = 0.333;//curand_uniform(&globalState[blockIdx.x]);
+	  double u = curand_uniform(&globalState[blockIdx.x]);
+	  double v = curand_uniform(&globalState[blockIdx.x]);
 
 	  if((u+v)>1)
 	  {
@@ -284,8 +284,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  // convert the random startpoint into coordinates
 	  double xRand = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
 	  double yRand = (points[numberOfPoints + t1] * u) + (points[numberOfPoints + t2] * v) + (points[numberOfPoints + t3] * w);
-	  //double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
-	  double zRand = (startLevel + 0.5) * thicknessOfPrism;
+	  double zRand = (startLevel + curand_uniform(&globalState[blockIdx.x])) * thicknessOfPrism;
 
 	  // propagate the ray
 	  double gain = propagateRayDevice(xRand, yRand, zRand, endPointX, endPointY, endPointZ, 

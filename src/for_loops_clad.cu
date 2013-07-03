@@ -167,7 +167,6 @@ float forLoopsClad(
 //  mexPrintf("the third triangle is: (%i, %i, %i)\n\n",t_in[2],t_in[size_t+2],t_in[2*size_t+2]);
 
 
-  int count = 0;
   for(i=0;i<size_p;i++)
   {
       printf("Doing job on point %li of %i\n",i,size_p);
@@ -182,8 +181,6 @@ float forLoopsClad(
 
           for(j=0;j<N_cells;j++)
           {
-              //if (j>35) break;
-              
               t_1 = t_in[j];
               t_2 = t_in[N_cells + j];
               t_3 = t_in[2*N_cells + j];
@@ -194,8 +191,8 @@ float forLoopsClad(
                   for(l=0;l<N_rays[j+k*N_cells];l++)
                   {
 //                        generate the random numbers in the triangle and the z-coordinate
-                      u = 0.333;//genrand_real3();
-                      v = 0.333;//genrand_real3();
+                      u = genrand_real3();
+                      v = genrand_real3();
                     
                       if((u+v)>1)
                       {
@@ -203,30 +200,22 @@ float forLoopsClad(
                           v = 1-v;
                       }
                       w = 1-u-v;
-                      //z_rand = (k + genrand_real3())*z_mesh;
-                      z_rand = (k + 0.5)*z_mesh;
+                      z_rand = (k + genrand_real3())*z_mesh;
                       x_rand = p_in[t_1]*u + p_in[t_2]*v + p_in[t_3]*w;
                       y_rand = p_in[size_p + t_1]*u + p_in[size_p + t_2]*v + p_in[size_p + t_3]*w;                      
                     
                       gain = propagation(x_rand, y_rand, z_rand, p_cx, p_cy, p_cz, j, k, 1);
 
-                      //gain *= beta_v[j+k*N_cells];
-                      //gain *= importance[j+k*N_cells];
                       phi[i+iz*(size_p)] += gain * beta_v[j+k*N_cells] * importance[j+k*N_cells];
                   
                   } // rays loop end
-                  if(k==1 && j < 36 && N_rays[j+k*N_cells]>0){
+    //            if(k==1 && j < 36 && N_rays[j+k*N_cells]>0){
     //                printf("\n-> Prism %d SUM=%f\n",j+k*N_cells,phi[i+iz*size_p]);
     //                printf("   %d rays start(%f, %f, %f) gain=%f imp=%f beta_v=%f\n",
     //                    N_rays[j+k*N_cells],x_rand,y_rand,z_rand,gain,importance[j+k*N_cells],beta_v[j+k*N_cells]);
-                  }
+    //            }
               }//mesh_z loop end
           }//N_cells  loop end
-
-          //if(iz == 0){
-          //  printIntermediateData(10,importance,phi,dndtAse,count);
-          //  count ++;
-          //}
           phi[i+iz*(size_p)] = phi[i+iz*(size_p)]/realNumRays;
 
       }//iz llop end
