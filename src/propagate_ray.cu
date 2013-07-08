@@ -23,7 +23,7 @@ __host__ __device__ double checkSide(int offset, double xN, double yN, double *p
 }
 
 __host__ __device__ double checkTop(int levelCurrent, double zPos, double zVec, double length,double thicknessOfPrism){
-	double denominator = zPos*zVec;
+	double denominator = zVec;
 	if (denominator != 0.0){
 		double nominator = levelCurrent * thicknessOfPrism - zPos;
 		double lengthHelp = nominator/denominator;
