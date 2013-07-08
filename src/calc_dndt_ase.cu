@@ -152,17 +152,6 @@ float calcDndtAse(
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, SEED));
 
-  // Set global variables on device
-  //@OPTIMIZE: initialize the constants as constants...
-  //@OPTIMIZE: call by value, not global variable
-  setupGlobalVariablesKernel<<<1,1>>>(double(hostSigmaE), 
-              double(hostSigmaA),
-              double(hostNTot), 
-              hostNumberOfTriangles, 
-              double(hostThicknessOfPrism),
-              hostNumberOfLevels, 
-              hostNumberOfPoints); 
-
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&points, 2 * hostNumberOfPoints * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&xOfNormals, 3 * hostNumberOfTriangles * sizeof(double)));
@@ -224,7 +213,9 @@ float calcDndtAse(
       calcSamplePhiAse<<< blocks, threads >>> ( devMTGPStates, phiASE, point_i, level_i,
           points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
           neighbors, forbidden, triangleIndices, betaValues, importance, 
-          indicesOfPrisms,realRaysPerSample );
+          indicesOfPrisms,realRaysPerSample,
+          hostNTot, hostSigmaE, hostSigmaA, hostThicknessOfPrism, hostNumberOfLevels,
+          hostNumberOfPoints, hostNumberOfTriangles);
 
       // save the number of used RaysPerSample
       hostRaysPerSample.push_back(realRaysPerSample);
