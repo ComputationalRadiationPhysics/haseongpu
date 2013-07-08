@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <propagate_ray.h>
 #include <geometry.h>
+#include <assert.h>
 
 // ##############################################################
 // # Reconstruction                                             #
@@ -60,30 +61,29 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
 
   // TODO What happens with random failure ?
   // TODO Distribute the remaining rays randomly
-  for (int i_r=0; i_r < raysLeft; i_r++){
-    int rand_t = (int )(rand() % numberOfTriangles);
-    int rand_z = (int )(rand() % (numberOfLevels-1));
-    raysPerPrism[rand_t + rand_z * numberOfTriangles]++;
+  // for (int i_r=0; i_r < raysLeft; i_r++){
+  //   int rand_t = (int )(rand() % numberOfTriangles);
+  //   int rand_z = (int )(rand() % (numberOfLevels-1));
+  //   raysPerPrism[rand_t + rand_z * numberOfTriangles]++;
 
-  }
-
+  // }
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
-  // for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-  //   for (int level_i=0; level_i < numberOfLevels; ++level_i){
-  //     if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
-  // 	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
+  for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
+    for (int level_i=0; level_i < numberOfLevels; ++level_i){
+      if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
+  	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
 
-  //     }
-  //     else{
-  // 	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
+      }
+      else{
+  	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
 
-  //     }
+      }
 
-  //   }
+    }
 
-  // }
+  }
 
 }
 
@@ -440,12 +440,12 @@ void importanceSampling(int point,
 
   // TODO What happens with random failure ?
   // Distribute the remaining rays randomly
-  for (int i_r=0; i_r < raysLeft; i_r++){
-    int rand_t = (int )(rand() % numberOfTriangles);
-    int rand_z = (int )(rand() % (numberOfLevels-1));
-    numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
+  // for (int i_r=0; i_r < raysLeft; i_r++){
+  //   int rand_t = (int )(rand() % numberOfTriangles);
+  //   int rand_z = (int )(rand() % (numberOfLevels-1));
+  //   numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
 
-  }
+  // }
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
