@@ -33,7 +33,7 @@ typedef Point Vector;
 struct Ray {
   Point p;
   Vector dir;
-  unsigned length;
+  float length;
   
 };
 

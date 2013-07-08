@@ -1,4 +1,5 @@
 #include "datatypes.h"
+#include "stdio.h"
 #include "mesh.h"
 #include "curand_kernel.h"
 
@@ -18,6 +19,7 @@ __host__ __device__ Ray generateRay(Point startPoint, Point endPoint){
   ray.p = startPoint;
   ray.dir = direction(startPoint, endPoint);
   ray.length = distance(startPoint, endPoint);
+
   return ray;
 
 }

@@ -30,10 +30,14 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
   dMesh->numberOfTriangles = numberOfTriangles;
   hMesh->numberOfLevels = numberOfLevels;
   dMesh->numberOfLevels = numberOfLevels;
-  hMesh->numberOfSamples = numberOfPoints*numberOfLevels;
-  dMesh->numberOfSamples = numberOfPoints*numberOfLevels;
   hMesh->numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
   dMesh->numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
+  hMesh->numberOfPoints = numberOfPoints;
+  dMesh->numberOfPoints = numberOfPoints;
+  hMesh->numberOfSamples = numberOfPoints * numberOfLevels;
+  dMesh->numberOfSamples = numberOfPoints*numberOfLevels;
+  hMesh->thickness = thicknessOfPrism;
+  dMesh->thickness = thicknessOfPrism;
 
   TwoDimPoint *points = parsePoints(pointXY, numberOfPoints);
 
@@ -60,7 +64,7 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
     triangle.A = points[triangleIndices->at(i)];
     triangle.B = points[triangleIndices->at(numberOfTriangles + i)];
     triangle.C = points[triangleIndices->at(2*numberOfTriangles + i)];
-
+    
     TwoDimPoint center = {xOfTriangleCenter->at(i), yOfTriangleCenter->at(i)};
     triangle.center = center;
     triangle.surface = surfaces->at(i);
@@ -78,10 +82,10 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
       edge.normal = normal;
       edge.forbidden = forbidden->at( e*numberOfTriangles + i);
 
-      edge.neighbor = &hMesh->triangles[neighbors->at( e*numberOfTriangles + i)];
+      edge.neighbor = &(hMesh->triangles[neighbors->at( e*numberOfTriangles + i)]);
       hMesh->triangles[i].edges[e] = edge;
 
-      edge.neighbor = &dMesh->triangles[neighbors->at( e*numberOfTriangles + i)];
+      edge.neighbor = &(dMesh->triangles[neighbors->at( e*numberOfTriangles + i)]);
       trianglesForDevice[i].edges[e] = edge;
     }
 

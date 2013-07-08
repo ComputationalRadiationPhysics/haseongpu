@@ -105,13 +105,20 @@ int main(int argc, char **argv){
   if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
+  // Fill mesh 
+  Mesh hMesh;
+  Mesh dMesh;
+  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
+
   // Debug
   // fprintf(stderr, "C nTot: %e\n", nTot);
   // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
-  // fprintf(stderr, "C numberOfPoints: %d\n", numberOfPoints);
-  // fprintf(stderr, "C numberOfTriangles: %d\n", numberOfTriangles); 
-  // fprintf(stderr, "C numberOfLevels: %d\n\n", numberOfLevels);
+   fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
+   fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
+   fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
+   fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
+   fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
 
   // Test vectors
   assert(numberOfPoints == (points->size() / 2));
@@ -127,10 +134,6 @@ int main(int argc, char **argv){
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
   assert((numberOfTriangles * (numberOfLevels-1)) <= raysPerSample);
-
-  Mesh hMesh;
-  Mesh dMesh;
-  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
 
   // Solution vector
   std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
@@ -168,17 +171,19 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
-      else if(strstr(argv[i], "ray_propagation_gpu_new") != 0){
+      else if(strstr(argv[i], "2") != 0){
 	// threads and blocks will be set in the following function (by reference)
-	runtime = calcDndtAse(threads, 
-			      blocks, 
-			      raysPerSample,
-			      dMesh,
-			      betaCells,
-			      nTot,
-			      sigmaA,
-			      sigmaE,
-			      crystalFluorescence);
+	runtime = calcDndtAseNew(threads, 
+				 blocks, 
+				 raysPerSample,
+				 dMesh,
+				 hMesh,
+				 betaCells,
+				 nTot,
+				 sigmaA,
+				 sigmaE,
+				 crystalFluorescence,
+				 ase);
 	strcpy(runmode, "Ray Propagation New GPU");
 	break;
       }

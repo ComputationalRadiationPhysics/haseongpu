@@ -1,4 +1,5 @@
 #include <mesh.h>
+#include <stdio.h>
 #include <propagate_ray.h>
 #include <geometry.h>
 
@@ -11,11 +12,11 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
   unsigned numberOfTriangles = mesh.numberOfTriangles;
   float thickness = mesh.thickness;
 
-  int raysLeft;
-  int raysDump;
-  double sumPhi;
-  double surfaceTotal;
-  double gain;
+  int raysLeft = 0;
+  int raysDump = 0;
+  double sumPhi = 0;
+  double surfaceTotal = 0;
+  double gain = 0;
   Ray ray;
   Point startPoint;
   Triangle startTriangle;
@@ -27,7 +28,15 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
       startPoint.x = startTriangle.center.x;
       startPoint.y = startTriangle.center.y;
       startPoint.z = (level_i + 0.5) * thickness;
+      // DEBUG
+      // printf("\nstartpoint x %f\n", startPoint.x );
+      // printf("startpoint y %f\n",  startPoint.y);
+      // printf("startpoint z %f\n",  startPoint.z);
+      // printf("endpoint x %f\n", samplePoint.x);
+      // printf("endpoint y %f\n",  samplePoint.y);
+      // printf("endpoint z %f\n", samplePoint.z);
       ray = generateRay(startPoint, samplePoint);
+
       gain = propagateRay(ray, level_i, startTriangle, triangles, sigmaA, sigmaE, nTot, thickness);
 
       importance[triangle_i + level_i * numberOfTriangles] = startTriangle.betaValues[level_i] * gain;
@@ -42,6 +51,7 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
     for(unsigned level_i = 0; level_i < numberOfLevels - 1; ++level_i){
       raysPerPrism[triangle_i + level_i * numberOfTriangles] =  (unsigned)(floor(importance[triangle_i + level_i * numberOfTriangles] / sumPhi * raysPerSample));
       raysDump +=  raysPerPrism[triangle_i + level_i * numberOfTriangles];
+      raysDump +=  raysPerPrism[0];
     }
 
   }
@@ -60,20 +70,20 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
-  for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-    for (int level_i=0; level_i < numberOfLevels; ++level_i){
-      if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
-  	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
+  // for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
+  //   for (int level_i=0; level_i < numberOfLevels; ++level_i){
+  //     if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
+  // 	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
 
-      }
-      else{
-  	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
+  //     }
+  //     else{
+  // 	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
 
-      }
+  //     }
 
-    }
+  //   }
 
-  }
+  // }
 
 }
 

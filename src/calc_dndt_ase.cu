@@ -57,6 +57,7 @@ float calcDndtAseNew (unsigned &threads,
 		      unsigned &blocks, 
 		      unsigned &hostRaysPerSample,
 		      Mesh mesh,
+		      Mesh hostMesh,
 		      std::vector<double> *betaCellsVector,
 		      float nTot,
 		      float sigmaA,
@@ -71,7 +72,6 @@ float calcDndtAseNew (unsigned &threads,
   unsigned *hostRaysPerPrism;
   cudaEvent_t start, stop;
   float runtimeGpu;
-  unsigned kernelcount;
   unsigned *hostIndicesOfPrisms;
   float *hostPhiAse;
   float *hostPhiAseTmp;
@@ -83,24 +83,29 @@ float calcDndtAseNew (unsigned &threads,
   double *importance;
   unsigned *indicesOfPrisms;
 
+  fprintf(stderr, "C numberOfTriangles: %d\n", hostMesh.numberOfTriangles);
+  fprintf(stderr, "C numberOfLevels: %d\n", hostMesh.numberOfLevels); 
+  fprintf(stderr, "C numberOfPrisms: %d\n", hostMesh.numberOfPrisms);
+  fprintf(stderr, "C numberOfPoints: %d\n", hostMesh.numberOfPoints); 
+  fprintf(stderr, "C numberOfSamples: %d\n\n", hostMesh.numberOfSamples);
+
   //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
   threads = 256; 
   blocks = 200;
 
-  hostPhiAse = (float*) malloc(mesh.numberOfSamples * sizeof(float));
-  hostImportance = (double*) malloc(mesh.numberOfPrisms * sizeof(double));
-  hostRaysPerPrism = (unsigned*) malloc(mesh.numberOfPrisms * sizeof(unsigned));
-  hostIndicesOfPrisms = (unsigned*) malloc(hostRaysPerSample * sizeof(unsigned));
+  hostPhiAse          = (float*)    malloc(hostMesh.numberOfSamples * sizeof(float));
+  hostImportance      = (double*)   malloc(hostMesh.numberOfPrisms  * sizeof(double));
+  hostRaysPerPrism    = (unsigned*) malloc(hostMesh.numberOfPrisms  * sizeof(unsigned));
+  hostIndicesOfPrisms = (unsigned*) malloc(hostRaysPerSample        * sizeof(unsigned));
 
   runtimeGpu = 0.0;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-  kernelcount = 0;
 
   for(int i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
-  for(int i=0; i < mesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
-  for(int i=0; i < mesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
-  for(int i=0; i < mesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
+  for(int i=0; i < hostMesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
+  for(int i=0; i < hostMesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
+  for(int i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
 
   // check, if we run on the correct machine / select a good device
   getCorrectDevice(1);
@@ -113,38 +118,40 @@ float calcDndtAseNew (unsigned &threads,
 
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&importance, mesh.numberOfPrisms * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
+
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
-  for(unsigned sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
-    Point sample  = mesh.samples[sample_i];
-    importanceSamplingNew(sample, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
+  for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
+    Point sample  = hostMesh.samples[sample_i];
+
+    importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
 
     // Prism scheduling for gpu threads
-    for(int prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
-      for(int ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
-	hostIndicesOfPrisms[absoluteRay++] = prism_i;
-	assert(absoluteRay <= hostRaysPerSample);
-      }
+    // for(int prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
+    //   for(int ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
+    // 	hostIndicesOfPrisms[absoluteRay++] = prism_i;
+    // 	assert(absoluteRay <= hostRaysPerSample);
+    //   }
 
-    }
+    // }
+
     // Copy dynamic sample date to device
-    CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, mesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
-    CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
+    // CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
+    // CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
     // Start Kernel
-    calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse);
-  
-    // Copy back phiAse
-    CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
-    hostPhiAse[sample_i] = *hostPhiAseTmp;
+    // calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse);
 
-    if(kernelcount % 200 == 0){
-      fprintf(stderr, "C Sampling point %d done\n",kernelcount);
-      kernelcount++;
+    // Copy back phiAse
+    // CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
+    // hostPhiAse[sample_i] = *hostPhiAseTmp;
+
+    if(sample_i % 200 == 0){
+      fprintf(stderr, "C Sampling point %d done\n", sample_i);
     }
   
   }
@@ -155,7 +162,7 @@ float calcDndtAseNew (unsigned &threads,
   cudaEventElapsedTime(&runtimeGpu, start, stop);
 
   // Calculate dndt Ase
-  for(int sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
+  for(int sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     hostPhiAse[sample_i] = float( (double(hostPhiAse[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
     double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(sigmaE + sigmaA) - double(nTot * sigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiAse[sample_i] / crystalFluorescence;
