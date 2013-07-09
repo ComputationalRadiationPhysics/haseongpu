@@ -59,6 +59,7 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
   Triangle *trianglesForDevice = new Triangle[numberOfTriangles];
   cudaMalloc((void**) &dMesh->triangles, numberOfTriangles*sizeof(Triangle));
 
+  double totalSurface = 0;
   for(unsigned i=0; i<numberOfTriangles; ++i) {
     Triangle triangle;
     triangle.A = points[triangleIndices->at(i)];
@@ -68,6 +69,7 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
     TwoDimPoint center = {xOfTriangleCenter->at(i), yOfTriangleCenter->at(i)};
     triangle.center = center;
     triangle.surface = surfaces->at(i);
+    totalSurface += triangle.surface;
 
     hMesh->triangles[i] = triangle;
     trianglesForDevice[i] = triangle;
@@ -96,6 +98,8 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
     cudaMalloc((void**) &trianglesForDevice[i].betaValues, (numberOfLevels-1)*sizeof(double));
     cudaMemcpy(trianglesForDevice[i].betaValues, hMesh->triangles[i].betaValues, (numberOfLevels-1)*sizeof(double), cudaMemcpyHostToDevice);
   }
+  hMesh->surface = totalSurface;
+  dMesh->surface = totalSurface;
 
   cudaMemcpy(dMesh->triangles, trianglesForDevice, numberOfTriangles*sizeof(Triangle), cudaMemcpyHostToDevice);
 }

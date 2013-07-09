@@ -66,6 +66,7 @@ struct Mesh {
   unsigned numberOfPoints;
   unsigned numberOfSamples;
   float thickness;
+  float surface;
 
   ~Mesh();
 
