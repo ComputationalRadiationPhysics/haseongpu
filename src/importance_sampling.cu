@@ -70,20 +70,20 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
-  for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-    for (int level_i=0; level_i < numberOfLevels; ++level_i){
-      if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
-  	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
+  // for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
+  //   for (int level_i=0; level_i < numberOfLevels; ++level_i){
+  //     if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
+  // 	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
 
-      }
-      else{
-  	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
+  //     }
+  //     else{
+  // 	importance[triangle_i + (level_i * numberOfTriangles)] = 0; 
 
-      }
+  //     }
 
-    }
+  //   }
 
-  }
+  // }
 
 }
 
