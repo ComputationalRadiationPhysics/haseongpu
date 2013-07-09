@@ -62,7 +62,8 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];
 
-	  atomicAdd(phiAse, float(gain));
+	  //atomicAdd(phiAse, float(gain));
+	  atomicAdd(phiAse, importance[startPrism]);
 
   }
 
