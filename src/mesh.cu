@@ -10,7 +10,7 @@ void NormalRay::normalize() {
   p.y = p.y/l;
 }
 
-TwoDimPoint* parsePoints(std::vector<double> *points, int numPoints) {
+TwoDimPoint* parsePoints(std::vector<double> *points, unsigned numPoints) {
   TwoDimPoint *p = new TwoDimPoint[numPoints];
 
   for(unsigned i=0; i < numPoints; ++i) {

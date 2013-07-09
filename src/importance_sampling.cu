@@ -150,8 +150,8 @@ unsigned importanceSampling(int point,
   }
 
   // Calculate number of rays/prism
-  for (int i_t=0; i_t < numberOfTriangles; ++i_t){
-    for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
+  for (unsigned i_t=0; i_t < numberOfTriangles; ++i_t){
+    for (unsigned i_z=0; i_z < (numberOfLevels-1); ++i_z){
       numberOfImportantRays[i_t + i_z * numberOfTriangles] = (unsigned)(floor(importance[i_t + i_z * numberOfTriangles] / sumPhi * raysPerSample));
       raysDump +=  numberOfImportantRays[i_t + i_z * numberOfTriangles];
     }
