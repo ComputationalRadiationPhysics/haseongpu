@@ -8,6 +8,7 @@
 #include <calc_dndt_ase.h>
 #include <parser.h>
 #include <write_to_vtk.h>
+#include <for_loops_clad.h>
 
 #include "mesh.h"
 
@@ -171,6 +172,7 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
+<<<<<<< HEAD
       else if(strstr(argv[i], "2") != 0){
 	// threads and blocks will be set in the following function (by reference)
 	runtime = calcDndtAseNew(threads, 
@@ -188,6 +190,37 @@ int main(int argc, char **argv){
 	break;
       }
 
+=======
+      if(strstr(argv[i], "for_loops") != 0){
+	// threads and blocks will be set in the following function (by reference)
+	runtime = forLoopsClad(
+			ase,
+			raysPerSample,
+			betaValues,
+			xOfNormals,
+			yOfNormals,
+			triangleIndices,
+			forbidden,
+			neighbors,
+			positionsOfNormalVectors,
+			points,
+			betaCells,
+			surfaces,
+			xOfTriangleCenter,
+			yOfTriangleCenter,
+			nTot,
+			sigmaA,
+			sigmaE,
+			numberOfPoints,
+			numberOfTriangles,
+			numberOfLevels,
+			thicknessOfPrism,
+			crystalFluorescence);
+	strcpy(runmode, "For Loops");
+	break;
+      }
+    
+>>>>>>> c872b097b14330c8dd939cf52fada8582d7015d6
     }
 
   }

@@ -13,31 +13,30 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState,
 				    unsigned raysPerSample, 
 				    float *phiAse);
 
-__global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
-				 float* phiASE,
-				 const int point2D,
-				 const int level,
-				 const int raysPerThread,
-				 double *points,
-				 double *xOfNormals,
-				 double *yOfNormals,
-				 int *positionsOfNormalVectors,
-				 int *neighbors,
-				 int *forbidden,
-				 int* triangleIndices,
-				 double* betaValues,
-				 double* importance,
-				 unsigned* indicesOfPrisms,
-				 unsigned raysPerSample);
+__global__ void calcSamplePhiAse(
+    curandStateMtgp32* globalState,
+    float* phiASE,
+    int point2D,
+    int level,
+    double *points,
+    double *xOfNormals,
+    double *yOfNormals,
+    int *positionsOfNormalVectors,
+    int *neighbors,
+    int *forbidden,
+    int* triangleIndices,
+    double* betaValues,
+    double* importance,
+    unsigned* indicesOfPrisms,
+    unsigned raysPerSample,
+    double nTot,
+    double sigmaE,
+    double sigmaA,
+    double thicknessOfPrism,
+    int numberOfLevels,
+    int numberOfPoints,
+    int numberOfTriangles);
 
-__global__ void setupGlobalVariablesKernel ( 
-					    double hostSigmaE,
-					    double hostSigmaA, 
-					    double hostNTot, 
-					    int hostNumberOfTriangles, 
-					    double hostThicknessOfPrism, 
-					    int hostNumberOfLevels, 
-					    int hostNumberOfPoints );
 
 
 #endif /* calc_sample_phi_ase_H */
