@@ -35,13 +35,10 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
   unsigned numberOfTriangles = mesh.numberOfTriangles;
 
   // One thread can compute multiple rays
-  for (int i=0; ; ++i){
-  	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
-  	  int rayNumber = id + (blockDim.x*gridDim.x * i);
-  	  if(rayNumber >= raysPerSample){
-  		  return;
-  	  }
-
+  int rayNumber;
+  unsigned i=0;
+  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
+  while ((rayNumber = id + (blockDim.x*gridDim.x * i++)) < raysPerSample) {
   	  // TODO check indices on new structs
   	  // Get triangle prism to start from
   	  int startPrism = indicesOfPrisms[rayNumber];
