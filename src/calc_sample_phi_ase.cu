@@ -4,6 +4,7 @@
 #include <geometry.h>
 #include <propagate_ray.h> /* propagateRay */
 
+#define ID 2560
 
 // ##############################################################
 // # Reconstruction                                             #
@@ -47,8 +48,7 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
   	  int startPrism = indicesOfPrisms[rayNumber];
   	  int startLevel = startPrism/numberOfTriangles;
   	  int startTriangle_i = startPrism - (numberOfTriangles * startLevel);
-  	  //Triangle startTriangle = triangles[startTriangle_i];
-  	  Triangle startTriangle = triangles[0];
+  	  Triangle startTriangle = triangles[startTriangle_i];
 
   	  // Random startpoint generation
 	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, mesh.thickness, globalState);
@@ -62,8 +62,12 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];
 
-	  //atomicAdd(phiAse, float(gain));
-	  atomicAdd(phiAse, importance[startPrism]);
+	  // if(id == ID){
+	  //   printf("C Thread %d rayNumber %d Prism %d Level %d Triangle %d Gain %f\n", id, rayNumber, startPrism, startLevel, startTriangle_i, gain);
+	  // }
+
+	  atomicAdd(phiAse, float(gain));
+	  //atomicAdd(phiAse, importance[startPrism]);
 
   }
 
@@ -156,7 +160,13 @@ __global__ void calcSamplePhiAse(
 				   positionsOfNormalVectors, neighbors, forbidden,  betaValues,
 				   nTot, sigmaE, sigmaA, thicknessOfPrism, numberOfLevels, numberOfPoints, numberOfTriangles);
 
-	  threadGain[threadIdx.x] += gain * betaValues[startPrism] * importance[startPrism];
+	  if(id == ID){
+	    printf("C Thread %d Raynumber %d Prism %d Level %d Triangle %d Gain %f\n", id, rayNumber, startPrism, startLevel, startTriangle, gain);
+	  }
+
+
+	  //threadGain[threadIdx.x] += gain * betaValues[startPrism] * importance[startPrism];
+	  threadGain[threadIdx.x] += gain;
   }
 
   // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)

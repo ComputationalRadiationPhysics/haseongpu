@@ -29,7 +29,6 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
       ray = generateRay(startPoint, samplePoint);
 
       gain = propagateRayNew(ray, level_i, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness);
-
       importance[triangle_i + level_i * mesh.numberOfTriangles] = startTriangle.betaValues[level_i] * gain;
       sumPhi += importance[triangle_i + level_i * mesh.numberOfTriangles];
 
@@ -135,7 +134,7 @@ unsigned importanceSampling(int point,
   // Calculate importance by propagation from trianglecenter to every other center
   for (int i_t=0; i_t < numberOfTriangles; ++i_t){
     for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
-      prop = propagateRay(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
+       prop = propagateRay(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
           thicknessOfPrism * (i_z+0.5),  xPos, yPos, zPos, i_t, i_z, 
           points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
           neighbors, forbidden, betaValues,
@@ -161,12 +160,12 @@ unsigned importanceSampling(int point,
 
   // TODO What happens with random failure ?
   // Distribute the remaining rays randomly
-    for (int i_r=0; i_r < raysLeft; i_r++){
-      int rand_t = (int )(rand() % numberOfTriangles);
-      int rand_z = (int )(rand() % (numberOfLevels-1));
-      numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
+    // for (int i_r=0; i_r < raysLeft; i_r++){
+    //   int rand_t = (int )(rand() % numberOfTriangles);
+    //   int rand_z = (int )(rand() % (numberOfLevels-1));
+    //   numberOfImportantRays[rand_t + rand_z * numberOfTriangles]++;
   
-    }
+    // }
 
   // Now think about the mount of rays which would come out of this volume(surface)
   // dividing this number with the new amount of rays gives the final importance weight for this area!
