@@ -9,7 +9,7 @@
 // # Reconstruction                                             #
 // ##############################################################
 __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
-  Point startPoint;
+  Point startPoint = {0,0,0};
   double u = curand_uniform(&globalState[blockIdx.x]);
   double v = curand_uniform(&globalState[blockIdx.x]);
 
@@ -36,27 +36,27 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 
   // One thread can compute multiple rays
   for (int i=0; ; ++i){
-	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
-	  int rayNumber = id + (blockDim.x*gridDim.x * i);
-	  if(rayNumber >= raysPerSample){
-		  return;
-	  }
+  	  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
+  	  int rayNumber = id + (blockDim.x*gridDim.x * i);
+  	  if(rayNumber >= raysPerSample){
+  		  return;
+  	  }
 
-	  // TODO check indices on new structs
-	  // Get triangle prism to start from
-	  int startPrism = indicesOfPrisms[rayNumber];
-	  int startLevel = startPrism/numberOfTriangles;
-	  int startTriangle_i = startPrism - (numberOfTriangles * startLevel);
-	  Triangle startTriangle = triangles[startTriangle_i];
+  	  // TODO check indices on new structs
+  	  // Get triangle prism to start from
+  	  int startPrism = indicesOfPrisms[rayNumber];
+  	  int startLevel = startPrism/numberOfTriangles;
+  	  int startTriangle_i = startPrism - (numberOfTriangles * startLevel);
+  	  //Triangle startTriangle = triangles[startTriangle_i];
+  	  Triangle startTriangle = triangles[0];
 
-	  // Random startpoint generation
+  	  // Random startpoint generation
 	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, mesh.thickness, globalState);
 
 	  // Ray generation
 	  Ray ray = generateRay(startPoint, samplePoint);
 
-	  // propagate the ray
-	  __syncthreads();
+  	  // // propagate the ray
 	  double gain = propagateRayNew(ray, startLevel, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness );
 
 	  gain *= startTriangle.betaValues[startLevel];

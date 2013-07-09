@@ -9,7 +9,11 @@ __host__ __device__ Vector direction(Point startPoint, Point endPoint){
 }
 
 __host__ __device__ float distance(Point startPoint, Point endPoint){
-  float d = sqrt(pow((endPoint.x - startPoint.x), 2) + pow((endPoint.y - startPoint.y),2) + pow((endPoint.z - startPoint.z),2));
+  float x, y, z;
+  x = endPoint.x - startPoint.x;
+  y = endPoint.y - startPoint.y;
+  z = endPoint.z - startPoint.z;
+  float d = sqrt(x*x + y*y + z*z);
   return fabs(d);
 
 }

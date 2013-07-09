@@ -75,7 +75,7 @@ float calcDndtAseNew (unsigned &threads,
   float runtimeGpu;
   unsigned *hostIndicesOfPrisms;
   float *hostPhiAse;
-  float *hostPhiAseTmp;
+  float hostPhiAseTmp[1] = {0};
 
   // GPU
   float *phiAse;
@@ -100,7 +100,7 @@ float calcDndtAseNew (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
 
   // check, if we run on the correct machine / select a good device
-  getCorrectDevice(1);
+  //getCorrectDevice(1);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -118,19 +118,11 @@ float calcDndtAseNew (unsigned &threads,
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
-  for(unsigned sample_i = 0; sample_i < 1; ++sample_i){
-    //for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
+  //for(unsigned sample_i = 0; sample_i < 1; ++sample_i){
+  for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     Point sample  = hostMesh.samples[sample_i];
 
     importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
-    for(int i=0; i < 15; ++i){
-      printf("C Importance[%d] %f\n",i, hostImportance[i]);
-    }
-
-    for(int i=0; i < 15; ++i){
-      printf("C RaysPerPrism[%d] %d\n",i, hostRaysPerPrism[i]);
-    }
-
 
     // Prism scheduling for gpu threads
     for(int prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
@@ -144,13 +136,16 @@ float calcDndtAseNew (unsigned &threads,
     // Copy dynamic sample date to device
     CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
+    CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAseTmp, sizeof(float), cudaMemcpyHostToDevice));
 
     // Start Kernel
+    fprintf(stderr, "\nC Start Kernel\n");
     calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sigmaA, sigmaE, nTot);
 
     // Copy back phiAse
     CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
     hostPhiAse[sample_i] = *hostPhiAseTmp;
+    *hostPhiAseTmp = 0;
 
     if(sample_i % 200 == 0){
       fprintf(stderr, "C Sampling point %d done\n", sample_i);
