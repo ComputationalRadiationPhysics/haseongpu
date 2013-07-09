@@ -27,7 +27,7 @@
  */
 int getCorrectDevice(int verbose){
   int count = 0, candidate = -1;
-  unsigned minCapability = MIN_COMPUTE_CAPABILITY;
+  int minCapability = MIN_COMPUTE_CAPABILITY;
   cudaDeviceProp prop;
 
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
@@ -102,10 +102,10 @@ float calcDndtAseNew (unsigned &threads,
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  for(int i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
-  for(int i=0; i < hostMesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
-  for(int i=0; i < hostMesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
-  for(int i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
+  for(unsigned i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
+  for(unsigned i=0; i < hostMesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
+  for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
+  for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
 
   // check, if we run on the correct machine / select a good device
   getCorrectDevice(1);
@@ -165,7 +165,7 @@ float calcDndtAseNew (unsigned &threads,
   cudaEventElapsedTime(&runtimeGpu, start, stop);
 
   // Calculate dndt Ase
-  for(int sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
+  for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     hostPhiAse[sample_i] = float( (double(hostPhiAse[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
     double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(sigmaE + sigmaA) - double(nTot * sigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiAse[sample_i] / crystalFluorescence;
@@ -263,10 +263,10 @@ float calcDndtAse(
   cudaEventCreate(&stop);
   kernelcount = 0;
 
-  for(int i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
-  for(int i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
-  for(int i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
-  for(int i=0; i < hostNumberOfPrisms; ++i) hostImportance[i] = 1.0;
+  for(unsigned i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
+  for(unsigned i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
+  for(unsigned i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
+  for(unsigned i=0; i < hostNumberOfPrisms; ++i) hostImportance[i] = 1.0;
 
   // check, if we run on the correct machine / select a good device
   getCorrectDevice(1);
@@ -385,7 +385,7 @@ float calcDndtAse(
 
   // Calculate dndt Ase
   CUDA_CHECK_RETURN(cudaMemcpy(hostPhiASE, phiASE, hostNumberOfPoints * hostNumberOfLevels * sizeof(float), cudaMemcpyDeviceToHost));
-  for(int sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
+  for(unsigned sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
     hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
     double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
     dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;

@@ -52,8 +52,7 @@ int main(int argc, char **argv){
   }
   
   // Parse number of rays
-  unsigned i;
-  for(i=1; i < argc; ++i){
+  for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--rays=", 6) == 0){
       const char* pos = strrchr(argv[i],'=');
       raysPerSample = atoi(pos+1);
@@ -61,14 +60,14 @@ int main(int argc, char **argv){
   }
 
   // Parse location of experiements
-  for(i=1; i < argc; ++i){
+  for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--experiment=", 12) == 0){
       memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
     } 
   }
 
   // Check if we want no output
-  for(i=1; i < argc; ++i){
+  for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--silent", 7) == 0){
 		silent=true;
     } 
@@ -139,7 +138,7 @@ int main(int argc, char **argv){
   std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
 
   // Run Experiment
-  for(i=1; i < argc; ++i){
+  for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
@@ -208,7 +207,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Prism             : %d\n", (int) numberOfPoints * (numberOfLevels-1));
   fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
   fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
-  fprintf(stderr, "C Rays Total        : %d\n", raysPerSample * ase->size());
+  fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * ase->size());
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);

@@ -70,8 +70,8 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
-  for (int triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
-    for (int level_i=0; level_i < numberOfLevels; ++level_i){
+  for (unsigned triangle_i=0; triangle_i < numberOfTriangles; ++triangle_i){
+    for (unsigned level_i=0; level_i < numberOfLevels; ++level_i){
       if (raysPerPrism[triangle_i + (level_i * numberOfTriangles)] > 0){
   	importance[triangle_i + (level_i * numberOfTriangles)] = raysPerSample * triangles[triangle_i].surface / surfaceTotal / raysPerPrism[triangle_i + (level_i * numberOfTriangles)];
 
@@ -409,8 +409,8 @@ void importanceSampling(int point,
   zPos = startLevel * thicknessOfPrism;
 
   // Calculate importance by propagation from trianglecenter to every other center
-  for (int i_t=0; i_t < numberOfTriangles; ++i_t){
-    for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
+  for (unsigned i_t=0; i_t < numberOfTriangles; ++i_t){
+    for (unsigned i_z=0; i_z < (numberOfLevels-1); ++i_z){
       prop = propagateRayHost(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
       			       thicknessOfPrism * (i_z+0.5),  xPos, yPos, zPos, i_t, i_z, 
       			       points, xOfNormals, yOfNormals, positionsOfNormalVectors, 
@@ -428,8 +428,8 @@ void importanceSampling(int point,
   }
 
   // Calculate number of rays/prism
-  for (int i_t=0; i_t < numberOfTriangles; ++i_t){
-    for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
+  for (unsigned i_t=0; i_t < numberOfTriangles; ++i_t){
+    for (unsigned i_z=0; i_z < (numberOfLevels-1); ++i_z){
       numberOfImportantRays[i_t + i_z * numberOfTriangles] = (unsigned)(floor(importance[i_t + i_z * numberOfTriangles] / sumPhi * raysPerSample));
       raysDump +=  numberOfImportantRays[i_t + i_z * numberOfTriangles];
       //fprintf(stderr, "[%d][%d] i: %.20f n: %d\n", i_z, i_t, importance[i_t + i_z*numberOfTriangles], numberOfImportantRays[i_t + i_z*numberOfTriangles]);
@@ -449,8 +449,8 @@ void importanceSampling(int point,
 
   //  Now think about the mount of rays which would come out of this volume(surface)
   //  dividing this number with the new amount of rays gives the final importance weight for this area!
-  for (int i_t=0; i_t<numberOfTriangles; ++i_t){
-    for (int i_z=0; i_z<(numberOfLevels-1); ++i_z){
+  for (unsigned i_t=0; i_t<numberOfTriangles; ++i_t){
+    for (unsigned i_z=0; i_z<(numberOfLevels-1); ++i_z){
       if (numberOfImportantRays[i_t + i_z*numberOfTriangles] > 0){
   	importance[i_t + i_z*numberOfTriangles] = raysPerSample * surface[i_t] / surfaceTotal / numberOfImportantRays[i_t + i_z*numberOfTriangles];
 
