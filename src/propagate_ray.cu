@@ -1,11 +1,16 @@
-<<<<<<< HEAD
 #include <mesh.h>
 #include <assert.h>
 #include <stdio.h>
 #include <geometry.h>
 #include <cuda_runtime_api.h>
+#include <stdio.h> /* printf */
 
+#define TEST_VALUES true
 #define MAX_LEVEL 10
+
+/*##########################################
+  # RECONSTRUCTION                         #
+  ##########################################*/
 
 __host__ __device__ double checkSurface(const int currentLevel, const double zPos, const double zVec, const float length, const double thickness){
   double denominator = zVec;
@@ -161,7 +166,7 @@ __host__ __device__ int getNextForbiddenEdge(Triangle triangle, int edge){
 
 }
 
-__host__ __device__ double propagateRay(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness){
+__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness){
   double distanceTotal = ray.length;
   double distanceRemaining = distanceTotal;
   double length = 0;
@@ -205,20 +210,14 @@ __host__ __device__ double propagateRay(Ray ray, unsigned startLevel, Triangle s
 
     distanceRemaining -= length;
 
-
-    
-
-
   }
 
   return gain /= (distanceTotal * distanceTotal);
-
-=======
-#include <stdio.h> /* printf */
-
-#define TEST_VALUES true
-#define SMALL 1E-06
-
+}
+ 
+/* ############################################
+   # OLD CODE                                 #
+   ############################################*/
 
 __host__ __device__ double checkSide(int offset, double xN, double yN, double *points, double xPos, double yPos, double length, double xVec, double yVec,int *positionsOfNormalVectors,int numberOfPoints){
 	double denominator = xN * xVec + yN * yVec;
@@ -403,5 +402,4 @@ __host__ __device__ double propagateRay(
 #endif
 
 	return gain /= (distanceTotal * distanceTotal);
->>>>>>> c872b097b14330c8dd939cf52fada8582d7015d6
 }

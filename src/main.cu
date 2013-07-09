@@ -115,11 +115,11 @@ int main(int argc, char **argv){
   // fprintf(stderr, "C nTot: %e\n", nTot);
   // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
-   fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
-   fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
-   fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
-   fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
-   fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
+   // fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
+   // fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
+   // fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
+   // fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
+   // fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
 
   // Test vectors
   assert(numberOfPoints == (points->size() / 2));
@@ -172,7 +172,6 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation GPU");
 	break;
       }
-<<<<<<< HEAD
       else if(strstr(argv[i], "2") != 0){
 	// threads and blocks will be set in the following function (by reference)
 	runtime = calcDndtAseNew(threads, 
@@ -189,9 +188,7 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation New GPU");
 	break;
       }
-
-=======
-      if(strstr(argv[i], "for_loops") != 0){
+      else if(strstr(argv[i], "for_loops") != 0){
 	// threads and blocks will be set in the following function (by reference)
 	runtime = forLoopsClad(
 			ase,
@@ -220,7 +217,6 @@ int main(int argc, char **argv){
 	break;
       }
     
->>>>>>> c872b097b14330c8dd939cf52fada8582d7015d6
     }
 
   }

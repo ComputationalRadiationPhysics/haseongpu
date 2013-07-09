@@ -29,7 +29,7 @@ __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thi
 }
 
 
-__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Mesh mesh, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, float *phiAse) {
+__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point samplePoint, Mesh mesh, unsigned* indicesOfPrisms, double* importance,unsigned raysPerSample, float *phiAse, const double sigmaA, const double sigmaE, const double nTot) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   Triangle *triangles = mesh.triangles;
   unsigned numberOfTriangles = mesh.numberOfTriangles;
@@ -50,14 +50,14 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 	  Triangle startTriangle = triangles[startTriangle_i];
 
 	  // Random startpoint generation
-	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, thicknessOfPrism, globalState);
+	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, mesh.thickness, globalState);
 
 	  // Ray generation
 	  Ray ray = generateRay(startPoint, samplePoint);
 
 	  // propagate the ray
 	  __syncthreads();
-	  double gain = propagateRay(ray, startLevel, startTriangle, triangles, sigmaA, sigmaE, nTot, thicknessOfPrism );
+	  double gain = propagateRayNew(ray, startLevel, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness );
 
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];

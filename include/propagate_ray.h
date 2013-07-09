@@ -1,13 +1,10 @@
 #ifndef propagate_ray_H
 #define propagate_ray_H
-<<<<<<< HEAD
 
 #include <mesh.h>
 
-__host__ __device__ double propagateRay(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness);
+__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness);
 
-#endif /* propagate_ray_H */
-=======
 __host__ __device__ double propagateRay(
 		double xPos,
 		double yPos,
@@ -32,5 +29,6 @@ __host__ __device__ double propagateRay(
     int numberOfPoints,
     int numberOfTriangles);
 
-#endif
->>>>>>> c872b097b14330c8dd939cf52fada8582d7015d6
+#endif /* propagate_ray_H */
+
+
