@@ -8,6 +8,7 @@
 #include <calc_dndt_ase.h>
 #include <parser.h>
 #include <write_to_vtk.h>
+#include <for_loops_clad.h>
 
 #include "mesh.h"
 
@@ -113,11 +114,11 @@ int main(int argc, char **argv){
   // fprintf(stderr, "C nTot: %e\n", nTot);
   // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
-   fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
-   fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
-   fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
-   fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
-   fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
+   // fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
+   // fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
+   // fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
+   // fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
+   // fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
 
   // Test vectors
   assert(numberOfPoints == (points->size() / 2));
@@ -186,7 +187,35 @@ int main(int argc, char **argv){
 	strcpy(runmode, "Ray Propagation New GPU");
 	break;
       }
-
+      else if(strstr(argv[i], "for_loops") != 0){
+	// threads and blocks will be set in the following function (by reference)
+	runtime = forLoopsClad(
+			ase,
+			raysPerSample,
+			betaValues,
+			xOfNormals,
+			yOfNormals,
+			triangleIndices,
+			forbidden,
+			neighbors,
+			positionsOfNormalVectors,
+			points,
+			betaCells,
+			surfaces,
+			xOfTriangleCenter,
+			yOfTriangleCenter,
+			nTot,
+			sigmaA,
+			sigmaE,
+			numberOfPoints,
+			numberOfTriangles,
+			numberOfLevels,
+			thicknessOfPrism,
+			crystalFluorescence);
+	strcpy(runmode, "For Loops");
+	break;
+      }
+    
     }
 
   }
