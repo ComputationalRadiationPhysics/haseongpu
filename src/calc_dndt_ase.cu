@@ -410,6 +410,7 @@ float calcDndtAse(
 
       // save the number of used RaysPerSample
       hostRaysPerSample.push_back(realRaysPerSample);
+
     }
   }
   
