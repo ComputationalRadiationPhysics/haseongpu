@@ -16,7 +16,6 @@ __global__ void importanceSamplingKernel1(
 
   Triangle *triangles = mesh.triangles;
   __shared__ double threadPhi[256];
-  double surfaceTotal = 0;
   double gain = 0;
   Ray ray;
   Point startPoint;
@@ -29,7 +28,7 @@ __global__ void importanceSamplingKernel1(
     return;
   }
   int level_i = startPrism/(mesh.numberOfTriangles);
-  int triangle_i = startPrism - (mesh.numberOfTriangles * startLevel);
+  int triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
 
   startTriangle = triangles[triangle_i];
   startPoint.x = startTriangle.center.x;
@@ -52,7 +51,7 @@ __global__ void importanceSamplingKernel1(
     i /= 2;
   }
   if(threadIdx.x == 0){
-    atomicAdd(&sumPhi, float(threadPhi[threadIdx.x]));
+    atomicAdd(sumPhi, float(threadPhi[threadIdx.x]));
   }
 }
 
@@ -60,14 +59,14 @@ __global__ void importanceSamplingKernel2(
     Mesh mesh,
     unsigned *raysPerPrism,
     double *importance,
-    float sumPhi,
+    float *sumPhi,
     unsigned raysPerSample,
     unsigned *raysDump){
   __shared__ unsigned raySum[256];
   raySum[threadIdx.x] = 0;
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms) return;
-  raysPerPrism[startPrism] = (unsigned) floor(importance[startPrism] / sumPhi * raysPerSample);
+  raysPerPrism[startPrism] = (unsigned) floor(importance[startPrism] / (*sumPhi) * raysPerSample);
   raySum[threadIdx.x] = raysPerPrism[startPrism];
   __syncthreads();
 
@@ -80,16 +79,18 @@ __global__ void importanceSamplingKernel2(
     i /= 2;
   }
   if(threadIdx.x == 0){
-    atomicAdd(&raysDump, float(raySum[threadIdx.x]));
+    atomicAdd(raysDump, raySum[threadIdx.x]);
   }
 }
 
 __global__ void importanceSamplingKernel3(
     Mesh mesh,
     unsigned *raysPerPrism,
-    unsigned raysLeft){
+    unsigned raysPerSample,
+    unsigned *raysDump){
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
+  int raysLeft = raysPerSample-(*raysDump);
   if(id==0){
     curandState randomState;
     curand_init(1234,0,0,&randomState);
@@ -105,10 +106,12 @@ __global__ void importanceSamplingKernel3(
     //int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh.numberOfLevels-1)) - 1;
     //atomicAdd(&raysPerPrism[rand_t + rand_z * mesh.numberOfTriangles],1);
   }
+}
 
 __global__ void importanceSamplingKernel4(
     Mesh mesh,
     unsigned *raysPerPrism,
+    unsigned raysPerSample,
     double *importance){ 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms){
@@ -117,7 +120,7 @@ __global__ void importanceSamplingKernel4(
   int startLevel = startPrism/(mesh.numberOfTriangles);
   int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
   if(raysPerPrism[startPrism] > 0){
-    importance[startPrism] = raysPerSample * mesh.triangle[startTriangle].surface / (mesh.surfaceTotal * raysPerPrism[startPrism]);
+    importance[startPrism] = raysPerSample * mesh.triangles[startTriangle].surface / (mesh.surface * raysPerPrism[startPrism]);
   }else{
     importance[startPrism] = 0;
   }
@@ -126,23 +129,25 @@ __global__ void importanceSamplingKernel4(
 unsigned importanceSamplingGPU(
     Point samplePoint, 
     Mesh hostMesh,
-    Mesh deviceMesh
+    Mesh deviceMesh,
     unsigned raysPerSample, 
     double sigmaA, 
     double sigmaE, 
     double nTot,  
     double *importance, 
-    float* sumPhi,
+    float *sumPhi,
     unsigned *raysPerPrism,
-    unsigned *raysDump){
+    unsigned *raysDump,
+    int threads,
+    int blocks){
 
-  cudaMemcpy(sumPhi,0,sizeof(unsigned),cudaMemcpyDeviceToHost);
-  cudaMemcpy(raysDump,0,sizeof(unsigned),cudaMemcpyDeviceToHost);
+  //cudaMemcpy(sumPhi,0.f,sizeof(float),cudaMemcpyDeviceToHost);
+ // cudaMemcpy(raysDump,0,sizeof(unsigned),cudaMemcpyDeviceToHost);
 
   importanceSamplingKernel1<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
   importanceSamplingKernel2<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
-  importanceSamplingKernel3<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample-raysDump);
-  importanceSamplingKernel4<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance);
+  importanceSamplingKernel3<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump);
+  importanceSamplingKernel4<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance);
 
   //return raysDump;  //use this, if we don't use randomly distributed rays (Kernel3)
   return raysPerSample;

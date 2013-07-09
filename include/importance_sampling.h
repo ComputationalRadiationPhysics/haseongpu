@@ -39,7 +39,7 @@ unsigned importanceSampling(int point,
 unsigned importanceSamplingGPU(
     Point samplePoint, 
     Mesh hostMesh,
-    Mesh deviceMesh
+    Mesh deviceMesh,
     unsigned raysPerSample, 
     double sigmaA, 
     double sigmaE, 
