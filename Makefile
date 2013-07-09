@@ -33,9 +33,7 @@ octrace: $(OBJS) Makefile
 clean:
 	rm -f bin/*
 
-#test: 
-#	$(NVCC) $(SRCS) $(TESTSRCS) $(TEST_FLAGS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
-#	rm bin/main.o
-#	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-#	g++ bin/*.o -o bin/test -lcudart
-#	rm bin/test*.o
+final_build:
+	rm -f bin/link.o
+	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
+	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
