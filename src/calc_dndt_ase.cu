@@ -6,7 +6,6 @@
 #include <vector>
 #include <curand_kernel.h>
 #include <cudachecks.h>
-#include <importance_sampling_kernel.h>
 #include <importance_sampling.h>
 #include <test_functions.h>
 #include <calc_sample_phi_ase.h>
@@ -20,16 +19,16 @@
 #define SEED 1234
 
 float calcDndtAse (unsigned &threads, 
-		      unsigned &blocks, 
-		      unsigned &hostRaysPerSample,
-		      Mesh mesh,
-		      Mesh hostMesh,
-		      std::vector<double> *betaCellsVector,
-		      float nTot,
-		      float sigmaA,
-		      float sigmaE,
-		      float crystalFluorescence,
-		      std::vector<double> *dndtAse){
+		   unsigned &blocks, 
+		   unsigned &hostRaysPerSample,
+		   Mesh mesh,
+		   Mesh hostMesh,
+		   std::vector<double> *betaCellsVector,
+		   float nTot,
+		   float sigmaA,
+		   float sigmaE,
+		   float crystalFluorescence,
+		   std::vector<double> *dndtAse){
 
   // Variable declaration
   // CPU
@@ -92,7 +91,7 @@ float calcDndtAse (unsigned &threads,
     if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
     Point sample  = hostMesh.samples[sample_i];
 
-    importanceSamplingGPU(sample,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,indicesOfPrisms,raysDump,threads,blocks);
+    importanceSampling(sample,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,indicesOfPrisms,raysDump,threads,blocks);
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
     // Prism scheduling for gpu threads

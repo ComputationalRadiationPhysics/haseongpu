@@ -67,7 +67,7 @@ __global__ void calcSamplePhiAse(
 	  Ray ray = generateRay(startPoint, samplePoint);
 
   	  // // propagate the ray
-	  double gain = propagateRayNew(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
+	  double gain = propagateRay(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
 
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];
