@@ -83,6 +83,9 @@ float calcDndtAseNew (unsigned &threads,
   mtgp32_kernel_params *devKernelParams;
   double *importance;
   unsigned *indicesOfPrisms;
+  float *sumPhi;
+  unsigned *raysDump;
+  unsigned *raysPerPrism;
 
   //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
   threads = 256; 
@@ -114,6 +117,9 @@ float calcDndtAseNew (unsigned &threads,
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism,hostMesh.numberOfPrisms * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
@@ -124,6 +130,8 @@ float calcDndtAseNew (unsigned &threads,
     Point sample  = hostMesh.samples[sample_i];
 
     importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
+    //importanceSamplingGPU(sample,hostMesh,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,raysDump,threads,blocks);
+    //CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
     // for(int i = 0; i < 10; ++i){
     //   printf("C RaysPerPrism[%d]: %d\n", i, hostRaysPerPrism[i]);
