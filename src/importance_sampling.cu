@@ -141,8 +141,14 @@ unsigned importanceSamplingGPU(
     int threads,
     int blocks){
 
-  //cudaMemcpy(sumPhi,0.f,sizeof(float),cudaMemcpyDeviceToHost);
- // cudaMemcpy(raysDump,0,sizeof(unsigned),cudaMemcpyDeviceToHost);
+  float *sumPhiHost = (float*) malloc(sizeof(float));
+  unsigned *raysDumpHost = (unsigned*) malloc(sizeof(unsigned));
+
+  *sumPhi = 0.f;
+  *raysDump = 0;
+
+  cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyDeviceToHost);
+  cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyDeviceToHost);
 
   importanceSamplingKernel1<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
   importanceSamplingKernel2<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
@@ -281,7 +287,7 @@ unsigned importanceSampling(int point,
   zPos = startLevel * thicknessOfPrism;
 
   // Calculate importance by propagation from trianglecenter to every other center
-  for (int i_t=0; i_t < numberOfTriangles; ++i_t){
+  for (unsigned i_t=0; i_t < numberOfTriangles; ++i_t){
     for (int i_z=0; i_z < (numberOfLevels-1); ++i_z){
        prop = propagateRay(xOfTriangleCenter[i_t], yOfTriangleCenter[i_t], 
           thicknessOfPrism * (i_z+0.5),  xPos, yPos, zPos, i_t, i_z, 
@@ -318,7 +324,7 @@ unsigned importanceSampling(int point,
 
   // Now think about the mount of rays which would come out of this volume(surface)
   // dividing this number with the new amount of rays gives the final importance weight for this area!
-  for (int i_t=0; i_t<numberOfTriangles; ++i_t){
+  for (unsigned i_t=0; i_t<numberOfTriangles; ++i_t){
     for (int i_z=0; i_z<(numberOfLevels-1); ++i_z){
       if (numberOfImportantRays[i_t + i_z*numberOfTriangles] > 0){
         importance[i_t + i_z*numberOfTriangles] = raysPerSample * surface[i_t] / surfaceTotal / numberOfImportantRays[i_t + i_z*numberOfTriangles];

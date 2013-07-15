@@ -47,6 +47,8 @@ unsigned importanceSamplingGPU(
     double *importance, 
     float* sumPhi,
     unsigned *raysPerPrism,
-    unsigned *raysDump);
+    unsigned *raysDump,
+    int threads,
+    int blocks);
 
 #endif /* importance_sampling_H */
