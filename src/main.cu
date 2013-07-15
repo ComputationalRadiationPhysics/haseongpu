@@ -181,7 +181,7 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
-	runtime = calcDndtAseNew(threads, 
+	runtime = calcDndtAse(threads, 
 				 blocks, 
 				 raysPerSample,
 				 dMesh,

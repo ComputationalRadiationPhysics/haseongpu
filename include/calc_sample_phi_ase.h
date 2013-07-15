@@ -5,7 +5,7 @@
 #include <cuda_runtime_api.h>
 #include <mesh.h>
 
-__global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, 
+__global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
 				    Point samplePoint, 
 				    Mesh mesh,
 				    unsigned* indicesOfPrisms, 
@@ -16,30 +16,6 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState,
 				    const double sigmaA,
 				    const double sigmaE,
 				    const double nTot);
-
-__global__ void calcSamplePhiAse(
-    curandStateMtgp32* globalState,
-    float* phiASE,
-    int point2D,
-    int level,
-    double *points,
-    double *xOfNormals,
-    double *yOfNormals,
-    int *positionsOfNormalVectors,
-    int *neighbors,
-    int *forbidden,
-    int* triangleIndices,
-    double* betaValues,
-    double* importance,
-    unsigned* indicesOfPrisms,
-    unsigned raysPerSample,
-    double nTot,
-    double sigmaE,
-    double sigmaA,
-    double thicknessOfPrism,
-    int numberOfLevels,
-    int numberOfPoints,
-    int numberOfTriangles);
 
 
 
