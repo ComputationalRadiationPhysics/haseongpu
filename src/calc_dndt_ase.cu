@@ -307,7 +307,7 @@ float calcDndtAse(
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
-  for(unsiged point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
+  for(unsigned point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
     if(point_i % 20 == 0) fprintf(stderr, "C Sampling point %d/%d\n",point_i,hostNumberOfPoints);
     for(unsigned level_i = 0; level_i < hostNumberOfLevels; ++level_i){
   
