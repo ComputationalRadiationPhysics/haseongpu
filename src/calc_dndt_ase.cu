@@ -130,8 +130,8 @@ float calcDndtAseNew (unsigned &threads,
     // }
 
     // Prism scheduling for gpu threads
-    for(int prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
-      for(int ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
+    for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
+      for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
     	hostIndicesOfPrisms[absoluteRay++] = prism_i;
     	assert(absoluteRay <= hostRaysPerSample);
       }
@@ -150,8 +150,6 @@ float calcDndtAseNew (unsigned &threads,
     CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
     hostPhiAse[sample_i] = *hostPhiAseTmp;
     *hostPhiAseTmp = 0;
-
-
   
   }
 
@@ -261,10 +259,10 @@ float calcDndtAse(
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  for(int i=0; i < hostRaysPerSampleMax; ++i) hostIndicesOfPrisms[i] = 0;
-  for(int i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
-  for(int i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
-  for(int i=0; i < hostNumberOfPrisms; ++i)hostImportance[i] = 1.0;
+  for(unsigned i=0; i < hostRaysPerSampleMax; ++i) hostIndicesOfPrisms[i] = 0;
+  for(unsigned i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
+  for(unsigned i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
+  for(unsigned i=0; i < hostNumberOfPrisms; ++i)hostImportance[i] = 1.0;
 
 
   CUDA_CHECK_RETURN(cudaEventRecord(start, 0));
@@ -309,34 +307,26 @@ float calcDndtAse(
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
-  // for(int point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
-  //   if(point_i % 20 == 0) fprintf(stderr, "C Sampling point %d/%d\n",point_i,hostNumberOfPoints);
-  //   for(int level_i = 0; level_i < hostNumberOfLevels; ++level_i){
-  for(int point_i = 0; point_i < 1 ; ++point_i){
+  for(unsiged point_i = 0; point_i < hostNumberOfPoints ; ++point_i){
     if(point_i % 20 == 0) fprintf(stderr, "C Sampling point %d/%d\n",point_i,hostNumberOfPoints);
-    for(int level_i = 0; level_i < 1; ++level_i){
-
+    for(unsigned level_i = 0; level_i < hostNumberOfLevels; ++level_i){
+  
     // Importance for one sample
-     unsigned realRaysPerSample = importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
-         (double*) &(pointsVector->at(0)), 
-         (double*) &(xOfNormalsVector->at(0)), 
-         (double*) &(yOfNormalsVector->at(0)),
-         (int*) &(positionsOfNormalVectorsVector->at(0)), 
-         (int*) &(neighborsVector->at(0)), 
-         (int*) &(forbiddenVector->at(0)), 
-         (double*) &(betaValuesVector->at(0)), 
-         (double*) &(xOfTriangleCenterVector->at(0)),
-         (double*) &(yOfTriangleCenterVector->at(0)), 
-         (float*) &(surfacesVector->at(0)), 
-         hostRaysPerSampleMax,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
-         hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
+     // unsigned realRaysPerSample = importanceSampling(point_i, level_i, hostImportance, hostNumberOfImportantRays, 
+     //     (double*) &(pointsVector->at(0)), 
+     //     (double*) &(xOfNormalsVector->at(0)), 
+     //     (double*) &(yOfNormalsVector->at(0)),
+     //     (int*) &(positionsOfNormalVectorsVector->at(0)), 
+     //     (int*) &(neighborsVector->at(0)), 
+     //     (int*) &(forbiddenVector->at(0)), 
+     //     (double*) &(betaValuesVector->at(0)), 
+     //     (double*) &(xOfTriangleCenterVector->at(0)),
+     //     (double*) &(yOfTriangleCenterVector->at(0)), 
+     //     (float*) &(surfacesVector->at(0)), 
+     //     hostRaysPerSampleMax,hostNumberOfPoints, hostNumberOfLevels, hostNumberOfTriangles, 
+     //     hostThicknessOfPrism, hostSigmaA, hostSigmaE, hostNTot);
 
-     for(int i = 0; i < 10; ++i){
-       printf("C RaysPerPrism[%d]: %d\n", i, hostNumberOfImportantRays[i]);
-     }
-
-
-     realRaysPerSample = hostRaysPerSampleMax;
+      unsigned realRaysPerSample = hostRaysPerSampleMax;
       importanceKernel1<<< blocks,threads >>>(point_i, level_i, importance, 
           points, xOfNormals, yOfNormals, positionsOfNormalVectors,
           neighbors, forbidden, betaValues, 
@@ -347,11 +337,11 @@ float calcDndtAse(
       CUDA_CHECK_RETURN(cudaMemcpy(hostImportance, importance, hostNumberOfPrisms * sizeof(double), cudaMemcpyDeviceToHost));
       cudaDeviceSynchronize();
       double sumPhi=0;
-      for(int i=0;i<hostNumberOfPrisms;++i){
+      for(unsigned i=0;i<hostNumberOfPrisms;++i){
         sumPhi += hostImportance[i];
       }
       double surfaceTotal = 0;
-      for(int i=0;i<hostNumberOfTriangles;++i){
+      for(unsigned i=0;i<hostNumberOfTriangles;++i){
         surfaceTotal += surfacesVector->at(i);
       }
       importanceKernel2<<< blocks,threads >>>(numberOfImportantRays,importance,sumPhi,hostRaysPerSampleMax,hostNumberOfPrisms);
@@ -359,7 +349,7 @@ float calcDndtAse(
       CUDA_CHECK_RETURN(cudaMemcpy(hostNumberOfImportantRays, numberOfImportantRays, hostNumberOfPrisms * sizeof(unsigned), cudaMemcpyDeviceToHost));
       cudaDeviceSynchronize();
       unsigned raysDump=0;
-      for(int prism_i=0; prism_i < hostNumberOfPrisms; ++prism_i){
+      for(unsigned prism_i=0; prism_i < hostNumberOfPrisms; ++prism_i){
        raysDump += hostNumberOfImportantRays[prism_i];
       }
 
@@ -368,8 +358,8 @@ float calcDndtAse(
       importanceKernel4<<< blocks,threads >>>(numberOfImportantRays,importance,surfaces,surfaceTotal,hostRaysPerSampleMax,hostNumberOfPrisms,hostNumberOfTriangles);
 
       // Prism scheduling for gpu threads
-      for(int prism_i=0, absoluteRay = 0; prism_i < hostNumberOfPrisms; ++prism_i){
-        for(int ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
+      for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostNumberOfPrisms; ++prism_i){
+        for(unsigned ray_i=0; ray_i < hostNumberOfImportantRays[prism_i]; ++ray_i){
           hostIndicesOfPrisms[absoluteRay++] = prism_i;
           assert(absoluteRay <= realRaysPerSample);
         }
@@ -402,11 +392,10 @@ float calcDndtAse(
   CUDA_CHECK_RETURN(cudaEventElapsedTime(&runtimeGpu, start, stop));
 
   // normalize Results
-  for(int sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
-    //hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample.at(sample_i) * 4.0f * 3.14159))); 
+  for(unsigned sample_i=0; sample_i < hostNumberOfSamples; ++sample_i){
+    hostPhiASE[sample_i] = float( (double(hostPhiASE[sample_i]) / (hostRaysPerSample.at(sample_i) * 4.0f * 3.14159))); 
     double gain_local = double(hostNTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE + hostSigmaA) - double(hostNTot * hostSigmaA);
-    //dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
-    dndtAse->at(sample_i) = hostPhiASE[sample_i];
+    dndtAse->at(sample_i) = gain_local * hostPhiASE[sample_i] / hostCrystalFluorescence;
   }
 
   //   // Print experiment data

@@ -34,6 +34,10 @@ octrace: $(OBJS) Makefile
 clean:
 	rm -f bin/*
 
+new: 
+	make clean
+	make
+
 final_build:
 	rm -f bin/link.o
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
