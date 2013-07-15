@@ -38,15 +38,15 @@ unsigned importanceSampling(int point,
 
 unsigned importanceSamplingGPU(
     Point samplePoint, 
-    Mesh hostMesh,
     Mesh deviceMesh,
     unsigned raysPerSample, 
     double sigmaA, 
     double sigmaE, 
     double nTot,  
     double *importance, 
-    float* sumPhi,
+    float *sumPhi,
     unsigned *raysPerPrism,
+    unsigned *indicesOfPrisms,
     unsigned *raysDump,
     int threads,
     int blocks);
