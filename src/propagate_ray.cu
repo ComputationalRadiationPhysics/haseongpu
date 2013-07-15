@@ -322,7 +322,7 @@ __host__ __device__ double propagateRay(
 
 		// check the 3 edges
 		for (unsigned i = 0; i<3 ; ++i){
-			if (forbiddenCurrent != i){
+		  if (forbiddenCurrent != (int)i){
 				offset = triangleCurrent + i * numberOfTriangles;
 				double lengthHelp = checkSide(offset, xOfNormals[offset], yOfNormals[offset], points, xPos, yPos, length, xVec, yVec, positionsOfNormalVectors,numberOfPoints);
 				if(lengthHelp){

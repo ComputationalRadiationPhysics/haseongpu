@@ -36,20 +36,6 @@ double sigma_a;
 double sigma_e;
 double N_tot;
 
-void printIntermediateData(unsigned size, double *importance, double *phi, std::vector<double> *dndtAse,int iteration){
-  printf("###### ITERATION: %d #########\n",iteration);
- // for(int i=0; i<size; ++i){
- //   printf("Importance[%d]: %f\n",i,importance[i]);
- // }
-  for(int i=0; i<size; ++i){
-    printf("phi[%d]: %f\n",i,phi[i]);
-  }
-  //for(int i=0; i<size; ++i){
-  //  printf("dndtAse[%d]: %f\n",i, dndtAse->at(i));
-  //}
-}
-
-
 // function prototypes
 double propagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start, int N_refl);
 void importf(int point, int mesh_start, double *importance, int *N_rays, int N_reflections);
@@ -169,7 +155,7 @@ float forLoopsClad(
 
   for(i=0;i<size_p;i++)
   {
-      printf("Doing job on point %li of %i\n",i,size_p);
+      printf("Doing job on point %d of %d\n",i,size_p);
       p_cx = p_in[i];
       p_cy = p_in[size_p+i];
       
