@@ -131,9 +131,9 @@ float calcDndtAseNew (unsigned &threads,
     if(sample_i % 20 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
     Point sample  = hostMesh.samples[sample_i];
 
-    importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
-    //importanceSamplingGPU(sample,hostMesh,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,raysDump,threads,blocks);
-    //CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
+    //importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
+    importanceSamplingGPU(sample,hostMesh,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,raysDump,threads,blocks);
+    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
     // Prism scheduling for gpu threads
     for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
@@ -145,7 +145,7 @@ float calcDndtAseNew (unsigned &threads,
     }
 
     // Copy dynamic sample date to device
-    CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
+    //CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
     //CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAseTmp, sizeof(float), cudaMemcpyHostToDevice));
 
