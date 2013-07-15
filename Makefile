@@ -9,8 +9,8 @@ NVCC = nvcc
 NVCC_FLAGS = --use_fast_math
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 #NVCC_FLAGS = --use_fast_math --include-path include
-ARCH = -arch=sm_20
-#ARCH = -arch=sm_35
+#ARCH = -arch=sm_20
+ARCH = -arch=sm_35
 
 # --maxrregcount=40
 

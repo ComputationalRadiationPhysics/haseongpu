@@ -75,7 +75,6 @@ float calcDndtAseNew (unsigned &threads,
   float runtimeGpu;
   unsigned *hostIndicesOfPrisms;
   float *hostPhiAse;
-  float hostPhiAseTmp[1] = {0};
 
   // GPU
   float *phiAse;
@@ -114,12 +113,15 @@ float calcDndtAseNew (unsigned &threads,
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, SEED));
 
   // Memory allocation on device
-  CUDA_CHECK_RETURN(cudaMalloc(&phiAse, sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism,hostMesh.numberOfPrisms * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
+
+  // Copy host to device
+  CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAse, hostMesh.numberOfSamples * sizeof(float), cudaMemcpyHostToDevice));
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
@@ -133,10 +135,6 @@ float calcDndtAseNew (unsigned &threads,
     //importanceSamplingGPU(sample,hostMesh,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,raysDump,threads,blocks);
     //CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
-    // for(int i = 0; i < 10; ++i){
-    //   printf("C RaysPerPrism[%d]: %d\n", i, hostRaysPerPrism[i]);
-    // }
-
     // Prism scheduling for gpu threads
     for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
       for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
@@ -149,17 +147,19 @@ float calcDndtAseNew (unsigned &threads,
     // Copy dynamic sample date to device
     CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
-    CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAseTmp, sizeof(float), cudaMemcpyHostToDevice));
+    //CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAseTmp, sizeof(float), cudaMemcpyHostToDevice));
 
     // Start Kernel
-    calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sigmaA, sigmaE, nTot);
+    calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
 
     // Copy back phiAse
-    CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
-    hostPhiAse[sample_i] = *hostPhiAseTmp;
-    *hostPhiAseTmp = 0;
+    // CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
+    // hostPhiAse[sample_i] = *hostPhiAseTmp;
+    // *hostPhiAseTmp = 0;
   
   }
+  // Copy solution back to host
+  CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAse, phiAse, hostMesh.numberOfSamples * sizeof(float), cudaMemcpyDeviceToHost));
 
   // Stop time
   cudaEventRecord(stop, 0);
