@@ -3,7 +3,7 @@
 
 #include<vector>
 
-#define SMALL 1E-04
+#define SMALL 1E-05
 #define VERY_SMALL 0.0
 
 struct TwoDimPoint {

@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -q k20f
 #PBS -l nodes=1:ppn=2
-#PBS -l walltime=0:10:00
+#PBS -l walltime=3:30:00
 #PBS -N octrace
 
 . /opt/modules-3.2.6/Modules/3.2.6/init/bash
@@ -16,7 +16,12 @@ cd ~/octrace
 
 make
 
+MODE="for_loops"
+RAYS=1000000
+echo "RAYS: $RAYS"
+echo "MODE: $MODE"
+
+FOLDER="$(pwd)"
 echo "Executing..."
 echo
-./bin/octrace --mode=bruteforce_gpu --rays=256 --experiment=/home/zenker64/octrace/utils/testdata_2
-#./bin/octrace --mode=ray_propagation_gpu --rays=256
+time ./bin/octrace --mode=$MODE --rays=$RAYS --experiment="$FOLDER/utils/testdata_2" --silent
