@@ -4,6 +4,7 @@
 #include <geometry.h>
 #include <assert.h>
 #include <curand_kernel.h>
+#include <cudachecks.h>
 
 __global__ void importanceSamplingKernel1(
     Mesh mesh,
@@ -144,11 +145,11 @@ unsigned importanceSamplingGPU(
   float *sumPhiHost = (float*) malloc(sizeof(float));
   unsigned *raysDumpHost = (unsigned*) malloc(sizeof(unsigned));
 
-  *sumPhi = 0.f;
-  *raysDump = 0;
+  *sumPhiHost = 0.f;
+  *raysDumpHost = 0;
 
-  cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyDeviceToHost);
-  cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyDeviceToHost);
+  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyHostToDevice));
 
   importanceSamplingKernel1<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
   importanceSamplingKernel2<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);

@@ -242,6 +242,12 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
     int tri_next, cell_z_next, forb, forb_dump;
 	//int ct; // used to read out cell_type 
     
+    // is not used
+    N_refl=0;
+
+    if(N_refl){
+      printf("_");
+    }
     
 //    initial positions
     tri = t_start;
