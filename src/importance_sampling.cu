@@ -37,7 +37,7 @@ __global__ void importanceSamplingKernel1(
   startPoint.z = (level_i + 0.5) * mesh.thickness;
 
   ray = generateRay(startPoint, samplePoint);
-  gain = propagateRayNew(ray, level_i, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness);
+  gain = propagateRayNew(ray, level_i, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness);
   importance[startPrism] = startTriangle.betaValues[level_i] * gain;
 
   threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh.numberOfTriangles];
@@ -184,7 +184,7 @@ void importanceSamplingNew(Point samplePoint, Mesh mesh, unsigned raysPerSample,
       startPoint.z = (level_i + 0.5) * mesh.thickness;
       ray = generateRay(startPoint, samplePoint);
 
-      gain = propagateRayNew(ray, level_i, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness);
+      gain = propagateRayNew(ray, level_i, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness);
       importance[triangle_i + level_i * mesh.numberOfTriangles] = startTriangle.betaValues[level_i] * gain;
       sumPhi += importance[triangle_i + level_i * mesh.numberOfTriangles];
 

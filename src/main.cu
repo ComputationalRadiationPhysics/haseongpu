@@ -9,8 +9,44 @@
 #include <parser.h>
 #include <write_to_vtk.h>
 #include <for_loops_clad.h>
+#include <cudachecks.h>
+#include <mesh.h>
 
-#include "mesh.h"
+#define MIN_COMPUTE_CAPABILITY 2
+
+/** 
+ * @brief Queries the devices to find the one with the highest Compute Capability
+ *        and sets it as our current device. 
+ *        Will result in a visible error and terminate program execution, 
+ *        if no suitable device is detected
+ */
+int getCorrectDevice(int verbose){
+  int count = 0, candidate = -1;
+  int minCapability = MIN_COMPUTE_CAPABILITY;
+  cudaDeviceProp prop;
+
+  CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
+  
+  for(int i=0; i<count; ++i){
+    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
+    if(prop.major >= minCapability){
+      minCapability = prop.major;
+      candidate = i;
+    }
+  }
+
+  if(candidate == -1){
+    fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
+    exit(1);
+  }else{
+    if(verbose > 0){
+      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, candidate) );
+      fprintf(stderr,"\nC using CUDA device: %s (Compute Capability %d.%d)\n", prop.name, prop.major, prop.minor); 
+    }
+    CUDA_CHECK_RETURN( cudaSetDevice(candidate) );
+  }
+  return candidate;
+}
 
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
@@ -95,7 +131,6 @@ int main(int argc, char **argv){
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
   if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
   if(fileToVector(root + "surface.txt", surfaces)) return 1;
-
   if(fileToValue(root + "n_tot.txt", nTot)) return 1;
   if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
   if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
@@ -104,6 +139,9 @@ int main(int argc, char **argv){
   if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
   if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
+
+  // Set/Test device to run experiment
+  getCorrectDevice(1);
 
   // Fill mesh 
   Mesh hMesh;
@@ -142,36 +180,6 @@ int main(int argc, char **argv){
   for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0){
-	// threads and blocks will be set in the following function (by reference)
-	runtime = calcDndtAse(
-			ase,
-			threads, 
-			blocks, 
-			raysPerSample,
-			betaValues,
-			xOfNormals,
-			yOfNormals,
-			triangleIndices,
-			forbidden,
-			neighbors,
-			positionsOfNormalVectors,
-			points,
-			betaCells,
-			surfaces,
-			xOfTriangleCenter,
-			yOfTriangleCenter,
-			nTot,
-			sigmaA,
-			sigmaE,
-			numberOfPoints,
-			numberOfTriangles,
-			numberOfLevels,
-			thicknessOfPrism,
-			crystalFluorescence);
-	strcpy(runmode, "Ray Propagation GPU");
-	break;
-      }
-      else if(strstr(argv[i], "2") != 0){
 	// threads and blocks will be set in the following function (by reference)
 	runtime = calcDndtAseNew(threads, 
 				 blocks, 

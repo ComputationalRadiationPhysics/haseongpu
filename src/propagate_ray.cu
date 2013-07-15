@@ -158,7 +158,7 @@ __host__ __device__ int getNextForbiddenEdge(Triangle triangle, int edge){
 
 }
 
-__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness){
+__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, const double sigmaA, const double sigmaE, const double nTot, const double thickness){
   double distanceTotal = ray.length;
   double distanceRemaining = distanceTotal;
   double length = 0;
@@ -173,8 +173,6 @@ __host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangl
   unsigned debugLoopCount = 0;
   
   while(fabs(distanceRemaining) > SMALL){
-
-    // NOTICE was failure in surface intersection
     // DEBUG
     //    printf("\nC Calc next triangle, distanceRemaining: %f nextForbiddenEdge: %d nextLevel: %d\n", distanceRemaining, nextForbiddenEdge, nextLevel);
     //    printf("C nextRay : POS(%f,%f,%f) VEC(%f, %f, %f)\n", nextRay.p.x, nextRay.p.y, nextRay.p.z, nextRay.dir.x, nextRay.dir.y, nextRay.dir.z);

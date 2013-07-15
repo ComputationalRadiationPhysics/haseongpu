@@ -18,41 +18,6 @@
 #include <mesh.h>
 
 #define SEED 1234
-#define MIN_COMPUTE_CAPABILITY 2
-
-
-/** Queries the devices to find the one with the highest Compute Capability
- * and sets it as our current device. 
- * Will result in a visible error and terminate program execution, 
- * if no suitable device is detected
- */
-int getCorrectDevice(int verbose){
-  int count = 0, candidate = -1;
-  int minCapability = MIN_COMPUTE_CAPABILITY;
-  cudaDeviceProp prop;
-
-  CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
-  
-  for(int i=0; i<count; ++i){
-    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
-    if(prop.major >= minCapability){
-      minCapability = prop.major;
-      candidate = i;
-    }
-  }
-
-  if(candidate == -1){
-    fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
-    exit(1);
-  }else{
-    if(verbose > 0){
-      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, candidate) );
-      fprintf(stderr,"\nC using CUDA device: %s (Compute Capability %d.%d)\n", prop.name, prop.major, prop.minor); 
-    }
-    CUDA_CHECK_RETURN( cudaSetDevice(candidate) );
-  }
-  return candidate;
-}
 
 float calcDndtAseNew (unsigned &threads, 
 		      unsigned &blocks, 
@@ -65,7 +30,6 @@ float calcDndtAseNew (unsigned &threads,
 		      float sigmaE,
 		      float crystalFluorescence,
 		      std::vector<double> *dndtAse){
-
 
   // Variable declaration
   // CPU
@@ -90,10 +54,10 @@ float calcDndtAseNew (unsigned &threads,
   threads = 256; 
   blocks = 200;
 
-  hostPhiAse          = (float*)    malloc(hostMesh.numberOfSamples * sizeof(float));
-  hostImportance      = (double*)   malloc(hostMesh.numberOfPrisms  * sizeof(double));
-  hostRaysPerPrism    = (unsigned*) malloc(hostMesh.numberOfPrisms  * sizeof(unsigned));
-  hostIndicesOfPrisms = (unsigned*) malloc(hostRaysPerSample        * sizeof(unsigned));
+  hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * sizeof(float));
+  hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * sizeof(double));
+  hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * sizeof(unsigned));
+  hostIndicesOfPrisms = (unsigned*) malloc (hostRaysPerSample        * sizeof(unsigned));
   runtimeGpu = 0.0;
 
   for(unsigned i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
@@ -101,8 +65,6 @@ float calcDndtAseNew (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
 
-  // check, if we run on the correct machine / select a good device
-  //getCorrectDevice(1);
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
@@ -126,12 +88,10 @@ float calcDndtAseNew (unsigned &threads,
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
-  //for(unsigned sample_i = 0; sample_i < 1; ++sample_i){
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-    if(sample_i % 20 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
+    if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
     Point sample  = hostMesh.samples[sample_i];
 
-    //importanceSamplingNew(sample, hostMesh, hostRaysPerSample, sigmaA, sigmaE, nTot, hostImportance, hostRaysPerPrism);
     importanceSamplingGPU(sample,hostMesh,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,raysDump,threads,blocks);
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
@@ -145,18 +105,11 @@ float calcDndtAseNew (unsigned &threads,
     }
 
     // Copy dynamic sample date to device
-    //CUDA_CHECK_RETURN(cudaMemcpy(importance, hostImportance, hostMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
-    //CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAseTmp, sizeof(float), cudaMemcpyHostToDevice));
 
     // Start Kernel
     calcSamplePhiAseNew<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
 
-    // Copy back phiAse
-    // CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseTmp, phiAse, sizeof(float), cudaMemcpyDeviceToHost));
-    // hostPhiAse[sample_i] = *hostPhiAseTmp;
-    // *hostPhiAseTmp = 0;
-  
   }
   // Copy solution back to host
   CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAse, phiAse, hostMesh.numberOfSamples * sizeof(float), cudaMemcpyDeviceToHost));
@@ -259,9 +212,6 @@ float calcDndtAse(
   hostNumberOfImportantRays = (unsigned*) malloc(hostNumberOfPrisms * sizeof(unsigned));
   hostIndicesOfPrisms = (int*) malloc(hostRaysPerSampleMax * sizeof(int));
 
-  // check, if we run on the correct machine / select a good device
-  getCorrectDevice(1);
-
   runtimeGpu = 0.0;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
@@ -270,7 +220,6 @@ float calcDndtAse(
   for(unsigned i=0; i < hostNumberOfSamples; ++i) hostPhiASE[i] = 0.f;
   for(unsigned i=0; i < hostNumberOfPrisms; ++i) hostNumberOfImportantRays[i] = 1;
   for(unsigned i=0; i < hostNumberOfPrisms; ++i)hostImportance[i] = 1.0;
-
 
   CUDA_CHECK_RETURN(cudaEventRecord(start, 0));
 

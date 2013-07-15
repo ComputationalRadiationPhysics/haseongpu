@@ -54,7 +54,7 @@ __global__ void calcSamplePhiAseNew(curandStateMtgp32* globalState, Point sample
 	  Ray ray = generateRay(startPoint, samplePoint);
 
   	  // // propagate the ray
-	  double gain = propagateRayNew(ray, startLevel, startTriangle, triangles, sigmaA, sigmaE, nTot, mesh.thickness );
+	  double gain = propagateRayNew(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
 
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];

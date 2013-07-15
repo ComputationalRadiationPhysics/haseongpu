@@ -3,7 +3,7 @@
 
 #include <mesh.h>
 
-__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, Triangle *triangles, const double sigmaA, const double sigmaE, const double nTot, const double thickness);
+__host__ __device__ double propagateRayNew(Ray ray, unsigned startLevel, Triangle startTriangle, const double sigmaA, const double sigmaE, const double nTot, const double thickness);
 
 __host__ __device__ double propagateRay(
 		double xPos,
