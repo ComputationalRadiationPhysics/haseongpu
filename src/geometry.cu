@@ -28,10 +28,11 @@ __host__ __device__ Ray generateRay(Point startPoint, Point endPoint){
 
 }
 
-__host__ __device__ Ray normalizeRay(Ray ray, double distance){
-  ray.dir.x = ray.dir.x / distance;
-  ray.dir.y = ray.dir.y / distance;
-  ray.dir.z = ray.dir.z / distance;
+__host__ __device__ Ray normalizeRay(Ray ray){
+  ray.dir.x = ray.dir.x / ray.length;
+  ray.dir.y = ray.dir.y / ray.length;
+  ray.dir.z = ray.dir.z / ray.length;
+  ray.length = 1;
 
   return ray;
 }

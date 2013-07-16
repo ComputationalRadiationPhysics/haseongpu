@@ -6,7 +6,7 @@ DATE="`date +%y%m%d%H%M%S`"
 
 # compiler, linker, archiver
 NVCC = nvcc
-NVCC_FLAGS = --use_fast_math
+NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 #NVCC_FLAGS = --use_fast_math --include-path include
 #ARCH = -arch=sm_20

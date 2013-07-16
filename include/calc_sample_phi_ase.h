@@ -6,13 +6,13 @@
 #include <mesh.h>
 
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
-				    Point samplePoint, 
-				    Mesh mesh,
-				    unsigned* indicesOfPrisms, 
-				    double* importance,
-				    unsigned raysPerSample, 
+				    const Point samplePoint, 
+				    const Mesh mesh,
+				    const unsigned* indicesOfPrisms, 
+				    const double* importance,
+				    const unsigned raysPerSample, 
 				    float *phiAse,
-				    unsigned sample_i,
+				    const unsigned sample_i,
 				    const double sigmaA,
 				    const double sigmaE,
 				    const double nTot);
