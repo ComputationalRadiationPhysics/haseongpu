@@ -8,7 +8,7 @@
 __host__ __device__ Vector direction(Point startPoint, Point endPoint);
 __host__ __device__ float distance(Point startPoint, Point endPoint);
 __host__ __device__ Ray generateRay(Point startPoint, Point endPoint);
-__host__ __device__ Ray normalizeRay(Ray ray, double distance);
+__host__ __device__ Ray normalizeRay(Ray ray);
 
 // Old functions
 __device__ float    collide_prism_gpu(PrismCu pr, RayCu r, VectorCu rayDirection, double absRayDistance);

@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -q k20f
+#PBS -q k20
 #PBS -l nodes=1:ppn=2
 #PBS -l walltime=3:30:00
 #PBS -N octrace
@@ -16,8 +16,8 @@ cd ~/octrace
 
 make
 
-MODE="for_loops"
-RAYS=1000000
+MODE="ray_propagation_gpu"
+RAYS=10000000
 echo "RAYS: $RAYS"
 echo "MODE: $MODE"
 

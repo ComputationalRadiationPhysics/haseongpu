@@ -101,6 +101,7 @@ float calcDndtAse (unsigned &threads,
         assert(absoluteRay <= hostRaysPerSample);
       }
     }
+
     // Copy dynamic sample data to device
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
@@ -125,7 +126,18 @@ float calcDndtAse (unsigned &threads,
   }
 
   // Free Memory
+  free(hostPhiAse);
+  free(hostImportance);
+  free(hostRaysPerPrism);
+  free(hostIndicesOfPrisms);
+  cudaFree(phiAse);
+  cudaFree(importance);
+  cudaFree(indicesOfPrisms);
+  cudaFree(raysPerPrism);
+  cudaFree(sumPhi);
+  cudaFree(raysDump);
   cudaDeviceReset();
+
   return runtimeGpu;
 
 }

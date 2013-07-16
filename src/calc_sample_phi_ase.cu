@@ -3,10 +3,6 @@
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
 
-
-// ##############################################################
-// # Reconstruction                                             #
-// ##############################################################
 __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
   Point startPoint = {0,0,0};
   double u = curand_uniform(&globalState[blockIdx.x]);
@@ -30,44 +26,38 @@ __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thi
 
 __global__ void calcSamplePhiAse(
 		curandStateMtgp32* globalState,
-		Point samplePoint,
-		Mesh mesh, 
-		unsigned* indicesOfPrisms, 
-		double* importance,
-		unsigned raysPerSample, 
+		const Point samplePoint,
+		const Mesh mesh, 
+		const unsigned* indicesOfPrisms, 
+		const double* importance,
+		const unsigned raysPerSample, 
 		float *phiAse, 
 		const unsigned sample_i,
 		const double sigmaA, 
 		const double sigmaE, 
 		const double nTot) {
 
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  Triangle *triangles = mesh.triangles;
-  unsigned numberOfTriangles = mesh.numberOfTriangles;
+  // Get global ID
+  int gid = threadIdx.x + blockIdx.x * blockDim.x;
+  int rayNumber = 0;
+  unsigned stride = 0;
 
   __shared__ double threadGain[256]; //MUST be the same as number of threads
   threadGain[threadIdx.x] = 0.;
 
   // One thread can compute multiple rays
-  int rayNumber;
-  unsigned i=0;
-  // the current ray which we compute is based on the id and an offset (number of threads*blocks)
-  while ((rayNumber = id + (blockDim.x*gridDim.x * i++)) < raysPerSample) {
-
+  // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
+  while ((rayNumber = gid + stride) < raysPerSample) {
+          stride += blockDim.x * gridDim.x;
   	  // Get triangle prism to start from
   	  int startPrism = indicesOfPrisms[rayNumber];
-  	  int startLevel = startPrism/numberOfTriangles;
-  	  int startTriangle_i = startPrism - (numberOfTriangles * startLevel);
-  	  Triangle startTriangle = triangles[startTriangle_i];
+  	  int startLevel = startPrism/mesh.numberOfTriangles;
+  	  int startTriangle_i = startPrism - (mesh.numberOfTriangles * startLevel);
+  	  Triangle startTriangle = mesh.triangles[startTriangle_i];
 
-  	  // Random startpoint generation
 	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, mesh.thickness, globalState);
-
-	  // Ray generation
-	  Ray ray = generateRay(startPoint, samplePoint);
-
-  	  // // propagate the ray
-	  double gain = propagateRay(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
+	  Ray ray          = generateRay(startPoint, samplePoint);
+	  double gain      = propagateRay(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
 
 	  gain *= startTriangle.betaValues[startLevel];
 	  gain *= importance[startPrism];
@@ -75,10 +65,9 @@ __global__ void calcSamplePhiAse(
 	  threadGain[threadIdx.x] += gain;
   }
 
-  // reduce the shared memory to one element (CUDA by Example, Chapter 5.3)
+  // Reduce the threadGain array (CUDA by Example, Chapter 5.3)  
   __syncthreads();
-  
-  i = blockDim.x/2;
+  unsigned i = blockDim.x/2;
   while(i != 0){
 	  if(threadIdx.x < i){
 		  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
