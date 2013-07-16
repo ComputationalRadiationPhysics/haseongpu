@@ -52,8 +52,8 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
     }
   }
 
-  cudaMalloc((void**) &dMesh->samples, numberOfPoints*sizeof(points));
-  cudaMemcpy(dMesh->samples, hMesh->samples, numberOfPoints*sizeof(points), cudaMemcpyHostToDevice);
+  cudaMalloc((void**) &dMesh->samples, numberOfPoints*numberOfLevels*sizeof(TwoDimPoint));
+  cudaMemcpy(dMesh->samples, hMesh->samples, numberOfPoints*numberOfLevels*sizeof(TwoDimPoint), cudaMemcpyHostToDevice);
 
   hMesh->triangles = new Triangle[numberOfTriangles];
   Triangle *trianglesForDevice = new Triangle[numberOfTriangles];
