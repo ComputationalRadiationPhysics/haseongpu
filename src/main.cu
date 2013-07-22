@@ -12,7 +12,8 @@
 #include <cudachecks.h>
 #include <mesh.h>
 
-#define MIN_COMPUTE_CAPABILITY 2
+#define MIN_COMPUTE_CAPABILITY_MAJOR 2
+#define MIN_COMPUTE_CAPABILITY_MINOR 0
 
 /** 
  * @brief Queries the devices to find the one with the highest Compute Capability
@@ -20,32 +21,46 @@
  *        Will result in a visible error and terminate program execution, 
  *        if no suitable device is detected
  */
-int getCorrectDevice(int verbose){
-  int count = 0, candidate = -1;
-  int minCapability = MIN_COMPUTE_CAPABILITY;
+unsigned getCorrectDevice(int verbose,unsigned **devices){
+  int count = 0, candidate = 0;
+  unsigned correctDevices = 0;
   cudaDeviceProp prop;
+  int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
+  int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
 
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
   
   for(int i=0; i<count; ++i){
-    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
-    if(prop.major >= minCapability){
-      minCapability = prop.major;
-      candidate = i;
-    }
+	  CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
+	  if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
+		  correctDevices++;
+	  }
   }
 
-  if(candidate == -1){
+  if(correctDevices == 0){
     fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
     exit(1);
-  }else{
-    if(verbose > 0){
-      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, candidate) );
-      fprintf(stderr,"\nC using CUDA device: %s (Compute Capability %d.%d)\n", prop.name, prop.major, prop.minor); 
-    }
-    CUDA_CHECK_RETURN( cudaSetDevice(candidate) );
   }
-  return candidate;
+
+  (*devices) = (unsigned*) malloc(sizeof(unsigned) * correctDevices);
+
+  if(verbose > 0){
+	  fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", correctDevices, minMajor,minMinor); 
+  }
+
+  candidate = 0;
+  for(int i=0; i<count; ++i){
+    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
+    if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
+		if(verbose > 0){
+			fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", candidate, prop.name, prop.major, prop.minor); 
+		}
+		(*devices)[candidate]=i;
+		candidate++;
+    }
+  }
+  CUDA_CHECK_RETURN( cudaSetDevice((*devices)[0]) );
+  return correctDevices;
 }
 
 int main(int argc, char **argv){
@@ -56,6 +71,8 @@ int main(int argc, char **argv){
   unsigned blocks = 0;
   unsigned threads = 0;
   bool silent = false;
+  unsigned *devices; // will be assigned in getCOrrectDevice();
+  unsigned numberOfDevices=0;
   
   // Experimentdata
   std::vector<double> * betaValues = new std::vector<double>;
@@ -141,12 +158,15 @@ int main(int argc, char **argv){
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
 
   // Set/Test device to run experiment
-  getCorrectDevice(1);
+  numberOfDevices = getCorrectDevice(1,&devices);
 
   // Fill mesh 
   Mesh hMesh;
-  Mesh dMesh;
-  Mesh::parse(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
+  Mesh *dMesh = new Mesh[numberOfDevices];
+//  Mesh::parse(&hMesh, &(dMesh[0]), triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
+
+  Mesh::parseMultiGPU(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces,numberOfDevices,devices);
+
 
   // Debug
   // fprintf(stderr, "C nTot: %e\n", nTot);
@@ -181,17 +201,19 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0){
 	// threads and blocks will be set in the following function (by reference)
+	CUDA_CHECK_RETURN(cudaSetDevice(devices[0]));
 	runtime = calcDndtAse(threads, 
 				 blocks, 
 				 raysPerSample,
-				 dMesh,
+				 dMesh[0],
 				 hMesh,
 				 betaCells,
 				 nTot,
 				 sigmaA,
 				 sigmaE,
 				 crystalFluorescence,
-				 ase);
+				 ase
+				 );
 	strcpy(runmode, "Ray Propagation New GPU");
 	break;
       }
