@@ -1,0 +1,47 @@
+für Multi-GPU:
+
+- calc_dndt_ase bekommt numberOfDevices (teilt die samples intern auf alle Devices auf)
+  - parsing legt für jedes Device alle daten an
+  - calc_dndt_ase legt alle nötigen datenfelder für jedes device auf einem Node selbst an
+  - calc_dndt_ase kombiniert die ASE-werte aller devices auf einem node
+
+- mehrere Wellenlängen durch mehr Nodes (über MPI)
+  - jeweils daten auf allen Nodes mittels MPI anlegen/parsen
+  - ASE-Ergebnisse mittels MPI wieder (gewichtet) kombinieren
+  - für jede Wellenlänge ein Node!
+  - evtl logik, um mehrere Wellenlängen nacheinander auf einem Node laufen zu lassen
+
+
+- reflexionen im importance-sampling bzw im calc_sample_phi_ase kernel ist dann unabhängig von GPU-Zahl
+
+
+
+für Matlab-connector
+
+- erster ansatz:
+  - schreiben der .txt-dateien durch matlab
+  - parsen der .txt-dateien mit octrace
+  - rückschreiben der ergebnisse als .txt
+  - matlab parst die .txt-dateien wieder
+  - pro:
+      - derzeit einfacher, mehr "basic"
+      - evtl flexibler (octave!)
+      - evtl getrennte ausführung von matlab-code und octrace-code auf cluster möglich
+  - contra: 
+      - fehleranfällig wegen den pfaden, 
+      - viele kleine dateien, 
+      - statische dateinamen im code
+
+- verbesserter(?) ansatz:
+  - octrace-software als library sehen
+  - connector-funktion in c, die mex-funktionen aufruft und ergebnisse an octrace übergibt
+  - rückwärts ähnlich
+  - pro: 
+      - mex-funktionen vmtl direkt aus Daniels Code nutzbar
+      - schönes interface, lässt sich schneller anpassen
+      - parsing wird simpler
+      - evtl etwas schneller
+      - weniger fehleranfällig
+  - contra: 
+      - läuft noch nicht
+      - schwieriger zu installieren (unterschiedlich compilieren!)
