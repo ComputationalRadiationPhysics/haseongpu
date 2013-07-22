@@ -24,9 +24,9 @@ FILE="$(echo $INPUT | grep -o -e '/.*.mat' | cut -c 2-)"
 rm -f ${FOLDER}*.txt
 rm -f ${FOLDER}raw_input.zip
 
-module load analysis/matlab/2012a
-#octave --silent --eval "parse_mat('$FOLDER','$FILE')" 1>/dev/null
-matlab -nodesktop -nosplash -nojvm -r "parse_mat('$FOLDER','$FILE');quit;" 2>&1 1>/dev/null 
+#module load analysis/matlab/2012a
+octave --silent --eval "parse_mat('$FOLDER','$FILE')" 1>/dev/null
+#matlab -nodesktop -nosplash -nojvm -r "parse_mat('$FOLDER','$FILE');quit;" 2>&1 1>/dev/null 
 
 cd $FOLDER
 zip raw_input.zip *.txt 1>/dev/null
