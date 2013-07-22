@@ -8,6 +8,7 @@
 #include <calc_dndt_ase.h>
 #include <parser.h>
 #include <write_to_vtk.h>
+#include <write_dndt_ase.h>
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
@@ -276,6 +277,8 @@ int main(int argc, char **argv){
 
   // Write experiment data to vtk
   writeToVtk(points, numberOfPoints, triangleIndices, numberOfTriangles, numberOfLevels, thicknessOfPrism, ase);
+  writeDndtAse(ase);
+  
 
   return 0;
 }

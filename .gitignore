@@ -23,3 +23,4 @@ octrace.e*
 octrace.o*
 utils/testdata_2/*.txt
 *.vtk
+dndt_ASE.txt
