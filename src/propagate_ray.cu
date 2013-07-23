@@ -104,7 +104,7 @@ __host__ __device__ void updateFromEdge(Triangle *triangle, int *forbiddenEdge, 
    case 4:
      // Lower surface
      *forbiddenEdge = 3;
-     (*level--);
+     (*level)--;
      break;
 
   }
