@@ -13,15 +13,6 @@ struct TwoDimPoint {
 
 typedef TwoDimPoint TwoDimDir;
 
-struct NormalRay {
-  TwoDimPoint p;
-  TwoDimDir dir;
-
-  __host__ __device__ double length();
-  __host__ __device__ void normalize();
-};
-
-
 struct Point {
   double x;
   double y;
@@ -41,33 +32,12 @@ struct Ray {
   
 };
 
-
-struct Triangle;
-
-/**
- * @brief One of the 3 sides of a triangle
- **/
-struct Edge {
-  NormalRay normal;
-  Triangle *neighbor;
-  int forbidden;
-};
+struct NormalRay {
+  TwoDimPoint p;
+  TwoDimDir dir;
+}
 
 
-/**
- * @brief A triangle of the meshed structure
- *
- **/
-struct Triangle {
-  TwoDimPoint A;
-  TwoDimPoint B;
-  TwoDimPoint C;
-
-  double *betaValues; // array of betaValues, one for each prism/level above the triangle
-  Edge edges[3]; // edges of the triangle size: 3
-  TwoDimPoint center;
-  float surface;
-};
 
 /**
  * @brief Contains the structure of the crystal
@@ -75,17 +45,40 @@ struct Triangle {
  * All the fixed values of how the crystal is meshed
  **/
 struct Mesh {
-  Triangle *triangles;
-  Point *samples;
+
+  // values
+  double *points;
+  double *betaValues;
+  double *normalVec;
+  double *centers;
+  float  *surfaces;
+  int	 *forbidden;
+
+  //indexstructs
+  unsigned *triangles;
+  int *neighbors;
+  unsigned *normalPoint;
+
+
+
+  //constants
+  float surfaceTotal;
+  float thickness;
   unsigned numberOfTriangles;
   unsigned numberOfLevels;
   unsigned numberOfPrisms;
   unsigned numberOfPoints;
   unsigned numberOfSamples;
-  float thickness;
-  float surface;
 
   ~Mesh();
+
+  int getNeighbor(unsigned triangle, int edge);
+  Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState);
+  double getBetaValue(unsigned triangle, unsigned level);
+  double getBetaValue(unsigned prism);
+  NormalRay getNormal(unsigned triangle, int edge);
+  Point getSamplePoint(unsigned sample);
+
 
   static void parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
 
