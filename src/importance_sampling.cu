@@ -39,7 +39,7 @@ __global__ void propagateFromTriangleCenter(
   }
   int level_i = startPrism/(mesh->numberOfTriangles);
   unsigned triangle_i = startPrism - (mesh->numberOfTriangles * level_i);
-  Point startPoint = mesh->getCenterPoint(triangle_i);
+  Point startPoint = mesh->getCenterPoint(triangle_i, level_i);
   Point samplePoint = mesh->getSamplePoint(sample_i);
 
   ray = generateRay(startPoint, samplePoint);

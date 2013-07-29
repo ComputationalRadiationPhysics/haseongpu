@@ -55,7 +55,7 @@ __global__ void calcSamplePhiAse(
 
   __shared__ double threadGain[256]; //MUST be the same as number of threads
   threadGain[threadIdx.x] = 0.;
-  const Point samplePoint = mesh.getSamplePoint(sample_i);
+  Point samplePoint = mesh.getSamplePoint(sample_i);
 
   // One thread can compute multiple rays
   // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
