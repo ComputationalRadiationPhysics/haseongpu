@@ -77,7 +77,7 @@ float calcDndtAse (unsigned &threads,
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism,hostMesh.numberOfPrisms * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
 
@@ -89,9 +89,8 @@ float calcDndtAse (unsigned &threads,
   cudaEventRecord(start, 0);
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
-    Point sample  = hostMesh.samples[sample_i];
 
-    importanceSampling(sample,mesh,hostRaysPerSample,sigmaA,sigmaE,nTot,importance,sumPhi,raysPerPrism,indicesOfPrisms,raysDump,threads,blocks);
+    importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, threads, blocks);
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 
     // Prism scheduling for gpu threads
@@ -106,7 +105,7 @@ float calcDndtAse (unsigned &threads,
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
     // Start Kernel
-    calcSamplePhiAse<<< blocks, threads >>>(devMTGPStates, sample, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
+    calcSamplePhiAse<<< blocks, threads >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
 
   }
   // Copy solution back to host

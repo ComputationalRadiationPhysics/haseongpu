@@ -2,16 +2,6 @@
 #include <stdio.h>
 #include <cudachecks.h>
 
-double NormalRay::length() {
-  return sqrt(dir.x*dir.x + dir.y*dir.y);
-}
-
-void NormalRay::normalize() {
-  double l = length();
-  p.x = p.x/l;
-  p.y = p.y/l;
-}
-
 /**
  * @brief converts a vector of points into a vector of TwoDimPoint
  *

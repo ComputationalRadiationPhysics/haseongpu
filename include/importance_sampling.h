@@ -35,18 +35,18 @@
  * @return the number of rays which are used for one sample point
  */
 unsigned importanceSampling(
-    Point samplePoint, 
-    Mesh deviceMesh,
-    unsigned raysPerSample, 
-    double sigmaA, 
-    double sigmaE, 
-    double nTot,  
-    double *importance, 
-    float *sumPhi,
-    unsigned *raysPerPrism,
-    unsigned *indicesOfPrisms,
-    unsigned *raysDump,
-    int threads,
-    int blocks);
+			    unsigned sample_i,
+			    Mesh deviceMesh,
+			    unsigned raysPerSample, 
+			    double sigmaA, 
+			    double sigmaE, 
+			    double nTot,  
+			    double *importance, 
+			    float *sumPhi,
+			    unsigned *raysPerPrism,
+			    unsigned *indicesOfPrisms,
+			    unsigned *raysDump,
+			    int threads,
+			    int blocks);
 
 #endif /* importance_sampling_H */

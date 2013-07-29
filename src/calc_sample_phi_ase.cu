@@ -1,4 +1,4 @@
-#include <curand_kernel.h> /* curand_uniform */
+
 #include <mesh.h>
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
@@ -15,31 +15,30 @@
  *
  * @return point is a random point inside a prism
  **/
-__device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
-  Point startPoint = {0,0,0};
-  double u = curand_uniform(&globalState[blockIdx.x]);
-  double v = curand_uniform(&globalState[blockIdx.x]);
+// __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
+//   Point startPoint = {0,0,0};
+//   double u = curand_uniform(&globalState[blockIdx.x]);
+//   double v = curand_uniform(&globalState[blockIdx.x]);
 
-  if((u+v)>1)
-    {
-      u = 1-u;
-      v = 1-v;
-    }
-  double w = 1-u-v;
+//   if((u+v)>1)
+//     {
+//       u = 1-u;
+//       v = 1-v;
+//     }
+//   double w = 1-u-v;
 
-  // convert the random startpoint into coordinates
-  startPoint.x = (triangle.A.x * u) + (triangle.B.x * v) + (triangle.C.x * w);
-  startPoint.y = (triangle.A.y * u) + (triangle.B.y * v) + (triangle.C.y * w);
-  startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
+//   // convert the random startpoint into coordinates
+//   startPoint.x = (triangle.A.x * u) + (triangle.B.x * v) + (triangle.C.x * w);
+//   startPoint.y = (triangle.A.y * u) + (triangle.B.y * v) + (triangle.C.y * w);
+//   startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
 
-  return startPoint;
-}
+//   return startPoint;
+// }
 
 
 __global__ void calcSamplePhiAse(
 		curandStateMtgp32* globalState,
-		const Point samplePoint,
-		const Mesh mesh, 
+		Mesh mesh, 
 		const unsigned* indicesOfPrisms, 
 		const double* importance,
 		const unsigned raysPerSample, 
@@ -56,6 +55,7 @@ __global__ void calcSamplePhiAse(
 
   __shared__ double threadGain[256]; //MUST be the same as number of threads
   threadGain[threadIdx.x] = 0.;
+  const Point samplePoint = mesh.getSamplePoint(sample_i);
 
   // One thread can compute multiple rays
   // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
@@ -64,14 +64,13 @@ __global__ void calcSamplePhiAse(
   	  // Get triangle prism to start from
   	  int startPrism = indicesOfPrisms[rayNumber];
   	  int startLevel = startPrism/mesh.numberOfTriangles;
-  	  int startTriangle_i = startPrism - (mesh.numberOfTriangles * startLevel);
-  	  Triangle startTriangle = mesh.triangles[startTriangle_i];
+  	  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
-	  Point startPoint = calcRndStartPoint(startTriangle, startLevel, mesh.thickness, globalState);
+	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
 	  Ray ray          = generateRay(startPoint, samplePoint);
-	  double gain      = propagateRay(ray, startLevel, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness );
+	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA, sigmaE, nTot, mesh.thickness );
 
-	  gain *= startTriangle.betaValues[startLevel];
+	  gain *= mesh.getBetaValue(startPrism);
 	  gain *= importance[startPrism];
 
 	  threadGain[threadIdx.x] += gain;

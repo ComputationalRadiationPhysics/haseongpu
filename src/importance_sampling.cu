@@ -17,40 +17,36 @@
  *
  */
 __global__ void propagateFromTriangleCenter(
-    Mesh mesh,
-    double *importance,
-    float *sumPhi,
-    Point samplePoint,
-    double sigmaA, 
-    double sigmaE, 
-    double nTot){
+					    Mesh *mesh,
+					    double *importance,
+					    float *sumPhi,
+					    unsigned sample_i,
+					    double sigmaA, 
+					    double sigmaE, 
+					    double nTot){
 
-  Triangle *triangles = mesh.triangles;
+  //Triangle *triangles = mesh.triangles;
   __shared__ double threadPhi[256];
   double gain = 0;
   Ray ray;
-  Point startPoint;
-  Triangle startTriangle;
+  
 
   threadPhi[threadIdx.x] = 0;
 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh.numberOfPrisms){
+  if(startPrism >= mesh->numberOfPrisms){
     return;
   }
-  int level_i = startPrism/(mesh.numberOfTriangles);
-  int triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
-
-  startTriangle = triangles[triangle_i];
-  startPoint.x = startTriangle.center.x;
-  startPoint.y = startTriangle.center.y;
-  startPoint.z = (level_i + 0.5) * mesh.thickness;
+  int level_i = startPrism/(mesh->numberOfTriangles);
+  unsigned triangle_i = startPrism - (mesh->numberOfTriangles * level_i);
+  Point startPoint = mesh->getCenterPoint(triangle_i);
+  Point samplePoint = mesh->getSamplePoint(sample_i);
 
   ray = generateRay(startPoint, samplePoint);
-  gain = propagateRay(ray, level_i, startTriangle, sigmaA, sigmaE, nTot, mesh.thickness);
-  importance[startPrism] = startTriangle.betaValues[level_i] * gain;
+  gain = propagateRay(ray, level_i, triangle_i, mesh, sigmaA, sigmaE, nTot, mesh->thickness);
+  importance[startPrism] = mesh->getBetaValue(triangle_i, level_i) * gain;
 
-  threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh.numberOfTriangles];
+  threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh->numberOfTriangles];
   __syncthreads();
 
   unsigned i = blockDim.x/2;
@@ -74,16 +70,16 @@ __global__ void propagateFromTriangleCenter(
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void distributeRaysByImportance(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    double *importance,
-    float *sumPhi,
-    unsigned raysPerSample,
-    unsigned *raysDump){
+					   Mesh *mesh,
+					   unsigned *raysPerPrism,
+					   double *importance,
+					   float *sumPhi,
+					   unsigned raysPerSample,
+					   unsigned *raysDump){
   __shared__ unsigned raySum[256];
   raySum[threadIdx.x] = 0;
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh.numberOfPrisms) return;
+  if(startPrism >= mesh->numberOfPrisms) return;
   raysPerPrism[startPrism] = (unsigned) floor(importance[startPrism] / (*sumPhi) * raysPerSample);
   raySum[threadIdx.x] = raysPerPrism[startPrism];
   __syncthreads();
@@ -112,10 +108,10 @@ __global__ void distributeRaysByImportance(
  *
  */
 __global__ void distributeRemainingRaysRandomly(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned raysPerSample,
-    unsigned *raysDump){
+						Mesh *mesh,
+						unsigned *raysPerPrism,
+						unsigned raysPerSample,
+						unsigned *raysDump){
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   int raysLeft = raysPerSample-(*raysDump);
@@ -123,9 +119,9 @@ __global__ void distributeRemainingRaysRandomly(
   if(id < raysLeft){
     curandState randomState;
     curand_init(id,0,0,&randomState);
-    int rand_t = (int ) ceil(curand_uniform(&randomState) * mesh.numberOfTriangles) - 1;
-    int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh.numberOfLevels-1)) - 1;
-    atomicAdd(&raysPerPrism[rand_t + rand_z * mesh.numberOfTriangles],1);
+    int rand_t = (int ) ceil(curand_uniform(&randomState) * mesh->numberOfTriangles) - 1;
+    int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh->numberOfLevels-1)) - 1;
+    atomicAdd(&raysPerPrism[rand_t + rand_z * mesh->numberOfTriangles],1);
   }
 }
 
@@ -140,18 +136,18 @@ __global__ void distributeRemainingRaysRandomly(
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void recalculateImportance(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned raysPerSample,
-    double *importance){ 
+				      Mesh *mesh,
+				      unsigned *raysPerPrism,
+				      unsigned raysPerSample,
+				      double *importance){ 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh.numberOfPrisms){
+  if(startPrism >= mesh->numberOfPrisms){
     return;
   }
-  int startLevel = startPrism/(mesh.numberOfTriangles);
-  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
+  int startLevel = startPrism/(mesh->numberOfTriangles);
+  int startTriangle = startPrism - (mesh->numberOfTriangles * startLevel);
   if(raysPerPrism[startPrism] > 0){
-    importance[startPrism] = raysPerSample * mesh.triangles[startTriangle].surface / (mesh.surface * raysPerPrism[startPrism]);
+    importance[startPrism] = raysPerSample * mesh->surfaces[startTriangle] / (mesh->surfaceTotal * raysPerPrism[startPrism]);
   }else{
     importance[startPrism] = 0;
   }
@@ -172,16 +168,16 @@ __global__ void recalculateImportance(
  *
  */
 __global__ void mapRaysToPrism(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned raysPerSample,
-    unsigned *indicesOfPrisms){
+			       Mesh mesh,
+			       unsigned *raysPerPrism,
+			       unsigned raysPerSample,
+			       unsigned *indicesOfPrisms){
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   if(id==0){
     // Prism scheduling for gpu threads
     unsigned absoluteRay = 0;
-    for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
+    for(unsigned prism_i=0; prism_i < mesh->numberOfPrisms; ++prism_i){
       for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i]; ++ray_i){
         indicesOfPrisms[absoluteRay++] = prism_i;
 #if TEST_VALUES==true
@@ -193,19 +189,19 @@ __global__ void mapRaysToPrism(
 }
 
 unsigned importanceSampling(
-    Point samplePoint, 
-    Mesh deviceMesh,
-    unsigned raysPerSample, 
-    double sigmaA, 
-    double sigmaE, 
-    double nTot,  
-    double *importance, 
-    float *sumPhi,
-    unsigned *raysPerPrism,
-    unsigned *indicesOfPrisms,
-    unsigned *raysDump,
-    int threads,
-    int blocks){
+			    unsigned sample_i,
+			    Mesh deviceMesh,
+			    unsigned raysPerSample, 
+			    double sigmaA, 
+			    double sigmaE, 
+			    double nTot,  
+			    double *importance, 
+			    float *sumPhi,
+			    unsigned *raysPerPrism,
+			    unsigned *indicesOfPrisms,
+			    unsigned *raysDump,
+			    int threads,
+			    int blocks){
 
   float *sumPhiHost = (float*) malloc(sizeof(float));
   unsigned *raysDumpHost = (unsigned*) malloc(sizeof(unsigned));
@@ -216,22 +212,22 @@ unsigned importanceSampling(
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  propagateFromTriangleCenter<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
-  distributeRaysByImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
-  distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump);
-  recalculateImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance);
+  propagateFromTriangleCenter<<< blocks,threads >>>(&deviceMesh,importance,sumPhi,sample_i,sigmaA,sigmaE,nTot);
+  distributeRaysByImportance<<< blocks,threads >>>(&deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
+  distributeRemainingRaysRandomly<<< blocks,threads >>>(&deviceMesh,raysPerPrism,raysPerSample,raysDump);
+  recalculateImportance<<< blocks,threads >>>(&deviceMesh,raysPerPrism,raysPerSample,importance);
 
-//  CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
-//
-//    // Prism scheduling for gpu threads
-//  for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
-//    for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
-//      hostIndicesOfPrisms[absoluteRay++] = prism_i;
-//      assert(absoluteRay <= hostRaysPerSample);
-//    }
-//  }
-//  // Copy dynamic sample data to device
-//  CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
+  //  CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
+  //
+  //    // Prism scheduling for gpu threads
+  //  for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
+  //    for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i]; ++ray_i){
+  //      hostIndicesOfPrisms[absoluteRay++] = prism_i;
+  //      assert(absoluteRay <= hostRaysPerSample);
+  //    }
+  //  }
+  //  // Copy dynamic sample data to device
+  //  CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
   return raysPerSample;
 }

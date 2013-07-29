@@ -2,6 +2,7 @@
 #define MESH_H 
 
 #include<vector>
+#include <curand_kernel.h> /* curand_uniform */
 
 #define SMALL 1E-06
 #define VERY_SMALL 0.0
@@ -35,7 +36,7 @@ struct Ray {
 struct NormalRay {
   TwoDimPoint p;
   TwoDimDir dir;
-}
+};
 
 
 
@@ -59,8 +60,6 @@ struct Mesh {
   int *neighbors;
   unsigned *normalPoint;
 
-
-
   //constants
   float surfaceTotal;
   float thickness;
@@ -72,12 +71,13 @@ struct Mesh {
 
   ~Mesh();
 
-  int getNeighbor(unsigned triangle, int edge);
-  Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState);
-  double getBetaValue(unsigned triangle, unsigned level);
-  double getBetaValue(unsigned prism);
-  NormalRay getNormal(unsigned triangle, int edge);
-  Point getSamplePoint(unsigned sample);
+  __device__ int getNeighbor(unsigned triangle, int edge);
+  __device__ Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState);
+  __device__ double getBetaValue(unsigned triangle, unsigned level);
+  __device__ double getBetaValue(unsigned prism);
+  __device__ NormalRay getNormal(unsigned triangle, int edge);
+  __device__ Point getSamplePoint(unsigned sample);
+  __device__ Point getCenterPoint(unsigned triangle);
 
 
   static void parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
