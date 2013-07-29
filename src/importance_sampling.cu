@@ -6,7 +6,17 @@
 #include <curand_kernel.h>
 #include <cudachecks.h>
 
-__global__ void importanceSamplingKernel1(
+/**
+ * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
+ *
+ * @param *importance will contain the initial importance for each prism
+ *
+ * @param *sumPhi will contain the cumulative sum of the importance values
+ *
+ * For other parameters, see documentation of importanceSampling()
+ *
+ */
+__global__ void propagateFromTriangleCenter(
     Mesh mesh,
     double *importance,
     float *sumPhi,
@@ -56,7 +66,14 @@ __global__ void importanceSamplingKernel1(
   }
 }
 
-__global__ void importanceSamplingKernel2(
+/**
+ * @brief uses a given importance distribution to decide how many rays will be launched from each prism
+ *
+ * @param *raysDump will contain the number of rays which were mapped to a specific prism
+ * 
+ * for other parameters, see documentation of importanceSampling()
+ */
+__global__ void distributeRaysByImportance(
     Mesh mesh,
     unsigned *raysPerPrism,
     double *importance,
@@ -84,7 +101,17 @@ __global__ void importanceSamplingKernel2(
   }
 }
 
-__global__ void importanceSamplingKernel3(
+/**
+ * @brief takes a number of rays and distributes them randomly over the available prisms
+ *
+ * @param *raysPerPrism the number of rays for each prism (will be changed)
+ *
+ * @param *raysDump the number of rays which were already distributed
+ *
+ * for other parameters, see documentation of importanceSampling()
+ *
+ */
+__global__ void distributeRemainingRaysRandomly(
     Mesh mesh,
     unsigned *raysPerPrism,
     unsigned raysPerSample,
@@ -102,7 +129,17 @@ __global__ void importanceSamplingKernel3(
   }
 }
 
-__global__ void importanceSamplingKernel4(
+
+/**
+ * @brief corrects the importance to match with the randomly distributed rays
+ *
+ * @param *raysPerPrism the number of rays to be launced for each prism
+ *
+ * @param *importance the importance for each prism (will be changed)
+ *
+ * for other parameters, see documentation of importanceSampling()
+ */
+__global__ void recalculateImportance(
     Mesh mesh,
     unsigned *raysPerPrism,
     unsigned raysPerSample,
@@ -120,10 +157,21 @@ __global__ void importanceSamplingKernel4(
   }
 }
 
+
 // unused, because we didn't find a good way to parallelize it...
 // OPTIMIZE
 // TODO
-__global__ void importanceSamplingKernel5(
+/**
+ * @brief maps every ray to a specific prism
+ *
+ * @param *raysPerPrism the number of rays to launch in each prism
+ *
+ * @param raysPerSample the total number of rays to launch 
+ *
+ * @param *indicesOfPrisms a mapping for each ray to a specific prism
+ *
+ */
+__global__ void mapRaysToPrism(
     Mesh mesh,
     unsigned *raysPerPrism,
     unsigned raysPerSample,
@@ -168,10 +216,10 @@ unsigned importanceSampling(
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  importanceSamplingKernel1<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
-  importanceSamplingKernel2<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
-  importanceSamplingKernel3<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump);
-  importanceSamplingKernel4<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance);
+  propagateFromTriangleCenter<<< blocks,threads >>>(deviceMesh,importance,sumPhi,samplePoint,sigmaA,sigmaE,nTot);
+  distributeRaysByImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
+  distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump);
+  recalculateImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance);
 
 //  CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
 //
@@ -185,6 +233,5 @@ unsigned importanceSampling(
 //  // Copy dynamic sample data to device
 //  CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
-  //return raysDump;  //use this, if we don't use randomly distributed rays (Kernel3)
   return raysPerSample;
 }

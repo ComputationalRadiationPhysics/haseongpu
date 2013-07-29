@@ -21,6 +21,7 @@ struct NormalRay {
   __host__ __device__ void normalize();
 };
 
+
 struct Point {
   double x;
   double y;
@@ -30,6 +31,9 @@ struct Point {
 
 typedef Point Vector;
 
+/**
+ * @brief a Ray, defined by a startpoint, direction and length
+ */
 struct Ray {
   Point p;
   Vector dir;
@@ -40,12 +44,20 @@ struct Ray {
 
 struct Triangle;
 
+/**
+ * @brief One of the 3 sides of a triangle
+ **/
 struct Edge {
   NormalRay normal;
   Triangle *neighbor;
   int forbidden;
 };
 
+
+/**
+ * @brief A triangle of the meshed structure
+ *
+ **/
 struct Triangle {
   TwoDimPoint A;
   TwoDimPoint B;
@@ -57,6 +69,11 @@ struct Triangle {
   float surface;
 };
 
+/**
+ * @brief Contains the structure of the crystal
+ *
+ * All the fixed values of how the crystal is meshed
+ **/
 struct Mesh {
   Triangle *triangles;
   Point *samples;

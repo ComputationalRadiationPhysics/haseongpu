@@ -3,6 +3,17 @@
 
 #include <vector>
 
+/**
+ * @brief creates a textfile containing all the dnd_ase values
+ *
+ * @param *ase the values to print
+ *
+ * @author Carlchristian Eckert
+ * @author Erik Zenker
+ * @author Marius Melzer
+ *
+ * @license GPLv3
+ */
 void writeDndtAse(std::vector<double>* ase);
 
 #endif 

@@ -12,6 +12,16 @@ void NormalRay::normalize() {
   p.y = p.y/l;
 }
 
+/**
+ * @brief converts a vector of points into a vector of TwoDimPoint
+ *
+ * @param *points an array of points, containing numPoints x-values, followed by numPoints y-values
+ *
+ * @param numPoints the number of points which are stored
+ *
+ * @return an array of TwoDimPoint with the length numPoints 
+ *
+ */
 TwoDimPoint* parsePoints(std::vector<double> *points, unsigned numPoints) {
   TwoDimPoint *p = new TwoDimPoint[numPoints];
 
@@ -27,6 +37,44 @@ Mesh::~Mesh() {
   if(!triangles) delete triangles;
 }
 
+/**
+ * @brief creates the Mesh datastructures on device and host for the propagation
+ *
+ * @param *hMesh the host mesh
+ *
+ * @param *dMesh the mesh on the device
+ *
+ * @param *triangleIndices indices of the points which form a triangle
+ *
+ * @param numberOfTriangles the number of triangles
+ *
+ * @param numberOfLeves the number of layers of the mesh
+ *
+ * @param numberOfPoints the number of vertices in one layer of the mesh
+ *
+ * @param thicknessOfPrism  the thickness of one layer of the mesh
+ *
+ * @param *pointXY coordinates of the vertices in one layer of the mesh
+ * 
+ * @param *betaValues constant values for each meshed prism
+ *
+ * @param *xOfTriangleCenter the x coordinates of each triangle's center
+ *
+ * @param *yOfTriangleCenter the y coordinates of each triangle's center
+ *
+ * @param *positionsOfNormalVectors indices to the points (pointXY), where the normals xOfNormals,yOfNormals start
+ *
+ * @param *xOfNormals the x components of a normal vector for each of the 3 sides of a triangle
+ *
+ * @param *yOfNormals the y components of a normal vector for each of the 3 sides of a triangle
+ *
+ * @param *forbidden the sides of the triangle from which a ray "entered" the triangle
+ *
+ * @param *neighbors indices to the adjacent triangles in triangleIndices
+ *
+ * @param *surfaces the sizes of the surface of each prism
+ *
+ */
 void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces) {
   hMesh->numberOfTriangles = numberOfTriangles;
   dMesh->numberOfTriangles = numberOfTriangles;
@@ -106,6 +154,11 @@ void Mesh::parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndice
   cudaMemcpy(dMesh->triangles, trianglesForDevice, numberOfTriangles*sizeof(Triangle), cudaMemcpyHostToDevice);
 }
 
+/**
+ * @brief fills the host mesh with the correct datastructures
+ *
+ * See parseMultiGPU for details on the parameters
+ */
 void fillHMesh(
     Mesh *hMesh,
     std::vector<unsigned> *triangleIndices, 
@@ -178,6 +231,13 @@ void fillHMesh(
   }
   hMesh->surface = totalSurface;
 }
+
+
+/**
+ * @brief fills a device mesh with the correct datastructures
+ *
+ * See parseMultiGPU for details on the parameters
+ */
 void fillDMesh(
     Mesh *hMesh,
     Mesh *dMesh, 
@@ -248,6 +308,48 @@ void fillDMesh(
 
 }
 
+/**
+ * @brief creates the Mesh datastructures on the host and on all possible devices for the propagation
+ *
+ * @param *hMesh the host mesh
+ *
+ * @param **dMesh an array of device meshes (one for each device) 
+ *
+ * @param *triangleIndices indices of the points which form a triangle
+ *
+ * @param numberOfTriangles the number of triangles
+ *
+ * @param numberOfLeves the number of layers of the mesh
+ *
+ * @param numberOfPoints the number of vertices in one layer of the mesh
+ *
+ * @param thicknessOfPrism  the thickness of one layer of the mesh
+ *
+ * @param *pointXY coordinates of the vertices in one layer of the mesh
+ * 
+ * @param *betaValues constant values for each meshed prism
+ *
+ * @param *xOfTriangleCenter the x coordinates of each triangle's center
+ *
+ * @param *yOfTriangleCenter the y coordinates of each triangle's center
+ *
+ * @param *positionsOfNormalVectors indices to the points (pointXY), where the normals xOfNormals,yOfNormals start
+ *
+ * @param *xOfNormals the x components of a normal vector for each of the 3 sides of a triangle
+ *
+ * @param *yOfNormals the y components of a normal vector for each of the 3 sides of a triangle
+ *
+ * @param *forbidden the sides of the triangle from which a ray "entered" the triangle
+ *
+ * @param *neighbors indices to the adjacent triangles in triangleIndices
+ *
+ * @param *surfaces the sizes of the surface of each prism
+ *
+ * @param numberOfDevices number of devices in *devices
+ *
+ * @param *devices array of device indices for all possible devices 
+ *
+ */
 void Mesh::parseMultiGPU(
     Mesh *hMesh,
     Mesh **dMesh, 

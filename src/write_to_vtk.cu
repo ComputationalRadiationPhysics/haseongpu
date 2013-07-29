@@ -4,6 +4,8 @@
 #include <iomanip> /* std::setprecision() */
 
 
+// TODO change to new mesh datastructures
+
 int writeToVtk(std::vector<double>* points, 
 	       unsigned numberOfPoints,  
 	       std::vector<unsigned>* triangleIndices, 
