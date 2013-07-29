@@ -78,11 +78,30 @@ struct Mesh {
   __device__ NormalRay getNormal(unsigned triangle, int edge);
   __device__ Point getSamplePoint(unsigned sample);
   __device__ Point getCenterPoint(unsigned triangle, unsigned level);
+  __device__ int getForbiddenEdge(unsigned triangle, int edge);
 
 
   static void parse(Mesh *hMesh, Mesh *dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces);
 
-  static void parseMultiGPU(Mesh *hMesh, Mesh **dMesh, std::vector<unsigned> *triangleIndices, unsigned numberOfTriangles, unsigned numberOfLevels, unsigned numberOfPoints, float thicknessOfPrism, std::vector<double> *pointXY, std::vector<double> *betaValues, std::vector<double> *xOfTriangleCenter, std::vector<double> *yOfTriangleCenter, std::vector<int> *positionsOfNormalVectors, std::vector<double> *xOfNormals, std::vector<double> *yOfNormals, std::vector<int> *forbidden, std::vector<int> *neighbors, std::vector<float> *surfaces,unsigned numberOfDevices,unsigned *devices);
+  static void parseMultiGPU(Mesh *hMesh, 
+			    Mesh **dMesh, 
+			    std::vector<unsigned> *triangleIndices, 
+			    unsigned numberOfTriangles, 
+			    unsigned numberOfLevels, 
+			    unsigned numberOfPoints, 
+			    float thicknessOfPrism, 
+			    std::vector<double> *pointXY, 
+			    std::vector<double> *betaValues, 
+			    std::vector<double> *xOfTriangleCenter, 
+			    std::vector<double> *yOfTriangleCenter, 
+			    std::vector<int> *positionsOfNormalVectors, 
+			    std::vector<double> *xOfNormals, 
+			    std::vector<double> *yOfNormals, 
+			    std::vector<int> *forbidden, 
+			    std::vector<int> *neighbors, 
+			    std::vector<float> *surfaces,
+			    unsigned numberOfDevices,
+			    unsigned *devices);
 };
 
 #endif /* MESH_H */

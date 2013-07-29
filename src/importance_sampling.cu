@@ -17,7 +17,7 @@
  *
  */
 __global__ void propagateFromTriangleCenter(
-					    Mesh *mesh,
+					    Mesh mesh,
 					    double *importance,
 					    float *sumPhi,
 					    unsigned sample_i,
@@ -34,19 +34,19 @@ __global__ void propagateFromTriangleCenter(
   threadPhi[threadIdx.x] = 0;
 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh->numberOfPrisms){
+  if(startPrism >= mesh.numberOfPrisms){
     return;
   }
-  int level_i = startPrism/(mesh->numberOfTriangles);
-  unsigned triangle_i = startPrism - (mesh->numberOfTriangles * level_i);
-  Point startPoint = mesh->getCenterPoint(triangle_i, level_i);
-  Point samplePoint = mesh->getSamplePoint(sample_i);
+  int level_i = startPrism/(mesh.numberOfTriangles);
+  unsigned triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
+  Point startPoint = mesh.getCenterPoint(triangle_i, level_i);
+  Point samplePoint = mesh.getSamplePoint(sample_i);
 
   ray = generateRay(startPoint, samplePoint);
-  gain = propagateRay(ray, level_i, triangle_i, mesh, sigmaA, sigmaE, nTot, mesh->thickness);
-  importance[startPrism] = mesh->getBetaValue(triangle_i, level_i) * gain;
+  gain = propagateRay(ray, level_i, triangle_i, &mesh, sigmaA, sigmaE, nTot, mesh.thickness);
+  importance[startPrism] = mesh.getBetaValue(triangle_i, level_i) * gain;
 
-  threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh->numberOfTriangles];
+  threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh.numberOfTriangles];
   __syncthreads();
 
   unsigned i = blockDim.x/2;
@@ -70,7 +70,7 @@ __global__ void propagateFromTriangleCenter(
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void distributeRaysByImportance(
-					   Mesh *mesh,
+					   Mesh mesh,
 					   unsigned *raysPerPrism,
 					   double *importance,
 					   float *sumPhi,
@@ -79,7 +79,7 @@ __global__ void distributeRaysByImportance(
   __shared__ unsigned raySum[256];
   raySum[threadIdx.x] = 0;
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh->numberOfPrisms) return;
+  if(startPrism >= mesh.numberOfPrisms) return;
   raysPerPrism[startPrism] = (unsigned) floor(importance[startPrism] / (*sumPhi) * raysPerSample);
   raySum[threadIdx.x] = raysPerPrism[startPrism];
   __syncthreads();
@@ -108,7 +108,7 @@ __global__ void distributeRaysByImportance(
  *
  */
 __global__ void distributeRemainingRaysRandomly(
-						Mesh *mesh,
+						Mesh mesh,
 						unsigned *raysPerPrism,
 						unsigned raysPerSample,
 						unsigned *raysDump){
@@ -119,9 +119,9 @@ __global__ void distributeRemainingRaysRandomly(
   if(id < raysLeft){
     curandState randomState;
     curand_init(id,0,0,&randomState);
-    int rand_t = (int ) ceil(curand_uniform(&randomState) * mesh->numberOfTriangles) - 1;
-    int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh->numberOfLevels-1)) - 1;
-    atomicAdd(&raysPerPrism[rand_t + rand_z * mesh->numberOfTriangles],1);
+    int rand_t = (int ) ceil(curand_uniform(&randomState) * mesh.numberOfTriangles) - 1;
+    int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh.numberOfLevels-1)) - 1;
+    atomicAdd(&raysPerPrism[rand_t + rand_z * mesh.numberOfTriangles],1);
   }
 }
 
@@ -136,18 +136,18 @@ __global__ void distributeRemainingRaysRandomly(
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void recalculateImportance(
-				      Mesh *mesh,
+				      Mesh mesh,
 				      unsigned *raysPerPrism,
 				      unsigned raysPerSample,
 				      double *importance){ 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  if(startPrism >= mesh->numberOfPrisms){
+  if(startPrism >= mesh.numberOfPrisms){
     return;
   }
-  int startLevel = startPrism/(mesh->numberOfTriangles);
-  int startTriangle = startPrism - (mesh->numberOfTriangles * startLevel);
+  int startLevel = startPrism/(mesh.numberOfTriangles);
+  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
   if(raysPerPrism[startPrism] > 0){
-    importance[startPrism] = raysPerSample * mesh->surfaces[startTriangle] / (mesh->surfaceTotal * raysPerPrism[startPrism]);
+    importance[startPrism] = raysPerSample * mesh.surfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism]);
   }else{
     importance[startPrism] = 0;
   }
@@ -177,7 +177,7 @@ __global__ void mapRaysToPrism(
   if(id==0){
     // Prism scheduling for gpu threads
     unsigned absoluteRay = 0;
-    for(unsigned prism_i=0; prism_i < mesh->numberOfPrisms; ++prism_i){
+    for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
       for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i]; ++ray_i){
         indicesOfPrisms[absoluteRay++] = prism_i;
 #if TEST_VALUES==true
@@ -212,10 +212,10 @@ unsigned importanceSampling(
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  propagateFromTriangleCenter<<< blocks,threads >>>(&deviceMesh,importance,sumPhi,sample_i,sigmaA,sigmaE,nTot);
-  distributeRaysByImportance<<< blocks,threads >>>(&deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump);
-  distributeRemainingRaysRandomly<<< blocks,threads >>>(&deviceMesh,raysPerPrism,raysPerSample,raysDump);
-  recalculateImportance<<< blocks,threads >>>(&deviceMesh,raysPerPrism,raysPerSample,importance);
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< blocks,threads >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA,sigmaE,nTot));
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
+  CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
+  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
 
   //  CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism,raysPerPrism, hostMesh.numberOfPrisms*sizeof(unsigned),cudaMemcpyDeviceToHost));
   //
