@@ -15,6 +15,8 @@
 #include <curand_mtgp32dc_p_11213.h>
 #include <cuda_runtime_api.h>
 #include <mesh.h>
+#include <ctime> /* progressBar */
+#include <progressbar.h> /*progressBar */
 
 #define SEED 1234
 
@@ -87,8 +89,9 @@ float calcDndtAse (unsigned &threads,
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   cudaEventRecord(start, 0);
+  time_t progressStartTime = time(0);
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-    if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
+    //if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
 
     importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, threads, blocks);
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * sizeof(unsigned),cudaMemcpyDeviceToHost));
@@ -106,6 +109,7 @@ float calcDndtAse (unsigned &threads,
 
     // Start Kernel
     calcSamplePhiAse<<< blocks, threads >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
+	fancyProgressBar(sample_i,hostMesh.numberOfSamples,80,progressStartTime);
 
   }
   // Copy solution back to host
