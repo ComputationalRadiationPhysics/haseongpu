@@ -109,7 +109,9 @@ float calcDndtAse (unsigned &threads,
 
     // Start Kernel
     calcSamplePhiAse<<< blocks, threads >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
-	fancyProgressBar(sample_i,hostMesh.numberOfSamples,80,progressStartTime);
+
+    // update progressbar
+	  if(sample_i % 10 ==0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,80,progressStartTime);
 
   }
   // Copy solution back to host

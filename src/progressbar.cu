@@ -14,7 +14,7 @@ void simpleProgressBar(unsigned part, unsigned full){
 	for(int i=0;i< length-(percentage*length) ;i++){
 		printf(" ");
 	}
-	printf("] %d\% (%d/%d)",int(percentage*100),part+1,full);
+	printf("] %d%% (%d/%d)",int(percentage*100),part+1,full);
 	fflush(stdout);
 }
 
@@ -33,6 +33,6 @@ void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t star
 	double timeSpent = difftime(now,starttime);
 	int timeTotal = timeSpent/percentage;
 	int timeRemaining = timeTotal-timeSpent;
-	printf("] %.1f\% (%d/%d) after %ds (%ds total, %ds remaining)",percentage*100,part+1,full,int(timeSpent),timeTotal,timeRemaining);
+	printf("] %.1f%% (%d/%d) after %ds (%ds total, %ds remaining)",percentage*100,part+1,full,int(timeSpent),timeTotal,timeRemaining);
 	fflush(stdout);
 }

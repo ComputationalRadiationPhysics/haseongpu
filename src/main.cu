@@ -258,7 +258,7 @@ int main(int argc, char **argv){
 
   // Print Solution
   unsigned sample_i;
-  fprintf(stderr, "C Solutions\n");
+  fprintf(stderr, "\n\nC Solutions\n");
   for(sample_i = 0; sample_i < ase->size(); ++sample_i){
     fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
   	if(silent){
