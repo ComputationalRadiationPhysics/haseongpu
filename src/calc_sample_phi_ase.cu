@@ -3,6 +3,18 @@
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
 
+/**
+ * @brief Generates a random point inside the given prism (triangle and level).
+ *        For random number generation, the mersenne twister (high periodicity)
+ *        is used.
+ * 
+ * @param globalState State for random number generation (mersenne twister).
+ *                    The state need to be initialized before. See
+ *                    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MTGP/
+ *                    for more information.
+ *
+ * @return point is a random point inside a prism
+ **/
 __device__ Point calcRndStartPoint(Triangle triangle, unsigned level, double thickness, curandStateMtgp32* globalState){
   Point startPoint = {0,0,0};
   double u = curand_uniform(&globalState[blockIdx.x]);

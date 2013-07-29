@@ -17,10 +17,15 @@
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
 
 /** 
- * @brief Queries the devices to find the one with the highest Compute Capability
- *        and sets it as our current device. 
- *        Will result in a visible error and terminate program execution, 
- *        if no suitable device is detected
+ * @brief Queries for devices on the running mashine and collects
+ *        them on the devices array. Set the first device in this 
+ *        array as computaion-device. On Errors the programm will
+ *        be stoped by exit().
+ * 
+ * @param verbose > 0 prints debug output
+ * @param devices Array of possible devices to use
+ * 
+ * @return Number of devices in devices array
  */
 unsigned getCorrectDevice(int verbose,unsigned **devices){
   int count = 0, candidate = 0;

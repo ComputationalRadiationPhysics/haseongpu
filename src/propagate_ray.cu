@@ -4,6 +4,16 @@
 #include <cuda_runtime_api.h>
 #include <stdio.h> /* printf */
 
+/**
+ * @brief Checks a level-plane(currentLevel * thickness) for intersection with an ray (zPos, zVec).
+ *        If the intersection-length is greater then length. 
+ *        Than the intersection-length will be returned. 
+ *        Otherwise 0 will be returned.
+ *
+ * @return intersection-length if intersection-length <= length
+ * @return 0 if intersection-length > length
+ *
+ **/
 __host__ __device__ double checkSurface(const int currentLevel, const double zPos, const double zVec, const double length, const double thickness){
   double denominator = zVec;
   if (denominator != 0.0){
@@ -17,6 +27,15 @@ __host__ __device__ double checkSurface(const int currentLevel, const double zPo
   return 0;
 }
 
+/**
+ * @brief Checks an edges of the given triangle/prism for an intersection
+ *        with ray and calculates the intersection-length. If the intersection-length
+ *        is greater then length. Than the intersection-length will be
+ *        returned. Otherwise 0 will be returned.
+ *
+ * @return intersection-length if intersection-length <= length
+ * @return 0 if intersection-length > length
+ **/
 __host__ __device__ double checkEdge(const Triangle triangle, const int edge, const Ray ray, const double length){
   double denominator = triangle.edges[edge].normal.dir.x * ray.dir.x + triangle.edges[edge].normal.dir.y * ray.dir.y;
   if (denominator != 0.0)
@@ -37,6 +56,13 @@ __host__ __device__ double checkEdge(const Triangle triangle, const int edge, co
   return 0;
 }
 
+/**
+ * @brief Calculates the intersection-length for the propagated ray and
+ *        the current triangle.
+ *
+ * @return edge number of the intesected edge (-1 for no intersection)
+ *
+ **/
 __host__ __device__ int calcTriangleRayIntersection(double *length, const Triangle triangle,  const Ray ray, const unsigned level, const int forbiddenEdge, const double thickness){
   int edge = -1;
   // Check 3 edges of triangle
@@ -70,7 +96,13 @@ __host__ __device__ int calcTriangleRayIntersection(double *length, const Triang
   return edge;
 }
 
-
+/**
+ * @brief This is simple vector calculation. The startpoint
+ *        of ray will be moved by length.
+ * 
+ * @return ray is the ray with moved startpoint
+ *
+ **/
 __host__ __device__ Ray calcNextRay(Ray ray, const double length){
   ray.p.x = ray.p.x + length * ray.dir.x;
   ray.p.y = ray.p.y + length * ray.dir.y;
@@ -80,11 +112,24 @@ __host__ __device__ Ray calcNextRay(Ray ray, const double length){
 
 }
 
+/**
+ * @brief Calculates the gain for the given prism(triangle and level) and 
+ *        the intersection-length of the ray.
+ *
+ * @return gain
+ *
+ **/
 __host__ __device__ double calcPrismGain(const Triangle triangle, const unsigned level, const double length, const double sigmaA, const double sigmaE, const double nTot){
   return (double) exp(nTot * (triangle.betaValues[level] * ( sigmaE + sigmaA ) - sigmaA ) * length);
  
 }
 
+/**
+ * @brief Sets the next triangle, next forbiddenEdge 
+ *        and next level depending on the cutted edge of 
+ *        the current triangle and the propagated ray.
+ *
+ **/
 __host__ __device__ void updateFromEdge(Triangle *triangle, int *forbiddenEdge, unsigned *level, const int edge){
    switch(edge){
    case 0:
