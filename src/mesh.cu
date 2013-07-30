@@ -7,69 +7,10 @@
 #include <mesh.h>
 #include <parser.h>
 
-/**
- * @brief converts a vector of points into a vector of TwoDimPoint
- *
- * @param *points an array of points, containing numPoints x-values, followed by numPoints y-values
- *
- * @param numPoints the number of points which are stored
- *
- * @return an array of TwoDimPoint with the length numPoints 
- *
- */
-TwoDimPoint* parsePoints(std::vector<double> *points, unsigned numPoints) {
-  TwoDimPoint *p = new TwoDimPoint[numPoints];
-
-  for(unsigned i=0; i < numPoints; ++i) {
-    p[i].x = points->at(i);
-    p[i].y = points->at(numPoints + i);
-  }
-
-  return p;
-}
 
 Mesh::~Mesh() {
   if(!triangles) delete triangles;
 }
-
-/**
- * @brief creates the Mesh datastructures on device and host for the propagation
- *
- * @param *hMesh the host mesh
- *
- * @param *dMesh the mesh on the device
- *
- * @param *triangleIndices indices of the points which form a triangle
- *
- * @param numberOfTriangles the number of triangles
- *
- * @param numberOfLeves the number of layers of the mesh
- *
- * @param numberOfPoints the number of vertices in one layer of the mesh
- *
- * @param thicknessOfPrism  the thickness of one layer of the mesh
- *
- * @param *points coordinates of the vertices in one layer of the mesh
- * 
- * @param *betaValues constant values for each meshed prism
- *
- * @param *xOfTriangleCenter the x coordinates of each triangle's center
- *
- * @param *yOfTriangleCenter the y coordinates of each triangle's center
- *
- * @param *positionsOfNormalVectors indices to the points (points), where the normals xOfNormals,yOfNormals start
- *
- * @param *xOfNormals the x components of a normal vector for each of the 3 sides of a triangle
- *
- * @param *yOfNormals the y components of a normal vector for each of the 3 sides of a triangle
- *
- * @param *forbidden the sides of the triangle from which a ray "entered" the triangle
- *
- * @param *neighbors indices to the adjacent triangles in triangleIndices
- *
- * @param *surfaces the sizes of the surface of each prism
- *
- */
 
 /**
  * @brief fills the host mesh with the correct datastructures
@@ -81,7 +22,9 @@ void fillHMesh(
     unsigned numberOfTriangles, 
     unsigned numberOfLevels,
     unsigned numberOfPoints, 
-    float thicknessOfPrism
+    float thicknessOfPrism,
+    std::vector<unsigned> *triangleIndices,
+    std::vector<double> *points
     ) {
 
   hMesh->numberOfTriangles = numberOfTriangles;
@@ -90,6 +33,9 @@ void fillHMesh(
   hMesh->numberOfPoints = numberOfPoints;
   hMesh->numberOfSamples = numberOfPoints * numberOfLevels;
   hMesh->thickness = thicknessOfPrism;
+
+  hMesh->points = &(points->at(0));
+  hMesh->triangles = &(triangleIndices->at(0));
 }
 
 /**
@@ -179,10 +125,33 @@ void fillDMesh(
   
 }
 
+/**
+ * @brief fetch the id of an adjacent triangle
+ *
+ * @param triangle the index of the triangle of which you want the neighbor
+ *
+ * @param edge the side of the triangle, for whih you want the neighbor
+ *
+ * @return the index of the neighbor triangle
+ */
 __device__ int Mesh::getNeighbor(unsigned triangle, int edge){
 	return neighbors[triangle + edge*numberOfTriangles];
 }
 
+/**
+ * @brief generate a random point within a prism
+ *
+ * @param triangle the triangle to describe the desired prism
+ *
+ * @param the level of the desired prism
+ *
+ * @param *globalState a global state for the Mersenne Twister PRNG
+ *
+ * @return random 3D point inside the desired prism
+ *
+ * Uses a Mersenne Twister PRNG and Barycentric coordinates to generate a
+ * random position inside a given triangle in a specific depth
+ */
 __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState){
 	Point startPoint = {0,0,0};
 	double u = curand_uniform(&globalState[blockIdx.x]);
@@ -206,14 +175,40 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
 	return startPoint;
 }
   
+
+/**
+ * @brief get a betaValue for a specific triangle and level
+ *
+ * @param triangle the id of the desired triangle
+ *
+ * @param level the level of the desired prism
+ *
+ * @return a beta value
+ */
 __device__ double Mesh::getBetaValue(unsigned triangle, unsigned level){
 	return betaValues[triangle + level*numberOfTriangles];
 }
 
+/**
+ * @brief get a betaValue for a specific prism
+ *
+ * @param the id of the desired prism
+ *
+ * @return a beta value
+ */
 __device__ double Mesh::getBetaValue(unsigned prism){
 	return betaValues[prism];
 }
 
+/**
+ * @brief generates a normal vector for a given side of a triangle
+ *
+ * @param triangle the desired triangle
+ *
+ * @param the edge (0,1,2) of the triangle
+ *
+ * @return a normal vector with length 1
+ */
 __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
 	NormalRay ray = { {0,0},{0,0}};
 	int offset =  edge*numberOfTriangles + triangle;
@@ -226,6 +221,13 @@ __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
 	return ray;
 }	
 
+/**
+ * @brief genenerates a point with the coordinates of a given vertex
+ *
+ * @param sample the id of the desired samplepoint
+ *
+ * @return the Point with correct 3D coordinates
+ */
 __device__ Point Mesh::getSamplePoint(unsigned sample){
 	Point p = {0,0,0};
 	unsigned level = sample/numberOfPoints;
@@ -236,6 +238,15 @@ __device__ Point Mesh::getSamplePoint(unsigned sample){
 	return p;
 }
 
+/**
+ * @brief get a Point in the center of a prism
+ *
+ * @param triangle the id of the desired triangle
+ *
+ * @param level the level of the desired prism
+ *
+ * @return a point with the coordinates (3D) of the prism center
+ */
 __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
 	Point p = {0,0,(level+0.5)*thickness};
 	p.x = centers[triangle];
@@ -243,12 +254,21 @@ __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
 	return p;
 }
 
+/**
+ * @brief gets the edge-id which will be forbidden
+ *
+ * @param trianle the index of the triangle you are currently in
+ *
+ * @param edge the index of the edge through which you are leaving the triangle
+ *
+ * @return the id of the edge, which will be forbidden in the new triangle
+ *
+ * The forbidden edge corresponds to the edge through which you left the
+ * previous triangle (has a different index in the new triangle)
+ */
 __device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge){
   return forbidden[edge * numberOfTriangles + triangle];
 }
-
-
-
 
 
 /**
@@ -352,7 +372,9 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       numberOfTriangles, 
       numberOfLevels,
       numberOfPoints, 
-      thicknessOfPrism
+      thicknessOfPrism,
+      triangleIndices,
+      points
       );
 
  for( unsigned i=0;i<numberOfDevices;i++){
