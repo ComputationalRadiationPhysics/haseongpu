@@ -3,13 +3,16 @@
 #include <vector> /* vector */
 #include <iomanip> /* std::setprecision() */
 #include <mesh.h>
+#include <cstdlib> /* atof */
+#include <string>
 
 int writeToVtk(Mesh *mesh,
-	       std::vector<double>* ase){
+	       std::vector<double>* ase,
+	       std::string filename){
 
   std::cerr << "C Write experiment data to vtk-file" << std::endl;
   std::ofstream vtkFile;
-  vtkFile.open("octrace.vtk");
+  vtkFile.open(filename.c_str());
 
   // Write header of vtk file
   vtkFile << "# vtk DataFile Version 2.0" << std::endl;
@@ -60,5 +63,65 @@ int writeToVtk(Mesh *mesh,
   
   vtkFile.close();
 
+  return 0;
+}
+
+int compareVtk(std::vector<double> *ase, std::string filename){
+  std::ifstream filestream;
+  std::string line;
+  bool foundLine = false;
+  double value = 0;
+  double diff = 0;
+  unsigned i = 0;
+  double minDiff = 10000; // should be enough
+  double maxDiff = 0;
+  double smallDiff = 0.1;
+
+  // No compare vtk was given
+  if(!filename.compare("")){
+    return 0;
+  }
+
+  filestream.open(filename.c_str(), std::ifstream::in);
+
+  if(filestream.is_open()){
+    while(filestream.good()){
+      std::getline(filestream, line);
+      if(!line.compare("LOOKUP_TABLE default")){ 
+	foundLine = true;
+	std::getline(filestream, line);
+      }
+      if(foundLine){
+	if(i == ase->size())
+	  break;
+	value = (double) atof(line.c_str());
+	diff = abs(ase->at(i) / value - 1) ;
+	ase->at(i) = diff;
+
+	if(diff >= maxDiff)
+	  maxDiff = diff;
+
+	if(diff <= minDiff)
+	  minDiff = diff;
+
+	if(diff >= smallDiff){
+	  std::cerr << "C ASE relative difference[" << i << "]: " << diff << " > " << smallDiff << std::endl;
+	}
+	i++;
+
+      }
+
+    }
+
+  }
+  else{
+    std::cerr << "C Can't open file " << filename << " for comparison" << std::endl;
+    return 1;
+  }
+
+
+  std::cerr << "C ASE max. relative difference: " << maxDiff << std::endl;
+  std::cerr << "C ASE min. relative difference: " << minDiff << std::endl;
+  filestream.close();
   return 0;
 }

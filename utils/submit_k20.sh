@@ -18,10 +18,11 @@ make
 
 MODE="ray_propagation_gpu"
 RAYS=10000000
+COMPARE="octrace_backtotheroot_1M.vtk"
 echo "RAYS: $RAYS"
 echo "MODE: $MODE"
 
 FOLDER="$(pwd)"
 echo "Executing..."
 echo
-time ./bin/octrace --mode=$MODE --rays=$RAYS --experiment="$FOLDER/utils/testdata_2" --silent
+time ./bin/octrace --mode=$MODE --rays=$RAYS --experiment="$FOLDER/utils/testdata_2" --silent --compare="$FOLDER/$COMPARE"

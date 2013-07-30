@@ -72,7 +72,8 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   char runmode[100];
-  char experimentLocation[256];
+  char experimentLocation[256] = "";
+  char compareLocation[256] = "";
   float runtime = 0.0;
   unsigned blocks = 0;
   unsigned threads = 0;
@@ -111,6 +112,13 @@ int main(int argc, char **argv){
       memcpy (experimentLocation, argv[i]+13, strlen(argv[i])-13 );
     } 
   }
+
+  for(int i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--compare=", 9) == 0){
+      memcpy (compareLocation, argv[i]+10, strlen(argv[i])-10 );
+    } 
+  }
+
 
   // Check if we want no output
   for(int i=1; i < argc; ++i){
@@ -234,10 +242,12 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
 
-  // Write experiment data to vtk
-  writeToVtk(&hMesh, ase);
+
+  // Write experiment data
+  writeToVtk(&hMesh, ase, "octrace.vtk");
+  compareVtk(ase, compareLocation);
+  //writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
-  
 
   return 0;
 }
