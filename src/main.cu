@@ -134,14 +134,13 @@ int main(int argc, char **argv){
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
 
-
   // Set/Test device to run experiment
   numberOfDevices = getCorrectDevice(1,&devices);
 
   // Parse experiemntdata and fill mesh 
   Mesh hMesh;
   Mesh *dMesh = new Mesh[numberOfDevices];
-  Mesh::parseMultiGPU(&hMesh, &dMesh, root, numberOfDevices,devices);
+  if(Mesh::parseMultiGPU(&hMesh, &dMesh, root, numberOfDevices, devices)) return 1;
 
   // Debug
   // fprintf(stderr, "C nTot: %e\n", nTot);
@@ -216,9 +215,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n\nC Solutions\n");
   for(sample_i = 0; sample_i < ase->size(); ++sample_i){
     fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
-  	if(silent){
-  		if(sample_i >= 10) break;
-  	}
+    if(silent){
+      if(sample_i >= 10) break;
+    }
   }
 
   // Print statistics
