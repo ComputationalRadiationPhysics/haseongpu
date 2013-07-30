@@ -27,14 +27,14 @@
  * 
  * @return Number of devices in devices array
  */
-unsigned getCorrectDevice(int verbose,unsigned **devices){
+unsigned getCorrectDevice(int verbose,unsigned **devices, int device){
   int count = 0, candidate = 0;
   unsigned correctDevices = 0;
   cudaDeviceProp prop;
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
 
-  CUDA_CHECK_RETURN( cudaGetDeviceCount(&count) );
+  CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
   
   for(int i=0; i<count; ++i){
 	  CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
@@ -65,7 +65,13 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
 		candidate++;
     }
   }
-  CUDA_CHECK_RETURN( cudaSetDevice((*devices)[0]) );
+
+  if(device == -1){
+    CUDA_CHECK_RETURN( cudaSetDevice((*devices)[0]) );
+  }
+  else{
+    CUDA_CHECK_RETURN( cudaSetDevice((*devices)[device]));
+  }
   return correctDevices;
 }
 
@@ -80,6 +86,7 @@ int main(int argc, char **argv){
   bool silent = false;
   unsigned *devices; // will be assigned in getCOrrectDevice();
   unsigned numberOfDevices=0;
+  int device = -1;
   
   // Constant data
   float nTot = 0;
@@ -113,6 +120,15 @@ int main(int argc, char **argv){
     } 
   }
 
+  // Parse which cuda device to choose
+  for(int i=1; i < argc; ++i){
+    if(strncmp(argv[i], "--device=", 8) == 0){
+      const char* pos = strrchr(argv[i],'=');
+      device = atoi(pos+1);
+    } 
+  }
+
+  // Parse what vtk file to compare with
   for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--compare=", 9) == 0){
       memcpy (compareLocation, argv[i]+10, strlen(argv[i])-10 );
@@ -143,7 +159,7 @@ int main(int argc, char **argv){
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
 
   // Set/Test device to run experiment
-  numberOfDevices = getCorrectDevice(1,&devices);
+  numberOfDevices = getCorrectDevice(1,&devices, device);
 
   // Parse experiemntdata and fill mesh 
   Mesh hMesh;
