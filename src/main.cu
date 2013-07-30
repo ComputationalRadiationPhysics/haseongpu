@@ -80,27 +80,13 @@ int main(int argc, char **argv){
   unsigned *devices; // will be assigned in getCOrrectDevice();
   unsigned numberOfDevices=0;
   
-  // Experimentdata
-  std::vector<double> * betaValues = new std::vector<double>;
-  std::vector<double> * xOfNormals = new std::vector<double>;
-  std::vector<double> * yOfNormals = new std::vector<double>;
-  std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
-  std::vector<int> * forbidden = new std::vector<int>;
-  std::vector<int> * neighbors = new std::vector<int>;
-  std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
-  std::vector<double> * points = new std::vector<double>;
-  std::vector<double> * betaCells = new std::vector<double>;
-  std::vector<float> * surfaces = new std::vector<float>;
-  std::vector<double> *xOfTriangleCenter = new std::vector<double>;
-  std::vector<double> *yOfTriangleCenter = new std::vector<double>;
+  // Constant data
   float nTot = 0;
   float sigmaA = 0;
   float sigmaE = 0;
-  unsigned numberOfPoints = 0;
-  unsigned numberOfTriangles = 0;
-  unsigned numberOfLevels = 0;
-  float thicknessOfPrism = 1;
   float crystalFluorescence = 0;
+  std::vector<double> * betaCells = new std::vector<double>;
+
 
   // Parse Commandline
   if(argc <= 1){
@@ -132,75 +118,43 @@ int main(int argc, char **argv){
 		silent=true;
     } 
   }
-
-  // Parse experimentdata
-  std::string root(experimentLocation);
   
+  std::string root(experimentLocation);
+
   // Add slash at the end, if missing
   if(root[root.size()-1] == 'w')
     root.erase(root.size()-1, 1);
   else if(root[root.size()-1] != '/')
     root.append("/");
 
-  if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
-  if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
-  if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
-  if(fileToVector(root + "neighbors.txt", neighbors)) return 1;
-  if(fileToVector(root + "n_x.txt", xOfNormals)) return 1;
-  if(fileToVector(root + "n_y.txt", yOfNormals)) return 1;
-  if(fileToVector(root + "x_center.txt", xOfTriangleCenter)) return 1;
-  if(fileToVector(root + "y_center.txt", yOfTriangleCenter)) return 1;
-  if(fileToVector(root + "p_in.txt", points)) return 1;
-  if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
-  if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
-  if(fileToVector(root + "surface.txt", surfaces)) return 1;
+  // Parse constant from files
   if(fileToValue(root + "n_tot.txt", nTot)) return 1;
   if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
   if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
-  if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
-  if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
-  if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
-  if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
+  if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
+
 
   // Set/Test device to run experiment
   numberOfDevices = getCorrectDevice(1,&devices);
 
-  // Fill mesh 
+  // Parse experiemntdata and fill mesh 
   Mesh hMesh;
   Mesh *dMesh = new Mesh[numberOfDevices];
-//  Mesh::parse(&hMesh, &(dMesh[0]), triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces);
-
-  Mesh::parseMultiGPU(&hMesh, &dMesh, triangleIndices, numberOfTriangles, numberOfLevels, numberOfPoints, thicknessOfPrism, points, betaValues, xOfTriangleCenter, yOfTriangleCenter, positionsOfNormalVectors, xOfNormals, yOfNormals, forbidden, neighbors, surfaces,numberOfDevices,devices);
-
+  Mesh::parseMultiGPU(&hMesh, &dMesh, root, numberOfDevices,devices);
 
   // Debug
   // fprintf(stderr, "C nTot: %e\n", nTot);
   // fprintf(stderr, "C sigmaA: %e\n", sigmaA);
   // fprintf(stderr, "C sigmaE: %e\n", sigmaE);
-   // fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
-   // fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
-   // fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
-   // fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
-   // fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
-
-  // Test vectors
-  assert(numberOfPoints == (points->size() / 2));
-  assert(numberOfTriangles == triangleIndices->size() / 3);
-  assert(positionsOfNormalVectors->size() == numberOfTriangles * 3);
-  assert(yOfTriangleCenter->size() == numberOfTriangles);
-  assert(xOfTriangleCenter->size() == numberOfTriangles);
-  assert(surfaces->size() == numberOfTriangles);
-  assert(betaValues->size() == numberOfTriangles * (numberOfLevels-1));
-  assert(xOfNormals->size() == numberOfTriangles * 3);
-  assert(yOfNormals->size() == numberOfTriangles * 3);
-  assert(triangleIndices->size() == numberOfTriangles * 3);
-  assert(forbidden->size() == numberOfTriangles * 3);
-  assert(neighbors->size() == numberOfTriangles * 3);
-  assert((numberOfTriangles * (numberOfLevels-1)) <= raysPerSample);
+  // fprintf(stderr, "C numberOfTriangles: %d\n", hMesh.numberOfTriangles);
+  // fprintf(stderr, "C numberOfLevels: %d\n", hMesh.numberOfLevels); 
+  // fprintf(stderr, "C numberOfPrisms: %d\n", hMesh.numberOfPrisms);
+  // fprintf(stderr, "C numberOfPoints: %d\n", hMesh.numberOfPoints); 
+  // fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
 
   // Solution vector
-  std::vector<double> *ase = new std::vector<double>(numberOfPoints * numberOfLevels, 0);
+  std::vector<double> *ase = new std::vector<double>(hMesh.numberOfSamples, 0);
 
   // Run Experiment
   for(int i=1; i < argc; ++i){
@@ -225,29 +179,30 @@ int main(int argc, char **argv){
       }
       else if(strstr(argv[i], "for_loops") != 0){
 	// threads and blocks will be set in the following function (by reference)
-	runtime = forLoopsClad(
-			ase,
-			raysPerSample,
-			betaValues,
-			xOfNormals,
-			yOfNormals,
-			triangleIndices,
-			forbidden,
-			neighbors,
-			positionsOfNormalVectors,
-			points,
-			betaCells,
-			surfaces,
-			xOfTriangleCenter,
-			yOfTriangleCenter,
-			nTot,
-			sigmaA,
-			sigmaE,
-			numberOfPoints,
-			numberOfTriangles,
-			numberOfLevels,
-			thicknessOfPrism,
-			crystalFluorescence);
+	// TODO get data from mesh
+	// runtime = forLoopsClad(
+	// 		ase,
+	// 		raysPerSample,
+	// 		betaValues,
+	// 		xOfNormals,
+	// 		yOfNormals,
+	// 		triangleIndices,
+	// 		forbidden,
+	// 		neighbors,
+	// 		positionsOfNormalVectors,
+	// 		points,
+	// 		betaCells,
+	// 		surfaces,
+	// 		xOfTriangleCenter,
+	// 		yOfTriangleCenter,
+	// 		nTot,
+	// 		sigmaA,
+	// 		sigmaE,
+	// 		numberOfPoints,
+	// 		numberOfTriangles,
+	// 		numberOfLevels,
+	// 		thicknessOfPrism,
+	// 		crystalFluorescence);
 	strcpy(runmode, "For Loops");
 	break;
       }
@@ -269,7 +224,7 @@ int main(int argc, char **argv){
   // Print statistics
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
-  fprintf(stderr, "C Prism             : %d\n", (int) numberOfPoints * (numberOfLevels-1));
+  fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
   fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
   fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
   fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * ase->size());
@@ -281,7 +236,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data to vtk
-  writeToVtk(points, numberOfPoints, triangleIndices, numberOfTriangles, numberOfLevels, thicknessOfPrism, ase);
+  writeToVtk(&hMesh, ase);
   writeDndtAse(ase);
   
 

@@ -1,6 +1,11 @@
-#include "mesh.h"
 #include <stdio.h>
+#include <vector>
+#include <string>
+#include <assert.h>
+
 #include <cudachecks.h>
+#include <mesh.h>
+#include <parser.h>
 
 /**
  * @brief converts a vector of points into a vector of TwoDimPoint
@@ -288,26 +293,59 @@ __device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge){
  * @param *devices array of device indices for all possible devices 
  *
  */
-void Mesh::parseMultiGPU(
-    Mesh *hMesh,
-    Mesh **dMesh, 
-    std::vector<unsigned> *triangleIndices, 
-    unsigned numberOfTriangles, 
-    unsigned numberOfLevels,
-    unsigned numberOfPoints, 
-    float thicknessOfPrism,
-    std::vector<double> *points, 
-    std::vector<double> *betaValues, 
-    std::vector<double> *xOfTriangleCenter, 
-    std::vector<double> *yOfTriangleCenter, 
-    std::vector<int> *positionsOfNormalVectors,
-    std::vector<double> *xOfNormals, 
-    std::vector<double> *yOfNormals,
-    std::vector<int> *forbidden, 
-    std::vector<int> *neighbors, 
-    std::vector<float> *surfaces,
-    unsigned numberOfDevices,
-    unsigned *devices) {
+int Mesh::parseMultiGPU(Mesh *hMesh,
+			 Mesh **dMesh, 
+			 std::string root,
+			 unsigned numberOfDevices,
+			 unsigned *devices) {
+  
+  // Experimentdata
+  std::vector<double> * betaValues = new std::vector<double>;
+  std::vector<double> * xOfNormals = new std::vector<double>;
+  std::vector<double> * yOfNormals = new std::vector<double>;
+  std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
+  std::vector<int> * forbidden = new std::vector<int>;
+  std::vector<int> * neighbors = new std::vector<int>;
+  std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
+  std::vector<double> * points = new std::vector<double>;
+  std::vector<float> * surfaces = new std::vector<float>;
+  std::vector<double> *xOfTriangleCenter = new std::vector<double>;
+  std::vector<double> *yOfTriangleCenter = new std::vector<double>;
+  unsigned numberOfPoints = 0;
+  unsigned numberOfTriangles = 0;
+  unsigned numberOfLevels = 0;
+  float thicknessOfPrism = 1;
+
+  // Parse experimentdata from files
+  if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
+  if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
+  if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
+  if(fileToVector(root + "neighbors.txt", neighbors)) return 1;
+  if(fileToVector(root + "n_x.txt", xOfNormals)) return 1;
+  if(fileToVector(root + "n_y.txt", yOfNormals)) return 1;
+  if(fileToVector(root + "x_center.txt", xOfTriangleCenter)) return 1;
+  if(fileToVector(root + "y_center.txt", yOfTriangleCenter)) return 1;
+  if(fileToVector(root + "p_in.txt", points)) return 1;
+  if(fileToVector(root + "t_in.txt", triangleIndices)) return 1;
+  if(fileToVector(root + "surface.txt", surfaces)) return 1;
+  if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
+  if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
+  if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
+  if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
+
+  assert(numberOfPoints == (points->size() / 2));
+  assert(numberOfTriangles == triangleIndices->size() / 3);
+  assert(positionsOfNormalVectors->size() == numberOfTriangles * 3);
+  assert(yOfTriangleCenter->size() == numberOfTriangles);
+  assert(xOfTriangleCenter->size() == numberOfTriangles);
+  assert(surfaces->size() == numberOfTriangles);
+  assert(betaValues->size() == numberOfTriangles * (numberOfLevels-1));
+  assert(xOfNormals->size() == numberOfTriangles * 3);
+  assert(yOfNormals->size() == numberOfTriangles * 3);
+  assert(triangleIndices->size() == numberOfTriangles * 3);
+  assert(forbidden->size() == numberOfTriangles * 3);
+  assert(neighbors->size() == numberOfTriangles * 3);
+
 
   fillHMesh(
       hMesh,
@@ -340,5 +378,6 @@ void Mesh::parseMultiGPU(
       );
   cudaDeviceSynchronize();
  }
+ return 0;
 }
 
