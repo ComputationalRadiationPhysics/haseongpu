@@ -242,11 +242,10 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
   fprintf(stderr, "\n");
 
-
   // Write experiment data
   writeToVtk(&hMesh, ase, "octrace.vtk");
   compareVtk(ase, compareLocation);
-  //writeToVtk(&hMesh, ase, "octrace_compare.vtk");
+  writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
 
   return 0;

@@ -75,11 +75,19 @@ int compareVtk(std::vector<double> *ase, std::string filename){
   unsigned i = 0;
   double minDiff = 10000; // should be enough
   double maxDiff = 0;
+  double totalDiff = 0;
+  double aseTotal = 0;
   double smallDiff = 0.1;
+  
 
   // No compare vtk was given
   if(!filename.compare("")){
     return 0;
+  }
+
+  // Sum up ase values
+  for(unsigned i = 0; i < ase->size(); ++i){
+    aseTotal += ase->at(i);
   }
 
   filestream.open(filename.c_str(), std::ifstream::in);
@@ -87,7 +95,8 @@ int compareVtk(std::vector<double> *ase, std::string filename){
   if(filestream.is_open()){
     while(filestream.good()){
       std::getline(filestream, line);
-      if(!line.compare("LOOKUP_TABLE default")){ 
+      std::size_t found = line.find("LOOKUP_TABLE default");
+      if(found != std::string::npos){ 
 	foundLine = true;
 	std::getline(filestream, line);
       }
@@ -95,7 +104,8 @@ int compareVtk(std::vector<double> *ase, std::string filename){
 	if(i == ase->size())
 	  break;
 	value = (double) atof(line.c_str());
-	diff = abs(ase->at(i) / value - 1) ;
+	totalDiff += abs(ase->at(i) - value);
+	diff = abs(ase->at(i) / value - 1);
 	ase->at(i) = diff;
 
 	if(diff >= maxDiff)
@@ -119,9 +129,9 @@ int compareVtk(std::vector<double> *ase, std::string filename){
     return 1;
   }
 
-
   std::cerr << "C ASE max. relative difference: " << maxDiff << std::endl;
   std::cerr << "C ASE min. relative difference: " << minDiff << std::endl;
+  std::cerr << "C ASE tot. relative difference: " << totalDiff / aseTotal << std::endl;
   filestream.close();
   return 0;
 }

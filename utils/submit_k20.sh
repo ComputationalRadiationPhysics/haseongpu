@@ -17,8 +17,8 @@ cd ~/octrace
 make
 
 MODE="ray_propagation_gpu"
-RAYS=10000000
-COMPARE="octrace_backtotheroot_1M.vtk"
+RAYS=100000000
+COMPARE="dndt_ASE_30.vtk"
 echo "RAYS: $RAYS"
 echo "MODE: $MODE"
 
