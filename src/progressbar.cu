@@ -26,7 +26,7 @@ void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t star
 	for(int i=0 ; i < (percentage*length) ; i++){
 		printf("#");
 	}
-	for(int i=0;i< length-(percentage*length) ;i++){
+	for(int i=0;i< (length-(percentage*length)-1) ;i++){
 		printf(" ");
 	}
 	time_t now = time(0);

@@ -242,9 +242,9 @@ unsigned importanceSampling(
   CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< blocks, threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
 
-  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum1<<<blocks,threads>>>(deviceMesh, raysPerPrism, cumulativeSums));
-  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum2<<<1,1>>>(deviceMesh, cumulativeSums));
-  CUDA_CHECK_KERNEL_SYNC(mapRaysToPrism<<<blocks,threads>>>(deviceMesh, raysPerPrism, raysPerSample, indicesOfPrisms,cumulativeSums));
+//  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum1<<<blocks,threads>>>(deviceMesh, raysPerPrism, cumulativeSums));
+//  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum2<<<1,1>>>(deviceMesh, cumulativeSums));
+//  CUDA_CHECK_KERNEL_SYNC(mapRaysToPrism<<<blocks,threads>>>(deviceMesh, raysPerPrism, raysPerSample, indicesOfPrisms,cumulativeSums));
 
   free(sumPhiHost);
   free(raysDumpHost);
