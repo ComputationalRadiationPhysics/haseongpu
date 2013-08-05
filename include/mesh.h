@@ -1,8 +1,9 @@
 #ifndef MESH_H
 #define MESH_H 
 
-#include<vector>
+#include <vector>
 #include <curand_kernel.h> /* curand_uniform */
+#include <string>
 
 #define SMALL 1E-06
 #define VERY_SMALL 0.0
@@ -80,24 +81,9 @@ struct Mesh {
   __device__ Point getCenterPoint(unsigned triangle, unsigned level);
   __device__ int getForbiddenEdge(unsigned triangle, int edge);
 
-
-  static void parseMultiGPU(Mesh *hMesh, 
+  static int parseMultiGPU(Mesh *hMesh, 
 			    Mesh **dMesh, 
-			    std::vector<unsigned> *triangleIndices, 
-			    unsigned numberOfTriangles, 
-			    unsigned numberOfLevels, 
-			    unsigned numberOfPoints, 
-			    float thicknessOfPrism, 
-			    std::vector<double> *pointXY, 
-			    std::vector<double> *betaValues, 
-			    std::vector<double> *xOfTriangleCenter, 
-			    std::vector<double> *yOfTriangleCenter, 
-			    std::vector<int> *positionsOfNormalVectors, 
-			    std::vector<double> *xOfNormals, 
-			    std::vector<double> *yOfNormals, 
-			    std::vector<int> *forbidden, 
-			    std::vector<int> *neighbors, 
-			    std::vector<float> *surfaces,
+			    std::string root,
 			    unsigned numberOfDevices,
 			    unsigned *devices);
 };
