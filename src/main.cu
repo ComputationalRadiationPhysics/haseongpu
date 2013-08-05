@@ -243,7 +243,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
   fprintf(stderr, "C Runmode           : %s \n", runmode);
-  fprintf(stderr, "C Runtime           : %f s\n", runtime / 1000.0);
+  fprintf(stderr, "C Runtime           : %f s\n", runtime);
   fprintf(stderr, "\n");
 
   // Write experiment data

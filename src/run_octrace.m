@@ -1,6 +1,32 @@
-%matlab_connector.m
+% run_octrace
+% calculates the dndt_ASE values for a given input
+function [dndt_ASE] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays)
 
-function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays)
+  % create all the textfiles in a separate folder
+  TMP_FOLDER = 'octrace_tmp';
+  FOLDER = [ pwd filesep TMP_FOLDER ];
+
+  % make sure that the input is clean 
+  clean_IO_files(FOLDER);
+
+  % create the new input based on the MATLAB variables
+  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,FOLDER);
+
+  % do the propagation
+  system(['./octrace ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --experiment=' FOLDER ]);
+
+  % get the result
+  dndt_ASE = parse_octrace_output;
+
+  % cleanup
+  clean_IO_files(FOLDER);
+end
+
+%takes all the variables and puts them into textfiles, so the CUDA code can parse them
+function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,FOLDER)
+
+  mkdir(FOLDER);
+  cd(FOLDER);
 
   x=fopen('p_in.txt','w');
   fprintf(x,'%.50f\n',p);
@@ -74,60 +100,42 @@ function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_
   fprintf(x,'%.50f\n',beta_cell);
   fclose(x);
 
-  x=fopen('surface.txt','w')
-  fprintf(x,'%.50f\n',surface)
-  fclose(x)
+  x=fopen('surface.txt','w');
+  fprintf(x,'%.50f\n',surface);
+  fclose(x);
 
-  x=fopen('x_center.txt','w')
-  fprintf(x,'%.50f\n',x_center)
-  fclose(x)
+  x=fopen('x_center.txt','w');
+  fprintf(x,'%.50f\n',x_center);
+  fclose(x);
 
-  x=fopen('y_center.txt','w')
-  fprintf(x,'%.50f\n',y_center)
-  fclose(x)
+  x=fopen('y_center.txt','w');
+  fprintf(x,'%.50f\n',y_center);
+  fclose(x);
 
-  x=fopen('NumRays.txt','w')
-  fprintf(x,'%d\n',NumRays)
-  fclose(x)
+  cd ..
 end 
   
 
+% takes the output from the CUDA code and fills it into a variable
 function [dndt_ASE] = parse_octrace_output ()
   dndt_ASE = load('dndt_ASE.txt');
 end
 
-function clean_IO_files ()
-  delete('p_in.txt');
-  delete('n_x.txt');
-  delete('n_y.txt');
-  delete('forbidden.txt');
-  delete('n_p.txt');
-  delete('neighbors.txt');
-  delete('t_in.txt');
-  delete('z_mesh.txt');
-  delete('mesh_z.txt');
-  delete('size_t.txt');
-  delete('size_p.txt');
-  delete('n_tot.txt');
-  delete('beta_v.txt');
-  delete('sigma_a.txt');
-  delete('sigma_e.txt');
-  delete('tfluo.txt');
-  delete('beta_cell.txt');
-  delete('surface.txt');
-  delete('x_center.txt');
-  delete('y_center.txt');
+% deletes the temporary folder and the dndt_ASE.txt
+function clean_IO_files (TMP_FOLDER)
+  
+  % disable warnings for this (if file is nonexistant...)
+  s = warning;
+  warning off all;
+
+  A = exist(TMP_FOLDER,'dir');
+
+  if A == 7
+    rmdir(TMP_FOLDER,'s');
+  end
+
   delete('dndt_ASE.txt');
-  delete('NumRays.txt');
+
+  warning(s);
 end
 
-function [dndt_ASE] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays)
-
-  clean_IO_files;
-
-  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays);
-
-  %octrace;
-
-  dndt_ASE = parse_octrace_output;
-end

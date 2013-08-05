@@ -46,6 +46,7 @@ unsigned importanceSampling(
 			    unsigned *raysPerPrism,
 			    unsigned *indicesOfPrisms,
 			    unsigned *raysDump,
+			    unsigned *cumulativeSums,
 			    int threads,
 			    int blocks);
 
