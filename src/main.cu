@@ -81,8 +81,8 @@ int main(int argc, char **argv){
   char experimentLocation[256] = "";
   char compareLocation[256] = "";
   float runtime = 0.0;
-  unsigned blocks = 0;
-  unsigned threads = 0;
+  unsigned blocks;
+  unsigned threads;
   bool silent = false;
   unsigned *devices; // will be assigned in getCOrrectDevice();
   unsigned numberOfDevices=0;
@@ -90,10 +90,10 @@ int main(int argc, char **argv){
   
   // Constant data
   float nTot = 0;
-  float sigmaA = 0;
-  float sigmaE = 0;
   float crystalFluorescence = 0;
   std::vector<double> * betaCells = new std::vector<double>;
+  std::vector<float> *sigmaA = new std::vector<float>;
+  std::vector<float> *sigmaE = new std::vector<float>;
 
   // Parse Commandline
   if(argc <= 1){
@@ -152,11 +152,12 @@ int main(int argc, char **argv){
 
   // Parse constant from files
   if(fileToValue(root + "n_tot.txt", nTot)) return 1;
-  if(fileToValue(root + "sigma_a.txt", sigmaA)) return 1;
-  if(fileToValue(root + "sigma_e.txt", sigmaE)) return 1;
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
-
+  if(fileToVector(root + "sigma_a.txt", sigmaA)) return 1;
+  if(fileToVector(root + "sigma_e.txt", sigmaE)) return 1;
+  assert(sigmaA->size() == sigmaE->size());
+  
   // Set/Test device to run experiment
   numberOfDevices = getCorrectDevice(1,&devices, device);
 
@@ -185,17 +186,17 @@ int main(int argc, char **argv){
 	// threads and blocks will be set in the following function (by reference)
 	CUDA_CHECK_RETURN(cudaSetDevice(devices[0]));
 	runtime = calcDndtAse(threads, 
-				 blocks, 
-				 raysPerSample,
-				 dMesh[0],
-				 hMesh,
-				 betaCells,
-				 nTot,
-				 sigmaA,
-				 sigmaE,
-				 crystalFluorescence,
-				 ase
-				 );
+			      blocks, 
+			      raysPerSample,
+			      dMesh[0],
+			      hMesh,
+			      betaCells,
+			      nTot,
+			      sigmaA,
+			      sigmaE,
+			      crystalFluorescence,
+			      ase
+			      );
 	strcpy(runmode, "Ray Propagation New GPU");
 	break;
       }
@@ -207,8 +208,8 @@ int main(int argc, char **argv){
 			&hMesh,
 			betaCells,
 			nTot,
-			sigmaA,
-			sigmaE,
+			sigmaA->at(0),
+			sigmaE->at(0),
 			hMesh.numberOfPoints,
 			hMesh.numberOfTriangles,
 			hMesh.numberOfLevels,
@@ -251,6 +252,11 @@ int main(int argc, char **argv){
   compareVtk(ase, compareLocation);
   writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
+
+  // Free memory
+  delete betaCells;
+  delete sigmaE;
+  delete sigmaA;
 
   return 0;
 }

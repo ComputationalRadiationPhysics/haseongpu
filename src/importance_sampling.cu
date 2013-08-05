@@ -21,15 +21,13 @@ __global__ void propagateFromTriangleCenter(
     double *importance,
     float *sumPhi,
     unsigned sample_i,
-    double sigmaA,
-    double sigmaE,
+    float *sigmaA,
+    float *sigmaE,
     double nTot){
 
-  //Triangle *triangles = mesh.triangles;
   __shared__ double threadPhi[256];
   double gain = 0;
   Ray ray;
-
 
   threadPhi[threadIdx.x] = 0;
 
@@ -41,12 +39,13 @@ __global__ void propagateFromTriangleCenter(
   unsigned triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
   Point startPoint = mesh.getCenterPoint(triangle_i, level_i);
   Point samplePoint = mesh.getSamplePoint(sample_i);
+  unsigned wavelengthOffset = gridDim.y * blockIdx.y;
 
   ray = generateRay(startPoint, samplePoint);
-  gain = propagateRay(ray, level_i, triangle_i, &mesh, sigmaA, sigmaE, nTot, mesh.thickness);
-  importance[startPrism] = mesh.getBetaValue(triangle_i, level_i) * gain;
+  gain = propagateRay(ray, level_i, triangle_i, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y], nTot, mesh.thickness);
+  importance[startPrism + wavelengthOffset] = mesh.getBetaValue(triangle_i, level_i) * gain;
 
-  threadPhi[threadIdx.x] = importance[triangle_i + level_i * mesh.numberOfTriangles];
+  threadPhi[threadIdx.x] = importance[startPrism + wavelengthOffset];
   __syncthreads();
 
   unsigned i = blockDim.x/2;
@@ -58,7 +57,7 @@ __global__ void propagateFromTriangleCenter(
     i /= 2;
   }
   if(threadIdx.x == 0){
-    atomicAdd(sumPhi, float(threadPhi[threadIdx.x]));
+    atomicAdd(&(sumPhi[blockIdx.y]), float(threadPhi[threadIdx.x]));
   }
 }
 
@@ -214,8 +213,8 @@ unsigned importanceSampling(
     unsigned sample_i,
     Mesh deviceMesh,
     unsigned raysPerSample,
-    double sigmaA,
-    double sigmaE,
+    float *sigmaA,
+    float *sigmaE,
     double nTot,
     double *importance,
     float *sumPhi,
@@ -223,21 +222,24 @@ unsigned importanceSampling(
     unsigned *indicesOfPrisms,
     unsigned *raysDump,
     unsigned *cumulativeSums,
-    int threads,
-    int blocks){
+    dim3 threads,
+    dim3 blocks){
 
-  float *sumPhiHost = (float*) malloc(sizeof(float));
-  unsigned *raysDumpHost = (unsigned*) malloc(sizeof(unsigned));
+  float *sumPhiHost = (float*) malloc(blocks.y * sizeof(float));
+  unsigned *raysDumpHost = (unsigned*) malloc(blocks.y * sizeof(unsigned));
 
-  *sumPhiHost = 0.f;
-  *raysDumpHost = 0;
+  for(unsigned i=0; i > blocks.y; ++i){
+    sumPhiHost[i] = 0.f;
+    raysDumpHost[i] = 0;
+  }
 
  // CUDA_CHECK_RETURN(cudaMemset(sumPhi,sizeof(float),0.f));
   //CUDA_CHECK_RETURN(cudaMemset(raysDump,sizeof(unsigned),0));
-  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost,sizeof(float),cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost,sizeof(unsigned),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost, blocks.y * sizeof(float),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost, blocks.y * sizeof(unsigned),cudaMemcpyHostToDevice));
 
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< blocks,threads >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA,sigmaE,nTot));
+  // TODO wavelength ...
   CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
   CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< blocks, threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance));

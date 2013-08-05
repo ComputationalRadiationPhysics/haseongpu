@@ -21,17 +21,17 @@
 #define SEED 4321
 
 float calcDndtAse (unsigned &threads, 
-    unsigned &blocks,
-    unsigned &hostRaysPerSample,
-    Mesh mesh,
-    Mesh hostMesh,
-    std::vector<double> *betaCellsVector,
-    float nTot,
-    float sigmaA,
-    float sigmaE,
-    float crystalFluorescence,
-    std::vector<double> *dndtAse
-    ){
+		   unsigned &blocks,
+		   unsigned &hostRaysPerSample,
+		   Mesh mesh,
+		   Mesh hostMesh,
+		   std::vector<double> *betaCellsVector,
+		   float nTot,
+		   std::vector<float> *hostSigmaA,
+		   std::vector<float> *hostSigmaE,
+		   float crystalFluorescence,
+		   std::vector<double> *dndtAse
+		   ){
 
   // Variable declaration
   // CPU
@@ -52,47 +52,60 @@ float calcDndtAse (unsigned &threads,
   unsigned *raysDump;
   unsigned *raysPerPrism;
   unsigned *cumulativeSums;
+  float * sigmaA;
+  float * sigmaE;
 
   //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
-  threads = 256; 
-  blocks = 200;
-
+  dim3 blockDim(256);
+  dim3 gridDim(200, hostSigmaE->size());
+  threads = blockDim.x;
+  blocks = gridDim.x * gridDim.y;
+    
   starttime = time(0);
 
-  hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * sizeof(float));
-  hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * sizeof(double));
-  hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * sizeof(unsigned));
-  hostIndicesOfPrisms = (unsigned*) malloc (hostRaysPerSample        * sizeof(unsigned));
+  hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * hostSigmaE->size() * sizeof(float));
+  hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * hostSigmaE->size() * sizeof(double));
+  hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * hostSigmaE->size() * sizeof(unsigned));
+  hostIndicesOfPrisms = (unsigned*) malloc (hostRaysPerSample        * hostSigmaE->size() * sizeof(unsigned));
 
-  for(unsigned i=0; i < hostRaysPerSample; ++i) hostIndicesOfPrisms[i] = 0;
-  for(unsigned i=0; i < hostMesh.numberOfSamples; ++i) hostPhiAse[i] = 0.f;
-  for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostRaysPerPrism[i] = 1;
-  for(unsigned i=0; i < hostMesh.numberOfPrisms; ++i) hostImportance[i] = 1.0;
+  for(unsigned i=0; i < hostRaysPerSample * hostSigmaE->size(); ++i) hostIndicesOfPrisms[i] = 0;
+  for(unsigned i=0; i < hostMesh.numberOfSamples * hostSigmaE->size(); ++i) hostPhiAse[i] = 0.f;
+  for(unsigned i=0; i < hostMesh.numberOfPrisms * hostSigmaE->size(); ++i) hostRaysPerPrism[i] = 1;
+  for(unsigned i=0; i < hostMesh.numberOfPrisms * hostSigmaE->size(); ++i) hostImportance[i] = 1.0;
 
-  CUDA_CALL(cudaMalloc((void **)&devMTGPStates, blocks * sizeof(curandStateMtgp32)));
+  CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x * gridDim.y * sizeof(curandStateMtgp32)));
+
+  // TODO RUN for each hostSigmaE->(i) ???
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
-  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, blocks, SEED));
+  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
 
   // Memory allocation on device
-  CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&cumulativeSums, sizeof(unsigned) * hostMesh.numberOfPrisms));
+  CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * hostSigmaE->size() * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * hostSigmaE->size() * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * hostSigmaE->size() * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * hostSigmaE->size() * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, hostSigmaE->size() * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, hostSigmaE->size() * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&cumulativeSums,  hostMesh.numberOfPrisms * hostSigmaE->size() * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&sigmaA, hostSigmaE->size() * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&sigmaE, hostSigmaE->size() * sizeof(float)));
 
   // Copy host to device
-  CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAse, hostMesh.numberOfSamples * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(phiAse, hostPhiAse, hostMesh.numberOfSamples * hostSigmaE->size() * sizeof(float), cudaMemcpyHostToDevice));
+
+  CUDA_CHECK_RETURN(cudaMemcpy(sigmaA, &(hostSigmaA->at(0)), hostSigmaA->size() * sizeof(float), cudaMemcpyHostToDevice));
+
+  CUDA_CHECK_RETURN(cudaMemcpy(sigmaE, &(hostSigmaE->at(0)), hostSigmaE->size() * sizeof(float), cudaMemcpyHostToDevice));
+  
 
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   progressStartTime = time(0);
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-    //if(sample_i % 200 == 0) fprintf(stderr, "C Sampling point %d/%d done\n", sample_i, hostMesh.numberOfSamples);
 
-    importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, threads, blocks);
+    importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
     // Prism scheduling for gpu threads
@@ -107,7 +120,7 @@ float calcDndtAse (unsigned &threads,
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
     // Start Kernel
-    calcSamplePhiAse<<< blocks, threads >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
+    calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, hostSigmaA->at(0), hostSigmaE->at(0), nTot);
 
     // update progressbar
     if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,60,progressStartTime);
@@ -119,7 +132,7 @@ float calcDndtAse (unsigned &threads,
   // Calculate dndt Ase
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     hostPhiAse[sample_i] = float( (double(hostPhiAse[sample_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
-    double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(sigmaE + sigmaA) - double(nTot * sigmaA);
+    double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE->at(0) + hostSigmaA->at(0)) - double(nTot * hostSigmaA->at(0));
     dndtAse->at(sample_i) = gain_local * hostPhiAse[sample_i] / crystalFluorescence;
 
   }

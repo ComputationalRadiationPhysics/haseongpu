@@ -46,16 +46,16 @@
  *
  **/
 float calcDndtAse (unsigned &threads, 
-		      unsigned &blocks, 
-		      unsigned &hostRaysPerSample,
-		      Mesh mesh,
-		      Mesh hostMesh,
-		      std::vector<double> *betaCellsVector,
-		      float nTot,
-		      float sigmaA,
-		      float sigmaE,
-		      float crystalFluorescence,
-		      std::vector<double> *dndtAse);
+		   unsigned &blocks, 
+		   unsigned &hostRaysPerSample,
+		   Mesh mesh,
+		   Mesh hostMesh,
+		   std::vector<double> *betaCellsVector,
+		   float nTot,
+		   std::vector<float> *sigmaA,
+		   std::vector<float> *sigmaE,
+		   float crystalFluorescence,
+		   std::vector<double> *dndtAse);
 
 
 #endif

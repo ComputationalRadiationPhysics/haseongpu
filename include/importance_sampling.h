@@ -38,8 +38,8 @@ unsigned importanceSampling(
 			    unsigned sample_i,
 			    Mesh deviceMesh,
 			    unsigned raysPerSample, 
-			    double sigmaA, 
-			    double sigmaE, 
+			    float *sigmaA, 
+			    float *sigmaE, 
 			    double nTot,  
 			    double *importance, 
 			    float *sumPhi,
@@ -47,7 +47,7 @@ unsigned importanceSampling(
 			    unsigned *indicesOfPrisms,
 			    unsigned *raysDump,
 			    unsigned *cumulativeSums,
-			    int threads,
-			    int blocks);
+			    dim3 threads,
+			    dim3 blocks);
 
 #endif /* importance_sampling_H */
