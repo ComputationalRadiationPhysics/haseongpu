@@ -18,7 +18,7 @@
 #include <ctime> /* progressBar */
 #include <progressbar.h> /*progressBar */
 
-#define SEED 1234
+#define SEED 4321
 
 float calcDndtAse (unsigned &threads, 
 		   unsigned &blocks, 

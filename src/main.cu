@@ -95,12 +95,11 @@ int main(int argc, char **argv){
   float crystalFluorescence = 0;
   std::vector<double> * betaCells = new std::vector<double>;
 
-
   // Parse Commandline
   if(argc <= 1){
     fprintf(stderr, "C No commandline arguments found\n");
-    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays] --experiment=[location to .zip]\n");
-    fprintf(stderr, "C Runmodes : bruteforce_gpu\n");
+    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays] --experiment=[location to experiment-data]\n");
+    fprintf(stderr, "C Runmodes : for_loops\n");
     fprintf(stderr, "             ray_propagation_gpu\n");
     return 0;
   }
@@ -202,30 +201,19 @@ int main(int argc, char **argv){
       }
       else if(strstr(argv[i], "for_loops") != 0){
 	// threads and blocks will be set in the following function (by reference)
-	// TODO get data from mesh
-	// runtime = forLoopsClad(
-	// 		ase,
-	// 		raysPerSample,
-	// 		betaValues,
-	// 		xOfNormals,
-	// 		yOfNormals,
-	// 		triangleIndices,
-	// 		forbidden,
-	// 		neighbors,
-	// 		positionsOfNormalVectors,
-	// 		points,
-	// 		betaCells,
-	// 		surfaces,
-	// 		xOfTriangleCenter,
-	// 		yOfTriangleCenter,
-	// 		nTot,
-	// 		sigmaA,
-	// 		sigmaE,
-	// 		numberOfPoints,
-	// 		numberOfTriangles,
-	// 		numberOfLevels,
-	// 		thicknessOfPrism,
-	// 		crystalFluorescence);
+	runtime = forLoopsClad(
+			ase,
+			raysPerSample,
+			&hMesh,
+			betaCells,
+			nTot,
+			sigmaA,
+			sigmaE,
+			hMesh.numberOfPoints,
+			hMesh.numberOfTriangles,
+			hMesh.numberOfLevels,
+			hMesh.thickness,
+			crystalFluorescence);
 	strcpy(runmode, "For Loops");
 	break;
       }

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <stdio.h>
+#include <mesh.h>
 
 #define ALIVE 1
 #define DEAD 0
@@ -20,7 +21,8 @@
 
 //global variables
 double *p_in, *beta_v, *n_x, *n_y, *center_x, *center_y;
-int *n_p, *neighbors, *forbidden;
+int *neighbors, *forbidden;
+unsigned *n_p;
 int size_p, N_cells, mesh_z, rays;
 int NumRays;
 double z_mesh;
@@ -43,18 +45,8 @@ void importf(int point, int mesh_start, double *importance, int *N_rays, int N_r
 float forLoopsClad(
 	std::vector<double> *dndtAse,
 	unsigned &raysPerSample,
-	std::vector<double> *betaValuesVector,
-	std::vector<double> *xOfNormalsVector,
-	std::vector<double> *yOfNormalsVector,
-	std::vector<unsigned> *triangleIndicesVector,
-	std::vector<int> *forbiddenVector,
-	std::vector<int> *neighborsVector,
-	std::vector<int> *positionsOfNormalsVector,
-	std::vector<double> *pointsVector,
+	Mesh *mesh,
 	std::vector<double> *betaCellsVector,
-	std::vector<float> *surfacesVector,
-	std::vector<double> *xOfTriangleCenterVector,
-	std::vector<double> *yOfTriangleCenterVector,
 	float hostNTot,
 	float hostSigmaA,
 	float hostSigmaE,
@@ -90,18 +82,17 @@ float forLoopsClad(
 // ************* INPUT ORDER BEGIN *************
 //  for further informations take a look on "mesh_cyl_rect.m"
   
-  p_in = (double *) &(pointsVector->at(0)); //point coordinates in 2D
-  t_in = (unsigned *) &(triangleIndicesVector->at(0));  //association triangle-points - c-indexing-sytle!
-  beta_v = (double *) &(betaValuesVector->at(0)); //interpolated volume beta
-  n_x = (double *) &(xOfNormalsVector->at(0)); //normals of the facets, x-components
-  n_y = (double *) &(yOfNormalsVector->at(0)); //normals of the facets, y-components
-//  n_z = (double *)mxGetData(prhs[X]); //would be facets z-normals, but it exists just in the tetrahedron triangulation
-  neighbors = (int *) &(neighborsVector->at(0)); //for each cell in t_in, its neighboring cell in plane geometry  - c-indexing-sytle!
-  surface_new = (float *) &(surfacesVector->at(0));  //information about the surfaces of the cells
-  center_x = (double *) &(xOfTriangleCenterVector->at(0)); //center positions of the cells, x-coordinates
-  center_y = (double *) &(yOfTriangleCenterVector->at(0)); //center positions of the cells, y_coordinates
-  n_p = (int *) &(positionsOfNormalsVector->at(0)); // gives the Index to one of the points in p_in which is in the plane of the normals - c-indexing-sytle!
-  forbidden = (int *) &(forbiddenVector->at(0));//are the correspondance of the face used in the previous triangle, which must not be tested (rounding errors)
+  p_in = mesh->points;
+  t_in = mesh->triangles;
+  beta_v = mesh->betaValues;
+  n_x = mesh->normalVec;
+  n_y = &(mesh->normalVec[3 * mesh->numberOfTriangles]);
+  neighbors = mesh->neighbors;
+  surface_new = mesh->surfaces;
+  center_x = mesh->centers;
+  center_y = &(mesh->centers[mesh->numberOfTriangles]);
+  n_p = mesh->normalPoint;
+  forbidden = mesh->forbidden;
   
 // *************  INPUT ORDER END  *************
   
@@ -374,7 +365,7 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
 //        at first the upper plane
         if (forb != 3){
             nominator = (cell_z+1)*z_mesh - z_pos;
-            denominator = z_pos*vec_z;
+            denominator = vec_z;
             if (denominator != 0.0)
             {
                 length_help = nominator/denominator;
@@ -390,7 +381,7 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
 //        next is the lower plane
         if (forb != 4){
             nominator = (cell_z)*z_mesh - z_pos;
-            denominator = z_pos*vec_z;
+            denominator = vec_z;
             
             if (denominator != 0.0)
             {

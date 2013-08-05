@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -q k20
 #PBS -l nodes=1:ppn=2
-#PBS -l walltime=3:30:00
-#PBS -N octrace
+#PBS -l walltime=40:30:00
+#PBS -N octrace_1T_rays
 
 . /opt/modules-3.2.6/Modules/3.2.6/init/bash
 export MODULES_NO_OUTPUT=1
@@ -17,7 +17,7 @@ cd ~/octrace
 make
 
 MODE="ray_propagation_gpu"
-RAYS=100000000
+RAYS=1000000000
 COMPARE="dndt_ASE_30.vtk"
 echo "RAYS: $RAYS"
 echo "MODE: $MODE"

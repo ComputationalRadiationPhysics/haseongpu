@@ -24,7 +24,16 @@ void fillHMesh(
     unsigned numberOfPoints, 
     float thicknessOfPrism,
     std::vector<unsigned> *triangleIndices,
-    std::vector<double> *points
+    std::vector<double> *points,
+    std::vector<double> *xOfTriangleCenter, 
+    std::vector<double> *yOfTriangleCenter, 
+    std::vector<int> *positionsOfNormal,
+    std::vector<double> *xOfNormals, 
+    std::vector<double> *yOfNormals,
+    std::vector<int> *forbidden, 
+    std::vector<int> *neighbors, 
+    std::vector<float> *surfaces,
+    std::vector<double> *betaValues
     ) {
 
   hMesh->numberOfTriangles = numberOfTriangles;
@@ -34,8 +43,21 @@ void fillHMesh(
   hMesh->numberOfSamples = numberOfPoints * numberOfLevels;
   hMesh->thickness = thicknessOfPrism;
 
+  std::vector<double> *hostCenters = new std::vector<double>(xOfTriangleCenter->begin(), xOfTriangleCenter->end());
+  hostCenters->insert(hostCenters->end(),yOfTriangleCenter->begin(),yOfTriangleCenter->end());
+
+  std::vector<double> *hostNormalVec = new std::vector<double>(xOfNormals->begin(), xOfNormals->end());
+  hostNormalVec->insert(hostNormalVec->end(),yOfNormals->begin(),yOfNormals->end());
+
   hMesh->points = &(points->at(0));
   hMesh->triangles = &(triangleIndices->at(0));
+  hMesh->betaValues = &(betaValues->at(0));
+  hMesh->normalVec = &(hostNormalVec->at(0));
+  hMesh->centers = &(hostCenters->at(0));
+  hMesh->surfaces = &(surfaces->at(0));
+  hMesh->forbidden = &(forbidden->at(0));
+  hMesh->neighbors = &(neighbors->at(0));
+  hMesh->normalPoint = (unsigned*) &(positionsOfNormal->at(0));
 }
 
 /**
@@ -374,7 +396,16 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       numberOfPoints, 
       thicknessOfPrism,
       triangleIndices,
-      points
+      points,
+      xOfTriangleCenter, 
+      yOfTriangleCenter, 
+      positionsOfNormalVectors,
+      xOfNormals, 
+      yOfNormals,
+      forbidden, 
+      neighbors, 
+      surfaces,
+      betaValues
       );
 
  for( unsigned i=0;i<numberOfDevices;i++){

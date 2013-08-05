@@ -77,13 +77,14 @@ int compareVtk(std::vector<double> *ase, std::string filename){
   double maxDiff = 0;
   double totalDiff = 0;
   double aseTotal = 0;
-  double smallDiff = 0.1;
+  double smallDiff = 10;
   
 
   // No compare vtk was given
   if(!filename.compare("")){
     return 0;
   }
+  std::cerr << "C Compare solution with " << filename << std::endl;
 
   // Sum up ase values
   for(unsigned i = 0; i < ase->size(); ++i){
@@ -104,9 +105,14 @@ int compareVtk(std::vector<double> *ase, std::string filename){
 	if(i == ase->size())
 	  break;
 	value = (double) atof(line.c_str());
-	totalDiff += abs(ase->at(i) - value);
-	diff = abs(ase->at(i) / value - 1);
-	ase->at(i) = diff;
+	//totalDiff += abs(ase->at(i) - value);
+
+	if(abs(value) > abs(ase->at(i)))
+	  diff = (abs(value / ase->at(i)) - 1) * 100;
+	else
+	  diff = (abs(ase->at(i) / value) - 1) * 100;
+
+	totalDiff += diff;
 
 	if(diff >= maxDiff)
 	  maxDiff = diff;
@@ -115,8 +121,9 @@ int compareVtk(std::vector<double> *ase, std::string filename){
 	  minDiff = diff;
 
 	if(diff >= smallDiff){
-	  std::cerr << "C ASE relative difference[" << i << "]: " << diff << " > " << smallDiff << std::endl;
-	}
+	  std::cerr << "C ASE relative difference[" << i << "]: " << diff  << "%" << "[" << ase->at(i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
+	 }
+	ase->at(i) = diff;
 	i++;
 
       }
@@ -129,9 +136,9 @@ int compareVtk(std::vector<double> *ase, std::string filename){
     return 1;
   }
 
-  std::cerr << "C ASE max. relative difference: " << maxDiff << std::endl;
-  std::cerr << "C ASE min. relative difference: " << minDiff << std::endl;
-  std::cerr << "C ASE tot. relative difference: " << totalDiff / aseTotal << std::endl;
+  std::cerr << "C ASE max. difference: " << maxDiff << "%" << std::endl;
+  std::cerr << "C ASE min. difference: " << minDiff << "%" << std::endl;
+  std::cerr << "C ASE tot. avg difference: " << totalDiff / ase->size() << "%" << std::endl;
   filestream.close();
   return 0;
 }
