@@ -25,7 +25,7 @@ __global__ void propagateFromTriangleCenter(
     double *sigmaE,
     double nTot){
 
-  __shared__ double threadPhi[256];
+  extern __shared__ double threadPhi[];
   double gain = 0;
   Ray ray;
 
@@ -75,7 +75,7 @@ __global__ void distributeRaysByImportance(
     float *sumPhi,
     unsigned raysPerSample,
     unsigned *raysDump){
-  __shared__ unsigned raySum[256];
+  extern __shared__ unsigned raySum[];
   unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
   raySum[threadIdx.x] = 0;
@@ -245,8 +245,8 @@ unsigned importanceSampling(
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost, blocks.y * sizeof(float),cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost, blocks.y * sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< blocks,threads >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA, sigmaE, nTot));
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< blocks,threads >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< blocks, threads, threads.x * sizeof(double) >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA, sigmaE, nTot));
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< blocks, threads, threads.x * sizeof(unsigned) >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
   CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< blocks, threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
 
