@@ -40,8 +40,6 @@
  *
  * @param sigmaE
  *
- * @param nTot
- *
  **/
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
 				 Mesh mesh,
@@ -51,7 +49,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 float *phiAse,
 				 const unsigned sample_i,
 				 double *sigmaA,
-				 double *sigmaE,
-				 const double nTot);
+				 double *sigmaE
+				 );
 
 #endif /* calc_sample_phi_ase_H */

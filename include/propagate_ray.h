@@ -40,9 +40,8 @@ __host__ __device__ double propagateRay(Ray ray,
 					unsigned  startTriangle, 
 					Mesh *mesh,
 					const double sigmaA, 
-					const double sigmaE, 
-					const double nTot, 
-					const double thickness);
+					const double sigmaE
+					);
 
 #endif /* propagate_ray_H */
 

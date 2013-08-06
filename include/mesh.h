@@ -107,7 +107,7 @@ struct Mesh {
   double *centers;
   float  *surfaces;
   int	 *forbidden;
-  float  *betaCells;
+  double  *betaCells;
 
   //indexstructs
   unsigned *triangles;

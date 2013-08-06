@@ -183,6 +183,7 @@ int main(int argc, char **argv){
 			      blocks, 
 			      raysPerSample,
 			      dMesh[0],
+				  hMesh,
 			      sigmaA,
 			      sigmaE,
 			      ase

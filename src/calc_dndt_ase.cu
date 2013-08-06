@@ -25,11 +25,8 @@ float calcDndtAse (unsigned &threads,
 		   unsigned &hostRaysPerSample,
 		   Mesh mesh,
 		   Mesh hostMesh,
-		   std::vector<double> *betaCellsVector,
-		   float nTot,
 		   std::vector<double> *hostSigmaA,
 		   std::vector<double> *hostSigmaE,
-		   float crystalFluorescence,
 		   std::vector<double> *dndtAse
 		   ){
 
@@ -105,7 +102,7 @@ float calcDndtAse (unsigned &threads,
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
 
-    hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+    hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
 
     CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
@@ -124,7 +121,7 @@ float calcDndtAse (unsigned &threads,
     CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
 
     // Start Kernel
-    calcSamplePhiAse<<< gridDim, blockDim , blockDim.x * sizeof(double)>>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE, nTot);
+    calcSamplePhiAse<<< gridDim, blockDim , blockDim.x * sizeof(double)>>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, sample_i, sigmaA, sigmaE);
 
     // update progressbar
     if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,60,progressStartTime);
@@ -137,8 +134,8 @@ float calcDndtAse (unsigned &threads,
   for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
       hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] = float((double(hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
-      double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(nTot * hostSigmaA->at(wave_i));
-      dndtAse->at(sample_i + hostMesh.numberOfSamples * wave_i) = gain_local * hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] / crystalFluorescence;
+      double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
+      dndtAse->at(sample_i + hostMesh.numberOfSamples * wave_i) = gain_local * hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] / hostMesh.crystalFluorescence;
 
     }
   }

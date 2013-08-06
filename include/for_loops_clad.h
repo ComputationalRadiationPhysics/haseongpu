@@ -6,7 +6,7 @@ float forLoopsClad(
 	std::vector<double> *dndtAse,
 	unsigned &raysPerSample,
 	Mesh *mesh,
-	std::vector<double> *betaCellsVector,
+	double *betaCells,
 	float hostNTot,
 	double hostSigmaA,
 	double hostSigmaE,

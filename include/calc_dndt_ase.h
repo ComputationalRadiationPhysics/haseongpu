@@ -30,15 +30,9 @@
  * @param mesh All information about triangles, points, contants. 
  *             See mesh.h for details.
  *
- * @param betaCellsVector Constant values for each prism
- *
- * @param nTot
- *
  * @param sigmaA
  *
  * @param sigmaE
- *
- * @param crystalFluorescence
  *
  * @param dndtAse Solution vector with dndt ASE values
  *
@@ -50,11 +44,8 @@ float calcDndtAse (unsigned &threads,
 		   unsigned &hostRaysPerSample,
 		   Mesh mesh,
 		   Mesh hostMesh,
-		   std::vector<double> *betaCellsVector,
-		   float nTot,
 		   std::vector<double> *sigmaA,
 		   std::vector<double> *sigmaE,
-		   float crystalFluorescence,
 		   std::vector<double> *dndtAse);
 
 

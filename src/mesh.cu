@@ -34,7 +34,7 @@ void fillHMesh(
     std::vector<int> *neighbors, 
     std::vector<float> *surfaces,
     std::vector<double> *betaValues,
-	std::vector<float> *betaCells,
+	std::vector<double> *betaCells,
 	float nTot,
 	float crystalFluorescence
     ) {
@@ -89,7 +89,7 @@ void fillDMesh(
     std::vector<int> *neighborsVector, 
     std::vector<float> *surfacesVector,
     std::vector<double> *betaValuesVector,
-	std::vector<float> *betaCells,
+	std::vector<double> *betaCells,
 	float nTot,
 	float crystalFluorescence
     ) {
@@ -121,7 +121,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->centers), 2 * hMesh->numberOfTriangles * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->surfaces), hMesh->numberOfTriangles * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(double)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
@@ -148,7 +148,7 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->forbidden, (int*) &(forbiddenVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (float*) &(betaCells->at(0)), hMesh->numberOfTriangles * (hMesh->numberOfLeves-1) * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (double*) &(betaCells->at(0)), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1) * sizeof(double), cudaMemcpyHostToDevice));
 
 
 
@@ -407,7 +407,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(triangleIndices->size() == numberOfTriangles * 3);
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
-  assert(betaCells->size() == numberOfTriangles * (numberOfLevels-1));
+  assert(betaCells->size() == numberOfPoints * numberOfLevels);
 
 
   fillHMesh(
