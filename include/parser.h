@@ -32,7 +32,7 @@ int fileToVector(std::string filename, std::vector<T> *v){
 
   }
   else{
-    fprintf(stderr, "Can't open file %s \n", filename.c_str());
+    fprintf(stderr, "C Can't open file %s \n", filename.c_str());
     fileStream.close();
     return 1;
   }
@@ -63,7 +63,7 @@ int fileToValue(std::string filename, T &value){
       value = (T) atof(line.c_str());
   }
   else{
-    fprintf(stderr, "Can't open file %s \n", filename.c_str());
+    fprintf(stderr, "C Can't open file %s \n", filename.c_str());
     fileStream.close();
     return 1;
   }
