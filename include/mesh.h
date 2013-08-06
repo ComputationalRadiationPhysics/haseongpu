@@ -107,6 +107,7 @@ struct Mesh {
   double *centers;
   float  *surfaces;
   int	 *forbidden;
+  double  *betaCells;
 
   //indexstructs
   unsigned *triangles;
@@ -116,6 +117,8 @@ struct Mesh {
   //constants
   float surfaceTotal;
   float thickness;
+  float nTot;
+  float crystalFluorescence;
   unsigned numberOfTriangles;
   unsigned numberOfLevels;
   unsigned numberOfPrisms;

@@ -16,8 +16,6 @@
  *
  * @param sigmaE
  *
- * @param nTot
- *
  * @param *importance the importance values on the GPU (pointer to the memory location)
  *
  * @param *sumPhi cumulative values of all the gains from propagation (pointer to the memory location)
@@ -40,7 +38,6 @@ unsigned importanceSampling(
 			    unsigned raysPerSample, 
 			    double *sigmaA, 
 			    double *sigmaE, 
-			    double nTot,  
 			    double *importance, 
 			    float *sumPhi,
 			    unsigned *raysPerPrism,

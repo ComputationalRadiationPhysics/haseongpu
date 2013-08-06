@@ -90,10 +90,7 @@ int main(int argc, char **argv){
   unsigned numberOfDevices=0;
   int device = -1;
   
-  // Constant data
-  float nTot = 0;
-  float crystalFluorescence = 0;
-  std::vector<double> * betaCells = new std::vector<double>;
+  // Wavelength data
   std::vector<double> *sigmaA = new std::vector<double>;
   std::vector<double> *sigmaE = new std::vector<double>;
 
@@ -155,10 +152,7 @@ int main(int argc, char **argv){
   else if(root[root.size()-1] != '/')
     root.append("/");
 
-  // Parse constant from files
-  if(fileToValue(root + "n_tot.txt", nTot)) return 1;
-  if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
-  if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
+  // Parse wavelengths from files
   if(fileToVector(root + "sigma_a.txt", sigmaA)) return 1;
   if(fileToVector(root + "sigma_e.txt", sigmaE)) return 1;
   assert(sigmaA->size() == sigmaE->size());
@@ -194,12 +188,9 @@ int main(int argc, char **argv){
 			      blocks, 
 			      raysPerSample,
 			      dMesh[0],
-			      hMesh,
-			      betaCells,
-			      nTot,
+				  hMesh,
 			      sigmaA,
 			      sigmaE,
-			      crystalFluorescence,
 			      ase
 			      );
 	strcpy(runmode, "Ray Propagation New GPU");
@@ -211,15 +202,15 @@ int main(int argc, char **argv){
 			ase,
 			raysPerSample,
 			&hMesh,
-			betaCells,
-			nTot,
+			hMesh.betaCells,
+			hMesh.nTot,
 			sigmaA->at(0),
 			sigmaE->at(0),
 			hMesh.numberOfPoints,
 			hMesh.numberOfTriangles,
 			hMesh.numberOfLevels,
 			hMesh.thickness,
-			crystalFluorescence);
+			hMesh.crystalFluorescence);
 	strcpy(runmode, "For Loops");
 	break;
       }
@@ -269,7 +260,6 @@ int main(int argc, char **argv){
   writeDndtAse(ase);
 
   // Free memory
-  delete betaCells;
   delete sigmaE;
   delete sigmaA;
 

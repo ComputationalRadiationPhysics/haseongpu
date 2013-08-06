@@ -46,7 +46,7 @@ float forLoopsClad(
 	std::vector<double> *dndtAse,
 	unsigned &raysPerSample,
 	Mesh *mesh,
-	std::vector<double> *betaCellsVector,
+	double *betaCells,
 	float hostNTot,
 	double hostSigmaA,
 	double hostSigmaE,
@@ -201,7 +201,7 @@ float forLoopsClad(
   
 	for (int sample_i=0; sample_i < size_p * mesh_z ; sample_i++){
 		phi[sample_i] = phi[sample_i] / (4.0 * 3.14159);
-		double gain_local = N_tot * (betaCellsVector->at(sample_i)) * (sigma_e+sigma_a) - (N_tot*sigma_a);
+		double gain_local = N_tot * betaCells[sample_i] * (sigma_e+sigma_a) - (N_tot*sigma_a);
 		dndtAse->at(sample_i) = gain_local * phi[sample_i] / hostCrystalFluorescence;
 	}
   printf("\ncalculations finished, givig back the data\n");
