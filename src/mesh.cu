@@ -27,13 +27,16 @@ void fillHMesh(
     std::vector<double> *points,
     std::vector<double> *xOfTriangleCenter, 
     std::vector<double> *yOfTriangleCenter, 
-    std::vector<int> *positionsOfNormal,
+    std::vector<unsigned> *positionsOfNormal,
     std::vector<double> *xOfNormals, 
     std::vector<double> *yOfNormals,
     std::vector<int> *forbidden, 
     std::vector<int> *neighbors, 
     std::vector<float> *surfaces,
-    std::vector<double> *betaValues
+    std::vector<double> *betaValues,
+	std::vector<float> *betaCells,
+	float nTot,
+	float crystalFluorescence
     ) {
 
   hMesh->numberOfTriangles = numberOfTriangles;
@@ -42,6 +45,8 @@ void fillHMesh(
   hMesh->numberOfPoints = numberOfPoints;
   hMesh->numberOfSamples = numberOfPoints * numberOfLevels;
   hMesh->thickness = thicknessOfPrism;
+  hMesh->crystalFluorescence = crystalFluorescence;
+  hMesh->nTot = nTot;
 
   std::vector<double> *hostCenters = new std::vector<double>(xOfTriangleCenter->begin(), xOfTriangleCenter->end());
   hostCenters->insert(hostCenters->end(),yOfTriangleCenter->begin(),yOfTriangleCenter->end());
@@ -57,7 +62,8 @@ void fillHMesh(
   hMesh->surfaces = &(surfaces->at(0));
   hMesh->forbidden = &(forbidden->at(0));
   hMesh->neighbors = &(neighbors->at(0));
-  hMesh->normalPoint = (unsigned*) &(positionsOfNormal->at(0));
+  hMesh->normalPoint = &(positionsOfNormal->at(0));
+  hMesh->betaCells = &(betaCells->at(0));
 }
 
 /**
@@ -76,13 +82,16 @@ void fillDMesh(
     std::vector<double> *pointsVector, 
     std::vector<double> *xOfTriangleCenter, 
     std::vector<double> *yOfTriangleCenter, 
-    std::vector<int> *positionsOfNormalVectors,
+    std::vector<unsigned> *positionsOfNormalVectors,
     std::vector<double> *xOfNormals, 
     std::vector<double> *yOfNormals,
     std::vector<int> *forbiddenVector, 
     std::vector<int> *neighborsVector, 
     std::vector<float> *surfacesVector,
-    std::vector<double> *betaValuesVector
+    std::vector<double> *betaValuesVector,
+	std::vector<float> *betaCells,
+	float nTot,
+	float crystalFluorescence
     ) {
 
 
@@ -96,6 +105,8 @@ void fillDMesh(
   dMesh->numberOfPoints = numberOfPoints;
   dMesh->numberOfSamples = numberOfPoints*numberOfLevels;
   dMesh->thickness = thicknessOfPrism;
+  dMesh->crystalFluorescence = crystalFluorescence;
+  dMesh->nTot = nTot;
 
   for(unsigned i=0;i<numberOfTriangles;++i){
     totalSurface+=double(surfacesVector->at(i));	
@@ -110,6 +121,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->centers), 2 * hMesh->numberOfTriangles * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->surfaces), hMesh->numberOfTriangles * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(float)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
@@ -136,6 +148,8 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->forbidden, (int*) &(forbiddenVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (float*) &(betaCells->at(0)), hMesh->numberOfTriangles * (hMesh->numberOfLeves-1) * sizeof(float), cudaMemcpyHostToDevice));
+
 
 
   // fill indexStructs
@@ -143,7 +157,7 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->neighbors,(int*) &(neighborsVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalPoint, (unsigned*) &(positionsOfNormalVectors->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalPoint, (unsigned*) &(positionsOfNormalVectors->at(0)), 3 * hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
   
 }
 
@@ -348,15 +362,18 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   std::vector<unsigned> * triangleIndices = new std::vector<unsigned>;
   std::vector<int> * forbidden = new std::vector<int>;
   std::vector<int> * neighbors = new std::vector<int>;
-  std::vector<int> * positionsOfNormalVectors = new std::vector<int>;
+  std::vector<unsigned> * positionsOfNormalVectors = new std::vector<unsigned>;
   std::vector<double> * points = new std::vector<double>;
   std::vector<float> * surfaces = new std::vector<float>;
   std::vector<double> *xOfTriangleCenter = new std::vector<double>;
   std::vector<double> *yOfTriangleCenter = new std::vector<double>;
+  std::vector<double> * betaCells = new std::vector<double>;
   unsigned numberOfPoints = 0;
   unsigned numberOfTriangles = 0;
   unsigned numberOfLevels = 0;
   float thicknessOfPrism = 1;
+  float nTot = 0;
+  float crystalFluorescence = 0;
 
   // Parse experimentdata from files
   if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
@@ -374,6 +391,9 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
   if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
   if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
+  if(fileToValue(root + "n_tot.txt", nTot)) return 1;
+  if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
+  if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
 
   assert(numberOfPoints == (points->size() / 2));
   assert(numberOfTriangles == triangleIndices->size() / 3);
@@ -387,6 +407,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(triangleIndices->size() == numberOfTriangles * 3);
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
+  assert(betaCells->size() == numberOfTriangles * (numberOfLevels-1));
 
 
   fillHMesh(
@@ -405,7 +426,10 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       forbidden, 
       neighbors, 
       surfaces,
-      betaValues
+      betaValues,
+	  betaCells,
+	  nTot,
+	  crystalFluorescence
       );
 
  for( unsigned i=0;i<numberOfDevices;i++){
@@ -427,7 +451,10 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       forbidden, 
       neighbors, 
       surfaces,
-      betaValues
+      betaValues,
+	  betaCells,
+	  nTot,
+	  crystalFluorescence
       );
   cudaDeviceSynchronize();
  }
