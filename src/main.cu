@@ -252,14 +252,17 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  writeToVtk(&hMesh, ase, std::string("octrace_") + std::string(ctime(0)) + std::string(".vtk"));
+  writeToVtk(&hMesh, ase, std::string("octrace") + std::string(".vtk"));
   compareVtk(ase, compareLocation, hMesh.numberOfSamples);
   writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
 
   // Free memory
+  free(devices);
+  cudaFree(dMesh);
   delete sigmaE;
   delete sigmaA;
+  delete ase;
 
   return 0;
 }

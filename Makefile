@@ -12,7 +12,7 @@ DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
 ARCH = -arch=sm_20
 ARCH = -arch=sm_35
-ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=compute_35
+ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
 
 # --maxrregcount=40
 
