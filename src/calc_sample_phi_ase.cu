@@ -38,7 +38,7 @@ __global__ void calcSamplePhiAse(
 	  // TODO move mersenne twister in 2nd dimension
 	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[blockIdx.y * gridDim.x]));
 	  Ray ray          = generateRay(startPoint, samplePoint);
-	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y], nTot, mesh.thickness );
+	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh,  sigmaA[blockIdx.y], sigmaE[blockIdx.y], nTot, mesh.thickness );
 
 	  gain *= mesh.getBetaValue(startPrism);
 	  gain *= importance[startPrism + wavelengthOffset * mesh.numberOfPrisms];

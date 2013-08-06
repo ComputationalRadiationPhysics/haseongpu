@@ -20,10 +20,12 @@
  * @brief Queries for devices on the running mashine and collects
  *        them on the devices array. Set the first device in this 
  *        array as computaion-device. On Errors the programm will
- *        be stoped by exit().
+ *        be stoped by exit(). Otherwise you can set the device by command
+ *        line parameter --device=
  * 
  * @param verbose > 0 prints debug output
- * @param devices Array of possible devices to use
+ *        devices Array of possible devices to use
+ *        device  number of device you want to set
  * 
  * @return Number of devices in devices array
  */
@@ -101,7 +103,7 @@ int main(int argc, char **argv){
     fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays] --experiment=[location to experiment-data]\n");
     fprintf(stderr, "C Runmodes : for_loops\n");
     fprintf(stderr, "             ray_propagation_gpu\n");
-    return 0;
+    return 1;
   }
   
   // Parse number of rays
@@ -109,6 +111,9 @@ int main(int argc, char **argv){
     if(strncmp(argv[i], "--rays=", 6) == 0){
       const char* pos = strrchr(argv[i],'=');
       raysPerSample = atoi(pos+1);
+      if(raysPerSample == 0){
+	fprintf(stderr, "C Please specify the number of rays per sample Point with --rays=\n");
+      }
     }
   }
 
@@ -182,7 +187,7 @@ int main(int argc, char **argv){
   // Run Experiment
   for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
-      if(strstr(argv[i], "ray_propagation_gpu") != 0){
+      if(strstr(argv[i], "ray_propagation_gpu") != 0 ){
 	// threads and blocks will be set in the following function (by reference)
 	CUDA_CHECK_RETURN(cudaSetDevice(devices[0]));
 	runtime = calcDndtAse(threads, 
@@ -218,8 +223,17 @@ int main(int argc, char **argv){
 	strcpy(runmode, "For Loops");
 	break;
       }
+      else{
+	fprintf(stderr, "C Please specify the runmode with --mode=\n");
+	return 1;
+      }
     
     }
+    else{
+      fprintf(stderr, "C Please specify the runmode with --mode=\n");
+      return 1;
+    }
+
 
   }
 
