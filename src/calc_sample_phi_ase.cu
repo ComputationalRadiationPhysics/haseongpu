@@ -20,7 +20,7 @@ __global__ void calcSamplePhiAse(
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int rayNumber = 0;
   unsigned stride = 0;
-  unsigned wavelengthOffset = blockIdx.y * gridDim.y;
+  unsigned wavelengthOffset = blockIdx.y;
 
   __shared__ double threadGain[256]; //MUST be the same as number of threads
   threadGain[threadIdx.x] = 0.;
@@ -36,7 +36,7 @@ __global__ void calcSamplePhiAse(
   	  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
 	  // TODO move mersenne twister in 2nd dimension
-	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
+	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[blockIdx.y * gridDim.x]));
 	  Ray ray          = generateRay(startPoint, samplePoint);
 	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y], nTot, mesh.thickness );
 

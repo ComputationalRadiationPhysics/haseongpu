@@ -39,7 +39,7 @@ __global__ void propagateFromTriangleCenter(
   unsigned triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
   Point startPoint = mesh.getCenterPoint(triangle_i, level_i);
   Point samplePoint = mesh.getSamplePoint(sample_i);
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
   ray = generateRay(startPoint, samplePoint);
   gain = propagateRay(ray, level_i, triangle_i, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y], nTot, mesh.thickness);
@@ -76,7 +76,7 @@ __global__ void distributeRaysByImportance(
     unsigned raysPerSample,
     unsigned *raysDump){
   __shared__ unsigned raySum[256];
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
   raySum[threadIdx.x] = 0;
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
@@ -116,7 +116,7 @@ __global__ void distributeRemainingRaysRandomly(
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   int raysLeft = raysPerSample-raysDump[blockIdx.y];
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
   if(id < raysLeft){
     curandState randomState;
@@ -144,7 +144,7 @@ __global__ void recalculateImportance(
     unsigned raysPerSample,
     double *importance){
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
@@ -177,7 +177,7 @@ __global__ void createCumulativeSum1(
     unsigned *raysPerPrism,
     unsigned *cumulativeSums){
 
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   if(id==0){
     cumulativeSums[0 + wavelengthOffset] = 0;
@@ -191,7 +191,7 @@ __global__ void createCumulativeSum2(
     Mesh mesh,
     unsigned *cumulativeSums){
 
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y * mesh.numberOfPrisms;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
   for(int i=0;i<mesh.numberOfPrisms;i++){
     cumulativeSums[i+1 + wavelengthOffset] += cumulativeSums[i + wavelengthOffset];
   }
@@ -208,7 +208,7 @@ __global__ void mapRaysToPrism(
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   if(id >= mesh.numberOfPrisms) return;
 
-  unsigned wavelengthOffset = gridDim.y * blockIdx.y;
+  unsigned wavelengthOffset = blockIdx.y;
   unsigned absoluteRay = cumulativeSums[id + wavelengthOffset * mesh.numberOfPrisms];
   for(unsigned prism_i=cumulativeSums[id + wavelengthOffset * mesh.numberOfPrisms]; prism_i < indicesOfPrisms[id + wavelengthOffset * raysPerSample]; ++prism_i){
     for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + wavelengthOffset * mesh.numberOfPrisms]; ++ray_i){

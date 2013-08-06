@@ -73,13 +73,15 @@ float calcDndtAse (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfPrisms * hostSigmaE->size(); ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * hostSigmaE->size(); ++i) hostImportance[i] = 1.0;
 
-  // TODO 2nd dimension
-  CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
+  // CUDA Mersenne twister
+  CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.y * gridDim.x  * sizeof(curandStateMtgp32)));
 
-  // TODO RUN for each hostSigmaE->(i) ???
-  CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
-  CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
-  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
+  // TODO maybe change seed for different mersenne twister
+  CUDA_CALL(cudaMalloc((void**)&devKernelParams, gridDim.y * sizeof(mtgp32_kernel_params)));
+  for(unsigned mersenne_i = 0; mersenne_i < gridDim.y; ++mersenne_i){
+    CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, &(devKernelParams[mersenne_i])));
+    CURAND_CALL(curandMakeMTGP32KernelState(&(devMTGPStates[gridDim.x * mersenne_i]), mtgp32dc_params_fast_11213, &(devKernelParams[mersenne_i]), gridDim.x, SEED + mersenne_i));
+  }
 
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * hostSigmaE->size() * sizeof(float)));
@@ -134,7 +136,7 @@ float calcDndtAse (unsigned &threads,
   // Calculate dndt Ase
   for(unsigned wave_i = 0; wave_i < hostSigmaE->size(); ++wave_i){
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-      hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] = float( (double(hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
+      hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] = float((double(hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i]) / (hostRaysPerSample * 4.0f * 3.14159)));
       double gain_local = double(nTot) * (betaCellsVector->at(sample_i)) * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(nTot * hostSigmaA->at(wave_i));
       dndtAse->at(sample_i + hostMesh.numberOfSamples * wave_i) = gain_local * hostPhiAse[sample_i + hostMesh.numberOfSamples * wave_i] / crystalFluorescence;
 

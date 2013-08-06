@@ -177,7 +177,7 @@ int main(int argc, char **argv){
   // fprintf(stderr, "C numberOfSamples: %d\n\n", hMesh.numberOfSamples);
 
   // Solution vector
-  std::vector<double> *ase = new std::vector<double>(hMesh.numberOfSamples, 0);
+  std::vector<double> *ase = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
 
   // Run Experiment
   for(int i=1; i < argc; ++i){
@@ -224,12 +224,13 @@ int main(int argc, char **argv){
   }
 
   // Print Solution
-  unsigned sample_i;
-  fprintf(stderr, "\n\nC Solutions\n");
-  for(sample_i = 0; sample_i < ase->size(); ++sample_i){
-    fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i));
-    if(silent){
-      if(sample_i >= 10) break;
+  for(unsigned wave_i = 0; wave_i < sigmaE->size(); ++wave_i){
+    fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
+    for(unsigned sample_i = 0; sample_i < ase->size(); ++sample_i){
+      fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i + hMesh.numberOfSamples * wave_i));
+      if(silent){
+	if(sample_i >= 10) break;
+      }
     }
   }
 
