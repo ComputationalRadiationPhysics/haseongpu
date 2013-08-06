@@ -99,10 +99,10 @@ float calcDndtAse (unsigned &threads,
   CUDA_CHECK_RETURN(cudaMemcpy(sigmaA, &(hostSigmaA->at(0)), hostSigmaA->size() * sizeof(double), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(sigmaE, &(hostSigmaE->at(0)), hostSigmaE->size() * sizeof(double), cudaMemcpyHostToDevice));
   
-
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   progressStartTime = time(0);
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
 
     hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, nTot, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
