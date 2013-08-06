@@ -35,9 +35,10 @@ __global__ void calcSamplePhiAse(
   	  int startLevel = startPrism/mesh.numberOfTriangles;
   	  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
-	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[blockIdx.y * gridDim.x]));
+	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wavelengthOffset * gridDim.x]));
 	  Ray ray          = generateRay(startPoint, samplePoint);
-	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y]);
+	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[wavelengthOffset], sigmaE[wavelengthOffset]);
+
 	  gain *= mesh.getBetaValue(startPrism);
 	  gain *= importance[startPrism + wavelengthOffset * mesh.numberOfPrisms];
 
