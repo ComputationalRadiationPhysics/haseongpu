@@ -44,14 +44,14 @@
  *
  **/
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
-				    Mesh mesh,
-				    const unsigned* indicesOfPrisms, 
-				    const double* importance,
-				    const unsigned raysPerSample, 
-				    float *phiAse,
-				    const unsigned sample_i,
-				    const double sigmaA,
-				    const double sigmaE,
-				    const double nTot);
+				 Mesh mesh,
+				 const unsigned* indicesOfPrisms, 
+				 const double* importance,
+				 const unsigned raysPerSample, 
+				 float *phiAse,
+				 const unsigned sample_i,
+				 double *sigmaA,
+				 double *sigmaE,
+				 const double nTot);
 
 #endif /* calc_sample_phi_ase_H */

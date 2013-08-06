@@ -52,8 +52,8 @@ float calcDndtAse (unsigned &threads,
 		   Mesh hostMesh,
 		   std::vector<double> *betaCellsVector,
 		   float nTot,
-		   std::vector<float> *sigmaA,
-		   std::vector<float> *sigmaE,
+		   std::vector<double> *sigmaA,
+		   std::vector<double> *sigmaE,
 		   float crystalFluorescence,
 		   std::vector<double> *dndtAse);
 

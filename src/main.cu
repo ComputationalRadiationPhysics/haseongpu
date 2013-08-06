@@ -92,8 +92,8 @@ int main(int argc, char **argv){
   float nTot = 0;
   float crystalFluorescence = 0;
   std::vector<double> * betaCells = new std::vector<double>;
-  std::vector<float> *sigmaA = new std::vector<float>;
-  std::vector<float> *sigmaE = new std::vector<float>;
+  std::vector<double> *sigmaA = new std::vector<double>;
+  std::vector<double> *sigmaE = new std::vector<double>;
 
   // Parse Commandline
   if(argc <= 1){
