@@ -45,10 +45,62 @@ struct NormalRay {
  * @brief Contains the structure of the crystal
  *
  * All the fixed values of how the crystal is meshed
- **/
+ *
+ * points The coordinates of the triangle vertices
+ *        All x coordinates followed by all of the y coordinates of the triangle vertices
+ *        structure: [x_1, x_2, ... x_n, y_1, y_2, ... y_n] (n == numberOfPoints)
+ *
+ *
+ * betaValues beta values for all prisms ordered accordingly to the prismIDs:
+ *            prismID = triangleID + layer * numberOfTriangles;
+ *            therefore, all betaValues for a layer are grouped together
+ *
+ * normalVec the normal vectors for each triangle edge
+ *           first half (size: 3*numberOfTriangles -> one for each side) contains
+ *           the x components of each vector, second half contains the y components.
+ *           the each half is ordered as follows:
+ *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
+ *           i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+ *
+ * centers the coordinates of the center points for each triangle
+ *         All x coordinates followed by all y coordinates of the triangle vertices
+ *         similar to "points"
+ *
+ * surfaces the sizes of the surfaces of each triangle, ordered by the triangleID
+ *
+ * forbidden describes the relation of edge indices of adjacent triangles
+ *           -1 means, there is no adjacent triangle to that edge
+ *           0,1,2 describes the index of the edge as seen from the ADJACENT triangle
+ *
+ *           order of data is similar to normalVec:
+ *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
+ *           i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+ *
+ * triangles contains the indices to access the "points" datastructure 
+ *           (each triangle has 3 points as vertices). Each entry is an
+ *           index from 0 to numberOfPoints, corresponding to the positions 
+ *           of a vertex in "points".
+ *           structure is similar to "forbidden":
+ *           [ triangle1A, triangle2A, ... triangleNA, triangle1B, triangle2B, ... triangleNB, triangle1C, ... ]
+ *           i.e. for triangles with vertices A,B,C there are all the indices
+ *           of the A-vertices, followed by all the B and C vertices.
+ *
+ * neighbors describes the relation of triangle indices to each other.
+ *           Each entry corresponds to a triangleID (see "triangles") which
+ *           is adjacent to the current triangle.
+ *           structure is similar to "forbidden":
+ *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
+ *
+ * normalPoint contains indices to the x and y components of the positions where the
+ *             normalVectors start (see normalVec).
+ *             Indices point to locations in "points" (i.e. normal vectors start at
+ *             triangle vertices!)
+ *             structure is VERY similar to triangles: 
+ *             [ triangle1p0, triangle2p0, ... triangleNp0, triangle1p1, triangle2p1, ... ]
+ *
+ */
 struct Mesh {
 
-  // values
   double *points;
   double *betaValues;
   double *normalVec;
