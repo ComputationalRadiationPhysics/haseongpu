@@ -179,11 +179,13 @@ int main(int argc, char **argv){
   std::vector<double> *ase = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
 
   // Run Experiment
+  bool foundMode = false;
   for(int i=1; i < argc; ++i){
     if(strncmp(argv[i], "--mode=", 6) == 0){
       if(strstr(argv[i], "ray_propagation_gpu") != 0 ){
 	// threads and blocks will be set in the following function (by reference)
 	CUDA_CHECK_RETURN(cudaSetDevice(devices[0]));
+	foundMode = true;
 	runtime = calcDndtAse(threads, 
 			      blocks, 
 			      raysPerSample,
@@ -198,6 +200,7 @@ int main(int argc, char **argv){
       }
       else if(strstr(argv[i], "for_loops") != 0){
 	// threads and blocks will be set in the following function (by reference)
+	foundMode = true;
 	runtime = forLoopsClad(
 			ase,
 			raysPerSample,
@@ -214,20 +217,15 @@ int main(int argc, char **argv){
 	strcpy(runmode, "For Loops");
 	break;
       }
-      else{
-	fprintf(stderr, "C Please specify the runmode with --mode=\n");
-	return 1;
-      }
-    
-    }
-    else{
-      fprintf(stderr, "C Please specify the runmode with --mode=\n");
-      return 1;
-    }
 
+	
+    }
 
   }
-
+  if(!foundMode){
+    fprintf(stderr, "C Please specify the runmode with --mode=\n");
+    return 1;
+  }
   // Print Solution
   for(unsigned wave_i = 0; wave_i < sigmaE->size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
@@ -254,7 +252,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  writeToVtk(&hMesh, ase, "octrace.vtk");
+  writeToVtk(&hMesh, ase, std::string("octrace_") + std::string(ctime(0)) + std::string(".vtk"));
   compareVtk(ase, compareLocation, hMesh.numberOfSamples);
   writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
