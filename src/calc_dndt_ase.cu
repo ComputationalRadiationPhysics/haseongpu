@@ -52,7 +52,6 @@ float calcDndtAse (unsigned &threads,
   double * sigmaA;
   double * sigmaE;
 
-  //OPTIMIZE: find perfect number of threads - MUST be the same as the size of shared memory in kernel
   dim3 blockDim(256);
   dim3 gridDim(200, hostSigmaE->size());
   threads = blockDim.x;
@@ -70,10 +69,8 @@ float calcDndtAse (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostImportance[i] = 1.0;
 
-  // CUDA Mersenne twister
+  // CUDA Mersenne twister for more than 200 blocks
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.y * gridDim.x  * sizeof(curandStateMtgp32)));
-
-  // TODO maybe change seed for different mersenne twister
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, gridDim.y * sizeof(mtgp32_kernel_params)));
   for(unsigned mersenne_i = 0; mersenne_i < gridDim.y; ++mersenne_i){
     CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, &(devKernelParams[mersenne_i])));

@@ -161,7 +161,6 @@ __global__ void recalculateImportance(
 
 // unused, because we didn't find a good way to parallelize it...
 // OPTIMIZE
-// TODO
 /**
  * @brief maps every ray to a specific prism
  *
