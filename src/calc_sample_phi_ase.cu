@@ -22,7 +22,7 @@ __global__ void calcSamplePhiAse(
   unsigned stride = 0;
   unsigned wavelengthOffset = blockIdx.y;
 
-  __shared__ double threadGain[256]; //MUST be the same as number of threads
+  extern __shared__ double threadGain[]; // Size is set by Kernelparameter
   threadGain[threadIdx.x] = 0.;
   Point samplePoint = mesh.getSamplePoint(sample_i);
 

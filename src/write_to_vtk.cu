@@ -66,13 +66,13 @@ int writeToVtk(Mesh *mesh,
   return 0;
 }
 
-int compareVtk(std::vector<double> *ase, std::string filename){
+int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOfSamples){
   std::ifstream filestream;
   std::string line;
   bool foundLine = false;
   double value = 0;
   double diff = 0;
-  unsigned i = 0;
+  unsigned ase_i = 0;
   double minDiff = 10000; // should be enough
   double maxDiff = 0;
   double totalDiff = 0;
@@ -86,8 +86,7 @@ int compareVtk(std::vector<double> *ase, std::string filename){
   }
   std::cerr << "C Compare solution with " << filename << std::endl;
 
-  // Sum up ase values
-  for(unsigned i = 0; i < ase->size(); ++i){
+  for(unsigned i = 0; i < numberOfSamples; ++i){
     aseTotal += ase->at(i);
   }
 
@@ -102,15 +101,14 @@ int compareVtk(std::vector<double> *ase, std::string filename){
 	std::getline(filestream, line);
       }
       if(foundLine){
-	if(i == ase->size())
+	if(ase_i == numberOfSamples)
 	  break;
 	value = (double) atof(line.c_str());
-	//totalDiff += abs(ase->at(i) - value);
 
-	if(abs(value) > abs(ase->at(i)))
-	  diff = (abs(value / ase->at(i)) - 1) * 100;
+	if(abs(value) > abs(ase->at(ase_i)))
+	  diff = (abs(value / ase->at(ase_i)) - 1) * 100;
 	else
-	  diff = (abs(ase->at(i) / value) - 1) * 100;
+	  diff = (abs(ase->at(ase_i) / value) - 1) * 100;
 
 	totalDiff += diff;
 
@@ -121,10 +119,10 @@ int compareVtk(std::vector<double> *ase, std::string filename){
 	  minDiff = diff;
 
 	if(diff >= smallDiff){
-	  std::cerr << "C ASE relative difference[" << i << "]: " << diff  << "%" << "[" << ase->at(i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
+	  std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << ase->at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
 	 }
-	ase->at(i) = diff;
-	i++;
+	ase->at(ase_i) = diff;
+	ase_i++;
 
       }
 

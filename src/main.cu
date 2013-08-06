@@ -250,7 +250,7 @@ int main(int argc, char **argv){
 
   // Write experiment data
   writeToVtk(&hMesh, ase, "octrace.vtk");
-  compareVtk(ase, compareLocation);
+  compareVtk(ase, compareLocation, hMesh.numberOfSamples);
   writeToVtk(&hMesh, ase, "octrace_compare.vtk");
   writeDndtAse(ase);
 
