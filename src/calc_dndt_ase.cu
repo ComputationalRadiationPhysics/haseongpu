@@ -139,7 +139,7 @@ float calcDndtAse (unsigned &threads,
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
       int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
       double a = hostPhiAseSquare[sampleOffset] / hostRaysPerSample;
-      double b = hostPhiAse->at(sampleOffset) * hostPhiAse->at(sampleOffset) / hostRaysPerSample;
+      double b = (hostPhiAse->at(sampleOffset) / hostRaysPerSample) * (hostPhiAse->at(sampleOffset) / hostRaysPerSample);
 
       expectation->at(sampleOffset) =  sqrt(abs((a - b) / hostRaysPerSample));
       

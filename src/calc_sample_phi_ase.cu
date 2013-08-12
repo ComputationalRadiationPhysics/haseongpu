@@ -22,10 +22,13 @@ __global__ void calcSamplePhiAse(
   int rayNumber = 0;
   unsigned stride = 0;
   unsigned wave_i = blockIdx.y;
+  double gainSum = 0;
+  double gainSumSquare = 0;
 
   __shared__ double threadGain[BLOCKDIM];
   __shared__ double threadGainSquare[BLOCKDIM];
   threadGain[threadIdx.x] = 0.;
+  threadGainSquare[threadIdx.x] = 0.;
   Point samplePoint = mesh.getSamplePoint(sample_i);
 
   // One thread can compute multiple rays
@@ -44,11 +47,14 @@ __global__ void calcSamplePhiAse(
 	  gain *= mesh.getBetaValue(startPrism);
 	  gain *= importance[startPrism + wave_i * mesh.numberOfPrisms];
 
-	  threadGain[threadIdx.x] += gain;
-	  threadGainSquare[threadIdx.x] += gain * gain;
+	  gainSum += gain;
+	  gainSumSquare += gain * gain;
 
   }
 
+  threadGain[threadIdx.x] = gainSum;
+  threadGainSquare[threadIdx.x] = gainSumSquare;
+  
   // Reduce the threadGain array (CUDA by Example, Chapter 5.3)  
   __syncthreads();
   unsigned i = blockDim.x/2;
@@ -62,7 +68,7 @@ __global__ void calcSamplePhiAse(
   }
   // thread 0 writes it to the global memory
   if(threadIdx.x == 0){
-	  atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
-	  atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+    atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+    atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
   }
 }
