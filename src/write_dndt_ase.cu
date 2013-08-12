@@ -2,7 +2,7 @@
 #include <vector>
 #include <iomanip>
 
-void writeDndtAse(std::vector<double>* ase){
+void writeDndtAse(std::vector<float>* ase){
   std::ofstream aseFile;
   aseFile.open("dndt_ASE.txt");
 

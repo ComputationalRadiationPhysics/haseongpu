@@ -14,6 +14,6 @@
  *
  * @license GPLv3
  */
-void writeDndtAse(std::vector<double>* ase);
+void writeDndtAse(std::vector<float>* ase);
 
 #endif 

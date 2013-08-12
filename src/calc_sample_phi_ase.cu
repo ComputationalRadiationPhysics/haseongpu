@@ -2,6 +2,8 @@
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
 
+#define BLOCKDIM 256
+
 __global__ void calcSamplePhiAse(
 		curandStateMtgp32* globalState,
 		Mesh mesh, 
@@ -9,6 +11,7 @@ __global__ void calcSamplePhiAse(
 		const double* importance,
 		const unsigned raysPerSample, 
 		float *phiAse, 
+		float *phiAseSquare,
 		const unsigned sample_i,
 		double *sigmaA, 
 		double *sigmaE
@@ -20,7 +23,8 @@ __global__ void calcSamplePhiAse(
   unsigned stride = 0;
   unsigned wave_i = blockIdx.y;
 
-  extern __shared__ double threadGain[]; // Size is set by Kernelparameter
+  __shared__ double threadGain[BLOCKDIM];
+  __shared__ double threadGainSquare[BLOCKDIM];
   threadGain[threadIdx.x] = 0.;
   Point samplePoint = mesh.getSamplePoint(sample_i);
 
@@ -41,6 +45,8 @@ __global__ void calcSamplePhiAse(
 	  gain *= importance[startPrism + wave_i * mesh.numberOfPrisms];
 
 	  threadGain[threadIdx.x] += gain;
+	  threadGainSquare[threadIdx.x] += gain * gain;
+
   }
 
   // Reduce the threadGain array (CUDA by Example, Chapter 5.3)  
@@ -49,6 +55,7 @@ __global__ void calcSamplePhiAse(
   while(i != 0){
 	  if(threadIdx.x < i){
 		  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+		  threadGainSquare[threadIdx.x] += threadGainSquare[threadIdx.x + i];
 	  }
 	  __syncthreads();
 	  i /= 2;
@@ -56,5 +63,6 @@ __global__ void calcSamplePhiAse(
   // thread 0 writes it to the global memory
   if(threadIdx.x == 0){
 	  atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+	  atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
   }
 }

@@ -90,8 +90,7 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
   double totalDiff = 0;
   double aseTotal = 0;
   double smallDiff = 10;
-  
-
+ 
   // No compare vtk was given
   if(!filename.compare("")){
     return 0;
