@@ -184,9 +184,10 @@ CUDA_CHECK_RETURN( cudaSetDevice(devices[device]));
   compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
   writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
+  std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
   writeMatlabOutput(
       phiAse,
-      std::vector<unsigned>(sigmaE->size(),1),
+      &mockupN_rays,
       expectation,
       sigmaE->size(),
       hMesh.numberOfSamples);

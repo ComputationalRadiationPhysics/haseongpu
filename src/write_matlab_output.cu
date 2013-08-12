@@ -14,7 +14,7 @@ void writeMatlabOutput(
 
 
   aseFile.open("phi_ASE.txt");
-  for(unsigned i = 0; i < ase->size(); ++i){
+  for(unsigned i = 0; i < numberOfSamples; ++i){
     for(unsigned j = 0; j < numberOfWavelengths; j++){
       aseFile << std::fixed << std::setprecision(20) << ase->at(i+j*numberOfSamples) << " ";
     }
@@ -25,7 +25,7 @@ void writeMatlabOutput(
 
 //  if(N_rays != NULL) {
 	  raysFile.open("N_rays.txt");
-	  for(unsigned i = 0; i < ase->size(); ++i){
+	  for(unsigned i = 0; i < numberOfSamples; ++i){
 		  for(unsigned j = 0; j<numberOfWavelengths; ++j){
 			  raysFile << N_rays->at(j) << " ";
 			  // TODO: change so that each samplepoint has its own number of rays! (adaptive number of rays!)
@@ -38,7 +38,7 @@ void writeMatlabOutput(
 
   //if(expectedValues != NULL){
 	  expectedValuesFile.open("expected_values.txt");
-	  for(unsigned i = 0; i < ase->size(); ++i){
+	  for(unsigned i = 0; i < numberOfSamples; ++i){
 		  for(unsigned j = 0; j < numberOfWavelengths; j++){
 			  expectedValuesFile << std::fixed << std::setprecision(20) <<  expectedValues->at(i+j*numberOfSamples) << " " ;
 		  }
