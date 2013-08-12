@@ -1,3 +1,6 @@
+#ifndef PARSER_H
+#define PARSER_H
+
 #include <string>  /* string */
 #include <iostream>
 #include <fstream> /* ifstream */
@@ -73,5 +76,24 @@ int fileToValue(std::string filename, T &value){
 }
 
 
+void parseCommandLine(
+    const int argc,
+    char** argv,
+    unsigned *raysPerSample,
+    std::string *root,
+    int *device,
+    bool *silent,
+    std::string *compareLocation,
+    int *mode
+    );
+
+int checkParameterValidity(
+    int argc,
+    unsigned raysPerSample,
+    std::string root,
+    int *device,
+    int mode
+    );
 
 
+#endif
