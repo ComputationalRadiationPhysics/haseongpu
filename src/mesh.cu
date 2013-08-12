@@ -7,9 +7,17 @@
 #include <mesh.h>
 #include <parser.h>
 
-
 Mesh::~Mesh() {
-  if(!triangles) delete triangles;
+  if(!points) delete points;
+  if(!betaValues) delete betaValues;
+  if(!normalVec) delete normalVec;
+  if(!centers) delete centers;
+  if(!surfaces) delete surfaces;
+  if(!forbidden) delete forbidden;
+  if(!betaCells) delete betaCells;
+  if(!triangles) delete triangles;  
+  if(!neighbors) delete neighbors;
+  if(!normalPoint) delete normalPoint;
 }
 
 /**

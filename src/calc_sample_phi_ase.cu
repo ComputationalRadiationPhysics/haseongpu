@@ -1,8 +1,6 @@
-
 #include <mesh.h>
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
-
 
 __global__ void calcSamplePhiAse(
 		curandStateMtgp32* globalState,
@@ -20,7 +18,7 @@ __global__ void calcSamplePhiAse(
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int rayNumber = 0;
   unsigned stride = 0;
-  unsigned wavelengthOffset = blockIdx.y;
+  unsigned wave_i = blockIdx.y;
 
   extern __shared__ double threadGain[]; // Size is set by Kernelparameter
   threadGain[threadIdx.x] = 0.;
@@ -31,16 +29,16 @@ __global__ void calcSamplePhiAse(
   while ((rayNumber = gid + stride) < raysPerSample) {
           stride += blockDim.x * gridDim.x;
   	  // Get triangle prism to start from
-  	  int startPrism = indicesOfPrisms[rayNumber + wavelengthOffset * raysPerSample];
+  	  int startPrism = indicesOfPrisms[rayNumber + wave_i * raysPerSample];
   	  int startLevel = startPrism/mesh.numberOfTriangles;
   	  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
-	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wavelengthOffset * gridDim.x]));
+	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wave_i * gridDim.x]));
 	  Ray ray          = generateRay(startPoint, samplePoint);
-	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[wavelengthOffset], sigmaE[wavelengthOffset]);
+	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[wave_i], sigmaE[wave_i]);
 
 	  gain *= mesh.getBetaValue(startPrism);
-	  gain *= importance[startPrism + wavelengthOffset * mesh.numberOfPrisms];
+	  gain *= importance[startPrism + wave_i * mesh.numberOfPrisms];
 
 	  threadGain[threadIdx.x] += gain;
   }
@@ -57,6 +55,6 @@ __global__ void calcSamplePhiAse(
   }
   // thread 0 writes it to the global memory
   if(threadIdx.x == 0){
-	  atomicAdd(&(phiAse[sample_i  + wavelengthOffset * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+	  atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
   }
 }

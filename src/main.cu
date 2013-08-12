@@ -3,6 +3,7 @@
 #include <assert.h> /* assert */
 #include <string> /* string */
 #include <vector> /* vector */
+#include <stdlib.h> /* atoi */
 
 // User header files
 #include <calc_dndt_ase.h>
@@ -252,17 +253,17 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  writeToVtk(&hMesh, ase, std::string("octrace") + std::string(".vtk"));
+  writeToVtk(&hMesh, ase, "octrace");
   compareVtk(ase, compareLocation, hMesh.numberOfSamples);
-  writeToVtk(&hMesh, ase, "octrace_compare.vtk");
+  writeToVtk(&hMesh, ase, "octrace_compare");
   writeDndtAse(ase);
 
   // Free memory
-  free(devices);
-  cudaFree(dMesh);
+  delete devices;
   delete sigmaE;
   delete sigmaA;
   delete ase;
+  cudaFree(dMesh);
 
   return 0;
 }
