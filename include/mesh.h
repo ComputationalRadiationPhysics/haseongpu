@@ -92,7 +92,8 @@ struct NormalRay {
  *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
  *
  * normalPoint contains indices to the x and y components of the positions where the
- *             normalVectors start (see normalVec).
+ *             normalVectors start (see normalVec). For each Triangle 3 points (3 sides)
+ *             are stored in this list.
  *             Indices point to locations in "points" (i.e. normal vectors start at
  *             triangle vertices!)
  *             structure is VERY similar to triangles: 

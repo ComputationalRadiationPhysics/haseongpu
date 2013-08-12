@@ -1,8 +1,8 @@
-
 #include <mesh.h>
 #include <geometry.h> /* generateRay */
 #include <propagate_ray.h> /* propagateRay */
 
+#define BLOCKDIM 256
 
 __global__ void calcSamplePhiAse(
 		curandStateMtgp32* globalState,
@@ -11,6 +11,7 @@ __global__ void calcSamplePhiAse(
 		const double* importance,
 		const unsigned raysPerSample, 
 		float *phiAse, 
+		float *phiAseSquare,
 		const unsigned sample_i,
 		double *sigmaA, 
 		double *sigmaE
@@ -20,10 +21,14 @@ __global__ void calcSamplePhiAse(
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int rayNumber = 0;
   unsigned stride = 0;
-  unsigned wavelengthOffset = blockIdx.y;
+  unsigned wave_i = blockIdx.y;
+  double gainSum = 0;
+  double gainSumSquare = 0;
 
-  extern __shared__ double threadGain[]; // Size is set by Kernelparameter
+  __shared__ double threadGain[BLOCKDIM];
+  __shared__ double threadGainSquare[BLOCKDIM];
   threadGain[threadIdx.x] = 0.;
+  threadGainSquare[threadIdx.x] = 0.;
   Point samplePoint = mesh.getSamplePoint(sample_i);
 
   // One thread can compute multiple rays
@@ -31,32 +36,39 @@ __global__ void calcSamplePhiAse(
   while ((rayNumber = gid + stride) < raysPerSample) {
           stride += blockDim.x * gridDim.x;
   	  // Get triangle prism to start from
-  	  int startPrism = indicesOfPrisms[rayNumber + wavelengthOffset * raysPerSample];
+  	  int startPrism = indicesOfPrisms[rayNumber + wave_i * raysPerSample];
   	  int startLevel = startPrism/mesh.numberOfTriangles;
   	  int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
-	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wavelengthOffset * gridDim.x]));
+	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wave_i * gridDim.x]));
 	  Ray ray          = generateRay(startPoint, samplePoint);
-	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[wavelengthOffset], sigmaE[wavelengthOffset]);
+	  double gain      = propagateRay(ray, startLevel, startTriangle, &mesh, sigmaA[wave_i], sigmaE[wave_i]);
 
 	  gain *= mesh.getBetaValue(startPrism);
-	  gain *= importance[startPrism + wavelengthOffset * mesh.numberOfPrisms];
+	  gain *= importance[startPrism + wave_i * mesh.numberOfPrisms];
 
-	  threadGain[threadIdx.x] += gain;
+	  gainSum += gain;
+	  gainSumSquare += gain * gain;
+
   }
 
+  threadGain[threadIdx.x] = gainSum;
+  threadGainSquare[threadIdx.x] = gainSumSquare;
+  
   // Reduce the threadGain array (CUDA by Example, Chapter 5.3)  
   __syncthreads();
   unsigned i = blockDim.x/2;
   while(i != 0){
 	  if(threadIdx.x < i){
 		  threadGain[threadIdx.x] += threadGain[threadIdx.x + i];
+		  threadGainSquare[threadIdx.x] += threadGainSquare[threadIdx.x + i];
 	  }
 	  __syncthreads();
 	  i /= 2;
   }
   // thread 0 writes it to the global memory
   if(threadIdx.x == 0){
-	  atomicAdd(&(phiAse[sample_i  + wavelengthOffset * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+    atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
+    atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(threadGain[threadIdx.x]));
   }
 }

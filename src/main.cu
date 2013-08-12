@@ -3,6 +3,7 @@
 #include <assert.h> /* assert */
 #include <string> /* string */
 #include <vector> /* vector */
+#include <stdlib.h> /* atoi */
 
 // User header files
 #include <calc_dndt_ase.h>
@@ -111,49 +112,52 @@ int main(int argc, char **argv){
   if(Mesh::parseMultiGPU(&hMesh, &dMesh, root, numberOfDevices, devices)) return 1;
 
   // Solution vector
-  std::vector<double> *ase = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
-
-  CUDA_CHECK_RETURN( cudaSetDevice(devices[device]));
-
+  std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
+  std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE->size(), 0);
+  std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
+CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
   // Run Experiment
   switch(mode){
-  case 0:
-    // threads and blocks will be set in the following function (by reference)
-    runtime = calcDndtAse(threads,
-        blocks,
-        raysPerSample,
-        dMesh[device],
-        hMesh,
-        sigmaA,
-        sigmaE,
-        ase
-    );
-    runmode="Ray Propagation New GPU";
-    break;
-  case 1:
-    // threads and blocks will be set in the following function (by reference)
-    runtime = forLoopsClad(
-        ase,
-        raysPerSample,
-        &hMesh,
-        hMesh.betaCells,
-        hMesh.nTot,
-        sigmaA->at(0),
-        sigmaE->at(0),
-        hMesh.numberOfPoints,
-        hMesh.numberOfTriangles,
-        hMesh.numberOfLevels,
-        hMesh.thickness,
-        hMesh.crystalFluorescence);
-    runmode = "For Loops";
-    break;
+    case 0:
+      // threads and blocks will be set in the following function (by reference)
+      runtime = calcDndtAse(threads, 
+			    blocks, 
+			    raysPerSample,
+			    dMesh[device],
+			    hMesh,
+			    sigmaA,
+			    sigmaE,
+			    dndtAse,
+			    phiAse,
+			    expectation
+          );
+      runmode="Ray Propagation New GPU";
+      break;
+    case 1:
+      // threads and blocks will be set in the following function (by reference)
+      runtime = forLoopsClad(
+          dndtAse,
+          raysPerSample,
+          &hMesh,
+          hMesh.betaCells,
+          hMesh.nTot,
+          sigmaA->at(0),
+          sigmaE->at(0),
+          hMesh.numberOfPoints,
+          hMesh.numberOfTriangles,
+          hMesh.numberOfLevels,
+          hMesh.thickness,
+          hMesh.crystalFluorescence);
+      runmode = "For Loops";
+      break;
   }
 
   // Print Solution
   for(unsigned wave_i = 0; wave_i < sigmaE->size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-    for(unsigned sample_i = 0; sample_i < ase->size(); ++sample_i){
-      fprintf(stderr, "C ASE PHI of sample %d: %.80f\n", sample_i, ase->at(sample_i + hMesh.numberOfSamples * wave_i));
+    for(unsigned sample_i = 0; sample_i < dndtAse->size(); ++sample_i){
+      int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+      fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse->at(sampleOffset), expectation->at(sampleOffset));
       if(silent){
         if(sample_i >= 10) break;
       }
@@ -164,9 +168,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
-  fprintf(stderr, "C Samples           : %d\n", (int) ase->size());
+  fprintf(stderr, "C Samples           : %d\n", (int) dndtAse->size());
   fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
-  fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * ase->size());
+  fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * dndtAse->size());
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
@@ -175,24 +179,26 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  writeToVtk(&hMesh, ase, std::string("octrace") + std::string(".vtk"));
-  compareVtk(ase, compareLocation, hMesh.numberOfSamples);
-  writeToVtk(&hMesh, ase, "octrace_compare.vtk");
+
+  writeToVtk(&hMesh, dndtAse, "octrace");
+  compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
   writeMatlabOutput(
-      ase,
+      phiAse,
       std::vector<unsigned>(sigmaE->size(),1),
-      std::vector<float>(sigmaE->size()*hMesh.numberOfSamples,-1),
+      expectation,
       sigmaE->size(),
-      hMesh.numberOfSamples
-  );
+      hMesh.numberOfSamples);
 
   // Free memory
-  free(devices);
-  cudaFree(dMesh);
+  delete devices;
   delete sigmaE;
   delete sigmaA;
-  delete ase;
+  delete dndtAse;
+  //delete phiAse;
+  delete expectation;
+  cudaFree(dMesh);
 
   return 0;
 }

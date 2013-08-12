@@ -5,13 +5,25 @@
 #include <mesh.h>
 #include <cstdlib> /* atof */
 #include <string>
+#include <time.h> /* time, time_t */
+#include <sstream> /* std::stringstream */
 
 int writeToVtk(Mesh *mesh,
 	       std::vector<double>* ase,
 	       std::string filename){
 
+  // Add time to filename
+  time_t currentTime;
+  time(&currentTime);
+  std::stringstream timeStream;
+  timeStream << (int) currentTime;
+
+  filename = filename +  "_" + timeStream.str() + ".vtk";
+
   std::cerr << "C Write experiment data to vtk-file" << std::endl;
   std::ofstream vtkFile;
+  
+
   vtkFile.open(filename.c_str());
 
   // Write header of vtk file
@@ -78,8 +90,7 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
   double totalDiff = 0;
   double aseTotal = 0;
   double smallDiff = 10;
-  
-
+ 
   // No compare vtk was given
   if(!filename.compare("")){
     return 0;

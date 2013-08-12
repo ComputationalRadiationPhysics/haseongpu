@@ -47,6 +47,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 const double* importance,
 				 const unsigned raysPerSample, 
 				 float *phiAse,
+				 float *phiAseSquare,
 				 const unsigned sample_i,
 				 double *sigmaA,
 				 double *sigmaE
