@@ -8,7 +8,7 @@
 #include <calc_dndt_ase.h>
 #include <parser.h>
 #include <write_to_vtk.h>
-#include <write_dndt_ase.h>
+#include <write_matlab_output.h>
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
@@ -53,7 +53,7 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
   (*devices) = (unsigned*) malloc(sizeof(unsigned) * correctDevices);
 
   if(verbose > 0){
-    fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", correctDevices, minMajor,minMinor); 
+    fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", correctDevices, minMajor,minMinor);
   }
 
   candidate = 0;
@@ -61,7 +61,7 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
       if(verbose > 0){
-        fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", candidate, prop.name, prop.major, prop.minor); 
+        fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", candidate, prop.name, prop.major, prop.minor);
       }
       (*devices)[candidate]=i;
       candidate++;
@@ -117,36 +117,36 @@ int main(int argc, char **argv){
 
   // Run Experiment
   switch(mode){
-    case 0:
-      // threads and blocks will be set in the following function (by reference)
-      runtime = calcDndtAse(threads, 
-          blocks, 
-          raysPerSample,
-          dMesh[device],
-          hMesh,
-          sigmaA,
-          sigmaE,
-          ase
-          );
-      runmode="Ray Propagation New GPU";
-      break;
-    case 1:
-      // threads and blocks will be set in the following function (by reference)
-      runtime = forLoopsClad(
-          ase,
-          raysPerSample,
-          &hMesh,
-          hMesh.betaCells,
-          hMesh.nTot,
-          sigmaA->at(0),
-          sigmaE->at(0),
-          hMesh.numberOfPoints,
-          hMesh.numberOfTriangles,
-          hMesh.numberOfLevels,
-          hMesh.thickness,
-          hMesh.crystalFluorescence);
-      runmode = "For Loops";
-      break;
+  case 0:
+    // threads and blocks will be set in the following function (by reference)
+    runtime = calcDndtAse(threads,
+        blocks,
+        raysPerSample,
+        dMesh[device],
+        hMesh,
+        sigmaA,
+        sigmaE,
+        ase
+    );
+    runmode="Ray Propagation New GPU";
+    break;
+  case 1:
+    // threads and blocks will be set in the following function (by reference)
+    runtime = forLoopsClad(
+        ase,
+        raysPerSample,
+        &hMesh,
+        hMesh.betaCells,
+        hMesh.nTot,
+        sigmaA->at(0),
+        sigmaE->at(0),
+        hMesh.numberOfPoints,
+        hMesh.numberOfTriangles,
+        hMesh.numberOfLevels,
+        hMesh.thickness,
+        hMesh.crystalFluorescence);
+    runmode = "For Loops";
+    break;
   }
 
   // Print Solution
@@ -178,7 +178,14 @@ int main(int argc, char **argv){
   writeToVtk(&hMesh, ase, std::string("octrace") + std::string(".vtk"));
   compareVtk(ase, compareLocation, hMesh.numberOfSamples);
   writeToVtk(&hMesh, ase, "octrace_compare.vtk");
-  writeDndtAse(ase);
+
+  writeMatlabOutput(
+      ase,
+      std::vector<unsigned>(sigmaE->size(),1),
+      std::vector<float>(sigmaE->size()*hMesh.numberOfSamples,-1),
+      sigmaE->size(),
+      hMesh.numberOfSamples
+  );
 
   // Free memory
   free(devices);
