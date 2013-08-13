@@ -440,8 +440,9 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
 	  crystalFluorescence
       );
 
- for( unsigned i=0;i<numberOfDevices;i++){
-  CUDA_CHECK_RETURN( cudaSetDevice(devices[i]) );
+  for( unsigned i=0;i < 1;i++){
+  //for( unsigned i=0;i < numberOfDevices;i++){
+  //CUDA_CHECK_RETURN( cudaSetDevice(devices[i]) );
   fillDMesh(
       hMesh,
       &((*dMesh)[i]),
@@ -464,8 +465,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
 	  nTot,
 	  crystalFluorescence
       );
-  cudaDeviceSynchronize();
- }
+  //cudaDeviceSynchronize();
+  }
  return 0;
 }
 

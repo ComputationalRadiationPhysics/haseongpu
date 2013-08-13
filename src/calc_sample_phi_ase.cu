@@ -5,17 +5,17 @@
 #define BLOCKDIM 256
 
 __global__ void calcSamplePhiAse(
-		curandStateMtgp32* globalState,
-		Mesh mesh, 
-		const unsigned* indicesOfPrisms, 
-		const double* importance,
-		const unsigned raysPerSample, 
-		float *phiAse, 
-		float *phiAseSquare,
-		const unsigned sample_i,
-		double *sigmaA, 
-		double *sigmaE
-		) {
+				 curandStateMtgp32* globalState,
+				 Mesh mesh, 
+				 const unsigned* indicesOfPrisms, 
+				 const double* importance,
+				 const unsigned raysPerSample, 
+				 float *phiAse, 
+				 float *phiAseSquare,
+				 const unsigned sample_i,
+				 double *sigmaA, 
+				 double *sigmaE
+				 ) {
 
   // Get global ID
   int gid = threadIdx.x + blockIdx.x * blockDim.x;

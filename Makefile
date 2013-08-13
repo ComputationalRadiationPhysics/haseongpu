@@ -6,7 +6,7 @@ DATE="`date +%y%m%d%H%M%S`"
 # compiler, linker, archiver
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
-NVCC_FLAGS = --use_fast_math 
+#NVCC_FLAGS = --use_fast_math -lineinfo
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
@@ -20,13 +20,13 @@ ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
 SRCS = $(wildcard src/*.cu src/*/*.cu)
 OBJS = $(SRCS:src/%.cu=bin/%.o)
 TESTSRCS = $(wildcard tests/*.cu)
-TEST_FLAGS = -g -G
+TEST_FLAGS = -g -G 
 INCLUDES = include
 
 all: octrace
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
-	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES)  $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
+	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES)  $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS) $(TEST_FLAGS)
 
 
 octrace: $(OBJS) Makefile

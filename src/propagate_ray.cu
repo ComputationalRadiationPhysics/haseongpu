@@ -159,7 +159,7 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
 }
 
 __device__ double propagateRay(Ray nextRay, unsigned nextLevel, unsigned nextTriangle, Mesh *mesh, 
-					const double sigmaA, const double sigmaE){
+			       const double sigmaA, const double sigmaE){
   double distanceTotal     = nextRay.length;
   double distanceRemaining = nextRay.length;
   double length  = 0;

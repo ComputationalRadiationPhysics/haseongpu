@@ -115,7 +115,7 @@ int main(int argc, char **argv){
   std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
-CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
+  //CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
   // Run Experiment
   switch(mode){
     case 0:
@@ -180,17 +180,17 @@ CUDA_CHECK_RETURN( cudaSetDevice(devices[device]));
 
   // Write experiment data
 
-  writeToVtk(&hMesh, dndtAse, "octrace");
-  compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-  writeToVtk(&hMesh, dndtAse, "octrace_compare");
+  // writeToVtk(&hMesh, dndtAse, "octrace");
+  // compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  // writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
-  std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
-  writeMatlabOutput(
-      phiAse,
-      &mockupN_rays,
-      expectation,
-      sigmaE->size(),
-      hMesh.numberOfSamples);
+  // std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
+  // writeMatlabOutput(
+  //     phiAse,
+  //     &mockupN_rays,
+  //     expectation,
+  //     sigmaE->size(),
+  //     hMesh.numberOfSamples);
 
   // Free memory
   delete devices;
