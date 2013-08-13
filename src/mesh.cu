@@ -372,16 +372,15 @@ __device__ unsigned Mesh::getCellType(unsigned triangle){
  *
  * @param *surfaces the sizes of the surface of each prism
  *
- * @param numberOfDevices number of devices in *devices
- *
  * @param *devices array of device indices for all possible devices 
  *
+ * @param maxGpus maximal number of devices to allocate
  */
 int Mesh::parseMultiGPU(Mesh *hMesh,
-    Mesh **dMesh,
-    std::string root,
-    unsigned numberOfDevices,
-    unsigned *devices) {
+			Mesh **dMesh,
+			std::string root,
+			unsigned *devices,
+			unsigned maxGpus) {
 
   // Experimentdata
   std::vector<double> * betaValues = new std::vector<double>;
@@ -470,9 +469,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       cladAbsorption
   );
 
-  for( unsigned i=0; i<1; i++){
-    //for( unsigned i=0;i<numberOfDevices;i++){
-    //CUDA_CHECK_RETURN( cudaSetDevice(devices[i]) );
+  for( unsigned i=0; i<maxGpus; i++){
+    CUDA_CHECK_RETURN(cudaSetDevice(devices[i]) );
     fillDMesh(
         hMesh,
         &((*dMesh)[i]),

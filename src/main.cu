@@ -16,6 +16,7 @@
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
+#define MAX_GPUS 1
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -75,17 +76,20 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   std::string runmode("");
-  std::string compareLocation ("");
+  std::string compareLocation("");
   float runtime = 0.0;
   unsigned blocks;
   unsigned threads;
   bool silent = false;
+  bool writeVtk = false;
   unsigned *devices; // will be assigned in getCOrrectDevice();
   unsigned numberOfDevices=0;
+  unsigned maxGpus = MAX_GPUS;
   int device = -1;
   int mode = -1;
+  
 
-  std::string root;
+  std::string experimentPath;
 
   // Wavelength data
   std::vector<double> *sigmaA = new std::vector<double>;
@@ -95,27 +99,28 @@ int main(int argc, char **argv){
   numberOfDevices = getCorrectDevice(1,&devices);
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &root, &device, &silent,
-      &compareLocation, &mode);
+  parseCommandLine(argc, argv, &raysPerSample, &experimentPath, &device, &silent,
+		   &writeVtk, &compareLocation, &mode);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, root, &device, mode)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, experimentPath, &device, mode)) return 1;
 
   // Parse wavelengths from files
-  if(fileToVector(root + "sigma_a.txt", sigmaA)) return 1;
-  if(fileToVector(root + "sigma_e.txt", sigmaE)) return 1;
+  if(fileToVector(experimentPath + "sigma_a.txt", sigmaA)) return 1;
+  if(fileToVector(experimentPath + "sigma_e.txt", sigmaE)) return 1;
   assert(sigmaA->size() == sigmaE->size());
+  assert(maxGpus <= numberOfDevices);
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
-  Mesh *dMesh = new Mesh[numberOfDevices];
-  if(Mesh::parseMultiGPU(&hMesh, &dMesh, root, numberOfDevices, devices)) return 1;
+  Mesh *dMesh = new Mesh[maxGpus];
+  if(Mesh::parseMultiGPU(&hMesh, &dMesh, experimentPath, devices, maxGpus)) return 1;
 
   // Solution vector
   std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
-  //CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
+  CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
   // Run Experiment
   switch(mode){
     case 0:
@@ -180,7 +185,6 @@ int main(int argc, char **argv){
 
   // Write experiment data
   std::vector<unsigned> *mockupN_rays = new std::vector<unsigned>(sigmaE->size(),1);
-
   writeMatlabOutput(
 		  phiAse,
 		  mockupN_rays,
@@ -188,10 +192,9 @@ int main(int argc, char **argv){
 		  sigmaE->size(),
 		  hMesh.numberOfSamples);
 
-  //writeToVtk(&hMesh, dndtAse, "octrace");
-  compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-  //writeToVtk(&hMesh, dndtAse, "octrace_compare");
-
+  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace");
+  if(compareLocation!="")compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
   // Free memory
   delete devices;

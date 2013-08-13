@@ -83,6 +83,7 @@ void parseCommandLine(
     std::string *root,
     int *device,
     bool *silent,
+    bool *writeVtk,
     std::string *compareLocation,
     int *mode
     );

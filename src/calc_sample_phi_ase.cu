@@ -3,8 +3,7 @@
 #include <propagate_ray.h> /* propagateRay */
 
 
-__global__ void calcSamplePhiAse(
-				 curandStateMtgp32* globalState,
+__global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
 				 const double* importance,

@@ -20,6 +20,27 @@
 
 #define SEED 1234
 
+/**
+ * @brief Calculates which ray should start in which prism. Thus
+ *        every thread in on gpu knows the index of the prism
+ *        where its rays starts.
+ *
+ **/
+void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned* raysPerPrism, unsigned raysPerSample, Mesh mesh, dim3 gridDim){
+  for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
+    for(unsigned prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
+      for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + mesh.numberOfPrisms * wave_i]; ++ray_i){
+	indicesOfPrisms[absoluteRay + raysPerSample * wave_i] = prism_i;
+	absoluteRay++;
+	assert(absoluteRay <= raysPerSample);
+      }
+      
+    }
+    
+  }
+  
+}
+
 float calcDndtAse (unsigned &threads, 
 		   unsigned &blocks,
 		   unsigned &hostRaysPerSample,
@@ -68,7 +89,6 @@ float calcDndtAse (unsigned &threads,
   expectationThreshold = 0.005;
   maxRaysPerSample = hostRaysPerSample * 10000;
 
-  //hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostPhiAseSquare    = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(double));
   hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(unsigned));
@@ -116,21 +136,12 @@ float calcDndtAse (unsigned &threads,
 
     while(!expectationIsMet){
     expectationIsMet = true;
+    
+    hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
 
-      hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
-
-      CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
-
-      // Prism scheduling for gpu threads
-      for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
-        for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
-          for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i + hostMesh.numberOfPrisms * wave_i]; ++ray_i){
-            hostIndicesOfPrisms[absoluteRay + hostRaysPerSample * wave_i] = prism_i;
-            absoluteRay++;
-            assert(absoluteRay <= hostRaysPerSample);
-          }
-        }
-      }
+    // Prism scheduling for gpu threads
+    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
+    calcIndicesOfPrism(hostIndicesOfPrisms, hostRaysPerPrism, hostRaysPerSample, hostMesh, gridDim);
 
       // Copy dynamic sample data to device
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));

@@ -20,13 +20,13 @@ ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
 SRCS = $(wildcard src/*.cu src/*/*.cu)
 OBJS = $(SRCS:src/%.cu=bin/%.o)
 TESTSRCS = $(wildcard tests/*.cu)
-TEST_FLAGS = -g -G 
+DEBUG_FLAGS = -g -G 
 INCLUDES = include
 
 all: octrace
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
-	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES)  $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS) $(TEST_FLAGS)
+	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES)  $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
 
 
 octrace: $(OBJS) Makefile

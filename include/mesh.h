@@ -143,10 +143,11 @@ struct Mesh {
   __device__ unsigned getCellType(unsigned triangle);
 
   static int parseMultiGPU(Mesh *hMesh, 
-			    Mesh **dMesh, 
-			    std::string root,
-			    unsigned numberOfDevices,
-			    unsigned *devices);
+			   Mesh **dMesh, 
+			   std::string root,
+			   unsigned *devices,
+			   unsigned maxGpus
+			   );
 };
 
 #endif /* MESH_H */
