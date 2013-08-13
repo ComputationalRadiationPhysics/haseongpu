@@ -109,6 +109,7 @@ struct Mesh {
   float  *surfaces;
   int	 *forbidden;
   double  *betaCells;
+  unsigned *cellTypes;
 
   //indexstructs
   unsigned *triangles;
@@ -116,6 +117,7 @@ struct Mesh {
   unsigned *normalPoint;
 
   //constants
+  double cladAbsorption;
   float surfaceTotal;
   float thickness;
   float nTot;
@@ -125,6 +127,8 @@ struct Mesh {
   unsigned numberOfPrisms;
   unsigned numberOfPoints;
   unsigned numberOfSamples;
+  unsigned cladNumber;
+
 
   ~Mesh();
 
@@ -136,6 +140,7 @@ struct Mesh {
   __device__ Point getSamplePoint(unsigned sample);
   __device__ Point getCenterPoint(unsigned triangle, unsigned level);
   __device__ int getForbiddenEdge(unsigned triangle, int edge);
+  __device__ unsigned getCellType(unsigned triangle);
 
   static int parseMultiGPU(Mesh *hMesh, 
 			    Mesh **dMesh, 
