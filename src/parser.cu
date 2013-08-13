@@ -9,6 +9,7 @@ void parseCommandLine(
     std::string *root,
     int *device,
     bool *silent,
+    bool *writeVtk,
     std::string *compareLocation,
     int *mode
     ) {
@@ -55,6 +56,10 @@ void parseCommandLine(
     // Parse if we want less output
     if (p.first == "--silent") {
       *silent = true;
+    }
+
+    if (p.first == "--write-vtk") {
+      *writeVtk = true;
     }
 
     // Parse what vtk file to compare with
