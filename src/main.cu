@@ -72,7 +72,6 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
   return correctDevices;
 }
 
-
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   std::string runmode("");
@@ -183,14 +182,15 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Runtime           : %f s\n", runtime);
   fprintf(stderr, "\n");
 
-  // Write experiment data
-  // std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
-  // writeMatlabOutput(
-  //     phiAse,
-  //     &mockupN_rays,
-  //     expectation,
-  //     sigmaE->size(),
-  //     hMesh.numberOfSamples);
+  //Write experiment data
+  std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
+  writeMatlabOutput(
+      phiAse,
+      &mockupN_rays,
+      expectation,
+      sigmaE->size(),
+      hMesh.numberOfSamples);
+
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace");
   if(compareLocation!="")compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
@@ -200,7 +200,7 @@ int main(int argc, char **argv){
   delete sigmaE;
   delete sigmaA;
   delete dndtAse;
-  //delete phiAse;
+  delete phiAse;
   delete expectation;
   cudaFree(dMesh);
 

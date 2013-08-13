@@ -171,9 +171,8 @@ float calcDndtAse (unsigned &threads,
   // Stop time
   runtime = difftime(time(0),starttime);
 
-
   // Free Memory
-  free(hostPhiAse);
+  // HINT Don't free importance if we return value to main
   free(hostImportance);
   free(hostRaysPerPrism);
   free(hostIndicesOfPrisms);
@@ -188,5 +187,4 @@ float calcDndtAse (unsigned &threads,
   cudaDeviceReset();
 
   return runtime;
-
 }
