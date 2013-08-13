@@ -18,7 +18,7 @@
 #include <ctime> /* progressBar */
 #include <progressbar.h> /*progressBar */
 
-#define SEED 4321
+#define SEED 1234
 
 float calcDndtAse (unsigned &threads, 
 		   unsigned &blocks,
@@ -65,7 +65,7 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.001;
+  expectationThreshold = 0.005;
   maxRaysPerSample = hostRaysPerSample * 10000;
 
   //hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
@@ -190,7 +190,6 @@ float calcDndtAse (unsigned &threads,
 
 
   // Free Memory
-  free(hostPhiAse);
   free(hostImportance);
   free(hostRaysPerPrism);
   free(hostIndicesOfPrisms);

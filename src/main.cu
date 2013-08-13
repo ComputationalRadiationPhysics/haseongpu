@@ -179,25 +179,28 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
+  std::vector<unsigned> *mockupN_rays = new std::vector<unsigned>(sigmaE->size(),1);
+
+  writeMatlabOutput(
+		  phiAse,
+		  mockupN_rays,
+		  expectation,
+		  sigmaE->size(),
+		  hMesh.numberOfSamples);
+
   //writeToVtk(&hMesh, dndtAse, "octrace");
   compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
   //writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
-  // std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
-  // writeMatlabOutput(
-  //     phiAse,
-  //     &mockupN_rays,
-  //     expectation,
-  //     sigmaE->size(),
-  //     hMesh.numberOfSamples);
 
   // Free memory
   delete devices;
   delete sigmaE;
   delete sigmaA;
   delete dndtAse;
-  //delete phiAse;
+  delete phiAse;
   delete expectation;
+  delete mockupN_rays;
   cudaFree(dMesh);
 
   return 0;

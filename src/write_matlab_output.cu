@@ -23,7 +23,6 @@ void writeMatlabOutput(
   aseFile.close();
 
 
-//  if(N_rays != NULL) {
 	  raysFile.open("N_rays.txt");
 	  for(unsigned i = 0; i < numberOfSamples; ++i){
 		  for(unsigned j = 0; j<numberOfWavelengths; ++j){
@@ -33,10 +32,8 @@ void writeMatlabOutput(
 		  raysFile << std::endl;
 	  }
 	  raysFile.close();
- // }
 
 
-  //if(expectedValues != NULL){
 	  expectedValuesFile.open("expected_values.txt");
 	  for(unsigned i = 0; i < numberOfSamples; ++i){
 		  for(unsigned j = 0; j < numberOfWavelengths; j++){
@@ -45,5 +42,4 @@ void writeMatlabOutput(
 		  expectedValuesFile << std::endl;
 	  }
 	  expectedValuesFile.close();
- // }
 }
