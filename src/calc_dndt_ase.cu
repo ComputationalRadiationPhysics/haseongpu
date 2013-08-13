@@ -40,6 +40,9 @@ float calcDndtAse (unsigned &threads,
   unsigned *hostIndicesOfPrisms;
   float *hostPhiAseSquare;
   time_t starttime,progressStartTime;
+  unsigned hostRaysPerSampleSave;
+  float expectationThreshold;
+  unsigned maxRaysPerSample;
 
   // GPU
   float *phiAse;
@@ -61,12 +64,15 @@ float calcDndtAse (unsigned &threads,
   blocks = gridDim.x * gridDim.y;
     
   starttime = time(0);
+  hostRaysPerSampleSave = hostRaysPerSample;
+  expectationThreshold = 0.001;
+  maxRaysPerSample = hostRaysPerSample * 10000;
 
   //hostPhiAse          = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostPhiAseSquare    = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(double));
   hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(unsigned));
-  hostIndicesOfPrisms = (unsigned*) malloc (hostRaysPerSample        * gridDim.y * sizeof(unsigned));
+  hostIndicesOfPrisms = (unsigned*) malloc (maxRaysPerSample         * gridDim.y * sizeof(unsigned));
 
   for(unsigned i=0; i < hostRaysPerSample * gridDim.y; ++i) hostIndicesOfPrisms[i] = 0;
   for(unsigned i=0; i < hostMesh.numberOfSamples * gridDim.y; ++i) hostPhiAseSquare[i] = 0.f;
@@ -85,7 +91,7 @@ float calcDndtAse (unsigned &threads,
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * gridDim.y * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysDump, gridDim.y * sizeof(unsigned)));
@@ -103,60 +109,82 @@ float calcDndtAse (unsigned &threads,
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
   progressStartTime = time(0);
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
+    bool expectationIsMet = false;
+    hostRaysPerSample = hostRaysPerSampleSave;
 
-    hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+    while(!expectationIsMet){
+    expectationIsMet = true;
 
-    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
+      hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
 
-    // Prism scheduling for gpu threads
-    for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
-      for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
-    	for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i + hostMesh.numberOfPrisms * wave_i]; ++ray_i){
-    	  hostIndicesOfPrisms[absoluteRay + hostRaysPerSample * wave_i] = prism_i;
-    	  absoluteRay++;
-    	  assert(absoluteRay <= hostRaysPerSample);
-    	}
+      CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
+
+      // Prism scheduling for gpu threads
+      for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
+        for(unsigned prism_i=0, absoluteRay = 0; prism_i < hostMesh.numberOfPrisms; ++prism_i){
+          for(unsigned ray_i=0; ray_i < hostRaysPerPrism[prism_i + hostMesh.numberOfPrisms * wave_i]; ++ray_i){
+            hostIndicesOfPrisms[absoluteRay + hostRaysPerSample * wave_i] = prism_i;
+            absoluteRay++;
+            assert(absoluteRay <= hostRaysPerSample);
+          }
+        }
+      }
+
+      // Copy dynamic sample data to device
+      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
+
+      // Start Kernel
+      calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
+
+      // Calculate expectations
+      for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
+        int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+
+        // Copy solution (for this samplepoint) back to host
+        CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAse->at(sampleOffset)), &(phiAse[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
+        CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAseSquare[sampleOffset]), &(phiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
+
+        // check the error
+        double a = hostPhiAseSquare[sampleOffset] / hostRaysPerSample;
+        double b = (hostPhiAse->at(sampleOffset) / hostRaysPerSample) * (hostPhiAse->at(sampleOffset) / hostRaysPerSample);
+        expectation->at(sampleOffset) =  sqrt(abs((a - b) / hostRaysPerSample));
+        if(expectation->at(sampleOffset) >= expectationThreshold){
+          expectationIsMet=false;
+        }
+      }
+
+      //alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
+      if(hostRaysPerSample == maxRaysPerSample) expectationIsMet = true;
+
+      // if the threshold is still too high, increase the number of rays and reset the previously calculated value
+      if(!expectationIsMet){
+        hostRaysPerSample *= 10;
+        for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
+          int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+          hostPhiAse->at(sampleOffset)=0;
+          hostPhiAseSquare[sampleOffset]=0;
+          CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
+          CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+        }
       }
     }
-
-    // Copy dynamic sample data to device
-    CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
-
-    // Start Kernel
-    calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
 
     // update progressbar
     if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,60,progressStartTime);
 
-  }
-  // Copy solution back to host
-  CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAse->at(0)), phiAse, hostMesh.numberOfSamples * gridDim.y * sizeof(float), cudaMemcpyDeviceToHost));
-  CUDA_CHECK_RETURN(cudaMemcpy(hostPhiAseSquare, phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float), cudaMemcpyDeviceToHost));
-
-  // Calculate expectations
-  for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-    for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-      int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-      double a = hostPhiAseSquare[sampleOffset] / hostRaysPerSample;
-      double b = (hostPhiAse->at(sampleOffset) / hostRaysPerSample) * (hostPhiAse->at(sampleOffset) / hostRaysPerSample);
-
-      expectation->at(sampleOffset) =  sqrt(abs((a - b) / hostRaysPerSample));
-      
-    }
-
-  }
-
-  // Calculate dndt Ase
-  for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-    for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
+    // Calculate dndt Ase, after one point is completely sampled
+    for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
       int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
       hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (hostRaysPerSample * 4.0f * 3.14159)));
       double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
       dndtAse->at(sampleOffset) = gain_local * hostPhiAse->at(sampleOffset) / hostMesh.crystalFluorescence;
-
     }
+
   }
+
+
   // Stop time
   runtime = difftime(time(0),starttime);
 
