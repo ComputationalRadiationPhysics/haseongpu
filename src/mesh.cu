@@ -7,6 +7,7 @@
 #include <mesh.h>
 #include <parser.h>
 
+
 Mesh::~Mesh() {
   if(!points) delete points;
   if(!betaValues) delete betaValues;
@@ -18,6 +19,7 @@ Mesh::~Mesh() {
   if(!triangles) delete triangles;  
   if(!neighbors) delete neighbors;
   if(!normalPoint) delete normalPoint;
+  if(!cellTypes) delete cellTypes;
 }
 
 /**
@@ -42,10 +44,13 @@ void fillHMesh(
     std::vector<int> *neighbors, 
     std::vector<float> *surfaces,
     std::vector<double> *betaValues,
-	std::vector<double> *betaCells,
-	float nTot,
-	float crystalFluorescence
-    ) {
+    std::vector<double> *betaCells,
+    std::vector<unsigned> * cellTypes,
+    float nTot,
+    float crystalFluorescence,
+    unsigned cladNumber,
+    double cladAbsorption
+) {
 
   hMesh->numberOfTriangles = numberOfTriangles;
   hMesh->numberOfLevels = numberOfLevels;
@@ -55,6 +60,8 @@ void fillHMesh(
   hMesh->thickness = thicknessOfPrism;
   hMesh->crystalFluorescence = crystalFluorescence;
   hMesh->nTot = nTot;
+  hMesh->cladNumber = cladNumber;
+  hMesh->cladAbsorption = cladAbsorption;
 
   std::vector<double> *hostCenters = new std::vector<double>(xOfTriangleCenter->begin(), xOfTriangleCenter->end());
   hostCenters->insert(hostCenters->end(),yOfTriangleCenter->begin(),yOfTriangleCenter->end());
@@ -72,6 +79,7 @@ void fillHMesh(
   hMesh->neighbors = &(neighbors->at(0));
   hMesh->normalPoint = &(positionsOfNormal->at(0));
   hMesh->betaCells = &(betaCells->at(0));
+  hMesh->cellTypes = &(cellTypes->at(0));
 }
 
 /**
@@ -97,10 +105,13 @@ void fillDMesh(
     std::vector<int> *neighborsVector, 
     std::vector<float> *surfacesVector,
     std::vector<double> *betaValuesVector,
-	std::vector<double> *betaCells,
-	float nTot,
-	float crystalFluorescence
-    ) {
+    std::vector<double> *betaCells,
+    std::vector<unsigned> *cellTypes,
+    float nTot,
+    float crystalFluorescence,
+    unsigned cladNumber,
+    double cladAbsorption
+) {
 
 
   // GPU variables
@@ -115,6 +126,8 @@ void fillDMesh(
   dMesh->thickness = thicknessOfPrism;
   dMesh->crystalFluorescence = crystalFluorescence;
   dMesh->nTot = nTot;
+  dMesh->cladAbsorption = cladAbsorption;
+  dMesh->cladNumber = cladNumber;
 
   for(unsigned i=0;i<numberOfTriangles;++i){
     totalSurface+=double(surfacesVector->at(i));	
@@ -130,6 +143,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->surfaces), hMesh->numberOfTriangles * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->cellTypes), hMesh->numberOfTriangles * sizeof(unsigned)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
@@ -137,7 +151,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->normalPoint), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
 
 
-    /// fill values
+  /// fill values
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->points, (double*) &(pointsVector->at(0)), 2 * hMesh->numberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
 
   std::vector<double> *hostNormalVec = new std::vector<double>(xOfNormals->begin(), xOfNormals->end());
@@ -158,6 +172,7 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (double*) &(betaCells->at(0)), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1) * sizeof(double), cudaMemcpyHostToDevice));
 
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->cellTypes, (unsigned*) &(cellTypes->at(0)), hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
 
 
   // fill indexStructs
@@ -166,7 +181,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->neighbors,(int*) &(neighborsVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalPoint, (unsigned*) &(positionsOfNormalVectors->at(0)), 3 * hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
-  
+
 }
 
 /**
@@ -179,7 +194,7 @@ void fillDMesh(
  * @return the index of the neighbor triangle
  */
 __device__ int Mesh::getNeighbor(unsigned triangle, int edge){
-	return neighbors[triangle + edge*numberOfTriangles];
+  return neighbors[triangle + edge*numberOfTriangles];
 }
 
 /**
@@ -197,28 +212,28 @@ __device__ int Mesh::getNeighbor(unsigned triangle, int edge){
  * random position inside a given triangle in a specific depth
  */
 __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState){
-	Point startPoint = {0,0,0};
-	double u = curand_uniform(&globalState[blockIdx.x]);
-	double v = curand_uniform(&globalState[blockIdx.x]);
+  Point startPoint = {0,0,0};
+  double u = curand_uniform(&globalState[blockIdx.x]);
+  double v = curand_uniform(&globalState[blockIdx.x]);
 
-	if((u+v)>1)
-	{
-		u = 1-u;
-		v = 1-v;
-	}
-	double w = 1-u-v;
-	int t1 = triangles[triangle];
-	int t2 = triangles[triangle + numberOfTriangles];
-	int t3 = triangles[triangle + 2 * numberOfTriangles];
+  if((u+v)>1)
+  {
+    u = 1-u;
+    v = 1-v;
+  }
+  double w = 1-u-v;
+  int t1 = triangles[triangle];
+  int t2 = triangles[triangle + numberOfTriangles];
+  int t3 = triangles[triangle + 2 * numberOfTriangles];
 
-	// convert the random startpoint into coordinates
-	startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
-	startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
-	startPoint.y = (points[t1+numberOfPoints] * u) + (points[t2+numberOfPoints] * v) + (points[t3+numberOfPoints] * w);
+  // convert the random startpoint into coordinates
+  startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
+  startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
+  startPoint.y = (points[t1+numberOfPoints] * u) + (points[t2+numberOfPoints] * v) + (points[t3+numberOfPoints] * w);
 
-	return startPoint;
+  return startPoint;
 }
-  
+
 
 /**
  * @brief get a betaValue for a specific triangle and level
@@ -230,7 +245,7 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
  * @return a beta value
  */
 __device__ double Mesh::getBetaValue(unsigned triangle, unsigned level){
-	return betaValues[triangle + level*numberOfTriangles];
+  return betaValues[triangle + level*numberOfTriangles];
 }
 
 /**
@@ -241,7 +256,7 @@ __device__ double Mesh::getBetaValue(unsigned triangle, unsigned level){
  * @return a beta value
  */
 __device__ double Mesh::getBetaValue(unsigned prism){
-	return betaValues[prism];
+  return betaValues[prism];
 }
 
 /**
@@ -254,15 +269,15 @@ __device__ double Mesh::getBetaValue(unsigned prism){
  * @return a normal vector with length 1
  */
 __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
-	NormalRay ray = { {0,0},{0,0}};
-	int offset =  edge*numberOfTriangles + triangle;
-	ray.p.x = points[ normalPoint [offset] ];
-	ray.p.y = points[ normalPoint [offset] + numberOfPoints ];
+  NormalRay ray = { {0,0},{0,0}};
+  int offset =  edge*numberOfTriangles + triangle;
+  ray.p.x = points[ normalPoint [offset] ];
+  ray.p.y = points[ normalPoint [offset] + numberOfPoints ];
 
-	ray.dir.x = normalVec[offset];
-	ray.dir.y = normalVec[offset + 3*numberOfTriangles];
+  ray.dir.x = normalVec[offset];
+  ray.dir.y = normalVec[offset + 3*numberOfTriangles];
 
-	return ray;
+  return ray;
 }	
 
 /**
@@ -273,13 +288,13 @@ __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
  * @return the Point with correct 3D coordinates
  */
 __device__ Point Mesh::getSamplePoint(unsigned sample){
-	Point p = {0,0,0};
-	unsigned level = sample/numberOfPoints;
-	p.z = level*thickness;
-	unsigned pos = sample - (numberOfPoints*level);
-	p.x = points[pos];
-	p.y = points[pos + numberOfPoints];
-	return p;
+  Point p = {0,0,0};
+  unsigned level = sample/numberOfPoints;
+  p.z = level*thickness;
+  unsigned pos = sample - (numberOfPoints*level);
+  p.x = points[pos];
+  p.y = points[pos + numberOfPoints];
+  return p;
 }
 
 /**
@@ -292,10 +307,10 @@ __device__ Point Mesh::getSamplePoint(unsigned sample){
  * @return a point with the coordinates (3D) of the prism center
  */
 __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
-	Point p = {0,0,(level+0.5)*thickness};
-	p.x = centers[triangle];
-	p.y = centers[triangle + numberOfTriangles];
-	return p;
+  Point p = {0,0,(level+0.5)*thickness};
+  p.x = centers[triangle];
+  p.y = centers[triangle + numberOfTriangles];
+  return p;
 }
 
 /**
@@ -312,6 +327,11 @@ __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
  */
 __device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge){
   return forbidden[edge * numberOfTriangles + triangle];
+}
+
+
+__device__ unsigned Mesh::getCellType(unsigned triangle){
+  return cellTypes[triangle];
 }
 
 
@@ -358,11 +378,11 @@ __device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge){
  *
  */
 int Mesh::parseMultiGPU(Mesh *hMesh,
-			 Mesh **dMesh, 
-			 std::string root,
-			 unsigned numberOfDevices,
-			 unsigned *devices) {
-  
+    Mesh **dMesh,
+    std::string root,
+    unsigned numberOfDevices,
+    unsigned *devices) {
+
   // Experimentdata
   std::vector<double> * betaValues = new std::vector<double>;
   std::vector<double> * xOfNormals = new std::vector<double>;
@@ -376,12 +396,15 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   std::vector<double> *xOfTriangleCenter = new std::vector<double>;
   std::vector<double> *yOfTriangleCenter = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
+  std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
   unsigned numberOfPoints = 0;
   unsigned numberOfTriangles = 0;
   unsigned numberOfLevels = 0;
+  unsigned cladNumber;
   float thicknessOfPrism = 1;
   float nTot = 0;
   float crystalFluorescence = 0;
+  double cladAbsorption = 0;
 
   // Parse experimentdata from files
   if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
@@ -401,7 +424,10 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   if(fileToValue(root + "z_mesh.txt", thicknessOfPrism)) return 1;
   if(fileToValue(root + "n_tot.txt", nTot)) return 1;
   if(fileToValue(root + "tfluo.txt", crystalFluorescence)) return 1;
+  if(fileToValue(root + "clad_num.txt", cladNumber)) return 1;
+  if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
+  if(fileToVector(root + "clad_int.txt", cellTypes)) return 1;
 
   assert(numberOfPoints == (points->size() / 2));
   assert(numberOfTriangles == triangleIndices->size() / 3);
@@ -416,6 +442,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(forbidden->size() == numberOfTriangles * 3);
   assert(neighbors->size() == numberOfTriangles * 3);
   assert(betaCells->size() == numberOfPoints * numberOfLevels);
+  assert(cellTypes->size()== numberOfTriangles);
 
 
   fillHMesh(
@@ -435,38 +462,45 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       neighbors, 
       surfaces,
       betaValues,
-	  betaCells,
-	  nTot,
-	  crystalFluorescence
-      );
+      betaCells,
+      cellTypes,
+      nTot,
+      crystalFluorescence,
+      cladNumber,
+      cladAbsorption
+  );
 
-  for( unsigned i=0;i < 1;i++){
-  //for( unsigned i=0;i < numberOfDevices;i++){
-  //CUDA_CHECK_RETURN( cudaSetDevice(devices[i]) );
-  fillDMesh(
-      hMesh,
-      &((*dMesh)[i]),
-      triangleIndices, 
-      numberOfTriangles, 
-      numberOfLevels,
-      numberOfPoints, 
-      thicknessOfPrism,
-      points, 
-      xOfTriangleCenter, 
-      yOfTriangleCenter, 
-      positionsOfNormalVectors,
-      xOfNormals, 
-      yOfNormals,
-      forbidden, 
-      neighbors, 
-      surfaces,
-      betaValues,
-	  betaCells,
-	  nTot,
-	  crystalFluorescence
-      );
-  //cudaDeviceSynchronize();
+  for( unsigned i=0; i<1; i++){
+    //for( unsigned i=0;i<numberOfDevices;i++){
+    //CUDA_CHECK_RETURN( cudaSetDevice(devices[i]) );
+    fillDMesh(
+        hMesh,
+        &((*dMesh)[i]),
+        triangleIndices,
+        numberOfTriangles,
+        numberOfLevels,
+        numberOfPoints,
+        thicknessOfPrism,
+        points,
+        xOfTriangleCenter,
+        yOfTriangleCenter,
+        positionsOfNormalVectors,
+        xOfNormals,
+        yOfNormals,
+        forbidden,
+        neighbors,
+        surfaces,
+        betaValues,
+        betaCells,
+        cellTypes,
+        nTot,
+        crystalFluorescence,
+        cladNumber,
+        cladAbsorption
+    );
+    cudaDeviceSynchronize();
   }
- return 0;
+  return 0;
+
 }
 

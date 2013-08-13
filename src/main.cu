@@ -179,10 +179,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-
-  // writeToVtk(&hMesh, dndtAse, "octrace");
-  // compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-  // writeToVtk(&hMesh, dndtAse, "octrace_compare");
+  //writeToVtk(&hMesh, dndtAse, "octrace");
+  compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  //writeToVtk(&hMesh, dndtAse, "octrace_compare");
 
   // std::vector<unsigned> mockupN_rays(sigmaE->size(),1);
   // writeMatlabOutput(

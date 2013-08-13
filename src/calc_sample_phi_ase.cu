@@ -54,8 +54,8 @@ __global__ void calcSamplePhiAse(
 
   threadGain[threadIdx.x] = gainSum;
   threadGainSquare[threadIdx.x] = gainSumSquare;
-  
-  // Reduce the threadGain array (CUDA by Example, Chapter 5.3)  
+
+  // Reduce the threadGain array (CUDA by Example, Chapter 5.3)
   __syncthreads();
   unsigned i = blockDim.x/2;
   while(i != 0){

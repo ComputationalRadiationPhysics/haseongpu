@@ -9,6 +9,13 @@ function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_
   % make sure that the input is clean 
   clean_IO_files(FOLDER);
 
+  if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs'))
+	[a,b] = size(sorted_int);
+	clad_int = ones(1,a);
+	clad_number = 3;
+	clad_abs = 5.5;
+  end
+
   % create the new input based on the MATLAB variables
   create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,FOLDER);
 
@@ -112,17 +119,19 @@ function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_
   fprintf(x,'%.50f\n',y_center);
   fclose(x);
 
+
   x=fopen('clad_int.txt','w');
   fprintf(x,'%d\n',clad_int);
   fclose(x);
 
   x=fopen('clad_num.txt','w');
-  fprintf(x,'%d\n',clad_num);
+  fprintf(x,'%d\n',clad_number);
   fclose(x);
 
   x=fopen('clad_abs.txt','w');
   fprintf(x,'%.50f\n',clad_abs);
   fclose(x);
+
 
   cd ..
 end 

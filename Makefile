@@ -6,7 +6,7 @@ DATE="`date +%y%m%d%H%M%S`"
 # compiler, linker, archiver
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
-#NVCC_FLAGS = --use_fast_math -lineinfo
+NVCC_FLAGS = --use_fast_math
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
