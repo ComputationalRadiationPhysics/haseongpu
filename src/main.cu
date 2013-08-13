@@ -72,7 +72,6 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
   return correctDevices;
 }
 
-
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   std::string runmode("");
