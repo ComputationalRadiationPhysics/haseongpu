@@ -195,6 +195,7 @@ int main(int argc, char **argv){
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace");
   if(compareLocation!="")compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
+  if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");
 
   // Free memory
   delete devices;
