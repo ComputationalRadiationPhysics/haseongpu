@@ -65,6 +65,13 @@ unsigned calcIndicesOfWavelengths(unsigned *indicesOfWavelength, dim3 gridDim, s
   return block_i;
 }
 
+double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSample){
+  double a = phiAseSquare / raysPerSample;
+  double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
+
+  return sqrt(abs((a - b) / raysPerSample));
+}
+
 float calcDndtAse (unsigned &threads, 
 		   unsigned &blocks,
 		   unsigned &hostRaysPerSample,
@@ -177,10 +184,8 @@ float calcDndtAse (unsigned &threads,
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
 
       // Filter wavelengths which reached expectations
-      //dim3 reducedGridDim(200, calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength));
       calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength);
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfWavelengths, hostIndicesOfWavelengths, gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
-      assert(gridDim.y >=1);
 
       // Start Kernel
       calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, indicesOfWavelengths, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
@@ -194,16 +199,10 @@ float calcDndtAse (unsigned &threads,
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAseSquare[sampleOffset]), &(phiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
 
         // check square error
-        double a = hostPhiAseSquare[sampleOffset] / hostRaysPerSample;
-        double b = (hostPhiAse->at(sampleOffset) / hostRaysPerSample) * (hostPhiAse->at(sampleOffset) / hostRaysPerSample);
-        expectation->at(sampleOffset) =  sqrt(abs((a - b) / hostRaysPerSample));
+        expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
         if(expectation->at(sampleOffset) >= expectationThreshold){
 	  expectationIsMet = false;
-	  ignoreWavelength->at(wave_i) = false;
         }
-	else{
-	  ignoreWavelength->at(wave_i) = false;
-	}
 
       }
 
@@ -217,15 +216,12 @@ float calcDndtAse (unsigned &threads,
 	// can be reused. But dont forget to add number of Rays to 
 	// hostRaysPerSample.
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-      	  if(!ignoreWavelength->at(wave_i)){
-      	    int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-      	    hostPhiAse->at(sampleOffset) = 0;
-      	    hostPhiAseSquare[sampleOffset] = 0;
-      	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
-      	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
-
-      	  }
-
+	  int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+	  hostPhiAse->at(sampleOffset) = 0;
+	  hostPhiAseSquare[sampleOffset] = 0;
+	  CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
+	  CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+	  
         }
 
       }
