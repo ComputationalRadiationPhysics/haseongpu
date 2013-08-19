@@ -106,8 +106,6 @@ float calcDndtAse (unsigned &threads,
   double *importance;
   unsigned *indicesOfPrisms;
   unsigned *indicesOfWavelengths;
-  float *sumPhi;
-  unsigned *raysDump;
   unsigned *raysPerPrism;
   unsigned *cumulativeSums;
   double * sigmaA;
@@ -137,12 +135,12 @@ float calcDndtAse (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostImportance[i] = 1.0;
 
-  // CUDA Mersenne twister for more than 200 blocks
+  // CUDA Mersenne twister for more than 200 blocks (for every wavelength)
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.y * gridDim.x  * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, gridDim.y * sizeof(mtgp32_kernel_params)));
-  for(unsigned mersenne_i = 0; mersenne_i < gridDim.y; ++mersenne_i){
-    CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, &(devKernelParams[mersenne_i])));
-    CURAND_CALL(curandMakeMTGP32KernelState(&(devMTGPStates[gridDim.x * mersenne_i]), mtgp32dc_params_fast_11213, &(devKernelParams[mersenne_i]), gridDim.x, SEED + mersenne_i));
+  for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
+    CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, &(devKernelParams[wave_i])));
+    CURAND_CALL(curandMakeMTGP32KernelState(&(devMTGPStates[gridDim.x * wave_i]), mtgp32dc_params_fast_11213, &(devKernelParams[wave_i]), gridDim.x, SEED + wave_i));
   }
 
   // Memory allocation on device
@@ -152,8 +150,6 @@ float calcDndtAse (unsigned &threads,
   CUDA_CHECK_RETURN(cudaMalloc(&phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * gridDim.y * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, gridDim.y * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&cumulativeSums,  hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&sigmaA, gridDim.y * sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&sigmaE, gridDim.y * sizeof(double)));
@@ -176,7 +172,8 @@ float calcDndtAse (unsigned &threads,
 
     while(!expectationIsMet){
       expectationIsMet = true;
-      hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+
+      hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, raysPerPrism, blockDim, gridDim);
       CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
       // Prism scheduling for gpu threads
@@ -212,9 +209,6 @@ float calcDndtAse (unsigned &threads,
       // if the threshold is still too high, increase the number of rays and reset the previously calculated value
       if(!expectationIsMet){
         hostRaysPerSample *= 10;
-	// I think this can be removed, because simulations up to this point
-	// can be reused. But dont forget to add number of Rays to 
-	// hostRaysPerSample.
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
 	  int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
 	  hostPhiAse->at(sampleOffset) = 0;
@@ -254,8 +248,6 @@ float calcDndtAse (unsigned &threads,
   cudaFree(importance);
   cudaFree(indicesOfPrisms);
   cudaFree(raysPerPrism);
-  cudaFree(sumPhi);
-  cudaFree(raysDump);
   cudaFree(sigmaA);
   cudaFree(sigmaE);
   cudaDeviceReset();

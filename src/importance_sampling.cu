@@ -224,35 +224,35 @@ unsigned importanceSampling(
     double *sigmaA,
     double *sigmaE,
     double *importance,
-    float *sumPhi,
     unsigned *raysPerPrism,
-    unsigned *indicesOfPrisms,
-    unsigned *raysDump,
-    unsigned *cumulativeSums,
-    dim3 threads,
-    dim3 blocks){
+    dim3 blockDim,
+    dim3 gridDim){
 
-  float *sumPhiHost = (float*) malloc(blocks.y * sizeof(float));
-  unsigned *raysDumpHost = (unsigned*) malloc(blocks.y * sizeof(unsigned));
+  float *hostSumPhi = (float*) malloc(gridDim.y * sizeof(float));
+  unsigned *hostDumpHost = (unsigned*) malloc(gridDim.y * sizeof(unsigned));
+  float *sumPhi;
+  unsigned *raysDump;
 
-  for(unsigned i=0; i < blocks.y; ++i){
-    sumPhiHost[i] = 0.f;
-    raysDumpHost[i] = 0;
+  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, gridDim.y * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, gridDim.y * sizeof(unsigned)));
+
+  for(unsigned i=0; i < gridDim.y; ++i){
+    hostSumPhi[i] = 0.f;
+    hostDumpHost[i] = 0;
   }
 
-  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,sumPhiHost, blocks.y * sizeof(float),cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,raysDumpHost, blocks.y * sizeof(unsigned),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,hostSumPhi, gridDim.y * sizeof(float),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,hostDumpHost, gridDim.y * sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< blocks, threads, threads.x * sizeof(double) >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA, sigmaE));
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< blocks, threads, threads.x * sizeof(unsigned) >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
-  CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< blocks,threads >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
-  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< blocks, threads >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDim, blockDim, blockDim.x * sizeof(double) >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA, sigmaE));
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDim, blockDim, blockDim.x * sizeof(unsigned) >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
+  CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< gridDim,blockDim >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
+  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDim, blockDim >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
 
-//  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum1<<<blocks,threads>>>(deviceMesh, raysPerPrism, cumulativeSums));
-//  CUDA_CHECK_KERNEL_SYNC(createCumulativeSum2<<<1,1>>>(deviceMesh, cumulativeSums));
-//  CUDA_CHECK_KERNEL_SYNC(mapRaysToPrism<<<blocks,threads>>>(deviceMesh, raysPerPrism, raysPerSample, indicesOfPrisms,cumulativeSums));
+  free(hostSumPhi);
+  free(hostDumpHost);
+  cudaFree(sumPhi);
+  cudaFree(raysDump);
 
-  free(sumPhiHost);
-  free(raysDumpHost);
   return raysPerSample;
 }

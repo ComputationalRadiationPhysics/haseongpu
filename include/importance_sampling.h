@@ -39,11 +39,7 @@ unsigned importanceSampling(
 			    double *sigmaA, 
 			    double *sigmaE, 
 			    double *importance, 
-			    float *sumPhi,
 			    unsigned *raysPerPrism,
-			    unsigned *indicesOfPrisms,
-			    unsigned *raysDump,
-			    unsigned *cumulativeSums,
 			    dim3 threads,
 			    dim3 blocks);
 
