@@ -94,7 +94,7 @@ int main(int argc, char **argv){
   std::vector<double> *sigmaA = new std::vector<double>;
   std::vector<double> *sigmaE = new std::vector<double>;
 
-  // Set/Test device to run experiment
+  // Set/Test device to run experiment with
   numberOfDevices = getCorrectDevice(1,&devices);
 
   // Parse Commandline
@@ -156,7 +156,7 @@ int main(int argc, char **argv){
       break;
   }
 
-  // Print Solution
+  // Print Solutions
   for(unsigned wave_i = 0; wave_i < sigmaE->size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
     for(unsigned sample_i = 0; sample_i < dndtAse->size(); ++sample_i){

@@ -41,6 +41,30 @@ void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned* raysPerPrism, unsig
   
 }
 
+/**
+ * @brief Calculates which 200 blocks of rays should use which wavelength
+ *        for calculations. IndivesOfWavelength contains
+ *        afterwards the indices to the sigma_e/_a arrays.
+ *        This will be used if not all wavelength need to be
+ *        calculated (to reach expectation value). It is kind of
+ *        a remapping BlockIDx.y <-> wavelength Index.
+ *
+ **/
+unsigned calcIndicesOfWavelengths(unsigned *indicesOfWavelength, dim3 gridDim, std::vector<bool> *ignoreWavelength){
+  unsigned block_i = 0;
+  for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
+
+    if(ignoreWavelength->at(wave_i) == false){
+      indicesOfWavelength[block_i] = wave_i;
+      block_i ++;
+    }
+
+  }
+ 
+
+  return block_i;
+}
+
 float calcDndtAse (unsigned &threads, 
 		   unsigned &blocks,
 		   unsigned &hostRaysPerSample,
@@ -59,11 +83,13 @@ float calcDndtAse (unsigned &threads,
   unsigned *hostRaysPerPrism;
   float runtime;
   unsigned *hostIndicesOfPrisms;
+  unsigned *hostIndicesOfWavelengths;
   float *hostPhiAseSquare;
   time_t starttime,progressStartTime;
   unsigned hostRaysPerSampleSave;
   float expectationThreshold;
   unsigned maxRaysPerSample;
+
 
   // GPU
   float *phiAse;
@@ -72,6 +98,7 @@ float calcDndtAse (unsigned &threads,
   mtgp32_kernel_params *devKernelParams;
   double *importance;
   unsigned *indicesOfPrisms;
+  unsigned *indicesOfWavelengths;
   float *sumPhi;
   unsigned *raysDump;
   unsigned *raysPerPrism;
@@ -86,15 +113,19 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.005;
-  maxRaysPerSample = hostRaysPerSample * 10000;
+  expectationThreshold = 0.01;
+  maxRaysPerSample = 10000000; // 10M
 
-  hostPhiAseSquare    = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
-  hostImportance      = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(double));
-  hostRaysPerPrism    = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(unsigned));
-  hostIndicesOfPrisms = (unsigned*) malloc (maxRaysPerSample         * gridDim.y * sizeof(unsigned));
+
+  // Memory allocation on host
+  hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
+  hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(double));
+  hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(unsigned));
+  hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * gridDim.y * sizeof(unsigned));
+  hostIndicesOfWavelengths = (unsigned*) malloc (gridDim.y * sizeof(unsigned));
 
   for(unsigned i=0; i < hostRaysPerSample * gridDim.y; ++i) hostIndicesOfPrisms[i] = 0;
+  for(unsigned i=0; i < gridDim.y; ++i) hostIndicesOfWavelengths[i] = 0;
   for(unsigned i=0; i < hostMesh.numberOfSamples * gridDim.y; ++i) hostPhiAseSquare[i] = 0.f;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y; ++i) hostImportance[i] = 1.0;
@@ -108,10 +139,11 @@ float calcDndtAse (unsigned &threads,
   }
 
   // Memory allocation on device
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * gridDim.y * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfWavelengths, gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * gridDim.y * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysDump, gridDim.y * sizeof(unsigned)));
@@ -132,22 +164,26 @@ float calcDndtAse (unsigned &threads,
 
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     bool expectationIsMet = false;
+    std::vector<bool> *ignoreWavelength = new std::vector<bool>(gridDim.y, false);
     hostRaysPerSample = hostRaysPerSampleSave;
 
     while(!expectationIsMet){
-    expectationIsMet = true;
-    
-    hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+      expectationIsMet = true;
+      hostRaysPerSample = importanceSampling(sample_i, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, sumPhi, raysPerPrism, indicesOfPrisms, raysDump, cumulativeSums, blockDim, gridDim);
+      CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
-    // Prism scheduling for gpu threads
-    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * sizeof(unsigned),cudaMemcpyDeviceToHost));
-    calcIndicesOfPrism(hostIndicesOfPrisms, hostRaysPerPrism, hostRaysPerSample, hostMesh, gridDim);
-
-      // Copy dynamic sample data to device
+      // Prism scheduling for gpu threads
+      calcIndicesOfPrism(hostIndicesOfPrisms, hostRaysPerPrism, hostRaysPerSample, hostMesh, gridDim);
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
 
+      // Filter wavelengths which reached expectations
+      //dim3 reducedGridDim(200, calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength));
+      calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength);
+      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfWavelengths, hostIndicesOfWavelengths, gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
+      assert(gridDim.y >=1);
+
       // Start Kernel
-      calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
+      calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, indicesOfWavelengths, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
 
       // Calculate expectations
       for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
@@ -157,29 +193,43 @@ float calcDndtAse (unsigned &threads,
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAse->at(sampleOffset)), &(phiAse[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAseSquare[sampleOffset]), &(phiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
 
-        // check the error
+        // check square error
         double a = hostPhiAseSquare[sampleOffset] / hostRaysPerSample;
         double b = (hostPhiAse->at(sampleOffset) / hostRaysPerSample) * (hostPhiAse->at(sampleOffset) / hostRaysPerSample);
         expectation->at(sampleOffset) =  sqrt(abs((a - b) / hostRaysPerSample));
         if(expectation->at(sampleOffset) >= expectationThreshold){
-          expectationIsMet=false;
+	  expectationIsMet = false;
+	  ignoreWavelength->at(wave_i) = false;
         }
+	else{
+	  ignoreWavelength->at(wave_i) = false;
+	}
+
       }
 
-      //alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
+      // alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
       if(hostRaysPerSample == maxRaysPerSample) expectationIsMet = true;
 
       // if the threshold is still too high, increase the number of rays and reset the previously calculated value
       if(!expectationIsMet){
         hostRaysPerSample *= 10;
+	// I think this can be removed, because simulations up to this point
+	// can be reused. But dont forget to add number of Rays to 
+	// hostRaysPerSample.
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-          int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-          hostPhiAse->at(sampleOffset)=0;
-          hostPhiAseSquare[sampleOffset]=0;
-          CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
-          CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+      	  if(!ignoreWavelength->at(wave_i)){
+      	    int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+      	    hostPhiAse->at(sampleOffset) = 0;
+      	    hostPhiAseSquare[sampleOffset] = 0;
+      	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
+      	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+
+      	  }
+
         }
+
       }
+
     }
 
     // update progressbar

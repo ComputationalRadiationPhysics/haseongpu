@@ -6,6 +6,7 @@
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
+				 const unsigned* indicesOfWavelengths, 
 				 const double* importance,
 				 const unsigned raysPerSample, 
 				 float *phiAse, 
@@ -19,7 +20,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int rayNumber = 0;
   unsigned stride = 0;
-  unsigned wave_i = blockIdx.y;
+  unsigned wave_i = indicesOfWavelengths[blockIdx.y];
   double gainSum = 0;
   double gainSumSquare = 0;
   Point samplePoint = mesh.getSamplePoint(sample_i);
@@ -43,8 +44,10 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 	  gainSum += gain;
 	  gainSumSquare += gain * gain;
 
-  }
 
-    atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSum));
-    atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSumSquare));
+  }
+  atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSum));
+  atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSumSquare));
+
+
 }
