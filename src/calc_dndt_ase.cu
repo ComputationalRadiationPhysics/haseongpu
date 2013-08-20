@@ -42,27 +42,20 @@ void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned* raysPerPrism, unsig
 }
 
 /**
- * @brief Calculates which 200 blocks of rays should use which wavelength
- *        for calculations. IndivesOfWavelength contains
- *        afterwards the indices to the sigma_e/_a arrays.
- *        This will be used if not all wavelength need to be
- *        calculated (to reach expectation value). It is kind of
- *        a remapping BlockIDx.y <-> wavelength Index.
- *
+ * @brief Gives every 200 blocks an index to the sigma_a/_e array or -1
+ *        if this wavelength will be ignored.
  **/
-unsigned calcIndicesOfWavelengths(unsigned *indicesOfWavelength, dim3 gridDim, std::vector<bool> *ignoreWavelength){
-  unsigned block_i = 0;
+void calcIndicesOfWavelengths(int *indicesOfWavelength, dim3 gridDim, std::vector<bool> *ignoreWavelength){
   for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
-
     if(ignoreWavelength->at(wave_i) == false){
-      indicesOfWavelength[block_i] = wave_i;
-      block_i ++;
+      indicesOfWavelength[wave_i] = wave_i;
+    }
+    else{
+      indicesOfWavelength[wave_i] = -1;
     }
 
   }
  
-
-  return block_i;
 }
 
 double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSample){
@@ -90,7 +83,7 @@ float calcDndtAse (unsigned &threads,
   unsigned *hostRaysPerPrism;
   float runtime;
   unsigned *hostIndicesOfPrisms;
-  unsigned *hostIndicesOfWavelengths;
+  int *hostIndicesOfWavelengths;
   float *hostPhiAseSquare;
   time_t starttime,progressStartTime;
   unsigned hostRaysPerSampleSave;
@@ -105,7 +98,7 @@ float calcDndtAse (unsigned &threads,
   mtgp32_kernel_params *devKernelParams;
   double *importance;
   unsigned *indicesOfPrisms;
-  unsigned *indicesOfWavelengths;
+  int *indicesOfWavelengths;
   unsigned *raysPerPrism;
   unsigned *cumulativeSums;
   double * sigmaA;
@@ -118,7 +111,7 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.01;
+  expectationThreshold = 0.005;
   maxRaysPerSample = 10000000; // 10M
 
 
@@ -127,7 +120,7 @@ float calcDndtAse (unsigned &threads,
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * sizeof(unsigned));
   hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * gridDim.y * sizeof(unsigned));
-  hostIndicesOfWavelengths = (unsigned*) malloc (gridDim.y * sizeof(unsigned));
+  hostIndicesOfWavelengths = (int*) malloc (gridDim.y * sizeof(int));
 
   for(unsigned i=0; i < hostRaysPerSample * gridDim.y; ++i) hostIndicesOfPrisms[i] = 0;
   for(unsigned i=0; i < gridDim.y; ++i) hostIndicesOfWavelengths[i] = 0;
@@ -145,7 +138,7 @@ float calcDndtAse (unsigned &threads,
 
   // Memory allocation on device
   CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * gridDim.y * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfWavelengths, gridDim.y * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfWavelengths, gridDim.y * sizeof(int)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&importance, hostMesh.numberOfPrisms * gridDim.y * sizeof(double)));
@@ -168,6 +161,7 @@ float calcDndtAse (unsigned &threads,
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     bool expectationIsMet = false;
     std::vector<bool> *ignoreWavelength = new std::vector<bool>(gridDim.y, false);
+    std::vector<unsigned> raysPerSamplePerWave(gridDim.y, hostRaysPerSampleSave);
     hostRaysPerSample = hostRaysPerSampleSave;
 
     while(!expectationIsMet){
@@ -182,7 +176,7 @@ float calcDndtAse (unsigned &threads,
 
       // Filter wavelengths which reached expectations
       calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength);
-      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfWavelengths, hostIndicesOfWavelengths, gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
+      CUDA_CHECK_RETURN(cudaMemcpy(indicesOfWavelengths, hostIndicesOfWavelengths, gridDim.y * sizeof(int), cudaMemcpyHostToDevice));
 
       // Start Kernel
       calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, indicesOfWavelengths, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
@@ -195,26 +189,33 @@ float calcDndtAse (unsigned &threads,
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAse->at(sampleOffset)), &(phiAse[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAseSquare[sampleOffset]), &(phiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
 
-        // check square error
+        // Check square error
         expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
         if(expectation->at(sampleOffset) >= expectationThreshold){
 	  expectationIsMet = false;
+	  ignoreWavelength->at(wave_i) = false;
         }
+	else{
+	  ignoreWavelength->at(wave_i) = true;
+	}
 
       }
 
-      // alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
+      // Alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
       if(hostRaysPerSample == maxRaysPerSample) expectationIsMet = true;
 
-      // if the threshold is still too high, increase the number of rays and reset the previously calculated value
+      // If the threshold is still too high, increase the number of rays and reset the previously calculated value
       if(!expectationIsMet){
         hostRaysPerSample *= 10;
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-	  int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-	  hostPhiAse->at(sampleOffset) = 0;
-	  hostPhiAseSquare[sampleOffset] = 0;
-	  CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
-	  CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+	  if(!ignoreWavelength->at(wave_i)){
+	    int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+	    raysPerSamplePerWave[wave_i] *= 10;
+	    hostPhiAse->at(sampleOffset) = 0;
+	    hostPhiAseSquare[sampleOffset] = 0;
+	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
+	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAseSquare[sampleOffset]), &(hostPhiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyHostToDevice));
+	  }
 	  
         }
 
@@ -227,10 +228,13 @@ float calcDndtAse (unsigned &threads,
 
     // Calculate dndt Ase, after one point is completely sampled
     for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-      int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-      hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (hostRaysPerSample * 4.0f * 3.14159)));
-      double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
-      dndtAse->at(sampleOffset) = gain_local * hostPhiAse->at(sampleOffset) / hostMesh.crystalFluorescence;
+      if(ignoreWavelength->at(wave_i)){
+	int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+	hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (raysPerSamplePerWave[wave_i] * 4.0f * 3.14159)));
+	double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
+	dndtAse->at(sampleOffset) = gain_local * hostPhiAse->at(sampleOffset) / hostMesh.crystalFluorescence;
+      }
+
     }
 
   }

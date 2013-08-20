@@ -6,7 +6,7 @@
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned* indicesOfWavelengths, 
+				 const int* indicesOfWavelengths, 
 				 const double* importance,
 				 const unsigned raysPerSample, 
 				 float *phiAse, 
@@ -16,14 +16,15 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 double *sigmaE
 				 ) {
 
-  // Get global ID
+  int wave_i = indicesOfWavelengths[blockIdx.y];
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int rayNumber = 0;
   unsigned stride = 0;
-  unsigned wave_i = indicesOfWavelengths[blockIdx.y];
   double gainSum = 0;
   double gainSumSquare = 0;
   Point samplePoint = mesh.getSamplePoint(sample_i);
+
+  if(wave_i == -1) return;
 
   // One thread can compute multiple rays
   // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
