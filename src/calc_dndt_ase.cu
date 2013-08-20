@@ -45,13 +45,14 @@ void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned* raysPerPrism, unsig
  * @brief Gives every 200 blocks an index to the sigma_a/_e array or -1
  *        if this wavelength will be ignored.
  **/
-void calcIndicesOfWavelengths(int *indicesOfWavelength, dim3 gridDim, std::vector<bool> *ignoreWavelength){
+void calcIndicesOfWavelengths(int *indicesOfWavelength, dim3 gridDim, std::vector<bool> ignoreWavelength){
   for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
-    if(ignoreWavelength->at(wave_i) == false){
-      indicesOfWavelength[wave_i] = wave_i;
+    if(ignoreWavelength[wave_i]){
+      indicesOfWavelength[wave_i] = -1;
     }
     else{
-      indicesOfWavelength[wave_i] = -1;
+      indicesOfWavelength[wave_i] = wave_i;
+
     }
 
   }
@@ -111,7 +112,7 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.005;
+  expectationThreshold = 0.01;
   maxRaysPerSample = 10000000; // 10M
 
 
@@ -160,7 +161,7 @@ float calcDndtAse (unsigned &threads,
 
   for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
     bool expectationIsMet = false;
-    std::vector<bool> *ignoreWavelength = new std::vector<bool>(gridDim.y, false);
+    std::vector<bool> ignoreWavelength(gridDim.y, false);
     std::vector<unsigned> raysPerSamplePerWave(gridDim.y, hostRaysPerSampleSave);
     hostRaysPerSample = hostRaysPerSampleSave;
 
@@ -193,22 +194,22 @@ float calcDndtAse (unsigned &threads,
         expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
         if(expectation->at(sampleOffset) >= expectationThreshold){
 	  expectationIsMet = false;
-	  ignoreWavelength->at(wave_i) = false;
+	  ignoreWavelength[wave_i] = false;
         }
 	else{
-	  ignoreWavelength->at(wave_i) = true;
+	  ignoreWavelength[wave_i] = true;
 	}
 
       }
 
-      // Alternative loopbreaker condition: raysPerSample got too big (doesn't fit into indicesOfPrisms)
-      if(hostRaysPerSample == maxRaysPerSample) expectationIsMet = true;
+      // Stop calculations on maxRaysPerSample (keep solution)
+      if(hostRaysPerSample == maxRaysPerSample) break;
 
       // If the threshold is still too high, increase the number of rays and reset the previously calculated value
       if(!expectationIsMet){
         hostRaysPerSample *= 10;
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-	  if(!ignoreWavelength->at(wave_i)){
+	  if(!ignoreWavelength[wave_i]){
 	    int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
 	    raysPerSamplePerWave[wave_i] *= 10;
 	    hostPhiAse->at(sampleOffset) = 0;
@@ -223,12 +224,12 @@ float calcDndtAse (unsigned &threads,
 
     }
 
-    // update progressbar
+    // Update progressbar
     if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,60,progressStartTime);
 
     // Calculate dndt Ase, after one point is completely sampled
     for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-      if(ignoreWavelength->at(wave_i)){
+      if(ignoreWavelength[wave_i]){
 	int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
 	hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (raysPerSamplePerWave[wave_i] * 4.0f * 3.14159)));
 	double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
