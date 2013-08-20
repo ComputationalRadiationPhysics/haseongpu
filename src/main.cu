@@ -191,7 +191,7 @@ int main(int argc, char **argv){
 		  sigmaE->size(),
 		  hMesh.numberOfSamples);
 
-  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace");
+  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_dndt");
   if(compareLocation!="")compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
   if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");

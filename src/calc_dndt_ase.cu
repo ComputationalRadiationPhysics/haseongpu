@@ -112,7 +112,7 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.01;
+  expectationThreshold = 0.001;
   maxRaysPerSample = 10000000; // 10M
 
 
@@ -229,13 +229,11 @@ float calcDndtAse (unsigned &threads,
 
     // Calculate dndt Ase, after one point is completely sampled
     for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
-      if(ignoreWavelength[wave_i]){
 	int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
 	hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (raysPerSamplePerWave[wave_i] * 4.0f * 3.14159)));
 	double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
 	dndtAse->at(sampleOffset) = gain_local * hostPhiAse->at(sampleOffset) / hostMesh.crystalFluorescence;
-      }
-
+    
     }
 
   }
