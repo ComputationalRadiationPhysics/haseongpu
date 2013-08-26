@@ -163,7 +163,7 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
 
 }
 
-__device__ double propagateRay(Ray nextRay, unsigned nextLevel, unsigned nextTriangle, Mesh *mesh, 
+__device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextTriangle, Mesh *mesh, 
 			       const double sigmaA, const double sigmaE){
   double distanceTotal     = nextRay.length;
   double distanceRemaining = nextRay.length;
@@ -176,14 +176,14 @@ __device__ double propagateRay(Ray nextRay, unsigned nextLevel, unsigned nextTri
   while(fabs(distanceRemaining) > SMALL){
     // Calc gain for triangle intersection
     length             = distanceRemaining;
-    nextEdge           = calcTriangleRayIntersection(&length, nextTriangle, nextRay, nextLevel, nextForbiddenEdge, mesh);
+    nextEdge           = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
     nextRay            = calcNextRay(nextRay, length);
-    gain              *= calcPrismGain(nextTriangle, nextLevel, length, mesh, sigmaA, sigmaE);
+    gain              *= calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
     distanceRemaining -= length;
 
     // Calc nextTriangle, nextForbiddenEdge and nextLevel
     if(nextEdge != -1){
-      updateFromEdge(&nextTriangle, &nextForbiddenEdge, &nextLevel, mesh, nextEdge);
+      updateFromEdge(nextTriangle, &nextForbiddenEdge, nextLevel, mesh, nextEdge);
     }
 
   }

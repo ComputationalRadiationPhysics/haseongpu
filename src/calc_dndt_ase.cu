@@ -112,8 +112,8 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.001;
-  maxRaysPerSample = 100000000; // 100M
+  expectationThreshold = 1;//0.01;
+  maxRaysPerSample = 10000000; // 10M
 
   // Memory allocation on host
   hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));

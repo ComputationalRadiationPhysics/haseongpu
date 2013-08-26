@@ -35,14 +35,14 @@ __global__ void propagateFromTriangleCenter(
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
-  int level_i = startPrism/(mesh.numberOfTriangles);
-  unsigned triangle_i = startPrism - (mesh.numberOfTriangles * level_i);
-  Point startPoint = mesh.getCenterPoint(triangle_i, level_i);
+  unsigned level = startPrism/(mesh.numberOfTriangles);
+  unsigned triangle_i = startPrism - (mesh.numberOfTriangles * level);
+  Point startPoint = mesh.getCenterPoint(triangle_i, level);
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
   ray = generateRay(startPoint, samplePoint);
-  gain = propagateRay(ray, level_i, triangle_i, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y]);
+  gain = propagateRay(ray, &level, &triangle_i, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y]);
   importance[startPrism + wavelengthOffset] = mesh.getBetaValue(startPrism) * gain;
 
   threadPhi[threadIdx.x] = importance[startPrism + wavelengthOffset];

@@ -36,8 +36,8 @@
  *
  **/
 __host__ __device__ double propagateRay(Ray ray, 
-					unsigned startLevel, 
-					unsigned  startTriangle, 
+					unsigned *startLevel, 
+					unsigned  *startTriangle, 
 					Mesh *mesh,
 					const double sigmaA, 
 					const double sigmaE
