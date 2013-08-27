@@ -3,6 +3,7 @@
 #include <geometry.h>
 #include <cuda_runtime_api.h>
 #include <stdio.h> /* printf */
+#include <assert.h> /* assert */
 
 /**
  * @brief Checks a level-plane(currentLevel * thickness) for intersection with an ray (zPos, zVec).
@@ -150,13 +151,13 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
    case 3:
      // Upper surface
      *forbiddenEdge = 4;
-     (*level)++;
+     if(*level != mesh->numberOfLevels) (*level)++;
      break;
 
    case 4:
      // Lower surface
      *forbiddenEdge = 3;
-     (*level)--;
+     if(*level != 0) (*level)--;
      break;
 
   }
@@ -174,6 +175,8 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 
   nextRay = normalizeRay(nextRay);
   while(fabs(distanceRemaining) > SMALL){
+    assert(*nextLevel <= mesh->numberOfLevels);
+    assert(*nextLevel >= 0);
     // Calc gain for triangle intersection
     length             = distanceRemaining;
     nextEdge           = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);

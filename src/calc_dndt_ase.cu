@@ -112,7 +112,7 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 1;//0.01;
+  expectationThreshold = 1000;//0.01;
   maxRaysPerSample = 10000000; // 10M
 
   // Memory allocation on host
