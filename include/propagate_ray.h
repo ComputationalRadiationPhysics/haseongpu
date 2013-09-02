@@ -43,6 +43,16 @@ __host__ __device__ double propagateRay(Ray ray,
 					const double sigmaE
 					);
 
+__device__ double propagateRayWithReflection(Point startPoint, 
+					     Point endPoint, 
+					     unsigned reflectionsLeft,
+					     int reflectionPlane,
+					     unsigned startLevel, 
+					     unsigned startTriangle, 
+					     Mesh *mesh, 
+					     const double sigmaA, 
+					     const double sigmaE);
+
 #endif /* propagate_ray_H */
 
 

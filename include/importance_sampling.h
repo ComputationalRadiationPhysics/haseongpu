@@ -34,6 +34,7 @@
  */
 unsigned importanceSampling(
 			    unsigned sample_i,
+			    unsigned maxReflections,
 			    Mesh deviceMesh,
 			    unsigned raysPerSample, 
 			    double *sigmaA, 
