@@ -192,8 +192,10 @@ int main(int argc, char **argv){
 		  hMesh.numberOfSamples);
 
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_dndt");
-  if(compareLocation!="")compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
+  if(compareLocation!="") {
+	  std::vector<double> compareAse = compareVtk(*dndtAse, compareLocation, hMesh.numberOfSamples);
+	  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
+  }
   if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");
 
   // Free memory

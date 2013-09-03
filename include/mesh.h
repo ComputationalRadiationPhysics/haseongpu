@@ -101,9 +101,8 @@ struct NormalRay {
  *             [ triangle1p0, triangle2p0, ... triangleNp0, triangle1p1, triangle2p1, ... ]
  *
  */
-class Mesh {
+struct Mesh {
 
-public:
   double *points;
   double *betaValues;
   double *normalVec;

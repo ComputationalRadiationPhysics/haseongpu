@@ -18,6 +18,6 @@
  *
  */
 int writeToVtk(Mesh *mesh, std::vector<double>* ase, std::string filename);
-int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOfSamples);
+std::vector<double> compareVtk(std::vector<double> ase, std::string filename, unsigned numberOfSamples);
 
 #endif /* WRITE_TO_VTK_H */

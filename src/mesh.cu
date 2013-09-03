@@ -11,19 +11,19 @@
 
 
 Mesh::~Mesh() {
-  if(points) delete points;
-  if(betaValues) delete betaValues;
-  if(normalVec) delete normalVec;
-  if(centers) delete centers;
-  if(surfaces) delete surfaces;
-  if(forbidden) delete forbidden;
-  if(betaCells) delete betaCells;
-  if(triangles) delete triangles;  
-  if(neighbors) delete neighbors;
-  if(normalPoint) delete normalPoint;
-  if(cellTypes) delete cellTypes;
-  if(refractiveIndices) delete refractiveIndices;
-  if(reflectivities) delete reflectivities;
+//  if(points) delete points;
+//  if(betaValues) delete betaValues;
+//  if(normalVec) delete normalVec;
+//  if(centers) delete centers;
+//  if(surfaces) delete surfaces;
+//  if(forbidden) delete forbidden;
+//  if(betaCells) delete betaCells;
+//  if(triangles) delete triangles;  
+//  if(neighbors) delete neighbors;
+//  if(normalPoint) delete normalPoint;
+//  if(cellTypes) delete cellTypes;
+//  if(refractiveIndices) delete refractiveIndices;
+//  if(reflectivities) delete reflectivities;
 }
 
 
@@ -470,7 +470,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(neighbors->size() == numberOfTriangles * 3);
   assert(betaCells->size() == numberOfPoints * numberOfLevels);
   assert(cellTypes->size()== numberOfTriangles);
-  assert(refractiveIndices->size() == 2);
+  assert(refractiveIndices->size() == 4);
   assert(reflectivities->size() == (refractiveIndices->size()/2) * numberOfTriangles);
 
 
