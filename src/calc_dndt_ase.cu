@@ -207,7 +207,7 @@ float calcDndtAse (unsigned &threads,
 
       // Start Kernel
       calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, indicesOfWavelengths, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
-      
+ 
 
       // Calculate expectations
       for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
