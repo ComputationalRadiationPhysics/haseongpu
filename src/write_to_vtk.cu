@@ -1,3 +1,4 @@
+#include "write_to_vtk.h"
 #include <iostream> /* cerr */
 #include <fstream> /* ofstream */
 #include <vector> /* vector */

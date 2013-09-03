@@ -1,3 +1,4 @@
+#include "calc_dndt_ase.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -8,11 +9,13 @@
 #include <cudachecks.h>
 #include <importance_sampling.h>
 #include <test_functions.h>
-#include <calc_sample_phi_ase.h>
+#include "calc_sample_phi_ase.h"
 /* include MTGP host helper functions */
 #include <curand_mtgp32_host.h>
+
 /* include MTGP pre-computed parameter sets */
-#include <curand_mtgp32dc_p_11213.h>
+/* include <curand_mtgp32dc_p_11213.h> */
+
 #include <cuda_runtime_api.h>
 #include <mesh.h>
 #include <ctime> /* progressBar */

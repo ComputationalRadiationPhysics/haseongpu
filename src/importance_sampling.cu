@@ -1,3 +1,4 @@
+#include "importance_sampling.h"
 #include <mesh.h>
 #include <stdio.h>
 #include <propagate_ray.h>

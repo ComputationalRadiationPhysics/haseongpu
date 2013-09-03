@@ -20,6 +20,7 @@ struct Point {
   double y;
   double z;
 
+
 };
 
 typedef Point Vector;
@@ -111,6 +112,9 @@ struct Mesh {
   double  *betaCells;
   unsigned *cellTypes;
 
+  float  *reflectionAngles; //[0]->bottom, [1]->top
+  float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
+
   //indexstructs
   unsigned *triangles;
   int *neighbors;
@@ -142,6 +146,14 @@ struct Mesh {
   __device__ int getForbiddenEdge(unsigned triangle, int edge);
   __device__ unsigned getCellType(unsigned triangle);
 
+
+  unsigned getMaxReflections(int reflectionPlane);
+  unsigned getMaxReflections();
+
+  __device__ __host__ float getReflectivity(int reflectionPlane, unsigned triangle);
+  __device__ __host__ float getReflectionAngle(int reflectionPlane);
+
+
   static int parseMultiGPU(Mesh *hMesh, 
 			   Mesh **dMesh, 
 			   std::string root,
@@ -149,5 +161,7 @@ struct Mesh {
 			   unsigned maxGpus
 			   );
 };
+
+double calculateMaxDiameter(std::vector<double> points);
 
 #endif /* MESH_H */

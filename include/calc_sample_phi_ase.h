@@ -2,7 +2,7 @@
 #define calc_sample_phi_ase_H
 
 #include <curand_mtgp32dc_p_11213.h>
-#include <cuda_runtime_api.h>
+/* include <cuda_runtime_api.h> */
 #include <mesh.h>
 
 /**

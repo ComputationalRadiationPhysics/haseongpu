@@ -1,3 +1,4 @@
+#include "propagate_ray.h"
 #include <mesh.h>
 #include <stdio.h>
 #include <geometry.h>
