@@ -101,8 +101,9 @@ struct NormalRay {
  *             [ triangle1p0, triangle2p0, ... triangleNp0, triangle1p1, triangle2p1, ... ]
  *
  */
-struct Mesh {
+class Mesh {
 
+public:
   double *points;
   double *betaValues;
   double *normalVec;
@@ -112,7 +113,7 @@ struct Mesh {
   double  *betaCells;
   unsigned *cellTypes;
 
-  float  *reflectionAngles; //[0]->bottom, [1]->top
+  float  * refractiveIndices; //[0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
   float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
 
   //indexstructs
@@ -132,7 +133,6 @@ struct Mesh {
   unsigned numberOfPoints;
   unsigned numberOfSamples;
   unsigned cladNumber;
-
 
   ~Mesh();
 
