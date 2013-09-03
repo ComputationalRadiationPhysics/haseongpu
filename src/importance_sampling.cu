@@ -21,15 +21,14 @@ __global__ void propagateFromTriangleCenter(
     double *importance,
     float *sumPhi,
     unsigned sample_i,
+    unsigned reflection_i,
+    unsigned reflections,
+    int reflectionPlane,
     double *sigmaA,
     double *sigmaE
     ){
 
-  extern __shared__ double threadPhi[];
   double gain = 0;
-  Ray ray;
-
-  threadPhi[threadIdx.x] = 0;
 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms){
@@ -40,25 +39,21 @@ __global__ void propagateFromTriangleCenter(
   Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
+  unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
 
-  ray = generateRay(startPoint, samplePoint);
-  gain = propagateRay(ray, &startLevel, &startTriangle, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y]);
-  importance[startPrism + wavelengthOffset] = mesh.getBetaValue(startPrism) * gain;
+  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, &mesh, sigmaA[blockIdx.y], sigmaE[blockIdx.y]);
 
-  threadPhi[threadIdx.x] = importance[startPrism + wavelengthOffset];
-  __syncthreads();
-
-  unsigned i = blockDim.x/2;
-  while(i != 0){
-    if(threadIdx.x < i){
-      threadPhi[threadIdx.x] += threadPhi[threadIdx.x + i];
-    }
-    __syncthreads();
-    i /= 2;
+  if(reflections > 0){
+    assert(gain == 0);
   }
-  if(threadIdx.x == 0){
-    atomicAdd(&(sumPhi[blockIdx.y]), float(threadPhi[threadIdx.x]));
-  }
+
+  // DEBUG
+  //printf("C x:%f y:%f z:%f reflections: %u reflectionPlane %d gain: %f\n", samplePoint.x, samplePoint.y, samplePoint.z, reflections, reflectionPlane, gain);
+
+  importance[startPrism + wavelengthOffset + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
+  
+  atomicAdd(&(sumPhi[blockIdx.y]), float(importance[startPrism + wavelengthOffset + reflectionOffset]));
+
 }
 
 /**
@@ -70,32 +65,28 @@ __global__ void propagateFromTriangleCenter(
  */
 __global__ void distributeRaysByImportance(
     Mesh mesh,
+    unsigned reflection_i,
     unsigned *raysPerPrism,
     double *importance,
     float *sumPhi,
     unsigned raysPerSample,
     unsigned *raysDump){
-  extern __shared__ unsigned raySum[];
-  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
 
-  raySum[threadIdx.x] = 0;
+  unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
+  unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
+
+
+
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms) return;
-  raysPerPrism[startPrism + wavelengthOffset] = (unsigned) floor(importance[startPrism + wavelengthOffset] / (sumPhi[blockIdx.y]) * raysPerSample);
-  raySum[threadIdx.x] = raysPerPrism[startPrism + wavelengthOffset];
-  __syncthreads();
+  raysPerPrism[startPrism + wavelengthOffset + reflectionOffset] = (unsigned) floor(importance[startPrism + wavelengthOffset + reflectionOffset] / (sumPhi[blockIdx.y]) * raysPerSample);
 
-  unsigned i = blockDim.x/2;
-  while(i != 0){
-    if(threadIdx.x < i){
-      raySum[threadIdx.x] += raySum[threadIdx.x + i];
-    }
-    __syncthreads();
-    i /= 2;
+  if(reflection_i > 0){
+    assert(raysPerPrism[startPrism + wavelengthOffset + reflectionOffset] == 0);
   }
-  if(threadIdx.x == 0){
-    atomicAdd(&(raysDump[blockIdx.y]), raySum[threadIdx.x]);
-  }
+
+  atomicAdd(&(raysDump[blockIdx.y]), raysPerPrism[startPrism + wavelengthOffset + reflectionOffset]);
+
 }
 
 /**
@@ -110,6 +101,7 @@ __global__ void distributeRaysByImportance(
  */
 __global__ void distributeRemainingRaysRandomly(
     Mesh mesh,
+    unsigned reflection_i,
     unsigned *raysPerPrism,
     unsigned raysPerSample,
     unsigned *raysDump){
@@ -117,6 +109,7 @@ __global__ void distributeRemainingRaysRandomly(
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   int raysLeft = raysPerSample-raysDump[blockIdx.y];
   unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
+  //unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
 
   if(id < raysLeft){
     curandState randomState;
@@ -124,8 +117,10 @@ __global__ void distributeRemainingRaysRandomly(
     int rand_t = (int ) ceil(curand_uniform(&randomState) * mesh.numberOfTriangles) - 1;
     int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh.numberOfLevels-1)) - 1;
     unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
+    //atomicAdd(&raysPerPrism[randomPrism + wavelengthOffset + reflectionOffset],1);
     atomicAdd(&raysPerPrism[randomPrism + wavelengthOffset],1);
-  }
+  } 
+
 }
 
 
@@ -140,21 +135,24 @@ __global__ void distributeRemainingRaysRandomly(
  */
 __global__ void recalculateImportance(
     Mesh mesh,
+    unsigned reflection_i,
     unsigned *raysPerPrism,
     unsigned raysPerSample,
     double *importance){
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   unsigned wavelengthOffset = blockIdx.y * mesh.numberOfPrisms;
+  unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
+
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
   int startLevel = startPrism/(mesh.numberOfTriangles);
   int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-  if(raysPerPrism[startPrism + wavelengthOffset] > 0){
-    importance[startPrism + wavelengthOffset] = raysPerSample * mesh.surfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + wavelengthOffset]);
+  if(raysPerPrism[startPrism + wavelengthOffset + reflectionOffset] > 0){
+    importance[startPrism + wavelengthOffset + reflectionOffset] = raysPerSample * mesh.surfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + wavelengthOffset + reflectionOffset]);
   }
   else{
-    importance[startPrism + wavelengthOffset] = 0;
+    importance[startPrism + wavelengthOffset + reflectionOffset] = 0;
   }
 }
 
@@ -219,6 +217,7 @@ __global__ void mapRaysToPrism(
 
 unsigned importanceSampling(
     unsigned sample_i,
+    unsigned reflectionSlices,
     Mesh deviceMesh,
     unsigned raysPerSample,
     double *sigmaA,
@@ -244,10 +243,23 @@ unsigned importanceSampling(
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,hostSumPhi, gridDim.y * sizeof(float),cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(raysDump,hostDumpHost, gridDim.y * sizeof(unsigned),cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDim, blockDim, blockDim.x * sizeof(double) >>>(deviceMesh,importance,sumPhi,sample_i,sigmaA, sigmaE));
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDim, blockDim, blockDim.x * sizeof(unsigned) >>>(deviceMesh,raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
-  CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< gridDim,blockDim >>>(deviceMesh,raysPerPrism,raysPerSample,raysDump));
-  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDim, blockDim >>>(deviceMesh,raysPerPrism,raysPerSample,importance));
+  for(unsigned reflection_i = 0; reflection_i < reflectionSlices; ++reflection_i){
+    int reflectionPlane  = (reflection_i % 2 == 0)? -1 : 1;
+    unsigned reflections = (reflection_i + 1) / 2;
+    CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDim, blockDim >>>(deviceMesh,importance,sumPhi,sample_i, reflection_i, reflections, reflectionPlane,sigmaA, sigmaE));
+  }
+
+  for(unsigned reflection_i = 0; reflection_i < reflectionSlices; ++reflection_i){
+    CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDim, blockDim >>>(deviceMesh, reflection_i, raysPerPrism,importance,sumPhi,raysPerSample,raysDump));
+  }
+
+  //for(unsigned reflection_i = 0; reflection_i < reflectionSlices; ++reflection_i){
+    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< gridDim,blockDim >>>(deviceMesh, 0, raysPerPrism,raysPerSample,raysDump));
+    //}
+
+  for(unsigned reflection_i = 0; reflection_i < reflectionSlices; ++reflection_i){
+    CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDim, blockDim >>>(deviceMesh,reflection_i, raysPerPrism,raysPerSample,importance));
+  }
 
   free(hostSumPhi);
   free(hostDumpHost);

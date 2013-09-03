@@ -1,6 +1,7 @@
 #include <mesh.h>
 #include <stdio.h>
 #include <geometry.h>
+#include <reflection.h> /* calcNextReflection */
 #include <cuda_runtime_api.h>
 #include <stdio.h> /* printf */
 #include <assert.h> /* assert */
@@ -173,10 +174,12 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
   int nextForbiddenEdge = -1;
   int nextEdge          = -1;
 
+  if(distanceTotal < SMALL)
+    return 1;
+
   nextRay = normalizeRay(nextRay);
   while(fabs(distanceRemaining) > SMALL){
     assert(*nextLevel <= mesh->numberOfLevels);
-    assert(*nextLevel >= 0);
     // Calc gain for triangle intersection
     length             = distanceRemaining;
     nextEdge           = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
@@ -192,4 +195,52 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
   }
 
   return gain /= (distanceTotal * distanceTotal);
+}
+
+
+__device__ double propagateRayWithReflection(Point startPoint, 
+					     Point endPoint, 
+					     unsigned reflections, 
+					     int reflectionPlane, 
+					     unsigned startLevel, 
+					     unsigned startTriangle, 
+					     Mesh *mesh, 
+					     const double sigmaA, 
+					     const double sigmaE){
+
+  const float reflectivity = 0;
+  const float totalReflectionAngle = 90;
+
+  double gain = 1.0;
+  for(unsigned reflection_i = 0; reflection_i < reflections; ++reflection_i){
+    Point reflectionPoint = {0,0,0};
+    float reflectionAngle = 0;
+    Ray   reflectionRay   = {{0,0,0},{0,0,0}};
+    
+    // Calc reflectionPoint and reflectionAngle
+    calcNextReflection(startPoint, endPoint, (reflections - reflection_i), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh);
+
+    // Propagate this part of the ray
+    reflectionRay       = generateRay(startPoint, reflectionPoint);
+
+    // DEBUG
+    //printf("C reflectionRay.length: %f\n",reflectionRay.length);
+    //printf("C startPoint x:%f y:%f z:%f reflectionPoint x:%f y:%f z:%f\n", startPoint.x, startPoint.y, startPoint.z,reflectionPoint.x, reflectionPoint.y, reflectionPoint.z);
+
+    gain               *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+    assert(reflectionAngle >= 0 && reflectionAngle <= 90);
+    if(reflectionAngle <= totalReflectionAngle) 
+      gain             *= reflectivity;
+    startPoint          = reflectionPoint;
+    reflectionPlane     = (reflectionPlane * -1);
+    
+    }
+
+  Ray ray = generateRay(startPoint, endPoint);
+  gain   *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+  // DEBUG
+  //printf("C ray.length: %f gain:%f\n",ray.length, gain);
+  
+  return gain;
+
 }
