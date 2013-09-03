@@ -1,3 +1,4 @@
+#include "reflection.h"
 #include <mesh.h>
 #include <geometry.h>
 #include <assert.h>

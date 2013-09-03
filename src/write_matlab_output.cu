@@ -1,3 +1,4 @@
+#include "write_matlab_output.h"
 #include <fstream>
 #include <vector>
 #include <iomanip>

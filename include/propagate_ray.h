@@ -35,7 +35,7 @@
  *              See at the code or accompanying paper for more clarity.
  *
  **/
-__host__ __device__ double propagateRay(Ray ray, 
+__device__ double propagateRay(Ray ray, 
 					unsigned *startLevel, 
 					unsigned  *startTriangle, 
 					Mesh *mesh,

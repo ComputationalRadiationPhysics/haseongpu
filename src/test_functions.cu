@@ -1,3 +1,4 @@
+#include "test_functions.h"
 #include <stdio.h>
 /**
  * Prints some of the global device variables.

@@ -1,3 +1,4 @@
+#include "geometry.h"
 #include "mesh.h"
 
 __host__ __device__ Vector direction(Point startPoint, Point endPoint){
