@@ -82,8 +82,8 @@ float calcDndtAse (unsigned &threads,
 		   unsigned &hostRaysPerSample,
 		   Mesh mesh,
 		   Mesh hostMesh,
-		   std::vector<double> *hostSigmaA,
-		   std::vector<double> *hostSigmaE,
+		   std::vector<double> hostSigmaA,
+		   std::vector<double> hostSigmaE,
 		   std::vector<double> *dndtAse,
 		   std::vector<float> *hostPhiAse,
 		   std::vector<double> *expectation
@@ -123,7 +123,7 @@ float calcDndtAse (unsigned &threads,
 
   // Variable Definitions
   dim3 blockDim(256);
-  dim3 gridDim(200, hostSigmaE->size());
+  dim3 gridDim(200, hostSigmaE.size());
   threads = blockDim.x;
   blocks = gridDim.x * gridDim.y;
     
@@ -136,6 +136,7 @@ float calcDndtAse (unsigned &threads,
   distributeRandomly = false;
 
   // Memory allocation on host
+
   hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(unsigned));
@@ -175,8 +176,8 @@ float calcDndtAse (unsigned &threads,
   // Copy host to device
   CUDA_CHECK_RETURN(cudaMemcpy(phiAse, &(hostPhiAse->at(0)), hostMesh.numberOfSamples * gridDim.y * sizeof(float), cudaMemcpyHostToDevice));
   CUDA_CHECK_RETURN(cudaMemcpy(phiAseSquare, hostPhiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float), cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(sigmaA, &(hostSigmaA->at(0)), hostSigmaA->size() * sizeof(double), cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(sigmaE, &(hostSigmaE->at(0)), gridDim.y * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(sigmaA, &(hostSigmaA[0]), hostSigmaA.size() * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(sigmaE, &(hostSigmaE[0]), gridDim.y * sizeof(double), cudaMemcpyHostToDevice));
   
   // Calculate Phi Ase foreach sample
   fprintf(stderr, "\nC Start Phi Ase calculation\n");
@@ -266,7 +267,7 @@ float calcDndtAse (unsigned &threads,
     for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
 	int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
 	hostPhiAse->at(sampleOffset) = float((double(hostPhiAse->at(sampleOffset)) / (raysPerSamplePerWave[wave_i] * 4.0f * 3.14159)));
-	double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE->at(wave_i) + hostSigmaA->at(wave_i)) - double(hostMesh.nTot * hostSigmaA->at(wave_i));
+	double gain_local = double(hostMesh.nTot) * hostMesh.betaCells[sample_i] * double(hostSigmaE[wave_i] + hostSigmaA[wave_i]) - double(hostMesh.nTot * hostSigmaA[wave_i]);
 	dndtAse->at(sampleOffset) = gain_local * hostPhiAse->at(sampleOffset) / hostMesh.crystalFluorescence;
     
     }

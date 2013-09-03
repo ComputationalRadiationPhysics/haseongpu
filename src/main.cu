@@ -129,8 +129,8 @@ int main(int argc, char **argv){
 			    raysPerSample,
 			    dMesh[device],
 			    hMesh,
-			    sigmaA,
-			    sigmaE,
+			    *sigmaA,
+			    *sigmaE,
 			    dndtAse,
 			    phiAse,
 			    expectation

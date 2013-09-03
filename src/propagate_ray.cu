@@ -210,7 +210,7 @@ __device__ double propagateRayWithReflection(Point startPoint,
 					     const double sigmaE){
 
   const float reflectivity = 0;
-  const float totalReflectionAngle = 90;
+  const float totalReflectionAngle = 33;
 
   double gain = 1.0;
   for(unsigned reflection_i = 0; reflection_i < reflections; ++reflection_i){
