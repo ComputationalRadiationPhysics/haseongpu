@@ -1,6 +1,6 @@
 % run_octrace
 % calculates the dndt_ASE values for a given input
-function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, reflectionAngles, reflectivities)
+function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities)
 
   % create all the textfiles in a separate folder
   TMP_FOLDER = 'octrace_tmp';
@@ -18,14 +18,14 @@ function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_
   end
 
   %TODO create real values in Matlab
-  if(~exist('reflectivities','var') || ~exist('reflectionAngles','var'))
-	  reflectionAngles = [45,45];
+  if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
+	  refractiveIndices = [1.83,1,1.83,1];
 	  [a,b] = size(sorted_int);
-	  reflectivities = ones(1,a*2) * 0.1;
+	  reflectivities = ones(1,a*2) * 0;
   end
 
   % create the new input based on the MATLAB variables
-  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,reflectionAngles,reflectivities,FOLDER);
+  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER);
 
   % do the propagation
   system(['./octrace ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --experiment=' FOLDER ]);
@@ -38,7 +38,7 @@ function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,reflectionAngles,reflectivities,FOLDER)
+function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER)
 
   mkdir(FOLDER);
   cd(FOLDER);
@@ -140,8 +140,8 @@ function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_
   fprintf(x,'%.50f\n',clad_abs);
   fclose(x);
 
-  x=fopen('reflection_angles.txt','w');
-  fprintf(x,'%3.5f\n',reflectionAngles);
+  x=fopen('refractive_indices.txt','w');
+  fprintf(x,'%3.5f\n',refractiveIndices);
   fclose(x);
 
   x=fopen('reflectivities.txt','w');

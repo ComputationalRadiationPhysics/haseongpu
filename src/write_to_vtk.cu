@@ -79,7 +79,7 @@ int writeToVtk(Mesh *mesh,
   return 0;
 }
 
-int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOfSamples){
+std::vector<double> compareVtk(std::vector<double> compare, std::string filename, const unsigned numberOfSamples){
   std::ifstream filestream;
   std::string line;
   bool foundLine = false;
@@ -94,12 +94,12 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
  
   // No compare vtk was given
   if(!filename.compare("")){
-    return 0;
+    return std::vector<double>();
   }
   std::cerr << "C Compare solution with " << filename << std::endl;
 
   for(unsigned i = 0; i < numberOfSamples; ++i){
-    aseTotal += ase->at(i);
+    aseTotal += compare.at(i);
   }
 
   filestream.open(filename.c_str(), std::ifstream::in);
@@ -117,10 +117,10 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
 	  break;
 	value = (double) atof(line.c_str());
 
-	if(abs(value) > abs(ase->at(ase_i)))
-	  diff = (abs(value / ase->at(ase_i)) - 1) * 100;
+	if(abs(value) > abs(compare.at(ase_i)))
+	  diff = (abs(value / compare.at(ase_i)) - 1) * 100;
 	else
-	  diff = (abs(ase->at(ase_i) / value) - 1) * 100;
+	  diff = (abs(compare.at(ase_i) / value) - 1) * 100;
 
 	totalDiff += diff;
 
@@ -131,9 +131,9 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
 	  minDiff = diff;
 
 	if(diff >= smallDiff){
-	  std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << ase->at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
+	  std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << compare.at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
 	 }
-	ase->at(ase_i) = diff;
+	compare.at(ase_i) = diff;
 	ase_i++;
 
       }
@@ -143,12 +143,12 @@ int compareVtk(std::vector<double> *ase, std::string filename, unsigned numberOf
   }
   else{
     std::cerr << "C Can't open file " << filename << " for comparison" << std::endl;
-    return 1;
+    return std::vector<double>();
   }
 
   std::cerr << "C ASE max. difference: " << maxDiff << "%" << std::endl;
   std::cerr << "C ASE min. difference: " << minDiff << "%" << std::endl;
-  std::cerr << "C ASE tot. avg difference: " << totalDiff / ase->size() << "%" << std::endl;
+  std::cerr << "C ASE tot. avg difference: " << totalDiff / compare.size() << "%" << std::endl;
   filestream.close();
-  return 0;
+  return compare;
 }

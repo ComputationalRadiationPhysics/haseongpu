@@ -3,6 +3,7 @@
 #include <string>
 #include <assert.h>
 #include <cfloat>
+#include <cmath>
 
 #include <cudachecks.h>
 #include <mesh.h>
@@ -10,17 +11,19 @@
 
 
 Mesh::~Mesh() {
-  if(!points) delete points;
-  if(!betaValues) delete betaValues;
-  if(!normalVec) delete normalVec;
-  if(!centers) delete centers;
-  if(!surfaces) delete surfaces;
-  if(!forbidden) delete forbidden;
-  if(!betaCells) delete betaCells;
-  if(!triangles) delete triangles;  
-  if(!neighbors) delete neighbors;
-  if(!normalPoint) delete normalPoint;
-  if(!cellTypes) delete cellTypes;
+//  if(points) delete points;
+//  if(betaValues) delete betaValues;
+//  if(normalVec) delete normalVec;
+//  if(centers) delete centers;
+//  if(surfaces) delete surfaces;
+//  if(forbidden) delete forbidden;
+//  if(betaCells) delete betaCells;
+//  if(triangles) delete triangles;  
+//  if(neighbors) delete neighbors;
+//  if(normalPoint) delete normalPoint;
+//  if(cellTypes) delete cellTypes;
+//  if(refractiveIndices) delete refractiveIndices;
+//  if(reflectivities) delete reflectivities;
 }
 
 
@@ -53,7 +56,7 @@ void fillHMesh(
     std::vector<double> *betaValues,
     std::vector<double> *betaCells,
     std::vector<unsigned> * cellTypes,
-    std::vector<float> * reflectionAngles,
+    std::vector<float> * refractiveIndices,
     std::vector<float> * reflectivities,
     float nTot,
     float crystalFluorescence,
@@ -89,7 +92,7 @@ void fillHMesh(
   hMesh->normalPoint = &(positionsOfNormal->at(0));
   hMesh->betaCells = &(betaCells->at(0));
   hMesh->cellTypes = &(cellTypes->at(0));
-  hMesh->reflectionAngles = &(reflectionAngles->at(0));
+  hMesh->refractiveIndices = &(refractiveIndices->at(0));
   hMesh->reflectivities = &(reflectivities->at(0));
 
 }
@@ -119,7 +122,7 @@ void fillDMesh(
     std::vector<double> *betaValuesVector,
     std::vector<double> *betaCells,
     std::vector<unsigned> *cellTypes,
-    std::vector<float> * reflectionAngles,
+    std::vector<float> * refractiveIndices,
     std::vector<float> * reflectivities,
     float nTot,
     float crystalFluorescence,
@@ -158,8 +161,8 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->cellTypes), hMesh->numberOfTriangles * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectionAngles), reflectionAngles->size() * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectivities), reflectionAngles->size()*(hMesh->numberOfTriangles) *sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->refractiveIndices), refractiveIndices->size() * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectivities), (refractiveIndices->size()/2)*(hMesh->numberOfTriangles) *sizeof(float)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
@@ -190,9 +193,9 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->cellTypes, (unsigned*) &(cellTypes->at(0)), hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectionAngles, (float*) &(reflectionAngles->at(0)), reflectionAngles->size() * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->refractiveIndices, (float*) &(refractiveIndices->at(0)), refractiveIndices->size() * sizeof(float), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectivities, (float*) &(reflectivities->at(0)), (hMesh->numberOfTriangles)* reflectionAngles->size() * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectivities, (float*) &(reflectivities->at(0)), (hMesh->numberOfTriangles)* (refractiveIndices->size()/2) * sizeof(float), cudaMemcpyHostToDevice));
 
   // fill indexStructs
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->triangles, (unsigned*) &(triangleIndices->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
@@ -415,7 +418,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   std::vector<double> *yOfTriangleCenter = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
   std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
-  std::vector<float> * reflectionAngles = new std::vector<float>;
+  std::vector<float> * refractiveIndices = new std::vector<float>;
   std::vector<float> * reflectivities = new std::vector<float>;
 
   unsigned numberOfPoints = 0;
@@ -450,7 +453,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
   if(fileToVector(root + "clad_int.txt", cellTypes)) return 1;
-  if(fileToVector(root + "reflection_angles.txt", reflectionAngles)) return 1;
+  if(fileToVector(root + "refractive_indices.txt", refractiveIndices)) return 1;
   if(fileToVector(root + "reflectivities.txt", reflectivities)) return 1;
 
   assert(numberOfPoints == (points->size() / 2));
@@ -467,8 +470,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(neighbors->size() == numberOfTriangles * 3);
   assert(betaCells->size() == numberOfPoints * numberOfLevels);
   assert(cellTypes->size()== numberOfTriangles);
-  assert(reflectionAngles->size() == 2);
-  assert(reflectivities->size() == reflectionAngles->size() * numberOfTriangles);
+  assert(refractiveIndices->size() == 4);
+  assert(reflectivities->size() == (refractiveIndices->size()/2) * numberOfTriangles);
 
 
   fillHMesh(
@@ -490,7 +493,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       betaValues,
       betaCells,
       cellTypes,
-	  reflectionAngles,
+	  refractiveIndices,
 	  reflectivities,
       nTot,
       crystalFluorescence,
@@ -520,7 +523,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
         betaValues,
         betaCells,
         cellTypes,
-		reflectionAngles,
+		refractiveIndices,
 		reflectivities,
         nTot,
         crystalFluorescence,
@@ -582,7 +585,6 @@ unsigned Mesh::getMaxReflections(int reflectionPlane){
 	double h = numberOfLevels * thickness; 
 	double z = d/tan(alpha);
 	return ceil(z/h);
-  //fprintf(stderr,"MaxReflections: %d\n",m);
 }
 
 unsigned Mesh::getMaxReflections(){
@@ -604,9 +606,9 @@ __device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned tr
 __device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane){
 	switch(reflectionPlane){
 		case -1:
-			return reflectionAngles[0];
+			return asin(refractiveIndices[1]/refractiveIndices[0]);
 		case 1:
-			return reflectionAngles[1];
+			return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
 	return  0;
 }

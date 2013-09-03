@@ -112,7 +112,7 @@ struct Mesh {
   double  *betaCells;
   unsigned *cellTypes;
 
-  float  *reflectionAngles; //[0]->bottom, [1]->top
+  float  * refractiveIndices; //[0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
   float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
 
   //indexstructs
@@ -132,7 +132,6 @@ struct Mesh {
   unsigned numberOfPoints;
   unsigned numberOfSamples;
   unsigned cladNumber;
-
 
   ~Mesh();
 
