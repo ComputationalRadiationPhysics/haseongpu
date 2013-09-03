@@ -2,14 +2,15 @@
 #include <mesh.h>
 #include <geometry.h>
 #include <assert.h>
+#include <math.h>
 
-__device__ double calcIntersectionAngle(const Ray ray, float *reflectionAngle){
+__device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   // Calc intesection angle with z-plane
-  float nominator = abs(ray.dir.z);
-  float denominator = sqrt((ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y) + (ray.dir.z * ray.dir.z));
+  double nominator = abs(ray.dir.z);
+  double denominator = sqrt((ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y) + (ray.dir.z * ray.dir.z));
   if(denominator != 0.0){
-    double radian = asin(nominator / denominator);
-    *reflectionAngle = (180 / 3.1415926) * radian;
+    double radian = acos(nominator / denominator);
+    *reflectionAngle = ((180. / M_PI) * radian);
     return 0;
   }
   return 1;
@@ -62,7 +63,7 @@ __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  in
   return generateRay(startPoint, endPoint);
 }
 
-__device__ int calcNextReflection(Point startPoint, Point endPoint, unsigned reflectionsLeft, int reflectionPlane, Point *reflectionPoint, float *reflectionAngle, Mesh *mesh){
+__device__ int calcNextReflection(Point startPoint, Point endPoint, unsigned reflectionsLeft, int reflectionPlane, Point *reflectionPoint, double *reflectionAngle, Mesh *mesh){
   Ray reflectionRay = generateReflectionRay(startPoint, endPoint, reflectionsLeft, reflectionPlane, mesh);
   if(calcPlaneIntersectionPoint(reflectionRay, reflectionPlane, mesh, reflectionPoint)) return 1;
   if(calcIntersectionAngle(reflectionRay, reflectionAngle)) return 1;

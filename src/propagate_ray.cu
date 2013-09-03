@@ -215,17 +215,19 @@ __device__ double propagateRayWithReflection(Point startPoint,
   double gain = 1.0;
   for(unsigned reflection_i = 0; reflection_i < reflections; ++reflection_i){
     Point reflectionPoint = {0,0,0};
-    float reflectionAngle = 0;
+    double reflectionAngle = 0;
     
     // Calc reflectionPoint and reflectionAngle
-    calcNextReflection(startPoint, endPoint, (reflections - reflection_i), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh);
-
+    if(calcNextReflection(startPoint, endPoint, (reflections - reflection_i), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh))
+      printf("C error\n");
+    
     // Propagate this part of the ray
     Ray reflectionRay   = generateRay(startPoint, reflectionPoint);
-
-    // DEBUG
     gain               *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-    assert(reflectionAngle >= 0 && reflectionAngle <= 90);
+
+    assert(reflectionAngle <= 90);
+    assert(reflectionAngle >= 0 );
+
     if(reflectionAngle <= totalReflectionAngle) 
       gain             *= reflectivity;
     startPoint          = reflectionPoint;
@@ -235,8 +237,6 @@ __device__ double propagateRayWithReflection(Point startPoint,
 
   Ray ray = generateRay(startPoint, endPoint);
   gain   *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-  // DEBUG
-  //printf("C ray.length: %f gain:%f\n",ray.length, gain);
   
   return gain;
 

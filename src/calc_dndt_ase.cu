@@ -129,14 +129,13 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.005;
-  maxRaysPerSample = 10000000; // 10M
-  maxReflections = 0;
+  expectationThreshold = 10000000;
+  maxRaysPerSample = 100000; // 100K
+  maxReflections = 1;
   reflectionSlices = 1 + 2 * maxReflections;
-  distributeRandomly = false;
+  distributeRandomly = true;
 
   // Memory allocation on host
-
   hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(unsigned));
@@ -194,12 +193,13 @@ float calcDndtAse (unsigned &threads,
     while(!expectationIsMet){
       expectationIsMet = true;
 
-      hostRaysPerSample = importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, raysPerPrism, hostRaysDump, distributeRandomly, blockDim, gridDim);
+      importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, raysPerPrism, hostRaysDump, distributeRandomly, blockDim, gridDim);
       CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * reflectionSlices * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
       // Prism scheduling for gpu threads
       calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh, gridDim);
       CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
+      CUDA_CHECK_RETURN(cudaMemcpy(numberOfReflections, hostNumberOfReflections, hostRaysPerSample * gridDim.y * sizeof(unsigned), cudaMemcpyHostToDevice));
 
       // Filter wavelengths which reached expectations
       calcIndicesOfWavelengths(hostIndicesOfWavelengths, gridDim, ignoreWavelength);
