@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <assert.h>
+#include <cfloat>
 
 #include <cudachecks.h>
 #include <mesh.h>
@@ -90,6 +91,7 @@ void fillHMesh(
   hMesh->cellTypes = &(cellTypes->at(0));
   hMesh->reflectionAngles = &(reflectionAngles->at(0));
   hMesh->reflectivities = &(reflectivities->at(0));
+
 }
 
 /**
@@ -426,9 +428,6 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   double cladAbsorption = 0;
 
 
-//TODO: parse angles
-//TODO: parse reflectivities
-
   // Parse experimentdata from files
   if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
   if(fileToVector(root + "beta_v.txt", betaValues)) return 1;
@@ -548,13 +547,13 @@ double getMaxDistance(std::vector<TwoDimPoint> points){
 	return maxDistance;
 }
 
-double calculateMaxDiameter(std::vector<double> points){
+double calculateMaxDiameter(double* points, unsigned offset){
 	// TODO find maximum/minimum possible value to initialize
-	TwoDimPoint minX = {9999,0};
-	TwoDimPoint minY = {0,9999};
-	TwoDimPoint maxX = {-9999,0};
-	TwoDimPoint maxY = {0,-9999};
-	unsigned offset = points.size()/2;
+	TwoDimPoint minX = {DBL_MAX,0};
+	TwoDimPoint minY = {0,DBL_MAX};
+	TwoDimPoint maxX = {DBL_MIN,0};
+	TwoDimPoint maxY = {0,DBL_MIN};
+	//unsigned offset = points.size()/2;
 
 	for(unsigned p=0; p<offset; ++p){
 		TwoDimPoint np = {points[p],points[p+offset]};
@@ -578,11 +577,12 @@ double calculateMaxDiameter(std::vector<double> points){
 }
 
 unsigned Mesh::getMaxReflections(int reflectionPlane){
-	double d = calculateMaxDiameter(std::vector<double>(*points));
+	double d = calculateMaxDiameter(points,numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane);
 	double h = numberOfLevels * thickness; 
 	double z = d/tan(alpha);
 	return ceil(z/h);
+  //fprintf(stderr,"MaxReflections: %d\n",m);
 }
 
 unsigned Mesh::getMaxReflections(){
