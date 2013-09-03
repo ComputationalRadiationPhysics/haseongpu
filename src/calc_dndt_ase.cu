@@ -101,6 +101,8 @@ float calcDndtAse (unsigned &threads,
   unsigned maxRaysPerSample;
   unsigned maxReflections;
   unsigned reflectionSlices;
+  unsigned *hostRaysDump;
+  bool distributeRandomly;
 
   // GPU
   float *phiAse;
@@ -116,6 +118,7 @@ float calcDndtAse (unsigned &threads,
   double * sigmaA;
   double * sigmaE;
 
+  // Variable Definitions
   dim3 blockDim(256);
   dim3 gridDim(200, hostSigmaE->size());
   threads = blockDim.x;
@@ -123,18 +126,20 @@ float calcDndtAse (unsigned &threads,
     
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 1000;//0.01;
+  expectationThreshold = 0.005;
   maxRaysPerSample = 10000000; // 10M
-  maxReflections = 1;
+  maxReflections = 0;
   reflectionSlices = 1 + 2 * maxReflections;
+  distributeRandomly = false;
 
   // Memory allocation on host
   hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * gridDim.y * reflectionSlices * sizeof(unsigned));
   hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * gridDim.y * sizeof(unsigned));
-  hostNumberOfReflections  = (int*) malloc (maxRaysPerSample         * gridDim.y * sizeof(int));
-  hostIndicesOfWavelengths = (int*) malloc (gridDim.y * sizeof(int));
+  hostNumberOfReflections  = (int*)      malloc (maxRaysPerSample         * gridDim.y * sizeof(int));
+  hostIndicesOfWavelengths = (int*)      malloc (gridDim.y                * sizeof(int));
+  hostRaysDump             = (unsigned*) malloc (gridDim.y                * sizeof(unsigned));
 
   for(unsigned i=0; i < maxRaysPerSample * gridDim.y; ++i) hostIndicesOfPrisms[i] = 0;
   for(unsigned i=0; i < maxRaysPerSample * gridDim.y; ++i) hostNumberOfReflections[i] = 0;
@@ -142,6 +147,7 @@ float calcDndtAse (unsigned &threads,
   for(unsigned i=0; i < hostMesh.numberOfSamples * gridDim.y; ++i) hostPhiAseSquare[i] = 0.f;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y * reflectionSlices; ++i) hostRaysPerPrism[i] = 1;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * gridDim.y * reflectionSlices; ++i) hostImportance[i] = 1.0;
+  for(unsigned i=0; i < gridDim.y; ++i) hostRaysDump[i] = 0;
 
   // CUDA Mersenne twister for more than 200 blocks (for every wavelength)
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.y * gridDim.x  * sizeof(curandStateMtgp32)));
@@ -178,12 +184,13 @@ float calcDndtAse (unsigned &threads,
     bool expectationIsMet = false;
     std::vector<bool> ignoreWavelength(gridDim.y, false);
     std::vector<unsigned> raysPerSamplePerWave(gridDim.y, hostRaysPerSampleSave);
+
     hostRaysPerSample = hostRaysPerSampleSave;
 
     while(!expectationIsMet){
       expectationIsMet = true;
 
-      hostRaysPerSample = importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, raysPerPrism, blockDim, gridDim);
+      hostRaysPerSample = importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, sigmaA, sigmaE, importance, raysPerPrism, hostRaysDump, distributeRandomly, blockDim, gridDim);
       CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * gridDim.y * reflectionSlices * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
       // Prism scheduling for gpu threads
@@ -196,6 +203,7 @@ float calcDndtAse (unsigned &threads,
 
       // Start Kernel
       calcSamplePhiAse<<< gridDim, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, indicesOfWavelengths, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, sigmaA, sigmaE);
+      
 
       // Calculate expectations
       for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
@@ -206,27 +214,35 @@ float calcDndtAse (unsigned &threads,
         CUDA_CHECK_RETURN(cudaMemcpy(&(hostPhiAseSquare[sampleOffset]), &(phiAseSquare[sampleOffset]), sizeof(float), cudaMemcpyDeviceToHost));
 
         // Check square error
-        expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
-        if(expectation->at(sampleOffset) >= expectationThreshold){
-	  expectationIsMet = false;
-	  ignoreWavelength[wave_i] = false;
-        }
-	else{
+        expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysDump[wave_i]);
+	if(hostRaysPerSample * 10 > maxRaysPerSample){
+	  expectationIsMet = true;
+	  if(!ignoreWavelength[wave_i]) 
+	    raysPerSamplePerWave[wave_i] = hostRaysDump[wave_i];
 	  ignoreWavelength[wave_i] = true;
+	  
 	}
+	else {
+	  if(expectation->at(sampleOffset) >= expectationThreshold){
+	    expectationIsMet = false;
+	    ignoreWavelength[wave_i] = false;
+	  }
+	  else{
+	    ignoreWavelength[wave_i] = true;
+	    raysPerSamplePerWave[wave_i] = hostRaysDump[wave_i];
+	  }
+	}
+	
 
       }
 
-      // Stop calculations on maxRaysPerSample (keep solution)
-      if(hostRaysPerSample == maxRaysPerSample) break;
-
       // If the threshold is still too high, increase the number of rays and reset the previously calculated value
       if(!expectationIsMet){
-        hostRaysPerSample *= 10;
+	hostRaysPerSample *= 10;
         for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
 	  if(!ignoreWavelength[wave_i]){
 	    int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
-	    raysPerSamplePerWave[wave_i] *= 10;
+	    raysPerSamplePerWave[wave_i] = hostRaysPerSample;
 	    hostPhiAse->at(sampleOffset) = 0;
 	    hostPhiAseSquare[sampleOffset] = 0;
 	    CUDA_CHECK_RETURN( cudaMemcpy(&(phiAse[sampleOffset]), &(hostPhiAse->at(sampleOffset)), sizeof(float), cudaMemcpyHostToDevice));
@@ -234,6 +250,7 @@ float calcDndtAse (unsigned &threads,
 	  }
 	  
         }
+
 
       }
 
@@ -262,6 +279,7 @@ float calcDndtAse (unsigned &threads,
   free(hostImportance);
   free(hostRaysPerPrism);
   free(hostIndicesOfPrisms);
+  free(hostRaysDump);
   cudaFree(phiAse);
   cudaFree(importance);
   cudaFree(indicesOfPrisms);
