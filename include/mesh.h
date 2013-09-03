@@ -146,7 +146,6 @@ struct Mesh {
   __device__ int getForbiddenEdge(unsigned triangle, int edge);
   __device__ unsigned getCellType(unsigned triangle);
 
-  double calculateMaxDiameter(std::vector<double> points);
 
   unsigned getMaxReflections(int reflectionPlane);
   unsigned getMaxReflections();
@@ -162,5 +161,7 @@ struct Mesh {
 			   unsigned maxGpus
 			   );
 };
+
+double calculateMaxDiameter(std::vector<double> points);
 
 #endif /* MESH_H */
