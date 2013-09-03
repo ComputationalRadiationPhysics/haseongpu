@@ -22,6 +22,12 @@ Mesh::~Mesh() {
   if(!cellTypes) delete cellTypes;
 }
 
+
+
+
+
+
+
 /**
  * @brief fills the host mesh with the correct datastructures
  *
@@ -46,6 +52,8 @@ void fillHMesh(
     std::vector<double> *betaValues,
     std::vector<double> *betaCells,
     std::vector<unsigned> * cellTypes,
+    std::vector<float> * reflectionAngles,
+    std::vector<float> * reflectivities,
     float nTot,
     float crystalFluorescence,
     unsigned cladNumber,
@@ -80,6 +88,8 @@ void fillHMesh(
   hMesh->normalPoint = &(positionsOfNormal->at(0));
   hMesh->betaCells = &(betaCells->at(0));
   hMesh->cellTypes = &(cellTypes->at(0));
+  hMesh->reflectionAngles = &(reflectionAngles->at(0));
+  hMesh->reflectivities = &(reflectivities->at(0));
 }
 
 /**
@@ -107,6 +117,8 @@ void fillDMesh(
     std::vector<double> *betaValuesVector,
     std::vector<double> *betaCells,
     std::vector<unsigned> *cellTypes,
+    std::vector<float> * reflectionAngles,
+    std::vector<float> * reflectivities,
     float nTot,
     float crystalFluorescence,
     unsigned cladNumber,
@@ -144,6 +156,8 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(double)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->cellTypes), hMesh->numberOfTriangles * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectionAngles), reflectionAngles->size() * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectivities), reflectionAngles->size()*(hMesh->numberOfTriangles) *sizeof(float)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
@@ -174,6 +188,9 @@ void fillDMesh(
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->cellTypes, (unsigned*) &(cellTypes->at(0)), hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
 
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectionAngles, (float*) &(reflectionAngles->at(0)), reflectionAngles->size() * sizeof(float), cudaMemcpyHostToDevice));
+
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectivities, (float*) &(reflectivities->at(0)), (hMesh->numberOfTriangles)* reflectionAngles->size() * sizeof(float), cudaMemcpyHostToDevice));
 
   // fill indexStructs
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->triangles, (unsigned*) &(triangleIndices->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
@@ -396,6 +413,9 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   std::vector<double> *yOfTriangleCenter = new std::vector<double>;
   std::vector<double> * betaCells = new std::vector<double>;
   std::vector<unsigned> * cellTypes = new std::vector<unsigned>;
+  std::vector<float> * reflectionAngles = new std::vector<float>;
+  std::vector<float> * reflectivities = new std::vector<float>;
+
   unsigned numberOfPoints = 0;
   unsigned numberOfTriangles = 0;
   unsigned numberOfLevels = 0;
@@ -404,6 +424,10 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   float nTot = 0;
   float crystalFluorescence = 0;
   double cladAbsorption = 0;
+
+
+//TODO: parse angles
+//TODO: parse reflectivities
 
   // Parse experimentdata from files
   if(fileToVector(root + "n_p.txt", positionsOfNormalVectors)) return 1;
@@ -427,6 +451,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   if(fileToValue(root + "clad_abs.txt", cladAbsorption)) return 1;
   if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
   if(fileToVector(root + "clad_int.txt", cellTypes)) return 1;
+  if(fileToVector(root + "reflection_angles.txt", reflectionAngles)) return 1;
+  if(fileToVector(root + "reflectivities.txt", reflectivities)) return 1;
 
   assert(numberOfPoints == (points->size() / 2));
   assert(numberOfTriangles == triangleIndices->size() / 3);
@@ -442,6 +468,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   assert(neighbors->size() == numberOfTriangles * 3);
   assert(betaCells->size() == numberOfPoints * numberOfLevels);
   assert(cellTypes->size()== numberOfTriangles);
+  assert(reflectionAngles->size() == 2);
+  assert(reflectivities->size() == reflectionAngles->size() * numberOfTriangles);
 
 
   fillHMesh(
@@ -463,6 +491,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
       betaValues,
       betaCells,
       cellTypes,
+	  reflectionAngles,
+	  reflectivities,
       nTot,
       crystalFluorescence,
       cladNumber,
@@ -491,6 +521,8 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
         betaValues,
         betaCells,
         cellTypes,
+		reflectionAngles,
+		reflectivities,
         nTot,
         crystalFluorescence,
         cladNumber,
@@ -500,5 +532,82 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   }
   return 0;
 
+}
+
+double distance2D(TwoDimPoint p1, TwoDimPoint p2){
+	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
+}
+
+double getMaxDistance(std::vector<TwoDimPoint> points){
+	double maxDistance = -1;
+
+	for(unsigned p1=0 ; p1 < points.size() ; ++p1)
+		for(unsigned p2 = p1; p2 < points.size() ; ++p2)
+			maxDistance = max(maxDistance,distance2D(points[p1],points[p2]));
+
+	return maxDistance;
+}
+
+double calculateMaxDiameter(std::vector<double> points){
+	// TODO find maximum/minimum possible value to initialize
+	TwoDimPoint minX = {9999,0};
+	TwoDimPoint minY = {0,9999};
+	TwoDimPoint maxX = {-9999,0};
+	TwoDimPoint maxY = {0,-9999};
+	unsigned offset = points.size()/2;
+
+	for(unsigned p=0; p<offset; ++p){
+		TwoDimPoint np = {points[p],points[p+offset]};
+		minX = (points[p] < minX.x) ? np : minX;
+		maxX = (points[p] > maxX.x) ? np : maxX;
+	}
+	for(unsigned p=offset;p<2*offset;++p){
+        TwoDimPoint np = {points[p-offset],points[p]};
+		minY = points[p]<minY.y ? np : minY;
+		maxY = points[p]>maxY.y ? np : maxY;
+	}
+
+	std::vector<TwoDimPoint> extrema;
+	extrema.push_back(minX);
+	extrema.push_back(minY);
+	extrema.push_back(maxX);
+	extrema.push_back(maxY);
+	
+
+	return getMaxDistance(extrema);
+}
+
+unsigned Mesh::getMaxReflections(int reflectionPlane){
+	double d = calculateMaxDiameter(std::vector<double>(*points));
+	float alpha = getReflectionAngle(reflectionPlane);
+	double h = numberOfLevels * thickness; 
+	double z = d/tan(alpha);
+	return ceil(z/h);
+}
+
+unsigned Mesh::getMaxReflections(){
+	unsigned top = getMaxReflections(1);
+	unsigned bottom = getMaxReflections(-1);
+	return max(top,bottom);
+}
+
+__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle){
+	switch(reflectionPlane){
+		case -1:
+			return reflectivities[triangle];
+		case 1:
+			return reflectivities[triangle + numberOfTriangles];
+	}
+	return 0;
+}
+
+__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane){
+	switch(reflectionPlane){
+		case -1:
+			return reflectionAngles[0];
+		case 1:
+			return reflectionAngles[1];
+	}
+	return  0;
 }
 
