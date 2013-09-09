@@ -551,12 +551,10 @@ double getMaxDistance(std::vector<TwoDimPoint> points){
 }
 
 double calculateMaxDiameter(double* points, unsigned offset){
-	// TODO find maximum/minimum possible value to initialize
 	TwoDimPoint minX = {DBL_MAX,0};
 	TwoDimPoint minY = {0,DBL_MAX};
 	TwoDimPoint maxX = {DBL_MIN,0};
 	TwoDimPoint maxY = {0,DBL_MIN};
-	//unsigned offset = points.size()/2;
 
 	for(unsigned p=0; p<offset; ++p){
 		TwoDimPoint np = {points[p],points[p+offset]};
