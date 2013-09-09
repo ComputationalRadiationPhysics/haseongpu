@@ -33,10 +33,6 @@ void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned *numberOfReflections
   for(unsigned reflection_i =0; reflection_i < reflectionSlices; ++reflection_i){
     for(unsigned prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
       unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-      //unsigned wavelengthOffset = wave_i * mesh.numberOfPrisms;
-      int reflectionPlane  = (reflection_i % 2 == 0)? -1 : 1;
-      unsigned reflections = (reflection_i + 1) / 2;
-
       for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + reflectionOffset]; ++ray_i){
         indicesOfPrisms[absoluteRay] = prism_i;
         numberOfReflections[absoluteRay] = reflection_i;
@@ -93,7 +89,7 @@ float calcDndtAse (unsigned &threads,
   unsigned *hostRaysPerPrism;
   float runtime;
   unsigned *hostIndicesOfPrisms;
-  int *hostNumberOfReflections;
+  unsigned *hostNumberOfReflections;
   float *hostPhiAseSquare;
   time_t starttime,progressStartTime;
   unsigned hostRaysPerSampleSave;
@@ -123,9 +119,9 @@ float calcDndtAse (unsigned &threads,
 
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.003;
-  maxRaysPerSample = 100000000; // 100M
-  maxReflections = 0;
+  expectationThreshold = 10000000;
+  maxRaysPerSample = max(100000,hostRaysPerSample); // 100M
+  maxReflections = 2;
   reflectionSlices = 1 + 2 * maxReflections;
   distributeRandomly = true;
 
@@ -134,7 +130,7 @@ float calcDndtAse (unsigned &threads,
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * reflectionSlices * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * reflectionSlices * sizeof(unsigned));
   hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * sizeof(unsigned));
-  hostNumberOfReflections  = (int*)      malloc (maxRaysPerSample         * sizeof(int));
+  hostNumberOfReflections  = (unsigned*) malloc (maxRaysPerSample         * sizeof(unsigned));
   hostRaysDump             = (unsigned*) malloc (1                        * sizeof(unsigned));
 
   for(unsigned i=0; i < maxRaysPerSample ; ++i) hostIndicesOfPrisms[i] = 0;
@@ -201,7 +197,7 @@ float calcDndtAse (unsigned &threads,
         // Check square error
         expectation->at(sampleOffset) =  calcExpectation(hostPhiAse->at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
 
-        if(expectation->at(sampleOffset) <= expectationThreshold) break;
+        if(expectation->at(sampleOffset) < expectationThreshold) break;
         if((hostRaysPerSample * 10) > maxRaysPerSample)          break;
 
         // fprintf(stderr,"increasing from %d to %d\n",hostRaysPerSample, hostRaysPerSample*10);
