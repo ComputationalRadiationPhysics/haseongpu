@@ -5,7 +5,8 @@
 #include <curand_kernel.h> /* curand_uniform */
 #include <string>
 
-#define SMALL 1E-06
+#define REFLECTION_SMALL 1E-3
+#define SMALL 1E-5
 #define VERY_SMALL 0.0
 
 struct TwoDimPoint {

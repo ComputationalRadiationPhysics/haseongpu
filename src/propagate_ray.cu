@@ -126,10 +126,10 @@ __device__ Ray calcNextRay(Ray ray, const double length){
  **/
 __device__ double calcPrismGain(const unsigned triangle, const unsigned level, const double length, Mesh *mesh, const double sigmaA, const double sigmaE){
   if (mesh->getCellType(triangle) == mesh->cladNumber){
-     return exp(-(mesh->cladAbsorption) * length);
-   }
-   else {
-  return (double) exp(mesh->nTot * (mesh->getBetaValue(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
+    return exp(-(mesh->cladAbsorption) * length);
+  }
+  else {
+     return (double) exp(mesh->nTot * (mesh->getBetaValue(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
    }
  
 }
@@ -175,8 +175,9 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
   int nextForbiddenEdge = -1;
   int nextEdge          = -1;
 
+  // Length to small, could be same points
   if(distanceTotal < SMALL)
-    return 1;
+     return 1;
 
   nextRay = normalizeRay(nextRay);
   while(fabs(distanceRemaining) > SMALL){
@@ -185,7 +186,10 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
     length             = distanceRemaining;
     nextEdge           = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
     nextRay            = calcNextRay(nextRay, length);
-    gain              *= calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
+    double gainTmp     = calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
+    gain              *= gainTmp;
+    assert(length >= 0);
+
     distanceRemaining -= length;
 
     // Calc nextTriangle, nextForbiddenEdge and nextLevel
@@ -195,7 +199,7 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 
   }
 
-  return gain /= (distanceTotal * distanceTotal);
+  return gain;
 }
 
 
@@ -211,19 +215,19 @@ __device__ double propagateRayWithReflection(Point startPoint,
 
   const float reflectivity = 0;
   const float totalReflectionAngle = 33;
+  double distanceTotal = 0;
 
   double gain = 1.0;
-  for(unsigned reflection_i = 0; reflection_i < reflections; ++reflection_i){
+
+  for(unsigned reflection = 0; reflection < reflections; ++reflection){
     Point reflectionPoint = {0,0,0};
     double reflectionAngle = 0;
     
     // Calc reflectionPoint and reflectionAngle
-    if(calcNextReflection(startPoint, endPoint, (reflections - reflection_i), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh))
-      printf("C error\n");
-    
-    // Propagate this part of the ray
+    calcNextReflection(startPoint, endPoint, (reflections - reflection), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh);
     Ray reflectionRay   = generateRay(startPoint, reflectionPoint);
-    gain               *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+    distanceTotal += reflectionRay.length;
+    gain  *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
 
     assert(reflectionAngle <= 90);
     assert(reflectionAngle >= 0 );
@@ -236,8 +240,10 @@ __device__ double propagateRayWithReflection(Point startPoint,
     }
 
   Ray ray = generateRay(startPoint, endPoint);
-  gain   *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+  gain  *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+  distanceTotal += ray.length;
   
-  return gain;
+  
+  return gain / (distanceTotal * distanceTotal);
 
 }
