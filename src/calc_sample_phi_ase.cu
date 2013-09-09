@@ -9,7 +9,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
 				 const int* indicesOfWavelengths, 
-				 const int* numberOfReflections,
+				 const unsigned* numberOfReflections,
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *phiAse, 
@@ -26,6 +26,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   double gainSum = 0;
   double gainSumSquare = 0;
   Point samplePoint = mesh.getSamplePoint(sample_i);
+  unsigned wavelengthOffset = wave_i * mesh.numberOfPrisms;
 
   // Return if this wavelength block should be ignored
   if(wave_i == -1) return;
@@ -35,17 +36,21 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
   while ((rayNumber = gid + stride) < raysPerSample) {
     stride += blockDim.x * gridDim.x;
     // Get triangle/prism to start ray from
-    unsigned startPrism    = indicesOfPrisms[rayNumber + wave_i * raysPerSample];
-    int reflections        = numberOfReflections[rayNumber + wave_i * raysPerSample];
-    int reflectionPlane    = (reflections > 0) ? 1 : -1;
-    unsigned startLevel    = startPrism/mesh.numberOfTriangles;
-    unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
+    unsigned startPrism       = indicesOfPrisms[rayNumber + wave_i * raysPerSample];
+    unsigned reflection_i     = numberOfReflections[rayNumber + wave_i * raysPerSample]; // TODO unsigned
+    unsigned reflections      = (reflection_i + 1) / 2;
+    int reflectionPlane       = (reflection_i % 2 == 0) ? -1 : 1;
+    unsigned startLevel       = startPrism/mesh.numberOfTriangles;
+    unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
+    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
+
 
     Point startPoint = mesh.genRndPoint(startTriangle, startLevel, &(globalState[wave_i * gridDim.x]));
 
     // Calculate reflections as different ray propagations
-    double gain    = propagateRayWithReflection(startPoint, samplePoint, abs(reflections), reflectionPlane, startLevel, startTriangle, &mesh, sigmaA[wave_i], sigmaE[wave_i]);
-    gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + wave_i * mesh.numberOfPrisms];
+    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, &mesh, sigmaA[wave_i], sigmaE[wave_i]);
+    gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + wavelengthOffset + reflectionOffset];
+
     gainSum       += gain;
     gainSumSquare += gain * gain;
 
