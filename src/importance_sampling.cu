@@ -140,62 +140,6 @@ __global__ void recalculateImportance(Mesh mesh,
   }
 }
 
-
-// unused, because we didn't find a good way to parallelize it...
-// OPTIMIZE
-/**
- * @brief maps every ray to a specific prism
- *
- * @param *raysPerPrism the number of rays to launch in each prism
- *
- * @param raysPerSample the total number of rays to launch 
- *
- * @param *indicesOfPrisms a mapping for each ray to a specific prism
- *
- */
-__global__ void createCumulativeSum1(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned *cumulativeSum){
-
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  if(id==0){
-    cumulativeSum[0] = 0;
-  }
-  if(id < mesh.numberOfPrisms-1){
-    cumulativeSum[id+1] = raysPerPrism[id];
-  }
-}
-
-__global__ void createCumulativeSum2(
-    Mesh mesh,
-    unsigned *cumulativeSum){
-
-  for(int i=0;i<mesh.numberOfPrisms;i++){
-    cumulativeSum[i+1] += cumulativeSum[i];
-  }
-  //printf("PartialSum sum: %d\n",partialSums[0]);
-}
-
-__global__ void mapRaysToPrism(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned raysPerSample,
-    unsigned *indicesOfPrisms,
-    unsigned *cumulativeSum){
-
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  if(id >= mesh.numberOfPrisms) return;
-
-  unsigned absoluteRay = cumulativeSum[id];
-  for(unsigned prism_i=cumulativeSum[id]; prism_i < indicesOfPrisms[id]; ++prism_i){
-    for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i]; ++ray_i){
-      indicesOfPrisms[absoluteRay++] = prism_i;
-    }
-  }
-}
-
-
 unsigned importanceSampling(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
