@@ -401,7 +401,7 @@ __device__ unsigned Mesh::getCellType(unsigned triangle){
 int Mesh::parseMultiGPU(Mesh *hMesh,
 			Mesh **dMesh,
 			std::string root,
-			unsigned *devices,
+			std::vector<unsigned> devices,
 			unsigned maxGpus) {
 
   // Experimentdata
@@ -502,7 +502,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   );
 
   for( unsigned i=0; i<maxGpus; i++){
-    CUDA_CHECK_RETURN(cudaSetDevice(devices[i]) );
+    CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
     fillDMesh(
         hMesh,
         &((*dMesh)[i]),

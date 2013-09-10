@@ -93,6 +93,7 @@ int checkParameterValidity(
     unsigned raysPerSample,
     std::string root,
     int *device,
+	unsigned deviceCount,
     int mode
     );
 

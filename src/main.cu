@@ -31,45 +31,41 @@
  * 
  * @return Number of devices in devices array
  */
-unsigned getCorrectDevice(int verbose,unsigned **devices){
-  int count = 0, candidate = 0;
-  unsigned correctDevices = 0;
+std::vector<unsigned> getCorrectDevice(int verbose){
   cudaDeviceProp prop;
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
+  int count;
+  int* test;
 
+  std::vector<unsigned> devices;
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
 
   for(int i=0; i<count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
-      correctDevices++;
+	  cudaSetDevice(i);
+	  if( cudaMalloc((void**) &test, sizeof(int)) == cudaSuccess){
+		devices.push_back(i);
+		cudaFree(test);
+	  }
     }
   }
 
-  if(correctDevices == 0){
+  if(devices.size() == 0){
     fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
     exit(1);
   }
 
-  (*devices) = (unsigned*) malloc(sizeof(unsigned) * correctDevices);
-
   if(verbose > 0){
-    fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", correctDevices, minMajor,minMinor);
+    fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
+	for(unsigned i=0; i<devices.size(); ++i){
+		CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
+        fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", devices[i], prop.name, prop.major, prop.minor);
+	}
   }
 
-  candidate = 0;
-  for(int i=0; i<count; ++i){
-    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
-    if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
-      if(verbose > 0){
-        fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", candidate, prop.name, prop.major, prop.minor);
-      }
-      (*devices)[candidate]=i;
-      candidate++;
-    }
-  }
-  return correctDevices;
+  return devices;
 }
 
 int main(int argc, char **argv){
@@ -81,8 +77,7 @@ int main(int argc, char **argv){
   unsigned threads;
   bool silent = false;
   bool writeVtk = false;
-  unsigned *devices; // will be assigned in getCOrrectDevice();
-  unsigned numberOfDevices=0;
+  std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
   unsigned maxGpus = MAX_GPUS;
   int device = -1;
   int mode = -1;
@@ -95,20 +90,20 @@ int main(int argc, char **argv){
   std::vector<double> *sigmaE = new std::vector<double>;
 
   // Set/Test device to run experiment with
-  numberOfDevices = getCorrectDevice(1,&devices);
+  devices = getCorrectDevice(1);
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &experimentPath, &device, &silent,
 		   &writeVtk, &compareLocation, &mode);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, experimentPath, &device, mode)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, experimentPath, &device, devices.size(), mode)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(experimentPath + "sigma_a.txt", sigmaA)) return 1;
   if(fileToVector(experimentPath + "sigma_e.txt", sigmaE)) return 1;
   assert(sigmaA->size() == sigmaE->size());
-  assert(maxGpus <= numberOfDevices);
+  assert(maxGpus <= devices.size());
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
@@ -119,7 +114,7 @@ int main(int argc, char **argv){
   std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE->size(), 0);
   std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
-  CUDA_CHECK_RETURN( cudaSetDevice(devices[device])); 
+  CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
   // Run Experiment
   switch(mode){
     case 0:
@@ -199,7 +194,6 @@ int main(int argc, char **argv){
   if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");
 
   // Free memory
-  delete devices;
   delete sigmaE;
   delete sigmaA;
   delete dndtAse;

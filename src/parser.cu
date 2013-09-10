@@ -82,6 +82,7 @@ int checkParameterValidity(
     unsigned raysPerSample,
     std::string root,
     int *device,
+    unsigned deviceCount,
     int mode
     ) {
 
@@ -102,6 +103,11 @@ int checkParameterValidity(
   }
   if (root.size() == 0) {
     fprintf(stderr, "C Please specify the experiment's location with --experiment=\n");
+    return 1;
+  }
+
+  if (*device >= int(deviceCount)){
+    fprintf(stderr, "C Error: There are only %d devices! (you requested Device %d)\n",deviceCount,*device);
     return 1;
   }
   if (*device == -1) {
