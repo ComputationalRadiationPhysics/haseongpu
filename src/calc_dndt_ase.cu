@@ -9,6 +9,7 @@
 #include <cudachecks.h>
 #include <importance_sampling.h>
 #include <test_functions.h>
+#include <cuda_utils.h> /* copyToDevice, copyFromDevice */
 #include "calc_sample_phi_ase.h"
 /* include MTGP host helper functions */
 #include <curand_mtgp32_host.h>
@@ -29,7 +30,12 @@
  *        where its rays starts.
  *
  **/
-void calcIndicesOfPrism(unsigned *indicesOfPrisms, unsigned *numberOfReflections, unsigned* raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh, dim3 gridDim){
+void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, unsigned *numberOfReflections, unsigned* raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh, dim3 gridDim){
+  // Init vectors with zero
+  for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms.at(i) = 0;
+  for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) numberOfReflections[i] = 0; // TODO change to numberOfReflections.size()
+
+  // Calc new values
   for(unsigned reflection_i =0; reflection_i < reflectionSlices; ++reflection_i){
     for(unsigned prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
       unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
@@ -90,7 +96,7 @@ float calcDndtAse (unsigned &threads,
   double *hostImportance;
   unsigned *hostRaysPerPrism;
   float runtime;
-  unsigned *hostIndicesOfPrisms;
+  // ** unsigned *hostIndicesOfPrisms;
   unsigned *hostNumberOfReflections;
   float *hostPhiAseSquare;
   time_t starttime,progressStartTime;
@@ -108,7 +114,7 @@ float calcDndtAse (unsigned &threads,
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;
   double *importance;
-  unsigned *indicesOfPrisms;
+  // ** unsigned *indicesOfPrisms;
   unsigned *numberOfReflections;
   unsigned *raysPerPrism;
   unsigned *cumulativeSums;
@@ -121,21 +127,23 @@ float calcDndtAse (unsigned &threads,
 
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 10000000;
-  maxRaysPerSample = max(100000,hostRaysPerSample); // 100M
-  maxReflections = 2;
+  expectationThreshold = 0.005;
+  maxRaysPerSample = max(10000,hostRaysPerSample); // 100M
+  maxReflections = 0;
   reflectionSlices = 1 + 2 * maxReflections;
   distributeRandomly = true;
 
   // Memory allocation on host
+  std::vector<unsigned> hostIndicesOfPrisms(maxRaysPerSample, 0);
+  // ** hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * sizeof(unsigned));
+
   hostPhiAseSquare         = (float*)    malloc (hostMesh.numberOfSamples * gridDim.y * sizeof(float));
   hostImportance           = (double*)   malloc (hostMesh.numberOfPrisms  * reflectionSlices * sizeof(double));
   hostRaysPerPrism         = (unsigned*) malloc (hostMesh.numberOfPrisms  * reflectionSlices * sizeof(unsigned));
-  hostIndicesOfPrisms      = (unsigned*) malloc (maxRaysPerSample         * sizeof(unsigned));
   hostNumberOfReflections  = (unsigned*) malloc (maxRaysPerSample         * sizeof(unsigned));
   hostRaysDump             = (unsigned*) malloc (1                        * sizeof(unsigned));
 
-  for(unsigned i=0; i < maxRaysPerSample ; ++i) hostIndicesOfPrisms[i] = 0;
+  // ** for(unsigned i=0; i < maxRaysPerSample ; ++i) hostIndicesOfPrisms[i] = 0;
   for(unsigned i=0; i < maxRaysPerSample ; ++i) hostNumberOfReflections[i] = 0;
   for(unsigned i=0; i < hostMesh.numberOfSamples * gridDim.y; ++i) hostPhiAseSquare[i] = 0.f;
   for(unsigned i=0; i < hostMesh.numberOfPrisms * reflectionSlices; ++i) hostRaysPerPrism[i] = 1;
@@ -153,7 +161,8 @@ float calcDndtAse (unsigned &threads,
   }
 
   // Memory allocation on device
-  CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * sizeof(unsigned)));
+  // **CUDA_CHECK_RETURN(cudaMalloc(&indicesOfPrisms, maxRaysPerSample * sizeof(unsigned)));
+  unsigned *indicesOfPrisms = copyToDevice(hostIndicesOfPrisms);
   CUDA_CHECK_RETURN(cudaMalloc(&numberOfReflections, maxRaysPerSample * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAse, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&phiAseSquare, hostMesh.numberOfSamples * gridDim.y * sizeof(float)));
@@ -176,15 +185,13 @@ float calcDndtAse (unsigned &threads,
       hostRaysPerSample = hostRaysPerSampleSave;
 
       while(true){
-        for(unsigned i=0; i < hostRaysPerSample && i < maxRaysPerSample ; ++i) hostIndicesOfPrisms[i] = 0;
-        for(unsigned i=0; i < hostRaysPerSample && i < maxRaysPerSample ; ++i) hostNumberOfReflections[i] = 0;
-
         importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i], importance, raysPerPrism, hostRaysDump, distributeRandomly, blockDim, gridDim);
         CUDA_CHECK_RETURN(cudaMemcpy(hostRaysPerPrism, raysPerPrism, hostMesh.numberOfPrisms * reflectionSlices * sizeof(unsigned),cudaMemcpyDeviceToHost));
 
         // Prism scheduling for gpu threads
         calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh, gridDim);
-        CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
+	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
+        // ** CUDA_CHECK_RETURN(cudaMemcpy(indicesOfPrisms, hostIndicesOfPrisms, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
         CUDA_CHECK_RETURN(cudaMemcpy(numberOfReflections, hostNumberOfReflections, hostRaysPerSample * sizeof(unsigned), cudaMemcpyHostToDevice));
 
         // Start Kernel
@@ -229,7 +236,7 @@ float calcDndtAse (unsigned &threads,
   // HINT Don't free importance if we return value to main
   free(hostImportance);
   free(hostRaysPerPrism);
-  free(hostIndicesOfPrisms);
+  // ** free(hostIndicesOfPrisms);
   free(hostRaysDump);
   cudaFree(phiAse);
   cudaFree(importance);
