@@ -20,7 +20,7 @@
  * @return 0 otherwise
  **/
 template <class T>
-int fileToVector(std::string filename, std::vector<T> *v){
+int fileToVector(const std::string filename, std::vector<T> *v){
   std::string line;
   std::ifstream fileStream; 
   T value = 0.0;
@@ -56,7 +56,7 @@ int fileToVector(std::string filename, std::vector<T> *v){
  * @return 0 otherwise
  **/
 template <class T>
-int fileToValue(std::string filename, T &value){
+int fileToValue(const std::string filename, T &value){
   std::string line;
   std::ifstream fileStream; 
 
@@ -80,21 +80,26 @@ void parseCommandLine(
     const int argc,
     char** argv,
     unsigned *raysPerSample,
+    unsigned *maxRaysPerSample,
     std::string *root,
     int *device,
     bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
-    int *mode
+    int *mode,
+    bool *useReflections,
+    float *expectationThreshold
     );
 
 int checkParameterValidity(
-    int argc,
-    unsigned raysPerSample,
-    std::string root,
+    const int argc,
+    const unsigned raysPerSample,
+    unsigned *maxRaysPerSample,
+    const std::string root,
     int *device,
-	unsigned deviceCount,
-    int mode
+	  const unsigned deviceCount,
+    const int mode,
+    float *expectationThreshold
     );
 
 

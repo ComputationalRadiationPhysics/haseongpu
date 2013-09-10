@@ -7,12 +7,15 @@ void parseCommandLine(
     const int argc,
     char** argv,
     unsigned *raysPerSample,
+    unsigned *maxRaysPerSample,
     std::string *root,
     int *device,
     bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
-    int *mode
+    int *mode,
+    bool *useReflections,
+    float *expectationThreshold
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -35,6 +38,10 @@ void parseCommandLine(
     // Parse number of rays
     if (p.first == "--rays") {
       *raysPerSample = atoi(p.second.c_str());
+    }
+
+    if (p.first == "--maxrays"){
+      *maxRaysPerSample = atoi(p.second.c_str());
     }
 
     if (p.first == "--experiment") {
@@ -74,16 +81,26 @@ void parseCommandLine(
       if (p.second == "for_loops")
         *mode = 1;
     }
+
+    if (p.first == "--reflection"){
+      *useReflections = true;
+    }
+
+    if (p.first == "--expectation"){
+      *expectationThreshold = atof(p.second.c_str());
+    }
   }
 }
 
 int checkParameterValidity(
-    int argc,
-    unsigned raysPerSample,
-    std::string root,
+    const int argc,
+    const unsigned raysPerSample,
+    unsigned *maxRaysPerSample,
+    const std::string root,
     int *device,
-    unsigned deviceCount,
-    int mode
+    const unsigned deviceCount,
+    const int mode,
+    float *expectationThreshold
     ) {
 
   if (argc <= 1) {
@@ -110,9 +127,21 @@ int checkParameterValidity(
     fprintf(stderr, "C Error: There are only %d devices! (you requested Device %d)\n",deviceCount,*device);
     return 1;
   }
+
   if (*device == -1) {
     *device = 0;
   }
+
+  if ((*expectationThreshold) <= 0.f){
+    if((*maxRaysPerSample) > 0){
+      fprintf(stderr, "C Warning: using adaptive number of rays, but no expectationThreshold is set (omit --maxrays or set expectation with --expectation=...\n");
+    }
+    (*expectationThreshold) = 10000000.f;
+  }
+
+  *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
+
+
 
 
   return 0;
