@@ -9,9 +9,9 @@
 #include <time.h> /* time, time_t */
 #include <sstream> /* std::stringstream */
 
-int writeToVtk(Mesh *mesh,
-	       std::vector<double>* ase,
-	       std::string filename){
+int writeToVtk(const Mesh& mesh,
+    const std::vector<double> ase,
+    const std::string pfilename){
 
   // Add time to filename
   time_t currentTime;
@@ -19,11 +19,11 @@ int writeToVtk(Mesh *mesh,
   std::stringstream timeStream;
   timeStream << (int) currentTime;
 
-  filename = filename +  "_" + timeStream.str() + ".vtk";
+  std::string filename = pfilename +  "_" + timeStream.str() + ".vtk";
 
   std::cerr << "C Write experiment data to vtk-file" << std::endl;
   std::ofstream vtkFile;
-  
+
 
   vtkFile.open(filename.c_str());
 
@@ -34,46 +34,46 @@ int writeToVtk(Mesh *mesh,
 
   // Write point data
   vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
-  vtkFile << "POINTS " << mesh->numberOfSamples <<  " float" << std::endl;
-  for(unsigned level_i=0; level_i < mesh->numberOfLevels; ++level_i){
-    for(unsigned point_i=0; point_i < mesh->numberOfPoints; ++point_i){
-      vtkFile << std::fixed << std::setprecision(6) << mesh->points[point_i] << " " << mesh->points[point_i + mesh->numberOfPoints] << " " << level_i * mesh->thickness << std::endl;
+  vtkFile << "POINTS " << mesh.numberOfSamples <<  " float" << std::endl;
+  for(unsigned level_i=0; level_i < mesh.numberOfLevels; ++level_i){
+    for(unsigned point_i=0; point_i < mesh.numberOfPoints; ++point_i){
+      vtkFile << std::fixed << std::setprecision(6) << mesh.points[point_i] << " " << mesh.points[point_i + mesh.numberOfPoints] << " " << level_i * mesh.thickness << std::endl;
 
     }
 
   }
 
   // Write prism data
-  vtkFile << "CELLS" << " " << mesh->numberOfPrisms << " " << mesh->numberOfPrisms * 7 << std::endl;
-  for(unsigned level_i=0; level_i < (mesh->numberOfLevels - 1); ++level_i){
-    for(unsigned triangle_i=0; triangle_i < mesh->numberOfTriangles; ++triangle_i){
+  vtkFile << "CELLS" << " " << mesh.numberOfPrisms << " " << mesh.numberOfPrisms * 7 << std::endl;
+  for(unsigned level_i=0; level_i < (mesh.numberOfLevels - 1); ++level_i){
+    for(unsigned triangle_i=0; triangle_i < mesh.numberOfTriangles; ++triangle_i){
       vtkFile << "6 " 
-		  << level_i * mesh->numberOfPoints + mesh->triangles[triangle_i] << " "
-	      << level_i * mesh->numberOfPoints + mesh->triangles[mesh->numberOfTriangles + triangle_i] << " "
-	      << level_i * mesh->numberOfPoints + mesh->triangles[2 * mesh->numberOfTriangles + triangle_i] << " "
-	      << (level_i+1) * mesh->numberOfPoints + mesh->triangles[triangle_i] << " "
-	      << (level_i+1) * mesh->numberOfPoints + mesh->triangles[mesh->numberOfTriangles + triangle_i] << " "
-	      << (level_i+1) * mesh->numberOfPoints + mesh->triangles[2 * mesh->numberOfTriangles + triangle_i] << std::endl;
-	
+        << level_i * mesh.numberOfPoints + mesh.triangles[triangle_i] << " "
+        << level_i * mesh.numberOfPoints + mesh.triangles[mesh.numberOfTriangles + triangle_i] << " "
+        << level_i * mesh.numberOfPoints + mesh.triangles[2 * mesh.numberOfTriangles + triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[mesh.numberOfTriangles + triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[2 * mesh.numberOfTriangles + triangle_i] << std::endl;
+
     }
 
   }
 
   // Write cell type
-  vtkFile << "CELL_TYPES " << mesh->numberOfPrisms << std::endl;
-  for(unsigned prism_i=0; prism_i < mesh->numberOfPrisms; ++prism_i){
+  vtkFile << "CELL_TYPES " << mesh.numberOfPrisms << std::endl;
+  for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
     vtkFile << "13" << std::endl;
   }
 
   // Write ase phi
-  vtkFile << "POINT_DATA " << mesh->numberOfSamples << std::endl;
+  vtkFile << "POINT_DATA " << mesh.numberOfSamples << std::endl;
   vtkFile << "SCALARS scalars float 1" << std::endl;
   vtkFile << "LOOKUP_TABLE default" << std::endl;
 
-  for(unsigned ase_i=0; ase_i < mesh->numberOfSamples; ++ase_i){
-    vtkFile << std::fixed << std::setprecision(6) << ase->at(ase_i) << std::endl;
+  for(unsigned ase_i=0; ase_i < mesh.numberOfSamples; ++ase_i){
+    vtkFile << std::fixed << std::setprecision(6) << ase.at(ase_i) << std::endl;
   }
-  
+
   vtkFile.close();
 
   return 0;
@@ -91,7 +91,7 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
   double totalDiff = 0;
   double aseTotal = 0;
   double smallDiff = 10;
- 
+
   // No compare vtk was given
   if(!filename.compare("")){
     return std::vector<double>();
@@ -109,32 +109,32 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
       std::getline(filestream, line);
       std::size_t found = line.find("LOOKUP_TABLE default");
       if(found != std::string::npos){ 
-	foundLine = true;
-	std::getline(filestream, line);
+        foundLine = true;
+        std::getline(filestream, line);
       }
       if(foundLine){
-	if(ase_i == numberOfSamples)
-	  break;
-	value = (double) atof(line.c_str());
+        if(ase_i == numberOfSamples)
+          break;
+        value = (double) atof(line.c_str());
 
-	if(abs(value) > abs(compare.at(ase_i)))
-	  diff = (abs(value / compare.at(ase_i)) - 1) * 100;
-	else
-	  diff = (abs(compare.at(ase_i) / value) - 1) * 100;
+        if(abs(value) > abs(compare.at(ase_i)))
+          diff = (abs(value / compare.at(ase_i)) - 1) * 100;
+        else
+          diff = (abs(compare.at(ase_i) / value) - 1) * 100;
 
-	totalDiff += diff;
+        totalDiff += diff;
 
-	if(diff >= maxDiff)
-	  maxDiff = diff;
+        if(diff >= maxDiff)
+          maxDiff = diff;
 
-	if(diff <= minDiff)
-	  minDiff = diff;
+        if(diff <= minDiff)
+          minDiff = diff;
 
-	if(diff >= smallDiff){
-	  std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << compare.at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
-	 }
-	compare.at(ase_i) = diff;
-	ase_i++;
+        if(diff >= smallDiff){
+          std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << compare.at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
+        }
+        compare.at(ase_i) = diff;
+        ase_i++;
 
       }
 
