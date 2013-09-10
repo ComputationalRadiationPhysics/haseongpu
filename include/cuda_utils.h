@@ -23,6 +23,15 @@ void copyToDevice(const std::vector<T> &v,  T* deviceV){
 }
 
 template <class T>
+T* copyToDevice(T a){
+  T* deviceV;
+  CUDA_CHECK_RETURN(cudaMalloc((void**)&deviceV, sizeof(T)));
+  CUDA_CHECK_RETURN(cudaMemcpy(deviceV, &a, sizeof(T), cudaMemcpyHostToDevice));
+
+  return deviceV;
+}
+
+template <class T>
 void copyToDevice(const T a, T* deviceV){
   CUDA_CHECK_RETURN(cudaMemcpy(deviceV, &a, sizeof(T), cudaMemcpyHostToDevice));
 }

@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <curand_kernel.h>
 #include <cudachecks.h>
+#include <cuda_utils.h>
 
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
@@ -152,20 +153,12 @@ unsigned importanceSampling(unsigned sample_i,
 			    dim3 blockDim,
 			    dim3 gridDim){
 
-  float *hostSumPhi = (float*) malloc(sizeof(float));
 
-  float *sumPhi;
-  unsigned *raysDump;
-  unsigned hostRaysDump;
+  float hostSumPhi = 0;
+  unsigned hostRaysDump = 0;
 
-  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
-
-  *hostSumPhi = 0.f;
-  hostRaysDump = 0;
-
-  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,hostSumPhi, sizeof(float),cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,&hostRaysDump, sizeof(unsigned),cudaMemcpyHostToDevice));
+  float *sumPhi = copyToDevice(hostSumPhi);
+  unsigned *raysDump = copyToDevice(hostRaysDump);
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sumPhi, sample_i, sigmaA, sigmaE));
@@ -177,14 +170,13 @@ unsigned importanceSampling(unsigned sample_i,
     hostRaysDump = raysPerSample;
   }
   else {
-    CUDA_CHECK_RETURN(cudaMemcpy(&hostRaysDump, raysDump,  sizeof(unsigned),cudaMemcpyDeviceToHost));
+    hostRaysDump = copyFromDevice(raysDump);
   }
 
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, raysPerSample, importance));
 
-  free(hostSumPhi);
   cudaFree(sumPhi);
   cudaFree(raysDump);
 
-  return raysPerSample;
+  return hostRaysDump;
 }
