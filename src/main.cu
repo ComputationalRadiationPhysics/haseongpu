@@ -187,20 +187,20 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> mockupN_rays;
+  std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
   writeMatlabOutput(
-		  &phiAse,
-		  &mockupN_rays,
-		  &expectation,
+		  phiAse,
+		  mockupN_rays,
+		  expectation,
 		  sigmaE.size(),
 		  hMesh.numberOfSamples);
 
-  if(writeVtk) writeToVtk(&hMesh, &dndtAse, "octrace_dndt");
+  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt");
   if(compareLocation!="") {
 	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-	  if(writeVtk) writeToVtk(&hMesh, &dndtAse, "octrace_compare");
+	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare");
   }
-  if(writeVtk) writeToVtk(&hMesh, &expectation, "octrace_expectation");
+  if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation");
 
   // Free memory
   cudaFree(dMesh);

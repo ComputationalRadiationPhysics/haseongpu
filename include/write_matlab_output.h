@@ -19,10 +19,10 @@
  * @license GPLv3
  */
 void writeMatlabOutput(
-    std::vector<float>* ase,
-    std::vector<unsigned> *N_rays, 
-    std::vector<double> *expectedValues,
-    unsigned numberOfWavelengths,
-    unsigned numberOfSamples);
+    const std::vector<float> ase,
+    const std::vector<unsigned> N_rays, 
+    const std::vector<double> expectedValues,
+    const unsigned numberOfWavelengths,
+    const unsigned numberOfSamples);
 
 #endif 
