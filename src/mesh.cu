@@ -401,7 +401,7 @@ __device__ unsigned Mesh::getCellType(unsigned triangle){
 int Mesh::parseMultiGPU(Mesh *hMesh,
 			Mesh **dMesh,
 			std::string root,
-			unsigned *devices,
+			std::vector<unsigned> devices,
 			unsigned maxGpus) {
 
   // Experimentdata
@@ -502,7 +502,7 @@ int Mesh::parseMultiGPU(Mesh *hMesh,
   );
 
   for( unsigned i=0; i<maxGpus; i++){
-    CUDA_CHECK_RETURN(cudaSetDevice(devices[i]) );
+    CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
     fillDMesh(
         hMesh,
         &((*dMesh)[i]),
@@ -551,12 +551,10 @@ double getMaxDistance(std::vector<TwoDimPoint> points){
 }
 
 double calculateMaxDiameter(double* points, unsigned offset){
-	// TODO find maximum/minimum possible value to initialize
 	TwoDimPoint minX = {DBL_MAX,0};
 	TwoDimPoint minY = {0,DBL_MAX};
 	TwoDimPoint maxX = {DBL_MIN,0};
 	TwoDimPoint maxY = {0,DBL_MIN};
-	//unsigned offset = points.size()/2;
 
 	for(unsigned p=0; p<offset; ++p){
 		TwoDimPoint np = {points[p],points[p+offset]};

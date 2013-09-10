@@ -157,7 +157,7 @@ struct Mesh {
   static int parseMultiGPU(Mesh *hMesh, 
 			   Mesh **dMesh, 
 			   std::string root,
-			   unsigned *devices,
+			   std::vector<unsigned> devices,
 			   unsigned maxGpus
 			   );
 };
