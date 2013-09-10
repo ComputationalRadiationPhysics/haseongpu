@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <curand_kernel.h>
 #include <cudachecks.h>
+#include <cuda_utils.h>
 
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
@@ -140,62 +141,6 @@ __global__ void recalculateImportance(Mesh mesh,
   }
 }
 
-
-// unused, because we didn't find a good way to parallelize it...
-// OPTIMIZE
-/**
- * @brief maps every ray to a specific prism
- *
- * @param *raysPerPrism the number of rays to launch in each prism
- *
- * @param raysPerSample the total number of rays to launch 
- *
- * @param *indicesOfPrisms a mapping for each ray to a specific prism
- *
- */
-__global__ void createCumulativeSum1(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned *cumulativeSum){
-
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  if(id==0){
-    cumulativeSum[0] = 0;
-  }
-  if(id < mesh.numberOfPrisms-1){
-    cumulativeSum[id+1] = raysPerPrism[id];
-  }
-}
-
-__global__ void createCumulativeSum2(
-    Mesh mesh,
-    unsigned *cumulativeSum){
-
-  for(int i=0;i<mesh.numberOfPrisms;i++){
-    cumulativeSum[i+1] += cumulativeSum[i];
-  }
-  //printf("PartialSum sum: %d\n",partialSums[0]);
-}
-
-__global__ void mapRaysToPrism(
-    Mesh mesh,
-    unsigned *raysPerPrism,
-    unsigned raysPerSample,
-    unsigned *indicesOfPrisms,
-    unsigned *cumulativeSum){
-
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  if(id >= mesh.numberOfPrisms) return;
-
-  unsigned absoluteRay = cumulativeSum[id];
-  for(unsigned prism_i=cumulativeSum[id]; prism_i < indicesOfPrisms[id]; ++prism_i){
-    for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i]; ++ray_i){
-      indicesOfPrisms[absoluteRay++] = prism_i;
-    }
-  }
-}
-
-
 unsigned importanceSampling(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
@@ -204,25 +149,16 @@ unsigned importanceSampling(unsigned sample_i,
 			    const double sigmaE,
 			    double *importance,
 			    unsigned *raysPerPrism,
-			    unsigned * hostRaysDump,
 			    const bool distributeRandomly,
 			    dim3 blockDim,
 			    dim3 gridDim){
 
-  float *hostSumPhi = (float*) malloc(sizeof(float));
 
-  float *sumPhi;
-  unsigned *raysDump;
+  float hostSumPhi = 0;
+  unsigned hostRaysDump = 0;
 
-  CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
-
-  *hostSumPhi = 0.f;
-  *hostRaysDump = 0;
-
-
-  CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,hostSumPhi, sizeof(float),cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,hostRaysDump, sizeof(unsigned),cudaMemcpyHostToDevice));
+  float *sumPhi = copyToDevice(hostSumPhi);
+  unsigned *raysDump = copyToDevice(hostRaysDump);
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sumPhi, sample_i, sigmaA, sigmaE));
@@ -231,17 +167,16 @@ unsigned importanceSampling(unsigned sample_i,
   // Distribute remaining rays randomly if wanted
   if(distributeRandomly){
     CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, raysDump));
-    *hostRaysDump = raysPerSample;
+    hostRaysDump = raysPerSample;
   }
   else {
-    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysDump, raysDump,  sizeof(unsigned),cudaMemcpyDeviceToHost));
+    hostRaysDump = copyFromDevice(raysDump);
   }
 
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, raysPerSample, importance));
 
-  free(hostSumPhi);
   cudaFree(sumPhi);
   cudaFree(raysDump);
 
-  return raysPerSample;
+  return hostRaysDump;
 }

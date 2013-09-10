@@ -120,9 +120,9 @@ int main(int argc, char **argv){
   if(Mesh::parseMultiGPU(hMesh, &dMesh, experimentPath, devices, maxGpus)) return 1;
 
   // Solution vector
-  std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 0);
   CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
   // Run Experiment
   switch(mode){
@@ -144,7 +144,7 @@ int main(int argc, char **argv){
     case 1:
       // threads and blocks will be set in the following function (by reference)
       runtime = forLoopsClad(
-          dndtAse,
+          &dndtAse,
           raysPerSample,
           &hMesh,
           hMesh.betaCells,
@@ -163,9 +163,9 @@ int main(int argc, char **argv){
   // Print Solutions
   for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-    for(unsigned sample_i = 0; sample_i < dndtAse->size(); ++sample_i){
+    for(unsigned sample_i = 0; sample_i < dndtAse.size(); ++sample_i){
       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse->at(sampleOffset), expectation->at(sampleOffset));
+      fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), expectation.at(sampleOffset));
       if(silent){
         if(sample_i >= 10) break;
       }
@@ -176,9 +176,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
-  fprintf(stderr, "C Samples           : %d\n", (int) dndtAse->size());
+  fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
   fprintf(stderr, "C Rays/Sample       : %d\n", raysPerSample);
-  fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * dndtAse->size());
+  fprintf(stderr, "C Rays Total        : %zu\n", raysPerSample * dndtAse.size());
   fprintf(stderr, "C GPU Blocks        : %d\n", blocks);
   fprintf(stderr, "C GPU Threads/Block : %d\n", threads);
   fprintf(stderr, "C GPU Threads Total : %d\n", threads * blocks);
@@ -187,26 +187,22 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> *mockupN_rays = new std::vector<unsigned>(sigmaE.size(),1);
+  std::vector<unsigned> mockupN_rays;
   writeMatlabOutput(
-      phiAse,
-      mockupN_rays,
-      expectation,
-      sigmaE.size(),
-      hMesh.numberOfSamples);
+		  &phiAse,
+		  &mockupN_rays,
+		  &expectation,
+		  sigmaE.size(),
+		  hMesh.numberOfSamples);
 
-  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_dndt");
+  if(writeVtk) writeToVtk(&hMesh, &dndtAse, "octrace_dndt");
   if(compareLocation!="") {
-    std::vector<double> compareAse = compareVtk(*dndtAse, compareLocation, hMesh.numberOfSamples);
-    if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
+	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+	  if(writeVtk) writeToVtk(&hMesh, &dndtAse, "octrace_compare");
   }
-  if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");
+  if(writeVtk) writeToVtk(&hMesh, &expectation, "octrace_expectation");
 
   // Free memory
-  delete dndtAse;
-  delete phiAse;
-  delete expectation;
-  delete mockupN_rays;
   cudaFree(dMesh);
 
   return 0;

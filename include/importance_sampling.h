@@ -41,7 +41,6 @@ unsigned importanceSampling(
 			    double sigmaE, 
 			    double *importance, 
 			    unsigned *raysPerPrism,
-			    unsigned *hostRaysDump,
 			    bool distributeRandomly,
 			    dim3 threads,
 			    dim3 blocks);

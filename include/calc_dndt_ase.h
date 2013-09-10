@@ -46,9 +46,9 @@ float calcDndtAse (unsigned &threads,
 		   Mesh hostMesh,
 		   std::vector<double> sigmaA,
 		   std::vector<double> sigmaE,
-		   std::vector<double> *dndtAse,
-		   std::vector<float> *phiAse,
-		   std::vector<double> *expectation);
+		   std::vector<double> &dndtAse,
+		   std::vector<float> &phiAse,
+		   std::vector<double> &expectation);
 
 
 #endif
