@@ -38,7 +38,7 @@ Mesh::~Mesh() {
  * See parseMultiGPU for details on the parameters
  */
 void fillHMesh(
-    Mesh *hMesh,
+    Mesh& hMesh,
     unsigned numberOfTriangles, 
     unsigned numberOfLevels,
     unsigned numberOfPoints, 
@@ -64,16 +64,16 @@ void fillHMesh(
     double cladAbsorption
 ) {
 
-  hMesh->numberOfTriangles = numberOfTriangles;
-  hMesh->numberOfLevels = numberOfLevels;
-  hMesh->numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
-  hMesh->numberOfPoints = numberOfPoints;
-  hMesh->numberOfSamples = numberOfPoints * numberOfLevels;
-  hMesh->thickness = thicknessOfPrism;
-  hMesh->crystalFluorescence = crystalFluorescence;
-  hMesh->nTot = nTot;
-  hMesh->cladNumber = cladNumber;
-  hMesh->cladAbsorption = cladAbsorption;
+  hMesh.numberOfTriangles = numberOfTriangles;
+  hMesh.numberOfLevels = numberOfLevels;
+  hMesh.numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
+  hMesh.numberOfPoints = numberOfPoints;
+  hMesh.numberOfSamples = numberOfPoints * numberOfLevels;
+  hMesh.thickness = thicknessOfPrism;
+  hMesh.crystalFluorescence = crystalFluorescence;
+  hMesh.nTot = nTot;
+  hMesh.cladNumber = cladNumber;
+  hMesh.cladAbsorption = cladAbsorption;
 
   std::vector<double> *hostCenters = new std::vector<double>(xOfTriangleCenter->begin(), xOfTriangleCenter->end());
   hostCenters->insert(hostCenters->end(),yOfTriangleCenter->begin(),yOfTriangleCenter->end());
@@ -81,19 +81,19 @@ void fillHMesh(
   std::vector<double> *hostNormalVec = new std::vector<double>(xOfNormals->begin(), xOfNormals->end());
   hostNormalVec->insert(hostNormalVec->end(),yOfNormals->begin(),yOfNormals->end());
 
-  hMesh->points = &(points->at(0));
-  hMesh->triangles = &(triangleIndices->at(0));
-  hMesh->betaValues = &(betaValues->at(0));
-  hMesh->normalVec = &(hostNormalVec->at(0));
-  hMesh->centers = &(hostCenters->at(0));
-  hMesh->surfaces = &(surfaces->at(0));
-  hMesh->forbidden = &(forbidden->at(0));
-  hMesh->neighbors = &(neighbors->at(0));
-  hMesh->normalPoint = &(positionsOfNormal->at(0));
-  hMesh->betaCells = &(betaCells->at(0));
-  hMesh->cellTypes = &(cellTypes->at(0));
-  hMesh->refractiveIndices = &(refractiveIndices->at(0));
-  hMesh->reflectivities = &(reflectivities->at(0));
+  hMesh.points = &(points->at(0));
+  hMesh.triangles = &(triangleIndices->at(0));
+  hMesh.betaValues = &(betaValues->at(0));
+  hMesh.normalVec = &(hostNormalVec->at(0));
+  hMesh.centers = &(hostCenters->at(0));
+  hMesh.surfaces = &(surfaces->at(0));
+  hMesh.forbidden = &(forbidden->at(0));
+  hMesh.neighbors = &(neighbors->at(0));
+  hMesh.normalPoint = &(positionsOfNormal->at(0));
+  hMesh.betaCells = &(betaCells->at(0));
+  hMesh.cellTypes = &(cellTypes->at(0));
+  hMesh.refractiveIndices = &(refractiveIndices->at(0));
+  hMesh.reflectivities = &(reflectivities->at(0));
 
 }
 
@@ -103,7 +103,7 @@ void fillHMesh(
  * See parseMultiGPU for details on the parameters
  */
 void fillDMesh(
-    Mesh *hMesh,
+    Mesh& hMesh,
     Mesh *dMesh, 
     std::vector<unsigned> *triangleIndices, 
     unsigned numberOfTriangles, 
@@ -153,56 +153,56 @@ void fillDMesh(
 
 
   // values
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->points), 2 * hMesh->numberOfPoints * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->normalVec), 2 * 3 * hMesh->numberOfTriangles * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaValues), hMesh->numberOfPrisms * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->centers), 2 * hMesh->numberOfTriangles * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->surfaces), hMesh->numberOfTriangles * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh->numberOfTriangles * sizeof(int)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1)* sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->cellTypes), hMesh->numberOfTriangles * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->points), 2 * hMesh.numberOfPoints * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->normalVec), 2 * 3 * hMesh.numberOfTriangles * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaValues), hMesh.numberOfPrisms * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->centers), 2 * hMesh.numberOfTriangles * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->surfaces), hMesh.numberOfTriangles * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->forbidden), 3 * hMesh.numberOfTriangles * sizeof(int)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->betaCells), hMesh.numberOfPoints * hMesh.numberOfLevels * sizeof(double)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->cellTypes), hMesh.numberOfTriangles * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->refractiveIndices), refractiveIndices->size() * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectivities), (refractiveIndices->size()/2)*(hMesh->numberOfTriangles) *sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->reflectivities), (refractiveIndices->size()/2)*(hMesh.numberOfTriangles) *sizeof(float)));
 
   // indexStructs
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->neighbors), 3 * hMesh->numberOfTriangles * sizeof(int)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->normalPoint), 3 * hMesh->numberOfTriangles * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->triangles), 3 * hMesh.numberOfTriangles * sizeof(unsigned)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->neighbors), 3 * hMesh.numberOfTriangles * sizeof(int)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh->normalPoint), 3 * hMesh.numberOfTriangles * sizeof(unsigned)));
 
 
   /// fill values
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->points, (double*) &(pointsVector->at(0)), 2 * hMesh->numberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->points, (double*) &(pointsVector->at(0)), 2 * hMesh.numberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
 
   std::vector<double> *hostNormalVec = new std::vector<double>(xOfNormals->begin(), xOfNormals->end());
   hostNormalVec->insert(hostNormalVec->end(),yOfNormals->begin(),yOfNormals->end());
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalVec, (double*) &(hostNormalVec->at(0)), 2 * 3 * hMesh->numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalVec, (double*) &(hostNormalVec->at(0)), 2 * 3 * hMesh.numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
   free(hostNormalVec);
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaValues, (double*) &(betaValuesVector->at(0)), hMesh->numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaValues, (double*) &(betaValuesVector->at(0)), hMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
 
   std::vector<double> *hostCenters = new std::vector<double>(xOfTriangleCenter->begin(), xOfTriangleCenter->end());
   hostCenters->insert(hostCenters->end(),yOfTriangleCenter->begin(),yOfTriangleCenter->end());
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->centers, (double*) &(hostCenters->at(0)), 2 * hMesh->numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->centers, (double*) &(hostCenters->at(0)), 2 * hMesh.numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
   free(hostCenters);
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->surfaces, (float*) &(surfacesVector->at(0)), hMesh->numberOfTriangles * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->surfaces, (float*) &(surfacesVector->at(0)), hMesh.numberOfTriangles * sizeof(float), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->forbidden, (int*) &(forbiddenVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->forbidden, (int*) &(forbiddenVector->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (double*) &(betaCells->at(0)), hMesh->numberOfTriangles * (hMesh->numberOfLevels-1) * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->betaCells, (double*) &(betaCells->at(0)), hMesh.numberOfPoints * hMesh.numberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->cellTypes, (unsigned*) &(cellTypes->at(0)), hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->cellTypes, (unsigned*) &(cellTypes->at(0)), hMesh.numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh->refractiveIndices, (float*) &(refractiveIndices->at(0)), refractiveIndices->size() * sizeof(float), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectivities, (float*) &(reflectivities->at(0)), (hMesh->numberOfTriangles)* (refractiveIndices->size()/2) * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->reflectivities, (float*) &(reflectivities->at(0)), (hMesh.numberOfTriangles)* (refractiveIndices->size()/2) * sizeof(float), cudaMemcpyHostToDevice));
 
   // fill indexStructs
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->triangles, (unsigned*) &(triangleIndices->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->triangles, (unsigned*) &(triangleIndices->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->neighbors,(int*) &(neighborsVector->at(0)), 3 * hMesh->numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->neighbors,(int*) &(neighborsVector->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
 
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalPoint, (unsigned*) &(positionsOfNormalVectors->at(0)), 3 * hMesh->numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh->normalPoint, (unsigned*) &(positionsOfNormalVectors->at(0)), 3 * hMesh.numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
 
 }
 
@@ -398,7 +398,7 @@ __device__ unsigned Mesh::getCellType(unsigned triangle){
  *
  * @param maxGpus maximal number of devices to allocate
  */
-int Mesh::parseMultiGPU(Mesh *hMesh,
+int Mesh::parseMultiGPU(Mesh& hMesh,
 			Mesh **dMesh,
 			std::string root,
 			std::vector<unsigned> devices,

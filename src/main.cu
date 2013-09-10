@@ -36,31 +36,34 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
   int count;
-  int* test;
+  std::vector<unsigned> devices;
 
   // Get number of devices
-  std::vector<unsigned> devices;
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
 
-  // Check devices for compute capability
+  // Check devices for compute capability and if device is busy
   for(int i=0; i<count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
       cudaSetDevice(i);
+      int* test;
       if(cudaMalloc((void**) &test, sizeof(int)) == cudaSuccess){
-	devices.push_back(i);
-	cudaFree(test);
+        devices.push_back(i);
+        cudaFree(test);
+        cudaDeviceReset();
       }
     }
   }
 
   if(devices.size() == 0){
-    fprintf(stderr,"\nNone of the CUDA-capable devices is sufficient!\n");
+    fprintf(stderr,"\nNone of the free CUDA-capable devices is sufficient!\n");
     exit(1);
   }
 
+  cudaSetDevice(devices.at(0));
+
   if(verbose > 0){
-    fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
+    fprintf(stderr,"\nFound %d available CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
     for(unsigned i=0; i<devices.size(); ++i){
       CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
       fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", devices[i], prop.name, prop.major, prop.minor);
@@ -73,6 +76,7 @@ std::vector<unsigned> getCorrectDevice(int verbose){
 
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
+  unsigned maxRaysPerSample = 0;
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
@@ -80,58 +84,60 @@ int main(int argc, char **argv){
   unsigned threads;
   bool silent = false;
   bool writeVtk = false;
+  bool useReflections = false;
+  float expectationThreshold = 0;
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
   unsigned maxGpus = MAX_GPUS;
   int device = -1;
   int mode = -1;
-  
+
 
   std::string experimentPath;
 
   // Wavelength data
-  std::vector<double> *sigmaA = new std::vector<double>;
-  std::vector<double> *sigmaE = new std::vector<double>;
+  std::vector<double> sigmaA;
+  std::vector<double> sigmaE;
 
   // Set/Test device to run experiment with
   devices = getCorrectDevice(1);
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &experimentPath, &device, &silent,
-		   &writeVtk, &compareLocation, &mode);
+  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &device, &silent,
+      &writeVtk, &compareLocation, &mode, &useReflections, &expectationThreshold);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, experimentPath, &device, devices.size(), mode)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, &device, devices.size(), mode, &expectationThreshold)) return 1;
 
   // Parse wavelengths from files
-  if(fileToVector(experimentPath + "sigma_a.txt", sigmaA)) return 1;
-  if(fileToVector(experimentPath + "sigma_e.txt", sigmaE)) return 1;
-  assert(sigmaA->size() == sigmaE->size());
+  if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
+  if(fileToVector(experimentPath + "sigma_e.txt", &sigmaE)) return 1;
+  assert(sigmaA.size() == sigmaE.size());
   assert(maxGpus <= devices.size());
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
   Mesh *dMesh = new Mesh[maxGpus];
-  if(Mesh::parseMultiGPU(&hMesh, &dMesh, experimentPath, devices, maxGpus)) return 1;
+  if(Mesh::parseMultiGPU(hMesh, &dMesh, experimentPath, devices, maxGpus)) return 1;
 
   // Solution vector
-  std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
-  std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE->size(), 0);
-  std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE->size(), 0);
+  std::vector<double> *dndtAse = new std::vector<double>(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<float> *phiAse = new std::vector<float>(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> *expectation = new std::vector<double>(hMesh.numberOfSamples * sigmaE.size(), 0);
   CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
   // Run Experiment
   switch(mode){
     case 0:
       // threads and blocks will be set in the following function (by reference)
       runtime = calcDndtAse(threads, 
-			    blocks, 
-			    raysPerSample,
-			    dMesh[device],
-			    hMesh,
-			    *sigmaA,
-			    *sigmaE,
-			    dndtAse,
-			    phiAse,
-			    expectation
+          blocks, 
+          raysPerSample,
+          dMesh[device],
+          hMesh,
+          sigmaA,
+          sigmaE,
+          dndtAse,
+          phiAse,
+          expectation
           );
       runmode="Ray Propagation New GPU";
       break;
@@ -143,8 +149,8 @@ int main(int argc, char **argv){
           &hMesh,
           hMesh.betaCells,
           hMesh.nTot,
-          sigmaA->at(0),
-          sigmaE->at(0),
+          sigmaA.at(0),
+          sigmaE.at(0),
           hMesh.numberOfPoints,
           hMesh.numberOfTriangles,
           hMesh.numberOfLevels,
@@ -155,7 +161,7 @@ int main(int argc, char **argv){
   }
 
   // Print Solutions
-  for(unsigned wave_i = 0; wave_i < sigmaE->size(); ++wave_i){
+  for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
     for(unsigned sample_i = 0; sample_i < dndtAse->size(); ++sample_i){
       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
@@ -181,24 +187,22 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> *mockupN_rays = new std::vector<unsigned>(sigmaE->size(),1);
+  std::vector<unsigned> *mockupN_rays = new std::vector<unsigned>(sigmaE.size(),1);
   writeMatlabOutput(
-		  phiAse,
-		  mockupN_rays,
-		  expectation,
-		  sigmaE->size(),
-		  hMesh.numberOfSamples);
+      phiAse,
+      mockupN_rays,
+      expectation,
+      sigmaE.size(),
+      hMesh.numberOfSamples);
 
   if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_dndt");
   if(compareLocation!="") {
-	  std::vector<double> compareAse = compareVtk(*dndtAse, compareLocation, hMesh.numberOfSamples);
-	  if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
+    std::vector<double> compareAse = compareVtk(*dndtAse, compareLocation, hMesh.numberOfSamples);
+    if(writeVtk) writeToVtk(&hMesh, dndtAse, "octrace_compare");
   }
   if(writeVtk) writeToVtk(&hMesh, expectation, "octrace_expectation");
 
   // Free memory
-  delete sigmaE;
-  delete sigmaA;
   delete dndtAse;
   delete phiAse;
   delete expectation;

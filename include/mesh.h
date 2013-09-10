@@ -154,7 +154,7 @@ struct Mesh {
   __device__ __host__ float getReflectionAngle(int reflectionPlane);
 
 
-  static int parseMultiGPU(Mesh *hMesh, 
+  static int parseMultiGPU(Mesh& hMesh, 
 			   Mesh **dMesh, 
 			   std::string root,
 			   std::vector<unsigned> devices,
