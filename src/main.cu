@@ -116,8 +116,9 @@ int main(int argc, char **argv){
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
-  Mesh *dMesh = new Mesh[maxGpus];
-  if(Mesh::parseMultiGPU(hMesh, &dMesh, experimentPath, devices, maxGpus)) return 1;
+  std::vector<Mesh> dMesh(maxGpus);
+  
+  if(Mesh::parseMultiGPU(hMesh, dMesh, experimentPath, devices, maxGpus)) return 1;
 
   // Solution vector
   std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
@@ -131,7 +132,7 @@ int main(int argc, char **argv){
       runtime = calcDndtAse(threads, 
           blocks, 
           raysPerSample,
-          dMesh[device],
+          dMesh.at(device),
           hMesh,
           sigmaA,
           sigmaE,
@@ -201,9 +202,6 @@ int main(int argc, char **argv){
 	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare");
   }
   if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation");
-
-  // Free memory
-  cudaFree(dMesh);
 
   return 0;
 }
