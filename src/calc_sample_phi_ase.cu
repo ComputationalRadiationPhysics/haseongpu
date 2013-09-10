@@ -32,12 +32,12 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
     stride += blockDim.x * gridDim.x;
     // Get triangle/prism to start ray from
     unsigned startPrism       = indicesOfPrisms[rayNumber];
-    unsigned reflection_i     = numberOfReflections[rayNumber]; // TODO unsigned
+    unsigned reflection_i     = numberOfReflections[rayNumber]; 
     unsigned reflections      = (reflection_i + 1) / 2;
     int reflectionPlane       = (reflection_i % 2 == 0) ? -1 : 1;
     unsigned startLevel       = startPrism/mesh.numberOfTriangles;
     unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
-    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms * blockDim.y;
+    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
 
     Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
