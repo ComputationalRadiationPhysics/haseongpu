@@ -115,8 +115,8 @@ float calcDndtAse (unsigned &threads,
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
   expectationThreshold = 0.5;
-  maxRaysPerSample = max(1000000, hostRaysPerSample); // 1M
-  maxReflections = 0;
+  maxRaysPerSample = max(10000, hostRaysPerSample); // 1M
+  maxReflections = 14;
   reflectionSlices = 1 + 2 * maxReflections;
   distributeRandomly = true;
 
@@ -165,6 +165,8 @@ float calcDndtAse (unsigned &threads,
         calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
 	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
 	copyToDevice(hostNumberOfReflections, numberOfReflections);
+
+	// TESTING OUTPUT
 	if(sample_i == 1386)
 	  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
 
@@ -205,6 +207,7 @@ float calcDndtAse (unsigned &threads,
   // Stop time
   runtime = difftime(time(0),starttime);
 
+  // TESTING OUTPUT
   expectation.assign(centerSample.begin(), centerSample.end());
 
   // Free Memory

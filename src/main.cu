@@ -91,7 +91,6 @@ int main(int argc, char **argv){
   int device = -1;
   int mode = -1;
 
-
   std::string experimentPath;
 
   // Wavelength data
@@ -187,7 +186,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> mockupN_rays;
+  std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
   writeMatlabOutput(
 		  &phiAse,
 		  &mockupN_rays,
