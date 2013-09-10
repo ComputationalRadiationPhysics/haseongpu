@@ -38,8 +38,10 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
 
+  // Get number of devices
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
 
+  // Check devices for compute capability
   for(int i=0; i<count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
@@ -58,6 +60,7 @@ unsigned getCorrectDevice(int verbose,unsigned **devices){
     fprintf(stderr,"\nFound %d CUDA devices with Compute Capability >= %d.%d):\n", correctDevices, minMajor,minMinor);
   }
 
+  
   candidate = 0;
   for(int i=0; i<count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
