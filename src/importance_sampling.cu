@@ -204,7 +204,6 @@ unsigned importanceSampling(unsigned sample_i,
 			    const double sigmaE,
 			    double *importance,
 			    unsigned *raysPerPrism,
-			    unsigned * hostRaysDump,
 			    const bool distributeRandomly,
 			    dim3 blockDim,
 			    dim3 gridDim){
@@ -213,16 +212,16 @@ unsigned importanceSampling(unsigned sample_i,
 
   float *sumPhi;
   unsigned *raysDump;
+  unsigned hostRaysDump;
 
   CUDA_CHECK_RETURN(cudaMalloc(&sumPhi, sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&raysDump, sizeof(unsigned)));
 
   *hostSumPhi = 0.f;
-  *hostRaysDump = 0;
-
+  hostRaysDump = 0;
 
   CUDA_CHECK_RETURN(cudaMemcpy(sumPhi,hostSumPhi, sizeof(float),cudaMemcpyHostToDevice));
-  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,hostRaysDump, sizeof(unsigned),cudaMemcpyHostToDevice));
+  CUDA_CHECK_RETURN(cudaMemcpy(raysDump,&hostRaysDump, sizeof(unsigned),cudaMemcpyHostToDevice));
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sumPhi, sample_i, sigmaA, sigmaE));
@@ -231,10 +230,10 @@ unsigned importanceSampling(unsigned sample_i,
   // Distribute remaining rays randomly if wanted
   if(distributeRandomly){
     CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, raysDump));
-    *hostRaysDump = raysPerSample;
+    hostRaysDump = raysPerSample;
   }
   else {
-    CUDA_CHECK_RETURN(cudaMemcpy(hostRaysDump, raysDump,  sizeof(unsigned),cudaMemcpyDeviceToHost));
+    CUDA_CHECK_RETURN(cudaMemcpy(&hostRaysDump, raysDump,  sizeof(unsigned),cudaMemcpyDeviceToHost));
   }
 
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, raysPerSample, importance));
