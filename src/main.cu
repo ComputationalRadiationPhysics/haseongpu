@@ -91,7 +91,6 @@ int main(int argc, char **argv){
   int device = -1;
   int mode = -1;
 
-
   std::string experimentPath;
 
   // Wavelength data

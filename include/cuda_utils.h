@@ -1,8 +1,9 @@
 #ifndef CUDA_UTILS_H
 #define CUDA_UTILS_H
 
-#include<vector>
-#include<cudachecks.h>
+#include <vector>
+#include <iostream>
+#include <cudachecks.h>
 
 /**
  * @brief Copy data from host to device

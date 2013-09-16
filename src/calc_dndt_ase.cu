@@ -30,7 +30,7 @@
  *        where its rays starts.
  *
  **/
-void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, std::vector<unsigned> &numberOfReflections, std::vector<unsigned> raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh, dim3 gridDim){
+void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, std::vector<unsigned> &numberOfReflections, std::vector<unsigned> raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh){
   // Init vectors with zero
   for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms[i] = 0;
   for(unsigned i=0;  i < numberOfReflections.size() ; ++i) numberOfReflections[i] = 0;
@@ -142,7 +142,7 @@ float calcDndtAse (unsigned &threads,
   
   // CUDA Mersenne twister for more than 200 blocks (for every wavelength)
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
-  CUDA_CALL(cudaMalloc((void**)&devKernelParams,sizeof(mtgp32_kernel_params)));
+  CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
 
   // TODO remove unused states (if using only 1 wavelength at a time...)
   for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
@@ -155,6 +155,8 @@ float calcDndtAse (unsigned &threads,
   progressStartTime = time(0);
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
+  std::vector<unsigned> centerSample(expectation.size(), 0);
+
   for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
       int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
@@ -165,9 +167,13 @@ float calcDndtAse (unsigned &threads,
 	copyFromDevice(hostRaysPerPrism, raysPerPrism);
 
         // Prism scheduling for gpu threads
-        calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh, gridDim);
+        calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
 	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
 	copyToDevice(hostNumberOfReflections, numberOfReflections);
+
+	// TESTING OUTPUT
+	if(sample_i == 1386)
+	  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
 
         // Start Kernel
         calcSamplePhiAse<<< 200, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, wave_i, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, hostSigmaA[wave_i], hostSigmaE[wave_i]);
@@ -188,7 +194,7 @@ float calcDndtAse (unsigned &threads,
         hostPhiAse.at(sampleOffset) = 0;
         hostPhiAseSquare[sampleOffset] = 0;
 	copyToDevice(hostPhiAse[sampleOffset], &(phiAse[sampleOffset]));
-	copyToDevice(hostPhiAseSquare[sampleOffset], &(hostPhiAseSquare[sampleOffset]));
+	copyToDevice(hostPhiAseSquare[sampleOffset], &(phiAseSquare[sampleOffset]));
 
       }
       // Update progressbar
@@ -205,6 +211,9 @@ float calcDndtAse (unsigned &threads,
 
   // Stop time
   runtime = difftime(time(0),starttime);
+
+  // TESTING OUTPUT
+  expectation.assign(centerSample.begin(), centerSample.end());
 
   // Free Memory
   cudaFree(phiAse);
