@@ -139,7 +139,7 @@ float calcDndtAse (unsigned &threads,
   progressStartTime = time(0);
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
-  std::vector<unsigned> centerSample(expectation.size(), 0);
+  // std::vector<unsigned> centerSample(expectation.size(), 0);
 
   for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
@@ -152,12 +152,12 @@ float calcDndtAse (unsigned &threads,
 
         // Prism scheduling for gpu threads
         calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
-	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
-	copyToDevice(hostNumberOfReflections, numberOfReflections);
+	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms, hostRaysPerSample);
+	copyToDevice(hostNumberOfReflections, numberOfReflections, hostRaysPerSample);
 
 	// TESTING OUTPUT
-	 if(sample_i == 1386)
-	   centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
+	// if(sample_i == 1386)
+	//   centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
 
         // Start Kernel
         calcSamplePhiAse<<< 200, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, wave_i, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, hostSigmaA[wave_i], hostSigmaE[wave_i]);
@@ -170,7 +170,7 @@ float calcDndtAse (unsigned &threads,
         expectation.at(sampleOffset) = calcExpectation(hostPhiAse.at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
 
         if(expectation.at(sampleOffset) < expectationThreshold) break;
-        if((hostRaysPerSample * 10) > maxRaysPerSample)         break;
+        if(hostRaysPerSample * 10 > maxRaysPerSample)         break;
 
         // fprintf(stderr,"increasing from %d to %d\n",hostRaysPerSample, hostRaysPerSample*10);
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
@@ -197,7 +197,7 @@ float calcDndtAse (unsigned &threads,
   runtime = difftime(time(0),starttime);
 
   // TESTING OUTPUT
-   expectation.assign(centerSample.begin(), centerSample.end());
+  // expectation.assign(centerSample.begin(), centerSample.end());
 
   // Free Memory
   cudaFree(phiAse);
