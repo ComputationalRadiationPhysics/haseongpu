@@ -115,6 +115,7 @@ struct Mesh {
 
   float  * refractiveIndices; //[0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
   float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
+  float  * totalReflectionAngles;
 
   //indexstructs
   unsigned *triangles;

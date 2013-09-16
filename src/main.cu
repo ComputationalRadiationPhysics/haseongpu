@@ -125,6 +125,11 @@ int main(int argc, char **argv){
   std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 0);
   CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
+
+  fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
+  fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(1));
+  fprintf(stderr, "maxreflections: %d\n",hMesh.getMaxReflections());
+  
   // Run Experiment
   switch(mode){
     case 0:
@@ -132,10 +137,13 @@ int main(int argc, char **argv){
       runtime = calcDndtAse(threads, 
           blocks, 
           raysPerSample,
+		  maxRaysPerSample,
           dMesh.at(device),
           hMesh,
           sigmaA,
           sigmaE,
+		  expectationThreshold,
+		  useReflections,
           dndtAse,
           phiAse,
           expectation
@@ -160,6 +168,7 @@ int main(int argc, char **argv){
       runmode = "For Loops";
       break;
   }
+
 
   // Print Solutions
   for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){

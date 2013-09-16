@@ -95,6 +95,12 @@ void fillHMesh(
   hMesh.refractiveIndices = &(refractiveIndices->at(0));
   hMesh.reflectivities = &(reflectivities->at(0));
 
+  std::vector<float> *totalReflectionAngles = new std::vector<float>(refractiveIndices->size()/2,0);
+  for(unsigned i=0;i<refractiveIndices->size();i+=2){
+    totalReflectionAngles->at(i/2) = (180. / M_PI * asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
+  }
+  hMesh.totalReflectionAngles = &(totalReflectionAngles->at(0));
+
 }
 
 /**
@@ -163,6 +169,7 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.cellTypes), hMesh.numberOfTriangles * sizeof(unsigned)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.refractiveIndices), refractiveIndices->size() * sizeof(float)));
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.reflectivities), (refractiveIndices->size()/2)*(hMesh.numberOfTriangles) *sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.totalReflectionAngles), (refractiveIndices->size()/2) *sizeof(float)));
 
   // indexStructs
   CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.triangles), 3 * hMesh.numberOfTriangles * sizeof(unsigned)));
@@ -196,6 +203,13 @@ void fillDMesh(
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh.refractiveIndices, (float*) &(refractiveIndices->at(0)), refractiveIndices->size() * sizeof(float), cudaMemcpyHostToDevice));
 
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh.reflectivities, (float*) &(reflectivities->at(0)), (hMesh.numberOfTriangles)* (refractiveIndices->size()/2) * sizeof(float), cudaMemcpyHostToDevice));
+
+  std::vector<float> *totalReflectionAngles = new std::vector<float>(refractiveIndices->size()/2,0);
+  for(unsigned i=0;i<refractiveIndices->size();i+=2){
+    totalReflectionAngles->at(i/2) = (asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
+  }
+  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.totalReflectionAngles, (float*) &(totalReflectionAngles->at(0)), refractiveIndices->size()/2 * sizeof(float), cudaMemcpyHostToDevice));
+  free(totalReflectionAngles);
 
   // fill indexStructs
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh.triangles, (unsigned*) &(triangleIndices->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
@@ -579,7 +593,7 @@ double calculateMaxDiameter(double* points, unsigned offset){
 
 unsigned Mesh::getMaxReflections(int reflectionPlane){
 	double d = calculateMaxDiameter(points,numberOfPoints);
-	float alpha = getReflectionAngle(reflectionPlane);
+	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h = numberOfLevels * thickness; 
 	double z = d/tan(alpha);
 	return ceil(z/h);
@@ -604,9 +618,11 @@ __device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned tr
 __device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane){
 	switch(reflectionPlane){
 		case -1:
-			return asin(refractiveIndices[1]/refractiveIndices[0]);
+      return totalReflectionAngles[0];
+			//return asin(refractiveIndices[1]/refractiveIndices[0]);
 		case 1:
-			return asin(refractiveIndices[3]/refractiveIndices[2]);
+      return totalReflectionAngles[1];
+			//return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
 	return  0;
 }
