@@ -7,6 +7,7 @@
 #include <curand_kernel.h>
 #include <cudachecks.h>
 #include <cuda_utils.h>
+#include <reflection.h> /* ReflectionPlane */
 
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
@@ -30,7 +31,7 @@ __global__ void propagateFromTriangleCenter(
   double gain = 0;
   unsigned reflection_i = blockIdx.z;
   unsigned reflections = (reflection_i + 1) / 2;
-  int reflectionPlane  = (reflection_i % 2 == 0)? -1 : 1;
+  ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms){

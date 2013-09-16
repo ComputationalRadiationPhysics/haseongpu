@@ -2,6 +2,7 @@
 #define propagate_ray_H
 
 #include <mesh.h>
+#include <reflection.h> /* ReflectionPlane */
 
 /**
  * @brief Propagates an ray through the triangle/prism/crystal structure.
@@ -46,7 +47,7 @@ __device__ double propagateRay(Ray ray,
 __device__ double propagateRayWithReflection(Point startPoint, 
 					     Point endPoint, 
 					     unsigned reflectionsLeft,
-					     int reflectionPlane,
+					     ReflectionPlane reflectionPlane,
 					     unsigned startLevel, 
 					     unsigned startTriangle, 
 					     Mesh *mesh, 

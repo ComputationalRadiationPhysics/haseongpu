@@ -206,7 +206,7 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 __device__ double propagateRayWithReflection(Point startPoint, 
 					     Point endPoint, 
 					     unsigned reflections, 
-					     int reflectionPlane, 
+					     ReflectionPlane reflectionPlane, 
 					     unsigned startLevel, 
 					     unsigned startTriangle, 
 					     Mesh *mesh, 
@@ -214,7 +214,7 @@ __device__ double propagateRayWithReflection(Point startPoint,
 					     const double sigmaE){
 
   const float reflectivity = 0;
-  const float totalReflectionAngle = 33;
+  const float totalReflectionAngle = 33.123676;
   double distanceTotal = 0;
 
   double gain = 1.0;
@@ -222,7 +222,7 @@ __device__ double propagateRayWithReflection(Point startPoint,
   for(unsigned reflection = 0; reflection < reflections; ++reflection){
     Point reflectionPoint = {0,0,0};
     double reflectionAngle = 0;
-    
+
     // Calc reflectionPoint and reflectionAngle
     calcNextReflection(startPoint, endPoint, (reflections - reflection), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh);
     Ray reflectionRay   = generateRay(startPoint, reflectionPoint);
@@ -235,7 +235,7 @@ __device__ double propagateRayWithReflection(Point startPoint,
     if(reflectionAngle <= totalReflectionAngle) 
       gain             *= reflectivity;
     startPoint          = reflectionPoint;
-    reflectionPlane     = (reflectionPlane * -1);
+    reflectionPlane     = reflectionPlane == TOP_REFLECTION ? BOTTOM_REFLECTION : TOP_REFLECTION;
     
     }
 

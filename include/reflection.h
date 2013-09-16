@@ -2,6 +2,9 @@
 #define Reflection_H
 
 #include "mesh.h"
-__device__ int calcNextReflection(Point startPoint, Point endPoint, unsigned reflectionsLeft, int reflectionPlane, Point *reflectionPoint, double *reflectionAngle, Mesh *mesh);
+
+enum ReflectionPlane {TOP_REFLECTION = 1, BOTTOM_REFLECTION = -1};
+
+__device__ int calcNextReflection(Point startPoint, Point endPoint, unsigned reflectionsLeft, ReflectionPlane reflectionPlane,Point *reflectionPoint, double *reflectionAngle, Mesh *mesh);
 
 #endif /* Reflection_H */

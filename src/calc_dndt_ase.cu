@@ -53,25 +53,6 @@ void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, std::vector<unsi
 
 }
 
-
-/**
- * @brief Gives every 200 blocks an index to the sigma_a/_e array or -1
- *        if this wavelength will be ignored.
- **/
-void calcIndicesOfWavelengths(int *indicesOfWavelength, dim3 gridDim, std::vector<bool> ignoreWavelength){
-  for(unsigned wave_i=0; wave_i < gridDim.y; ++wave_i){
-    if(ignoreWavelength[wave_i]){
-      indicesOfWavelength[wave_i] = -1;
-    }
-    else{
-      indicesOfWavelength[wave_i] = wave_i;
-
-    }
-
-  }
-
-}
-
 double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
   double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
@@ -114,7 +95,7 @@ float calcDndtAse (unsigned &threads,
 
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.5;
+  expectationThreshold = 0.01;
   maxRaysPerSample = max(10000, hostRaysPerSample); // 1M
   maxReflections = 14;
   reflectionSlices = 1 + 2 * maxReflections;
@@ -208,7 +189,7 @@ float calcDndtAse (unsigned &threads,
   runtime = difftime(time(0),starttime);
 
   // TESTING OUTPUT
-  expectation.assign(centerSample.begin(), centerSample.end());
+  // expectation.assign(centerSample.begin(), centerSample.end());
 
   // Free Memory
   cudaFree(phiAse);
