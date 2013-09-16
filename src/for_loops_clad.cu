@@ -8,7 +8,7 @@
 
 #define ALIVE 1
 #define DEAD 0
-#define SMALL 1E-06 // 1µm is considered to be small
+#define SMALL_FOR_LOOPS 1E-06 // 1µm is considered to be small
 #define MAXREFL 5 // number of max amount of reflections <= this has to be done in a better way later (distance defines the max number)
 
 // change 2011/02/23
@@ -469,7 +469,7 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
         y_pos = y_pos + length*vec_y;
         z_pos = z_pos + length*vec_z;
         
-        if (abs(distance)< SMALL)
+        if (abs(distance)< SMALL_FOR_LOOPS)
         {
             ray_life = DEAD;
             break;

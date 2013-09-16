@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <vector_types.h>
+#include <iostream>
 #include <assert.h>
 #include <vector>
 #include <curand_kernel.h>
@@ -22,6 +22,7 @@
 #include <ctime> /* progressBar */
 #include <progressbar.h> /*progressBar */
 
+
 #define SEED 1234
 
 /**
@@ -31,13 +32,14 @@
  *
  **/
 void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, std::vector<unsigned> &numberOfReflections, std::vector<unsigned> raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh){
-  // Init vectors with zero
-  for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms[i] = 0;
-  for(unsigned i=0;  i < numberOfReflections.size() ; ++i) numberOfReflections[i] = 0;
+  // Init vectors with zero (slow and not needed anymore)
+  // for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms[i] = 0;
+  // for(unsigned i=0;  i < numberOfReflections.size() ; ++i) numberOfReflections[i] = 0;
 
   // Calc new values
+  unsigned absoluteRay = 0;
   for(unsigned reflection_i =0; reflection_i < reflectionSlices; ++reflection_i){
-    for(unsigned prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
+    for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
       unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
       for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + reflectionOffset]; ++ray_i){
         indicesOfPrisms[absoluteRay] = prism_i;
@@ -61,19 +63,19 @@ double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSampl
 }
 
 float calcDndtAse (unsigned &threads, 
-    unsigned &blocks,
-    unsigned &hostRaysPerSample,
-	unsigned maxRaysPerSample,
-    Mesh mesh,
-    Mesh hostMesh,
-    std::vector<double> hostSigmaA,
-    std::vector<double> hostSigmaE,
-	float expectationThreshold,
-	bool useReflections,
-    std::vector<double> &dndtAse,
-    std::vector<float> &hostPhiAse,
-    std::vector<double> &expectation
-    ){
+		   unsigned &blocks,
+		   unsigned &hostRaysPerSample,
+		   unsigned maxRaysPerSample,
+		   Mesh mesh,
+		   Mesh hostMesh,
+		   std::vector<double> hostSigmaA,
+		   std::vector<double> hostSigmaE,
+		   float expectationThreshold,
+		   bool useReflections,
+		   std::vector<double> &dndtAse,
+		   std::vector<float> &hostPhiAse,
+		   std::vector<double> &expectation
+		   ){
 
   // Variable declaration
   // CPU
@@ -83,6 +85,9 @@ float calcDndtAse (unsigned &threads,
   unsigned maxReflections;
   unsigned reflectionSlices;
   bool distributeRandomly;
+
+  std::cout << hostRaysPerSample << std::endl;
+  std::cout << maxRaysPerSample << std::endl;
 
   // GPU
   curandStateMtgp32 *devMTGPStates;
@@ -154,8 +159,8 @@ float calcDndtAse (unsigned &threads,
 	copyToDevice(hostNumberOfReflections, numberOfReflections);
 
 	// TESTING OUTPUT
-	if(sample_i == 1386)
-	  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
+	 if(sample_i == 1386)
+	   centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
 
         // Start Kernel
         calcSamplePhiAse<<< 200, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, wave_i, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, hostSigmaA[wave_i], hostSigmaE[wave_i]);
@@ -168,7 +173,7 @@ float calcDndtAse (unsigned &threads,
         expectation.at(sampleOffset) = calcExpectation(hostPhiAse.at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
 
         if(expectation.at(sampleOffset) < expectationThreshold) break;
-        if((hostRaysPerSample * 10) > maxRaysPerSample)          break;
+        if((hostRaysPerSample * 10) > maxRaysPerSample)         break;
 
         // fprintf(stderr,"increasing from %d to %d\n",hostRaysPerSample, hostRaysPerSample*10);
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
@@ -195,7 +200,7 @@ float calcDndtAse (unsigned &threads,
   runtime = difftime(time(0),starttime);
 
   // TESTING OUTPUT
-  // expectation.assign(centerSample.begin(), centerSample.end());
+   expectation.assign(centerSample.begin(), centerSample.end());
 
   // Free Memory
   cudaFree(phiAse);

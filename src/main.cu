@@ -134,19 +134,19 @@ int main(int argc, char **argv){
     case 0:
       // threads and blocks will be set in the following function (by reference)
       runtime = calcDndtAse(threads, 
-          blocks, 
-          raysPerSample,
-		  maxRaysPerSample,
-          dMesh.at(device),
-          hMesh,
-          sigmaA,
-          sigmaE,
-		  expectationThreshold,
-		  useReflections,
-          dndtAse,
-          phiAse,
-          expectation
-          );
+			    blocks, 
+			    raysPerSample,
+			    maxRaysPerSample,
+			    dMesh.at(device),
+			    hMesh,
+			    sigmaA,
+			    sigmaE,
+			    expectationThreshold,
+			    useReflections,
+			    dndtAse,
+			    phiAse,
+			    expectation
+			    );
       runmode="Ray Propagation New GPU";
       break;
     case 1:
@@ -204,12 +204,12 @@ int main(int argc, char **argv){
 		  sigmaE.size(),
 		  hMesh.numberOfSamples);
 
-  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt");
+  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   if(compareLocation!="") {
 	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare");
+	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   }
-  if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation");
+  if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
 
   return 0;
 }

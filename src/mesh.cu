@@ -550,11 +550,11 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
 
 }
 
-double distance2D(TwoDimPoint p1, TwoDimPoint p2){
+double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) {
 	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
 }
 
-double getMaxDistance(std::vector<TwoDimPoint> points){
+double getMaxDistance(std::vector<TwoDimPoint> points) {
 	double maxDistance = -1;
 
 	for(unsigned p1=0 ; p1 < points.size() ; ++p1)
@@ -564,7 +564,7 @@ double getMaxDistance(std::vector<TwoDimPoint> points){
 	return maxDistance;
 }
 
-double calculateMaxDiameter(double* points, unsigned offset){
+double calculateMaxDiameter(const double* points, const unsigned offset) {
 	TwoDimPoint minX = {DBL_MAX,0};
 	TwoDimPoint minY = {0,DBL_MAX};
 	TwoDimPoint maxX = {DBL_MIN,0};
@@ -591,7 +591,7 @@ double calculateMaxDiameter(double* points, unsigned offset){
 	return getMaxDistance(extrema);
 }
 
-unsigned Mesh::getMaxReflections(int reflectionPlane){
+unsigned Mesh::getMaxReflections (int reflectionPlane) const{
 	double d = calculateMaxDiameter(points,numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h = numberOfLevels * thickness; 
@@ -599,13 +599,13 @@ unsigned Mesh::getMaxReflections(int reflectionPlane){
 	return ceil(z/h);
 }
 
-unsigned Mesh::getMaxReflections(){
+unsigned Mesh::getMaxReflections() const{
 	unsigned top = getMaxReflections(1);
 	unsigned bottom = getMaxReflections(-1);
 	return max(top,bottom);
 }
 
-__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle){
+__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle) const{
 	switch(reflectionPlane){
 		case -1:
 			return reflectivities[triangle];
@@ -615,7 +615,7 @@ __device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned tr
 	return 0;
 }
 
-__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane){
+__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane) const{
 	switch(reflectionPlane){
 		case -1:
       return totalReflectionAngles[0];

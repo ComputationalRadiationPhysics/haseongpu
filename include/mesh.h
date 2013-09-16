@@ -148,11 +148,11 @@ struct Mesh {
   __device__ unsigned getCellType(unsigned triangle);
 
 
-  unsigned getMaxReflections(int reflectionPlane);
-  unsigned getMaxReflections();
+  unsigned getMaxReflections(int reflectionPlane) const;
+  unsigned getMaxReflections() const;
 
-  __device__ __host__ float getReflectivity(int reflectionPlane, unsigned triangle);
-  __device__ __host__ float getReflectionAngle(int reflectionPlane);
+  __device__ __host__ float getReflectivity(int reflectionPlane, unsigned triangle) const;
+  __device__ __host__ float getReflectionAngle(int reflectionPlane) const;
 
 
   static int parseMultiGPU(Mesh& hMesh, 
@@ -163,6 +163,6 @@ struct Mesh {
 			   );
 };
 
-double calculateMaxDiameter(std::vector<double> points);
+//double calculateMaxDiameter(std::vector<double> points) const;
 
 #endif /* MESH_H */

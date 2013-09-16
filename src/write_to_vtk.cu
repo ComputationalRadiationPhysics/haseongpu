@@ -10,26 +10,32 @@
 #include <sstream> /* std::stringstream */
 
 int writeToVtk(const Mesh& mesh,
-    const std::vector<double> ase,
-    const std::string pfilename){
+	       const std::vector<double> ase,
+	       const std::string pfilename,
+	       const unsigned raysPerSample,
+	       const unsigned maxRaysPerSample,
+	       const float expectationThreshold,
+	       const float runtime){
+
+  // Konstruct experiment information
+  std::stringstream experimentStream;
+  unsigned r = mesh.getMaxReflections();
+  experimentStream << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime;
 
   // Add time to filename
   time_t currentTime;
   time(&currentTime);
-  std::stringstream timeStream;
-  timeStream << (int) currentTime;
+  std::stringstream filenameStream;
+  filenameStream  << pfilename << "_" << (int) currentTime << ".vtk";
 
-  std::string filename = pfilename +  "_" + timeStream.str() + ".vtk";
-
-  std::cerr << "C Write experiment data to vtk-file" << std::endl;
+  std::cerr << "C Write experiment data to vtk-file " << filenameStream.str() << std::endl;
   std::ofstream vtkFile;
 
-
-  vtkFile.open(filename.c_str());
+  vtkFile.open(filenameStream.str().c_str());
 
   // Write header of vtk file
   vtkFile << "# vtk DataFile Version 2.0" << std::endl;
-  vtkFile << "octrace vtk file" << std::endl;
+  vtkFile << experimentStream.str() << std::endl;
   vtkFile << "ASCII" << std::endl;
 
   // Write point data
