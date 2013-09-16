@@ -213,13 +213,19 @@ __device__ double propagateRayWithReflection(Point startPoint,
 					     const double sigmaA, 
 					     const double sigmaE){
 
-  const float reflectivity = 0;
-  const float totalReflectionAngle = 33;
   double distanceTotal = 0;
 
   double gain = 1.0;
 
   for(unsigned reflection = 0; reflection < reflections; ++reflection){
+    float reflectivity = mesh->getReflectivity(reflectionPlane, startTriangle);;
+    float totalReflectionAngle = mesh->getReflectionAngle(reflectionPlane);
+
+    if(!(totalReflectionAngle > 33)){
+		printf("ReflectionAngle: %f (reflectionPlane: %d)\n",totalReflectionAngle,reflectionPlane);
+	}
+    assert(totalReflectionAngle < 34);
+    assert(reflectivity == 0);
     Point reflectionPoint = {0,0,0};
     double reflectionAngle = 0;
     
@@ -234,10 +240,11 @@ __device__ double propagateRayWithReflection(Point startPoint,
 
     if(reflectionAngle <= totalReflectionAngle) 
       gain             *= reflectivity;
+
     startPoint          = reflectionPoint;
     reflectionPlane     = (reflectionPlane * -1);
-    
-    }
+
+  }
 
   Ray ray = generateRay(startPoint, endPoint);
   gain  *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);

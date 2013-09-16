@@ -206,7 +206,7 @@ void fillDMesh(
 
   std::vector<float> *totalReflectionAngles = new std::vector<float>(refractiveIndices->size()/2,0);
   for(unsigned i=0;i<refractiveIndices->size();i+=2){
-    totalReflectionAngles->at(i/2) = (asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
+    totalReflectionAngles->at(i/2) = (180. / M_PI *  asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
   }
   CUDA_CHECK_RETURN(cudaMemcpy(dMesh.totalReflectionAngles, (float*) &(totalReflectionAngles->at(0)), refractiveIndices->size()/2 * sizeof(float), cudaMemcpyHostToDevice));
   free(totalReflectionAngles);
