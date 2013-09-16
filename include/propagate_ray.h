@@ -37,20 +37,20 @@
  *
  **/
 __device__ double propagateRay(Ray ray, 
-					unsigned *startLevel, 
-					unsigned  *startTriangle, 
-					Mesh *mesh,
-					const double sigmaA, 
-					const double sigmaE
-					);
+			       unsigned *startLevel, 
+			       unsigned  *startTriangle, 
+			       const Mesh &mesh,
+			       const double sigmaA, 
+			       const double sigmaE
+			       );
 
 __device__ double propagateRayWithReflection(Point startPoint, 
-					     Point endPoint, 
-					     unsigned reflectionsLeft,
+					     const Point endPoint, 
+					     const unsigned reflections,
 					     ReflectionPlane reflectionPlane,
 					     unsigned startLevel, 
 					     unsigned startTriangle, 
-					     Mesh *mesh, 
+					     const Mesh &mesh, 
 					     const double sigmaA, 
 					     const double sigmaE);
 

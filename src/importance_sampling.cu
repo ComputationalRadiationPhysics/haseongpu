@@ -1,4 +1,4 @@
-#include "importance_sampling.h"
+#include <importance_sampling.h>
 #include <mesh.h>
 #include <stdio.h>
 #include <propagate_ray.h>
@@ -19,14 +19,13 @@
  * For other parameters, see documentation of importanceSampling()
  *
  */
-__global__ void propagateFromTriangleCenter(
-    Mesh mesh,
-    double *importance,
-    float *sumPhi,
-    const unsigned sample_i,
-    const double sigmaA,
-    const double sigmaE
-    ){
+__global__ void propagateFromTriangleCenter(const Mesh mesh,
+					    double *importance,
+					    float *sumPhi,
+					    const unsigned sample_i,
+					    const double sigmaA,
+					    const double sigmaE
+					    ){
 
   double gain = 0;
   unsigned reflection_i = blockIdx.z;
@@ -43,7 +42,7 @@ __global__ void propagateFromTriangleCenter(
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, &mesh, sigmaA, sigmaE);
+  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
 
   // DEBUG
   //printf("C x:%f y:%f z:%f reflections: %u reflectionPlane %d gain: %f\n", samplePoint.x, samplePoint.y, samplePoint.z, reflections, reflectionPlane, gain);

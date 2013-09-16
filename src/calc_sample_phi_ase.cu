@@ -7,7 +7,7 @@
 #include <reflection.h> /* ReflectionPlane */
 
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
-				 Mesh mesh, 
+				 const Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
 				 const unsigned* numberOfReflections,
@@ -43,7 +43,7 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
     Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
 
     // Calculate reflections as different ray propagations
-    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, &mesh, sigmaA, sigmaE);
+    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + reflectionOffset];
 
     gainSum       += gain;

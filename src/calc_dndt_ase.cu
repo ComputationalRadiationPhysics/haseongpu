@@ -86,9 +86,6 @@ float calcDndtAse (unsigned &threads,
   unsigned reflectionSlices;
   bool distributeRandomly;
 
-  std::cout << hostRaysPerSample << std::endl;
-  std::cout << maxRaysPerSample << std::endl;
-
   // GPU
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;

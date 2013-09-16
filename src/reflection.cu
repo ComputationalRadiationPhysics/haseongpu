@@ -16,12 +16,12 @@ __device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   return 1;
 }
 
-__device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const ReflectionPlane reflectionPlane, const Mesh *mesh, Point *intersectionPoint){
+__device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const ReflectionPlane reflectionPlane, const Mesh &mesh, Point *intersectionPoint){
   // Assume that mesh is on x/y axis and parallel to x/y axis
   double planeZ = 0.0;
   if(reflectionPlane == TOP_REFLECTION){
     // Reflection on TOP plane
-    planeZ = mesh->thickness * mesh->numberOfLevels;
+    planeZ = mesh.thickness * mesh.numberOfLevels;
   }
   double denominator = reflectionRay.dir.z;  
   if (denominator != 0.0){
@@ -39,20 +39,20 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
 }
 
 
-__device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh *mesh){
+__device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh &mesh){
   float mirrorPlaneZ = 0;
   if(reflectionsLeft % 2 == 0){
     // Even reflectionCount is postponement
-    endPoint.z = endPoint.z + reflectionPlane * (reflectionsLeft * mesh->thickness * mesh->numberOfLevels); 
+    endPoint.z = endPoint.z + reflectionPlane * (reflectionsLeft * mesh.thickness * mesh.numberOfLevels); 
   }
   else {
     // Odd reflectionsCount is reflection
 
     if(reflectionPlane == TOP_REFLECTION){
-      mirrorPlaneZ = ceil(reflectionsLeft/(double)2) * mesh->thickness * mesh->numberOfLevels;
+      mirrorPlaneZ = ceil(reflectionsLeft/(double)2) * mesh.thickness * mesh.numberOfLevels;
     }
     else{
-      mirrorPlaneZ = floor(reflectionsLeft/(double)2) * mesh->thickness * mesh->numberOfLevels;
+      mirrorPlaneZ = floor(reflectionsLeft/(double)2) * mesh.thickness * mesh.numberOfLevels;
     }
 
     endPoint.z = reflectionPlane * abs(( mirrorPlaneZ + mirrorPlaneZ - endPoint.z));
@@ -61,7 +61,7 @@ __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  in
   return generateRay(startPoint, endPoint);
 }
 
-__device__ int calcNextReflection(const Point startPoint, const Point endPoint, const unsigned reflectionsLeft, const ReflectionPlane reflectionPlane, Point *reflectionPoint, double *reflectionAngle, Mesh *mesh){
+__device__ int calcNextReflection(const Point startPoint, const Point endPoint, const unsigned reflectionsLeft, const ReflectionPlane reflectionPlane, Point *reflectionPoint, double *reflectionAngle, const Mesh &mesh){
   Ray reflectionRay = generateReflectionRay(startPoint, endPoint, reflectionsLeft, reflectionPlane, mesh);
   if(calcPlaneIntersectionPoint(reflectionRay, reflectionPlane, mesh, reflectionPoint)) return 1;
   if(calcIntersectionAngle(reflectionRay, reflectionAngle)) return 1;

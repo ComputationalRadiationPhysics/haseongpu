@@ -137,15 +137,15 @@ struct Mesh {
 
   ~Mesh();
 
-  __device__ int getNeighbor(unsigned triangle, int edge);
-  __device__ Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState);
-  __device__ double getBetaValue(unsigned triangle, unsigned level);
-  __device__ double getBetaValue(unsigned prism);
-  __device__ NormalRay getNormal(unsigned triangle, int edge);
-  __device__ Point getSamplePoint(unsigned sample);
-  __device__ Point getCenterPoint(unsigned triangle, unsigned level);
-  __device__ int getForbiddenEdge(unsigned triangle, int edge);
-  __device__ unsigned getCellType(unsigned triangle);
+  __device__ int getNeighbor(unsigned triangle, int edge) const;
+  __device__ Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState) const;
+  __device__ double getBetaValue(unsigned triangle, unsigned level) const;
+  __device__ double getBetaValue(unsigned prism) const;
+  __device__ NormalRay getNormal(unsigned triangle, int edge) const;
+  __device__ Point getSamplePoint(unsigned sample) const;
+  __device__ Point getCenterPoint(unsigned triangle, unsigned level) const;
+  __device__ int getForbiddenEdge(unsigned triangle, int edge) const;
+  __device__ unsigned getCellType(unsigned triangle) const;
 
 
   unsigned getMaxReflections(int reflectionPlane) const;

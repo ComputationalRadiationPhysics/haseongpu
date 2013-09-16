@@ -42,7 +42,7 @@
  *
  **/
 __global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
-				 Mesh mesh,
+				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
 				 const unsigned* numberOfReflections,
