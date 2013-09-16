@@ -63,10 +63,13 @@ double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSampl
 float calcDndtAse (unsigned &threads, 
     unsigned &blocks,
     unsigned &hostRaysPerSample,
+	unsigned maxRaysPerSample,
     Mesh mesh,
     Mesh hostMesh,
     std::vector<double> hostSigmaA,
     std::vector<double> hostSigmaE,
+	float expectationThreshold,
+	bool useReflections,
     std::vector<double> &dndtAse,
     std::vector<float> &hostPhiAse,
     std::vector<double> &expectation
@@ -77,8 +80,6 @@ float calcDndtAse (unsigned &threads,
   float runtime;
   time_t starttime,progressStartTime;
   unsigned hostRaysPerSampleSave;
-  float expectationThreshold;
-  unsigned maxRaysPerSample;
   unsigned maxReflections;
   unsigned reflectionSlices;
   bool distributeRandomly;
@@ -95,9 +96,14 @@ float calcDndtAse (unsigned &threads,
 
   starttime = time(0);
   hostRaysPerSampleSave = hostRaysPerSample;
-  expectationThreshold = 0.01;
-  maxRaysPerSample = max(10000, hostRaysPerSample); // 1M
-  maxReflections = 14;
+
+  if(useReflections){
+    maxReflections = hostMesh.getMaxReflections(); 
+  }
+  else {
+    maxReflections = 0;
+  }
+
   reflectionSlices = 1 + 2 * maxReflections;
   distributeRandomly = true;
 
