@@ -35,14 +35,12 @@
  *
  **/
 
-double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSample){
+double calcExpectation(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
   double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
 
   return sqrt(abs((a - b) / raysPerSample));
 }
-
-
 
 double getDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, const std::vector<float>& phiAse, const unsigned sampleOffset){
   unsigned sample_i = sampleOffset % mesh.numberOfSamples;
@@ -52,117 +50,95 @@ double getDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, co
 }
 
 float calcDndtAse (unsigned &threads, 
-		   unsigned &blocks,
-		   unsigned &hostRaysPerSample,
-		   unsigned maxRaysPerSample,
-		   Mesh mesh,
-		   Mesh hostMesh,
-		   std::vector<double> hostSigmaA,
-		   std::vector<double> hostSigmaE,
-		   float expectationThreshold,
-		   bool useReflections,
-		   std::vector<double> &dndtAse,
-		   std::vector<float> &hostPhiAse,
-		   std::vector<double> &expectation
-		   ){
+    unsigned &blocks,
+    unsigned &hostRaysPerSample,
+    const unsigned maxRaysPerSample,
+    const Mesh& mesh,
+    const Mesh& hostMesh,
+    const std::vector<double>& hostSigmaA,
+    const std::vector<double>& hostSigmaE,
+    const float expectationThreshold,
+    const bool useReflections,
+    std::vector<double> &dndtAse,
+    std::vector<float> &hostPhiAse,
+    std::vector<double> &expectation
+    ){
 
-  // Variable declaration
-  // CPU
-  time_t starttime,progressStartTime;
-  unsigned hostRaysPerSampleSave;
-  unsigned maxReflections;
-  unsigned reflectionSlices;
-  bool distributeRandomly;
+  // Optimization to use more L1 cache
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
-  // GPU
+  using thrust::device_vector;
+  using  thrust::raw_pointer_cast;
+
+  // variable Definitions CPU
+  time_t starttime                = time(0);
+  unsigned hostRaysPerSampleSave  = hostRaysPerSample;
+  unsigned maxReflections         = useReflections ? hostMesh.getMaxReflections() : 0;
+  unsigned reflectionSlices       = 1 + (2 * maxReflections);
+  unsigned numberOfWavelengths    = hostSigmaE.size();
+  bool distributeRandomly         = true;
+  dim3 blockDim(256);             //OPTIMIZE: find perfect number of threads
+  dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
+  threads                         = blockDim.x; // give back to calling function
+  blocks                          = gridDim.x;
+  // Memory allocation/init and copy for device memory
+  device_vector<unsigned> numberOfReflections(maxRaysPerSample,  0);
+  device_vector<unsigned> indicesOfPrisms    (maxRaysPerSample,  0);
+  device_vector<float>    phiAse             (hostPhiAse.size(), 0);
+  device_vector<unsigned> raysPerPrism       (hostMesh.numberOfPrisms * reflectionSlices, 1);
+  device_vector<unsigned> prefixSum          (hostMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<double>   importance         (hostMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<float>    phiAseSquare       (hostMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
+ 
+ // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;
-
-  // Variable Definitions
-  dim3 blockDim(256);
-  dim3 gridDim(200, hostSigmaE.size());
-
-  // give back to calling function
-  threads = blockDim.x;
-  blocks = gridDim.x;
-
-  starttime = time(0);
-  hostRaysPerSampleSave = hostRaysPerSample;
-
-  if(useReflections){
-    maxReflections = hostMesh.getMaxReflections(); 
-  }
-  else {
-    maxReflections = 0;
-  }
-
-  reflectionSlices = 1 + 2 * maxReflections;
-  distributeRandomly = true;
-
-
-  // Memory allocation/init and copy for device
-  thrust::device_vector<unsigned> numberOfReflections(maxRaysPerSample,0);
-  thrust::device_vector<unsigned> indicesOfPrisms(maxRaysPerSample,0);
-  thrust::device_vector<unsigned> raysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
-  thrust::device_vector<unsigned> prefixSum   (hostMesh.numberOfPrisms * reflectionSlices, 0);
-  thrust::device_vector<double>   importance  (hostMesh.numberOfPrisms * reflectionSlices, 0);
-
-  //OPTIMIZE: use only 1 value for phiAseSquare
-  thrust::device_vector<float> phiAseSquare(hostMesh.numberOfSamples * gridDim.y, 0);
-  thrust::device_vector<float> phiAse(hostPhiAse);
-
-  // CUDA Mersenne twister for more than 200 blocks (for every wavelength)
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
+  
 
-  // Calculate Phi Ase foreach sample
-  fprintf(stderr, "\nC Start Phi Ase calculation\n");
-  progressStartTime = time(0);
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  // Calculate Phi Ase for each wavelength
+  for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
+    time_t progressStartTime = time(0);
+    fprintf(stderr, "\nC Phi_ASE calculation for wavelength %d\n",wave_i);
 
-  // std::vector<unsigned> centerSample(expectation.size(), 0);
-
-  for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
+    //calculation for each sample point
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-      int sampleOffset = sample_i + hostMesh.numberOfSamples * wave_i;
+      unsigned sampleOffset  = sample_i + hostMesh.numberOfSamples * wave_i;
       hostRaysPerSample = hostRaysPerSampleSave;
 
       while(true){
         importanceSampling(
             sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i],
-            thrust::raw_pointer_cast(&importance[0]), thrust::raw_pointer_cast(&raysPerPrism[0]),
-            distributeRandomly, blockDim, gridDim);
+            raw_pointer_cast(&importance[0]), raw_pointer_cast(&raysPerPrism[0]),
+            distributeRandomly, blockDim, gridDim
+            );
 
         // Prism scheduling for gpu threads
         mapRaysToPrisms(indicesOfPrisms,numberOfReflections,raysPerPrism,prefixSum,reflectionSlices,hostRaysPerSample,hostMesh.numberOfPrisms);
 
-        // TESTING OUTPUT
-        //if(sample_i == 1386)
-        //  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
-
         // Start Kernel
-        calcSamplePhiAse<<< 200, blockDim >>>(
-            devMTGPStates, 
+        calcSamplePhiAse<<< gridDim, blockDim >>>(
+            devMTGPStates,
             mesh, 
-            thrust::raw_pointer_cast(&indicesOfPrisms[0]), 
+            raw_pointer_cast(&indicesOfPrisms[0]), 
             wave_i, 
-            thrust::raw_pointer_cast(&numberOfReflections[0]), 
-            thrust::raw_pointer_cast(&importance[0]),
+            raw_pointer_cast(&numberOfReflections[0]), 
+            raw_pointer_cast(&importance[0]),
             hostRaysPerSample, 
-            thrust::raw_pointer_cast(&phiAse[0]), 
-            thrust::raw_pointer_cast(&phiAseSquare[0]),
+            raw_pointer_cast(&phiAse[0]), 
+            raw_pointer_cast(&phiAseSquare[0]),
             sample_i, 
-            hostSigmaA[wave_i], 
-            hostSigmaE[wave_i]
+            hostSigmaA[wave_i], hostSigmaE[wave_i]
             );
 
         // Check square error
         expectation.at(sampleOffset) = calcExpectation(phiAse[sampleOffset], phiAseSquare[sampleOffset], hostRaysPerSample);
 
         if(expectation[sampleOffset] < expectationThreshold) break;
-        if(hostRaysPerSample * 10 > maxRaysPerSample)         break;
+        if(hostRaysPerSample * 10 > maxRaysPerSample)        break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
         hostRaysPerSample *= 10;
@@ -181,13 +157,9 @@ float calcDndtAse (unsigned &threads,
     }
   }
 
-  // TESTING OUTPUT
-  // expectation.assign(centerSample.begin(), centerSample.end());
-
   // Free Memory
   cudaFree(devMTGPStates);
   cudaFree(devKernelParams);
 
   return difftime(time(0),starttime);
 }
-

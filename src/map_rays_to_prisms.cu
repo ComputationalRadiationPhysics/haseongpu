@@ -8,16 +8,18 @@
 #include <thrust/device_vector.h>
 
 
-
+using thrust::device_vector;
+using thrust::host_vector;
+using thrust::raw_pointer_cast;
 
 __global__ void mapPrefixSumToPrisms(
-    unsigned numberOfPrisms,
+    const unsigned numberOfPrisms,
+    const unsigned raysPerSample,
+    const unsigned reflectionSlices,
     const unsigned* raysPerPrism,
     const unsigned* prefixSum,
-    const unsigned raysPerSample,
     unsigned *indicesOfPrisms,
-    unsigned *numberOfReflections,
-    const unsigned reflectionSlices
+    unsigned *numberOfReflections
     ){
 
   int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -37,13 +39,14 @@ __global__ void mapPrefixSumToPrisms(
 
 
 void GPU_algorithm(
-    thrust::device_vector<unsigned> &indicesOfPrisms, 
-    thrust::device_vector<unsigned> &prefixSum, 
-    const thrust::device_vector<unsigned>& raysPerPrism, 
     const unsigned numberOfPrisms, 
     const unsigned raysPerSample,
-    thrust::device_vector<unsigned> &numberOfReflections,
-    unsigned reflectionSlices)
+    const unsigned reflectionSlices,
+    const thrust::device_vector<unsigned>& raysPerPrism, 
+    thrust::device_vector<unsigned> &prefixSum, 
+    thrust::device_vector<unsigned> &indicesOfPrisms, 
+    thrust::device_vector<unsigned> &numberOfReflections
+    )
 {
   const unsigned blocksize = 256;
   const unsigned gridsize  = (raysPerPrism.size()+blocksize-1)/blocksize;
@@ -52,12 +55,12 @@ void GPU_algorithm(
 
   CUDA_CHECK_KERNEL_SYNC(mapPrefixSumToPrisms <<<gridsize,blocksize>>> (
       numberOfPrisms, 
-      thrust::raw_pointer_cast( &raysPerPrism[0] ),
-      thrust::raw_pointer_cast( &prefixSum[0] ), 
       raysPerSample, 
-      thrust::raw_pointer_cast( &indicesOfPrisms[0] ),
-      thrust::raw_pointer_cast( &numberOfReflections[0] ),
-      reflectionSlices
+      reflectionSlices,
+      raw_pointer_cast( &raysPerPrism[0] ),
+      raw_pointer_cast( &prefixSum[0] ), 
+      raw_pointer_cast( &indicesOfPrisms[0] ),
+      raw_pointer_cast( &numberOfReflections[0] )
       ));
 
 }
@@ -96,13 +99,20 @@ void mapRaysToPrisms(
     const unsigned numberOfPrisms
     ){
 
-  using namespace thrust;
 
   //fill(indicesOfPrisms.begin(),indicesOfPrisms.end(),0);
   //fill(numberOfReflections.begin(),numberOfReflections.end(),0);
 
   //time_t before_GPU = clock();
-  GPU_algorithm(indicesOfPrisms, prefixSum, raysPerPrism, numberOfPrisms, raysPerSample, numberOfReflections,reflectionSlices);
+  GPU_algorithm(
+      numberOfPrisms,
+      raysPerSample,
+      reflectionSlices,
+      raysPerPrism,
+      prefixSum,
+      indicesOfPrisms,
+      numberOfReflections
+      );
   //time_t after_GPU = clock();
 
   // only for error-checking!
