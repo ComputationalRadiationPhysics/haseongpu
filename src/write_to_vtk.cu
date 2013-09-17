@@ -15,11 +15,13 @@ int writeToVtk(const Mesh& mesh,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float expectationThreshold,
+	       const bool useReflections,
 	       const float runtime){
 
   // Konstruct experiment information
   std::stringstream experimentStream;
-  unsigned r = mesh.getMaxReflections();
+  unsigned r = useReflections ? mesh.getMaxReflections() : 0;
+  
   experimentStream << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime;
 
   // Add time to filename

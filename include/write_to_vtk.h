@@ -23,6 +23,7 @@ int writeToVtk(const Mesh& mesh,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float expectationThreshold,
+	       const bool useReflections,
 	       const float runtime);
 std::vector<double> compareVtk(std::vector<double> ase, std::string filename, unsigned numberOfSamples);
 

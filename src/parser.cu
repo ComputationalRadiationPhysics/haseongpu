@@ -13,7 +13,7 @@ void parseCommandLine(
     bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
-    int *mode,
+    RunMode *mode,
     bool *useReflections,
     float *expectationThreshold
     ) {
@@ -77,9 +77,12 @@ void parseCommandLine(
 
     if (p.first == "--mode") {
       if (p.second == "ray_propagation_gpu")
-        *mode = 0;
+        *mode = RAY_PROPAGATION_GPU;
       if (p.second == "for_loops")
-        *mode = 1;
+        *mode = FOR_LOOPS;
+      if (p.second == "test_environment")
+        *mode = TEST;
+
     }
 
     if (p.first == "--reflection"){
@@ -99,18 +102,25 @@ int checkParameterValidity(
     const std::string root,
     int *device,
     const unsigned deviceCount,
-    const int mode,
+    const RunMode mode,
     float *expectationThreshold
     ) {
 
   if (argc <= 1) {
     fprintf(stderr, "C No commandline arguments found\n");
-    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode] --rays=[number of rays] --experiment=[location to experiment-data]\n");
+    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n"); 
+    fprintf(stderr, "C                      --rays=[number of rays]\n"); 
+    fprintf(stderr, "C                      --experiment=[location to experiment-data]\n");
+    fprintf(stderr, "C                      --compare=[location of vtk-file to compare with]\n");
+    fprintf(stderr, "C                      --expectation=[max value of expectation]\n");
+    fprintf(stderr, "C                      --maxrays=[max number of rays for adaptive sampling]\n");
+    fprintf(stderr, "C                      --device=[number of device will be forced]\n");
     fprintf(stderr, "C Runmodes : for_loops\n");
     fprintf(stderr, "             ray_propagation_gpu\n");
+    fprintf(stderr, "             test_environment\n");
     return 1;
   }
-  if (mode == -1) {
+  if (mode == NONE) {
     fprintf(stderr, "C Please specify the runmode with --mode=\n");
     return 1;
   }
