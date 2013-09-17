@@ -1,4 +1,5 @@
 #include "calc_dndt_ase.h"
+#include "map_rays_to_prisms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -21,6 +22,7 @@
 #include <mesh.h>
 #include <ctime> /* progressBar */
 #include <progressbar.h> /*progressBar */
+#include <thrust/device_vector.h>
 
 #define SEED 1234
 
@@ -63,13 +65,13 @@ double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSampl
 float calcDndtAse (unsigned &threads, 
     unsigned &blocks,
     unsigned &hostRaysPerSample,
-	unsigned maxRaysPerSample,
+    unsigned maxRaysPerSample,
     Mesh mesh,
     Mesh hostMesh,
     std::vector<double> hostSigmaA,
     std::vector<double> hostSigmaE,
-	float expectationThreshold,
-	bool useReflections,
+    float expectationThreshold,
+    bool useReflections,
     std::vector<double> &dndtAse,
     std::vector<float> &hostPhiAse,
     std::vector<double> &expectation
@@ -108,20 +110,25 @@ float calcDndtAse (unsigned &threads,
   distributeRandomly = true;
 
   // Memory allocation on host
-  std::vector<unsigned> hostIndicesOfPrisms(maxRaysPerSample, 0);
-  std::vector<unsigned> hostNumberOfReflections(maxRaysPerSample, 0);
+  //std::vector<unsigned> hostIndicesOfPrisms(maxRaysPerSample, 0);
+  //std::vector<unsigned> hostNumberOfReflections(maxRaysPerSample, 0);
   std::vector<double>   hostImportance(hostMesh.numberOfPrisms * reflectionSlices, 0);
-  std::vector<unsigned> hostRaysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
+  //std::vector<unsigned> hostRaysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
   std::vector<float>    hostPhiAseSquare(hostMesh.numberOfSamples * gridDim.y, 0);
 
   // Memory allocation/init and copy for device
-  unsigned *indicesOfPrisms     = copyToDevice(hostIndicesOfPrisms);
-  unsigned *numberOfReflections = copyToDevice(hostNumberOfReflections);
-  unsigned *raysPerPrism        = copyToDevice(hostRaysPerPrism);
+  //unsigned *indicesOfPrisms     = copyToDevice(hostIndicesOfPrisms);
+  //unsigned *numberOfReflections = copyToDevice(hostNumberOfReflections);
+  //unsigned *raysPerPrism        = copyToDevice(hostRaysPerPrism);
+  thrust::device_vector<unsigned> numberOfReflections(maxRaysPerSample,0);
+  thrust::device_vector<unsigned> indicesOfPrisms(maxRaysPerSample,0);
+  thrust::device_vector<unsigned> raysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
+  thrust::device_vector<unsigned> prefixSum(hostMesh.numberOfPrisms * reflectionSlices, 0);
+
   double   *importance          = copyToDevice(hostImportance);
   float    *phiAseSquare        = copyToDevice(hostPhiAseSquare);
   float    *phiAse              = copyToDevice(hostPhiAse);
-  
+
   // CUDA Mersenne twister for more than 200 blocks (for every wavelength)
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
@@ -145,24 +152,25 @@ float calcDndtAse (unsigned &threads,
       hostRaysPerSample = hostRaysPerSampleSave;
 
       while(true){
-        importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i], importance, raysPerPrism, distributeRandomly, blockDim, gridDim);
-	copyFromDevice(hostRaysPerPrism, raysPerPrism);
+        importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i], importance, thrust::raw_pointer_cast(&raysPerPrism[0]), distributeRandomly, blockDim, gridDim);
+        //copyFromDevice(hostRaysPerPrism, raysPerPrism);
 
         // Prism scheduling for gpu threads
-        calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
-	copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
-	copyToDevice(hostNumberOfReflections, numberOfReflections);
+        mapRaysToPrisms(indicesOfPrisms,numberOfReflections,raysPerPrism,prefixSum,reflectionSlices,hostRaysPerSample,hostMesh.numberOfPrisms);
+        //calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
+        //copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
+        //copyToDevice(hostNumberOfReflections, numberOfReflections);
 
-	// TESTING OUTPUT
-	if(sample_i == 1386)
-	  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
+        // TESTING OUTPUT
+        //if(sample_i == 1386)
+        //  centerSample.assign(hostRaysPerPrism.begin(), hostRaysPerPrism.end());
 
         // Start Kernel
-        calcSamplePhiAse<<< 200, blockDim >>>(devMTGPStates, mesh, indicesOfPrisms, wave_i, numberOfReflections, importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, hostSigmaA[wave_i], hostSigmaE[wave_i]);
+        calcSamplePhiAse<<< 200, blockDim >>>(devMTGPStates, mesh, thrust::raw_pointer_cast(&indicesOfPrisms[0]), wave_i, thrust::raw_pointer_cast(&numberOfReflections[0]), importance, hostRaysPerSample, phiAse, phiAseSquare, sample_i, hostSigmaA[wave_i], hostSigmaE[wave_i]);
 
         // Copy solution (for this samplepoint) back to host
-	hostPhiAse[sampleOffset]       = copyFromDevice(&(phiAse[sampleOffset]));
-	hostPhiAseSquare[sampleOffset] = copyFromDevice(&(phiAseSquare[sampleOffset]));
+        hostPhiAse[sampleOffset]       = copyFromDevice(&(phiAse[sampleOffset]));
+        hostPhiAseSquare[sampleOffset] = copyFromDevice(&(phiAseSquare[sampleOffset]));
 
         // Check square error
         expectation.at(sampleOffset) = calcExpectation(hostPhiAse.at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
@@ -175,8 +183,8 @@ float calcDndtAse (unsigned &threads,
         hostRaysPerSample *= 10;
         hostPhiAse.at(sampleOffset) = 0;
         hostPhiAseSquare[sampleOffset] = 0;
-	copyToDevice(hostPhiAse[sampleOffset], &(phiAse[sampleOffset]));
-	copyToDevice(hostPhiAseSquare[sampleOffset], &(phiAseSquare[sampleOffset]));
+        copyToDevice(hostPhiAse[sampleOffset], &(phiAse[sampleOffset]));
+        copyToDevice(hostPhiAseSquare[sampleOffset], &(phiAseSquare[sampleOffset]));
 
       }
       // Update progressbar
@@ -188,8 +196,11 @@ float calcDndtAse (unsigned &threads,
       dndtAse.at(sampleOffset) = gain_local * hostPhiAse.at(sampleOffset) / hostMesh.crystalFluorescence;
 
 
+
     }
   }
+
+
 
   // Stop time
   runtime = difftime(time(0),starttime);
@@ -200,11 +211,11 @@ float calcDndtAse (unsigned &threads,
   // Free Memory
   cudaFree(phiAse);
   cudaFree(importance);
-  cudaFree(indicesOfPrisms);
-  cudaFree(raysPerPrism);
-  cudaFree(numberOfReflections);
+  //cudaFree(indicesOfPrisms);
+  //cudaFree(raysPerPrism);
+  //cudaFree(numberOfReflections);
   cudaFree(phiAseSquare);
-  cudaDeviceReset();
+  //cudaDeviceReset();
 
   return runtime;
 }

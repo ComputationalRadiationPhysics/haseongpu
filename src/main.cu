@@ -147,7 +147,7 @@ int main(int argc, char **argv){
           phiAse,
           expectation
           );
-      runmode="Ray Propagation New GPU";
+	  cudaDeviceReset();
       break;
     case 1:
       // threads and blocks will be set in the following function (by reference)

@@ -2,6 +2,7 @@
 #	Makefile
 #
 DATE="`date +%y%m%d%H%M%S`"
+export CPLUS_INCLUDE_PATH=
 
 # compiler, linker, archiver
 NVCC = nvcc
