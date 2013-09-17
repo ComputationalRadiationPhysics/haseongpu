@@ -229,7 +229,7 @@ void fillDMesh(
  *
  * @return the index of the neighbor triangle
  */
-__device__ int Mesh::getNeighbor(unsigned triangle, int edge){
+__device__ int Mesh::getNeighbor(unsigned triangle, int edge) const{
   return neighbors[triangle + edge*numberOfTriangles];
 }
 
@@ -247,7 +247,7 @@ __device__ int Mesh::getNeighbor(unsigned triangle, int edge){
  * Uses a Mersenne Twister PRNG and Barycentric coordinates to generate a
  * random position inside a given triangle in a specific depth
  */
-__device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState){
+__device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState) const{
   Point startPoint = {0,0,0};
   double u = curand_uniform(&globalState[blockIdx.x]);
   double v = curand_uniform(&globalState[blockIdx.x]);
@@ -280,7 +280,7 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
  *
  * @return a beta value
  */
-__device__ double Mesh::getBetaValue(unsigned triangle, unsigned level){
+__device__ double Mesh::getBetaValue(unsigned triangle, unsigned level) const{
   return betaValues[triangle + level*numberOfTriangles];
 }
 
@@ -291,7 +291,7 @@ __device__ double Mesh::getBetaValue(unsigned triangle, unsigned level){
  *
  * @return a beta value
  */
-__device__ double Mesh::getBetaValue(unsigned prism){
+__device__ double Mesh::getBetaValue(unsigned prism) const{
   return betaValues[prism];
 }
 
@@ -304,7 +304,7 @@ __device__ double Mesh::getBetaValue(unsigned prism){
  *
  * @return a normal vector with length 1
  */
-__device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
+__device__ NormalRay Mesh::getNormal(unsigned triangle, int edge) const{
   NormalRay ray = { {0,0},{0,0}};
   int offset =  edge*numberOfTriangles + triangle;
   ray.p.x = points[ normalPoint [offset] ];
@@ -323,7 +323,7 @@ __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge){
  *
  * @return the Point with correct 3D coordinates
  */
-__device__ Point Mesh::getSamplePoint(unsigned sample){
+__device__ Point Mesh::getSamplePoint(unsigned sample) const{
   Point p = {0,0,0};
   unsigned level = sample/numberOfPoints;
   p.z = level*thickness;
@@ -342,7 +342,7 @@ __device__ Point Mesh::getSamplePoint(unsigned sample){
  *
  * @return a point with the coordinates (3D) of the prism center
  */
-__device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
+__device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level) const{
   Point p = {0,0,(level+0.5)*thickness};
   p.x = centers[triangle];
   p.y = centers[triangle + numberOfTriangles];
@@ -361,12 +361,12 @@ __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level){
  * The forbidden edge corresponds to the edge through which you left the
  * previous triangle (has a different index in the new triangle)
  */
-__device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge){
+__device__ int Mesh::getForbiddenEdge(unsigned triangle,int edge) const{
   return forbidden[edge * numberOfTriangles + triangle];
 }
 
 
-__device__ unsigned Mesh::getCellType(unsigned triangle){
+__device__ unsigned Mesh::getCellType(unsigned triangle) const{
   return cellTypes[triangle];
 }
 
@@ -550,11 +550,11 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
 
 }
 
-double distance2D(TwoDimPoint p1, TwoDimPoint p2){
+double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) {
 	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
 }
 
-double getMaxDistance(std::vector<TwoDimPoint> points){
+double getMaxDistance(std::vector<TwoDimPoint> points) {
 	double maxDistance = -1;
 
 	for(unsigned p1=0 ; p1 < points.size() ; ++p1)
@@ -564,7 +564,7 @@ double getMaxDistance(std::vector<TwoDimPoint> points){
 	return maxDistance;
 }
 
-double calculateMaxDiameter(double* points, unsigned offset){
+double calculateMaxDiameter(const double* points, const unsigned offset) {
 	TwoDimPoint minX = {DBL_MAX,0};
 	TwoDimPoint minY = {0,DBL_MAX};
 	TwoDimPoint maxX = {DBL_MIN,0};
@@ -591,7 +591,7 @@ double calculateMaxDiameter(double* points, unsigned offset){
 	return getMaxDistance(extrema);
 }
 
-unsigned Mesh::getMaxReflections(int reflectionPlane){
+unsigned Mesh::getMaxReflections (int reflectionPlane) const{
 	double d = calculateMaxDiameter(points,numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h = numberOfLevels * thickness; 
@@ -599,13 +599,13 @@ unsigned Mesh::getMaxReflections(int reflectionPlane){
 	return ceil(z/h);
 }
 
-unsigned Mesh::getMaxReflections(){
+unsigned Mesh::getMaxReflections() const{
 	unsigned top = getMaxReflections(1);
 	unsigned bottom = getMaxReflections(-1);
 	return max(top,bottom);
 }
 
-__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle){
+__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle) const{
 	switch(reflectionPlane){
 		case -1:
 			return reflectivities[triangle];
@@ -615,7 +615,7 @@ __device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned tr
 	return 0;
 }
 
-__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane){
+__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane) const{
 	switch(reflectionPlane){
 		case -1:
       return totalReflectionAngles[0];

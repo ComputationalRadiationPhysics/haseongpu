@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <vector_types.h>
+#include <iostream>
 #include <assert.h>
 #include <vector>
 #include <curand_kernel.h>
@@ -24,6 +24,7 @@
 #include <progressbar.h> /*progressBar */
 #include <thrust/device_vector.h>
 
+
 #define SEED 1234
 
 /**
@@ -33,13 +34,14 @@
  *
  **/
 void calcIndicesOfPrism(std::vector<unsigned> &indicesOfPrisms, std::vector<unsigned> &numberOfReflections, std::vector<unsigned> raysPerPrism, unsigned reflectionSlices, unsigned raysPerSample, Mesh mesh){
-  // Init vectors with zero
-  for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms[i] = 0;
-  for(unsigned i=0;  i < numberOfReflections.size() ; ++i) numberOfReflections[i] = 0;
+  // Init vectors with zero (slow and not needed anymore)
+  // for(unsigned i=0;  i < indicesOfPrisms.size() ; ++i) indicesOfPrisms[i] = 0;
+  // for(unsigned i=0;  i < numberOfReflections.size() ; ++i) numberOfReflections[i] = 0;
 
   // Calc new values
+  unsigned absoluteRay = 0;
   for(unsigned reflection_i =0; reflection_i < reflectionSlices; ++reflection_i){
-    for(unsigned prism_i=0, absoluteRay = 0; prism_i < mesh.numberOfPrisms; ++prism_i){
+    for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
       unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
       for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + reflectionOffset]; ++ray_i){
         indicesOfPrisms[absoluteRay] = prism_i;
@@ -63,19 +65,19 @@ double calcExpectation(double phiAse, double phiAseSquare, unsigned raysPerSampl
 }
 
 float calcDndtAse (unsigned &threads, 
-    unsigned &blocks,
-    unsigned &hostRaysPerSample,
-    unsigned maxRaysPerSample,
-    Mesh mesh,
-    Mesh hostMesh,
-    std::vector<double> hostSigmaA,
-    std::vector<double> hostSigmaE,
-    float expectationThreshold,
-    bool useReflections,
-    std::vector<double> &dndtAse,
-    std::vector<float> &hostPhiAse,
-    std::vector<double> &expectation
-    ){
+		   unsigned &blocks,
+		   unsigned &hostRaysPerSample,
+		   unsigned maxRaysPerSample,
+		   Mesh mesh,
+		   Mesh hostMesh,
+		   std::vector<double> hostSigmaA,
+		   std::vector<double> hostSigmaE,
+		   float expectationThreshold,
+		   bool useReflections,
+		   std::vector<double> &dndtAse,
+		   std::vector<float> &hostPhiAse,
+		   std::vector<double> &expectation
+		   ){
 
   // Variable declaration
   // CPU
@@ -110,22 +112,15 @@ float calcDndtAse (unsigned &threads,
   distributeRandomly = true;
 
   // Memory allocation on host
-  //std::vector<unsigned> hostIndicesOfPrisms(maxRaysPerSample, 0);
-  //std::vector<unsigned> hostNumberOfReflections(maxRaysPerSample, 0);
-  std::vector<double>   hostImportance(hostMesh.numberOfPrisms * reflectionSlices, 0);
-  //std::vector<unsigned> hostRaysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
   std::vector<float>    hostPhiAseSquare(hostMesh.numberOfSamples * gridDim.y, 0);
 
   // Memory allocation/init and copy for device
-  //unsigned *indicesOfPrisms     = copyToDevice(hostIndicesOfPrisms);
-  //unsigned *numberOfReflections = copyToDevice(hostNumberOfReflections);
-  //unsigned *raysPerPrism        = copyToDevice(hostRaysPerPrism);
   thrust::device_vector<unsigned> numberOfReflections(maxRaysPerSample,0);
   thrust::device_vector<unsigned> indicesOfPrisms(maxRaysPerSample,0);
   thrust::device_vector<unsigned> raysPerPrism(hostMesh.numberOfPrisms * reflectionSlices, 1);
   thrust::device_vector<unsigned> prefixSum(hostMesh.numberOfPrisms * reflectionSlices, 0);
 
-  double   *importance          = copyToDevice(hostImportance);
+  double   *importance          = copyToDevice(std::vector<double>(hostMesh.numberOfPrisms * reflectionSlices,0));
   float    *phiAseSquare        = copyToDevice(hostPhiAseSquare);
   float    *phiAse              = copyToDevice(hostPhiAse);
 
@@ -144,7 +139,7 @@ float calcDndtAse (unsigned &threads,
   progressStartTime = time(0);
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 
-  std::vector<unsigned> centerSample(expectation.size(), 0);
+  // std::vector<unsigned> centerSample(expectation.size(), 0);
 
   for(unsigned wave_i = 0; wave_i < gridDim.y; ++wave_i){
     for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
@@ -153,13 +148,9 @@ float calcDndtAse (unsigned &threads,
 
       while(true){
         importanceSampling(sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i], importance, thrust::raw_pointer_cast(&raysPerPrism[0]), distributeRandomly, blockDim, gridDim);
-        //copyFromDevice(hostRaysPerPrism, raysPerPrism);
 
         // Prism scheduling for gpu threads
         mapRaysToPrisms(indicesOfPrisms,numberOfReflections,raysPerPrism,prefixSum,reflectionSlices,hostRaysPerSample,hostMesh.numberOfPrisms);
-        //calcIndicesOfPrism(hostIndicesOfPrisms, hostNumberOfReflections, hostRaysPerPrism, reflectionSlices, hostRaysPerSample, hostMesh);
-        //copyToDevice(hostIndicesOfPrisms, indicesOfPrisms);
-        //copyToDevice(hostNumberOfReflections, numberOfReflections);
 
         // TESTING OUTPUT
         //if(sample_i == 1386)
@@ -176,9 +167,8 @@ float calcDndtAse (unsigned &threads,
         expectation.at(sampleOffset) = calcExpectation(hostPhiAse.at(sampleOffset), hostPhiAseSquare[sampleOffset], hostRaysPerSample);
 
         if(expectation.at(sampleOffset) < expectationThreshold) break;
-        if((hostRaysPerSample * 10) > maxRaysPerSample)          break;
+        if(hostRaysPerSample * 10 > maxRaysPerSample)         break;
 
-        // fprintf(stderr,"increasing from %d to %d\n",hostRaysPerSample, hostRaysPerSample*10);
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
         hostRaysPerSample *= 10;
         hostPhiAse.at(sampleOffset) = 0;
@@ -211,11 +201,7 @@ float calcDndtAse (unsigned &threads,
   // Free Memory
   cudaFree(phiAse);
   cudaFree(importance);
-  //cudaFree(indicesOfPrisms);
-  //cudaFree(raysPerPrism);
-  //cudaFree(numberOfReflections);
   cudaFree(phiAseSquare);
-  //cudaDeviceReset();
 
   return runtime;
 }

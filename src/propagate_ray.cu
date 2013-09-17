@@ -39,8 +39,8 @@ __device__ double checkSurface(const int currentLevel, const double zPos, const 
  * @return intersection-length if intersection-length <= length
  * @return 0 if intersection-length > length
  **/
-__device__ double checkEdge(const unsigned triangle, const int edge, const Ray ray, Mesh *mesh, const double length){
-  NormalRay normal = mesh->getNormal(triangle, edge);
+__device__ double checkEdge(const unsigned triangle, const int edge, const Ray ray, const Mesh &mesh, const double length){
+  NormalRay normal = mesh.getNormal(triangle, edge);
   double denominator = normal.dir.x * ray.dir.x + normal.dir.y * ray.dir.y;
 
   if (denominator != 0.0)
@@ -68,7 +68,7 @@ __device__ double checkEdge(const unsigned triangle, const int edge, const Ray r
  * @return edge number of the intesected edge (-1 for no intersection)
  *
  **/
-__device__ int calcTriangleRayIntersection(double *length, const unsigned triangle,  const Ray ray, const unsigned level, const int forbiddenEdge, Mesh *mesh){
+__device__ int calcTriangleRayIntersection(double *length, const unsigned triangle,  const Ray ray, const unsigned level, const int forbiddenEdge, const Mesh &mesh){
   int edge = -1;
   // Check 3 edges of triangle
   for(int edge_i = 0; edge_i < 3; ++edge_i){
@@ -83,7 +83,7 @@ __device__ int calcTriangleRayIntersection(double *length, const unsigned triang
   
   // check the upper surface
   if (forbiddenEdge != 3){
-    double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, *length, mesh->thickness);
+    double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, *length, mesh.thickness);
     if(lengthTmp){
       *length = lengthTmp;
       edge = 3;
@@ -92,7 +92,7 @@ __device__ int calcTriangleRayIntersection(double *length, const unsigned triang
 
   // check the lower surface
   if (forbiddenEdge != 4){
-    double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, *length, mesh->thickness);
+    double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, *length, mesh.thickness);
     if (lengthTmp){
       *length = lengthTmp;
       edge = 4;
@@ -124,12 +124,12 @@ __device__ Ray calcNextRay(Ray ray, const double length){
  * @return gain
  *
  **/
-__device__ double calcPrismGain(const unsigned triangle, const unsigned level, const double length, Mesh *mesh, const double sigmaA, const double sigmaE){
-  if (mesh->getCellType(triangle) == mesh->cladNumber){
-    return exp(-(mesh->cladAbsorption) * length);
+__device__ double calcPrismGain(const unsigned triangle, const unsigned level, const double length, const Mesh &mesh, const double sigmaA, const double sigmaE){
+  if (mesh.getCellType(triangle) == mesh.cladNumber){
+    return exp(-(mesh.cladAbsorption) * length);
   }
   else {
-     return (double) exp(mesh->nTot * (mesh->getBetaValue(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
+     return (double) exp(mesh.nTot * (mesh.getBetaValue(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
    }
  
 }
@@ -140,20 +140,20 @@ __device__ double calcPrismGain(const unsigned triangle, const unsigned level, c
  *        the current triangle and the propagated ray.
  *
  **/
-__device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned *level, Mesh *mesh, const int edge){
+__device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned *level, const Mesh &mesh, const int edge){
    switch(edge){
    case 0:
    case 1:
    case 2:
      // One of three edges
-     *forbiddenEdge = mesh->getForbiddenEdge(*triangle, edge);
-     *triangle = mesh->getNeighbor(*triangle, edge);
+     *forbiddenEdge = mesh.getForbiddenEdge(*triangle, edge);
+     *triangle = mesh.getNeighbor(*triangle, edge);
      break;
 
    case 3:
      // Upper surface
      *forbiddenEdge = 4;
-     if(*level != mesh->numberOfLevels) (*level)++;
+     if(*level != mesh.numberOfLevels) (*level)++;
      break;
 
    case 4:
@@ -166,7 +166,7 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
 
 }
 
-__device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextTriangle, Mesh *mesh, 
+__device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextTriangle, const Mesh &mesh, 
 			       const double sigmaA, const double sigmaE){
   double distanceTotal     = nextRay.length;
   double distanceRemaining = nextRay.length;
@@ -181,7 +181,7 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 
   nextRay = normalizeRay(nextRay);
   while(fabs(distanceRemaining) > SMALL){
-    assert(*nextLevel <= mesh->numberOfLevels);
+    assert(*nextLevel <= mesh.numberOfLevels);
     // Calc gain for triangle intersection
     length             = distanceRemaining;
     nextEdge           = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
@@ -204,12 +204,12 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 
 
 __device__ double propagateRayWithReflection(Point startPoint, 
-					     Point endPoint, 
-					     unsigned reflections, 
+					     const Point endPoint, 
+					     const unsigned reflections, 
 					     ReflectionPlane reflectionPlane, 
 					     unsigned startLevel, 
 					     unsigned startTriangle, 
-					     Mesh *mesh, 
+					     const Mesh &mesh, 
 					     const double sigmaA, 
 					     const double sigmaE){
 
@@ -217,8 +217,8 @@ __device__ double propagateRayWithReflection(Point startPoint,
   double gain = 1.0;
 
   for(unsigned reflection = 0; reflection < reflections; ++reflection){
-    float reflectivity = mesh->getReflectivity(reflectionPlane, startTriangle);;
-    float totalReflectionAngle = mesh->getReflectionAngle(reflectionPlane);
+    float reflectivity = mesh.getReflectivity(reflectionPlane, startTriangle);;
+    float totalReflectionAngle = mesh.getReflectionAngle(reflectionPlane);
     Point reflectionPoint = {0,0,0};
     double reflectionAngle = 0;
 
