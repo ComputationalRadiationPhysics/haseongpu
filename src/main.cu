@@ -199,18 +199,19 @@ int main(int argc, char **argv){
   // Write experiment data
   std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
   writeMatlabOutput(
+		  experimentPath,
 		  phiAse,
 		  mockupN_rays,
 		  expectation,
 		  sigmaE.size(),
 		  hMesh.numberOfSamples);
 
-  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+  if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   if(compareLocation!="") {
 	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+	  if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   }
-  if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+  if(writeVtk) writeToVtk(hMesh, expectation, experimentPath + "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
 
   return 0;
 }

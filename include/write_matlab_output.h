@@ -2,6 +2,7 @@
 #define WRITE_DNDT_ASE_H
 
 #include <vector>
+#include <string>
 
 /**
  * @brief creates textfiles containing all the results (one column per wavelength!)
@@ -19,6 +20,7 @@
  * @license GPLv3
  */
 void writeMatlabOutput(
+    const std::string experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,

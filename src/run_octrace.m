@@ -2,12 +2,15 @@
 % calculates the dndt_ASE values for a given input
 function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities)
 
+  CURRENT_DIR = pwd;
+  FILENAME=[ mfilename('fullpath') '.m' ];
+  [ OCTRACE_DIR, NAME , EXTENSION ] = fileparts(FILENAME);
+
   % create all the textfiles in a separate folder
-  TMP_FOLDER = 'octrace_tmp';
-  FOLDER = [ pwd filesep TMP_FOLDER ];
+  TMP_FOLDER = [ '/' 'tmp' filesep 'octrace_tmp' ];
 
   % make sure that the input is clean 
-  clean_IO_files(FOLDER);
+  clean_IO_files(TMP_FOLDER);
 
   %TODO create real values in Matlab
   if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
@@ -25,20 +28,20 @@ function [expected_values, importance, N_rays, phi_ASE] = run_octrace(p,normals_
   end
 
   % create the new input based on the MATLAB variables
-  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER);
+  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
 
   % do the propagation
-  system(['./octrace ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --experiment=' FOLDER ]);
+  system([ OCTRACE_DIR '/bin/octrace ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --experiment=' TMP_FOLDER ]);
 
   % get the result
-  [ expected_values, importance, N_rays, phi_ASE ] = parse_octrace_output;
+  [ expected_values, importance, N_rays, phi_ASE ] = parse_octrace_output(TMP_FOLDER,CURRENT_DIR);
 
   % cleanup
-  clean_IO_files(FOLDER);
+  clean_IO_files(TMP_FOLDER);
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER)
+function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
 
   mkdir(FOLDER);
   cd(FOLDER);
@@ -148,16 +151,18 @@ function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_
   fprintf(x,'%.50f\n',reflectivities);
   fclose(x);
 
-  cd ..
+  cd(CURRENT_DIR);
 end 
   
 
 % takes the output from the CUDA code and fills it into a variable
-function [expectedValues, importance, N_rays, phi_ASE] = parse_octrace_output ()
+function [expectedValues, importance, N_rays, phi_ASE] = parse_octrace_output (FOLDER,CURRENT_DIR)
+  cd (FOLDER);
   phi_ASE = load('phi_ASE.txt');
   expectedValues = load('expected_values.txt');
   importance = load('importance.txt');
   N_rays = load('N_rays.txt');
+  cd (CURRENT_DIR);
 end
 
 % deletes the temporary folder and the dndt_ASE.txt
@@ -173,10 +178,10 @@ function clean_IO_files (TMP_FOLDER)
     rmdir(TMP_FOLDER,'s');
   end
 
-  delete('dndt_ASE.txt');
-  delete('expected_values.txt');
-  delete('importance.txt');
-  delete('N_rays.txt');
+  %delete('dndt_ASE.txt');
+  %delete('expected_values.txt');
+  %delete('importance.txt');
+  %delete('N_rays.txt');
 
   warning(s);
 end

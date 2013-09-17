@@ -4,6 +4,7 @@
 #include <iomanip>
 
 void writeMatlabOutput(
+    const std::string experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
@@ -15,7 +16,7 @@ void writeMatlabOutput(
   std::ofstream expectedValuesFile;
 
 
-  aseFile.open("phi_ASE.txt");
+  aseFile.open((experimentPath + "phi_ASE.txt").c_str());
   for(unsigned i = 0; i < numberOfSamples; ++i){
     for(unsigned j = 0; j < numberOfWavelengths; j++){
       aseFile << std::fixed << std::setprecision(20) << ase.at(i+j*numberOfSamples) << " ";
@@ -25,7 +26,7 @@ void writeMatlabOutput(
   aseFile.close();
 
 
-  raysFile.open("N_rays.txt");
+  raysFile.open((experimentPath + "N_rays.txt").c_str());
   for(unsigned i = 0; i < numberOfSamples; ++i){
     for(unsigned j = 0; j<numberOfWavelengths; ++j){
       raysFile << N_rays.at(j) << " ";
@@ -36,7 +37,7 @@ void writeMatlabOutput(
   raysFile.close();
 
 
-  expectedValuesFile.open("expected_values.txt");
+  expectedValuesFile.open((experimentPath + "expected_values.txt").c_str());
   for(unsigned i = 0; i < numberOfSamples; ++i){
     for(unsigned j = 0; j < numberOfWavelengths; j++){
       expectedValuesFile << std::fixed << std::setprecision(20) <<  expectedValues.at(i+j*numberOfSamples) << " " ;

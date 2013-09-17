@@ -34,7 +34,7 @@ octrace: $(OBJS) Makefile
 	rm -f bin/link.o
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	g++ bin/*.o -o bin/octrace -lcudart
-	cp src/run_octrace.m bin/.
+	cp src/run_octrace.m .
 
 clean:
 	rm -f bin/*
@@ -47,4 +47,4 @@ final_build:
 	rm -f bin/link.o
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	cp src/run_octrace.m bin/.
+	cp src/run_octrace.m .
