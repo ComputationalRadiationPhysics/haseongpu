@@ -128,6 +128,8 @@ int main(int argc, char **argv){
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(1));
   fprintf(stderr, "maxreflections: %d\n",hMesh.getMaxReflections());
+  fprintf(stderr, "sigma_A: %f %f\n",sigmaA[0],sigmaA[1]);
+  fprintf(stderr, "sigma_E: %f %f\n",sigmaE[0],sigmaE[1]);
   
   // Run Experiment
   switch(mode){
@@ -173,13 +175,20 @@ int main(int argc, char **argv){
   // Print Solutions
   for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-    for(unsigned sample_i = 0; sample_i < dndtAse.size(); ++sample_i){
+    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
       fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), expectation.at(sampleOffset));
       if(silent){
         if(sample_i >= 10) break;
       }
     }
+    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+      int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+      fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), expectation.at(sampleOffset));
+      if(silent){
+        if(sample_i >= 10) break;
+      }
+	}
   }
 
   // Print statistics
@@ -198,16 +207,15 @@ int main(int argc, char **argv){
 
   // Write experiment data
   std::vector<unsigned> mockupN_rays(sigmaE.size() * hMesh.numberOfSamples, 1);
-  std::vector<double> mockupImportance(sigmaE.size() * hMesh.numberOfPrisms, 1);
   writeMatlabOutput(
 		  experimentPath,
 		  phiAse,
 		  mockupN_rays,
 		  expectation,
-      mockupImportance,
 		  sigmaE.size(),
 		  hMesh.numberOfSamples,
-      hMesh.numberOfPrisms);
+		  hMesh.numberOfLevels
+      );
 
   if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   if(compareLocation!="") {
