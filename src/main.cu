@@ -132,12 +132,15 @@ int main(int argc, char **argv){
   
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
+  float samplePerGpu = hMesh.numberOfSamples / (float)maxGpus;
+
   switch(mode){
     case RAY_PROPAGATION_GPU:
       // threads and blocks will be set in the following function (by reference)
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-	unsigned minSample_i = gpu_i * (hMesh.numberOfSamples / maxGpus);
-	unsigned maxSample_i = (gpu_i + 1) * (hMesh.numberOfSamples / maxGpus);
+	unsigned minSample_i = gpu_i * samplePerGpu;
+	unsigned maxSample_i = min((float)hMesh.numberOfSamples, (gpu_i + 1) * samplePerGpu);
+	//std::cout << minSample_i << " " << maxSample_i << std::endl;
 	threadIds[gpu_i] = calcDndtAseThreaded(threads, 
 					       blocks, 
 					       raysPerSample,
@@ -155,7 +158,6 @@ int main(int argc, char **argv){
 					       minSample_i,
 					       maxSample_i
 					       );
-
 
       }
       joinAll(threadIds);
