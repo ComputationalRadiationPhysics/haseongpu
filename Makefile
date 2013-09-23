@@ -32,6 +32,7 @@ bin/%.o: src/%.cu $(wildcard include/*.h)
 
 octrace: $(OBJS) Makefile
 	rm -f bin/link.o
+	mkdir -p bin
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	g++ bin/*.o -o bin/octrace -lcudart
 	cp src/run_octrace.m .
@@ -45,6 +46,7 @@ new:
 
 final_build:
 	rm -f bin/link.o
+	mkdir -p bin
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	cp src/run_octrace.m .
