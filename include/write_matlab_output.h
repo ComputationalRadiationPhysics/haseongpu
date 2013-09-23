@@ -24,7 +24,9 @@ void writeMatlabOutput(
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
+    const std::vector<double> importance,
     const unsigned numberOfWavelengths,
-    const unsigned numberOfSamples);
+    const unsigned numberOfSamples,
+    const unsigned numberOfPrisms);
 
 #endif 

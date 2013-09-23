@@ -8,12 +8,15 @@ void writeMatlabOutput(
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
+    const std::vector<double> importance, 
     const unsigned numberOfWavelengths,
-    const unsigned numberOfSamples){
+    const unsigned numberOfSamples,
+    const unsigned numberOfPrisms){
 
   std::ofstream aseFile;
   std::ofstream raysFile;
   std::ofstream expectedValuesFile;
+  std::ofstream importanceFile;
 
 
   aseFile.open((experimentPath + "phi_ASE.txt").c_str());
@@ -30,7 +33,6 @@ void writeMatlabOutput(
   for(unsigned i = 0; i < numberOfSamples; ++i){
     for(unsigned j = 0; j<numberOfWavelengths; ++j){
       raysFile << N_rays.at(j) << " ";
-      // TODO: change so that each samplepoint has its own number of rays! (adaptive number of rays!)
     }
     raysFile << std::endl;
   }
@@ -45,4 +47,15 @@ void writeMatlabOutput(
     expectedValuesFile << std::endl;
   }
   expectedValuesFile.close();
+
+
+  importanceFile.open((experimentPath + "importance.txt").c_str());
+  for(unsigned i = 0; i < numberOfPrisms; ++i){
+    for(unsigned j = 0; j < numberOfWavelengths; j++){
+      importanceFile << std::fixed << std::setprecision(20) <<  importance.at(i+j*numberOfPrisms) << " " ;
+    }
+    importanceFile << std::endl;
+  }
+  importanceFile.close();
+
 }

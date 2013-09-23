@@ -197,14 +197,17 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
+  std::vector<unsigned> mockupN_rays(sigmaE.size() * hMesh.numberOfSamples, 1);
+  std::vector<double> mockupImportance(sigmaE.size() * hMesh.numberOfPrisms, 1);
   writeMatlabOutput(
 		  experimentPath,
 		  phiAse,
 		  mockupN_rays,
 		  expectation,
+      mockupImportance,
 		  sigmaE.size(),
-		  hMesh.numberOfSamples);
+		  hMesh.numberOfSamples,
+      hMesh.numberOfPrisms);
 
   if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
   if(compareLocation!="") {
