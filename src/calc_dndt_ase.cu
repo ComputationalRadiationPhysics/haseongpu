@@ -26,13 +26,6 @@
 
 #define SEED 1234
 
-/**
- * @brief Calculates which ray should start in which prism. Thus
- *        every thread in on gpu knows the index of the prism
- *        where its rays starts.
- *
- **/
-
 double calcExpectation(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
   double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
@@ -48,22 +41,27 @@ double getDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, co
 }
 
 float calcDndtAse (unsigned &threads, 
-    unsigned &blocks,
-    unsigned &hRaysPerSample,
-    const unsigned maxRaysPerSample,
-    const Mesh& dMesh,
-    const Mesh& hMesh,
-    const std::vector<double>& hSigmaA,
-    const std::vector<double>& hSigmaE,
-    const float expectationThreshold,
-    const bool useReflections,
-    std::vector<double> &dndtAse,
-    std::vector<float> &hPhiAse,
-    std::vector<double> &expectation
+		   unsigned &blocks,
+		   unsigned &hRaysPerSample,
+		   const unsigned maxRaysPerSample,
+		   const Mesh& dMesh,
+		   const Mesh& hMesh,
+		   const std::vector<double>& hSigmaA,
+		   const std::vector<double>& hSigmaE,
+		   const float expectationThreshold,
+		   const bool useReflections,
+		   std::vector<double> &dndtAse,
+		   std::vector<float> &hPhiAse,
+		   std::vector<double> &expectation,
+		   unsigned gpu_i,
+		   unsigned minSample_i,
+		   unsigned maxSample_i
+
     ){
 
   // Optimization to use more L1 cache
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  cudaSetDevice(gpu_i);
 
   using thrust::device_vector;
   using  thrust::raw_pointer_cast;
@@ -96,7 +94,6 @@ float calcDndtAse (unsigned &threads,
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
-  
 
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
@@ -104,35 +101,36 @@ float calcDndtAse (unsigned &threads,
     fprintf(stderr, "\nC Phi_ASE calculation for wavelength %d\n",wave_i);
 
     //calculation for each sample point
-    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+    for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       hRaysPerSample = hRaysPerSampleSave;
 
       unsigned hRaysPerSampleDump = 0;
       while(true){
 	hRaysPerSampleDump = importanceSampling(
-            sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
-            raw_pointer_cast(&dImportance[0]), raw_pointer_cast(&dRaysPerPrism[0]),
-            distributeRandomly, blockDim, gridDim
-            );
+						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
+						raw_pointer_cast(&dImportance[0]), 
+						raw_pointer_cast(&dRaysPerPrism[0]),
+						distributeRandomly, blockDim, gridDim
+						);
 
         // Prism scheduling for gpu threads
         mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
 
         // Start Kernel
         calcSamplePhiAse<<< gridDim, blockDim >>>(
-            devMTGPStates,
-            dMesh, 
-            raw_pointer_cast(&dIndicesOfPrisms[0]), 
-            wave_i, 
-            raw_pointer_cast(&dNumberOfReflections[0]), 
-            raw_pointer_cast(&dImportance[0]),
-            hRaysPerSampleDump, 
-            raw_pointer_cast(&dPhiAse[0]), 
-            raw_pointer_cast(&dPhiAseSquare[0]),
-            sample_i, 
-            hSigmaA[wave_i], hSigmaE[wave_i]
-            );
+						  devMTGPStates,
+						  dMesh, 
+						  raw_pointer_cast(&dIndicesOfPrisms[0]), 
+						  wave_i, 
+						  raw_pointer_cast(&dNumberOfReflections[0]), 
+						  raw_pointer_cast(&dImportance[0]),
+						  hRaysPerSampleDump, 
+						  raw_pointer_cast(&dPhiAse[0]), 
+						  raw_pointer_cast(&dPhiAseSquare[0]),
+						  sample_i, 
+						  hSigmaA[wave_i], hSigmaE[wave_i]
+						  );
 
         // Check square error
         expectation.at(sampleOffset) = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);

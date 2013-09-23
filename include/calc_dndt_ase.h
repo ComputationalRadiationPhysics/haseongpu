@@ -51,7 +51,10 @@ float calcDndtAse (unsigned &threads,
 		   const bool useReflections,
 		   std::vector<double> &dndtAse,
 		   std::vector<float> &phiAse,
-		   std::vector<double> &expectation);
+		   std::vector<double> &expectation,
+		   unsigned gpu_i,
+		   unsigned minSample_i,
+		   unsigned maxSample_i);
 
 
 #endif

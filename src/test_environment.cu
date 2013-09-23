@@ -1,19 +1,7 @@
 #include <vector>
 #include <mesh.h>
-#include <thread>
 #include <iostream>
 
-void foo() 
-{
-  std::cout << "From Thread" << std::endl;
-}
-
-
-bool threadTest(){
-  std::thread t0(foo);
-  std::thread t1(foo);
-
-}
 
 
 bool testEnvironment (unsigned &threads, 
@@ -31,7 +19,8 @@ bool testEnvironment (unsigned &threads,
 		       std::vector<double> &expectation
 		       ){
 
-  threadTest();
+  
+
 
   return true;
 }

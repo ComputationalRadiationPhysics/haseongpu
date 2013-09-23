@@ -7,9 +7,9 @@ export CPLUS_INCLUDE_PATH=
 # compiler, linker, archiver
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
-NVCC_FLAGS = --use_fast_math
-GCC_FLAGS = -std=c++0x
-LIBS =  -lpthread
+NVCC_FLAGS = --use_fast_math --compiler-options ""
+GCC_FLAGS = 
+LIBS = -lpthread -lcudart
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
@@ -29,13 +29,13 @@ INCLUDES = include
 all: octrace
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
-	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES)  $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
+	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
 
 
 octrace: $(OBJS) Makefile
 	rm -f bin/link.o
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	g++ bin/*.o -o bin/octrace -lcudart $(GCC_FLAGS) $(LIBS)
+	g++ bin/*.o -o bin/octrace  $(GCC_FLAGS) $(LIBS)
 	cp src/run_octrace.m bin/.
 
 clean:

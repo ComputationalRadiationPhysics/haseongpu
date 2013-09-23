@@ -4,6 +4,7 @@
 #include <string> /* string */
 #include <vector> /* vector */
 #include <stdlib.h> /* atoi */
+#include <pthread.h> /* pthread_t, pthread_join */
 
 // User header files
 #include <calc_dndt_ase.h>
@@ -14,10 +15,11 @@
 #include <cudachecks.h>
 #include <mesh.h>
 #include <test_environment.h>
+#include <thread.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
-#define MAX_GPUS 1
+#define MAX_GPUS 4
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -27,10 +29,8 @@
  *        line parameter --device=
  * 
  * @param verbose > 0 prints debug output
- *        devices Array of possible devices to use
- *        device  number of device you want to set
  * 
- * @return Number of devices in devices array
+ * @return vector of possible devices
  */
 std::vector<unsigned> getCorrectDevice(int verbose){
   cudaDeviceProp prop;
@@ -131,24 +131,35 @@ int main(int argc, char **argv){
   fprintf(stderr, "maxreflections: %d\n",hMesh.getMaxReflections());
   
   // Run Experiment
+  std::vector<pthread_t> threadIds(maxGpus, 0);
   switch(mode){
     case RAY_PROPAGATION_GPU:
       // threads and blocks will be set in the following function (by reference)
-      runtime = calcDndtAse(threads, 
-			    blocks, 
-			    raysPerSample,
-			    maxRaysPerSample,
-			    dMesh.at(device),
-			    hMesh,
-			    sigmaA,
-			    sigmaE,
-			    expectationThreshold,
-			    useReflections,
-			    dndtAse,
-			    phiAse,
-			    expectation
-			    );
-      cudaDeviceReset();
+      for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+	unsigned minSample_i = gpu_i * (hMesh.numberOfSamples / maxGpus);
+	unsigned maxSample_i = (gpu_i + 1) * (hMesh.numberOfSamples / maxGpus);
+	threadIds[gpu_i] = calcDndtAseThreaded(threads, 
+					       blocks, 
+					       raysPerSample,
+					       maxRaysPerSample,
+					       dMesh.at(devices.at(gpu_i)),
+					       hMesh,
+					       sigmaA,
+					       sigmaE,
+					       expectationThreshold,
+					       useReflections,
+					       dndtAse,
+					       phiAse,
+					       expectation,
+					       devices.at(gpu_i),
+					       minSample_i,
+					       maxSample_i
+					       );
+
+
+      }
+      joinAll(threadIds);
+      cudaDeviceReset();      
       runmode="Ray Propagation New GPU";
       break;
     case FOR_LOOPS:
