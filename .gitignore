@@ -29,6 +29,8 @@ N_rays.txt
 expected_values.txt
 run_octrace.m
 
+paper/Makefile
+paper/updatePDF.sh
 paper/*.aux
 paper/*.log
 paper/*.dvi

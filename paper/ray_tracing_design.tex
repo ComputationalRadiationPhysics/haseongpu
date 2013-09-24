@@ -1,0 +1,52 @@
+\subsection{Design}
+\begin{itemize}
+  \item Mesh stucture
+    \begin{itemize}
+
+      \item The crystal is seen as a 2D plane that gets sampled by a set of
+        points. 
+
+      \item Delauny triangulation is used to connect these points to a mesh of
+        triangles.
+
+      \item The triangles are extruded by a thickness to generate a slice of
+        prisms. This slice gets duplicated several times to cover the whole
+        crystal.
+
+      \item The sample points can be distributed non-uniformly to increase
+        spatial resolution in areas of interest.
+
+    \end{itemize}
+
+  \item Ray tracing on prism structure\\
+    \textbf{Picture: 2d prism structure and one ray cutting through.}
+
+    \begin{itemize}
+      
+      \item To calculate the amplification of a single ray from a position $r$
+        to a sampled point $r_0$, the ray is traced along its path through the
+        prisms. The intersections with prism surfaces define line segments of a
+        certain length. These segments are used for gain calculation.
+
+      \item Starting from point $r$ inside a prism $p$, there are 5 possible
+        intersection planes for the ray. One plane for the top and bottom
+        surfaces and one for each of the 3 horizontal sides of $p$.
+
+      \item Based on the intersection plane, the next prism is known due to a
+        neighboring relation in the datastructure.  neighbor relation, that you
+        store in a list.
+
+      \item The intersection is calculated for each prism along the path, until
+        $r_0$ is reached.
+
+    \end{itemize}
+  \item Parallel ray tracing
+    \begin{itemize}
+      \item Every ray can be calculated independently from each other.
+        Exploiting this parallelism provides a great opportunity to boost
+        performance. Only the resulting gains for each sample point have to be
+        combined in the end.
+      \item GPUs are a suitable tool to realize the parallelisation
+      \item Mention mersenne twister
+    \end{itemize}
+\end{itemize}
