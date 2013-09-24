@@ -1,0 +1,41 @@
+\section{Ray tracing}
+\subsection{Design}
+\begin{itemize}
+\item Mesh stucture
+  \begin{itemize}
+  \item The crystal plane is divided into a set of points and 
+    these points are connected to a mesh of triangles by 
+    Delaunay triangulation.
+  \item The triangles will be extruded by a thickness to generate prisms.
+    These Prisms will be duplicated by several levels to fill the 
+    whole crystal volume.			  
+  \end{itemize}
+\item Ray tracing on prism structure
+  \begin{itemize}
+  \item To calculate amplification of the spontaneous emission of a ray from
+    point r to r0, we need to know which prisms are on this path and how
+    long are the lines of intersection in this prisms.
+  \item Starting from point r, the ray has 5 possible planes for 
+    intersection inside the prism. There are 2 planes of prism-surfaces
+    and 3 planes of prism-sides.
+  \item Depending on intersected plane, you know the next prism by a neighbor
+    relation, that you store in a list. Besides it's forbidden to return 
+    to the last prism.
+  \item You repeat this until you reach point r0.
+    
+  \end{itemize}
+\item Parallel ray tracing
+  \begin{itemize}
+  \item Every ray can be calculated independently from each other. So it's
+    a perfect chance to boost the performance by parallelization. 
+    The ray gain values have to be added atomically to the ase value
+    of point r0.
+  \item Used parallel architecture
+  \item Mention mersenne twister
+  \end{itemize}
+\end{itemize}
+\subsection{Implementation}
+\begin{itemize}
+\item Different wavelength
+\item Reflections
+\end{itemize}
