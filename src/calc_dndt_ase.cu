@@ -99,6 +99,9 @@ float calcDndtAse (unsigned &threads,
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
   
 
+  thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
+  thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
+  unsigned midRaysPerSample=0;
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
     time_t progressStartTime = time(0);
@@ -119,31 +122,37 @@ float calcDndtAse (unsigned &threads,
         // Prism scheduling for gpu threads
         mapRaysToPrisms(indicesOfPrisms,numberOfReflections,raysPerPrism,prefixSum,reflectionSlices,hostRaysPerSample,hostMesh.numberOfPrisms);
 
+        if(sample_i == 1386){
+          thrust::copy(numberOfReflections.begin(),numberOfReflections.end(),hNumberOfReflections.begin());
+          thrust::copy(indicesOfPrisms.begin(),indicesOfPrisms.end(),hIndicesOfPrisms.begin());
+          midRaysPerSample=hostRaysPerSample;
+        }
         // Start Kernel
-        calcSamplePhiAse<<< gridDim, blockDim >>>(
-            devMTGPStates,
-            mesh, 
-            raw_pointer_cast(&indicesOfPrisms[0]), 
-            wave_i, 
-            raw_pointer_cast(&numberOfReflections[0]), 
-            raw_pointer_cast(&importance[0]),
-            hostRaysPerSample, 
-            raw_pointer_cast(&phiAse[0]), 
-            raw_pointer_cast(&phiAseSquare[0]),
-            sample_i, 
-            hostSigmaA[wave_i], hostSigmaE[wave_i]
-            );
+//        calcSamplePhiAse<<< gridDim, blockDim >>>(
+//            devMTGPStates,
+//            mesh, 
+//            raw_pointer_cast(&indicesOfPrisms[0]), 
+//            wave_i, 
+//            raw_pointer_cast(&numberOfReflections[0]), 
+//            raw_pointer_cast(&importance[0]),
+//            hostRaysPerSample, 
+//            raw_pointer_cast(&phiAse[0]), 
+//            raw_pointer_cast(&phiAseSquare[0]),
+//            sample_i, 
+//            hostSigmaA[wave_i], hostSigmaE[wave_i]
+//            );
+      
 
         // Check square error
-        expectation.at(sampleOffset) = calcExpectation(phiAse[sampleOffset], phiAseSquare[sampleOffset], hostRaysPerSample);
+//        expectation.at(sampleOffset) = calcExpectation(phiAse[sampleOffset], phiAseSquare[sampleOffset], hostRaysPerSample);
 
-        if(expectation[sampleOffset] < expectationThreshold) break;
+ //       if(expectation[sampleOffset] < expectationThreshold) break;
         if(hostRaysPerSample * 10 > maxRaysPerSample)        break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
-        hostRaysPerSample *= 10;
-        phiAse[sampleOffset] = 0;
-        phiAseSquare[sampleOffset] = 0;
+  //      hostRaysPerSample *= 10;
+  //      phiAse[sampleOffset] = 0;
+  //      phiAseSquare[sampleOffset] = 0;
 
       }
       // Update progressbar
@@ -156,6 +165,23 @@ float calcDndtAse (unsigned &threads,
 
     }
   }
+
+  std::vector<unsigned> reflectionsPerPrism(hostMesh.numberOfPrisms,0);
+
+  
+  for(unsigned i=0 ; i<20 ; ++i){
+    fprintf(stderr, "%d IndicesOfPrisms: %d\n",i, hIndicesOfPrisms[i]);
+    fprintf(stderr, "    reflections:    %d\n",hNumberOfReflections[i]);
+  }
+  for(unsigned i=0; i<midRaysPerSample; ++i){
+    unsigned index = hIndicesOfPrisms[i];
+    reflectionsPerPrism[index] = max(reflectionsPerPrism[index],hNumberOfReflections[i]);
+  }
+
+  for(unsigned i=0; i<reflectionsPerPrism.size();++i){
+    dndtAse[i] = reflectionsPerPrism[i];
+  }
+
 
   // Free Memory
   cudaFree(devMTGPStates);
