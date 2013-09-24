@@ -7,6 +7,8 @@
 #include <cstdlib> /* atof */
 #include <vector> 
 
+enum RunMode { NONE, RAY_PROPAGATION_GPU, FOR_LOOPS, TEST };
+
 /**
  * @brief Parses a given file(filename) line by line.
  *        Each line should contain just one value
@@ -86,7 +88,7 @@ void parseCommandLine(
     bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
-    int *mode,
+    RunMode *mode,
     bool *useReflections,
     float *expectationThreshold
     );
@@ -97,8 +99,8 @@ int checkParameterValidity(
     unsigned *maxRaysPerSample,
     const std::string root,
     int *device,
-	  const unsigned deviceCount,
-    const int mode,
+    const unsigned deviceCount,
+    const RunMode mode,
     float *expectationThreshold
     );
 

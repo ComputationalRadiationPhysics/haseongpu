@@ -15,11 +15,13 @@ int writeToVtk(const Mesh& mesh,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float expectationThreshold,
+	       const bool useReflections,
 	       const float runtime){
 
   // Konstruct experiment information
   std::stringstream experimentStream;
-  unsigned r = mesh.getMaxReflections();
+  unsigned r = useReflections ? mesh.getMaxReflections() : 0;
+  
   experimentStream << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime;
 
   // Add time to filename
@@ -78,6 +80,86 @@ int writeToVtk(const Mesh& mesh,
 
   for(unsigned ase_i=0; ase_i < mesh.numberOfSamples; ++ase_i){
     vtkFile << std::fixed << std::setprecision(6) << ase.at(ase_i) << std::endl;
+  }
+
+  vtkFile.close();
+
+  return 0;
+}
+
+
+
+int writePrismToVtk(const Mesh& mesh,
+	       const std::vector<double> prismData,
+	       const std::string pfilename,
+	       const unsigned raysPerSample,
+	       const unsigned maxRaysPerSample,
+	       const float expectationThreshold,
+	       const bool useReflections,
+	       const float runtime){
+
+  // Konstruct experiment information
+  std::stringstream experimentStream;
+  unsigned r = useReflections ? mesh.getMaxReflections() : 0;
+  
+  experimentStream << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime;
+
+  // Add time to filename
+  time_t currentTime;
+  time(&currentTime);
+  std::stringstream filenameStream;
+  filenameStream  << pfilename << "_" << (int) currentTime << ".vtk";
+
+  std::cerr << "C Write experiment data to vtk-file " << filenameStream.str() << std::endl;
+  std::ofstream vtkFile;
+
+  vtkFile.open(filenameStream.str().c_str());
+
+  // Write header of vtk file
+  vtkFile << "# vtk DataFile Version 2.0" << std::endl;
+  vtkFile << experimentStream.str() << std::endl;
+  vtkFile << "ASCII" << std::endl;
+
+  // Write point data
+  vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
+  vtkFile << "POINTS " << mesh.numberOfSamples <<  " float" << std::endl;
+  for(unsigned level_i=0; level_i < mesh.numberOfLevels; ++level_i){
+    for(unsigned point_i=0; point_i < mesh.numberOfPoints; ++point_i){
+      vtkFile << std::fixed << std::setprecision(6) << mesh.points[point_i] << " " << mesh.points[point_i + mesh.numberOfPoints] << " " << level_i * mesh.thickness << std::endl;
+
+    }
+
+  }
+
+  // Write prism data
+  vtkFile << "CELLS" << " " << mesh.numberOfPrisms << " " << mesh.numberOfPrisms * 7 << std::endl;
+  for(unsigned level_i=0; level_i < (mesh.numberOfLevels - 1); ++level_i){
+    for(unsigned triangle_i=0; triangle_i < mesh.numberOfTriangles; ++triangle_i){
+      vtkFile << "6 " 
+        << level_i * mesh.numberOfPoints + mesh.triangles[triangle_i] << " "
+        << level_i * mesh.numberOfPoints + mesh.triangles[mesh.numberOfTriangles + triangle_i] << " "
+        << level_i * mesh.numberOfPoints + mesh.triangles[2 * mesh.numberOfTriangles + triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[mesh.numberOfTriangles + triangle_i] << " "
+        << (level_i+1) * mesh.numberOfPoints + mesh.triangles[2 * mesh.numberOfTriangles + triangle_i] << std::endl;
+
+    }
+
+  }
+
+  // Write cell type
+  vtkFile << "CELL_TYPES " << mesh.numberOfPrisms << std::endl;
+  for(unsigned prism_i=0; prism_i < mesh.numberOfPrisms; ++prism_i){
+    vtkFile << "13" << std::endl;
+  }
+
+  // Write ase phi
+  vtkFile << "CELL_DATA " << mesh.numberOfPrisms << std::endl;
+  vtkFile << "SCALARS scalars float 1" << std::endl;
+  vtkFile << "LOOKUP_TABLE default" << std::endl;
+
+  for(unsigned prismData_i=0; prismData_i < mesh.numberOfSamples; ++prismData_i){
+    vtkFile << std::fixed << std::setprecision(6) << prismData.at(prismData_i) << std::endl;
   }
 
   vtkFile.close();

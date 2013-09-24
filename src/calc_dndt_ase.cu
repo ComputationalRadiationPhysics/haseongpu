@@ -9,8 +9,6 @@
 #include <curand_kernel.h>
 #include <cudachecks.h>
 #include <importance_sampling.h>
-#include <test_functions.h>
-#include <cuda_utils.h> /* copyToDevice, copyFromDevice */
 #include "calc_sample_phi_ase.h"
 /* include MTGP host helper functions */
 #include <curand_mtgp32_host.h>
@@ -51,16 +49,16 @@ double getDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, co
 
 float calcDndtAse (unsigned &threads, 
     unsigned &blocks,
-    unsigned &hostRaysPerSample,
+    unsigned &hRaysPerSample,
     const unsigned maxRaysPerSample,
-    const Mesh& mesh,
-    const Mesh& hostMesh,
-    const std::vector<double>& hostSigmaA,
-    const std::vector<double>& hostSigmaE,
+    const Mesh& dMesh,
+    const Mesh& hMesh,
+    const std::vector<double>& hSigmaA,
+    const std::vector<double>& hSigmaE,
     const float expectationThreshold,
     const bool useReflections,
     std::vector<double> &dndtAse,
-    std::vector<float> &hostPhiAse,
+    std::vector<float> &hPhiAse,
     std::vector<double> &expectation
     ){
 
@@ -72,25 +70,26 @@ float calcDndtAse (unsigned &threads,
 
   // variable Definitions CPU
   time_t starttime                = time(0);
-  unsigned hostRaysPerSampleSave  = hostRaysPerSample;
-  unsigned maxReflections         = useReflections ? hostMesh.getMaxReflections() : 0;
+  unsigned hRaysPerSampleSave     = hRaysPerSample;
+  unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
-  unsigned numberOfWavelengths    = hostSigmaE.size();
+  unsigned numberOfWavelengths    = hSigmaE.size();
   bool distributeRandomly         = true;
-  dim3 blockDim(256);             //OPTIMIZE: find perfect number of threads
+  dim3 blockDim(128);             
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
   threads                         = blockDim.x; // give back to calling function
   blocks                          = gridDim.x;
+
   // Memory allocation/init and copy for device memory
-  device_vector<unsigned> numberOfReflections(maxRaysPerSample,  0);
-  device_vector<unsigned> indicesOfPrisms    (maxRaysPerSample,  0);
-  device_vector<float>    phiAse             (hostPhiAse.size(), 0);
-  device_vector<unsigned> raysPerPrism       (hostMesh.numberOfPrisms * reflectionSlices, 1);
-  device_vector<unsigned> prefixSum          (hostMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<double>   importance         (hostMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<float>    phiAseSquare       (hostMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
+  device_vector<unsigned> dNumberOfReflections(maxRaysPerSample,  0);
+  device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
+  device_vector<float>    dPhiAse             (hPhiAse.size(), 0);
+  device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
+  device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<float>    dPhiAseSquare       (hMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
  
- // CUDA Mersenne twister (can not have more than 200 blocks!)
+  // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
   mtgp32_kernel_params *devKernelParams;
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
@@ -108,65 +107,65 @@ float calcDndtAse (unsigned &threads,
     fprintf(stderr, "\nC Phi_ASE calculation for wavelength %d\n",wave_i);
 
     //calculation for each sample point
-    for(unsigned sample_i = 0; sample_i < hostMesh.numberOfSamples; ++sample_i){
-      unsigned sampleOffset  = sample_i + hostMesh.numberOfSamples * wave_i;
-      hostRaysPerSample = hostRaysPerSampleSave;
+    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+      unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
+      hRaysPerSample = hRaysPerSampleSave;
 
+      unsigned hRaysPerSampleDump = 0;
       while(true){
-        importanceSampling(
-            sample_i, reflectionSlices, mesh, hostRaysPerSample, hostSigmaA[wave_i], hostSigmaE[wave_i],
-            raw_pointer_cast(&importance[0]), raw_pointer_cast(&raysPerPrism[0]),
+	hRaysPerSampleDump = importanceSampling(
+            sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
+            raw_pointer_cast(&dImportance[0]), raw_pointer_cast(&dRaysPerPrism[0]),
             distributeRandomly, blockDim, gridDim
             );
 
         // Prism scheduling for gpu threads
-        mapRaysToPrisms(indicesOfPrisms,numberOfReflections,raysPerPrism,prefixSum,reflectionSlices,hostRaysPerSample,hostMesh.numberOfPrisms);
+        mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
 
         if(sample_i == 1386){
-          thrust::copy(numberOfReflections.begin(),numberOfReflections.end(),hNumberOfReflections.begin());
-          thrust::copy(indicesOfPrisms.begin(),indicesOfPrisms.end(),hIndicesOfPrisms.begin());
-          midRaysPerSample=hostRaysPerSample;
+          thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
+          thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
+          midRaysPerSample=hRaysPerSample;
         }
         // Start Kernel
-//        calcSamplePhiAse<<< gridDim, blockDim >>>(
-//            devMTGPStates,
-//            mesh, 
-//            raw_pointer_cast(&indicesOfPrisms[0]), 
-//            wave_i, 
-//            raw_pointer_cast(&numberOfReflections[0]), 
-//            raw_pointer_cast(&importance[0]),
-//            hostRaysPerSample, 
-//            raw_pointer_cast(&phiAse[0]), 
-//            raw_pointer_cast(&phiAseSquare[0]),
-//            sample_i, 
-//            hostSigmaA[wave_i], hostSigmaE[wave_i]
-//            );
-      
+        calcSamplePhiAse<<< gridDim, blockDim >>>(
+            devMTGPStates,
+            dMesh, 
+            raw_pointer_cast(&dIndicesOfPrisms[0]), 
+            wave_i, 
+            raw_pointer_cast(&dNumberOfReflections[0]), 
+            raw_pointer_cast(&dImportance[0]),
+            hRaysPerSampleDump, 
+            raw_pointer_cast(&dPhiAse[0]), 
+            raw_pointer_cast(&dPhiAseSquare[0]),
+            sample_i, 
+            hSigmaA[wave_i], hSigmaE[wave_i]
+            );
 
         // Check square error
-//        expectation.at(sampleOffset) = calcExpectation(phiAse[sampleOffset], phiAseSquare[sampleOffset], hostRaysPerSample);
+        expectation.at(sampleOffset) = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
 
- //       if(expectation[sampleOffset] < expectationThreshold) break;
-        if(hostRaysPerSample * 10 > maxRaysPerSample)        break;
+        if(expectation[sampleOffset] < expectationThreshold) break;
+        if(hRaysPerSample * 10 > maxRaysPerSample)           break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
-  //      hostRaysPerSample *= 10;
-  //      phiAse[sampleOffset] = 0;
-  //      phiAseSquare[sampleOffset] = 0;
+        hRaysPerSample             *= 10;
+        dPhiAse[sampleOffset]       = 0;
+        dPhiAseSquare[sampleOffset] = 0;
 
       }
       // Update progressbar
-      if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i,hostMesh.numberOfSamples,60,progressStartTime);
+      if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i, hMesh.numberOfSamples, 60, progressStartTime);
 
       // get phiASE, normalize it and get dndtAse
-      hostPhiAse.at(sampleOffset) = phiAse[sampleOffset];
-      hostPhiAse[sampleOffset] /= hostRaysPerSample * 4.0f * 3.14159;
-      dndtAse[sampleOffset] = getDndtAse(hostMesh,hostSigmaA[wave_i],hostSigmaE[wave_i],hostPhiAse,sampleOffset);
+      hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
+      hPhiAse[sampleOffset]   /= hRaysPerSampleDump * 4.0f * 3.14159;
+      dndtAse[sampleOffset]    = getDndtAse(hMesh, hSigmaA[wave_i], hSigmaE[wave_i], hPhiAse, sampleOffset);
 
     }
   }
 
-  std::vector<unsigned> reflectionsPerPrism(hostMesh.numberOfPrisms,0);
+  std::vector<unsigned> reflectionsPerPrism(hMesh.numberOfPrisms,0);
 
   
   for(unsigned i=0 ; i<20 ; ++i){

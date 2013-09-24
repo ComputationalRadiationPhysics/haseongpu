@@ -13,6 +13,7 @@
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
+#include <test_environment.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
@@ -89,7 +90,7 @@ int main(int argc, char **argv){
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
   unsigned maxGpus = MAX_GPUS;
   int device = -1;
-  int mode = -1;
+  RunMode mode = NONE;
 
   std::string experimentPath;
 
@@ -133,7 +134,7 @@ int main(int argc, char **argv){
   
   // Run Experiment
   switch(mode){
-    case 0:
+    case RAY_PROPAGATION_GPU:
       // threads and blocks will be set in the following function (by reference)
       runtime = calcDndtAse(threads, 
 			    blocks, 
@@ -152,7 +153,7 @@ int main(int argc, char **argv){
       cudaDeviceReset();
       runmode="Ray Propagation New GPU";
       break;
-    case 1:
+    case FOR_LOOPS:
       // threads and blocks will be set in the following function (by reference)
       runtime = forLoopsClad(
           &dndtAse,
@@ -169,6 +170,26 @@ int main(int argc, char **argv){
           hMesh.crystalFluorescence);
       runmode = "For Loops";
       break;
+  case TEST:
+    testEnvironment(threads, 
+		    blocks, 
+		    raysPerSample,
+		    maxRaysPerSample,
+		    dMesh.at(device),
+		    hMesh,
+		    sigmaA,
+		    sigmaE,
+		    expectationThreshold,
+		    useReflections,
+		    dndtAse,
+		    phiAse,
+		    expectation
+		    );
+    cudaDeviceReset();
+    runmode="Test Environment";
+    break;
+  default:
+    exit(0);
   }
 
 
@@ -217,12 +238,12 @@ int main(int argc, char **argv){
 		  hMesh.numberOfLevels
       );
 
-  if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+  if(writeVtk) writePrismToVtk(hMesh, dndtAse, "octrace_prism", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
   if(compareLocation!="") {
 	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-	  if(writeVtk) writeToVtk(hMesh, dndtAse, experimentPath + "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
   }
-  if(writeVtk) writeToVtk(hMesh, expectation, experimentPath + "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, runtime);
+  if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
 
   return 0;
 }

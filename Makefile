@@ -8,6 +8,8 @@ export CPLUS_INCLUDE_PATH=
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 NVCC_FLAGS = --use_fast_math
+GCC_FLAGS = -std=c++0x
+LIBS =  -lpthread -lcudart
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
@@ -34,7 +36,7 @@ octrace: $(OBJS) Makefile
 	rm -f bin/link.o
 	mkdir -p bin
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	g++ bin/*.o -o bin/octrace -lcudart
+	g++ bin/*.o -o bin/octrace $(GCC_FLAGS) $(LIBS)
 	cp src/run_octrace.m .
 
 clean:
