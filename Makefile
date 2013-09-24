@@ -9,7 +9,7 @@ NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 NVCC_FLAGS = --use_fast_math
 GCC_FLAGS = -std=c++0x
-LIBS =  -lpthread
+LIBS =  -lpthread -lcudart
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
@@ -34,9 +34,10 @@ bin/%.o: src/%.cu $(wildcard include/*.h)
 
 octrace: $(OBJS) Makefile
 	rm -f bin/link.o
+	mkdir -p bin
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	g++ bin/*.o -o bin/octrace -lcudart $(GCC_FLAGS) $(LIBS)
-	cp src/run_octrace.m bin/.
+	g++ bin/*.o -o bin/octrace $(GCC_FLAGS) $(LIBS)
+	cp src/run_octrace.m .
 
 clean:
 	rm -f bin/*
@@ -47,6 +48,7 @@ new:
 
 final_build:
 	rm -f bin/link.o
+	mkdir -p bin
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	cp src/run_octrace.m bin/.
+	cp src/run_octrace.m .

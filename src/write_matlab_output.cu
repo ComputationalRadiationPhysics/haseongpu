@@ -3,45 +3,49 @@
 #include <vector>
 #include <iomanip>
 
+template <typename T>
+void write3dMatrix(
+    const std::vector<T>& data, 
+    std::ofstream &file,
+    const unsigned rowCount,
+    const unsigned columnCount,
+    const unsigned pageCount
+    ){
+  
+  unsigned elementsPerPage = rowCount*columnCount;
+  file << rowCount << " " << columnCount << " " << pageCount << std::endl;
+  for(unsigned page_i = 0; page_i < pageCount; ++page_i){
+    for(unsigned j = 0; j < elementsPerPage ; ++j){
+      file << std::fixed << std::setprecision(20) << data.at(j + page_i * elementsPerPage) << " , ";
+    }
+  }
+  file << std::endl;
+
+}
+
+
 void writeMatlabOutput(
+    const std::string experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
     const unsigned numberOfWavelengths,
-    const unsigned numberOfSamples){
+    const unsigned numberOfSamples,
+    const unsigned numberOfLevels){
 
   std::ofstream aseFile;
   std::ofstream raysFile;
   std::ofstream expectedValuesFile;
+  const unsigned samplesPerLevel = numberOfSamples/numberOfLevels;
 
-
-  aseFile.open("phi_ASE.txt");
-  for(unsigned i = 0; i < numberOfSamples; ++i){
-    for(unsigned j = 0; j < numberOfWavelengths; j++){
-      aseFile << std::fixed << std::setprecision(20) << ase.at(i+j*numberOfSamples) << " ";
-    }
-    aseFile << std::endl;
-  }
+  aseFile.open((experimentPath + "phi_ASE.txt").c_str());
+  write3dMatrix(ase,aseFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
   aseFile.close();
 
-
-  raysFile.open("N_rays.txt");
-  for(unsigned i = 0; i < numberOfSamples; ++i){
-    for(unsigned j = 0; j<numberOfWavelengths; ++j){
-      raysFile << N_rays.at(j) << " ";
-      // TODO: change so that each samplepoint has its own number of rays! (adaptive number of rays!)
-    }
-    raysFile << std::endl;
-  }
+  raysFile.open((experimentPath + "N_rays.txt").c_str());
+  write3dMatrix(N_rays,raysFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
   raysFile.close();
 
-
-  expectedValuesFile.open("expected_values.txt");
-  for(unsigned i = 0; i < numberOfSamples; ++i){
-    for(unsigned j = 0; j < numberOfWavelengths; j++){
-      expectedValuesFile << std::fixed << std::setprecision(20) <<  expectedValues.at(i+j*numberOfSamples) << " " ;
-    }
-    expectedValuesFile << std::endl;
-  }
-  expectedValuesFile.close();
+  expectedValuesFile.open((experimentPath + "expected_values.txt").c_str());
+  write3dMatrix(expectedValues,expectedValuesFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
 }
