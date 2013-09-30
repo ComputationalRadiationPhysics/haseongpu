@@ -1,5 +1,3 @@
-#include "calc_dndt_ase.h"
-#include "map_rays_to_prisms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -7,21 +5,20 @@
 #include <assert.h>
 #include <vector>
 #include <curand_kernel.h>
-#include <cudachecks.h>
-#include <importance_sampling.h>
-#include "calc_sample_phi_ase.h"
-/* include MTGP host helper functions */
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 #include <curand_mtgp32_host.h>
-
-/* include MTGP pre-computed parameter sets */
-/* include <curand_mtgp32dc_p_11213.h> */
-
 #include <cuda_runtime_api.h>
 #include <mesh.h>
 #include <ctime> /* progressBar */
-#include <progressbar.h> /*progressBar */
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
+
+#include <calc_dndt_ase.h>
+#include <map_rays_to_prisms.h>
+#include <cudachecks.h>
+#include <progressbar.h> /* progressBar */
+#include <importance_sampling.h>
+#include <calc_sample_phi_ase.h>
+#include <write_to_vtk.h>
 
 
 #define SEED 1234
@@ -88,6 +85,11 @@ float calcDndtAse (unsigned &threads,
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<float>    dPhiAseSquare       (hMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
+
+  thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
+  thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
+  thrust::host_vector<unsigned> hRaysPerPrism(hMesh.numberOfPrisms * reflectionSlices, 0);
+  unsigned midRaysPerSample=0;
  
   // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
@@ -96,11 +98,7 @@ float calcDndtAse (unsigned &threads,
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
-  
 
-  thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
-  thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
-  unsigned midRaysPerSample=0;
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
     time_t progressStartTime = time(0);
@@ -122,11 +120,14 @@ float calcDndtAse (unsigned &threads,
         // Prism scheduling for gpu threads
         mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
 
+	// OUTPUT DATA
         if(sample_i == 1386){
           thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
           thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
+	  thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
           midRaysPerSample=hRaysPerSample;
         }
+
         // Start Kernel
         calcSamplePhiAse<<< gridDim, blockDim >>>(
             devMTGPStates,
@@ -165,22 +166,24 @@ float calcDndtAse (unsigned &threads,
     }
   }
 
-  std::vector<unsigned> reflectionsPerPrism(hMesh.numberOfPrisms,0);
-
+  // JUST OUTPUT
+  std::vector<unsigned> reflectionsPerPrism(hMesh.numberOfPrisms, 0);
+  std::vector<unsigned> raysPerPrism(hMesh.numberOfPrisms, 0);
   
-  for(unsigned i=0 ; i<20 ; ++i){
-    fprintf(stderr, "%d IndicesOfPrisms: %d\n",i, hIndicesOfPrisms[i]);
-    fprintf(stderr, "    reflections:    %d\n",hNumberOfReflections[i]);
-  }
-  for(unsigned i=0; i<midRaysPerSample; ++i){
+  for(unsigned i=0; i < midRaysPerSample; ++i){
     unsigned index = hIndicesOfPrisms[i];
-    reflectionsPerPrism[index] = max(reflectionsPerPrism[index],hNumberOfReflections[i]);
+    reflectionsPerPrism[index] = max(reflectionsPerPrism[index], hNumberOfReflections[i]);
   }
 
-  for(unsigned i=0; i<reflectionsPerPrism.size();++i){
-    dndtAse[i] = reflectionsPerPrism[i];
+  for(unsigned i=0; i < hMesh.numberOfPrisms; ++i){
+    for(unsigned j=0; j < reflectionSlices; ++j){
+      unsigned index = i + hMesh.numberOfPrisms * j;
+      raysPerPrism[i] += hRaysPerPrism[index];
+    }
   }
 
+  writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_1386_reflections", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
+  writePrismToVtk(hMesh, raysPerPrism, "octrace_1386_rays", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
 
   // Free Memory
   cudaFree(devMTGPStates);

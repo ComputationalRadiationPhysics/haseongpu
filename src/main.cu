@@ -238,7 +238,6 @@ int main(int argc, char **argv){
 		  hMesh.numberOfLevels
       );
 
-  if(writeVtk) writePrismToVtk(hMesh, dndtAse, "octrace_prism", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
   if(compareLocation!="") {
 	  std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
 	  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_compare", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);

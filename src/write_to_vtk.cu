@@ -87,10 +87,8 @@ int writeToVtk(const Mesh& mesh,
   return 0;
 }
 
-
-
 int writePrismToVtk(const Mesh& mesh,
-	       const std::vector<double> prismData,
+	       const std::vector<unsigned> prismData,
 	       const std::string pfilename,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
@@ -153,12 +151,12 @@ int writePrismToVtk(const Mesh& mesh,
     vtkFile << "13" << std::endl;
   }
 
-  // Write ase phi
+  // Write prism data
   vtkFile << "CELL_DATA " << mesh.numberOfPrisms << std::endl;
   vtkFile << "SCALARS scalars float 1" << std::endl;
   vtkFile << "LOOKUP_TABLE default" << std::endl;
 
-  for(unsigned prismData_i=0; prismData_i < mesh.numberOfSamples; ++prismData_i){
+  for(unsigned prismData_i=0; prismData_i < mesh.numberOfPrisms; ++prismData_i){
     vtkFile << std::fixed << std::setprecision(6) << prismData.at(prismData_i) << std::endl;
   }
 
