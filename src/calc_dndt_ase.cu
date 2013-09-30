@@ -121,7 +121,7 @@ float calcDndtAse (unsigned &threads,
         mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
 
 	// OUTPUT DATA
-        if(sample_i == 1386){
+        if(sample_i == 0){
           thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
           thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
 	  thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
@@ -172,7 +172,7 @@ float calcDndtAse (unsigned &threads,
   
   for(unsigned i=0; i < midRaysPerSample; ++i){
     unsigned index = hIndicesOfPrisms[i];
-    reflectionsPerPrism[index] = max(reflectionsPerPrism[index], hNumberOfReflections[i]);
+    reflectionsPerPrism[index] = max(reflectionsPerPrism[index], (hNumberOfReflections[i] + 1) / 2);
   }
 
   for(unsigned i=0; i < hMesh.numberOfPrisms; ++i){
@@ -182,8 +182,8 @@ float calcDndtAse (unsigned &threads,
     }
   }
 
-  writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_1386_reflections", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
-  writePrismToVtk(hMesh, raysPerPrism, "octrace_1386_rays", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
+  writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
+  writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
 
   // Free Memory
   cudaFree(devMTGPStates);
