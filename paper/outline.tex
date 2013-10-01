@@ -55,7 +55,7 @@ there are several ways to exploit parallelization:
 \textit{formula for the additive monte carlo simulation}
 
 
-\section{implementation techniques}
+\section{acceleration techniques}
 ways to improve the speed
 \subsection{Importance Sampling}
 \begin{itemize}
@@ -69,6 +69,40 @@ ways to improve the speed
   \item some outliers have high Mean Square Error
   \item use more rays to address the problem $\rightarrow$ takes a lot more time
   \item adaptive rays: check MSE after the calculation and restart with more rays if required
+\end{itemize}
+
+
+\section{octrace tool}
+\textbf{really include this section with all the detail?}
+\subsection{features}
+\begin{itemize}
+  \item polychromatic (multiple wavelengths)
+  \item reflections
+  \item variable + adaptive number of rays
+  \item multigpu
+  \item threshold for MSE
+  \item creation of VTK files containing $\Phi_{ASE}$, reflections per prism etc.
+  \item comparison with existing VTK files 
+  \item wrapper script for matlab
+\end{itemize}
+
+\subsection{usage}
+\subsubsection{input}
+\textit{format for the input files:}
+\begin{itemize}
+  \item points
+  \item triangles
+  \item sigma\_A
+  \item sigma\_E
+  \item \dots
+\end{itemize}
+
+\subsubsection{output}
+\textit{format of the output files:}
+\begin{itemize}
+  \item Phi\_ASE
+  \item expectation
+  \item N\_rays
 \end{itemize}
 
 
