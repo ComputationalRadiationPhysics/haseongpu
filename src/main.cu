@@ -83,6 +83,8 @@ int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   float maxExpectation = 0;
+  float  avgExpectation = 0;
+  unsigned highExpectation = 0;
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
@@ -230,6 +232,8 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
   fprintf(stderr, "C MSE threshold     : %f\n", expectationThreshold);
   fprintf(stderr, "C max. MSE          : %f\n", maxExpectation);
+  fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
+  fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
   fprintf(stderr, "C Runmode           : %s \n", runmode.c_str());
   fprintf(stderr, "C Runtime           : %f s\n", runtime);
   fprintf(stderr, "\n");

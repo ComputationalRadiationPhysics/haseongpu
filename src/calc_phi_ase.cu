@@ -57,7 +57,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   unsigned numberOfWavelengths    = hSigmaE.size();
-  bool distributeRandomly         = false;
+  bool distributeRandomly         = true;
   dim3 blockDim(128);             
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
