@@ -7,9 +7,7 @@
 #include <vector>
 
 
-pthread_t calcDndtAseThreaded(unsigned &threads, 
-			      unsigned &blocks, 
-			      unsigned &hostRaysPerSample,
+pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      const unsigned maxRaysPerSample,
 			      const Mesh& mesh,
 			      const Mesh& hostMesh,
@@ -17,12 +15,12 @@ pthread_t calcDndtAseThreaded(unsigned &threads,
 			      const std::vector<double>& sigmaE,
 			      const float expectationThreshold,
 			      const bool useReflections,
-			      std::vector<double> &dndtAse,
 			      std::vector<float> &phiAse,
 			      std::vector<double> &expectation,
 			      unsigned gpu_i,
 			      unsigned minSample_i,
-			      unsigned maxSample_i);
+			      unsigned maxSample_i,
+			      float &runtime);
 
 void joinAll(std::vector<pthread_t> threadIds);
 

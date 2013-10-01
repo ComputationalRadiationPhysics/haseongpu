@@ -173,7 +173,7 @@ unsigned importanceSampling(unsigned sample_i,
     hostRaysDump = copyFromDevice(raysDump);
   }
 
-  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, raysPerSample, importance));
+  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, hostRaysDump, importance));
 
   cudaFree(sumPhi);
   cudaFree(raysDump);

@@ -2,11 +2,7 @@
 #include <mesh.h>
 #include <iostream>
 
-
-
-bool testEnvironment (unsigned &threads, 
-		       unsigned &blocks,
-		       unsigned &hRaysPerSample,
+bool testEnvironment ( unsigned &hRaysPerSample,
 		       const unsigned maxRaysPerSample,
 		       const Mesh& dMesh,
 		       const Mesh& hMesh,

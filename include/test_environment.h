@@ -1,9 +1,7 @@
 #ifndef testEnvironment_T
 #define testEnvironment_T
 
-float testEnvironment (unsigned &threads, 
-		       unsigned &blocks,
-		       unsigned &hRaysPerSample,
+float testEnvironment (unsigned &hRaysPerSample,
 		       const unsigned maxRaysPerSample,
 		       const Mesh& dMesh,
 		       const Mesh& hMesh,
