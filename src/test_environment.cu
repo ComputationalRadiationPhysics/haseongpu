@@ -15,8 +15,6 @@ bool testEnvironment ( unsigned &hRaysPerSample,
 		       std::vector<double> &expectation
 		       ){
 
-  
-
 
   return true;
 }
