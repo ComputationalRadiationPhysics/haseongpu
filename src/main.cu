@@ -127,10 +127,13 @@ int main(int argc, char **argv){
   std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 1000);
+  std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
 
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(1));
   fprintf(stderr, "maxreflections: %d\n",hMesh.getMaxReflections());
+  fprintf(stderr, "sigma_A: %f %f\n",sigmaA[0],sigmaA[1]);
+  fprintf(stderr, "sigma_E: %f %f\n",sigmaE[0],sigmaE[1]);
   
   // Run Experiment
   std::vector<float> runtimes(maxGpus, 0);
@@ -151,6 +154,7 @@ int main(int argc, char **argv){
 					       useReflections,
 					       phiAse,
 					       expectation,
+						   totalRays,
 					       devices.at(gpu_i),
 					       minSample_i,
 					       maxSample_i,
@@ -211,12 +215,19 @@ int main(int argc, char **argv){
   // Print Solutions
   for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
     fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-    for(unsigned sample_i = 0; sample_i < dndtAse.size(); ++sample_i){
+    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
       dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
       if(silent && sample_i <=10)
 	fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), expectation.at(sampleOffset));
     }
+    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+      int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+      fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), expectation.at(sampleOffset));
+      if(silent){
+        if(sample_i >= 10) break;
+      }
+	}
   }
 
   // Compare with vtk
@@ -239,13 +250,15 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
   writeMatlabOutput(
+		  experimentPath,
 		  phiAse,
-		  mockupN_rays,
+		  totalRays,
 		  expectation,
 		  sigmaE.size(),
-		  hMesh.numberOfSamples);
+		  hMesh.numberOfSamples,
+		  hMesh.numberOfLevels
+      );
 
   if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
   if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
