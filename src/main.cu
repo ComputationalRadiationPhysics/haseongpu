@@ -19,7 +19,6 @@
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
-#define MAX_GPUS 4
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -92,8 +91,7 @@ int main(int argc, char **argv){
   bool useReflections = false;
   float expectationThreshold = 0;
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
-  unsigned maxGpus = MAX_GPUS;
-  int device = -1;
+  unsigned maxGpus = 0;
   RunMode mode = NONE;
 
   std::string experimentPath;
@@ -106,17 +104,16 @@ int main(int argc, char **argv){
   devices = getCorrectDevice(1);
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &device, &silent,
-      &writeVtk, &compareLocation, &mode, &useReflections, &expectationThreshold);
+  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
+		   &writeVtk, &compareLocation, &mode, &useReflections, &expectationThreshold, &maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, &device, devices.size(), mode, &expectationThreshold)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &expectationThreshold, &maxGpus)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
   if(fileToVector(experimentPath + "sigma_e.txt", &sigmaE)) return 1;
   assert(sigmaA.size() == sigmaE.size());
-  assert(maxGpus <= devices.size());
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
@@ -127,9 +124,8 @@ int main(int argc, char **argv){
   // Solution vector
   std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 1000);
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
-  CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
 
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(1));
@@ -189,7 +185,7 @@ int main(int argc, char **argv){
   case TEST:
     testEnvironment(raysPerSample,
 		    maxRaysPerSample,
-		    dMesh.at(device),
+		    dMesh.at(0),
 		    hMesh,
 		    sigmaA,
 		    sigmaE,

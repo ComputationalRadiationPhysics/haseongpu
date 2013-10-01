@@ -9,13 +9,13 @@ void parseCommandLine(
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
     std::string *root,
-    int *device,
     bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    float *expectationThreshold
+    float *expectationThreshold,
+    unsigned *maxgpus
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -56,11 +56,6 @@ void parseCommandLine(
       *root = temp_root;
     }
 
-    // Parse which cuda device to choose
-    if (p.first == "--device") {
-      *device = atoi(p.second.c_str());
-    }
-
     // Parse if we want less output
     if (p.first == "--silent") {
       *silent = true;
@@ -92,6 +87,12 @@ void parseCommandLine(
     if (p.first == "--expectation"){
       *expectationThreshold = atof(p.second.c_str());
     }
+    
+    if (p.first == "--maxgpus"){
+      *maxgpus = atoi(p.second.c_str());
+    }
+
+
   }
 }
 
@@ -100,10 +101,10 @@ int checkParameterValidity(
     const unsigned raysPerSample,
     unsigned *maxRaysPerSample,
     const std::string root,
-    int *device,
     const unsigned deviceCount,
     const RunMode mode,
-    float *expectationThreshold
+    float *expectationThreshold,
+    unsigned *maxgpus
     ) {
 
   if (argc <= 1) {
@@ -114,7 +115,7 @@ int checkParameterValidity(
     fprintf(stderr, "C                      --compare=[location of vtk-file to compare with]\n");
     fprintf(stderr, "C                      --expectation=[max value of expectation]\n");
     fprintf(stderr, "C                      --maxrays=[max number of rays for adaptive sampling]\n");
-    fprintf(stderr, "C                      --device=[number of device will be forced]\n");
+    fprintf(stderr, "C                      --maxgpus=[max number of gpus to use]\n");
     fprintf(stderr, "C Runmodes : for_loops\n");
     fprintf(stderr, "             ray_propagation_gpu\n");
     fprintf(stderr, "             test_environment\n");
@@ -133,15 +134,6 @@ int checkParameterValidity(
     return 1;
   }
 
-  if (*device >= int(deviceCount)){
-    fprintf(stderr, "C Error: There are only %d devices! (you requested Device %d)\n",deviceCount,*device);
-    return 1;
-  }
-
-  if (*device == -1) {
-    *device = 0;
-  }
-
   if ((*expectationThreshold) <= 0.f){
     if((*maxRaysPerSample) > 0){
       fprintf(stderr, "C Warning: using adaptive number of rays, but no expectationThreshold is set (omit --maxrays or set expectation with --expectation=...\n");
@@ -151,8 +143,13 @@ int checkParameterValidity(
 
   *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
 
+  if(*maxgpus > deviceCount){
+    fprintf(stderr, "C Warning: You don't have so many devices, use --maxgpus=%d", deviceCount);
+    return 1;
+  }
 
-
-
+  if(*maxgpus == 0){
+    *maxgpus = deviceCount;
+  }
   return 0;
 }

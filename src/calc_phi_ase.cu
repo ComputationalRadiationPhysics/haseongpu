@@ -120,15 +120,14 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 	if(expTmp > expectation.at(sampleOffset)){
 	  double a = dPhiAse[sampleOffset];
 	  double b = dPhiAseSquare[sampleOffset];
-	  fprintf(stderr, "\nC phiAse: %f\n", a);
-	  fprintf(stderr, "C phiAseSquare: %f\n", b);
-	  fprintf(stderr, "C RaysPerSampleDump: %d\n", hRaysPerSampleDump);
-	  fprintf(stderr, "C %f > %f (%d)\n", expTmp, expectation.at(sampleOffset), sample_i);
+	  fprintf(stderr, "\nC RaysPerSampleDump: %d\n", hRaysPerSampleDump);
+	  fprintf(stderr, "C RaysPerSample: %d\n", hRaysPerSample);
+	  fprintf(stderr, "C %f > %f (%d)\n\n", expTmp, expectation.at(sampleOffset), sample_i);
 	}
         expectation.at(sampleOffset) = expTmp;
 
-        if(expectation[sampleOffset] < expectationThreshold) break;
-        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample)           break;
+        if(expectation[sampleOffset] < expectationThreshold)     break;
+        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample)break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
         hRaysPerSample             *= 10;
@@ -137,7 +136,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
+      //if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
