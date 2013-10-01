@@ -37,7 +37,7 @@
  * @param dndtAse Solution vector with dndt ASE values
  *
  **/
-float calcPhiAse ( unsigned long &hostRaysPerSample,
+float calcPhiAse ( unsigned &hostRaysPerSample,
 		   const unsigned maxRaysPerSample,
 		   const Mesh& mesh,
 		   const Mesh& hostMesh,
