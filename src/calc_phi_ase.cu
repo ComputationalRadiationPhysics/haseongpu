@@ -29,7 +29,7 @@ double calcExpectation(const double phiAse, const double phiAseSquare, const uns
 }
 
 
-float calcPhiAse ( unsigned long &hRaysPerSample,
+float calcPhiAse ( unsigned &hRaysPerSample,
 		   const unsigned maxRaysPerSample,
 		   const Mesh& dMesh,
 		   const Mesh& hMesh,
@@ -39,6 +39,7 @@ float calcPhiAse ( unsigned long &hRaysPerSample,
 		   const bool useReflections,
 		   std::vector<float> &hPhiAse,
 		   std::vector<double> &expectation,
+       std::vector<unsigned> &totalRays,
 		   unsigned gpu_i,
 		   unsigned minSample_i,
 		   unsigned maxSample_i,
@@ -138,9 +139,10 @@ float calcPhiAse ( unsigned long &hRaysPerSample,
       // Update progressbar
       if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
 
-      // get phiASE, normalize it and get dndtAse
+      // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
       hPhiAse[sampleOffset]   /= hRaysPerSampleDump * 4.0f * 3.14159;
+      totalRays[sampleOffset]  = hRaysPerSampleDump;
     }
 
   }

@@ -128,6 +128,7 @@ int main(int argc, char **argv){
   std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
   CUDA_CHECK_RETURN( cudaSetDevice(devices.at(device))); 
 
   fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
@@ -153,6 +154,7 @@ int main(int argc, char **argv){
 					       useReflections,
 					       phiAse,
 					       expectation,
+						   totalRays,
 					       devices.at(gpu_i),
 					       minSample_i,
 					       maxSample_i,
@@ -239,10 +241,9 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  std::vector<unsigned> mockupN_rays(sigmaE.size(), 1);
   writeMatlabOutput(
 		  phiAse,
-		  mockupN_rays,
+		  totalRays,
 		  expectation,
 		  sigmaE.size(),
 		  hMesh.numberOfSamples);

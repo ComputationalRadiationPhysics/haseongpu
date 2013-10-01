@@ -18,6 +18,7 @@ struct calcDndtAseArgs
 		  const bool puseReflections,
 		  std::vector<float> &pphiAse,
 		  std::vector<double> &pexpectation,
+      std::vector<unsigned> &pTotalRays,
 		  unsigned pgpu_i,
 		  unsigned pminSample_i,
 		  unsigned pmaxSample_i,
@@ -31,6 +32,7 @@ struct calcDndtAseArgs
 				    useReflections(puseReflections),
 				    phiAse(pphiAse),
 				    expectation(pexpectation),
+            totalRays(pTotalRays),
 				    gpu_i(pgpu_i),
 				    minSample_i(pminSample_i),
 				    maxSample_i(pmaxSample_i),
@@ -47,6 +49,7 @@ struct calcDndtAseArgs
   const bool useReflections;
   std::vector<float> &phiAse;
   std::vector<double> &expectation;
+  std::vector<unsigned> &totalRays;
   unsigned gpu_i;
   unsigned minSample_i;
   unsigned maxSample_i;
@@ -65,6 +68,7 @@ void *entryPoint(void* arg){
    	      a->useReflections,
    	      a->phiAse,
    	      a->expectation,
+          a->totalRays,
    	      a->gpu_i,
    	      a->minSample_i,
    	      a->maxSample_i,
@@ -83,6 +87,7 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      const bool useReflections,
 			      std::vector<float> &phiAse,
 			      std::vector<double> &expectation,
+			      std::vector<unsigned> &totalRays,
 			      unsigned gpu_i,
 			      unsigned minSample_i,
 			      unsigned maxSample_i,
@@ -97,6 +102,7 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 					      useReflections,
 					      phiAse,
 					      expectation,
+                totalRays,
 					      gpu_i,
 					      minSample_i,
 					      maxSample_i,
