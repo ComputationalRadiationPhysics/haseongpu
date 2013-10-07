@@ -1,4 +1,30 @@
 \section{Methods}
+\subsection{Parallel ideas}
+
+there are several ways to exploit parallelization in the Monte Carlo simulation:
+
+\begin{description}
+
+  \item[samplepoints] ($\rightarrow$ implemented as multiGPU)
+
+    The samples from \ref{label:meshSampling} are independent from each other
+    and can therefore be calculated in parallel
+
+  \item[rays] ($\rightarrow$ implented through threads/blocks)
+    
+    Every ray can be calculated independently from each other.
+    Exploiting this parallelism provides a great opportunity to boost
+    performance. Only the resulting gains for each sample point have to be
+    combined in the end.
+
+  \item[wavelengths]
+
+    According to \label{label:monteCarlo}, the simulation of a polychromatic
+    laser can be split into sufficiently small monochromatic simulations which
+    are again completely independent from each other.
+
+\end{description}
+
 
 \subsection{Importance sampling}
 \begin{itemize}
@@ -11,11 +37,16 @@
 \end{itemize}
 
 \subsection{Adaptive rays}
+Since most sample points behave in a good way, they don't need
+to be samlped with a high number of rays. Only some outliers need to
+be simulated with a higher precision. You can quantify the precision
+and therefore the difference between the true and calculated value by
+the mean squared error (MSE).
+The adaptive method allows you to remove strong peaks in the result
+of monte carlo simulation without sampling all sample points with
+a high number of rays.
 \begin{itemize}
-\item Since most sample points behave in a good way, they don't need
-  to be samlped with a high number of rays. Only some outliers have high Mean
-  Squared Error, these need resampling.
-\item MSE in formula: 
+\item MSE: 
      \[f(\vec{r_0}) = \frac{1}{n} \sum_{i=1}^n g_i \]
      \[f^2(r_0) = \frac{1}{n} \sum_{i=1}^n g_i^2 \]
      \[MSE(r_0) = \sqrt{\frac{f^2(r_0) - f(r_0)^2}{n}}\]
@@ -30,4 +61,6 @@
   of a higher number of rays per sample point. It could also happen, that the maximum number
   of rays are not enough to reach the given MSE threshold.
 \end{itemize}
-\includegraphics[width=8cm]{plot/adaptive.png}
+\begin{center}
+  \includegraphics[width=8cm]{plot/adaptive.png}
+\end{center}
