@@ -91,30 +91,5 @@ The crystal is sampled and meshed into prisms
 
 
 
-\subsection{parallel ideas}
-
-there are several ways to exploit parallelization in the Monte Carlo simulation:
-
-\begin{description}
-
-  \item[samplepoints] ($\rightarrow$ implemented as multiGPU)
-
-    The samples from \ref{label:meshSampling} are independent from each other
-    and can therefore be calculated in parallel
-
-  \item[rays] ($\rightarrow$ implented through threads/blocks)
-    
-    Every ray can be calculated independently from each other.
-    Exploiting this parallelism provides a great opportunity to boost
-    performance. Only the resulting gains for each sample point have to be
-    combined in the end.
-
-  \item[wavelengths]
-
-    According to \label{label:monteCarlo}, the simulation of a polychromatic
-    laser can be split into sufficiently small monochromatic simulations which
-    are again completely independent from each other.
-
-\end{description}
 
 
