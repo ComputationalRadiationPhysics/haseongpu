@@ -1,19 +1,33 @@
-\documentclass[5p]{elsarticle}
-\usepackage{graphicx}
+\documentclass[3p,twocolumn]{elsarticle}
 
-\title{Parallel ASE-Flux}
-\author{E. Zenker, C. Eckert, M. Melzer, D. Ahlbach, M. Bussmann} 
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
 
 \begin{document}
-\maketitle
+
+\title{Parallel ASE-Flux}
+
+\author[hzdr]{C. Eckert}
+\ead{c.eckert@hzdr.de}
+
+\author[hzdr]{E. Zenker}
+\ead{e.zenker@hzdr.de}
+
+\address[hzdr]{Institute of Radiation Physics, Helmholtz-Zentrum Dresden-Rossendorf e. V., Bautzner Landstraße 400, 01328 Dresden,  Germany}
+
+
 \begin{abstract}
-A fast GPU-implementation of a MonteCarlo based ASE-Flux simulation.
+  A fast GPU-implementation of a MonteCarlo based ASE-Flux simulation. \cite{ASE2010}
 \end{abstract}
 
+
+\maketitle
 \input{introduction}
 \input{model}
 \input{methods}
 \input{application}
 \input{results}		
+\bibliography{bibliography}
 
 \end{document} 
