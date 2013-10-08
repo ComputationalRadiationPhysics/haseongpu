@@ -1,25 +1,28 @@
 \section{Methods}
-\subsection{Parallel ideas}
-
-there are several ways to exploit parallelization in the Monte Carlo simulation:
+\subsection{Parallel methods}
+There are several granularities and ways of parallelization in this kind of 
+Monte Carlo simulation. In the following, the used parallelization points and
+its implementations are listed:
 
 \begin{description}
 
-  \item[samplepoints] ($\rightarrow$ implemented as multiGPU)
+  \item[Sample points] (multiple GPUs)\\
+    The sample points from \ref{label:meshSampling} are independent from each other
+    and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
+    calculation runs in his own GPU-Kernel, thus sample points can be partioned 
+    to several devices. As a result the speedup for multiple GPUs is almost linear.
 
-    The samples from \ref{label:meshSampling} are independent from each other
-    and can therefore be calculated in parallel
-
-  \item[rays] ($\rightarrow$ implented through threads/blocks)
-    
-    Every ray can be calculated independently from each other.
+  \item[Rays] (GPU threads)\\
+    Every ray can be traced independently through the mesh structure.
     Exploiting this parallelism provides a great opportunity to boost
     performance. Only the resulting gains for each sample point have to be
-    combined in the end.
+    added atomatically in the end.
+    Furthermore rays with same origin and direction will be grouped
+    into warps to utilize the GPU cache in a good way.
 
-  \item[wavelengths]
 
-    According to \label{label:monteCarlo}, the simulation of a polychromatic
+  \item[Wavelengths] (Seperate block dimension)\\
+    According to \ref{label:monteCarlo}, the simulation of a polychromatic
     laser can be split into sufficiently small monochromatic simulations which
     are again completely independent from each other.
 
@@ -27,45 +30,56 @@ there are several ways to exploit parallelization in the Monte Carlo simulation:
 
 
 \subsection{Importance sampling}
-\begin{itemize}
-\item Importance sampling is a well known technique in the domain
-  of statistics \cite{importanceSampling}. In case of ASE-Flux calculation a presampling of
-  a sample point is done to figure out important areas
-  inside the mesh. Important areas generate more rays for a
-  particular sample point.
-\item Importance sampling can increase the efficiency of Monte-Carlo-Simulations (reduce variance)
-\end{itemize}
+Importance sampling is a well known technique in the domain
+of statistics \cite{importanceSamplingSource}. In case of 
+ASE-Flux calculation a presampling of a sample point is done
+to figure out which areas inside the mesh are worth to start rays from.
+This method has a strong impact on the precision of the
+calculated values. 
 
-\subsection{Adaptive rays}
-Since most sample points behave in a good way, they don't need
-to be samlped with a high number of rays. Only some outliers need to
+Figure \ref{graphic:importance} demonstrates
+the differences between calculation with und without
+importance sampling. It is shown each a cut through the activ 
+gain medium in which the graphic without important
+sampling has some peaks. Thus importance 
+sampling can increase the efficiency of Monte-Carlo-Simulations 
+by reducing variance.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=8cm]{graphics/importance.png}
+  \caption{Comparison: no importance sampling (top), with importance sampling (bottom)}
+  \label{graphic:importance}
+\end{figure}
+
+\subsection{Adaptive sampling}
+Since most sample points behave in a good way, there is no need
+to sample them with a high number of rays. Only some outliers need to
 be simulated with a higher precision. You can quantify the precision
 and therefore the difference between the true and calculated value by
 further determine the mean squared error (MSE).
 The adaptive method allows you to remove strong peaks in the result
-of monte carlo simulation without sampling all sample points with
-a high number of rays (See figure \ref{plot:adaptive}).
-\begin{figure}
+of the simulation without sampling all sample points with
+a high number of rays and therefore reduce runtime.
+\begin{figure}[H]
   \centering
   \includegraphics[width=8cm]{plot/mse.png}
-  \caption{Adaptive vs. no adaptive}
+  \caption{Comparision adaptive, not adaptive}
   \label{plot:adaptive}
 \end{figure}
-Dependant on a $MSE$-threshold and the $MSE$ value
-of the sample, the number of rays per sample point 
-will be increased to a maximum number.
+In Figure~\ref{plot:adaptive} the adaptive method with 
+50K to 500M rays per sample point is compared to a simulation 
+not adaptive with 300K rays per sample point (same runtime of 10s).
+The not adaptive method has some big peaks while all sample points of 
+the adaptive method lie under a preset $MSE$-threshold (in this case 0.005). 
 
-Thus not every sample point needs to be sampled
-with a high number of rays to obtain high precision.
-Only sample points with $MSE(r_0) \quad \textgreater \quad MSE$-threshold need
-resampling. This saves a lot of calculation time.
+The adaptive method won't reduce the average MSE over sample points,
+but it will reduce the maximal
+MSE values. 
 
-By decresing the MSE threshold (increasing precision), the runtime increses because
-of a higher number of rays per sample point. It could also happen, that the maximum number
-of rays are not enough to reach the given MSE threshold.
-\begin{itemize}
-\item []
-     \[f(\vec{r_0}) = \frac{1}{n} \sum_{i=1}^n g_i \]
-     \[f^2(r_0) = \frac{1}{n} \sum_{i=1}^n g_i^2 \]
-     \[MSE(r_0) = \sqrt{\frac{f^2(r_0) - f(r_0)^2}{n}}\]
-\end{itemize}
+%\begin{itemize}
+%\item []
+%     \[f(\vec{r_0}) = \frac{1}{n} \sum_{i=1}^n g_i \]
+%     \[f^2(r_0) = \frac{1}{n} \sum_{i=1}^n g_i^2 \]
+%     \[MSE(r_0) = \sqrt{\frac{f^2(r_0) - f(r_0)^2}{n}}\]
+%\end{itemize}
+
