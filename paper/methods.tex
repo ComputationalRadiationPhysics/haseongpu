@@ -7,7 +7,7 @@ its implementations are listed:
 \begin{description}
 
   \item[Sample points] (multiple GPUs)\\
-    The sample points from \ref{label:meshSampling} are independent from each other
+    The sample points introduced \ref{label:meshSampling} are independent from each other
     and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
     calculation runs in his own GPU-Kernel, thus sample points can be partioned 
     to several devices. As a result the speedup for multiple GPUs is almost linear.
@@ -20,14 +20,12 @@ its implementations are listed:
     Furthermore rays with same origin and direction will be grouped
     into warps to utilize the GPU cache in a good way.
 
-
   \item[Wavelengths] (Seperate block dimension)\\
     According to \ref{label:monteCarlo}, the simulation of a polychromatic
     laser can be split into sufficiently small monochromatic simulations which
     are again completely independent from each other.
 
 \end{description}
-
 
 \subsection{Importance sampling}
 Importance sampling is a well known technique in the domain
@@ -45,8 +43,8 @@ sampling has some peaks. Thus importance
 sampling can increase the efficiency of Monte-Carlo-Simulations 
 by reducing variance.
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=8cm]{graphics/importance.png}
+  \centerline
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Comparison: no importance sampling (top), with importance sampling (bottom)}
   \label{graphic:importance}
 \end{figure}
@@ -61,8 +59,8 @@ The adaptive method allows you to remove strong peaks in the result
 of the simulation without sampling all sample points with
 a high number of rays and therefore reduce runtime.
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=8cm]{plot/mse.png}
+  \centerline{
+    \resizebox{0.45\textwidth}{!}{\includegraphics[width=8cm]{plot/mse.png}}}
   \caption{Comparision adaptive, not adaptive}
   \label{plot:adaptive}
 \end{figure}
