@@ -19,7 +19,7 @@ there are several ways to exploit parallelization in the Monte Carlo simulation:
 
   \item[wavelengths]
 
-    According to \label{label:monteCarlo}, the simulation of a polychromatic
+    According to \ref{label:monteCarlo}, the simulation of a polychromatic
     laser can be split into sufficiently small monochromatic simulations which
     are again completely independent from each other.
 
@@ -29,7 +29,7 @@ there are several ways to exploit parallelization in the Monte Carlo simulation:
 \subsection{Importance sampling}
 \begin{itemize}
 \item Importance sampling is a well known technique in the domain
-  of statistics \cite{importanceSampling}. In case of ASE-Flux calculation a presampling of
+  of statistics \cite{importanceSamplingSource}. In case of ASE-Flux calculation a presampling of
   a sample point is done to figure out important areas
   inside the mesh. Important areas generate more rays for a
   particular sample point.
@@ -55,7 +55,7 @@ a high number of rays.
   will be increased to a maximum number.
 \item Thus not every sample point needs to be sampled
   with a high number of rays to obtain high precision.
-  Only sample points with $MSE(r_0) \quad \textgreater \quad MSE$-threshold need
+  Only sample points with $MSE(r_0) > MSE$-threshold need
   resampling. This saves a lot of calculation time.
 \item By decresing the MSE threshold (increasing precision), the runtime increses because
   of a higher number of rays per sample point. It could also happen, that the maximum number
