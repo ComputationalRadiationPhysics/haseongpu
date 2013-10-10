@@ -33,6 +33,39 @@
    the whole magic stuff for you. But you can also run it by hand,
    see synopsis for details.
 
+## Matlab interface ##
+
+   * add run_octrace.m to your matlab path
+   * call run_octrace from your matlab script
+
+   run_octrace(
+	points,
+	triangleNormalsX,
+	triangleNormalsY,
+	forbiddenEdge,
+	triangleNormalPoint,
+	triangleNeighbors, 
+	trianglePointIndices,
+	thickness,
+	numberOfLevels,
+	nTot,
+	betaVol,
+	laserWavelength,
+	crystal,
+	prismBetaValues,
+	triangleSurfaces,
+	triangleCenterX,
+	triangleCenterY,
+	clad,
+	cladNum,
+	cladAbs,
+	refractiveIndices,
+	reflectivities,
+	maxRays,
+	expectationThreshold,
+	useReflections
+	)
+
 ## Synopsis ##
 
    Command:
@@ -53,23 +86,30 @@
       is the parallel algorithm based on nvidia cuda
       devices.
 
+    --expecatation=
+      Sets the maximal MSE of the ASE value. If a sample-point
+      does not reach this MSE-threshold, the number of rays
+      per sample-point will be increased upto maxrays.
+
     --rays=
-      Sets the number of rays per sampled point in the
+      Sets the minimum number of rays per sample-point in the
       crystal structure.
+
+    --maxrays=
+      Sets the maximal number of rays per sample-point. The number
+      of rays per sample-point will vary between minimum and
+      maximum number of rays in dependance of a MSE-Threshold.
+      (see --expecatation=)
 
     --silent
       Don't print so much debug information.
-
-    --device=
-      Sets the device number by hand. Maybe you have several
-      devices on you node and you want to choose a special one
-      by device number.
 
     --compare=
       Is the location of a .vtk file with that you want to compare
       your solution. It is good to recognize stastical differences
       between different rays counts.
 
-
+    --write-vtk
+      Write the ASE-Flux of the calculation to a .vtk file
 
            

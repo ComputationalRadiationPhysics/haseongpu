@@ -41,6 +41,7 @@ paper/*.toc
 paper/*.pdf
 paper/*.bst
 paper/*.eps
+paper/*.spl
 paper/*.~lock.*
 paper/*/*.aux
 paper/*/*.log
@@ -53,4 +54,5 @@ paper/*/*.toc
 paper/*/*.pdf
 paper/*/*.bst
 paper/*/*.eps
+paper/*/*.spl
 paper/*/*.~lock.*
