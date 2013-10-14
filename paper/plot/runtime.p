@@ -11,6 +11,7 @@ set y2tics nomirror
 set y2tics 100
 set grid noxtics noytics noztics front
 set xlabel "rays per sample"
+set format x "%.0te%+03T";
 set xrange [10000:10000000]
 
 #set style fill solid 1 noborder
