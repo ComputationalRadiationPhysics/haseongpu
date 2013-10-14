@@ -7,7 +7,7 @@ its implementations are listed:
 \begin{description}
 
   \item[Sample points] (multiple GPUs)\\
-    The sample points introduced in \ref{label:meshSampling} are independent from each other
+    The sample points introduced in \ref{subsec:meshSampling} are independent from each other
     and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
     calculation runs in his own GPU-Kernel, thus sample points can be partioned 
     to several devices. As a result the speedup for multiple GPUs is almost linear.
@@ -21,7 +21,7 @@ its implementations are listed:
     into warps to utilize the GPU cache in a good way.
 
   \item[Wavelengths] (Seperate block dimension)\\
-    According to \ref{label:monteCarlo}, the simulation of a polychromatic
+    According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
     laser can be split into sufficiently small monochromatic simulations which
     are again completely independent from each other.
 
