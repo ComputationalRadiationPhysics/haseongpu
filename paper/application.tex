@@ -1,26 +1,37 @@
 \section{Application}
 The application is available as a commandline-tool and reads
 its simulation data from plain text files (in future also from stdin).
-For an easy acces the offered MATLAB interface (see \ref{label:matlab_interface}) 
+For an easy access the offered MATLAB interface (see \ref{label:matlab_interface}) 
 is highly recommended. Experienced users can also call the application
-directly. Please consult the readme file, the provided 
+directly. Please consult the README file, the provided 
 example code or the source code for more details.\\
-\textbf{TODO:}~octave interface
+\textbf{TODO:}~octave interface ?
 
 \subsection{Installation}
 The application was tested and developed under a linux environment.
-It can be build by running make inside the root directory, provided
-that make (up to 3.81), gcc (up to 4.6.2) and cuda (5.0) is installed. The device code 
-runs on Nvida graphics cards from compute capability 2.0 (at least fermi
-generation). 
+It can be build by running make inside the application directory, provided
+that make (up to 3.81), gcc (up to 4.6.2) and cuda (5.0) are installed. 
+This will also setup a MATLAB file calcPhiASE.m in the application
+directory. The device code runs on Nvida graphics cards from compute 
+capability 2.0 (at least fermi generation). 
 
 \subsection{MATLAB interface}
 \label{label:matlab_interface}
 Because MATLAB is widely used in academic and research institutions, a MATLAB
-interface is provided. You need to include ``run\_octrace.m'' (you will find it
-inside the root directory after build) into your
-MATLAB path and call the run\_octrace function from you MATLAB environment.
-See the README file for more interface details.
+interface is provided. You need to include the MATLAB file calcPhisASE.m from
+the application directory into your MATLAB path and call the calcPhiASE function 
+from you MATLAB environment.
+
+\subsubsection{Usage}
+In \ref{label:input} you'll find a brief overview about the
+arguments of the calcPhisAse function. See the README file for 
+more interface details. Otherwise it's just a function call from
+your MATLAB script.
+\[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
+Mesh information need to be generated in advanced
+to save calculation time, because usually $\Phi$-ASE calculations
+run over several timesteps on the same mesh. 
+
 
 %%\subsection{Features}
 %%\begin{itemize}
@@ -33,10 +44,12 @@ See the README file for more interface details.
 %%  \item comparison with existing VTK files 
 %% \end{itemize}
 
-\subsection{Usage}
-\subsubsection{input}
-\begin{tabular}{| p{3cm} | p{4cm} |}
-  \hline
+
+
+\subsubsection{Input Arguments}
+\label{label:input}
+\tablehead{\hline \textbf{Argument} & \textbf{Description} \\\hline \hline}
+\begin{supertabular}{| p{3cm} | p{4cm} |}
   points & Sample points of the mesh \\\hline
   triangleNormalsX & X coordinates of triangle edges normal vector \\\hline
   triangleNormalsY & Y coordinates of triangle edges normal vector \\\hline
@@ -62,12 +75,13 @@ See the README file for more interface details.
   maxRays & Maximal number of rays for adaptive sampling \\\hline
   MSEThreshold & MSE-Threshold for adaptive sampling \\\hline
   useReflections & Switch to activate reflections \\\hline
-\end{tabular}
+\end{supertabular}
 
-\subsubsection{output}
-\begin{tabular}{| p{3cm} | p{4cm} |}
+\subsubsection{Output}
+\tablehead{\hline \textbf{Output} & \textbf{Description} \\\hline \hline}
+\begin{supertabular}{| p{3cm} | p{4cm} |}
   \hline
-  $\Phi$-ASE & solution of simulation for each sample point \\\hline
+  phiASE & solution of simulation for each sample point \\\hline
   MSE & Mean squared error for each sample point \\\hline
-  Nrays & number of rays per sample point \\\hline
-\end{tabular}
+  nRays & number of rays per sample point \\\hline
+\end{supertabular}

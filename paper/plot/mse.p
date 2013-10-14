@@ -5,6 +5,7 @@ set key opaque
 set title ""
 set xlabel "Sample points"
 set ylabel "MSE"
+#set format y "%.0t*10^%+03T"
 set yrange [0:0.07]
 set xrange [0:3210]
 set xtics 0,400,3210
