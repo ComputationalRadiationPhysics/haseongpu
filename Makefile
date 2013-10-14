@@ -26,18 +26,18 @@ TESTSRCS = $(wildcard tests/*.cu)
 DEBUG_FLAGS = -g -G 
 INCLUDES = include
 
-all: octrace
+all: calcPhiASE
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
 
 
-octrace: $(OBJS) Makefile
+calcPhiASE: $(OBJS) Makefile
 	rm -f bin/link.o
 	mkdir -p bin
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	g++ bin/*.o -o bin/octrace $(GCC_FLAGS) $(LIBS)
-	cp src/run_octrace.m .
+	g++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
+	cp src/calcPhiASE.m .
 
 clean:
 	rm -f bin/*
@@ -51,4 +51,4 @@ final_build:
 	mkdir -p bin
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	cp src/run_octrace.m .
+	cp src/calcPhiASE.m .
