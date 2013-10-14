@@ -83,6 +83,8 @@ int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   float maxExpectation = 0;
+  float  avgExpectation = 0;
+  unsigned highExpectation = 0;
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
@@ -126,12 +128,6 @@ int main(int argc, char **argv){
   std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
   std::vector<double> expectation(hMesh.numberOfSamples * sigmaE.size(), 1000);
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
-
-  fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(-1));
-  fprintf(stderr, "reflectionAngle: %f\n",hMesh.getReflectionAngle(1));
-  fprintf(stderr, "maxreflections: %d\n",hMesh.getMaxReflections());
-  fprintf(stderr, "sigma_A: %f %f\n",sigmaA[0],sigmaA[1]);
-  fprintf(stderr, "sigma_E: %f %f\n",sigmaE[0],sigmaE[1]);
   
   // Run Experiment
   std::vector<float> runtimes(maxGpus, 0);
@@ -152,7 +148,7 @@ int main(int argc, char **argv){
 					       useReflections,
 					       phiAse,
 					       expectation,
-						   totalRays,
+					       totalRays,
 					       devices.at(gpu_i),
 					       minSample_i,
 					       maxSample_i,
@@ -207,7 +203,11 @@ int main(int argc, char **argv){
   // Filter maxExpectation
   for(std::vector<double>::iterator it = expectation.begin(); it != expectation.end(); ++it){
     maxExpectation = max(maxExpectation, *it);
+    avgExpectation += *it;
+    if(*it > expectationThreshold)
+      highExpectation++;
   }
+  avgExpectation /= expectation.size();
 
 
   // Print Solutions
@@ -241,6 +241,8 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
   fprintf(stderr, "C MSE threshold     : %f\n", expectationThreshold);
   fprintf(stderr, "C max. MSE          : %f\n", maxExpectation);
+  fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
+  fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
   fprintf(stderr, "C Runmode           : %s \n", runmode.c_str());
   fprintf(stderr, "C Runtime           : %f s\n", runtime);
   fprintf(stderr, "\n");
@@ -256,6 +258,7 @@ int main(int argc, char **argv){
 		  hMesh.numberOfLevels
       );
 
+  //writeVectorToFile(expectation, "octrace_expvec");
   if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
   if(writeVtk) writeToVtk(hMesh, expectation, "octrace_expectation", raysPerSample, maxRaysPerSample, expectationThreshold, useReflections, runtime);
 

@@ -37,4 +37,6 @@ int writePrismToVtk(const Mesh& mesh,
 
 std::vector<double> compareVtk(std::vector<double> ase, std::string filename, unsigned numberOfSamples);
 
+void writeVectorToFile(std::vector<double> v, std::string pFilename);
+
 #endif /* WRITE_TO_VTK_H */

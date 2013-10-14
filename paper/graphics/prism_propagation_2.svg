@@ -11,7 +11,7 @@
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    width="679.07141"
-   height="541.99023"
+   height="511.99023"
    id="svg43385"
    version="1.1"
    inkscape:version="0.48.4 r9939"
@@ -28,7 +28,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="1.4142136"
      inkscape:cx="335.95777"
-     inkscape:cy="294.06695"
+     inkscape:cy="377.20405"
      inkscape:document-units="px"
      inkscape:current-layer="svg43385"
      showgrid="false"
@@ -44,7 +44,7 @@
      fit-margin-top="5"
      fit-margin-left="10"
      fit-margin-right="10"
-     fit-margin-bottom="-20"
+     fit-margin-bottom="-50"
      inkscape:snap-midpoints="false"
      inkscape:snap-smooth-nodes="false" />
   <defs
@@ -838,7 +838,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
