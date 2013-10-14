@@ -62,7 +62,7 @@
 	refractiveIndices,
 	reflectivities,
 	maxRays,
-	expectationThreshold,
+	MSEThreshold,
 	useReflections
 	)
 
