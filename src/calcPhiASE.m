@@ -1,5 +1,5 @@
-% run_octrace
-% calculates the dndt_ASE values for a given input
+% calcPhiASE
+% calculates the phi_ASE values for a given input
 %first, enter all parameters for the mesh:
 % p
 % normals_x
@@ -32,15 +32,15 @@
 % expected_values           real expectation-values for each samplepoint (aligned like phi_ASE)
 % N_rays                    number of rays that were used for each samplepoint
 
-function [phi_ASE, expected_values, N_rays] = run_octrace(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,expectation_threshold,use_reflections)
+function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,expectation_threshold,use_reflections)
 
 
 CURRENT_DIR = pwd;
 FILENAME=[ mfilename('fullpath') '.m' ];
-[ OCTRACE_DIR, NAME , EXTENSION ] = fileparts(FILENAME);
+[ CALCPHIASE_DIR, NAME , EXTENSION ] = fileparts(FILENAME);
 
 % create all the textfiles in a separate folder
-TMP_FOLDER = [ '/' 'tmp' filesep 'octrace_tmp' ];
+TMP_FOLDER = [ '/' 'tmp' filesep 'calcPhiASE_tmp' ];
 
 % make sure that the input is clean 
 clean_IO_files(TMP_FOLDER);
@@ -64,7 +64,7 @@ if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','v
 
 
   % create the new input based on the MATLAB variables
-  create_octrace_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
+  create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
 
   % create the correct reflection-parameter for the c-function
   REFLECT='';
@@ -73,10 +73,10 @@ if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','v
   end
 
   % do the propagation
-  system([ OCTRACE_DIR '/bin/octrace ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) ' --expectation=' num2str(expectation_threshold) REFLECT ' --experiment=' TMP_FOLDER ]);
+  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) ' --expectation=' num2str(expectation_threshold) REFLECT ' --experiment=' TMP_FOLDER ]);
 
   % get the result
-  [ expected_values, N_rays, phi_ASE ] = parse_octrace_output(TMP_FOLDER,CURRENT_DIR);
+  [ expected_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
 
   % cleanup
   clean_IO_files(TMP_FOLDER);
@@ -84,7 +84,7 @@ if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','v
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_octrace_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
+function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
 
 mkdir(FOLDER);
 cd(FOLDER);
@@ -199,7 +199,7 @@ end
 
 
 % takes the output from the CUDA code and fills it into a variable
-function [expectedValues,  N_rays, phi_ASE] = parse_octrace_output (FOLDER,CURRENT_DIR)
+function [expectedValues,  N_rays, phi_ASE] = parse_calcPhiASE_output (FOLDER,CURRENT_DIR)
 cd (FOLDER);
 fid = fopen('phi_ASE.txt');
 arraySize = str2num(fgetl(fid))
