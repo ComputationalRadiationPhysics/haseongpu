@@ -7,7 +7,7 @@ its implementations are listed:
 \begin{description}
 
   \item[Sample points] (multiple GPUs)\\
-    The sample points introduced \ref{label:meshSampling} are independent from each other
+    The sample points introduced in \ref{label:meshSampling} are independent from each other
     and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
     calculation runs in his own GPU-Kernel, thus sample points can be partioned 
     to several devices. As a result the speedup for multiple GPUs is almost linear.
@@ -33,7 +33,7 @@ of statistics \cite{importanceSamplingSource}. In case of
 ASE-Flux calculation a presampling of a sample point is done
 to figure out which areas inside the mesh are worth to start rays from.
 This method has a strong impact on the precision of the
-calculated values. 
+simulation.
 
 Figure \ref{graphic:importance} demonstrates
 the differences between calculation with und without
@@ -41,11 +41,11 @@ importance sampling. It is shown each a cut through the activ
 gain medium in which the graphic without important
 sampling has some peaks. Thus importance 
 sampling can increase the efficiency of Monte-Carlo-Simulations 
-by reducing variance.
-\begin{figure}[H]
+by reducing variance and simulation runtime. 
+\begin{figure}
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
-  \caption{Comparison: no importance sampling (top), with importance sampling (bottom)}
+  \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
   \label{graphic:importance}
 \end{figure}
 
@@ -58,21 +58,22 @@ further determine the mean squared error (MSE).
 The adaptive method allows you to remove strong peaks in the result
 of the simulation without sampling all sample points with
 a high number of rays and therefore reduce runtime.
-\begin{figure}[H]
+\begin{figure}
   \centerline{
-    \resizebox{0.45\textwidth}{!}{\includegraphics[width=8cm]{plot/mse.png}}}
-  \caption{Comparision adaptive, not adaptive}
+    \resizebox{0.45\textwidth}{!}{\includegraphics{plot/mse.png}}}
+  \caption{Comparision adaptive, not adaptive, no importance sampling}
   \label{plot:adaptive}
 \end{figure}
+
 In Figure~\ref{plot:adaptive} the adaptive method with 
-50K to 500M rays per sample point is compared to a simulation 
-not adaptive with 300K rays per sample point (same runtime of 10s).
-The not adaptive method has some big peaks while all sample points of 
+50K to 500M rays per sample point is compared to the simulations
+not adaptive and no importance sampling with each 300K rays per sample point (same runtime of 10s).
+The not adaptive and no importance sampling method have some big peaks while all sample points of 
 the adaptive method lie under a preset $MSE$-threshold (in this case 0.005). 
 
 The adaptive method won't reduce the average MSE over sample points,
-but it will reduce the maximal
-MSE values. 
+but it will reduce the maximal MSE values. Thus using the adaptives
+methods gives higher precision by same calculation time.
 
 %\begin{itemize}
 %\item []
