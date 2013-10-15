@@ -6,7 +6,7 @@ figure \ref{graphic:samples_reduced}).
 
 
 
-\subsection{the crystal mesh} \label{subsec:meshSampling}
+\subsection{The crystal mesh} \label{subsec:meshSampling}
 
 To distribute the \emph{sample points} on the medium, it is seen as a
 horizontal 2-dimensional plane, which can be sampled with a non-uniform
@@ -38,7 +38,7 @@ prisms (figure \ref{graphic:samples_reduced}).
 
 
 
-\subsection{ray tracing}
+\subsection{Ray tracing}
 \label{subsec:raytracing}
 
 To calculate the amplification of a single ray from a position $r_i$ to a sample
@@ -77,24 +77,34 @@ knowledge about the meshing structure:
 This process is iterated for each prism on the path between $r_i$ and the
 desired sample point $r_0$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
-gain calculation: For each prism $x$, the contribution to the gain is calculated as
-a function of $l_x$:
-
+gain calculation: For each prism $x$, the contribution to the gain is calculated
+as a function of $l_x$:
 \[ 
   partial\_gain(x) = 
   e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
 \]
-
 where $\beta_x$ is the \textbf{TODO: describe beta} beta value in the current
 prism.
-The gain for the whole ray can then be computed as
 
+The gain for the whole ray can then be computed as
 \[ 
-  gain(\overrightarrow{r_ir_0}) =  \beta_i \cdot 
-  \frac  { \prod^n partial\_gain(n) }{distance(r_i,r_0)^2 }
-\]
+  gain(\overrightarrow{r_ir_0}) =  
+  \frac {\beta_i}  {dist(r_i,r_0)^2 }
+  \cdot 
+   \prod^n partial\_gain(n) 
+ \]
+
+
 
 \subsection{Reflections}
+\label{subsec:reflections}
+
+In order to allow for reflecting rays on the upper and lower surface of the medium, the model is
+extended to include the refractive indices of the medium and the surrounding.
+Furthermore, each triangle on the surfaces may be covered with a different coating
+material.  
+
+
 
 \begin{itemize}
 
