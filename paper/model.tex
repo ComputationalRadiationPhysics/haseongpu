@@ -21,7 +21,7 @@ prisms (figure \ref{graphic:samples_reduced}).
 
 \begin{figure}
   \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
   }
   \caption{extruded plane of triangles}
   \label{graphic:extruded_mesh}
@@ -29,7 +29,7 @@ prisms (figure \ref{graphic:samples_reduced}).
 
 \begin{figure}
   \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
   \caption{non-uniform sampling of active gain medium in 2 slices}
   \label{graphic:samples_reduced}
@@ -47,7 +47,7 @@ point $r_0$, the ray is traced along its path through the prisms (see figure
 
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{./graphics/prism_propagation_2.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/prism_propagation_2.png}}
   }
   \caption{propagation of a ray through the prism structure}
   \label{graphic:prism_propagation}
@@ -89,35 +89,51 @@ prism.
 The gain for the whole ray can then be computed as
 \[ 
   gain(\overrightarrow{r_ir_0}) =  
-  \frac {\beta_i}  {dist(r_i,r_0)^2 }
-  \cdot 
-   \prod^n partial\_gain(n) 
- \]
+  \frac{\beta_i}{ |\overrightarrow{r_ir_0}|^2} \cdot \prod^npartial\_gain(n) 
+\]
 
 
 
 \subsection{Reflections}
 \label{subsec:reflections}
 
-In order to allow for reflecting rays on the upper and lower surface of the medium, the model is
-extended to include the refractive indices of the medium and the surrounding.
-Furthermore, each triangle on the surfaces may be covered with a different coating
-material.  
+In order to allow for reflecting rays on the upper and lower surface of the
+medium, the model is extended to include the refractive indices of the medium
+and the surrounding.  Furthermore, each triangle on the surfaces may be covered
+with a different coating material. The ray is split into multiple separate
+sub-rays, each representing one part of the reflection (see figure
+\ref{graphic:reflections_2D}: $\overrightarrow{r_im_1}$,
+$\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 
 
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
+  }
+  \caption{reflections of a ray propagation on the crystal surface}
+  \label{graphic:reflections_2D}
+\end{figure}
 
-\begin{itemize}
 
-  \item Depending on the material and coating, there are different
-    reflectivities on the crystal's surfaces.
+On each of the reflection points, the refractive indices of crystal and
+environment are used to determine the maximum angle for a total reflection. This
+can now be used to estimate the \emph{initial gain} $g_i$ of a ray that is
+reflected at position $x_i$:
+\[
+  %inital\_gain(\overrightarrow{x_ix_{i+1}}) =
+  g_i = 
+  \begin{cases}
+    gain(\overrightarrow{x_{i-1}x_i}) & if \alpha \ge \alpha_{tot}  \\
+    gain(\overrightarrow{x_{i-1}x_i}) \cdot reflectivity[x_i] & if \alpha < \alpha_{tot}   
+  \end{cases}
+\]
 
-  \item A fast simulation allows to take reflecting rays into account and to
-    estimate the impact of lateral lasing.
+This computation comprises a significant overhead, which necessitates the use of
+a high performance algorithm. 
 
-  \item Only reflections on upper and lower plane implemented until now.
-
-\end{itemize}
-
+However, the current implementation only supports reflections on the upper and
+lower surface, resulting in a limitation which excludes the simulation of
+lateral lasing.
 
 
 \subsection{Monte Carlo simulation}
