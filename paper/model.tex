@@ -8,11 +8,11 @@ figure \ref{graphic:samples_reduced}).
 
 \subsection{The crystal mesh} \label{subsec:meshSampling}
 
-To distribute the \emph{sample points} on the medium, it is seen as a
-horizontal 2-dimensional plane, which can be sampled with a non-uniform
+In order to distribute the \emph{sample points} on the medium, it is treated as
+a horizontal 2-dimensional plane, which can be sampled with a non-uniform
 density. This approach allows to increase the spatial resolution in certain
 areas of interest. Using Delauny triangulation, these sample points are
-connected to a 2D mesh of triangles.
+connected into a 2D mesh of triangles.
 
 The triangle mesh is extruded in direction of the vertical axis to form a
 \emph{slice} of right prisms (figure \ref{graphic:extruded_mesh}). This
@@ -41,23 +41,23 @@ prisms (figure \ref{graphic:samples_reduced}).
 \subsection{Ray tracing}
 \label{subsec:raytracing}
 
-To calculate the amplification of a single ray from a position $r_i$ to a sample
+For calculating the amplification of a single ray from a position $r_i$ to a sample
 point $r_0$, the ray is traced along its path through the prisms (see figure
 \ref{graphic:prism_propagation}). 
 
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/prism_propagation_2.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/prism_propagation_3.png}}
   }
   \caption{propagation of a ray through the prism structure}
   \label{graphic:prism_propagation}
 \end{figure}
 
 Starting from point $r_i$ inside a prism, there are 5 possible intersection
-planes for the ray. One plane for the top and bottom surfaces and one for each
+planes with the ray. One plane for the top and bottom surfaces and one for each
 of the 3 horizontal sides. Once the intersection plane is determined (the ray is
 intersecting at point $r_x$), the next prism can be calculated based on the
-knowledge about the meshing structure:
+knowledge about the mesh structure:
 
 \begin{description}
 
@@ -100,16 +100,14 @@ The gain for the whole ray can then be computed as
 \subsection{Reflections}
 \label{subsec:reflections}
 
-In order to allow for reflecting rays on the upper and lower surface of the
-medium, the model is extended to include the refractive indices of the medium
-and the surrounding.  Furthermore, each triangle on the surfaces may be covered
-with a different coating material. The ray is split into multiple separate
-sub-rays, each representing one part of the reflection (see figure
+In order to allow a more detailed simulation, the model is extended to include
+reflections on the surface of the medium. The ray is split into multiple
+separate sub-rays, each representing one part of the reflection (see figure
 \ref{graphic:reflections_2D}: $\overrightarrow{r_im_1}$,
 $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 
 
-\begin{figure}[H]
+\begin{figure}
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
   }
@@ -118,11 +116,12 @@ $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 \end{figure}
 
 
+\textbf{TODO: uniform naming for points (not $x_i$ and $m_i$ mixed like they are
+now)}
 On each of the reflection points, the refractive indices of crystal and
 environment are used to determine the maximum angle for a total reflection. This
 can now be used to estimate the \emph{initial gain} $g_i$ of a ray that is
 reflected at position $x_i$:
-
 \begin{equation}
 \label{eq:gain}
   g_i = 
@@ -132,12 +131,12 @@ reflected at position $x_i$:
   \end{cases}
 \end{equation}
 
-This computation comprises a significant overhead, which necessitates the use of
-a high performance algorithm. 
-
-However, the current implementation only supports reflections on the upper and
-lower surface, resulting in a limitation which excludes the simulation of
-lateral lasing.
+The computation of all sub-rays comprises a significant overhead over the more
+simplistic model with just a single ray, which necessitates the use of a high
+performance algorithm.  The current implementation includes different refractive
+indices as well as varying reflectivites for each delauny triangle. However,
+only reflections on the upper and lower surface are supported, resulting in a
+limited simulation which disregards lateral lasing. 
 
 
 \subsection{Monte Carlo simulation}
