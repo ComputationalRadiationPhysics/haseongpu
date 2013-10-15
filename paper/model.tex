@@ -97,16 +97,19 @@ The gain for the whole ray can then be computed as
 \subsection{Reflections}
 \label{subsec:reflections}
 
-In order to allow for reflecting rays on the upper and lower surface of the
-medium, the model is extended to include the refractive indices of the medium
-and the surrounding.  Furthermore, each triangle on the surfaces may be covered
-with a different coating material. The ray is split into multiple separate
-sub-rays, each representing one part of the reflection (see figure
+%In order to allow for reflecting rays on the upper and lower surface of the
+%medium, the model is extended to include the refractive indices of the medium
+%and the surrounding.  Furthermore, each triangle on the surfaces may be covered
+%with a different coating material. 
+In order to allow a more detailed simulation, the model is extended to include
+reflections on the surface of the medium. The ray is split into multiple
+separate sub-rays, each representing one part of the reflection (see figure
 \ref{graphic:reflections_2D}: $\overrightarrow{r_im_1}$,
 $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 
 
-\begin{figure}[H]
+
+\begin{figure}
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
   }
@@ -115,12 +118,13 @@ $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 \end{figure}
 
 
+\textbf{TODO: uniform naming for points (not $x_i$ and $m_i$ mixed like they are
+now)}
 On each of the reflection points, the refractive indices of crystal and
 environment are used to determine the maximum angle for a total reflection. This
 can now be used to estimate the \emph{initial gain} $g_i$ of a ray that is
 reflected at position $x_i$:
 \[
-  %inital\_gain(\overrightarrow{x_ix_{i+1}}) =
   g_i = 
   \begin{cases}
     gain(\overrightarrow{x_{i-1}x_i}) & if \alpha \ge \alpha_{tot}  \\
@@ -128,12 +132,12 @@ reflected at position $x_i$:
   \end{cases}
 \]
 
-This computation comprises a significant overhead, which necessitates the use of
-a high performance algorithm. 
-
-However, the current implementation only supports reflections on the upper and
-lower surface, resulting in a limitation which excludes the simulation of
-lateral lasing.
+The computation of all sub-rays comprises a significant overhead over the more
+simplistic model with just a single ray, which necessitates the use of a high
+performance algorithm.  The current implementation includes different refractive
+indices as well as varying reflectivites for each delauny triangle. However,
+only reflections on the upper and lower surface are supported, resulting in a
+limited simulation which disregards lateral lasing. 
 
 
 \subsection{Monte Carlo simulation}
