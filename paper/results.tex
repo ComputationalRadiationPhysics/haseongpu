@@ -56,3 +56,46 @@ simulation values comperable to extremly long simulations (figure \ref{plot:adap
 
 \textbf{TODO: FIX MSE BUG}
 
+
+\subsection{Limitations and future work}
+\label{subsec:limitations}
+
+Is summarized as a list of \textbf{TODO}s and suggestions, sorted by difficulty (from
+hardest to easiest).
+
+\begin{itemize} 
+  
+  \item[x] reflections are only possible on upper and lower surface.  This
+    doesn't allow to simulate the effects of lateral lasing.
+
+  \item[$\rightarrow$] can be fixed by implementing a more complex reflection
+    model
+
+  \item[x] needs large number of parameters
+
+  \item[$\rightarrow$] mesh can be generated internally (well\dots some part of
+    it)
+
+  \item[x] limited speedup of adaptive solution with multiGPU
+
+  \item[$\rightarrow$] could be fixed by a fair assignment of samplepoints to
+    the devices
+
+  \item[x] runs only on 1 host-node
+
+  \item[$\rightarrow$] MPI should fix this easily
+
+  \item[x] probably won't run on Windows
+
+  \item[$\rightarrow$] can probably be fixed by using more flexible filepaths
+    and maybe some conditional compilation
+
+  \item[x] doesn't have stdin interface
+
+  \item[$\rightarrow$] should be easy 
+
+  \item[x] doesn't have an octave interface
+
+  \item[$\rightarrow$] might only need small adjustments 
+
+\end{itemize}
