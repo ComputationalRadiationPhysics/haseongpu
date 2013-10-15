@@ -79,19 +79,22 @@ desired sample point $r_0$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
 gain calculation: For each prism $x$, the contribution to the gain is calculated
 as a function of $l_x$:
-\[ 
+
+\begin{equation}
+\label{eq:partial_gain}
   partial\_gain(x) = 
   e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
-\]
+\end{equation}
 where $\beta_x$ is the \textbf{TODO: describe beta} beta value in the current
 prism.
 
 The gain for the whole ray can then be computed as
-\[ 
+
+\begin{equation}
+\label{eq:gain}
   gain(\overrightarrow{r_ir_0}) =  
   \frac{\beta_i}{ |\overrightarrow{r_ir_0}|^2} \cdot \prod^npartial\_gain(n) 
-\]
-
+\end{equation}
 
 
 \subsection{Reflections}
@@ -119,14 +122,15 @@ On each of the reflection points, the refractive indices of crystal and
 environment are used to determine the maximum angle for a total reflection. This
 can now be used to estimate the \emph{initial gain} $g_i$ of a ray that is
 reflected at position $x_i$:
-\[
-  %inital\_gain(\overrightarrow{x_ix_{i+1}}) =
+
+\begin{equation}
+\label{eq:gain}
   g_i = 
   \begin{cases}
     gain(\overrightarrow{x_{i-1}x_i}) & if \alpha \ge \alpha_{tot}  \\
-    gain(\overrightarrow{x_{i-1}x_i}) \cdot reflectivity[x_i] & if \alpha < \alpha_{tot}   
+    gain(\overrightarrow{x_{i-1}x_i}) \cdot \gamma(x_i) & if \alpha < \alpha_{tot}   
   \end{cases}
-\]
+\end{equation}
 
 This computation comprises a significant overhead, which necessitates the use of
 a high performance algorithm. 

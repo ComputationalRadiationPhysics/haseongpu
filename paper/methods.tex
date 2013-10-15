@@ -6,19 +6,28 @@ its implementations are listed:
 
 \begin{description}
 
-  \item[Sample points] (multiple GPUs)\\
-    The sample points introduced in \ref{subsec:meshSampling} are independent from each other
-    and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
-    calculation runs in his own GPU-Kernel, thus sample points can be partioned 
-    to several devices. As a result the speedup for multiple GPUs is almost linear.
-
-  \item[Rays] (GPU threads)\\
+\item[Rays] (GPU threads)\\
     Every ray can be traced independently through the mesh structure.
     Exploiting this parallelism provides a great opportunity to boost
-    performance. Only the resulting gains for each sample point have to be
-    added atomatically in the end.
-    Furthermore rays with same origin and direction will be grouped
-    into warps to utilize the GPU cache in a good way.
+    performance. A CUDA-thread implements the raytracing with the 
+    following cycle:
+    \begin{enumerate}
+      \item Request a ray for tracing
+      \item Generate random start point $r_i$
+      \item Calculate $gain(\overrightarrow{r_ir_0})$ by \eqref{eq:gain}
+      \item Add gain to $\sum_{gain}$ atomically
+    \end{enumerate}
+    This repeats until every ray was traced. Furthermore rays with same
+    origin and direction will be grouped into warps to utilize the
+    GPU cache in a good way.
+
+  \item[Sample points] (multiple GPUs)\\
+    The sample points are independent from each other
+    and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
+    calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
+    to several devices. This is done automatically to the available GPUs on
+    the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
+    GPUs is almost linear, which was tested up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
 
   \item[Wavelengths] (Seperate block dimension)\\
     According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
