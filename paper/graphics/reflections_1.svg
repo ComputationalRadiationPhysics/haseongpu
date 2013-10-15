@@ -26,9 +26,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.4"
-     inkscape:cx="350.92165"
-     inkscape:cy="639.82543"
+     inkscape:zoom="1.979899"
+     inkscape:cx="360.95878"
+     inkscape:cy="697.91039"
      inkscape:document-units="px"
      inkscape:current-layer="layer4"
      showgrid="false"
@@ -266,7 +266,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -281,8 +281,8 @@
        d="m 152.85715,326.64792 0,132.85715"
        style="fill:none;stroke:#000000;stroke-width:1.50000000000000000;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
     <path
-       style="fill:none;stroke:#000000;stroke-width:1.50000000000000000;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
-       d="m 272.85715,326.64792 0,132.85715"
+       style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 236.85715,326.64792 0,132.85715"
        id="path2989"
        inkscape:connector-curvature="0" />
     <path
@@ -631,12 +631,12 @@
     <path
        inkscape:connector-curvature="0"
        id="path5412"
-       d="m 152.85715,326.64792 120,0"
-       style="fill:none;stroke:#000000;stroke-width:1.50000000000000000;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#DiamondM);marker-end:url(#DotM)" />
+       d="m 152.85715,326.64792 84,0"
+       style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#DiamondM);marker-end:url(#DotM)" />
     <path
        inkscape:connector-curvature="0"
        id="path5416"
-       d="m 272.85715,326.64792 100,0"
+       d="m 236.85715,326.64792 136,0"
        style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:none;marker-end:url(#DotM)" />
     <path
        inkscape:connector-curvature="0"
@@ -661,7 +661,7 @@
     <path
        inkscape:connector-curvature="0"
        id="path5426"
-       d="m 152.85715,459.50507 120,0"
+       d="m 152.85715,459.50507 84,0"
        style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#DotM);marker-end:none" />
     <path
        inkscape:connector-curvature="0"
@@ -676,7 +676,7 @@
     <path
        inkscape:connector-curvature="0"
        id="path5432"
-       d="m 272.85715,459.50507 16.88529,0"
+       d="m 236.85715,459.50507 52.88529,0"
        style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#DotM)" />
     <g
        id="g9332"
