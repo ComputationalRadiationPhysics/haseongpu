@@ -17,11 +17,22 @@ In the following, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Sample Points on multiple GPUs}
-The sample points are independent from each other
-and therefore its $\Phi_{ASE}(\vec{r}_0)$ can be calculated in parallel. Every $\Phi_{ASE}(\vec{r}_0)$
-calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
-to several devices. This is done automatically to the available GPUs on
-the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
+Each Monte Carlo experiment (see \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(\vec{r}_0)$ 
+value of a sample point $\vec{r}_0$ independent from each other.
+Thus, every $\Phi_{ASE}(\vec{r}_0)$ calculation can be executed as its own CUDA-Kernel
+and therefore sample points can be distributed to several devices.
+
+Consider having $n$ GPUs on a node available, 
+$n$ \emph{pthreads} are spawned on the host. A GPU and a
+disjunct subset of sample points are assigned to every pthread, so that every
+sample point is distributed exactly to one pthread.
+From this point on, the pthreads run in parallel and start a
+CUDA-Kernel for every sample point in their subset.
+The Kernels inside a pthread are called in serial,
+thus the number of pthreads is limited by the number of sample points, when 
+every GPU simulates exacly one sample point.
+
+As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
     
 \subsubsection{Rays as GPU threads}
@@ -62,7 +73,7 @@ gain medium in which the graphic without important
 sampling has some peaks. Thus, importance 
 sampling can increase the efficiency of Monte Carlo simulations 
 by reducing variance and simulation runtime. 
-\begin{figure}
+\begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
