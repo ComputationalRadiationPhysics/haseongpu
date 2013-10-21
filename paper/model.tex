@@ -2,35 +2,45 @@
 \numberwithin{equation}{section}
 
 
-This section describes the underlying model and ideas for the $\Phi_{ASE}$
-calculation in an active gain medium with planar top and bottom surfaces (see
-figure \ref{graphic:samples_reduced}).
+%This section describes the underlying model and ideas for the $\Phi_{ASE}$
+%calculation in an active gain medium with planar top and bottom surfaces (see
+%figure \ref{graphic:samples_reduced}).
+
+The calculation of the ASE Flux $\Phi_{ASE}$ model is based on the concept of an
+active gain medium with planar top and bottom surfaces. This \emph{crystal} is
+then sampled and for each \emph{sample point} (figure
+\ref{graphic:samples_reduced}) the amplification of spontaneous emission is
+determined. 
+
 
 \subsection{Monte Carlo simulation}
 \label{subsec:monteCarlo}
 
-For a given \emph{sample point} $r_0$ in the crystal, the ASE Flux $\Phi_{ASE}$ can
+For a given sample point $r_0$ in the crystal, $\Phi_{ASE}$ can
 be calculated as described in \cite{ASE2010}:
 \begin{equation}
-  \label{eq:phi_ase_daniel}
+  \label{eq:phi_ase_daniel} 
   \Phi_{ASE}(\vec{r}_0)=\frac{1}{4\pi}\iint
   \frac
     {\hat{n}(\vec{r})}
     {\tau_{f}|\rho(\vec{r},\vec{r}_0)|^2}
-  ~g(\lambda)~G_{\vec{r}\rightarrow\vec{r}_0}
+  ~g(\lambda)
+  ~G_{\vec{r}\rightarrow\vec{r}_0}
   ~dV d\lambda
 \end{equation}
-This can be estimated using Monte Carlo methods. Therefore, the equation is
-rewritten as
+where $G_{\vec{r}\rightarrow\vec{r}_0}$ denotes the amplification between
+position $\vec{r}$ and $r_0$ as a line integral on the vector
+$\overrightarrow{rr_0}$.  One approach to solve the integral is to use Monte
+Carlo methods. Therefore, the equation is rewritten as a sum:
 \begin{equation}
   \label{eq:monte_carlo_ase}
-  \Phi_{ASE} = 
+  \Phi_{ASE}(\vec{r}_0) = 
   \frac{1}{4\pi N}
   \sum^{N}_{i=1} \hat{n}(\vec{r}) \cdot gain(\overrightarrow{r_ir_0})
 \end{equation}
 where $N$ is the number of Monte Carlo experiments (the number of \emph{rays}
 simulated) and $gain(\overrightarrow{r_ir_0})$ is the amplification along the
-path of a single ray as described in formula \ref{eq:gain}.
+path $\overrightarrow{r_ir_0}$ of a single ray as described in formula \ref{eq:gain}.
 
 
 
@@ -42,6 +52,14 @@ a horizontal 2-dimensional plane, which can be sampled with a non-uniform
 density. This approach allows to increase the spatial resolution in certain
 areas of interest. Using Delaunay triangulation, these sample points are
 connected into a 2D mesh of triangles.
+
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
+  }
+  \caption{extruded plane of triangles}
+  \label{graphic:extruded_mesh}
+\end{figure}
 
 The triangle mesh is extruded in direction of the vertical axis to form a
 \emph{slice} of right prisms (figure \ref{graphic:extruded_mesh}). This
@@ -57,13 +75,6 @@ prisms (figure \ref{graphic:samples_reduced}).
 \end{figure}
 
 
-\begin{figure}
-  \centerline{
-    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
-  }
-  \caption{extruded plane of triangles}
-  \label{graphic:extruded_mesh}
-\end{figure}
 
 
 \subsection{Ray tracing}
@@ -125,6 +136,7 @@ The gain for the whole ray can then be computed as
 \end{equation}
 
 
+
 \subsection{Reflections}
 \label{subsec:reflections}
 
@@ -135,7 +147,7 @@ separate sub-rays, each representing one part of the reflection (see figure
 $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 
 
-\begin{figure}
+\begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
   }
@@ -166,4 +178,3 @@ performance algorithm.  The current implementation includes different refractive
 indices as well as varying reflectivites for each Delaunay triangle. However,
 only reflections on the upper and lower surface are supported, resulting in a
 limited simulation that disregards lateral lasing. 
-
