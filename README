@@ -131,7 +131,7 @@
      of the mesh is thickness * numberOfLevels!
 
    * nTot float
-     Allocation of the active gain medium
+     Doping of the active gain medium
 
   * betaVolume [float], size = numberOfTriangles * numberOfLevels - 1
      Stimulus in the volume (prisms).
@@ -144,7 +144,7 @@
      struct(s_abs, VALUES, s_ems, VALUES)
 
    * crystal [float]
-     Describes the crystalFluoresncence of the ative gain medium.
+     Describes the crystalFluorescence of the active gain medium.
 
    * betaCells [float]
      Stimulus in the sample points.

@@ -3,44 +3,46 @@
 
 The application is available as a commandline-tool and reads
 its simulation data from plain text files. 
-For an easy access the offered MATLAB interface (see \ref{label:matlab_interface}) 
-is highly recommended. Experienced users can also call the application
-directly. Please consult the README file, the provided 
-example code or the source code for more details.\\
-\textbf{TODO}: improvment features
-\subsection{Features}
-\begin{itemize}
-  \item polychromatic (multiple wavelengths)
-  \item reflections on top and bottom of amplifying medium
-  \item variable + adaptive number of rays per sample point
-  \item multigpu on one computation node
-  \item threshold for MSE
- \end{itemize}
 
-\subsection{Installation}
-The application was tested and developed under a linux environment.
+It was improven by polychromatic wavelengths, adaptive sampling, multigpu computation and 
+reflections towards the orginal application from Albach \cite{ASE2010}.
+
+For an easy access the offered MATLAB interface (see \ref{label:matlab_interface}) 
+is highly recommended. Experienced users with the intention to call the application
+directly, should consult the README file, the provided 
+example code or the source code for more details.
+
+\subsection{Installation and Usage}
+The application was tested and developed under a linux environment
+and runs on Nvidia graphics cards with capability 2.0 (fermi generation) or higher.
 It can be built by running make inside the application directory, provided
 that make (tested with 3.82), gcc (up to 4.6.2) and cuda (5.0) are installed. 
 This will also setup a MATLAB file calcPhiASE.m in the application
-directory. The device code runs on Nvidia graphics cards with 
-capability 2.0 (fermi generation) or higher. 
+directory. 
 
-\subsection{MATLAB interface}
-\label{label:matlab_interface}
-Because MATLAB is widely used in academic and research institutions, a MATLAB
-interface is provided. To run the application from MATLAB, two steps are
+To run the application from MATLAB, two steps are
 necessary in advance:
 \begin{enumerate}
-  \item Include calcPhiASE.me from the application directory into your MATLAB path
-  \item Call calcPhiASE function from the MATLAB script
+  \label{label:matlab_interface}
+  \item Include calcPhiASE.m from the application directory into your MATLAB path
+  \item Call calcPhiASE function from the MATLAB script: \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
 \end{enumerate}
-
-\subsubsection{Usage}
 In \ref{label:input}, a brief overview about the
-arguments of the calcPhisAse function can be found. See the README file for 
-more interface details. Otherwise it is just a function call from
-a MATLAB script:
-\[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
+arguments of the calcPhisAse function can be found 
+or see the README file for more interface details.
+
+
+%\subsection{MATLAB interface}
+%\label{label:matlab_interface}
+%Because MATLAB is widely used in academic and research institutions, a MATLAB
+%interface is provided. 
+
+%\subsubsection{Usage}
+%In \ref{label:input}, a brief overview about the
+%arguments of the calcPhisAse function can be found. See the README file for 
+%more interface details. Otherwise it is just a function call from
+%a MATLAB script:
+
 
 \subsubsection{Input Arguments}
 Mesh information needs to be generated in advance
@@ -55,7 +57,6 @@ data need to be provided by the MATLAB script:
     \item Normal vectors of prism (triangle) sides
     \item Center points of the triangles
     \item Surfaces of triangles
-      %\item Set of triangle points $\mathcal{P}$
     \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
     \item Thickness of a mesh slice 
     \item Number of slices
@@ -63,13 +64,12 @@ data need to be provided by the MATLAB script:
     \item Reflectivities of mesh planes bottom and top
     \end{itemize}
 
-  \item Constants 
+  \item Properties 
     \begin{itemize}
-      \item Stimulus in the sample points ($\beta-cells$)
-      \item Stimulus in the volume/prisms ($\beta-volume$)
-      \item Crystal Fluoresncence of the active gain medium
+      \item Stimuli in the sample points and volume/prisms
+      \item Crystal Fluorescence of the active gain medium
       \item Cladding of the mesh (use of different materials)
-      \item Allocation of the active gain medium
+      \item Doping of the active gain medium
     \end{itemize}
 
   \item Laser information
