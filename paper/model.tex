@@ -1,16 +1,12 @@
 \section{Model}
 \numberwithin{equation}{section}
 
-
-%This section describes the underlying model and ideas for the $\Phi_{ASE}$
-%calculation in an active gain medium with planar top and bottom surfaces (see
-%figure \ref{graphic:samples_reduced}).
-
 The calculation of the ASE Flux $\Phi_{ASE}$ model is based on the concept of an
 active gain medium with planar top and bottom surfaces. This \emph{crystal} is
 then sampled and for each \emph{sample point} (figure
 \ref{graphic:samples_reduced}) the amplification of spontaneous emission is
 determined. 
+
 
 
 \subsection{Monte Carlo simulation}
@@ -32,15 +28,19 @@ where $G_{\vec{r}\rightarrow\vec{r}_0}$ denotes the amplification between
 position $\vec{r}$ and $r_0$ as a line integral on the vector
 $\overrightarrow{rr_0}$.  One approach to solve the integral is to use Monte
 Carlo methods. Therefore, the equation is rewritten as a sum:
+\textbf{\\TODO: polychromatic calculation? Or remove $\lambda$ in
+\eqref{eq:phi_ase_daniel}?\\}
+\textbf{TODO: is $\tau_f$ correct here?} 
 \begin{equation}
   \label{eq:monte_carlo_ase}
   \Phi_{ASE}(\vec{r}_0) = 
-  \frac{1}{4\pi N}
+  \frac{1}{4\pi N\tau_f}
   \sum^{N}_{i=1} \hat{n}(\vec{r}) \cdot gain(\overrightarrow{r_ir_0})
 \end{equation}
 where $N$ is the number of Monte Carlo experiments (the number of \emph{rays}
 simulated) and $gain(\overrightarrow{r_ir_0})$ is the amplification along the
-path $\overrightarrow{r_ir_0}$ of a single ray as described in formula \ref{eq:gain}.
+path $\overrightarrow{r_ir_0}$ of a single ray as described in formula
+\eqref{eq:gain}.
 
 
 
@@ -66,7 +66,7 @@ The triangle mesh is extruded in direction of the vertical axis to form a
 slice is then duplicated several times, until the whole medium is divided into
 prisms (figure \ref{graphic:samples_reduced}).
 
-\begin{figure}
+\begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
@@ -156,8 +156,9 @@ $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 \end{figure}
 
 
-On each of the reflection points, Brewster's angle $\theta_{B}$ is calculated to estimate the
-\emph{initial gain} $g_i$ of a ray that is reflected at position $x_i$:
+On each of the reflection points, Brewster's angle $\theta_{B}$ is calculated to
+estimate the \emph{initial gain} $g_i$ of a ray that is reflected at position
+$x_i$:
 
 \begin{equation}
 \label{eq:gain_reflection}
