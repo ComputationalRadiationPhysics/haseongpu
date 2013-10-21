@@ -60,31 +60,23 @@ simulation values comperable to extremly long simulations (figure \ref{plot:adap
 \subsection{Limitations and future work}
 \label{subsec:limitations}
 
-Is summarized as a list of \textbf{TODO}s and suggestions, sorted by difficulty (from
-hardest to easiest).
+Future work should address reflections on the sides of the crystal to allow the
+simulation of lateral lasing. The current implementation only supports
+reflections on the upper and lower surface.
+Apart from that, the scaling issues seen in figure \ref{plot:gpu_scaling} can be
+mitigated by assigning the samplepoints to the GPUs in a demand-based way.  In
+theory, processing times on the different devices will be more evenly, reducing
+the time needed to wait for the slowest device and thus decreasing the
+cumulative duration of the calculation. Having such a system in place, one might
+easily extend the algorithm to span over multiple nodes in a cluster using
+Message Passing Interface (MPI)\cite{MPI} to further increase the speed.
+
+
+The rest is summarized as a list of \textbf{TODO}s and suggestions.
+\emph{REMOVE THIS?}
 
 \begin{itemize} 
   
-  \item[x] reflections are only possible on upper and lower surface.  This
-    doesn't allow to simulate the effects of lateral lasing.
-
-  \item[$\rightarrow$] can be fixed by implementing a more complex reflection
-    model
-
-  \item[x] needs large number of parameters
-
-  \item[$\rightarrow$] mesh can be generated internally (well\dots some part of
-    it)
-
-  \item[x] limited speedup of adaptive solution with multiGPU
-
-  \item[$\rightarrow$] could be fixed by a fair assignment of samplepoints to
-    the devices
-
-  \item[x] runs only on 1 host-node
-
-  \item[$\rightarrow$] MPI should fix this easily
-
   \item[x] probably won't run on Windows
 
   \item[$\rightarrow$] can probably be fixed by using more flexible filepaths
