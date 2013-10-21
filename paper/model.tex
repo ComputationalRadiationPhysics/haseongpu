@@ -118,27 +118,28 @@ $\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
 \end{figure}
 
 
-\textbf{TODO: uniform naming for points (not $x_i$ and $m_i$ mixed like they are
-now)}
-On each of the reflection points, the refractive indices of crystal and
-environment are used to determine the maximum angle for a total reflection. This
-can now be used to estimate the \emph{initial gain} $g_i$ of a ray that is
-reflected at position $x_i$:
+On each of the reflection points, Brewster's angle $\theta_{B}$ is calculated to estimate the
+\emph{initial gain} $g_i$ of a ray that is reflected at position $x_i$:
+
 \begin{equation}
 \label{eq:gain_reflection}
   g_i = 
   \begin{cases}
-    gain(\overrightarrow{x_{i-1}x_i}) & if \alpha \ge \alpha_{tot}  \\
-    gain(\overrightarrow{x_{i-1}x_i}) \cdot \gamma(x_i) & if \alpha < \alpha_{tot}   
+    gain(\overrightarrow{x_{i-1}x_i}) & \text{if } \theta \ge \theta_{B}  \\
+    gain(\overrightarrow{x_{i-1}x_i}) \cdot \gamma(x_i) & \text{if } \theta < \theta_{B}   
   \end{cases}
 \end{equation}
+Where $\gamma(x_i)$ is the fraction of the reflected energy (the reflectivity)
+when the angle is too acute for total internal reflection, based on the surface
+coating. $x_n$ refers to
+either a mirror point $m_n$, $r_i$ or $r_0$.
 
 The computation of all sub-rays comprises a significant overhead over the more
 simplistic model with just a single ray, which necessitates the use of a high
 performance algorithm.  The current implementation includes different refractive
 indices as well as varying reflectivites for each delauny triangle. However,
 only reflections on the upper and lower surface are supported, resulting in a
-limited simulation which disregards lateral lasing. 
+limited simulation that disregards lateral lasing. 
 
 
 \subsection{Monte Carlo simulation}
@@ -146,7 +147,7 @@ limited simulation which disregards lateral lasing.
 
 \begin{itemize}
 
-  \item \textit{integral is expressed by formula} \cite[Daniel's Thesis]{ASE2010}
+  \item \textit{integral is expressed by formula} \cite{ASE2010}
 
   \item Monte Carlo simulation as a way to calculate the integral for the whole
     crystal.
