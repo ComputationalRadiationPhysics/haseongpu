@@ -1,6 +1,6 @@
 \section{Methods}
 \numberwithin{equation}{section}
-This section explains methods used to reduce runtime by parallelization and also
+This section explains methods used to reduce runtime and
 increase precision.
 
 \subsection{Parallel methods}
@@ -17,15 +17,27 @@ In the following, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Sample Points on multiple GPUs}
-The sample points are independent from each other
-and therefore its $\Phi_{ASE}(\vec{r}_0)$ can be calculated in parallel. Every $\Phi_{ASE}(\vec{r}_0)$
-calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
-to several devices. This is done automatically to the available GPUs on
-the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
+Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(\vec{r}_0)$ 
+value of a sample point $\vec{r}_0$ independent from each other.
+Thus, every $\Phi_{ASE}(\vec{r}_0)$ calculation can be executed as its own CUDA-Kernel
+and therefore sample points can be distributed to several devices.
+
+Consider having $k$ GPUs on a node available, 
+$k$ \emph{pthreads} are spawned on the host. A GPU and a
+disjunct subset of sample points are assigned to every pthread, so that every
+sample point is distributed exactly to one pthread.
+From this point on, the pthreads run in parallel and start a
+CUDA-Kernel for every sample point in their subset.
+The Kernels inside a pthread are called in serial,
+thus the number of pthreads is limited by the number of sample points, when 
+every GPU simulates exacly one sample point.
+
+As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
     
 \subsubsection{Rays as GPU threads}
-    Every ray can be traced independently through the mesh structure.
+    The Raytracing (see section \ref{subsec:raytracing}) of every ray can be done independently 
+    through the mesh structure.
     Exploiting this parallelism provides a great opportunity to boost
     performance. A CUDA-thread implements the raytracing with the 
     following cycle:
@@ -33,36 +45,33 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
       \item Request a prism to start ray from
       \item Generate start point inside the prism $r_i$
       \item Generate ray $\overrightarrow{r_ir_0}$
-      \item Calculate $gain(\overrightarrow{r_ir_0})$ by \eqref{eq:gain}
-      \item Add gain to $\sum_{gain}$ atomically
+      \item Calculate $gain(\overrightarrow{r_ir_0})$ \eqref{eq:gain}
+      \item Add gain to gain of the other rays atomically \eqref{eq:monte_carlo_ase}
     \end{enumerate}
     This repeats until every ray was traced. Furthermore rays with same
     origin and direction will be grouped into warps to utilize the
     GPU cache in a good way.
-
-\subsubsection{Wavelength as seperate block dimensions}
-    According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
-    laser can be split into sufficiently small monochromatic simulations which
-    are again completely independent from each other.
 
 
 \subsection{Importance sampling}
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
-ASE-Flux calculation, a presampling of a sample point is done
-to figure out which areas are more important to the result
-and thus need more rays then others. This method has a strong
-impact on the precision of the simulation.
+ASE-Flux calculation, before every kernel call a presampling 
+of a sample point is done to figure out which areas are more
+important to the result and thus need more rays then others.
+This method has a strong impact on the precision of the simulation.
 
 Figure \ref{graphic:importance} demonstrates
 the differences between calculation without and with
 importance sampling. It is shown each a cut through the active
 gain medium in which the graphic without important
-sampling has some peaks. Thus, importance 
-sampling can increase the efficiency of Monte Carlo simulations 
-by reducing variance and simulation runtime. 
-\begin{figure}
+sampling has some peaks. To reduce peaks, the experiment
+could be simulated with more rays, but this would increase
+calculation time. Thus, importance sampling can increase the
+efficiency of Monte Carlo simulations by reducing variance 
+and simulation runtime. 
+\begin{figure}%[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
