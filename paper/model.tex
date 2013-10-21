@@ -13,7 +13,7 @@ figure \ref{graphic:samples_reduced}).
 In order to distribute the \emph{sample points} on the medium, it is treated as
 a horizontal 2-dimensional plane, which can be sampled with a non-uniform
 density. This approach allows to increase the spatial resolution in certain
-areas of interest. Using Delauny triangulation, these sample points are
+areas of interest. Using Delaunay triangulation, these sample points are
 connected into a 2D mesh of triangles.
 
 The triangle mesh is extruded in direction of the vertical axis to form a
@@ -137,7 +137,7 @@ either a mirror point $m_n$, $r_i$ or $r_0$.
 The computation of all sub-rays comprises a significant overhead over the more
 simplistic model with just a single ray, which necessitates the use of a high
 performance algorithm.  The current implementation includes different refractive
-indices as well as varying reflectivites for each delauny triangle. However,
+indices as well as varying reflectivites for each Delaunay triangle. However,
 only reflections on the upper and lower surface are supported, resulting in a
 limited simulation that disregards lateral lasing. 
 
