@@ -1,22 +1,38 @@
 \section{Methods}
-
 \numberwithin{equation}{section}
+This section explains methods used to reduce runtime by parallelization and also
+increase precision.
 
 \subsection{Parallel methods}
-There are several granularities and ways of parallelization in this kind of 
-Monte Carlo simulation. In the following, the used parallelization points and
-its implementations are listed:
+\label{subsec:parallel_methods}
+Moving from a single CPU to a multiple
+GPU implementation is not so much about changing the overall algorithm,
+but more about efficient utilisation of the GPU ressources. 
+By using CUDA as a parallel computing platform created by NVIDIA,
+it is possible to obtain high performance with a high level 
+programming model (similar to C++). Therefore the parallelization was pushed on CUDA-thread, 
+CUDA-block and multiple GPU level to reach a good speedup compared to 
+the original implementation.
+In the following, the used parallelization
+techniques and their implementations are explained.
 
-\begin{description}
-
-\item[Rays] (GPU threads)\\
+\subsubsection{Sample Points on multiple GPUs}
+The sample points are independent from each other
+and therefore its $\Phi_{ASE}(\vec{r}_0)$ can be calculated in parallel. Every $\Phi_{ASE}(\vec{r}_0)$
+calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
+to several devices. This is done automatically to the available GPUs on
+the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
+GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
+    
+\subsubsection{Rays as GPU threads}
     Every ray can be traced independently through the mesh structure.
     Exploiting this parallelism provides a great opportunity to boost
     performance. A CUDA-thread implements the raytracing with the 
     following cycle:
     \begin{enumerate}
-      \item Request a ray for tracing
-      \item Generate random start point $r_i$
+      \item Request a prism to start ray from
+      \item Generate start point inside the prism $r_i$
+      \item Generate ray $\overrightarrow{r_ir_0}$
       \item Calculate $gain(\overrightarrow{r_ir_0})$ by \eqref{eq:gain}
       \item Add gain to $\sum_{gain}$ atomically
     \end{enumerate}
@@ -24,22 +40,14 @@ its implementations are listed:
     origin and direction will be grouped into warps to utilize the
     GPU cache in a good way.
 
-  \item[Sample points] (multiple GPUs)\\
-    The sample points are independent from each other
-    and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
-    calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
-    to several devices. This is done automatically to the available GPUs on
-    the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
-    GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
-
-  \item[Wavelengths] (Seperate block dimension)\\
+\subsubsection{Wavelength as seperate block dimensions}
     According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
     laser can be split into sufficiently small monochromatic simulations which
     are again completely independent from each other.
 
-\end{description}
 
 \subsection{Importance sampling}
+\label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
 ASE-Flux calculation, a presampling of a sample point is done
@@ -62,6 +70,7 @@ by reducing variance and simulation runtime.
 \end{figure}
 
 \subsection{Adaptive sampling}
+\label{subsec:adaptive_sampling}
 Since most sample points behave in a good way, there is no need
 to sample them with a high number of rays. Only some outliers need to
 be sampled with a higher precision. To assess the precision
