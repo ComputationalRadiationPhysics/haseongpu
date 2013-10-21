@@ -49,14 +49,14 @@
 	thickness,
 	numberOfLevels,
 	nTot,
-	betaVol,
-	laserWavelength,
+	betaVolume,	
+	laserParameter,
 	crystal,
-	prismBetaValues,
+	betaCells,
 	triangleSurfaces,
 	triangleCenterX,
 	triangleCenterY,
-	clad,
+	cladType,
 	cladNum,
 	cladAbs,
 	refractiveIndices,
@@ -67,6 +67,11 @@
 	)
 
 ### Argument description ### 
+    In the following all arguments of the MATLAB call are described.
+    You will find on each point a head with datatype (an array when
+    in brackets []), the size of the array and to which set of
+    numbers the array belongs.
+
 
    * points [float], in {0, ..., numberOfPoints}, size = numberOfPoints
      The coordinates of the triangle vertices. All x coordinates followed by all
@@ -126,20 +131,23 @@
      of the mesh is thickness * numberOfLevels!
 
    * nTot float
-     
-   * betaVol [float]
+     Allocation of the active gain medium
 
-   * laserWavelength [float] 
+  * betaVolume [float], size = numberOfTriangles * numberOfLevels - 1
+     Stimulus in the volume (prisms).
+     Beta values for all prisms ordered accordingly to the prismIDs:
+     prismID = triangleID + layer * numberOfTriangles.
+     Therefore, all betaValues for a layer are grouped together
+
+   * laserParameter [float] 
      Is a structure for the laser parameters (wavelength sigmas)
      struct(s_abs, VALUES, s_ems, VALUES)
 
    * crystal [float]
      Describes the crystalFluoresncence of the ative gain medium.
 
-   * prismBetaValues [float], size = numberOfTriangles * numberOfLevels - 1
-     Beta values for all prisms ordered accordingly to the prismIDs:
-     prismID = triangleID + layer * numberOfTriangles.
-     Therefore, all betaValues for a layer are grouped together
+   * betaCells [float]
+     Stimulus in the sample points.
 
    * triangleSurfaces [float], size = numberOfTriangles
      The sizes of the surfaces of each triangle, ordered by the triangleID.
@@ -152,9 +160,14 @@
      The y coordinates of the center points for each triangle
      ordered by TriangleID.
 
-   * clad [int], size = numberOfTriangles
+   * cladType [int], size = numberOfTriangles
+     Sets cladding index for triangles {0,1,2,...}
+
    * cladNum unsigned, size = 1
+     Set which cladding to use
+
    * cladAbs float, size = 1
+     Absorption coefficient of cladding
 
    * refractiveIndices [float], size = 4
      Describes the refractive indices of the active

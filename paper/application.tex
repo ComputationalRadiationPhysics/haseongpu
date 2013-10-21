@@ -7,7 +7,15 @@ For an easy access the offered MATLAB interface (see \ref{label:matlab_interface
 is highly recommended. Experienced users can also call the application
 directly. Please consult the README file, the provided 
 example code or the source code for more details.\\
-\textbf{TODO:}~octave interface ?
+\textbf{TODO}: improvment features
+\subsection{Features}
+\begin{itemize}
+  \item polychromatic (multiple wavelengths)
+  \item reflections on top and bottom of amplifying medium
+  \item variable + adaptive number of rays per sample point
+  \item multigpu on one computation node
+  \item threshold for MSE
+ \end{itemize}
 
 \subsection{Installation}
 The application was tested and developed under a linux environment.
@@ -33,51 +41,51 @@ arguments of the calcPhisAse function can be found. See the README file for
 more interface details. Otherwise it is just a function call from
 a MATLAB script:
 \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
-\textbf{TODO}: Need Feature section?
-%%\subsection{Features}
-%%\begin{itemize}
-%%  \item polychromatic (multiple wavelengths)
-%%  \item reflections on top and bottom of amplifying medium
-%%  \item variable + adaptive number of rays per sample point
-%%  \item multigpu on one computation node
-%%  \item threshold for MSE
-%%  \item creation of VTK files containing $\Phi_{ASE}$, reflections per prism etc.
-%%  \item comparison with existing VTK files 
-%% \end{itemize}
 
 \subsubsection{Input Arguments}
 Mesh information needs to be generated in advance
 to save calculation time, because usually $\Phi$-ASE calculations
 run over several timesteps on the same mesh. Thus the following
 data need to be provided by the MATLAB script:
-\label{label:input}
-\tablehead{\hline \textbf{Argument} & \textbf{Description} \\\hline \hline}
-\begin{flushleft}
-\begin{supertabular}{| p{3cm} | p{4cm} |}
-  triangle points & Sample points of the mesh \\\hline
-  prism side normals & Normal vectors of prism(triangle) sides\\\hline
-  triangle neigbor relation & Adjacent edges of neighbor triangles\\\hline
-  triangle center points & Center points of the triangles\\\hline
-  thickness & Thickness of one mesh level \\\hline
-  number of slices & Total number of slices of the medium \\\hline
-  triangleSurfaces & Surfaces of triangles \\\hline
-  \hline
-  nTot & \textbf{TODO} Some constant \\\hline
-  betaVol & \textbf{TODO} Some constant for each sample points \\\hline
-  crystal & \textbf{TODO} Crystalparameters \\\hline
-  prismBetaValues & \textbf{TODO} Some constant for every prism of the mesh \\\hline
-  cladding & cladNum, cladAbs \\\hline
-  \hline
-  laserWavelength & $\sigma_a$, $\sigma_e$ \\\hline
-  \hline
-  refractiveIndices &  Refractive index of mesh and volume around \\\hline
-  reflectivities & Reflectivities of mesh planes bottom and top \\\hline
-  \hline
-  maxRays & Maximal number of rays for adaptive sampling \\\hline
-  MSEThreshold & MSE-threshold for adaptive sampling \\\hline
-  useReflections & Switch to activate reflections \\\hline
-\end{supertabular}
+\begin{itemize}
+  \label{label:input}
+  \item Mesh information
+    \begin{itemize}
+    \item Set of triangles $\mathcal{T}$
+    \item Normal vectors of prism (triangle) sides
+    \item Center points of the triangles
+    \item Surfaces of triangles
+      %\item Set of triangle points $\mathcal{P}$
+    \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
+    \item Thickness of a mesh slice 
+    \item Number of slices
+    \item Refractive index of mesh and volume around
+    \item Reflectivities of mesh planes bottom and top
+    \end{itemize}
 
+  \item Constants 
+    \begin{itemize}
+      \item Stimulus in the sample points ($\beta-cells$)
+      \item Stimulus in the volume/prisms ($\beta-volume$)
+      \item Crystal Fluoresncence of the active gain medium
+      \item Cladding of the mesh (use of different materials)
+      \item Allocation of the active gain medium
+    \end{itemize}
+
+  \item Laser information
+    \begin{itemize}
+      \item laser absorption $\sigma_a$
+      \item laser emission $\sigma_e$
+    \end{itemize}
+
+  \item Algorithm information
+    \begin{itemize}
+      \item Maximal number of rays for adaptive sampling
+      \item MSE-threshold for adaptive sampling
+      \item Decide whether to activate reflections
+    \end{itemize}
+    
+\end{itemize}
 
 \subsubsection{Output}
 \tablehead{\hline \textbf{Output} & \textbf{Description} \\\hline \hline}
@@ -87,4 +95,3 @@ data need to be provided by the MATLAB script:
   MSE & Mean squared error for each sample point \\\hline
   nRays & number of rays per sample point \\\hline
 \end{supertabular}
-\end{flushleft}
