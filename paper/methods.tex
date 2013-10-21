@@ -30,7 +30,7 @@ its implementations are listed:
     calculation is implemeneted as a own CUDA-Kernel, thus sample points can be partioned 
     to several devices. This is done automatically to the available GPUs on
     the same host by pthreads \cite{pthreads}. As a result the speedup for multiple
-    GPUs is almost linear, which was tested up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
+    GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
 
   \item[Wavelengths] (Seperate block dimension)\\
     According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
@@ -42,17 +42,17 @@ its implementations are listed:
 \subsection{Importance sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
-ASE-Flux calculation a presampling of a sample point is done
-to figure out which areas inside the mesh are worth to start rays from.
-This method has a strong impact on the precision of the
-simulation.
+ASE-Flux calculation, a presampling of a sample point is done
+to figure out which areas are more important to the result
+and thus need more rays then others. This method has a strong
+impact on the precision of the simulation.
 
 Figure \ref{graphic:importance} demonstrates
-the differences between calculation with und without
-importance sampling. It is shown each a cut through the activ 
+the differences between calculation without and with
+importance sampling. It is shown each a cut through the active
 gain medium in which the graphic without important
-sampling has some peaks. Thus importance 
-sampling can increase the efficiency of Monte-Carlo-Simulations 
+sampling has some peaks. Thus, importance 
+sampling can increase the efficiency of Monte Carlo simulations 
 by reducing variance and simulation runtime. 
 \begin{figure}
   \centerline
@@ -64,12 +64,12 @@ by reducing variance and simulation runtime.
 \subsection{Adaptive sampling}
 Since most sample points behave in a good way, there is no need
 to sample them with a high number of rays. Only some outliers need to
-be simulated with a higher precision. You can quantify the precision
-and therefore the difference between the true and calculated value by
-further determine the mean squared error (MSE).
-The adaptive method allows you to remove strong peaks in the result
+be sampled with a higher precision. To assess the precision
+and therefore the difference between the true and calculated value,
+it is further determined the mean squared error (MSE).
+The adaptive method allows to remove strong peaks in the result
 of the simulation without sampling all sample points with
-a high number of rays and therefore reduce runtime.
+a high number of rays resulting in reduced runtime.
 \begin{figure}
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse.png}}}
@@ -77,15 +77,15 @@ a high number of rays and therefore reduce runtime.
   \label{plot:adaptive}
 \end{figure}
 
-In Figure~\ref{plot:adaptive} the adaptive method with 
-50K to 500M rays per sample point is compared to the simulations
-not adaptive and no importance sampling with each 300K rays per sample point (same runtime of 10s).
+In figure~\ref{plot:adaptive} the adaptive method with 
+$5 \cdot 10^4$ to $5 \cdot 10^8$ rays per sample point is compared to the simulations
+non adaptive and no importance sampling with each $3 \cdot 10^5$ rays per sample point (same runtime of 10s).
 The not adaptive and no importance sampling method have some big peaks while all sample points of 
 the adaptive method lie under a preset $MSE$-threshold (in this case 0.005). 
 
-The adaptive method won't reduce the average MSE over sample points,
-but it will reduce the maximal MSE values. Thus using the adaptives
-methods gives higher precision by same calculation time.
+The adaptive method will not reduce the average MSE over sample points,
+but it will reduce the maximal MSE values. Thus, using the adaptive
+methods gives lower error by same calculation time.
 
 %\begin{itemize}
 %\item []
