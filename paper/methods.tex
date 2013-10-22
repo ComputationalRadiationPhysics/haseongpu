@@ -18,13 +18,14 @@ techniques and their implementations are explained.
 
 \subsubsection{Sample Points on multiple GPUs}
 
-Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(\vec{r}_0)$ 
-value of a sample point $\vec{r}_0$ independent from each other.
-Thus, every $\Phi_{ASE}(\vec{r}_0)$ calculation can be executed as its own CUDA-Kernel
+Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(s_i)$ 
+value of a sample point $s_i$ independent from each other.
+Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as its own CUDA-Kernel
 and therefore sample points can be distributed to several devices.
 
 Consider having $k$ GPUs on a node available, 
-$k$ \emph{pthreads} are spawned on the host. A GPU and a
+$k$ \emph{pthreads} are spawned on the host, like it
+is shown in figure \ref{graphic:multigpu}. A GPU and a
 disjunct subset of sample points are assigned to every pthread, so that every
 sample point is distributed exactly to one pthread.
 From this point on, the pthreads run in parallel and start a
@@ -44,19 +45,21 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
 \end{figure}
 
 \subsubsection{Rays as GPU threads}
-    The Raytracing (see section \ref{subsec:raytracing}) of every ray can be done independently 
-    through the mesh structure.
+    The Raytracing of every ray can be done independently 
+    through the mesh structure. 
     Exploiting this parallelism provides a great opportunity to boost
-    performance. A CUDA-thread implements the raytracing with the 
-    following cycle:
+    performance. Figure \ref{graphic:kernel} demonstrates the distribution
+    of rays to CUDA threads. In which a CUDA thread implements the following
+    raytracing cycle:
     \begin{enumerate}
+      \item Get current sample point $s_i$
       \item Request a prism to start ray from
-      \item Generate start point inside the prism $r_i$
-      \item Generate ray $\overrightarrow{r_ir_0}$
-      \item Calculate $gain(\overrightarrow{r_ir_0})$ \eqref{eq:gain}
+      \item Generate start point $r_{i,u}$ inside this prism 
+      \item Generate ray $\overrightarrow{r_{i,u}s_i}$
+      \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
       \item Add gain to gain of the other rays atomically \eqref{eq:monte_carlo_ase}
     \end{enumerate}
-    This repeats until every ray was traced. Furthermore rays with same
+    This repeats maximal $t$ times until every ray was traced. Furthermore rays with same
     origin and direction will be grouped into warps to utilize the
     GPU cache in a good way.
 

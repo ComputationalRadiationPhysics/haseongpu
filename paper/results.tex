@@ -38,27 +38,23 @@ a worse scaling (figure \ref{plot:gpu_scaling}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
-  \caption{Scaling on multiple devices}
+  \caption{scaling on multiple devices}
   \label{plot:gpu_scaling}
 \end{figure}
 But nevertheless, by introducing adaptive sampling, the precision of the the simulation
 can be adjusted by a $MSE$-threshold rather than increasing the number
-of rays for every sample point. Thus very low computation time results in
-simulation values comperable to extremly long simulations (figure \ref{plot:adaptive_runtime})\\
-%Please consider, to lower the MSE-Threshold below a certain
-%values, exponentially more rays are required.
+of rays for every sample point. By making the attempt to stay under this $MSE$-threshold,
+the maximal $MSE$ values decreases very fast. Thus very low computation time results in
+simulation values comperable to extremly long simulations (see figure \ref{plot:adaptive_runtime}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/adaptive_runtime.png}}}
-  \caption{runtime comparison of adaptive vs. not adaptive }
+  \caption{runtime comparison of adaptive and non adaptive }
   \label{plot:adaptive_runtime}
 \end{figure}
 
-
-
 \subsection{Limitations and future work}
 \label{subsec:limitations}
-
 Future work should address reflections on the sides of the crystal to allow the
 simulation of lateral lasing. The current implementation only supports
 reflections on the upper and lower surface.

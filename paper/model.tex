@@ -8,41 +8,35 @@ then sampled and for each \emph{sample point} (figure
 determined. 
 
 
-
 \subsection{Monte Carlo simulation}
 \label{subsec:monteCarlo}
 
-For a given sample point $r_0$ in the crystal, $\Phi_{ASE}$ can
+For a given sample point $s_i$ in the crystal, $\Phi_{ASE}$ can
 be calculated as described in \cite{ASE2010}:
 \begin{equation}
   \label{eq:phi_ase_daniel} 
-  \Phi_{ASE}(\vec{r}_0)=\frac{1}{4\pi}\iint
+  \Phi_{ASE}(s_i)=\frac{1}{4\pi}\iint
   \frac
-    {\hat{n}(\vec{r})}
-    {\tau_{f}|\rho(\vec{r},\vec{r}_0)|^2}
+    {\hat{n}(r)}
+    {\tau_{f}|\rho(r,s_i)|^2}
   ~g(\lambda)
-  ~G_{\vec{r}\rightarrow\vec{r}_0}
+  ~G_{r\rightarrow s_i}
   ~dV d\lambda
 \end{equation}
-where $G_{\vec{r}\rightarrow\vec{r}_0}$ denotes the amplification between
-position $\vec{r}$ and $r_0$ as a line integral on the vector
-$\overrightarrow{rr_0}$.  One approach to solve the integral is to use Monte
-Carlo methods. Therefore, the equation is rewritten as a sum:
-\textbf{\\TODO: polychromatic calculation? Or remove $\lambda$ in
-\eqref{eq:phi_ase_daniel}?\\}
-\textbf{TODO: is $\tau_f$ correct here?} 
+where $G_{r\rightarrow s_i}$ denotes the amplification between
+position $r$ and $s_i$ as a line integral on the vector
+$\overrightarrow{rs_i}$.  One approach to solve the integral is to use Monte
+Carlo integration. For a single wavelenght, the equation is rewritten as a sum:
 \begin{equation}
   \label{eq:monte_carlo_ase}
-  \Phi_{ASE}(\vec{r}_0) = 
+  \Phi_{ASE}(s_i) = 
   \frac{1}{4\pi N\tau_f}
-  \sum^{N}_{i=1} \hat{n}(\vec{r}) \cdot gain(\overrightarrow{r_ir_0})
+  \sum^{N-1}_{u=0} \hat{n}(r_{i,u}) \cdot gain(\overrightarrow{r_{i,u}s_i})
 \end{equation}
 where $N$ is the number of Monte Carlo experiments (the number of \emph{rays}
-simulated) and $gain(\overrightarrow{r_ir_0})$ is the amplification along the
-path $\overrightarrow{r_ir_0}$ of a single ray as described in formula
+simulated) and $gain(\overrightarrow{r_{i,u}s_i})$ is the amplification along the
+path $\overrightarrow{r_{i,u}s_i}$ of a single ray as described in formula
 \eqref{eq:gain}.
-
-
 
 
 \subsection{The crystal mesh} \label{subsec:meshSampling}
@@ -80,8 +74,8 @@ prisms (figure \ref{graphic:samples_reduced}).
 \subsection{Ray tracing}
 \label{subsec:raytracing}
 
-For calculating the amplification of a single ray from a position $r_i$ to a sample
-point $r_0$, the ray is traced along its path through the prisms (see figure
+For calculating the amplification of a single ray from a position $r_{i,u}$ to a sample
+point $s_i$, the ray is traced along its path through the prisms (see figure
 \ref{graphic:prism_propagation}). 
 
 \begin{figure}[H]
@@ -92,7 +86,7 @@ point $r_0$, the ray is traced along its path through the prisms (see figure
   \label{graphic:prism_propagation}
 \end{figure}
 
-Starting from point $r_i$ inside a prism, there are 5 possible intersection
+Starting from point $r_{i,u}$ inside a prism, there are 5 possible intersection
 planes with the ray. One plane for the top and bottom surfaces and one for each
 of the 3 horizontal sides. Once the intersection plane is determined (the ray is
 intersecting at point $r_x$), the next prism can be calculated based on the
@@ -113,8 +107,8 @@ knowledge about the mesh structure:
 
 \end{description}
 
-This process is iterated for each prism on the path between $r_i$ and the
-desired sample point $r_0$. The intersections (like $r_x$) with prism surfaces
+This process is iterated for each prism on the path between $r_{,u}i$ and the
+desired sample point $s_i$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
 gain calculation: For each prism $x$, the contribution to the gain is calculated
 as a function of $l_x$:
@@ -124,15 +118,15 @@ as a function of $l_x$:
   partial\_gain(x) = 
   e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
 \end{equation}
-where $\beta_x$ is the \textbf{TODO: describe beta} beta value in the current
+where $\beta_x$ is the stimulus in the current
 prism.
 
 The gain for the whole ray can then be computed as
 
 \begin{equation}
 \label{eq:gain}
-  gain(\overrightarrow{r_ir_0}) =  
-  \frac{\beta_i}{ |\overrightarrow{r_ir_0}|^2} \cdot \prod^npartial\_gain(n) 
+  gain(\overrightarrow{r_{i,u}s_i}) =  
+  \frac{\beta_i}{ |\overrightarrow{r_{i,u}s_i}|^2} \cdot \prod^npartial\_gain(n) 
 \end{equation}
 
 
@@ -143,8 +137,8 @@ The gain for the whole ray can then be computed as
 In order to allow a more detailed simulation, the model is extended to include
 reflections on the surface of the medium. The ray is split into multiple
 separate sub-rays, each representing one part of the reflection (see figure
-\ref{graphic:reflections_2D}: $\overrightarrow{r_im_1}$,
-$\overrightarrow{m_1m_2}$, $\overrightarrow{m_2r_0}$).
+\ref{graphic:reflections_2D}: $\overrightarrow{r_{i,u}m_1}$,
+$\overrightarrow{m_1m_2}$, $\overrightarrow{m_2s_i}$).
 
 
 \begin{figure}[H]
@@ -171,7 +165,7 @@ $x_i$:
 Where $\gamma(x_i)$ is the fraction of the reflected energy (the reflectivity)
 when the angle is too acute for total internal reflection, based on the surface
 coating. $x_n$ refers to
-either a mirror point $m_n$, $r_i$ or $r_0$.
+either a mirror point $m_n$, $r_{i,u}$ or $s_i$.
 
 The computation of all sub-rays comprises a significant overhead over the more
 simplistic model with just a single ray, which necessitates the use of a high
