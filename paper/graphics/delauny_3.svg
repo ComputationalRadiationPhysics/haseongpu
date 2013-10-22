@@ -15,7 +15,10 @@
    id="svg43385"
    version="1.1"
    inkscape:version="0.48.4 r9939"
-   sodipodi:docname="prism_propagation_1.svg">
+   sodipodi:docname="delauny_3.svg"
+   inkscape:export-filename="/home/carli/Dokumente/TUD/CUDA/projekt/git/octrace/paper/graphics/delauny_3.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
@@ -25,12 +28,12 @@
      inkscape:pageshadow="2"
      inkscape:zoom="1.4"
      inkscape:cx="291.32563"
-     inkscape:cy="258.97869"
+     inkscape:cy="230.40726"
      inkscape:document-units="px"
      inkscape:current-layer="layer18"
      showgrid="false"
      inkscape:object-nodes="true"
-     inkscape:window-width="1598"
+     inkscape:window-width="798"
      inkscape:window-height="879"
      inkscape:window-x="0"
      inkscape:window-y="19"
@@ -807,7 +810,9 @@
          sodipodi:role="line"
          x="491.62006"
          y="176.05515"
-         id="tspan4113">sample point</tspan></text>
+         id="tspan4113">sample point s<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan8209">i</tspan></tspan></text>
     <text
        xml:space="preserve"
        style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"

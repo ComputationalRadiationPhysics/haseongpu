@@ -28,7 +28,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="1.979899"
      inkscape:cx="360.95878"
-     inkscape:cy="697.91039"
+     inkscape:cy="657.50429"
      inkscape:document-units="px"
      inkscape:current-layer="layer4"
      showgrid="false"
@@ -437,7 +437,7 @@
          id="tspan9799"
          sodipodi:role="line">r<tspan
    id="tspan9801"
-   style="font-size:65.00091553%;text-align:start;text-anchor:start;baseline-shift:sub">i </tspan></tspan></text>
+   style="font-size:65.00091553%;text-align:start;text-anchor:start;baseline-shift:sub">i,u </tspan></tspan></text>
     <path
        sodipodi:nodetypes="cc"
        inkscape:connector-curvature="0"
@@ -455,9 +455,9 @@
          id="tspan11373"
          y="306.05521"
          x="238.17451"
-         sodipodi:role="line">r<tspan
-   id="tspan11381"
-   style="font-size:65.00091553%;text-align:start;text-anchor:start;baseline-shift:sub">0 </tspan></tspan></text>
+         sodipodi:role="line">s<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan11491">i </tspan></tspan></text>
     <g
        transform="translate(-9.392852,66.428605)"
        style="display:inline"
@@ -522,6 +522,8 @@
          x="507.38016"
          id="tspan9415"
          sodipodi:role="line">m<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan11493">i,u,</tspan><tspan
    id="tspan9423"
    style="font-size:65.00091553%;baseline-shift:sub">1</tspan></tspan></text>
     <text
@@ -535,8 +537,10 @@
          x="370.59116"
          id="tspan9421"
          sodipodi:role="line">m<tspan
+   style="font-size:65%;baseline-shift:sub"
+   id="tspan11495">i,u,</tspan><tspan
    id="tspan9425"
-   style="font-size:65%;baseline-shift:sub">2</tspan></tspan></text>
+   style="font-size:65.00091553%;baseline-shift:sub">2</tspan></tspan></text>
     <path
        style="display:inline;fill:none;stroke:#ff0000;stroke-width:1.50000000000000000;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
        d="M 152.85715,326.64792 289.74244,459.50507"
