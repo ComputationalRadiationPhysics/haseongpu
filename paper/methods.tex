@@ -17,6 +17,7 @@ In the following, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Sample Points on multiple GPUs}
+
 Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(\vec{r}_0)$ 
 value of a sample point $\vec{r}_0$ independent from each other.
 Thus, every $\Phi_{ASE}(\vec{r}_0)$ calculation can be executed as its own CUDA-Kernel
@@ -35,6 +36,13 @@ every GPU simulates exacly one sample point.
 As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
     
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning.png}}}
+  \caption{partitioning of the workload to multiple devices}
+  \label{graphic:multigpu}
+\end{figure}
+
 \subsubsection{Rays as GPU threads}
     The Raytracing (see section \ref{subsec:raytracing}) of every ray can be done independently 
     through the mesh structure.
