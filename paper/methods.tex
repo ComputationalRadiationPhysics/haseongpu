@@ -20,7 +20,7 @@ techniques and their implementations are explained.
 
 Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(s_i)$ 
 value of a sample point $s_i$ independent from each other.
-Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as its own CUDA-Kernel
+Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as its own CUDA kernel
 and therefore sample points can be distributed to several devices.
 
 Consider having $k$ GPUs on a node available, 
@@ -29,15 +29,15 @@ is shown in figure \ref{graphic:multigpu}. A GPU and a
 disjunct subset of sample points are assigned to every pthread, so that every
 sample point is distributed exactly to one pthread.
 From this point on, the pthreads run in parallel and start a
-CUDA-Kernel for every sample point in their subset.
-The Kernels inside a pthread are called in serial,
+CUDA kernel for every sample point in their subset.
+The kernels inside a pthread are called sequentially,
 thus the number of pthreads is limited by the number of sample points, when 
 every GPU simulates exacly one sample point.
 
 As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
     
-\begin{figure}[H]
+\begin{figure}
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning.png}}}
   \caption{partitioning of the workload to multiple devices}
@@ -64,10 +64,10 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
     GPU cache in a good way.
 
 
-\begin{figure}[H]
+\begin{figure}
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail.png}}}
-  \caption{$\Phi_{ASE}$ Kernel in detail}
+  \caption{$\Phi_{ASE}$ kernel with CUDA threads}
   \label{graphic:kernel}
 \end{figure}
 
@@ -89,7 +89,7 @@ could be simulated with more rays, but this would increase
 calculation time. Thus, importance sampling can increase the
 efficiency of Monte Carlo simulations by reducing variance 
 and simulation runtime. 
-\begin{figure}%[H]
+\begin{figure}
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
