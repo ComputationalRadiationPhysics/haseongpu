@@ -9,7 +9,7 @@ set yrange [1:4]
 
 plot \
 "scaling.dat" u 1:2 w linespoints t "scaling adaptive" pt 57,\
-"scaling.dat" u 1:3 w linespoints t "scaling not adaptive" pt 37
+"scaling.dat" u 1:3 w linespoints t "scaling non adaptive" pt 37
 
 # Output
 set term png

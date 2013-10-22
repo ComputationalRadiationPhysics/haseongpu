@@ -12,9 +12,9 @@ set xtics 0,400,3210
 
 plot\
 "expvec_noimportance.dat" w boxes t "MSE no importance sampling" lt rgb "blue",\
-"expvec_noadaptive.dat" w boxes t "MSE not adaptive + importance" lt rgb "red",\
+"expvec_noadaptive.dat" w boxes t "MSE non adaptive + importance" lt rgb "red",\
 "expvec_adaptive.dat" w boxes t "MSE adaptive + importance" lt rgb "green",\
-0.0015 t "avg. MSE (not)adaptive"
+0.0015 t "avg. MSE (non)adaptive"
 
 # Output
 set term png

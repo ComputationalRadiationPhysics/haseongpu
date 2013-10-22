@@ -1,13 +1,15 @@
-set xlabel "max. MSE"
+set xlabel "1 / max. MSE"
+set grid xtics
+set grid ytics
 set ylabel "runtime[s]"
-set yrange [0:1000]
-set xrange [0:1]
-unset logscale x
+set yrange [0:500]
+set xrange [1:510]
+set logscale x
 unset logscale y
 
 plot \
-"adaptive_runtime.dat" u 1:2 w linespoints t "runtime no adaptive",\
-"adaptive_runtime.dat" u 1:3 w linespoints t "runtime adaptive"
+"adaptive_runtime.dat" u 4:3 w linespoints t "runtime adaptive" pt 57,\
+"adaptive_runtime.dat" u 4:2 w linespoints t "runtime non adaptive" pt 37
 
 # Output
 set term png
