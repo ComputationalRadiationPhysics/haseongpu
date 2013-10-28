@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
-#include <assert.h>
-#include <vector>
+#include <assert.h> #include <vector>
 #include <curand_kernel.h>
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
@@ -35,10 +34,10 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 		   const Mesh& hMesh,
 		   const std::vector<double>& hSigmaA,
 		   const std::vector<double>& hSigmaE,
-		   const float expectationThreshold,
+		   const std::vector<float>& mseThreshold,
 		   const bool useReflections,
 		   std::vector<float> &hPhiAse,
-		   std::vector<double> &expectation,
+		   std::vector<double> &mse,
 		   std::vector<unsigned> &totalRays,
 		   unsigned gpu_i,
 		   unsigned minSample_i,
@@ -130,20 +129,20 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 						   hSigmaE[wave_i] );
 
         // Check square error
-	float expTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
-	//std::cout << "MSE: " << expTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
+	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
+	//std::cout << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
 
 	// MSE TESTs
-	// if(expTmp > expectation.at(sampleOffset)){
+	// if(mseTmp > mse.at(sampleOffset)){
 	//   double a = dPhiAse[sampleOffset];
 	//   double b = dPhiAseSquare[sampleOffset];
 	//   fprintf(stderr, "\nC RaysPerSampleDump: %d\n", hRaysPerSampleDump);
 	//   fprintf(stderr, "C RaysPerSample: %d\n", hRaysPerSample);
-	//   fprintf(stderr, "C %f > %f (%d)\n\n", expTmp, expectation.at(sampleOffset), sample_i);
+	//   fprintf(stderr, "C %f > %f (%d)\n\n", mseTmp, mse.at(sampleOffset), sample_i);
 	// }
-        expectation.at(sampleOffset) = expTmp;
+        mse.at(sampleOffset) = mseTmp;
 
-        if(expectation[sampleOffset] < expectationThreshold)     break;
+        if(mse[sampleOffset] < mseThreshold.at(wave_i))     break;
         if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample)break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
@@ -157,7 +156,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
-      hPhiAse[sampleOffset]   /= hRaysPerSampleDump * 4.0f * 3.14159;
+      hPhiAse[sampleOffset]   /= hRaysPerSampleDump * 4.0f * M_PI;
       totalRays[sampleOffset]  = hRaysPerSampleDump;
     }
 
@@ -179,8 +178,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   //   }
   // }
 
-  //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
-  //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, expectationThreshold, useReflections, 0);
+  //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
+  //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
 
   // Free Memory
   cudaFree(devMTGPStates);
