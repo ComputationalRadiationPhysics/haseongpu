@@ -5,6 +5,7 @@
 #include <vector> /* vector */
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
+#include <algorithm> /* max_element */
 
 // User header files
 #include <calc_phi_ase.h>
@@ -242,7 +243,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C Statistics\n");
   fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
   fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
-  fprintf(stderr, "C MSE threshold     : %f\n", std::max_element(mseThreshold.begin(),mseThreshold.end());
+  fprintf(stderr, "C MSE threshold     : %f\n", *(std::max_element(mseThreshold.begin(),mseThreshold.end())));
   fprintf(stderr, "C max. MSE          : %f\n", maxExpectation);
   fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
   fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
@@ -262,8 +263,8 @@ int main(int argc, char **argv){
       );
 
   //writeVectorToFile(mse, "octrace_expvec");
-  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, mse, "octrace_mse", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, mse, "octrace_mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
 
   return 0;
 }
