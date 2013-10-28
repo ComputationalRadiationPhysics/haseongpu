@@ -25,14 +25,14 @@
 % refractiveIndices         the refractive indices for each surface [top_inner, top_outer, bottom_inner, bottom_outer]
 % reflectivities            the amount of reflection in case there is no total internal reflection)
 % MaxRays                   the maximum number of rays for each samplepoint
-% expectation_threshold     the maximum allowed expectation (see calc_dndt_ase.cu) for each samplepoint (calculation will be restarted with more rays, if expectation not low enough)
+% mse_threshold             the maximum allowed expectation (see calc_dndt_ase.cu) for each samplepoint (calculation will be restarted with more rays, if expectation not low enough)
 % bool use_reflections      if reflections should be used
 %
 % phi_ASE                   phi_ASE values, multiple Wavelengths in different columns
 % expected_values           real expectation-values for each samplepoint (aligned like phi_ASE)
 % N_rays                    number of rays that were used for each samplepoint
 
-function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,expectation_threshold,use_reflections)
+function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
 
 
 CURRENT_DIR = pwd;
@@ -47,24 +47,31 @@ clean_IO_files(TMP_FOLDER);
 
 %TODO create real values in Matlab
 if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
-    WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
-    [a,b] = size(sorted_int);
-    clad_int = ones(1,a);
-    clad_number = 3;
-    clad_abs = 5.5;
-  end
+  WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
+  [a,b] = size(sorted_int);
+  clad_int = ones(1,a);
+  clad_number = 3;
+  clad_abs = 5.5;
+end
 
-  %TODO create real values in Matlab
-  if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
-    WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
-    refractiveIndices = [1.83,1,1.83,1];
-    [a,b] = size(sorted_int);
-    reflectivities = ones(1,a*2) * 0;
-  end
+%TODO create real values in Matlab
+if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
+  WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
+  refractiveIndices = [1.83,1,1.83,1];
+  [a,b] = size(sorted_int);
+  reflectivities = ones(1,a*2) * 0;
+end
+
+%TODO create real values in Matlab
+if(~exist('mse_threshold','var'))
+  WARNING = 'The variable mse_threshold does not exist'
+  [a,b] = size(laser.s_ems);
+  mse_threshold = ones(1,a)*0.1;
+end
 
 
   % create the new input based on the MATLAB variables
-  create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
+  create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
 
   % create the correct reflection-parameter for the c-function
   REFLECT='';
@@ -73,7 +80,7 @@ if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','v
   end
 
   % do the propagation
-  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) ' --expectation=' num2str(expectation_threshold) REFLECT ' --experiment=' TMP_FOLDER ]);
+  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER ]);
 
   % get the result
   [ expected_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
@@ -84,7 +91,7 @@ if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','v
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
+function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,FOLDER,CURRENT_DIR)
 
 mkdir(FOLDER);
 cd(FOLDER);
@@ -192,6 +199,10 @@ fclose(x);
 
 x=fopen('reflectivities.txt','w');
 fprintf(x,'%.50f\n',reflectivities);
+fclose(x);
+
+x=fopen('mse_threshold.txt','w');
+fprintf(x,'%.15f\n',mse_threshold);
 fclose(x);
 
 cd(CURRENT_DIR);
