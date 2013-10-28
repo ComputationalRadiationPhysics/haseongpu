@@ -1,9 +1,12 @@
-\documentclass[3p,twocolumn]{elsarticle}
+\documentclass[3p]{elsarticle}
 
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsfonts}
 \usepackage{float}
+\usepackage{supertabular}
+\usepackage{multicol}
 
 \begin{document}
 
@@ -14,6 +17,12 @@
 
 \author[hzdr]{E. Zenker}
 \ead{e.zenker@hzdr.de}
+
+\author[hzdr]{D. Albach}
+\ead{d.albach@hzdr.de}
+
+\author[hzdr]{M. Bussmann}
+\ead{m.bussmann@hzdr.de}
 
 \address[hzdr]{
   Institute of Radiation Physics, 
@@ -26,15 +35,17 @@
 
 %abstract must be before maketitle
 \input{abstract}
-
 \maketitle
+
+\begin{multicols}{2}
 
 \input{introduction}
 \input{model}
 \input{methods}
 \input{application}
 \input{results}		
-
 \input{bibliography}
+
+\end{multicols}
 
 \end{document} 

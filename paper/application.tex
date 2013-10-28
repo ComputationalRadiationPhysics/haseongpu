@@ -1,73 +1,96 @@
 \section{Application}
+\numberwithin{equation}{section}
+
 The application is available as a commandline-tool and reads
-its simulation data from plain text files (in future also from stdin).
-For an easy acces the offered MATLAB interface (see \ref{label:matlab_interface}) 
-is highly recommended. Experienced users can also call the application
-directly. Please consult the readme file, the provided 
-example code or the source code for more details.\\
-\textbf{TODO:}~octave interface
+its simulation data from plain text files. It was improven by polychromatic
+wavelengths, adaptive sampling, multigpu computation and 
+reflections towards the orginal application from Albach \cite{ASE2010}.
 
-\subsection{Installation}
-The application was tested and developed under a linux environment.
-It can be build by running make inside the root directory, provided
-that make (up to 3.81), gcc (up to 4.6.2) and cuda (5.0) is installed. The device code 
-runs on Nvida graphics cards from compute capability 2.0 (at least fermi
-generation). 
+For an easy access the offered MATLAB interface (see \ref{label:matlab_interface}) 
+is highly recommended. Experienced users with the intention to call the application
+directly, should consult the README file, the provided 
+example code or the source code for more details.
 
-\subsection{MATLAB interface}
-\label{label:matlab_interface}
-Because MATLAB is widely used in academic and research institutions, a MATLAB
-interface is provided. You need to include ``run\_octrace.m'' (you will find it
-inside the root directory after build) into your
-MATLAB path and call the run\_octrace function from you MATLAB environment.
-See the README file for more interface details.
+\subsection{Installation and Usage}
+The application was tested and developed under a linux environment
+and runs on Nvidia graphics cards with capability 2.0 (fermi generation) or higher.
+It can be built by running make inside the application directory, provided
+that make (tested with 3.82), gcc (up to 4.6.2) and cuda (5.0) are installed. 
+This will also setup a MATLAB file calcPhiASE.m in the application
+directory. 
 
-%%\subsection{Features}
-%%\begin{itemize}
-%%  \item polychromatic (multiple wavelengths)
-%%  \item reflections on top and bottom of amplifying medium
-%%  \item variable + adaptive number of rays per sample point
-%%  \item multigpu on one computation node
-%%  \item threshold for MSE
-%%  \item creation of VTK files containing $\Phi_{ASE}$, reflections per prism etc.
-%%  \item comparison with existing VTK files 
-%% \end{itemize}
+To run the application from MATLAB, two steps are
+necessary in advance:
+\begin{enumerate}
+  \label{label:matlab_interface}
+  \item Include calcPhiASE.m from the application directory into your MATLAB path
+  \item Call calcPhiASE function from the MATLAB script: \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
+\end{enumerate}
+In \ref{label:input}, a brief overview about the
+arguments of the calcPhisAse function can be found 
+or see the README file for more interface details.
 
-\subsection{Usage}
-\subsubsection{input}
-\begin{tabular}{| p{3cm} | p{4cm} |}
-  \hline
-  points & Sample points of the mesh \\\hline
-  triangleNormalsX & X coordinates of triangle edges normal vector \\\hline
-  triangleNormalsY & Y coordinates of triangle edges normal vector \\\hline
-  forbiddenEdges & Adjacent edges of neighbor triangles\\\hline
-  triangleNormalPoint & Start points of triangle edges normal vector \\\hline
-  triangleNeighbors & Neighbor relation of triangles \\\hline
-  trianglePoints & Points of the triangle vertices \\\hline
-  thickness & Thickness of one mesh level \\\hline
-  numberOfLevels & Total number of levels \\\hline
-  nTot & \textbf{TODO} Some constant \\\hline
-  betaVol & \textbf{TODO} Some constant for each sample Points \\\hline
-  laserWavelength & \textbf{TODO} Laserparameter \\\hline
-  crystal & \textbf{TODO}Crystalparameter \\\hline
-  prismBetaValues & \textbf{TODO} Some constant for every prism of the mesh \\\hline
-  triangleSurfaces & Surfaces of triangles \\\hline
-  triangleCenterX & X coordinate of triangle center point\\\hline
-  triangleCenterY & Y coordinate of triangle center point\\\hline
-  clad & \textbf{TODO} Cladding stuff \\\hline
-  cladNum & \textbf{TODO} More Cladding stuff \\\hline
-  cladAbs & \textbf{TODO} More Cladding stuff \\\hline
-  refractiveIndices &  Refraction index of mesh and volume around \\\hline
-  reflectivities & Reflectivities of mesh planes top and bottom \\\hline
-  maxRays & Maximal number of rays for adaptive sampling \\\hline
-  MSEThreshold & MSE-Threshold for adaptive sampling \\\hline
-  useReflections & Switch to activate reflections \\\hline
-\end{tabular}
 
-\subsubsection{output}
-\begin{tabular}{| p{3cm} | p{4cm} |}
-  \hline
-  $\Phi$-ASE & solution of simulation for each sample point \\\hline
-  MSE & Mean squared error for each sample point \\\hline
-  Nrays & number of rays per sample point \\\hline
-\end{tabular}
+%\subsection{MATLAB interface}
+%\label{label:matlab_interface}
+%Because MATLAB is widely used in academic and research institutions, a MATLAB
+%interface is provided. 
+
+%\subsubsection{Usage}
+%In \ref{label:input}, a brief overview about the
+%arguments of the calcPhisAse function can be found. See the README file for 
+%more interface details. Otherwise it is just a function call from
+%a MATLAB script:
+
+
+\subsubsection{Input Arguments}
+Mesh information needs to be generated in advance
+to save calculation time, because usually $\Phi$-ASE calculations
+run over several timesteps on the same mesh. Thus the following
+data need to be provided by the MATLAB script:
+\begin{itemize}
+  \label{label:input}
+  \item Mesh information
+    \begin{itemize}
+    \item Set of triangles $\mathcal{T}$
+    \item Normal vectors of prism (triangle) sides
+    \item Center points of the triangles
+    \item Surfaces of triangles
+    \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
+    \item Thickness of a mesh slice 
+    \item Number of slices
+    \item Refractive index of mesh and volume around
+    \item Reflectivities of mesh planes bottom and top
+    \end{itemize}
+
+  \item Properties 
+    \begin{itemize}
+      \item Stimuli in the sample points and volume/prisms $\beta$
+      \item Crystal Fluorescence of the active gain medium $\tau_{f}$
+      \item Cladding of the mesh (use of different materials)
+      \item Doping of the active gain medium $N_{tot}$
+    \end{itemize}
+
+  \item Laser information
+    \begin{itemize}
+      \item laser absorption $\sigma_a$
+      \item laser emission $\sigma_e$
+    \end{itemize}
+
+  \item Algorithm information
+    \begin{itemize}
+      \item Maximal number of rays for adaptive sampling
+      \item MSE-threshold for adaptive sampling
+      \item Decide whether to activate reflections
+    \end{itemize}
+    
+\end{itemize}
+
+\subsubsection{Output}
+The MATLAB function returns data 
+for each sample point as follows:
+\begin{itemize}
+  \item $\Phi_{ASE}$ values
+  \item MSE values
+  \item Number of Rays of Monte Carlo simulation
+\end{itemize}

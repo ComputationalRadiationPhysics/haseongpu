@@ -21,7 +21,7 @@
    + cuda 5.0
    
    Hardware:
-   + Nvidia device >= Compute capability 2.0
+   + Nvidia device >= Compute capability 2.0 (at least fermi)
 
 ## Installation ##
 
@@ -33,10 +33,10 @@
    the whole magic stuff for you. But you can also run it by hand,
    see synopsis for details.
 
-## Matlab interface ##
+## MATLAB interface ##
 
-   * add run_octrace.m to your matlab path
-   * call run_octrace from your matlab script
+   * add calcPhiASE.m to your matlab path
+   * call calcPhiASE from your matlab script
 
    run_octrace(
 	points,
@@ -49,14 +49,14 @@
 	thickness,
 	numberOfLevels,
 	nTot,
-	betaVol,
-	laserWavelength,
+	betaVolume,	
+	laserParameter,
 	crystal,
-	prismBetaValues,
+	betaCells,
 	triangleSurfaces,
 	triangleCenterX,
 	triangleCenterY,
-	clad,
+	cladType,
 	cladNum,
 	cladAbs,
 	refractiveIndices,
@@ -65,6 +65,130 @@
 	MSEThreshold,
 	useReflections
 	)
+
+### Argument description ### 
+    In the following all arguments of the MATLAB call are described.
+    You will find on each point a head with datatype (an array when
+    in brackets []), the size of the array and to which set of
+    numbers the array belongs.
+
+
+   * points [float], in {0, ..., numberOfPoints}, size = numberOfPoints
+     The coordinates of the triangle vertices. All x coordinates followed by all
+     of the y coordinates of the triangle vertices
+     structure: [x_1, x_2, ... x_n, y_1, y_2, ... y_n] (n == numberOfPoints)
+
+   * triangleNormalsX [float], size = numberOfTriangles * 3
+     The x coordinate of the normal vectors for each triangle edge.
+     It is ordered as follows:
+     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
+     i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+
+   * triangleNormalsY [float], size = numberOfTriangles * 3
+     The y coordinate of the normal vectors for each triangle edge.
+     It is ordered as follows:
+     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
+     i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+
+   * triangleNormalPoint [unsigned], in {0, ...,  numberOfPoints}, size = numberOfTriangles * 3
+     Contains indices to the point where the
+     triangleNormalVectors start. For each Triangle 3 points (3 edges)
+     are stored in this list. Indices point to locations in "points" 
+     (i.e. normal vectors start at triangle vertices!)l
+     Structure is VERY similar to triangles: 
+     [ triangle1_p0, triangle2_p0, ... triangleN_p0, triangle1_p1, triangle2_p1, ... ]
+
+   * forbiddenEdge [int], in {-1,0,1,2,4}, size = 5
+     Describes the relation of edge indices of adjacent triangles
+     -1 means, there is no adjacent triangle to that edge
+     0,1,2 describes the index of the edge as seen from the ADJACENT triangle
+     Order of data is similar to normalVec:
+     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
+     i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+
+   * triangleNeighbors [int], in {-1,0,1,2,4}, size = 5
+     Describes the neighnor relation of triangles to each other.
+     Each entry corresponds to a triangleID (see "triangles") which
+     is adjacent to the current triangle and edge.
+     Structure is similar to "forbidden":
+     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
+   
+   * trianglePointIndices [int] in {0, ..., numberOfPoints}, size = numberOfTriangles * 3
+     Contains the indices to access the "points" datastructure 
+     (each triangle has 3 points as vertices). Each entry is an
+     index from 0 to numberOfPoints, corresponding to the positions 
+     of a vertex in "points".
+     Structure as follows:
+     [ triangle1A, triangle2A, ... triangleNA, triangle1B, triangle2B, ... triangleNB, triangle1C, ... ]
+     i.e. for triangles with vertices A,B,C there are all the indices
+     of the A-vertices, followed by all the B and C vertices.
+
+   * thickness float, size = 1
+     Thickness of one prism level of the mesh.
+
+   * numberOfLevels unsigned, size = 1
+     Total number of levels of the mesh. Thus the total thickness
+     of the mesh is thickness * numberOfLevels!
+
+   * nTot float
+     Doping of the active gain medium
+
+  * betaVolume [float], size = numberOfTriangles * numberOfLevels - 1
+     Stimulus in the volume (prisms).
+     Beta values for all prisms ordered accordingly to the prismIDs:
+     prismID = triangleID + layer * numberOfTriangles.
+     Therefore, all betaValues for a layer are grouped together
+
+   * laserParameter [float] 
+     Is a structure for the laser parameters (wavelength sigmas)
+     struct(s_abs, VALUES, s_ems, VALUES)
+
+   * crystal [float]
+     Describes the crystalFluorescence of the active gain medium.
+
+   * betaCells [float]
+     Stimulus in the sample points.
+
+   * triangleSurfaces [float], size = numberOfTriangles
+     The sizes of the surfaces of each triangle, ordered by the triangleID.
+
+   * triangleCenterX [float], size = numberOfTriangles
+     The x coordinates of the center points for each triangle
+     ordered by TriangleID.
+
+   * triangleCenterY [float], size = numberOfTriangles
+     The y coordinates of the center points for each triangle
+     ordered by TriangleID.
+
+   * cladType [int], size = numberOfTriangles
+     Sets cladding index for triangles {0,1,2,...}
+
+   * cladNum unsigned, size = 1
+     Set which cladding to use
+
+   * cladAbs float, size = 1
+     Absorption coefficient of cladding
+
+   * refractiveIndices [float], size = 4
+     Describes the refractive indices of the active
+     gain medium top and bottom planes.
+     It is structured as follows:
+     {bottomInside, bottomOutside, topInside, topOutside}
+     bottomInside = topInside (because it is the same medium)
+
+   * reflectivities [float], in {0, ...,1}, size = 2 * numberOfTriangles
+     Defines the reflectivities of prism planes.
+     First the reflectivities of bottom plane and then the reflectivities
+     of top plane. Both it ordered by TriangleID.
+
+   * maxRays unsigned, size = 1
+     Maximal number of rays for adaptive sampling
+ 
+   * MSEThreshold float, size = 1
+     MSE-Threshold for adaptive sampling
+
+   * useReflections bool, size = 1
+     Switch to activate reflections
 
 ## Synopsis ##
 

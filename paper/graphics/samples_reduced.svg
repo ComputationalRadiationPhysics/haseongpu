@@ -7,13 +7,16 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="811.80188"
+   width="837.51752"
    height="537.30762"
-   viewBox="0 0 811.80188 537.30762"
+   viewBox="0 0 837.51752 537.30762"
    id="svg9589"
    version="1.1"
    inkscape:version="0.48.4 r9939"
-   sodipodi:docname="samples_reduced.png">
+   sodipodi:docname="samples_reduced.svg"
+   inkscape:export-filename="/home/carli/Dokumente/TUD/CUDA/projekt/git/octrace/paper/graphics/samples_reduced.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
   <metadata
      id="metadata19641">
     <rdf:RDF>
@@ -35,13 +38,13 @@
      guidetolerance="10"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:window-width="1598"
+     inkscape:window-width="798"
      inkscape:window-height="879"
      id="namedview19639"
      showgrid="false"
-     inkscape:zoom="0.51558551"
-     inkscape:cx="320.24559"
-     inkscape:cy="402.13686"
+     inkscape:zoom="1.031171"
+     inkscape:cx="690.35676"
+     inkscape:cy="327.31807"
      inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="0"
@@ -37666,7 +37669,7 @@ CreationDate: Mon Oct 14 10:46:38 2013
      cx="183.728"
      transform="translate(-170.228,-125.258)" />
   <g
-     transform="translate(-4.5918639,-37.940431)"
+     transform="translate(-4.5918627,-37.940427)"
      style="display:inline"
      id="g48171">
     <path
@@ -37724,23 +37727,27 @@ CreationDate: Mon Oct 14 10:46:38 2013
          style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Serif;-inkscape-font-specification:Serif">x</tspan></text>
   </g>
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.10500002;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow2Lend);display:inline"
-     d="m 590.81746,37.347292 c -48.36588,-26.839429 -78.84871,12.84591 -78.84871,12.84591"
+     style="fill:none;stroke:#000000;stroke-width:1.051103;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow2Lend);display:inline"
+     d="M 583.08624,37.342385 C 539.42671,10.43947 511.91008,50.218681 511.91008,50.218681"
      id="path3125"
      inkscape:connector-curvature="0"
      sodipodi:nodetypes="cc" />
   <text
      xml:space="preserve"
-     style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;display:inline;font-family:Serif;-inkscape-font-specification:Serif"
-     x="592.8175"
-     y="49.347282"
+     style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:90.55553675%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:end;fill:#000000;fill-opacity:1;stroke:none;display:inline;font-family:Serif;-inkscape-font-specification:Serif"
+     x="828.005"
+     y="49.347286"
      id="text4107"
-     sodipodi:linespacing="125%"><tspan
+     sodipodi:linespacing="90.555537%"><tspan
        sodipodi:role="line"
-       x="592.8175"
-       y="49.347282"
-       id="tspan4113"
-       style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Serif;-inkscape-font-specification:Serif">sample point</tspan></text>
+       x="828.005"
+       y="49.347286"
+       style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:88.16665411%;writing-mode:lr-tb;text-anchor:end;font-family:Serif;-inkscape-font-specification:Serif"
+       id="tspan8045"><tspan
+   id="tspan8065"
+   style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:125%;writing-mode:lr-tb;text-anchor:end;font-family:Serif;-inkscape-font-specification:Serif">sampl</tspan>e point s<tspan
+   style="font-size:65.00091553%;text-align:end;line-height:88.16665411%;text-anchor:end;baseline-shift:sub"
+   id="tspan8047">i</tspan></tspan></text>
   <path
      style="fill:none;stroke:#000000;stroke-width:1.12543881px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:url(#DistanceStart);marker-end:url(#DistanceEnd)"
      d="m 590.71645,487.28084 -6.45996,38.72328"

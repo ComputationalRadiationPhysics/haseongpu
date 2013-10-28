@@ -1,48 +1,93 @@
 \section{Methods}
+\numberwithin{equation}{section}
+This section explains methods used to reduce runtime and
+increase precision.
+
 \subsection{Parallel methods}
-There are several granularities and ways of parallelization in this kind of 
-Monte Carlo simulation. In the following, the used parallelization points and
-its implementations are listed:
+\label{subsec:parallel_methods}
+Moving from a single CPU to a multiple
+GPU implementation is not so much about changing the overall algorithm,
+but more about efficient utilisation of the GPU ressources. 
+By using CUDA as a parallel computing platform created by NVIDIA,
+it is possible to obtain high performance with a high level 
+programming model (similar to C++). Therefore the parallelization was pushed on CUDA-thread, 
+CUDA-block and multiple GPU level to reach a good speedup compared to 
+the original implementation.
+In the following, the used parallelization
+techniques and their implementations are explained.
 
-\begin{description}
+\subsubsection{Sample Points on multiple GPUs}
 
-  \item[Sample points] (multiple GPUs)\\
-    The sample points introduced in \ref{subsec:meshSampling} are independent from each other
-    and therefore its $\Phi$-ASE can be calculated in parallel. Every $\Phi$-ASE
-    calculation runs in his own GPU-Kernel, thus sample points can be partioned 
-    to several devices. As a result the speedup for multiple GPUs is almost linear.
+Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(s_i)$ 
+value of a sample point $s_i$ independent from each other.
+Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as its own CUDA kernel
+and therefore sample points can be distributed to several devices.
 
-  \item[Rays] (GPU threads)\\
-    Every ray can be traced independently through the mesh structure.
+Consider having $k$ GPUs on a node available, 
+$k$ \emph{pthreads} are spawned on the host, like it
+is shown in figure \ref{graphic:multigpu}. A GPU and a
+disjunct subset of sample points are assigned to every pthread, so that every
+sample point is distributed exactly to one pthread.
+From this point on, the pthreads run in parallel and start a
+CUDA kernel for every sample point in their subset.
+The kernels inside a pthread are called sequentially,
+thus the number of pthreads is limited by the number of sample points, when 
+every GPU simulates exacly one sample point.
+
+As a result the speedup for multiple
+GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
+    
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning.png}}}
+  \caption{partitioning of the workload to multiple devices}
+  \label{graphic:multigpu}
+\end{figure}
+
+\subsubsection{Rays as GPU threads}
+    The Raytracing of every ray can be done independently 
+    through the mesh structure. 
     Exploiting this parallelism provides a great opportunity to boost
-    performance. Only the resulting gains for each sample point have to be
-    added atomatically in the end.
-    Furthermore rays with same origin and direction will be grouped
-    into warps to utilize the GPU cache in a good way.
-
-  \item[Wavelengths] (Seperate block dimension)\\
-    According to \ref{subsec:monteCarlo}, the simulation of a polychromatic
-    laser can be split into sufficiently small monochromatic simulations which
-    are again completely independent from each other.
-
-\end{description}
+    performance. Figure \ref{graphic:kernel} demonstrates the distribution
+    of rays to CUDA threads. In which a CUDA thread implements the following
+    raytracing cycle:
+    \begin{enumerate}
+      \item Get current sample point $s_i$
+      \item Request a prism to start ray from
+      \item Generate start point $r_{i,u}$ inside this prism 
+      \item Generate ray $\overrightarrow{r_{i,u}s_i}$
+      \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
+      \item Add gain to gain of the other rays atomically \eqref{eq:monte_carlo_ase}
+    \end{enumerate}
+    This repeats maximal $t$ times until every ray was traced. Furthermore rays with same
+    origin and direction will be grouped into warps to utilize the
+    GPU cache in a good way.
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail.png}}}
+  \caption{$\Phi_{ASE}$ kernel with CUDA threads}
+  \label{graphic:kernel}
+\end{figure}
 
 \subsection{Importance sampling}
+\label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
-ASE-Flux calculation a presampling of a sample point is done
-to figure out which areas inside the mesh are worth to start rays from.
-This method has a strong impact on the precision of the
-simulation.
+ASE-Flux calculation, before every kernel call a presampling 
+of a sample point is done to figure out which areas are more
+important to the result and thus need more rays then others.
+This method has a strong impact on the precision of the simulation.
 
 Figure \ref{graphic:importance} demonstrates
-the differences between calculation with und without
-importance sampling. It is shown each a cut through the activ 
+the differences between calculation without and with
+importance sampling. It is shown each a cut through the active
 gain medium in which the graphic without important
-sampling has some peaks. Thus importance 
-sampling can increase the efficiency of Monte-Carlo-Simulations 
-by reducing variance and simulation runtime. 
-\begin{figure}
+sampling has some peaks. To reduce peaks, the experiment
+could be simulated with more rays, but this would increase
+calculation time. Thus, importance sampling can increase the
+efficiency of Monte Carlo simulations by reducing variance 
+and simulation runtime. 
+\begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
@@ -50,30 +95,33 @@ by reducing variance and simulation runtime.
 \end{figure}
 
 \subsection{Adaptive sampling}
+\label{subsec:adaptive_sampling}
 Since most sample points behave in a good way, there is no need
 to sample them with a high number of rays. Only some outliers need to
-be simulated with a higher precision. You can quantify the precision
-and therefore the difference between the true and calculated value by
-further determine the mean squared error (MSE).
-The adaptive method allows you to remove strong peaks in the result
+be sampled with a higher precision. To assess the precision
+and therefore the difference between the true and calculated value,
+it is further determined the mean squared error (MSE).
+The adaptive method allows to remove strong peaks in the result
 of the simulation without sampling all sample points with
-a high number of rays and therefore reduce runtime.
-\begin{figure}
+a high number of rays resulting in reduced runtime.
+%\end{multicols}
+\begin{figure}[H]
   \centerline{
-    \resizebox{0.45\textwidth}{!}{\includegraphics{plot/mse.png}}}
-  \caption{Comparision adaptive, not adaptive, no importance sampling}
+    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse.png}}}
+  \caption{Comparision no importance samling, not adaptive, adaptive}
   \label{plot:adaptive}
 \end{figure}
+%\begin{multicols}{2}
 
-In Figure~\ref{plot:adaptive} the adaptive method with 
-50K to 500M rays per sample point is compared to the simulations
-not adaptive and no importance sampling with each 300K rays per sample point (same runtime of 10s).
+In figure~\ref{plot:adaptive} the adaptive method with 
+$5 \cdot 10^4$ to $5 \cdot 10^8$ rays per sample point is compared to the simulations
+non adaptive and no importance sampling with each $3 \cdot 10^5$ rays per sample point (same runtime of 10s).
 The not adaptive and no importance sampling method have some big peaks while all sample points of 
 the adaptive method lie under a preset $MSE$-threshold (in this case 0.005). 
 
-The adaptive method won't reduce the average MSE over sample points,
-but it will reduce the maximal MSE values. Thus using the adaptives
-methods gives higher precision by same calculation time.
+The adaptive method will not reduce the average MSE over sample points,
+but it will reduce the maximal MSE values. Thus, using the adaptive
+methods gives lower error by same calculation time.
 
 %\begin{itemize}
 %\item []

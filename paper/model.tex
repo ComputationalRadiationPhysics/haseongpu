@@ -1,35 +1,68 @@
 \section{Model}
+\numberwithin{equation}{section}
 
-This section describes the underlying model and ideas for the $\Phi_{ASE}$
-calculation in an active gain medium with planar top and bottom surfaces (see
-figure \ref{graphic:samples_reduced}).
+The calculation of the ASE Flux $\Phi_{ASE}$ model is based on the concept of an
+active gain medium with planar top and bottom surfaces. This \emph{crystal} is
+then sampled and for each \emph{sample point} (figure
+\ref{graphic:samples_reduced}) the amplification of spontaneous emission is
+determined. 
 
 
+\subsection{Monte Carlo simulation}
+\label{subsec:monteCarlo}
 
-\subsection{the crystal mesh} \label{subsec:meshSampling}
+For a given sample point $s_i$ in the crystal, $\Phi_{ASE}$ can
+be calculated as described in \cite{ASE2010}:
+\begin{equation}
+  \label{eq:phi_ase_daniel} 
+  \Phi_{ASE}(s_i)=\frac{1}{4\pi}\iint
+  \frac
+    {\hat{n}(r)}
+    {\tau_{f}|\rho(r,s_i)|^2}
+  ~g(\lambda)
+  ~G_{r\rightarrow s_i}
+  ~dV d\lambda
+\end{equation}
+where $G_{r\rightarrow s_i}$ denotes the amplification between
+position $r$ and $s_i$ as a line integral on the vector
+$\overrightarrow{rs_i}$.  One approach to solve the integral is to use Monte
+Carlo integration. For a single wavelenght, the equation is rewritten as a sum:
+\begin{equation}
+  \label{eq:monte_carlo_ase}
+  \Phi_{ASE}(s_i) = 
+  \frac{1}{4\pi N\tau_f}
+  \sum^{N-1}_{u=0} \hat{n}(r_{i,u}) \cdot gain(\overrightarrow{r_{i,u}s_i})
+\end{equation}
+where $N$ is the number of Monte Carlo experiments (the number of \emph{rays}
+simulated) and $gain(\overrightarrow{r_{i,u}s_i})$ is the amplification along the
+path $\overrightarrow{r_{i,u}s_i}$ of a single ray as described in formula
+\eqref{eq:gain}.
 
-To distribute the \emph{sample points} on the medium, it is seen as a
-horizontal 2-dimensional plane, which can be sampled with a non-uniform
+
+\subsection{The crystal mesh} \label{subsec:meshSampling}
+
+In order to distribute the sample points on the medium, it is treated as
+a horizontal 2-dimensional plane, which can be sampled with a non-uniform
 density. This approach allows to increase the spatial resolution in certain
-areas of interest. Using Delauny triangulation, these sample points are
-connected to a 2D mesh of triangles.
+areas of interest. Using Delaunay triangulation, these sample points are
+connected into a 2D mesh of triangles.
+
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
+  }
+  \caption{extruded plane of triangles}
+  \label{graphic:extruded_mesh}
+\end{figure}
 
 The triangle mesh is extruded in direction of the vertical axis to form a
 \emph{slice} of right prisms (figure \ref{graphic:extruded_mesh}). This
 slice is then duplicated several times, until the whole medium is divided into
 prisms (figure \ref{graphic:samples_reduced}).
 
-\begin{figure}
+\begin{figure}[H]
   \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
-  }
-  \caption{extruded plane of triangles}
-  \label{graphic:extruded_mesh}
-\end{figure}
-
-\begin{figure}
-  \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
   \caption{non-uniform sampling of active gain medium in 2 slices}
   \label{graphic:samples_reduced}
@@ -38,26 +71,26 @@ prisms (figure \ref{graphic:samples_reduced}).
 
 
 
-\subsection{ray tracing}
+\subsection{Ray tracing}
 \label{subsec:raytracing}
 
-To calculate the amplification of a single ray from a position $r_i$ to a sample
-point $r_0$, the ray is traced along its path through the prisms (see figure
+For calculating the amplification of a single ray from a position $r_{i,u}$ to a sample
+point $s_i$, the ray is traced along its path through the prisms (see figure
 \ref{graphic:prism_propagation}). 
 
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.45\textwidth} {!} {\includegraphics{./graphics/prism_propagation_2.png}}
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/prism_propagation_3.png}}
   }
   \caption{propagation of a ray through the prism structure}
   \label{graphic:prism_propagation}
 \end{figure}
 
-Starting from point $r_i$ inside a prism, there are 5 possible intersection
-planes for the ray. One plane for the top and bottom surfaces and one for each
+Starting from point $r_{i,u}$ inside a prism, there are 5 possible intersection
+planes with the ray. One plane for the top and bottom surfaces and one for each
 of the 3 horizontal sides. Once the intersection plane is determined (the ray is
 intersecting at point $r_x$), the next prism can be calculated based on the
-knowledge about the meshing structure:
+knowledge about the mesh structure:
 
 \begin{description}
 
@@ -65,7 +98,7 @@ knowledge about the meshing structure:
     the ray will remain in the same slice, but the next prism is based on a
     different triangle. This triangle is a \emph{neighbor} of the previous one.
     The relevant datastructure to determine the neighboring triangle is created
-    during the Delauny triangulation in \ref{subsec:meshSampling}.
+    during the Delauny triangulation in section \ref{subsec:meshSampling}.
 
   \item[top/bottom plane]
     if the ray is intersecting with the top or bottom plane of the prism, the
@@ -74,58 +107,69 @@ knowledge about the meshing structure:
 
 \end{description}
 
-This process is iterated for each prism on the path between $r_i$ and the
-desired sample point $r_0$. The intersections (like $r_x$) with prism surfaces
+This process is iterated for each prism on the path between $r_{,u}i$ and the
+desired sample point $s_i$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
-gain calculation: For each prism $x$, the contribution to the gain is calculated as
-a function of $l_x$:
+gain calculation: For each prism $x$, the contribution to the gain is calculated
+as a function of $l_x$:
 
-\[ 
+\begin{equation}
+\label{eq:partial_gain}
   partial\_gain(x) = 
   e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
-\]
-
-where $\beta_x$ is the \textbf{TODO: describe beta} beta value in the current
+\end{equation}
+where $\beta_x$ is the stimulus in the current
 prism.
+
 The gain for the whole ray can then be computed as
 
-\[ 
-  gain(\overrightarrow{r_ir_0}) =  \beta_i \cdot 
-  \frac  { \prod^n partial\_gain(n) }{distance(r_i,r_0)^2 }
-\]
+\begin{equation}
+\label{eq:gain}
+  gain(\overrightarrow{r_{i,u}s_i}) =  
+  \frac{\beta_i}{ |\overrightarrow{r_{i,u}s_i}|^2} \cdot \prod^npartial\_gain(n) 
+\end{equation}
+
+
 
 \subsection{Reflections}
+\label{subsec:reflections}
 
-\begin{itemize}
-
-  \item Depending on the material and coating, there are different
-    reflectivities on the crystal's surfaces.
-
-  \item A fast simulation allows to take reflecting rays into account and to
-    estimate the impact of lateral lasing.
-
-  \item Only reflections on upper and lower plane implemented until now.
-
-\end{itemize}
+In order to allow a more detailed simulation, the model is extended to include
+reflections on the surface of the medium. The ray is split into multiple
+separate sub-rays, each representing one part of the reflection (see figure
+\ref{graphic:reflections_2D}: $\overrightarrow{r_{i,u}m_{i,u,1}}$,
+$\overrightarrow{m_{i,u,1}m_{i,u,2}}$, $\overrightarrow{m_{i,u,2}s_i}$).
 
 
-
-\subsection{Monte Carlo simulation}
-\label{subsec:monteCarlo}
-
-\begin{itemize}
-
-  \item \textit{integral is expressed by formula} \cite[Daniel's Thesis]{ASE2010}
-
-  \item Monte Carlo simulation as a way to calculate the integral for the whole
-    crystal.
-
-  \item \textit{formula for the additive Monte Carlo}
-
-\end{itemize}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
+  }
+  \caption{reflections of a ray propagation on the crystal surface}
+  \label{graphic:reflections_2D}
+\end{figure}
 
 
+On each of the reflection points, Brewster's angle $\theta_{B}$ is calculated to
+estimate the \emph{initial gain} $g_i$ of a ray that is reflected at position
+$x_i$:
 
+\begin{equation}
+\label{eq:gain_reflection}
+  g_i = 
+  \begin{cases}
+    gain(\overrightarrow{x_{i-1}x_i}) & \text{if } \theta \ge \theta_{B}  \\
+    gain(\overrightarrow{x_{i-1}x_i}) \cdot \gamma(x_i) & \text{if } \theta < \theta_{B}   
+  \end{cases}
+\end{equation}
+Where $\gamma(x_i)$ is the fraction of the reflected energy (the reflectivity)
+when the angle is too acute for total internal reflection, based on the surface
+coating. $x_n$ refers to
+either a mirror point $m_n$, $r_{i,u}$ or $s_i$.
 
-
-
+The computation of all sub-rays comprises a significant overhead over the more
+simplistic model with just a single ray, which necessitates the use of a high
+performance algorithm.  The current implementation includes different refractive
+indices as well as varying reflectivites for each Delaunay triangle. However,
+only reflections on the upper and lower surface are supported, resulting in a
+limited simulation that disregards lateral lasing. 
