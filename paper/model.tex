@@ -2,7 +2,7 @@
 \numberwithin{equation}{section}
 
 The calculation of the ASE Flux $\Phi_{ASE}$ model is based on the concept of an
-active gain medium with planar top and bottom surfaces. This \emph{crystal} is
+active gain medium with planar top and bottom surfaces. This \emph{gain medium} is
 then sampled and for each \emph{sample point} (figure
 \ref{graphic:samples_reduced}) the amplification of spontaneous emission is
 determined. 
@@ -11,7 +11,7 @@ determined.
 \subsection{Monte Carlo simulation}
 \label{subsec:monteCarlo}
 
-For a given sample point $s_i$ in the crystal, $\Phi_{ASE}$ can
+For a given sample point $s_i$ in the gain medium, $\Phi_{ASE}$ can
 be calculated as described in \cite{ASE2010}:
 \begin{equation}
   \label{eq:phi_ase_daniel} 
@@ -33,13 +33,13 @@ Carlo integration. For a single wavelenght, the equation is rewritten as a sum:
   \frac{1}{4\pi N\tau_f}
   \sum^{N-1}_{u=0} \hat{n}(r_{i,u}) \cdot gain(\overrightarrow{r_{i,u}s_i})
 \end{equation}
-where $N$ is the number of Monte Carlo experiments (the number of \emph{rays}
+where $N$ is the number of Monte Carlo simulations (the number of \emph{rays}
 simulated) and $gain(\overrightarrow{r_{i,u}s_i})$ is the amplification along the
 path $\overrightarrow{r_{i,u}s_i}$ of a single ray as described in formula
 \eqref{eq:gain}.
 
 
-\subsection{The crystal mesh} \label{subsec:meshSampling}
+\subsection{The gain medium mesh} \label{subsec:meshSampling}
 
 In order to distribute the sample points on the medium, it is treated as
 a horizontal 2-dimensional plane, which can be sampled with a non-uniform
@@ -49,27 +49,24 @@ connected into a 2D mesh of triangles.
 
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
-  }
-  \caption{extruded plane of triangles}
-  \label{graphic:extruded_mesh}
-\end{figure}
-
-The triangle mesh is extruded in direction of the vertical axis to form a
-\emph{slice} of right prisms (figure \ref{graphic:extruded_mesh}). This
-slice is then duplicated several times, until the whole medium is divided into
-prisms (figure \ref{graphic:samples_reduced}).
-
-\begin{figure}[H]
-  \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
   \caption{non-uniform sampling of active gain medium in 2 slices}
   \label{graphic:samples_reduced}
 \end{figure}
 
+The triangle mesh is extruded in direction of the vertical axis to form a
+\emph{slice} of right prisms (figure \ref{graphic:extruded_mesh}). This
+slice is then duplicated several times, until the whole medium is divided into
+prisms (Figure \ref{graphic:samples_reduced}).
 
-
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_3.png}}
+  }
+  \caption{extruded plane of triangles}
+  \label{graphic:extruded_mesh}
+\end{figure}
 
 \subsection{Ray tracing}
 \label{subsec:raytracing}
@@ -136,7 +133,7 @@ The gain for the whole ray can then be computed as
 
 In order to allow a more detailed simulation, the model is extended to include
 reflections on the surface of the medium. The ray is split into multiple
-separate sub-rays, each representing one part of the reflection (see figure
+separate sub-rays, each representing one part of the reflection (see Figure
 \ref{graphic:reflections_2D}: $\overrightarrow{r_{i,u}m_{i,u,1}}$,
 $\overrightarrow{m_{i,u,1}m_{i,u,2}}$, $\overrightarrow{m_{i,u,2}s_i}$).
 
@@ -145,7 +142,7 @@ $\overrightarrow{m_{i,u,1}m_{i,u,2}}$, $\overrightarrow{m_{i,u,2}s_i}$).
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_1.png}}
   }
-  \caption{reflections of a ray propagation on the crystal surface}
+  \caption{reflections of a ray propagation on the gain medium surface}
   \label{graphic:reflections_2D}
 \end{figure}
 
@@ -172,4 +169,4 @@ simplistic model with just a single ray, which necessitates the use of a high
 performance algorithm.  The current implementation includes different refractive
 indices as well as varying reflectivites for each Delaunay triangle. However,
 only reflections on the upper and lower surface are supported, resulting in a
-limited simulation that disregards lateral lasing. 
+limited simulation that disregards lateral feedback. 

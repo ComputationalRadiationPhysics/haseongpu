@@ -35,7 +35,7 @@ thus the number of pthreads is limited by the number of sample points, when
 every GPU simulates exacly one sample point.
 
 As a result the speedup for multiple
-GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
+GPUs is almost linear, which was tested with up to 4 GPUs.
     
 \begin{figure}[H]
   \centerline
@@ -73,13 +73,13 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
-ASE-Flux calculation, before every kernel call a presampling 
+ASE-Flux calculation, before every kernel call an importance sampling 
 of a sample point is done to figure out which areas are more
 important to the result and thus need more rays then others.
 This method has a strong impact on the precision of the simulation.
 
 Figure \ref{graphic:importance} demonstrates
-the differences between calculation without and with
+the differences between calculation with and without
 importance sampling. It is shown each a cut through the active
 gain medium in which the graphic without important
 sampling has some peaks. To reduce peaks, the experiment
@@ -113,7 +113,7 @@ a high number of rays resulting in reduced runtime.
 \end{figure}
 %\begin{multicols}{2}
 
-In figure~\ref{plot:adaptive} the adaptive method with 
+In Figure~\ref{plot:adaptive} the adaptive method with 
 $5 \cdot 10^4$ to $5 \cdot 10^8$ rays per sample point is compared to the simulations
 non adaptive and no importance sampling with each $3 \cdot 10^5$ rays per sample point (same runtime of 10s).
 The not adaptive and no importance sampling method have some big peaks while all sample points of 
