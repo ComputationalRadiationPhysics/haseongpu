@@ -89,7 +89,6 @@ void parseCommandLine(
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    float *expectationThreshold,
     unsigned *maxgpus
     );
 
@@ -100,7 +99,6 @@ int checkParameterValidity(
     const std::string root,
     const unsigned deviceCount,
     const RunMode mode,
-    float *expectationThreshold,
     unsigned *maxgpus
     );
 

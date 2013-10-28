@@ -14,10 +14,10 @@ struct calcDndtAseArgs
 		  const Mesh& phostMesh,
 		  const std::vector<double>& psigmaA,
 		  const std::vector<double>& psigmaE,
-		  const float pexpectationThreshold,
+		  const std::vector<float>& pMseThreshold,
 		  const bool puseReflections,
 		  std::vector<float> &pphiAse,
-		  std::vector<double> &pexpectation,
+		  std::vector<double> &pMse,
       std::vector<unsigned> &pTotalRays,
 		  unsigned pgpu_i,
 		  unsigned pminSample_i,
@@ -28,10 +28,10 @@ struct calcDndtAseArgs
 				    hostMesh(phostMesh),
 				    sigmaA(psigmaA),
 				    sigmaE(psigmaE),
-				    expectationThreshold(pexpectationThreshold),
+				    mseThreshold(pMseThreshold),
 				    useReflections(puseReflections),
 				    phiAse(pphiAse),
-				    expectation(pexpectation),
+				    mse(pMse),
             totalRays(pTotalRays),
 				    gpu_i(pgpu_i),
 				    minSample_i(pminSample_i),
@@ -45,10 +45,10 @@ struct calcDndtAseArgs
   const Mesh& hostMesh;
   const std::vector<double>& sigmaA;
   const std::vector<double>& sigmaE;
-  const float expectationThreshold;
+  const std::vector<float>& mseThreshold;
   const bool useReflections;
   std::vector<float> &phiAse;
-  std::vector<double> &expectation;
+  std::vector<double> &mse;
   std::vector<unsigned> &totalRays;
   unsigned gpu_i;
   unsigned minSample_i;
@@ -64,10 +64,10 @@ void *entryPoint(void* arg){
    	      a->hostMesh,
    	      a->sigmaA,
    	      a->sigmaE,
-   	      a->expectationThreshold,
+   	      a->mseThreshold,
    	      a->useReflections,
    	      a->phiAse,
-   	      a->expectation,
+   	      a->mse,
           a->totalRays,
    	      a->gpu_i,
    	      a->minSample_i,
@@ -83,10 +83,10 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      const Mesh& hostMesh,
 			      const std::vector<double>& sigmaA,
 			      const std::vector<double>& sigmaE,
-			      const float expectationThreshold,
+			      const std::vector<float>& mseThreshold,
 			      const bool useReflections,
 			      std::vector<float> &phiAse,
-			      std::vector<double> &expectation,
+			      std::vector<double> &mse,
 			      std::vector<unsigned> &totalRays,
 			      unsigned gpu_i,
 			      unsigned minSample_i,
@@ -98,10 +98,10 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 					      hostMesh,
 					      sigmaA,
 					      sigmaE,
-					      expectationThreshold,
+					      mseThreshold,
 					      useReflections,
 					      phiAse,
-					      expectation,
+					      mse,
                 totalRays,
 					      gpu_i,
 					      minSample_i,

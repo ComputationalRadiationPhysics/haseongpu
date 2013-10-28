@@ -14,7 +14,6 @@ void parseCommandLine(
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    float *expectationThreshold,
     unsigned *maxgpus
     ) {
 
@@ -84,10 +83,6 @@ void parseCommandLine(
       *useReflections = true;
     }
 
-    if (p.first == "--expectation"){
-      *expectationThreshold = atof(p.second.c_str());
-    }
-    
     if (p.first == "--maxgpus"){
       *maxgpus = atoi(p.second.c_str());
     }
@@ -103,7 +98,6 @@ int checkParameterValidity(
     const std::string root,
     const unsigned deviceCount,
     const RunMode mode,
-    float *expectationThreshold,
     unsigned *maxgpus
     ) {
 
@@ -113,7 +107,6 @@ int checkParameterValidity(
     fprintf(stderr, "C                      --rays=[number of rays]\n"); 
     fprintf(stderr, "C                      --experiment=[location to experiment-data]\n");
     fprintf(stderr, "C                      --compare=[location of vtk-file to compare with]\n");
-    fprintf(stderr, "C                      --expectation=[max value of expectation]\n");
     fprintf(stderr, "C                      --maxrays=[max number of rays for adaptive sampling]\n");
     fprintf(stderr, "C                      --maxgpus=[max number of gpus to use]\n");
     fprintf(stderr, "C Runmodes : for_loops\n");
@@ -132,13 +125,6 @@ int checkParameterValidity(
   if (root.size() == 0) {
     fprintf(stderr, "C Please specify the experiment's location with --experiment=\n");
     return 1;
-  }
-
-  if ((*expectationThreshold) <= 0.f){
-    if((*maxRaysPerSample) > 0){
-      fprintf(stderr, "C Warning: using adaptive number of rays, but no expectationThreshold is set (omit --maxrays or set expectation with --expectation=...\n");
-    }
-    (*expectationThreshold) = 10000000.f;
   }
 
   *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
