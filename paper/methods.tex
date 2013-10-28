@@ -37,7 +37,7 @@ every GPU simulates exacly one sample point.
 As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
     
-\begin{figure}
+\begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning.png}}}
   \caption{partitioning of the workload to multiple devices}
@@ -62,7 +62,7 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
     This repeats maximal $t$ times until every ray was traced. Furthermore rays with same
     origin and direction will be grouped into warps to utilize the
     GPU cache in a good way.
-\begin{figure}
+\begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail.png}}}
   \caption{$\Phi_{ASE}$ kernel with CUDA threads}
@@ -87,7 +87,7 @@ could be simulated with more rays, but this would increase
 calculation time. Thus, importance sampling can increase the
 efficiency of Monte Carlo simulations by reducing variance 
 and simulation runtime. 
-\begin{figure}
+\begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
   \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
@@ -104,12 +104,14 @@ it is further determined the mean squared error (MSE).
 The adaptive method allows to remove strong peaks in the result
 of the simulation without sampling all sample points with
 a high number of rays resulting in reduced runtime.
-\begin{figure}
+\end{multicols}
+\begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse.png}}}
   \caption{Comparision no importance samling, not adaptive, adaptive}
   \label{plot:adaptive}
 \end{figure}
+\begin{multicols}{2}
 
 In figure~\ref{plot:adaptive} the adaptive method with 
 $5 \cdot 10^4$ to $5 \cdot 10^8$ rays per sample point is compared to the simulations
