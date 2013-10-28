@@ -90,6 +90,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
     time_t progressStartTime = time(0);
     //calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
+    //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
+      //std::cout << "SAMPLE " << sample_i << std::endl;
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       hRaysPerSample = hRaysPerSampleSave;
 
@@ -129,13 +131,16 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
         // Check square error
 	float expTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
-	if(expTmp > expectation.at(sampleOffset)){
-	  double a = dPhiAse[sampleOffset];
-	  double b = dPhiAseSquare[sampleOffset];
-	  fprintf(stderr, "\nC RaysPerSampleDump: %d\n", hRaysPerSampleDump);
-	  fprintf(stderr, "C RaysPerSample: %d\n", hRaysPerSample);
-	  fprintf(stderr, "C %f > %f (%d)\n\n", expTmp, expectation.at(sampleOffset), sample_i);
-	}
+	//std::cout << "MSE: " << expTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
+
+	// MSE TESTs
+	// if(expTmp > expectation.at(sampleOffset)){
+	//   double a = dPhiAse[sampleOffset];
+	//   double b = dPhiAseSquare[sampleOffset];
+	//   fprintf(stderr, "\nC RaysPerSampleDump: %d\n", hRaysPerSampleDump);
+	//   fprintf(stderr, "C RaysPerSample: %d\n", hRaysPerSample);
+	//   fprintf(stderr, "C %f > %f (%d)\n\n", expTmp, expectation.at(sampleOffset), sample_i);
+	// }
         expectation.at(sampleOffset) = expTmp;
 
         if(expectation[sampleOffset] < expectationThreshold)     break;
