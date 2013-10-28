@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
-#include <assert.h> #include <vector>
+#include <assert.h>
+#include <vector>
 #include <curand_kernel.h>
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>

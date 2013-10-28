@@ -148,7 +148,7 @@ int main(int argc, char **argv){
 					       hMesh,
 					       sigmaA,
 					       sigmaE,
-					       mseThreshold.at(0),
+					       mseThreshold,
 					       useReflections,
 					       phiAse,
 					       mse,
