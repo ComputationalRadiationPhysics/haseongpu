@@ -248,6 +248,7 @@ int main(int argc, char **argv){
   fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
   fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
   fprintf(stderr, "C Runmode           : %s \n", runmode.c_str());
+  fprintf(stderr, "C Nr of GPUs        : %d \n", maxGpus);
   fprintf(stderr, "C Runtime           : %f s\n", runtime);
   fprintf(stderr, "\n");
 
