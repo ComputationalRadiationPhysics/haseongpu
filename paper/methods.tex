@@ -25,7 +25,7 @@ and therefore sample points can be distributed to several devices.
 
 Consider having $k$ GPUs on a node available, 
 $k$ \emph{pthreads} are spawned on the host, like it
-is shown in figure \ref{graphic:multigpu}. A GPU and a
+is shown in Figure \ref{graphic:multigpu}. A GPU and a
 disjunct subset of sample points are assigned to every pthread, so that every
 sample point is distributed exactly to one pthread.
 From this point on, the pthreads run in parallel and start a
@@ -74,7 +74,7 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
 ASE-Flux calculation, before every kernel call an importance sampling 
-of a sample point is done to figure out which areas are more
+of a sample point is done to Figure out which areas are more
 important to the result and thus need more rays then others.
 This method has a strong impact on the precision of the simulation.
 
