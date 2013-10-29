@@ -1,40 +1,56 @@
-unset logscale x
-unset logscale y
+#! /usr/bin/env gnuplot
+clear
+reset
+set key on
+set border 3
+set grid
+
+set xlabel "MSE"
+#set ylabel "number of sample points"
+
 set key opaque
-#set key center top# setze legende
-set title ""
-set xlabel "Sample point"
-set ylabel "MSE"
-#set format y "%.0t*10^%+03T"
-set ytics nomirror
-set yrange [0:0.07]
-set xrange [320:480]
-#set xrange [0:320]
-set xtics 320,40,480
-#set xtics 0,40,320
-set grid front
-set xtics nomirror
+set xtics 0,0.0025,0.01
+set ytics 0,100,300
+set xrange [0.00025:0.01]
+set yrange [0:300]
 
-set style fill transparent solid 1 border -1
+set ytics nomirror 
 
-#plot\
-#"expvec_noimportance.dat" w filledcurves  above x1 t "MSE no importance sampling" lt rgb "#2B83BA" ,\
-#"expvec_noadaptive.dat" w filledcurves  above x1 t "MSE non adaptive + importance" lt rgb "#D7191C",\
-#"expvec_adaptive.dat" w filledcurves above x1 t "MSE adaptive + importance" lt rgb "#ABDDA4",\
-#0.005 t "MSE treshold" lt rgb "#ABDDA4" lw 2
+set grid  front lw 2
 
+
+set parametric
+const=0.005
+set trange [0:500]
+
+x = 3
+#fs transparent pattern 4 bo
+   
 plot\
-"expvec_noimportance.dat" w boxes   t "MSE no importance sampling" lt rgb "#2B83BA" ,\
-"expvec_noadaptive.dat" w boxes   t "MSE non adaptive + importance" lt rgb "#D7191C",\
-"expvec_adaptive.dat" w boxes  t "MSE adaptive + importance" lt rgb "#ABDDA4",\
-0.005 t "MSE treshold" lt rgb "#ABDDA4" lw 2
+      "mse_noimportance_hist.dat" u 2:3 t "no importance sampling" s bezier w filledcurves above x1 lw x lc rgb "forest-green"  fs transparent solid 0.5,\
+   "mse_noadaptive_hist.dat" u 2:3 t "importance sampling" s bezier w filledcurves above x1 lw x  lc rgb "gold" fs transparent solid 0.5
+
+
 
 
 # Output
-set term pngcairo size 800,400
-set output "mse.png"
+set term pngcairo #size 800,400
+set output "mse_importance.png"
 replot
 set term postscript
-set output "mse.ps"
+set output "mse_importance.ps"
 replot
-set term x11
+set term wxt
+
+plot\
+      "mse_adaptive_hist.dat" u 2:3 t "adaptive sampling" s bezier w filledcurves above x1 lw x lc rgb "red"  fs transparent solid 0.5,\
+   "mse_noadaptive_hist.dat" u 2:3 t "non adaptive sampling" s bezier w filledcurves above x1 lw x  lc rgb "gold" fs transparent solid 0.5
+
+# Output
+set term pngcairo #size 800,400
+set output "mse_adaptive.png"
+replot
+set term postscript
+set output "mse_adaptive.ps"
+replot
+set term wxt
