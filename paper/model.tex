@@ -131,21 +131,25 @@ The gain for the whole ray can then be computed as
 \subsection{Reflections}
 \label{subsec:reflections}
 
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_2.png}}
+  }
+  \caption{total internal reflections on the gain medium surface}
+  \label{graphic:reflections_2D}
+\end{figure}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/transmission1.png}}
+  }
+  \caption{reflections with partial transmission on the gain medium surface}
+  \label{graphic:transmission_2D}
+\end{figure}
 In order to allow a more detailed simulation, the model is extended to include
 reflections on the surface of the medium. The ray is split into multiple
 separate sub-rays, each representing one part of the reflection (see Figure
 \ref{graphic:reflections_2D}: $\overrightarrow{r_{i,u}m_{i,u,1}}$,
 $\overrightarrow{m_{i,u,1}m_{i,u,2}}$, $\overrightarrow{m_{i,u,2}s_i}$).
-
-
-\begin{figure}[H]
-  \centerline{
-    \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_2.png}}
-  }
-  \caption{reflections of a ray propagation on the gain medium surface}
-  \label{graphic:reflections_2D}
-\end{figure}
-
 
 On each of the reflection points, Brewster's angle $\theta_{B}$ is calculated to
 estimate the \emph{initial gain} $g_i$ of a ray that is reflected at position
