@@ -45,6 +45,12 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 \end{figure}
 
 \subsubsection{Rays as GPU threads}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/iteration_detail4.png}}}
+  \caption{steps for a single ray within a CUDA thread}
+  \label{graphic:algorithm_steps}
+\end{figure}
     The Raytracing of every ray can be done independently 
     through the mesh structure. 
     Exploiting this parallelism provides a great opportunity to boost
@@ -121,7 +127,7 @@ a high number of rays resulting in reduced runtime.
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_adaptive.png}}}
   \caption{MSE histogram with and without adaptive sampling}
-  \label{plot:adaptive}
+  \label{plot:adaptive2}
 \end{figure}
 
 %\begin{multicols}{2}
