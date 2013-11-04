@@ -95,6 +95,7 @@ int main(int argc, char **argv){
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
   unsigned maxGpus = 0;
   RunMode mode = NONE;
+  int sample_i = -1;
 
   std::string experimentPath;
 
@@ -108,7 +109,7 @@ int main(int argc, char **argv){
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus);
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &sample_i);
 
   // sanity checks
   if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus)) return 1;
@@ -142,6 +143,10 @@ int main(int argc, char **argv){
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
 	unsigned minSample_i = gpu_i * samplePerGpu;
 	unsigned maxSample_i = min((float)hMesh.numberOfSamples, (gpu_i + 1) * samplePerGpu);
+	if(sample_i != -1){
+	  minSample_i = sample_i;
+	  maxSample_i = sample_i + 1;
+	}
 	threadIds[gpu_i] = calcPhiAseThreaded( raysPerSample,
 					       maxRaysPerSample,
 					       dMesh.at(devices.at(gpu_i)),
@@ -267,12 +272,10 @@ int main(int argc, char **argv){
   std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
   std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-
-  //writeVectorToFile(mse, "octrace_expvec");
-  if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, tmpPhiAse, "octrace_phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, mse, "octrace_mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, tmpTotalRays, "octrace_total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, dndtAse, "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, tmpPhiAse, "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, mse, "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, tmpTotalRays, "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
   
   return 0;
 }
