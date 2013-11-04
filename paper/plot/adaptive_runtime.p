@@ -1,3 +1,4 @@
+#! /usr/bin/env gnuplot
 set xlabel "1 / max. MSE"
 set grid xtics
 set grid ytics
@@ -8,8 +9,8 @@ set logscale x
 unset logscale y
 
 plot \
-"adaptive_runtime.dat" u 4:3 w linespoints t "runtime adaptive" pt 57,\
-"adaptive_runtime.dat" u 4:2 w linespoints t "runtime non adaptive" pt 37
+"adaptive_runtime.dat" u 4:3 w linespoints t "runtime adaptive" lw 3 ps 2 pt 57,\
+"adaptive_runtime.dat" u 4:2 w linespoints t "runtime non adaptive" lw 3 ps 2 pt 37
 
 # Output
 set term png
