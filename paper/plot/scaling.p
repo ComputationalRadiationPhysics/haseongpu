@@ -1,3 +1,4 @@
+#! /usr/bin/env gnuplot
 set key top left
 set grid xtics
 set grid ytics
@@ -10,12 +11,8 @@ set yrange [1:4]
 #set yrange [0:1]
 
 plot \
-"scaling.dat" u 1:2 w linespoints t "scaling adaptive" pt 57,\
-"scaling.dat" u 1:3 w linespoints t "scaling non adaptive" pt 37
-
-#plot \
-#"scaling.dat" u 1:4 w linespoints t "efficency adaptive" pt 57,\
-#"scaling.dat" u 1:5 w linespoints t "efficency non adaptive" pt 37
+"scaling.dat" u 1:2 w linespoints t "scaling adaptive" lw 3 ps 2 pt 57,\
+"scaling.dat" u 1:3 w linespoints t "scaling non adaptive" lw 3 ps 2 pt 37
 
 
 # Output
