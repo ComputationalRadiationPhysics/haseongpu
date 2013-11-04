@@ -58,7 +58,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   unsigned numberOfWavelengths    = hSigmaE.size();
-  bool distributeRandomly         = false;
+  bool distributeRandomly         = true;
   dim3 blockDim(128);             
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
@@ -74,8 +74,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   // OUTPUT DATA
   // thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
   // thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
-  // thrust::host_vector<unsigned> hRaysPerPrism(hMesh.numberOfPrisms * reflectionSlices, 0);
-  // unsigned midRaysPerSample=0;
+  //thrust::host_vector<unsigned> hRaysPerPrism(hMesh.numberOfPrisms * reflectionSlices, 0);
+  //unsigned midRaysPerSample=0;
  
   // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
@@ -90,13 +90,15 @@ float calcPhiAse ( unsigned &hRaysPerSample,
     time_t progressStartTime = time(0);
     //calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-    //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
+      // MSE BUG TEST
+      //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
       //std::cout << "SAMPLE " << sample_i << std::endl;
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       hRaysPerSample = hRaysPerSampleSave;
 
       unsigned hRaysPerSampleDump = 0;
       while(true){
+	//unsigned run = 0;
 	hRaysPerSampleDump = importanceSampling(
 						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
 						raw_pointer_cast(&dImportance[0]), 
@@ -111,7 +113,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
         // if(sample_i == 0){
         //   thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
         //   thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
-	//   thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
+	// thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
         //   midRaysPerSample=hRaysPerSample;
         // }
 
@@ -131,9 +133,9 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
         // Check square error
 	float expTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
-	//std::cout << "MSE: " << expTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
 
 	// MSE TESTs
+	//std::cout << "MSE: " << expTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
 	// if(expTmp > expectation.at(sampleOffset)){
 	//   double a = dPhiAse[sampleOffset];
 	//   double b = dPhiAseSquare[sampleOffset];

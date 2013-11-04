@@ -235,7 +235,7 @@ int main(int argc, char **argv){
   // Compare with vtk
   if(compareLocation!="") {
     std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
-    //if(writeVtk) writeToVtk(hMesh, compareAse, "octrace_compare", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+
   }
 
   // Print statistics
@@ -263,10 +263,17 @@ int main(int argc, char **argv){
 		  hMesh.numberOfLevels
       );
 
+  // FOR OUTPUT
+  std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
+  std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
+
+
   //writeVectorToFile(mse, "octrace_expvec");
   if(writeVtk) writeToVtk(hMesh, dndtAse, "octrace_dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  if(writeVtk) writeToVtk(hMesh, tmpPhiAse, "octrace_phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
   if(writeVtk) writeToVtk(hMesh, mse, "octrace_mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-
+  if(writeVtk) writeToVtk(hMesh, tmpTotalRays, "octrace_total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  
   return 0;
 }
 
