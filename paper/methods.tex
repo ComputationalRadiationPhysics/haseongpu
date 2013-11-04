@@ -45,41 +45,65 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 \end{figure}
 
 \subsubsection{Rays as GPU threads}
+    The Raytracing of every ray can be done independently through the mesh
+    structure.  Exploiting this parallelism provides a great opportunity to
+    boost performance. Figure \ref{graphic:kernel} demonstrates the distribution
+    of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
+    CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
+    Since there are $N$ rays to calculate for each sample point, each thread
+    traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
+    corresponding gain values using the following cycle (see Figure
+    \ref{graphic:algorithm_steps}):
+    
+    \begin{enumerate}
+      \item Get current sample point $s_i$
+      \item Request a prism $x$ to start ray from
+      \item Generate start point $r_{i,u}$ inside this prism 
+      \item Generate ray $\overrightarrow{r_{i,u}s_i}$
+      \item Calculate the partial gains for $\overrightarrow{r_{i,u}s_i}$:
+        \begin{enumerate}
+          \item find intersection between $\overrightarrow{r_{i,u}s_i}$
+            and $x$\label{goto:5a}
+          \item calculate length $l_x$ of partial ray $\overrightarrow{r_{i,u}r_x}$
+          \item calculate $partial\_gain(x)$ \eqref{eq:partial_gain}
+          \item if the ray did not reach $s_i$, determine neigboring prism $x'$,
+            set $x := x'$ and $r_x$ as the new start point. goto \ref{goto:5a} 
+        \end{enumerate}
+      \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
+      \item Add gain to gain of the other rays in the thread
+    \end{enumerate}
+    After a maximum of $t$ iterations, the thread has computed its share and
+    adds its accumulated gain atomically to the results of the other threads
+    \eqref{eq:monte_carlo_ase}.
+
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail2.png}}}
+  \caption{$\Phi_{ASE}$ kernel with CUDA threads}
+  \label{graphic:kernel}
+\end{figure}
+
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/iteration_detail4.png}}}
   \caption{steps for a single ray within a CUDA thread}
   \label{graphic:algorithm_steps}
 \end{figure}
-    The Raytracing of every ray can be done independently 
-    through the mesh structure. 
-    Exploiting this parallelism provides a great opportunity to boost
-    performance. Figure \ref{graphic:kernel} demonstrates the distribution
-    of rays to CUDA threads. In which a CUDA thread implements the following
-    raytracing cycle:
-    \begin{enumerate}
-      \item Get current sample point $s_i$
-      \item Request a prism to start ray from
-      \item Generate start point $r_{i,u}$ inside this prism 
-      \item Generate ray $\overrightarrow{r_{i,u}s_i}$
-      \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
-      \item Add gain to gain of the other rays atomically \eqref{eq:monte_carlo_ase}
-    \end{enumerate}
-    This repeats maximal $t$ times until every ray was traced. Furthermore rays with same
-    origin and direction will be grouped into warps to utilize the
-    GPU cache in a good way.
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail3.png}}}
-  \caption{$\Phi_{ASE}$ kernel with CUDA threads}
-  \label{graphic:kernel}
-\end{figure}
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.35\textwidth}{!}{\includegraphics{graphics/thread_detail1.png}}}
-  \caption{Multiple gain calculations within a single CUDA thread}
-  \label{graphic:thread_detail}
-\end{figure}
+   % Furthermore, rays are grouped together in such a way that they have a
+   % similar origin, which improves performance through better utilisation of the
+   % GPU L1 cache.
+
+    Furthermore, successive threads start rays from a similar origin, which
+    results in similar paths through the mesh structure and therefore similar
+    prisms. This leads to better utilisation of the GPU L1 cache and higher
+    performance.
+    
+%\begin{figure}[H]
+%  \centerline
+%  {\resizebox{0.35\textwidth}{!}{\includegraphics{graphics/thread_detail1.png}}}
+%  \caption{Multiple gain calculations within a single CUDA thread}
+%  \label{graphic:thread_detail}
+%\end{figure}
 
 \subsection{Importance sampling}
 \label{subsec:importance_sampling}
@@ -125,7 +149,7 @@ a high number of rays resulting in reduced runtime.
 \end{figure}
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_adaptive.png}}}
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/mse_adaptive.png}}}
   \caption{MSE histogram with and without adaptive sampling}
   \label{plot:adaptive2}
 \end{figure}
