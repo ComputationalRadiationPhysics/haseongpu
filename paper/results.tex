@@ -18,8 +18,8 @@
 
 
 \subsection{Runtimes}
-In figure \ref{plot:runtime}, the developed parallel ASE-flux algorithm was compared to 
-the original single threaded algorithm by Daniel Albach
+In Figure \ref{plot:runtime}, the developed parallel ASE-flux algorithm was compared to 
+the original single threaded algorithm in
 \cite{ASE2010}. The mesh was sampled with an increasing number of rays per sample
 to show linear scaling of the algorithm. Using four GPUs, a speedup of up to 
 296 (84 for one GPU) was reached. However, the GPU algorithm was enhanced with
@@ -34,7 +34,7 @@ Distributing the computation to multiple devices scales well up to the
 point, that every sample point is simulated with the exact same number
 of rays. Changing this (e.g. through adaptive sampling), leads to
 a potencial unbalanced distribution of computation and therefore to
-a worse scaling (figure \ref{plot:gpu_scaling}).
+a worse scaling (Figure \ref{plot:gpu_scaling}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
@@ -45,7 +45,7 @@ But nevertheless, by introducing adaptive sampling, the precision of the the sim
 can be adjusted by a $MSE$-threshold rather than increasing the number
 of rays for every sample point. By making the attempt to stay under this $MSE$-threshold,
 the maximal $MSE$ values decreases very fast. Thus very low computation time results in
-simulation values comperable to extremly long simulations (see figure \ref{plot:adaptive_runtime}).
+simulation values comperable to extremly long simulations (see Figure \ref{plot:adaptive_runtime}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/adaptive_runtime.png}}}
@@ -55,10 +55,10 @@ simulation values comperable to extremly long simulations (see figure \ref{plot:
 
 \subsection{Limitations and future work}
 \label{subsec:limitations}
-Future work should address reflections on the sides of the crystal to allow the
+Future work should address reflections on the sides of the gain medium to allow the
 simulation of lateral lasing. The current implementation only supports
 reflections on the upper and lower surface.
-Apart from that, the scaling issues seen in figure \ref{plot:gpu_scaling} can be
+Apart from that, the scaling issues seen in Figure \ref{plot:gpu_scaling} can be
 mitigated by assigning the samplepoints to the GPUs in a demand-based way.  In
 theory, processing times on the different devices will be more evenly, reducing
 the time needed to wait for the slowest device and thus decreasing the

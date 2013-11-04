@@ -25,7 +25,7 @@ and therefore sample points can be distributed to several devices.
 
 Consider having $k$ GPUs on a node available, 
 $k$ \emph{pthreads} are spawned on the host, like it
-is shown in figure \ref{graphic:multigpu}. A GPU and a
+is shown in Figure \ref{graphic:multigpu}. A GPU and a
 disjunct subset of sample points are assigned to every pthread, so that every
 sample point is distributed exactly to one pthread.
 From this point on, the pthreads run in parallel and start a
@@ -35,16 +35,22 @@ thus the number of pthreads is limited by the number of sample points, when
 every GPU simulates exacly one sample point.
 
 As a result the speedup for multiple
-GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:gpu_scaling}).
+GPUs is almost linear, which was tested with up to 4 GPUs.
     
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning.png}}}
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning2.png}}}
   \caption{partitioning of the workload to multiple devices}
   \label{graphic:multigpu}
 \end{figure}
 
 \subsubsection{Rays as GPU threads}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/iteration_detail4.png}}}
+  \caption{steps for a single ray within a CUDA thread}
+  \label{graphic:algorithm_steps}
+\end{figure}
     The Raytracing of every ray can be done independently 
     through the mesh structure. 
     Exploiting this parallelism provides a great opportunity to boost
@@ -64,22 +70,28 @@ GPUs is almost linear, which was tested with up to 4 GPUs (see figure \ref{plot:
     GPU cache in a good way.
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail.png}}}
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail3.png}}}
   \caption{$\Phi_{ASE}$ kernel with CUDA threads}
   \label{graphic:kernel}
+\end{figure}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.35\textwidth}{!}{\includegraphics{graphics/thread_detail1.png}}}
+  \caption{Multiple gain calculations within a single CUDA thread}
+  \label{graphic:thread_detail}
 \end{figure}
 
 \subsection{Importance sampling}
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. In case of 
-ASE-Flux calculation, before every kernel call a presampling 
-of a sample point is done to figure out which areas are more
+ASE-Flux calculation, before every kernel call an importance sampling 
+of a sample point is done to Figure out which areas are more
 important to the result and thus need more rays then others.
 This method has a strong impact on the precision of the simulation.
 
 Figure \ref{graphic:importance} demonstrates
-the differences between calculation without and with
+the differences between calculation with and without
 importance sampling. It is shown each a cut through the active
 gain medium in which the graphic without important
 sampling has some peaks. To reduce peaks, the experiment
@@ -89,8 +101,8 @@ efficiency of Monte Carlo simulations by reducing variance
 and simulation runtime. 
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/importance.png}}}
-  \caption{Cuts through activ gain medium: no importance sampling (top), with importance sampling (bottom)}
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/phiASE_difference.png}}}
+  \caption{Difference of $\Phi_{ASE}$ with and without importance sampling}
   \label{graphic:importance}
 \end{figure}
 
@@ -107,13 +119,20 @@ a high number of rays resulting in reduced runtime.
 %\end{multicols}
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse.png}}}
-  \caption{Comparision no importance samling, not adaptive, adaptive}
+    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_importance.png}}}
+  \caption{MSE histogram with and without importance sampling}
   \label{plot:adaptive}
 \end{figure}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_adaptive.png}}}
+  \caption{MSE histogram with and without adaptive sampling}
+  \label{plot:adaptive2}
+\end{figure}
+
 %\begin{multicols}{2}
 
-In figure~\ref{plot:adaptive} the adaptive method with 
+In Figure~\ref{plot:adaptive} the adaptive method with 
 $5 \cdot 10^4$ to $5 \cdot 10^8$ rays per sample point is compared to the simulations
 non adaptive and no importance sampling with each $3 \cdot 10^5$ rays per sample point (same runtime of 10s).
 The not adaptive and no importance sampling method have some big peaks while all sample points of 

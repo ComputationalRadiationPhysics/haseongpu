@@ -184,11 +184,14 @@
    * maxRays unsigned, size = 1
      Maximal number of rays for adaptive sampling
  
-   * MSEThreshold float, size = 1
-     MSE-Threshold for adaptive sampling
+   * mse_threshold float, size = number of wavelength
+      Sets the maximal MSE of the ASE value for each wavelength.
+      If a sample-point does not reach this MSE-threshold, the number 
+      of rays per sample-point will be increased upto maxrays.
 
    * useReflections bool, size = 1
      Switch to activate reflections
+    
 
 ## Synopsis ##
 
@@ -210,11 +213,6 @@
       is the parallel algorithm based on nvidia cuda
       devices.
 
-    --expecatation=
-      Sets the maximal MSE of the ASE value. If a sample-point
-      does not reach this MSE-threshold, the number of rays
-      per sample-point will be increased upto maxrays.
-
     --rays=
       Sets the minimum number of rays per sample-point in the
       crystal structure.
@@ -223,7 +221,7 @@
       Sets the maximal number of rays per sample-point. The number
       of rays per sample-point will vary between minimum and
       maximum number of rays in dependance of a MSE-Threshold.
-      (see --expecatation=)
+      (see MSEThreshold)
 
     --silent
       Don't print so much debug information.
