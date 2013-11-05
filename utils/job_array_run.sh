@@ -1,9 +1,16 @@
 #! /usr/bin/env sh
 
+if [ "$1" == "" ] || [ "$2" == "" ]
+    then
+    echo "Usage: $0 NUM_SAMPLES NUM_NODES"
+fi
+
 
 ## PARAMETER ########################################
 MIN_SAMPLE_I=0
 MAX_SAMPLE_I=$(($1 - 1))
+NUM_SAMPLES=$1
+NUM_NODES=$2
 SUM=0
 PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
 PIPE_STARTED="tmp/octrace_job_array_pipe_started"
@@ -37,7 +44,7 @@ echo "maxSample: $MAX_SAMPLE_I"
 
 echo " "
 echo "Submit jobs..."
-JOBNAME=`qsub -t $MIN_SAMPLE_I-$MAX_SAMPLE_I $SUBMIT -e $STDOUT_PATH -o $STDOUT_PATH`
+JOBNAME=`qsub -t $NUM_NODES $SUBMIT -e $STDOUT_PATH -o $STDOUT_PATH -v $NUM_NODES $NUM_SAMPLES`
 #qsub -W depend=afterok:$JOBNAME $POSTPROCESS -e $STDOUT_PATH -o $STDOUT_PATH
 
 echo " "

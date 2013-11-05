@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -q k20
-#PBS -l nodes=1:ppn=2
+#PBS -l nodes=1:ppn=8
 #PBS -l walltime=00:30:00
 #PBS -N calcPhiASE
 
@@ -13,6 +13,15 @@ uname -a
 echo " "
 cd ~/octrace
 
+## FS PARAMETER ###########################
+PIPE_STARTED="tmp/octrace_job_array_pipe_started"
+PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
+HOSTNAMES="tmp/hostnames"
+FOLDER="$(pwd)"
+NODE_ID=$PBS_ARRAYID
+NUM_SAMPLES=$2
+SAMPLE_PER_NODE="$(echo "$NUM_SAMPLES / $NUM_NODES" | bc -l)"
+
 ## OCTRACE PARAMETER ######################
 MAXGPUS="1"
 #USE_REFLECTION="--reflection"
@@ -20,14 +29,11 @@ RAYSPERSAMPLE="10000"
 MAXRAYS="10000"
 SILENT="--silent"
 EXPERIMENT="testdata_2"
-SAMPLE=$PBS_ARRAYID
-MODE="ray_propagation_gpu"
 
-## FS PARAMETER ###########################
-PIPE_STARTED="tmp/octrace_job_array_pipe_started"
-PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
-HOSTNAMES="tmp/hostnames"
-FOLDER="$(pwd)"
+MODE="ray_propagation_gpu"
+MIN_SAMPLE_I=$(echo "$NODE_ID * $SAMPLE_PER_NODE" | bc)
+MAX_SAMPLE_I=$(echo "($NODE_ID+1) * $SAMPLE_PER_NODE" | bc)
+if [ $MAX_SAMPLE_I -gt $NUM_SAMPLES ]; then MAX_SAMPLE_I=$NUM_SAMPLES; fi
 ###########################################
 
 echo "Executing..."
@@ -36,6 +42,6 @@ echo
 echo `hostname` >> $HOSTNAMES
 echo 1 >> $PIPE_STARTED
 
-time ./bin/calcPhiASE --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE $USE_REFLECTION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --sample_i=$SAMPLE
+time ./bin/calcPhiASE --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE $USE_REFLECTION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --min_sample_i=$MIN_SAMPLE_I --max_sample_i=$(($MAX_SAMPLE_I-1))
 
 echo 1 >> $PIPE_FINISHED
