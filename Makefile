@@ -35,6 +35,8 @@ bin/%.o: src/%.cu $(wildcard include/*.h)
 calcPhiASE: $(OBJS) Makefile
 	rm -f bin/link.o
 	mkdir -p bin
+	mkdir -p output
+	mkdir -p input
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	g++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
