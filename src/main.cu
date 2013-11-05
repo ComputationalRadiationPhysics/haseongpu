@@ -266,22 +266,21 @@ int main(int argc, char **argv){
   fprintf(stderr, "\n");
 
   // Write experiment data
-  writeMatlabOutput(
-      experimentPath,
-      phiAse,
-      totalRays,
-      mse,
-      sigmaE.size(),
-      hMesh.numberOfSamples,
-      hMesh.numberOfLevels
-      );
-
+  // writeMatlabOutput(
+  //     "output/",
+  //     phiAse,
+  //     totalRays,
+  //     mse,
+  //     sigmaE.size(),
+  //     hMesh.numberOfSamples,
+  //     hMesh.numberOfLevels
+  //     );
 
   // Write output in single files
   for(unsigned wave_i=0 ; wave_i < sigmaE.size() ; ++wave_i){
     for(unsigned sample_i = minSampleRange; sample_i < minSampleRange+samplesPerNode ; sample_i++){
       unsigned sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      writeValueToFile(phiAse.at(sampleOffset),"tmp/results/","wavelength",wave_i,"sample",sample_i);
+      writeValueToFile(phiAse.at(sampleOffset),"output/results/","wavelength",wave_i,"sample",sample_i);
     }
   }
 

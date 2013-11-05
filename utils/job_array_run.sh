@@ -17,7 +17,7 @@ TMP_PATH="tmp"
 PIPE_FINISHED="$TMP_PATH/octrace_job_array_pipe_finished"
 PIPE_STARTED="$TMP_PATH/octrace_job_array_pipe_started"
 HOSTNAMES="$TMP_PATH/hostnames"
-RESULTS="$TMP_PATH/results/"
+RESULTS="output/results/"
 POSTPROCESS="job_array_post.sh"
 SUBMIT="utils/submit_k20.sh"
 #####################################################
@@ -27,6 +27,8 @@ cd ~/octrace
 
 echo "Prepare environment..."
 echo " "
+rm -f $TMP_PATH/*
+mkdir -p $RESULTS
 mkdir -p $TMP_PATH
 rm -f $PIPE_FINISHED
 rm -f $PIPE_STARTED
