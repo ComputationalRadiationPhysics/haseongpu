@@ -14,7 +14,9 @@ void parseCommandLine(
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    unsigned *maxgpus
+    unsigned *maxgpus,
+    int *minSample_i,
+    int *maxSample_i
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -87,6 +89,13 @@ void parseCommandLine(
       *maxgpus = atoi(p.second.c_str());
     }
 
+    if (p.first == "--min_sample_i"){
+      *minSample_i = atoi(p.second.c_str());
+    }
+    if (p.first == "--max_sample_i"){
+      *maxSample_i = atoi(p.second.c_str());
+    }
+
 
   }
 }
@@ -98,7 +107,9 @@ int checkParameterValidity(
     const std::string root,
     const unsigned deviceCount,
     const RunMode mode,
-    unsigned *maxgpus
+    unsigned *maxgpus,
+    const int minSample_i,
+    const int maxSample_i
     ) {
 
   if (argc <= 1) {
@@ -137,5 +148,14 @@ int checkParameterValidity(
   if(*maxgpus == 0){
     *maxgpus = deviceCount;
   }
+
+  if(minSample_i < 0){
+    fprintf(stderr, "C Warning: --min_sample_i < 0!");
+  }
+
+  if(maxSample_i < minSample_i){
+    fprintf(stderr, "C Warning: maxSample_i < minSample_i!");
+  }
+
   return 0;
 }

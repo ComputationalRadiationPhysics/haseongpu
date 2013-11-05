@@ -23,7 +23,7 @@ octrace.e*
 octrace.o*
 utils/testdata_2/*.txt
 *.vtk
-dndt_ASE.txt
+output/*.txt
 phi_ASE.txt
 N_rays.txt
 expected_values.txt
