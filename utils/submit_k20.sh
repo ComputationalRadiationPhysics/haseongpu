@@ -24,10 +24,9 @@ SAMPLE_PER_NODE="$(echo "$NUM_SAMPLES / $NUM_NODES" | bc -l)"
 ## OCTRACE PARAMETER ######################
 MAXGPUS="4"
 #USE_REFLECTION="--reflection"
-RAYSPERSAMPLE="100000"
-MAXRAYS="100000000"
+RAYSPERSAMPLE="10000000"
+MAXRAYS="10000000"
 SILENT="--silent"
-EXPERIMENT="testdata_2"
 
 MODE="ray_propagation_gpu"
 MIN_SAMPLE_I=$(echo "$NODE_ID * $SAMPLE_PER_NODE" | bc)
@@ -41,6 +40,6 @@ echo
 echo `hostname` >> $HOSTNAMES
 echo 1 >> $PIPE_STARTED
 
-time ./bin/calcPhiASE --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE $USE_REFLECTION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --min_sample_i=$MIN_SAMPLE_I --max_sample_i=$(($MAX_SAMPLE_I-1))
+time ./bin/calcPhiASE --experiment="$FOLDER/input" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE $USE_REFLECTION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --min_sample_i=$MIN_SAMPLE_I --max_sample_i=$(($MAX_SAMPLE_I-1))
 
 echo 1 >> $PIPE_FINISHED

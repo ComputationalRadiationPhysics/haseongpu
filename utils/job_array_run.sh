@@ -66,7 +66,7 @@ done;
 rm -f $TMP_PATH/phi_ASE.txt
 for i in $(ls $RESULTS)
 do
-    cat $RESULTS/$i >> $TMP_PATH/phi_ASE.txt
+    cat $RESULTS/$i >> output/phi_ASE.txt
 done
 
 
