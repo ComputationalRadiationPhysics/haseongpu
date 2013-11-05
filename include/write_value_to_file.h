@@ -3,9 +3,14 @@
 
 #include <string>
 
-template <typename T>
+//template < typename T >
 int writeValueToFile(
-	       const T value,
-	       const std::string filename);
+    const float value, 
+    const std::string path, 
+    const std::string indexName1, 
+    const int index1, 
+    const std::string indexName2, 
+    const int index2
+    );
 
 #endif /* WRITE_ARRAY_FILE_H*/

@@ -90,7 +90,8 @@ void parseCommandLine(
     RunMode *mode,
     bool *useReflections,
     unsigned *maxgpus,
-    int *sample_i
+    int *minSample_i,
+	int *maxSample_i
     );
 
 int checkParameterValidity(
@@ -100,7 +101,9 @@ int checkParameterValidity(
     const std::string root,
     const unsigned deviceCount,
     const RunMode mode,
-    unsigned *maxgpus
+    unsigned *maxgpus,
+	const int minSample_i,
+	const int maxSample_i
     );
 
 
