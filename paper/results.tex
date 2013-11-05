@@ -18,50 +18,65 @@
 
 
 \subsection{Runtimes}
-In Figure \ref{plot:runtime}, the developed parallel ASE-flux algorithm was compared to 
-the original single threaded algorithm in
-\cite{ASE2010}. The mesh was sampled with an increasing number of rays per sample
-to show linear scaling of the algorithm. Using four GPUs, a speedup of up to 
-296 (84 for one GPU) was reached. However, the GPU algorithm was enhanced with
-more features during development process, resulting in more complex computations.
+
+The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
+each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
+and 4 NVIDIA Tesla K20M GPUs. In Figure \ref{plot:runtime}, the runtimes of the
+original single threaded algorithm from \cite{ASE2010} are compared to the
+developed non-adaptive parallel ASE-flux algorithm with different numbers of
+rays to demonstrate scaling for different workloads. To increase the number of
+GPUs to 48, a QSUB array job (\cite{qsub}) was scheduled and the sampling points
+distributed to the available GPUs as seen in section
+\ref{subsubsec:multigpu}. 
+When using the CPU or up to 4 GPUs, the computation uses only a single node,
+which results in a linear scaling of the algorithm. If the cluster's job
+submission system is used, a significant runtime overhead can be seen as a
+result of the job scheduler. Therefore, using a high number of GPUs can lead to
+suboptimal performance in otherwise fast computations. However, this becomes
+neglegible for very work intensive simulations.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/runtime.png}}}
   \caption{runtime of orginial algorithm compared to parallel algorithm}
   \label{plot:runtime}
 \end{figure}
-Distributing the computation to multiple devices scales well up to the
-point, that every sample point is simulated with the exact same number
-of rays. Changing this (e.g. through adaptive sampling), leads to
-a potencial unbalanced distribution of computation and therefore to
-a worse scaling (Figure \ref{plot:gpu_scaling}).
+Apart from scheduling overhead, distributing the computation to multiple devices
+scales well as long as every sample point is simulated with the exact same
+number of rays. Changing this (e.g. through adaptive sampling), leads to a
+potentially unbalanced distribution workload and a high impact on efficiency.
+(Figure \ref{plot:gpu_scaling}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
   \caption{scaling on multiple devices}
   \label{plot:gpu_scaling}
 \end{figure}
-But nevertheless, by introducing adaptive sampling, the precision of the the simulation
-can be adjusted by a $MSE$-threshold rather than increasing the number
-of rays for every sample point. By making the attempt to stay under this $MSE$-threshold,
-the maximal $MSE$ values decreases very fast. Thus very low computation time results in
-simulation values comperable to extremly long simulations (see Figure \ref{plot:adaptive_runtime}).
+Nevertheless, by using the idea of adaptive sampling, the precision of the
+simulation can be adjusted using a $MSE$-threshold rather than simply increasing
+the number of rays for all the sample points. Since only a small number of
+sample points actually needs to be sampled with a high resolution, a small
+increase in runtime can be sufficient to lower the maximal $MSE$ values below
+the desired threshold. (Figure
+\ref{plot:adaptive_runtime}). This can be adjusted to yield similar simulation
+results as the non-adaptive implementation, at a fraction of the runtime. Note
+that some values in the graphic actually display almost the same runtime, since
+the computation always succeeded to stay below the given threshold with very
+little additional effort.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/adaptive_runtime.png}}}
   \caption{runtime comparison of adaptive and non adaptive }
   \label{plot:adaptive_runtime}
 \end{figure}
-
 \subsection{Limitations and future work}
 \label{subsec:limitations}
 Future work should address reflections on the sides of the gain medium to allow the
 simulation of lateral lasing. The current implementation only supports
 reflections on the upper and lower surface.
 Apart from that, the scaling issues seen in Figure \ref{plot:gpu_scaling} can be
-mitigated by assigning the samplepoints to the GPUs in a demand-based way.  In
+mitigated by assigning the samplepoints to the GPUs in a demand-based way. In
 theory, processing times on the different devices will be more evenly, reducing
 the time needed to wait for the slowest device and thus decreasing the
-cumulative duration of the calculation. Having such a system in place, one might
-easily extend the algorithm to span over multiple nodes in a cluster using
-Message Passing Interface (MPI)\cite{MPI} to further increase the speed.
+cumulative duration of the calculation. This might be efficiently done by
+the use of Message Passing Interface (MPI)\cite{MPI} instead of the default QSUB
+submission system to further increase the speed.
