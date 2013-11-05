@@ -281,7 +281,7 @@ int main(int argc, char **argv){
   for(unsigned wave_i=0 ; wave_i < sigmaE.size() ; ++wave_i){
     for(unsigned sample_i = minSampleRange; sample_i < minSampleRange+samplesPerNode ; sample_i++){
       unsigned sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      writeValueToFile(phiAse.at(sampleOffset),"tmp_multinode/","wavelength",wave_i,"sample",sample_i);
+      writeValueToFile(phiAse.at(sampleOffset),"tmp/results/","wavelength",wave_i,"sample",sample_i);
     }
   }
 

@@ -19,20 +19,19 @@ PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
 HOSTNAMES="tmp/hostnames"
 FOLDER="$(pwd)"
 NODE_ID=$PBS_ARRAYID
-NUM_SAMPLES=$2
 SAMPLE_PER_NODE="$(echo "$NUM_SAMPLES / $NUM_NODES" | bc -l)"
 
 ## OCTRACE PARAMETER ######################
 MAXGPUS="1"
 #USE_REFLECTION="--reflection"
-RAYSPERSAMPLE="10000"
-MAXRAYS="10000"
+RAYSPERSAMPLE="10000000"
+MAXRAYS="10000000"
 SILENT="--silent"
 EXPERIMENT="testdata_2"
 
 MODE="ray_propagation_gpu"
 MIN_SAMPLE_I=$(echo "$NODE_ID * $SAMPLE_PER_NODE" | bc)
-MAX_SAMPLE_I=$(echo "($NODE_ID+1) * $SAMPLE_PER_NODE" | bc)
+MAX_SAMPLE_I=$(echo "(($NODE_ID+1) * $SAMPLE_PER_NODE)/1" | bc)
 if [ $MAX_SAMPLE_I -gt $NUM_SAMPLES ]; then MAX_SAMPLE_I=$NUM_SAMPLES; fi
 ###########################################
 
