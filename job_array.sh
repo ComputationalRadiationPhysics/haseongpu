@@ -3,7 +3,8 @@
 MIN_SAMPLE_I=0
 MAX_SAMPLE_I=$(($1 - 1))
 SUM=0
-PIPE="job_array_pipe"
+PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
+PIPE_STARTED="tmp/octrace_job_array_pipe_started"
 STDOUT_PATH="tmp/"
 
 echo " "
@@ -12,9 +13,12 @@ cd ~/octrace
 echo "Prepare environment..."
 echo " "
 mkdir -p $STDOUT_PATH
-rm -f $PIPE
-touch $PIPE
-echo 0 >> $PIPE
+rm -f $PIPE_FINISHED
+touch $PIPE_FINISHED
+rm -f $PIPE_STARTED
+touch $PIPE_STARTED
+echo 0 >> $PIPE_FINISHED
+echo 0 >> $PIPE_STARTED
 
 echo "Build..."
 make
@@ -32,12 +36,14 @@ echo "Wait for jobs..."
 
 MAX_SAMPLE_I=$(($MAX_SAMPLE_I + 1))
 while [ $SUM -lt $MAX_SAMPLE_I ] ; do 
-    SUM=0;while read l; do SUM=$((SUM+$l));done<$PIPE;
-    printf "%d of %d samples finished\r" $SUM $MAX_SAMPLE_I
+    SUM=0;while read l; do SUM=$((SUM+$l));done<$PIPE_FINISHED;
+    SUM_START=0;while read l; do SUM_START=$((SUM_START+$l));done<$PIPE_STARTED;
+    printf "%d of %d samples finished(%d started)\r" $SUM $MAX_SAMPLE_I SUM_START
     sleep 1s
 done;
 
 
-rm $PIPE
+rm $PIPE_FINISHED
+rm $PIPE_STARTED
 echo " "
 echo "Done..."

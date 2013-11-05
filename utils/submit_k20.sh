@@ -27,14 +27,16 @@ SAMPLE=$PBS_ARRAYID
 
 MODE="ray_propagation_gpu"
 #FIFO=$1
-PIPE="/tmp/octrace_job_array_pipe"
+PIPE_FINISHED="tmp/octrace_job_array_pipe_finished"
+PIPE_STARTED="tmp/octrace_job_array_pipe_started"
+
 
 FOLDER="$(pwd)"
 echo "Executing..."
 echo
 
-echo 0 >> $PIPE
+echo 1 >> $PIPE_STARTED
 
 time ./bin/calcPhiASE --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE $WRITE_VTK $USE_REFLECTION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --sample_i=$SAMPLE
 
-echo 1 >> $PIPE
+echo 1 >> $PIPE_FINISHED
