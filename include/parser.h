@@ -89,7 +89,8 @@ void parseCommandLine(
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    unsigned *maxgpus
+    unsigned *maxgpus,
+    int *sample_i
     );
 
 int checkParameterValidity(

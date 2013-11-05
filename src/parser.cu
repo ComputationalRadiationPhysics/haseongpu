@@ -14,7 +14,8 @@ void parseCommandLine(
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
-    unsigned *maxgpus
+    unsigned *maxgpus,
+    int *sample_i
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -85,6 +86,10 @@ void parseCommandLine(
 
     if (p.first == "--maxgpus"){
       *maxgpus = atoi(p.second.c_str());
+    }
+
+    if (p.first == "--sample_i"){
+      *sample_i = atoi(p.second.c_str());
     }
 
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -q k20
 #PBS -l nodes=1:ppn=2
-#PBS -l walltime=40:30:00
-#PBS -N octrace_baseline_upto_100M_rays_per_sample_14r
+#PBS -l walltime=00:30:00
+#PBS -N calc_phi_ASE
 
 . /opt/modules-3.2.6/Modules/3.2.6/init/bash
 export MODULES_NO_OUTPUT=1
@@ -14,22 +14,23 @@ uname -a
 echo
 cd ~/octrace
 
-make
+MAXGPUS="1"
+#USE_REFLECTION="--reflection"
+EXPECTATION="0.005"
+RAYSPERSAMPLE="10000"
+MAXRAYS="10000"
 
+WRITE_VTK="--write-vtk"
 EXPERIMENT="testdata_2"
 SILENT="--silent"
-DEVICE=0
-#USE_REFLECTION="--reflection"
-EXPECTATION="0.001"
-MAXRAYS="100000000"
-WRITE_VTK="--write-vtk"
-RAYSPERSAMPLE="1000000"
-MODE="ray_propagation_gpu"
-echo "RAYS: $RAYSPERSAMPLE"
-echo "MODE: $MODE"
+SAMPLE=$PBS_ARRAYID
 
+MODE="ray_propagation_gpu"
+#FIFO=$1
+FIFO="job_array_fifo"
 
 FOLDER="$(pwd)"
 echo "Executing..."
 echo
-time ./bin/octrace --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE --compare="$FOLDER/$COMPARE" --device="$DEVICE" $WRITE_VTK $USE_REFLECTION --expectation=$EXPECTATION --maxrays=$MAXRAYS
+time ./bin/calcPhiASE --experiment="$FOLDER/utils/$EXPERIMENT" --mode=$MODE $SILENT --rays=$RAYSPERSAMPLE --compare="$FOLDER/$COMPARE" $WRITE_VTK $USE_REFLECTION --expectation=$EXPECTATION --maxrays=$MAXRAYS --maxgpus=$MAXGPUS --sample_i=$SAMPLE
+
