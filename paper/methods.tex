@@ -138,9 +138,7 @@ and simulation runtime.
 
 \subsection{Adaptive sampling}
 \label{subsec:adaptive_sampling}
-Since most sample points behave in a good way, there is no need
-to sample them with a high number of rays. Only some outliers need to
-be sampled with a higher resolution. To assess the precision
+To assess the precision
 and therefore the difference between the true and calculated value,
 it is further determined the mean squared error (MSE):
 \begin{align}
@@ -148,9 +146,11 @@ it is further determined the mean squared error (MSE):
      f^2(s_i)     &= \frac{1}{N} \sum_{u=0}^{N-1} gain(\overrightarrow{r_{i,u}s_i})^2\\
      MSE(s_i)     &= \sqrt{\frac{f^2(s_i) - f(s_i)^2}{N}}
 \end{align}
-The adaptive method allows to remove strong peaks in the result
-of the simulation without sampling all sample points with
-a high number of rays, resulting in reduced runtime.
+Since most sample points $s_i$ have a low $MSE(s_i)$, there is no need
+to sample them with a high number of rays. Only some outliers need to
+be sampled with a higher resolution. This can be done with an adaptive
+method, which allows to remove strong peaks in the result
+of the simulation by resampling these points with more rays.
 
 For comparision, the impact of importance sampling
 on the MSE values is shown (see Figure~\ref{plot:importance2}). 
