@@ -51,8 +51,7 @@ int main(int argc, char** argv){
       MPI_Status status;
       MPI_Recv(buf,1,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
       if(buf[0] == -1){
-        MPI_Finalize();
-        return 0;
+        break;
       }else{
         ofstream myfile;
         myfile.open("~/mpi_out.txt",ios::ate);
@@ -62,7 +61,7 @@ int main(int argc, char** argv){
     }
   }
 
-
+  MPI_Finalize();
   return 0;
 
 }
