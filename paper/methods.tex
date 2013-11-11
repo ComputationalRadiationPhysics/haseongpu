@@ -110,22 +110,22 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
-before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and it is used 
+before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
 to figure out which areas are more important to the result. 
 The result of the importance sampling is a schedule for a specific sample point, that
-describes in which prism a ray starts.
+describes in which prism each ray starts.
 This method has a strong impact on the precision of the simulation
 and is able to reduce strong peaks in Monte Carlo simulations.
 
 To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
 \[\Phi_{ASE~diff} = |\Phi_{ASE~importance} - \Phi_{ASE~no~importance}|\] of the 
 result with and without importance sampling was calculated with 
-each $10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then the number of rays per sample point was increased for the simulation
+$10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
+Then, the number of rays per sample point was increased for the simulation
 without importance sampling.
-The more rays are simulated, the smaller is $\Phi_{ASE~diff}$, what 
+The more rays are simulated, the smaller is $\Phi_{ASE~diff}$, which 
 means that the results get closer and therefore the simulation
-with importance sampling reaches same results by less
+with importance sampling reaches same results with less
 rays per sample point. Thus, importance sampling can increase the
 efficiency of Monte Carlo simulations by reducing variance 
 and simulation runtime. 
@@ -140,7 +140,7 @@ and simulation runtime.
 \label{subsec:adaptive_sampling}
 Since most sample points behave in a good way, there is no need
 to sample them with a high number of rays. Only some outliers need to
-be sampled with a higher precision. To assess the precision
+be sampled with a higher resolution. To assess the precision
 and therefore the difference between the true and calculated value,
 it is further determined the mean squared error (MSE):
 \begin{align}
@@ -152,9 +152,9 @@ The adaptive method allows to remove strong peaks in the result
 of the simulation without sampling all sample points with
 a high number of rays, resulting in reduced runtime.
 
-For comparision it is shown the impact of importance sampling
-on the MSE values (see Figure~\ref{plot:importance2}). 
-Already importance sampling reduces the MSE values for
+For comparision, the impact of importance sampling
+on the MSE values is shown (see Figure~\ref{plot:importance2}). 
+Importance sampling alone already reduces the MSE values for
 many sample points considerable.
 \begin{figure}[H]
   \centerline{
@@ -162,7 +162,7 @@ many sample points considerable.
   \caption{histogram of MSE values with and without importance sampling}
   \label{plot:importance2}
 \end{figure}
-By using also adaptive sampling, reduces the MSE values to a specific MSE threshold.
+By using also adaptive sampling, the MSE values are reduced to a specific MSE threshold.
 Figure \ref{plot:adaptive} shows the histogramm of MSE values for a MSE threshold
 of $0.005$. All sample points $s_i$ with $MSE(s_i) > 0.005$ were resampled with more rays
 per sample point to lower their MSE value. The other sample points remained unchanged
@@ -173,7 +173,7 @@ to reduce calculation time.
   \caption{histogram of MSE values with and without adaptive sampling}
   \label{plot:adaptive}
 \end{figure}
-The adaptive method will not reduce the average MSE over sample points,
+The adaptive method will not reduce the average MSE over all sample points,
 but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
 
