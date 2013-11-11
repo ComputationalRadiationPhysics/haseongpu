@@ -53,10 +53,10 @@ int main(int argc, char** argv){
       if(buf[0] == -1){
         break;
       }else{
-        ofstream myfile;
-        myfile.open("~/mpi_out.txt",ios::ate);
-        myfile << "rank: " << rank << "   buf received: " << buf[0] << endl;
-        myfile.close();
+        //ofstream myfile;
+        //myfile.open("~/mpi_out.txt",ios::ate);
+        cout << "rank: " << rank << "   buf received: " << buf[0] << endl;
+        //myfile.close();
       }
     }
   }
