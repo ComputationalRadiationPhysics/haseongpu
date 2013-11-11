@@ -5,13 +5,15 @@
 
 The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
 each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
-and 4 NVIDIA Tesla K20M GPUs. Job submission to the compute nodes can be done
-using QSUB \cite{qsub}. The used gain medium is a \textbf{TODO: Daniel should
-check/complete the description of the medium} YAG crystal with a square surface
-of $16cm^2$\textbf{(?)} and a thickness of $0.6cm$\textbf{(?)}. Its upper
-surface was sampled with 321 points, resulting in 600 Delaunay triangles (see
-section \ref{subsec:meshSampling}). The mesh is extruded 9 times on the vertical
-axis, amounting to a total of 3210 sample points and 5400 prisms respectively.
+and 4 NVIDIA Tesla K20M GPUs. Each GPU contains 2496 CUDA cores with a total
+peak performance of 3520 GFLOP/s. Job submission is handled by
+TORQUE\cite{torque} with Maui as scheduling backend.  The used gain medium is a
+\textbf{TODO: Daniel should check/complete the description of the medium} YAG
+crystal with a square surface of $16cm^2$\textbf{(?)} and a thickness of
+$0.6cm$\textbf{(?)}. Its upper surface was sampled with 321 points, resulting in
+600 Delaunay triangles (see section \ref{subsec:meshSampling}). The mesh is
+extruded 9 times on the vertical axis, amounting to a total of 3210 sample
+points and 5400 prisms respectively.
 
 
 
@@ -36,8 +38,8 @@ axis, amounting to a total of 3210 sample points and 5400 prisms respectively.
 In Figure \ref{plot:runtime}, the runtimes of the original single threaded
 algorithm from \cite{ASE2010} are compared to the developed non-adaptive
 parallel ASE-flux algorithm with different numbers of rays to demonstrate
-scaling for different workloads. To increase the number of GPUs to 48, a QSUB
-array job was scheduled and the sampling points distributed to the available
+scaling for different workloads. To increase the number of GPUs to 48, an
+\emph{array job} was scheduled and the sampling points distributed to the available
 GPUs as seen in section \ref{subsubsec:multigpu}.  When using the CPU or up to 4
 GPUs, the computation uses only a single node, which results in a linear scaling
 of the algorithm. If the cluster's job submission system is used, a significant
@@ -90,5 +92,5 @@ processing times on the different devices will be more evenly, reducing the time
 needed to wait for the slowest device and thus decreasing the overall duration
 of the calculation. This might be efficiently by allocating the nodes first and
 then using Message Passing Interface (MPI)\cite{MPI} to assign sample points by
-a on-demand basis to the nodes. Lastly, a faster job submission system than QSUB
+a on-demand basis to the nodes. Lastly, a faster job scheduler for TORQUE
 could improve the previously mentioned scheduling overhead significantly.
