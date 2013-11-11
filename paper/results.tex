@@ -6,8 +6,8 @@
 The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
 each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
 and 4 NVIDIA Tesla K20M GPUs. Each GPU contains 2496 CUDA cores with a total
-peak performance of 3520 GFLOP/s. Job submission is handled by
-TORQUE\cite{torque} with Maui as scheduling backend.  The used gain medium is a
+peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE
+(\cite{torque}) with Maui as scheduling backend. The modeled gain medium is a
 \textbf{TODO: Daniel should check/complete the description of the medium} YAG
 crystal with a square surface of $16cm^2$\textbf{(?)} and a thickness of
 $0.6cm$\textbf{(?)}. Its upper surface was sampled with 321 points, resulting in
@@ -38,12 +38,13 @@ algorithm from \cite{ASE2010} are compared to the developed non-adaptive
 parallel ASE-flux algorithm with different numbers of rays to demonstrate
 scaling for different workloads. All simulations were done without the usage
 of reflections. To increase the number of GPUs to 48, an
-\emph{array job} was scheduled and the sampling points distributed to the available
-GPUs as seen in section \ref{subsubsec:multigpu}.  When using the CPU or up to 4
-GPUs, the computation uses only a single node, which results in a linear scaling
-of the algorithm. If the cluster's job submission system is used, a significant
-runtime overhead can be seen as a result of the job scheduler. Therefore, using
-a high number of GPUs can lead to suboptimal performance in otherwise fast
+\emph{array job} was scheduled and the sampling points distributed to the
+available GPUs as seen in section \ref{subsubsec:multigpu}.  When using the CPU
+or up to 4 GPUs, the computation uses only a single node, which results in a
+linear scaling of the algorithm. If the cluster's job submission system is used,
+a significant runtime overhead can be seen as a result of the job scheduler.
+This is probably related to a non-optimal PBS script. Therefore, using a high
+number of GPUs can lead to suboptimal performance in otherwise fast
 computations. However, this becomes neglegible for very work intensive
 simulations.
 \begin{figure}[H]
@@ -68,12 +69,11 @@ simulation can be adjusted using a $MSE$-threshold rather than simply increasing
 the number of rays for all the sample points. Since only a small number of
 sample points actually needs to be sampled with a high resolution, a small
 increase in runtime can be sufficient to lower the maximal $MSE$ values below
-the desired threshold. (Figure
-\ref{plot:adaptive_runtime}). This can be adjusted to yield similar simulation
-results as the non-adaptive implementation at a fraction of the runtime. Note
-that some values in the graphic actually display almost the same runtime, since
-the computation always succeeded to stay below the given threshold with very
-little additional effort.
+the desired threshold. (Figure \ref{plot:adaptive_runtime}). This can be
+adjusted to yield similar simulation results as the non-adaptive implementation
+at a fraction of the runtime. Note that some values in the graphic actually
+display almost the same runtime, since the computation always succeeded to stay
+below the given threshold with very little additional effort.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/adaptive_runtime.png}}}
@@ -91,5 +91,6 @@ processing times on the different devices will be more evenly, reducing the time
 needed to wait for the slowest device and thus decreasing the overall duration
 of the calculation. This might be efficiently by allocating the nodes first and
 then using Message Passing Interface (MPI)\cite{MPI} to assign sample points by
-a on-demand basis to the nodes. Lastly, a faster job scheduler for TORQUE
-could improve the previously mentioned scheduling overhead significantly.
+a on-demand basis to the nodes. Lastly, a more optimized job submission script
+for TORQUE could improve the previously mentioned scheduling overhead
+significantly.
