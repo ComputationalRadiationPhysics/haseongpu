@@ -56,4 +56,4 @@ final_build:
 	cp src/calcPhiASE.m .
 
 mpi:
-	mpic++ -Wall -lm src/mpi_ase.cc -o bin/mpi_ase
+	mpic++ -Wall -lm src/mpi_ase.cc -o bin/mpi_ase -std=c++11
