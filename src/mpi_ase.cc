@@ -13,7 +13,7 @@ int main(int argc, char** argv){
   int size;
   vector<int> samplePoints(30);
 
-  for(int i=0;i<samplePoints.size();++i){
+  for(unsigned i=0;i<samplePoints.size();++i){
     samplePoints[i] = i;
   }
 
@@ -33,11 +33,12 @@ int main(int argc, char** argv){
 
     while(!samplePoints.empty()){
       MPI_Recv(buf,1,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
-      sample_i[0] = samplePoints.pop_back(); 
+      sample_i[0] = samplePoints.back(); 
+      samplePoints.pop_back();
       MPI_Send(sample_i,1,MPI_INT,status.MPI_SOURCE,0,MPI_COMM_WORLD);
     }
 
-    for(unsigned i=0 ; i<size-1 ; ++i){
+    for(int i=0 ; i < size-1 ; ++i){
       MPI_Recv(buf,1,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
       sample_i[0] = -1; 
       MPI_Send(sample_i,1,MPI_INT,status.MPI_SOURCE,0,MPI_COMM_WORLD);
@@ -47,6 +48,7 @@ int main(int argc, char** argv){
     int buf[1] = {0};
     while(true){
       MPI_Send(buf,1,MPI_INT,0,0,MPI_COMM_WORLD);
+      MPI_Status status;
       MPI_Recv(buf,1,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
       if(buf[0] == -1){
         MPI_Finalize();

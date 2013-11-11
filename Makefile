@@ -54,3 +54,6 @@ final_build:
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	cp src/calcPhiASE.m .
+
+mpi:
+	mpic++ -Wall -lm src/mpi_ase.cc -o bin/mpi_ase
