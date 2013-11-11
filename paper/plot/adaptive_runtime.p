@@ -1,4 +1,5 @@
 #! /usr/bin/env gnuplot
+set term wxt enhanced font "Serif, 14"
 set ylabel "max. MSE"
 set grid xtics ytics
 set xtics nomirror
@@ -11,11 +12,11 @@ set logscale y
 
 plot \
 "adaptive_runtime.dat" u 3:1 t "runtime adaptive" w linespoints lw 3 ps 2 pt 57,\
-"adaptive_runtime.dat" u 2:1 t "runtime non adaptive" w linespoints lw 3 ps 2 pt 37
+"adaptive_runtime.dat" u 2:1 t "runtime non adaptive" w linespoints lc rgb "blue" lw 3 ps 2 pt 37
 
 
 # Output
-set term png
+set term png enhanced font "Serif, 14"
 set output "adaptive_runtime.png"
 replot
 set term postscript

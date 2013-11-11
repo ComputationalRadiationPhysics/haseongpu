@@ -1,4 +1,5 @@
 #! /usr/bin/env gnuplot
+set term wxt enhanced font "Serif, 14"
 set key top right
 set grid xtics
 set grid ytics
@@ -15,11 +16,11 @@ set xrange [1:64]
 
 plot \
 "scaling.dat" u 1:((472/$3)/$1) w linespoints t "efficency adaptive" lw 3 ps 2 pt 57,\
-"scaling.dat" u 1:((1057/$2)/$1) w linespoints t "efficency non adaptive" lw 3 ps 2 pt 37
+"scaling.dat" u 1:((1057/$2)/$1) w linespoints t "efficency non adaptive" lc rgb "blue" lw 3 ps 2 pt 37
 
 
 # Output
-set term png
+set term pngcairo enhanced font "Serif, 14"
 set output "scaling.png"
 replot
 set term postscript

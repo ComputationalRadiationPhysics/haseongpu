@@ -4,8 +4,8 @@ set key top left
 set logscale x
 set logscale y
 set ylabel "runtime[s]"
-set ytics nomirror
-set xtics nomirror
+#set ytics nomirror
+#set xtics nomirror
 #set grid #noxtics noytics noztics front
 set grid ytics xtics
 set xlabel "rays per sample"
@@ -21,7 +21,7 @@ plot \
 
 
 # Output
-set term png
+set term pngcairo enhanced font 'Serif,14'
 set output "runtime.png"
 replot
 set term postscript
