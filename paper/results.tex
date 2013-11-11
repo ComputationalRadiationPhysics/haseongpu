@@ -36,7 +36,8 @@ axis, amounting to a total of 3210 sample points and 5400 prisms respectively.
 In Figure \ref{plot:runtime}, the runtimes of the original single threaded
 algorithm from \cite{ASE2010} are compared to the developed non-adaptive
 parallel ASE-flux algorithm with different numbers of rays to demonstrate
-scaling for different workloads. To increase the number of GPUs to 48, a QSUB
+scaling for different workloads. All simulations were done without the usage
+of reflections. To increase the number of GPUs to 48, a QSUB
 array job was scheduled and the sampling points distributed to the available
 GPUs as seen in section \ref{subsubsec:multigpu}.  When using the CPU or up to 4
 GPUs, the computation uses only a single node, which results in a linear scaling
@@ -59,7 +60,7 @@ potentially unbalanced workload on different devices and a high impact on effici
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
-  \caption{scaling on multiple devices}
+  \caption{efficiency on multiple devices}
   \label{plot:gpu_scaling}
 \end{figure}
 Nevertheless, by using the idea of adaptive sampling, the precision of the
