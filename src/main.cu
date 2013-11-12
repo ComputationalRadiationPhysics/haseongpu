@@ -38,7 +38,7 @@ unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
  * 
  * @return vector of possible devices
  */
-std::vector<unsigned> getCorrectDevice(int verbose){
+std::vector<unsigned> getCorrectDevice(unsigned maxGpus){
   cudaDeviceProp prop;
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
@@ -49,17 +49,22 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
 
   // Check devices for compute capability and if device is busy
-  for(int i=0; i<count; ++i){
+  int devicesAllocated = 0;
+  for(int i=0; i < count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
       cudaSetDevice(i);
-      int* test;
-      if(cudaMalloc((void**) &test, sizeof(int)) == cudaSuccess){
+      int* occupy;
+      if(cudaMalloc((void**) &occupy, sizeof(int)) == cudaSuccess){
         devices.push_back(i);
-        cudaFree(test);
-        cudaDeviceReset();
+	devicesAllocated++;
+	if(devicesAllocated == maxGpus)
+	  break;
+
       }
+
     }
+
   }
 
   if(devices.size() == 0){
@@ -68,14 +73,6 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   }
 
   cudaSetDevice(devices.at(0));
-
-  if(verbose > 0){
-    //fprintf(stderr,"\nFound %d available CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
-    for(unsigned i=0; i<devices.size(); ++i){
-      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
-      //fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", devices[i], prop.name, prop.major, prop.minor);
-    }
-  }
 
   return devices;
 
@@ -112,16 +109,15 @@ int main(int argc, char **argv){
   std::vector<double> sigmaE;
   std::vector<float> mseThreshold;
 
-  // Set/Test device to run experiment with
-  devices = getCorrectDevice(1);
-
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
       &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange);
 
+  // Set/Test device to run experiment with
+  devices = getCorrectDevice(maxGpus);
+
   // sanity checks
   if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange)) return 1;
-
 
   // Parse wavelengths from files
   if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
@@ -196,6 +192,7 @@ int main(int argc, char **argv){
 			     phiAse,
 			     mse,
 			     totalRays,
+			     devices.at(0),
 			     maxSampleRange
 			    );
     runmode = "RAY PROPAGATION MPI";
