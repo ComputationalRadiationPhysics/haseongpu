@@ -4,6 +4,7 @@
 #include <vector>
 #include <mpi.h>
 #include <iostream>
+#include <logging.h>
 
 #define HEAD_NODE 0
 #define RESULT_TAG 1
@@ -20,19 +21,19 @@ void mpiHead(std::vector<float> &results, unsigned numberOfComputeNodes){
 
     switch(status.MPI_TAG){
     case RESULT_TAG:
-      std::cout << "Received result" << std::endl;
+      //std::cout << "Received result" << std::endl;
       results.at((unsigned)res[0]) = res[1];
       break;
 
     case SAMPLE_REQUEST_TAG:
       if(sample_i[0] == (int)results.size()){
 	int abortMPI[1] = {-1};
-	std::cout << "Send abort" << std::endl;
+	//std::cout << "Send abort" << std::endl;
 	MPI_Send(abortMPI, 1, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
 	finished++;
       }
       else{
-	std::cout << "Send sample point " << sample_i[0]<< " to "<< status.MPI_SOURCE << std::endl;
+	//std::cout << "Send sample point " << sample_i[0]<< " to "<< status.MPI_SOURCE << std::endl;
 	MPI_Send(sample_i, 1, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
 	sample_i[0]++;
       }
@@ -59,8 +60,6 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		std::vector<double> &mse,
 		std::vector<unsigned> &totalRays,
 		unsigned gpu_i,
-		unsigned minSample_i,
-		unsigned maxSample_i,
 		float &runtime){
   while(true){
     int rank;
@@ -89,8 +88,8 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   mse,
 		   totalRays,
 		   gpu_i,
-		   minSample_i,
-		   maxSample_i,
+		   sample_i[0],
+		   sample_i[0]+1,
 		   runtime);
 
       res[0] = sample_i[0]; 
@@ -115,13 +114,13 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
+		      unsigned gpu_i,
 		      unsigned maxSample_i){
 
 
   int rank;
   int size;
   float runtime;
-  std::vector<float> phiASE(maxSample_i+1,0.0);
 
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){
@@ -135,10 +134,15 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 
   switch(rank){
   case HEAD_NODE:
-    mpiHead(phiASE, size-1);
+    std::cerr << "Start Head node" << std::endl;
+    mpiHead(hPhiAse, size-1);
+    for(unsigned i = 0; i < hPhiAse.size(); ++i){
+      dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
+    }
     break;
 
   default:
+    std::cerr << "Start Compute node" << std::endl;
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
 	       dMesh,
@@ -150,9 +154,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 	       hPhiAse,
 	       mse,
 	       totalRays,
-	       0,
-	       maxSample_i,
-	       maxSample_i,
+	       gpu_i,
 	       runtime);
     break;
 

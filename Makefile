@@ -56,6 +56,6 @@ final_build:
 	cp src/calcPhiASE.m .
 
 
-
-mpi: src/%.cc
+# BUGGY !!! DOES NOT WORK, try direct from commandline !!!
+mpi: $(wildcard src/calc_phi_ase_mpi.cc)
 	mpic++ -Wall -lm -c src/calc_phi_ase_mpi.cc -I include -o bin/calc_phi_ase_mpi.o
