@@ -26,7 +26,7 @@ TESTSRCS = $(wildcard tests/*.cu)
 DEBUG_FLAGS = -g -G 
 INCLUDES = include
 
-all: calcPhiASE mpi
+all: calcPhiASE
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
@@ -36,7 +36,7 @@ calcPhiASE: $(OBJS) Makefile
 	rm -f bin/link.o
 	mkdir -p bin
 	mkdir -p output
-	mkdir -p input
+	mkdir -p input mpi
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	g++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
@@ -55,5 +55,7 @@ final_build:
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	cp src/calcPhiASE.m .
 
+
+
 mpi:
-	mpic++ -Wall -lm src/mpi_ase.cc -I include -o bin/mpi_ase
+	mpic++ -Wall -lm -c src/calc_phi_ase_mpi.cc -I include -o bin/calc_phi_ase_mpi.o
