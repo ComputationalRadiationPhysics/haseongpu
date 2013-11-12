@@ -165,7 +165,7 @@ int checkParameterValidity(
 
   int samplesForNode = maxSample_i-minSample_i+1;
   if(samplesForNode < *maxgpus){
-    dout(V_WARN) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
+    dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
      *maxgpus = samplesForNode;
   }
   return 0;

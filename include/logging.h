@@ -12,8 +12,8 @@
 
 #define COLOR_ERROR 31
 #define COLOR_WARN 31
-#define COLOR_INFO 30
-#define COLOR_STATISTIC 30
+#define COLOR_INFO 32
+#define COLOR_STATISTIC 32
 #define COLOR_DEBUG 36
 
 extern unsigned verbosity;

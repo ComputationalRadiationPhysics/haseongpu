@@ -17,11 +17,13 @@ std::ostream& dout(unsigned activation_level) {
   }
 
   if(activation_level & V_INFO){
-    return std::cout << "\033[0;" << COLOR_INFO << "m[INFO] ";
+    //return std::cout << "\033[0;" << COLOR_INFO << "m[INFO] ";
+    return std::cout << "\033[0" << "m[INFO] ";
   }
 
   if(activation_level & V_STAT){
-    return std::cout << "\033[0;" << COLOR_STATISTIC << "m[STATISTIC] ";
+    //return std::cout << "\033[0;" << COLOR_STATISTIC << "m[STATISTIC] ";
+    return std::cout << "\033[0" << "m[STATISTIC] ";
   }
 
   if(activation_level & V_DEBUG){
