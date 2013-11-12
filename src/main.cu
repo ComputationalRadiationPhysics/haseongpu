@@ -39,7 +39,7 @@ unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
  * 
  * @return vector of possible devices
  */
-std::vector<unsigned> getCorrectDevice(int verbose){
+std::vector<unsigned> getCorrectDevice(){
   cudaDeviceProp prop;
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
@@ -70,12 +70,10 @@ std::vector<unsigned> getCorrectDevice(int verbose){
 
   cudaSetDevice(devices.at(0));
 
-  if(verbose > 0){
-    dout(V_INFO) << "Found " << int(devices.size()) << " available CUDA devices with Compute Capability >= " << minMajor << "." << minMinor << "):" << std::endl;
-    for(unsigned i=0; i<devices.size(); ++i){
-      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
-      dout(V_INFO) << "[" << devices[i] << "] " << prop.name << " (Compute Capability " << prop.major << "." << prop.minor << ")" << std::endl;
-    }
+  dout(V_INFO) << "Found " << int(devices.size()) << " available CUDA devices with Compute Capability >= " << minMajor << "." << minMinor << "):" << std::endl;
+  for(unsigned i=0; i<devices.size(); ++i){
+    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
+    dout(V_INFO) << "[" << devices[i] << "] " << prop.name << " (Compute Capability " << prop.major << "." << prop.minor << ")" << std::endl;
   }
 
   return devices;
@@ -107,7 +105,7 @@ int main(int argc, char **argv){
   int maxSampleRange = 0;
 
   std::string experimentPath;
-  verbosity = 63;
+  verbosity = 31;
 
   // Wavelength data
   std::vector<double> sigmaA;
@@ -115,7 +113,7 @@ int main(int argc, char **argv){
   std::vector<float> mseThreshold;
 
   // Set/Test device to run experiment with
-  devices = getCorrectDevice(1);
+  devices = getCorrectDevice();
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
@@ -176,8 +174,7 @@ int main(int argc, char **argv){
 					     maxSample_i,
 					     runtimes.at(gpu_i)
 					     );
-
-    }
+}
     joinAll(threadIds);
     for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
       runtime = max(*it, runtime);
@@ -272,7 +269,8 @@ int main(int argc, char **argv){
   // }
 
   //Print statistics
-  dout(V_STAT) << "\nStatistics\n" << std::endl;
+  dout(V_STAT | V_NOLABEL) << std::endl;
+  dout(V_STAT) << "Statistics\n" << std::endl;
   dout(V_STAT) << "Prism             : " << (int) hMesh.numberOfPrisms << std::endl;
   dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
   dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;

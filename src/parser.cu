@@ -99,6 +99,9 @@ void parseCommandLine(
       *maxSample_i = atoi(p.second.c_str());
     }
 
+    if (p.first == "--verbosity"){
+      verbosity = unsigned(atoi(p.second.c_str()));
+    }
 
   }
 }
@@ -123,10 +126,17 @@ int checkParameterValidity(
     dout(V_ERROR) << "                     --compare=[location of vtk-file to compare with]" << std::endl;
     dout(V_ERROR) << "                     --maxrays=[max number of rays for adaptive sampling]" << std::endl;
     dout(V_ERROR) << "                     --maxgpus=[max number of gpus to use]" << std::endl;
+    dout(V_ERROR) << "                     --verbosity=VERBOSITY_LEVEL" << std::endl;
     dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
     dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
     dout(V_ERROR) << "           mpi" << std::endl;
-    dout(V_ERROR) << "           test_environment" << std::endl;
+    dout(V_ERROR) << "           test_environment\n" << std::endl;
+    dout(V_ERROR) << "Verbosity levels: 0 (quiet)" << std::endl; 
+    dout(V_ERROR) << "                  1 (error)" << std::endl; 
+    dout(V_ERROR) << "                  2 (warning)" << std::endl; 
+    dout(V_ERROR) << "                  4 (info)" << std::endl; 
+    dout(V_ERROR) << "                  8 (statistics)" << std::endl; 
+    dout(V_ERROR) << "                 16 (debug)" << std::endl; 
     return 1;
   }
   if (mode == NONE) {
@@ -143,9 +153,7 @@ int checkParameterValidity(
   }
 
   *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
-
-  if(*maxgpus > deviceCount){
-    dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
+if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
     return 1;
   }
 
@@ -167,6 +175,11 @@ int checkParameterValidity(
   if(samplesForNode < *maxgpus){
     dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
      *maxgpus = samplesForNode;
+  }
+
+  if(verbosity >= 32){
+    verbosity = 31;
+    dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 31 (all). Levels can be bitmasked together." << std::endl;
   }
   return 0;
 }
