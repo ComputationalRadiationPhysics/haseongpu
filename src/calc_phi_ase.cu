@@ -18,6 +18,7 @@
 #include <calc_sample_phi_ase.h>
 #include <mesh.h>
 #include <progressbar.h> /*progressBar */
+#include <logging.h>
 
 #define SEED 1234
 
@@ -93,7 +94,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
       float mseRunZero = 0.0;
       // MSE BUG TEST
       //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
-      //std::cout << "SAMPLE " << sample_i << std::endl;
+      //dout(V_DEBUG) << "SAMPLE " << sample_i << std::endl;
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       hRaysPerSample = hRaysPerSampleSave;
 
@@ -140,14 +141,14 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 	}
 
 	// MSE TESTs
-	//std::cout << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
-	// if(mseTmp > mse.at(sampleOffset)){
-	//   double a = dPhiAse[sampleOffset];
-	//   double b = dPhiAseSquare[sampleOffset];
-	//   fprintf(stderr, "\nC RaysPerSampleDump: %d\n", hRaysPerSampleDump);
-	//   fprintf(stderr, "C RaysPerSample: %d\n", hRaysPerSample);
-	//   fprintf(stderr, "C %f > %f (%d)\n\n", mseTmp, mse.at(sampleOffset), sample_i);
-	// }
+	dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
+	 if(mseTmp > mse.at(sampleOffset)){
+	   double a = dPhiAse[sampleOffset];
+	   double b = dPhiAseSquare[sampleOffset];
+	   dout(V_DEBUG) << "\nRaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
+	   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
+	   dout(V_DEBUG) << mseTmp << " > " << mse.at(sampleOffset) << "(" << sample_i << ")\n" << std::endl;
+	 }
         mse.at(sampleOffset) = mseTmp;
 
         if(mse.at(sampleOffset) < mseThreshold.at(wave_i))     break;
@@ -160,7 +161,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      //if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
+      if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];

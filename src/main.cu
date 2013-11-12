@@ -25,7 +25,7 @@
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
-unsigned verbosity = V_DEBUG | V_INFO | V_WARNING; // extern through logging.h
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -63,7 +63,7 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   }
 
   if(devices.size() == 0){
-    fprintf(stderr,"\nNone of the free CUDA-capable devices is sufficient!\n");
+    dout(V_ERROR) << "None of the free CUDA-capable devices is sufficient!" << std::endl;
     exit(1);
   }
 
@@ -196,7 +196,6 @@ int main(int argc, char **argv){
 			     phiAse,
 			     mse,
 			     totalRays,
-			     minSampleRange,
 			     maxSampleRange
 			    );
     runmode = "MPI";
@@ -248,23 +247,25 @@ int main(int argc, char **argv){
   avgExpectation /= mse.size();
 
 
-  // Print Solutions
-  // for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
-  //   fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-  //   for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-  //     int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-  //     dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
-  //     if(silent && sample_i <=10)
-  //       fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), mse.at(sampleOffset));
-  //   }
-  //   for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-  //     int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-  //     fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), mse.at(sampleOffset));
-  //     if(silent){
-  //       if(sample_i >= 10) break;
-  //     }
-  //   }
-  // }
+   // Print Solutions
+   for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
+     dout(V_DEBUG) << "\n\nSolutions " <<  wave_i << std::endl;
+     for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+       dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
+       if(silent && sample_i <=10)
+         //fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), mse.at(sampleOffset));
+         dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;;
+     }
+     for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+       int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+       //fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), mse.at(sampleOffset));
+       dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sampleOffset) << " " << mse.at(sampleOffset) <<std::endl;
+       if(silent){
+         if(sample_i >= 10) break;
+       }
+     }
+   }
 
   // Compare with vtk
   // if(compareLocation!="") {
@@ -272,19 +273,17 @@ int main(int argc, char **argv){
 
   // }
 
-  // Print statistics
-  // fprintf(stderr, "\n");
-  // fprintf(stderr, "C Statistics\n");
-  // fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
-  // fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
-  // fprintf(stderr, "C MSE threshold     : %f\n", *(std::max_element(mseThreshold.begin(),mseThreshold.end())));
-  // fprintf(stderr, "C max. MSE          : %f\n", maxExpectation);
-  // fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
-  // fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
-  // fprintf(stderr, "C Runmode           : %s \n", runmode.c_str());
-  // fprintf(stderr, "C Nr of GPUs        : %d \n", maxGpus);
-  // fprintf(stderr, "C Runtime           : %f s\n", runtime);
-  // fprintf(stderr, "\n");
+  //Print statistics
+  dout(V_STAT) << "\nStatistics\n" << std::endl;
+  dout(V_STAT) << "Prism             : " << (int) hMesh.numberOfPrisms << std::endl;
+  dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
+  dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
+  dout(V_STAT) << "max. MSE          : " << maxExpectation << std::endl;
+  dout(V_STAT) << "avg. MSE          : " << avgExpectation << std::endl;
+  dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
+  dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
+  dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
+  dout(V_STAT) << "Runtime           : " << runtime << "s" << std::endl;
 
   // Write experiment data
   // writeMatlabOutput(
