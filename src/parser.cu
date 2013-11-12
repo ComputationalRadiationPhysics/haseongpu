@@ -160,9 +160,9 @@ int checkParameterValidity(
   }
 
   int samplesForNode = maxSample_i-minSample_i+1;
-  if(samplesForNode < maxgpus){
+  if(samplesForNode < *maxgpus){
     fprintf(stderr, "C Warning: More GPUs requested than there are sample points. Number of used GPUs reduced to %d", samplesForNode);
-    maxgpus = samplesForNode;
+     *maxgpus = samplesForNode;
   }
   return 0;
 }

@@ -26,7 +26,7 @@ TESTSRCS = $(wildcard tests/*.cu)
 DEBUG_FLAGS = -g -G 
 INCLUDES = include
 
-all: calcPhiASE
+all: calcPhiASE mpi
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
@@ -56,4 +56,4 @@ final_build:
 	cp src/calcPhiASE.m .
 
 mpi:
-	mpic++ -Wall -lm src/mpi_ase.cc -I include -o bin/mpi_ase -std=c++11 
+	mpic++ -Wall -lm src/mpi_ase.cc -I include -o bin/mpi_ase

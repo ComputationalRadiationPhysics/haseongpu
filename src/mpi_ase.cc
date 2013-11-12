@@ -17,7 +17,7 @@ float runSimulation(int sample_i){
   std::stringstream outputFile;
   float result = 0.0;
 
-  outputFile << "wavelength_000_sample" << std::setfill('0') << std::setw(6) << sample_i;
+  outputFile << "./output/results/wavelength_000_sample" << std::setfill('0') << std::setw(6) << sample_i;
   command << "./utils/start_exp.sh " << sample_i;
   system(command.str().c_str());
   fileToValue(outputFile.str(), result);
