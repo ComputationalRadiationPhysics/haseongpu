@@ -5,6 +5,11 @@
 #include <mpi.h>
 #include <iostream>
 
+#define HEAD_NODE 0
+#define RESULT_TAG 1
+#define SAMPLE_REQUEST_TAG 2
+#define SAMPLE_SEND_TAG 3
+
 void mpiHead(std::vector<float> &results, unsigned numberOfComputeNodes){
   MPI_Status status;
   float res[2] = {0,0};
@@ -15,19 +20,19 @@ void mpiHead(std::vector<float> &results, unsigned numberOfComputeNodes){
 
     switch(status.MPI_TAG){
     case RESULT_TAG:
-      //std::cout << "Received result" << std::endl;
+      std::cout << "Received result" << std::endl;
       results.at((unsigned)res[0]) = res[1];
       break;
 
     case SAMPLE_REQUEST_TAG:
       if(sample_i[0] == (int)results.size()){
 	int abortMPI[1] = {-1};
-	//std::cout << "Send abort" << std::endl;
+	std::cout << "Send abort" << std::endl;
 	MPI_Send(abortMPI, 1, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
 	finished++;
       }
       else{
-	//std::cout << "Send sample point " << sample_i[0]<< " to "<< status.MPI_SOURCE << std::endl;
+	std::cout << "Send sample point " << sample_i[0]<< " to "<< status.MPI_SOURCE << std::endl;
 	MPI_Send(sample_i, 1, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
 	sample_i[0]++;
       }
@@ -44,13 +49,13 @@ void mpiHead(std::vector<float> &results, unsigned numberOfComputeNodes){
 
 void mpiCompute(unsigned &hostRaysPerSample,
 		const unsigned maxRaysPerSample,
-		const Mesh& mesh,
-		const Mesh& hostMesh,
-		const std::vector<double>& sigmaA,
-		const std::vector<double>& sigmaE,
+		const Mesh& dMesh,
+		const Mesh& hMesh,
+		const std::vector<double>& hSigmaA,
+		const std::vector<double>& hSigmaE,
 		const std::vector<float>& mseThreshold,
 		const bool useReflections,
-		std::vector<float> &phiAse,
+		std::vector<float> &hPhiAse,
 		std::vector<double> &mse,
 		std::vector<unsigned> &totalRays,
 		unsigned gpu_i,
@@ -84,12 +89,12 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   mse,
 		   totalRays,
 		   gpu_i,
+		   minSample_i,
 		   maxSample_i,
-		   maxSample_i,
-		   runtimehostRaysPerSample)
+		   runtime);
 
       res[0] = sample_i[0]; 
-      res[1] = phiAse.at(sample_i[0])
+      res[1] = hPhiAse.at(sample_i[0]);
       //std::cout << "Rank[" << rank << "] send result " << sample_i[0] << " : " << res[1] << std::endl;
       MPI_Send(res, 2, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
 
@@ -115,7 +120,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 
   int rank;
   int size;
-  int runtime;
+  float runtime;
   std::vector<float> phiASE(maxSample_i+1,0.0);
 
   int mpiError = MPI_Init(NULL,NULL);
@@ -134,7 +139,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
 
   default:
-    mpiCompute(hostRaysPerSample,
+    mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
 	       dMesh,
 	       hMesh,
@@ -150,6 +155,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 	       maxSample_i,
 	       runtime);
     break;
+
   };
 
 
