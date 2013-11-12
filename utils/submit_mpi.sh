@@ -6,4 +6,4 @@
 
 cd ~/octrace
 
-mpiexec -npernode 4 ~/octrace/bin/mpi_ase
+mpiexec -npernode 1 ~/octrace/bin/mpi_ase

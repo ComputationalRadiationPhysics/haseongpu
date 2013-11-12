@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
-#include <stdlib.h>     /* system, NULL, EXIT_FAILURE */
+#include <cstdlib>     /* system, NULL, EXIT_FAILURE */
 #include <iomanip>      /*setfill, setw*/
 #include <parser.h>
 
@@ -19,7 +19,11 @@ float runSimulation(int sample_i){
 
   outputFile << "./output/results/wavelength_000_sample" << std::setfill('0') << std::setw(6) << sample_i;
   command << "./utils/start_exp.sh " << sample_i;
-  system(command.str().c_str());
+  if(system(command.str().c_str())){
+    std::cerr << "Fail to run Simulation for sample " << sample_i << std::endl;
+    return -1;
+  }
+  
   fileToValue(outputFile.str(), result);
 
   return result;
@@ -81,7 +85,7 @@ void mpiCompute(){
       float res[2] = {0,0}; 
       res[0] = sample_i[0]; 
       res[1] = runSimulation(sample_i[0]);
-      //std::cout << "Rank[" << rank << "] send result " << sample_i[0] << std::endl;
+      //std::cout << "Rank[" << rank << "] send result " << sample_i[0] << " : " << res[1] << std::endl;
       MPI_Send(res, 2, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
 
     }
@@ -95,7 +99,7 @@ int main(int argc, char** argv){
 
   int rank;
   int size;
-  std::vector<float> phiASE(3210,0.0);
+  std::vector<float> phiASE(20,0.0);
 
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){

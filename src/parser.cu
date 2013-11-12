@@ -34,7 +34,7 @@ void parseCommandLine(
   }
   for (unsigned i = 0; i < parameters.size(); ++i) {
     std::pair < std::string, std::string > p = parameters.at(i);
-    fprintf(stderr, "arg[%d]: (%s,%s)\n", i, p.first.c_str(), p.second.c_str());
+    //fprintf(stderr, "arg[%d]: (%s,%s)\n", i, p.first.c_str(), p.second.c_str());
 
     // Parse number of rays
     if (p.first == "--rays") {
@@ -78,6 +78,8 @@ void parseCommandLine(
         *mode = FOR_LOOPS;
       if (p.second == "test_environment")
         *mode = TEST;
+      if (p.second == "mpi")
+        *mode = RAY_PROPAGATION_MPI;
 
     }
 
