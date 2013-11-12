@@ -141,14 +141,14 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 	}
 
 	// MSE TESTs
-	dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
-	 if(mseTmp > mse.at(sampleOffset)){
-	   double a = dPhiAse[sampleOffset];
-	   double b = dPhiAseSquare[sampleOffset];
-	   dout(V_DEBUG) << "\nRaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
-	   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
-	   dout(V_DEBUG) << mseTmp << " > " << mse.at(sampleOffset) << "(" << sample_i << ")\n" << std::endl;
-	 }
+	//dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
+	 //if(mseTmp > mse.at(sampleOffset)){
+	 //  double a = dPhiAse[sampleOffset];
+	 //  double b = dPhiAseSquare[sampleOffset];
+	 //  dout(V_DEBUG) << "\nRaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
+	 //  dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
+	 //  dout(V_DEBUG) << mseTmp << " > " << mse.at(sampleOffset) << "(" << sample_i << ")\n" << std::endl;
+	 //}
         mse.at(sampleOffset) = mseTmp;
 
         if(mse.at(sampleOffset) < mseThreshold.at(wave_i))     break;
@@ -193,6 +193,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
   //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
 
+  dout(V_INFO | V_NOLABEL) << "\n" << std::endl;
   // Free Memory
   cudaFree(devMTGPStates);
   cudaFree(devKernelParams);

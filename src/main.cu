@@ -27,6 +27,7 @@
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
 unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
 
+
 /** 
  * @brief Queries for devices on the running mashine and collects
  *        them on the devices array. Set the first device in this 
@@ -70,10 +71,10 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   cudaSetDevice(devices.at(0));
 
   if(verbose > 0){
-    //fprintf(stderr,"\nFound %d available CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
+    dout(V_INFO) << "Found " << int(devices.size()) << " available CUDA devices with Compute Capability >= " << minMajor << "." << minMinor << "):" << std::endl;
     for(unsigned i=0; i<devices.size(); ++i){
       CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
-      //fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", devices[i], prop.name, prop.major, prop.minor);
+      dout(V_INFO) << "[" << devices[i] << "] " << prop.name << " (Compute Capability " << prop.major << "." << prop.minor << ")" << std::endl;
     }
   }
 
@@ -106,6 +107,7 @@ int main(int argc, char **argv){
   int maxSampleRange = 0;
 
   std::string experimentPath;
+  verbosity = 63;
 
   // Wavelength data
   std::vector<double> sigmaA;
@@ -253,17 +255,13 @@ int main(int argc, char **argv){
      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
        dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
-       if(silent && sample_i <=10)
-         //fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), mse.at(sampleOffset));
-         dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;;
+       if(sample_i <=10)
+         dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;
      }
      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-       //fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), mse.at(sampleOffset));
        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sampleOffset) << " " << mse.at(sampleOffset) <<std::endl;
-       if(silent){
-         if(sample_i >= 10) break;
-       }
+       if(sample_i >= 10) break;
      }
    }
 
@@ -283,7 +281,7 @@ int main(int argc, char **argv){
   dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
   dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
   dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
-  dout(V_STAT) << "Runtime           : " << runtime << "s" << std::endl;
+  dout(V_STAT) << "Runtime           : " << runtime << "s\n\n" << std::endl;
 
   // Write experiment data
   // writeMatlabOutput(
