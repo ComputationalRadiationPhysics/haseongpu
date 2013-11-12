@@ -126,22 +126,22 @@ int checkParameterValidity(
     return 1;
   }
   if (mode == NONE) {
-    fprintf(stderr, "C Please specify the runmode with --mode=\n");
+    fprintf(stderr, "C Error: Please specify the runmode with --mode=\n");
     return 1;
   }
   if (raysPerSample == 0) {
-    fprintf(stderr, "C Please specify the number of rays per sample Point with --rays=\n");
+    fprintf(stderr, "C Error: Please specify the number of rays per sample Point with --rays=\n");
     return 1;
   }
   if (root.size() == 0) {
-    fprintf(stderr, "C Please specify the experiment's location with --experiment=\n");
+    fprintf(stderr, "C Error: Please specify the experiment's location with --experiment=\n");
     return 1;
   }
 
   *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
 
   if(*maxgpus > deviceCount){
-    fprintf(stderr, "C Warning: You don't have so many devices, use --maxgpus=%d", deviceCount);
+    fprintf(stderr, "C Error: You don't have so many devices, use --maxgpus=%d", deviceCount);
     return 1;
   }
 
@@ -150,12 +150,19 @@ int checkParameterValidity(
   }
 
   if(minSample_i < 0){
-    fprintf(stderr, "C Warning: --min_sample_i < 0!");
+    fprintf(stderr, "C Error: --min_sample_i < 0!");
+    return 1;
   }
 
   if(maxSample_i < minSample_i){
-    fprintf(stderr, "C Warning: maxSample_i < minSample_i!");
+    fprintf(stderr, "C Error: maxSample_i < minSample_i!");
+    return 1;
   }
 
+  int samplesForNode = maxSample_i-minSample_i+1;
+  if(samplesForNode < maxgpus){
+    fprintf(stderr, "C Warning: More GPUs requested than there are sample points. Number of used GPUs reduced to %d", samplesForNode);
+    maxgpus = samplesForNode;
+  }
   return 0;
 }

@@ -148,13 +148,10 @@ int main(int argc, char **argv){
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
         unsigned minSample_i = gpu_i * samplePerGpu;
         unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
-        //if(maxSampleRange == 0){
-        //  minSample_i = sample_i;
-        //  maxSample_i = sample_i + 1;
-        //}else{
-          minSample_i += minSampleRange;
-          maxSample_i += minSampleRange; 
-        //}
+
+        minSample_i += minSampleRange;
+        maxSample_i += minSampleRange; 
+
         threadIds[gpu_i] = calcPhiAseThreaded( raysPerSample,
             maxRaysPerSample,
             dMesh.at(devices.at(gpu_i)),
