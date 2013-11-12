@@ -21,8 +21,11 @@
 
 #include <write_value_to_file.h>
 
+#include <logging.h>
+
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
+unsigned verbosity = V_DEBUG | V_INFO | V_WARNING; // extern through logging.h
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -82,6 +85,7 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
   double gain_local = mesh.nTot * mesh.betaCells[sample_i] * (sigmaE + sigmaA) - double(mesh.nTot * sigmaA);
   return gain_local * phiAse / mesh.crystalFluorescence;
 }
+
 
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
