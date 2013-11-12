@@ -181,7 +181,7 @@ int main(int argc, char **argv){
       runtime = max(*it, runtime);
     }
     cudaDeviceReset();      
-    runmode="Ray Propagation New GPU";
+    runmode="Ray Propagation GPU";
     break;
 
   case RAY_PROPAGATION_MPI:
@@ -198,7 +198,7 @@ int main(int argc, char **argv){
 			     totalRays,
 			     maxSampleRange
 			    );
-    runmode = "MPI";
+    runmode = "RAY PROPAGATION MPI";
     break;
 
   case FOR_LOOPS:
