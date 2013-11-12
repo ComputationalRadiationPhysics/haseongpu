@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include <iostream>
 #include <logging.h>
+#include <progressbar.h>
 
 #define HEAD_NODE 0
 #define RESULT_TAG 1
@@ -23,6 +24,7 @@ void mpiHead(std::vector<float> &results, unsigned numberOfComputeNodes){
     case RESULT_TAG:
       //std::cout << "Received result" << std::endl;
       results.at((unsigned)res[0]) = res[1];
+      fileProgressBar(results.size(),"output/progress");
       break;
 
     case SAMPLE_REQUEST_TAG:
