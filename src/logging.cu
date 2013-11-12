@@ -8,6 +8,10 @@ std::ostream& dout(unsigned activation_level) {
     return dummy;
   }
 
+  if(activation_level & V_NOLABEL){
+    return std::cout;
+  }
+
   if(activation_level & V_ERROR){
     return std::cerr << "\033[0;" << COLOR_ERROR << "m[ERROR] ";
   }
