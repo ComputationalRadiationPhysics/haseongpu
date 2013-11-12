@@ -17,6 +17,7 @@ ARCH = -arch=sm_20
 ARCH = -arch=sm_35
 ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
 
+
 # --maxrregcount=40
 
 # build variables
@@ -28,11 +29,13 @@ INCLUDES = include
 
 all: calcPhiASE
 
+bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
+	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
+
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
 
-
-calcPhiASE: $(OBJS) Makefile
+calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
 	mkdir -p bin
 	mkdir -p output
@@ -55,7 +58,6 @@ final_build:
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	cp src/calcPhiASE.m .
 
+#mpi: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
+#	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
 
-# BUGGY !!! DOES NOT WORK, try direct from commandline !!!
-mpi: $(wildcard src/calc_phi_ase_mpi.cc)
-	mpic++ -Wall -lm -c src/calc_phi_ase_mpi.cc -I include -o bin/calc_phi_ase_mpi.o
