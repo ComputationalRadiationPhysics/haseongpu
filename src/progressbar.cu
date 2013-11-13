@@ -60,7 +60,7 @@ void fileProgressBar(unsigned nTotal, std::string path){
 		int progress = int(percentage*length);
 		filestream << "Progress: [";
 		for(int i=0;i<progress ;++i){
-      switch((i+progress) % 12){
+      switch((i+part) % 12){
         case 0: filestream << "ø"; break;
         case 1: filestream << "¤"; break;
         case 2: filestream << "º"; break;
@@ -74,14 +74,8 @@ void fileProgressBar(unsigned nTotal, std::string path){
         case 10: filestream << "¸"; break;
         case 11: filestream << ","; break;
       }
-
 		}
-    //switch(part % 4){
-    //  case 0: filestream << "-"; break;
-    //  case 1: filestream << "\\"; break;
-    //  case 2: filestream << "|"; break;
-    //  case 3: filestream << "/"; break;
-    //}
+
 		for(int i=0; i < length-progress ; ++i){
 			filestream << " ";
 		}
