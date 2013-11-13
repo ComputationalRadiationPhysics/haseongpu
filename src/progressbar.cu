@@ -43,9 +43,8 @@ void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t star
 
 
 void fileProgressBar(unsigned nTotal, std::string path){
-	unsigned length = 50;
+	int length = 50;
 	static unsigned part = 0;
-  static unsigned progress = 0;
 	static const time_t starttime = time(0);
 	static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
 	static std::ofstream filestream;
@@ -58,9 +57,9 @@ void fileProgressBar(unsigned nTotal, std::string path){
 		if(!filestream.is_open()){
 			filestream.open(path.c_str(),std::ofstream::trunc);
 		}
-		progress = unsigned(percentage*length);
+		int progress = int(percentage*length);
 		filestream << "Progress: [";
-		for(unsigned i=0;i< progress-1 ;++i){
+		for(int i=0;i<progress-1 ;++i){
 			filestream << "#";
 		}
     switch(part % 4){
@@ -69,7 +68,7 @@ void fileProgressBar(unsigned nTotal, std::string path){
       case 2: filestream << "|"; break;
       case 3: filestream << "/"; break;
     }
-		for(unsigned i=0; i < length-progress ; ++i){
+		for(int i=0; i < length-progress ; ++i){
 			filestream << " ";
 		}
 		filestream << "] ";
