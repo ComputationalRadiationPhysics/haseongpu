@@ -54,15 +54,21 @@ void fileProgressBar(unsigned nTotal, std::string path){
 	const float percentage = float(part) / float(nTotal);
 
 	// write progressbar
-	if(unsigned(percentage*length) > progress){
+	//if(unsigned(percentage*length) > progress || part%10==0){
 		if(!filestream.is_open()){
 			filestream.open(path.c_str(),std::ofstream::trunc);
 		}
 		progress = unsigned(percentage*length);
 		filestream << "Progress: [";
-		for(unsigned i=0;i< progress ;++i){
+		for(unsigned i=0;i< progress-1 ;++i){
 			filestream << "#";
 		}
+    switch(part % 4){
+      case 0: filestream << "-"; break;
+      case 1: filestream << "\\"; break;
+      case 2: filestream << "|"; break;
+      case 3: filestream << "/"; break;
+    }
 		for(unsigned i=0; i < length-progress ; ++i){
 			filestream << " ";
 		}
@@ -78,6 +84,6 @@ void fileProgressBar(unsigned nTotal, std::string path){
 		filestream << "Runtime " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "s remaining)" << std::flush;
 
 		filestream.close();
-	}
+	//}
 }
 
