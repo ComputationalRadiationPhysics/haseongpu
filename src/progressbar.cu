@@ -6,6 +6,28 @@
 #include <iomanip>
 #include <fstream>
 
+void printWave(std::ostream &stream,unsigned part,int progress,int length){
+  for(int i=0;i<progress ;++i){
+    switch((i+part) % 12){
+      case 0: stream << "ø"; break;
+      case 1: stream << "¤"; break;
+      case 2: stream << "º"; break;
+      case 3: stream << "°"; break;
+      case 4: stream << "`"; break;
+      case 5: stream << "°"; break;
+      case 6: stream << "º"; break;
+      case 7: stream << "¤"; break;
+      case 8: stream << "ø"; break;
+      case 9: stream << ","; break;
+      case 10: stream << "¸"; break;
+      case 11: stream << ","; break;
+    }
+  }
+  for(int i=0; i < length-progress ; ++i){
+    stream << " ";
+  }
+}
+
 void simpleProgressBar(unsigned part, unsigned full){
 	unsigned length = 80;
 
@@ -19,8 +41,9 @@ void simpleProgressBar(unsigned part, unsigned full){
 	for(int i=0;i< length-(percentage*length) ;i++){
 		dout(V_INFO | V_NOLABEL) << " ";
 	}
-	dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "%% (" << part+1 << "/" << full << std::flush;
+	dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
 }
+
 
 void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t starttime){
 
@@ -28,17 +51,13 @@ void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t star
 
 	dout(V_INFO | V_NOLABEL) << "\r";
 	dout(V_INFO) << "Progress: [";
-	for(int i=0 ; i < (percentage*length) ; i++){
-		dout(V_INFO | V_NOLABEL) << "#";
-	}
-	for(int i=0;i< (length-(percentage*length)-1) ;i++){
-		dout(V_INFO | V_NOLABEL) << " ";
-	}
-	time_t now = time(0);
-	double timeSpent = difftime(now,starttime);
+  
+  printWave(dout(V_INFO | V_NOLABEL), part, int(percentage*length), length);
+
+	double timeSpent = difftime(time(0),starttime);
 	int timeTotal = timeSpent/percentage;
 	int timeRemaining = timeTotal-timeSpent;
-	dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << ") after " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "remaining)" << std::flush; 
+	dout(V_INFO | V_NOLABEL) << "] " << std::setfill(' ') << std::setw(3) << int(percentage*100) << "% (" << part+1 << "/" << full << ") after " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "s remaining)" << std::flush;
 }
 
 
@@ -52,33 +71,12 @@ void fileProgressBar(unsigned nTotal, std::string path){
 	++part;
 	const float percentage = float(part) / float(nTotal);
 
-	// write progressbar
-	//if(unsigned(percentage*length) > progress || part%10==0){
 		if(!filestream.is_open()){
 			filestream.open(path.c_str(),std::ofstream::trunc);
 		}
-		int progress = int(percentage*length);
+  
 		filestream << "Progress: [";
-		for(int i=0;i<progress ;++i){
-      switch((i+part) % 12){
-        case 0: filestream << "ø"; break;
-        case 1: filestream << "¤"; break;
-        case 2: filestream << "º"; break;
-        case 3: filestream << "°"; break;
-        case 4: filestream << "`"; break;
-        case 5: filestream << "°"; break;
-        case 6: filestream << "º"; break;
-        case 7: filestream << "¤"; break;
-        case 8: filestream << "ø"; break;
-        case 9: filestream << ","; break;
-        case 10: filestream << "¸"; break;
-        case 11: filestream << ","; break;
-      }
-		}
-
-		for(int i=0; i < length-progress ; ++i){
-			filestream << " ";
-		}
+    printWave(filestream,part,int(percentage*length),length);
 		filestream << "] ";
 
 		// write progress in percent
@@ -91,6 +89,5 @@ void fileProgressBar(unsigned nTotal, std::string path){
 		filestream << "Runtime " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "s remaining)" << std::flush;
 
 		filestream.close();
-	//}
 }
 
