@@ -8,7 +8,7 @@
 
 void printWave(std::ostream &stream,unsigned part,int progress,int length){
   for(int i=0;i<progress ;++i){
-    switch((i+part) % 12){
+    switch((part-i) % 12){
       case 0: stream << "ø"; break;
       case 1: stream << "¤"; break;
       case 2: stream << "º"; break;
@@ -66,7 +66,7 @@ void fileProgressBar(unsigned nTotal, std::string path){
 	static unsigned part = 0;
 	static const time_t starttime = time(0);
 	static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
-	static std::ofstream filestream;
+	std::ofstream filestream;
 
 	++part;
 	const float percentage = float(part) / float(nTotal);

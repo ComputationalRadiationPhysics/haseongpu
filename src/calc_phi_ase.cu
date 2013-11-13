@@ -161,7 +161,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
+      //if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
+      fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
