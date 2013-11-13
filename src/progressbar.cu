@@ -45,6 +45,7 @@ void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t star
 void fileProgressBar(unsigned nTotal, std::string path){
 	unsigned length = 50;
 	static unsigned part = 0;
+  static unsigned progress = 0;
 	static const time_t starttime = time(0);
 	static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
 	static std::ofstream filestream;
