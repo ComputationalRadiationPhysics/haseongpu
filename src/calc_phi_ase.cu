@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <iostream>
 #include <assert.h>
 #include <vector>
 #include <curand_kernel.h>
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
-#include <ctime> /* progressBar */
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <write_to_vtk.h>
@@ -66,7 +64,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample,  0);
   device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
-  device_vector<float>    dPhiAse             (hPhiAse.size(), 0);
+  device_vector<float>    dPhiAse             (hPhiAse.size(),    0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
@@ -119,25 +117,40 @@ float calcPhiAse ( unsigned &hRaysPerSample,
         // }
 
         // Start Kernel
-        calcSamplePhiAse<<< gridDim, blockDim >>>( devMTGPStates,
-						   dMesh, 
-						   raw_pointer_cast(&dIndicesOfPrisms[0]), 
-						   wave_i, 
-						   raw_pointer_cast(&dNumberOfReflections[0]), 
-						   raw_pointer_cast(&dImportance[0]),
-						   hRaysPerSampleDump, 
-						   raw_pointer_cast(&dPhiAse[0]), 
-						   raw_pointer_cast(&dPhiAseSquare[0]),
-						   sample_i, 
-						   hSigmaA[wave_i], 
-						   hSigmaE[wave_i] );
+
+        if(useReflections){
+          calcSamplePhiAse<<< gridDim, blockDim >>>( devMTGPStates,
+              dMesh, 
+              raw_pointer_cast(&dIndicesOfPrisms[0]), 
+              wave_i, 
+              raw_pointer_cast(&dNumberOfReflections[0]), 
+              raw_pointer_cast(&dImportance[0]),
+              hRaysPerSampleDump, 
+              raw_pointer_cast(&dPhiAse[0]), 
+              raw_pointer_cast(&dPhiAseSquare[0]),
+              sample_i, 
+              hSigmaA[wave_i], 
+              hSigmaE[wave_i] );
+        }else{
+          calcSamplePhiAseWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
+              dMesh, 
+              raw_pointer_cast(&dIndicesOfPrisms[0]), 
+              wave_i, 
+              raw_pointer_cast(&dImportance[0]),
+              hRaysPerSampleDump, 
+              raw_pointer_cast(&dPhiAse[0]), 
+              raw_pointer_cast(&dPhiAseSquare[0]),
+              sample_i, 
+              hSigmaA[wave_i], 
+              hSigmaE[wave_i] );
+        }
 
 
 	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
-	if(run == 0){
-	  mseRunZero = mseTmp;
-	  run++;
-	}
+//	if(run == 0){
+//	  mseRunZero = mseTmp;
+//	  run++;
+//	}
 
 	// MSE TESTs
 	//dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
@@ -160,14 +173,13 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      //if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
       fancyProgressBar(maxSample_i / (gpu_i + 1));
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
       hPhiAse.at(sampleOffset)   /= hRaysPerSampleDump * 4.0f * M_PI;
       totalRays.at(sampleOffset)  = hRaysPerSampleDump;
-      mse.at(sampleOffset) = mseRunZero;
+//    mse.at(sampleOffset) = mseRunZero;
 
     }
     

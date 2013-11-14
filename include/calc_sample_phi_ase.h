@@ -55,4 +55,16 @@ __global__ void calcSamplePhiAse(curandStateMtgp32* globalState,
 				 double sigmaE
 				 );
 
+__global__ void calcSamplePhiAseWithoutReflections(curandStateMtgp32* globalState, 
+				 const Mesh mesh,
+				 const unsigned* indicesOfPrisms, 
+				 const unsigned wave_i, 
+				 const double* importance,
+				 const unsigned raysPerSample,
+				 float *phiAse,
+				 float *phiAseSquare,
+				 const unsigned sample_i,
+				 double sigmaA,
+				 double sigmaE
+				 );
 #endif /* calc_sample_phi_ase_H */
