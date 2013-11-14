@@ -88,7 +88,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
-    time_t progressStartTime = time(0);
+    //time_t progressStartTime = time(0);
     //calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
       float mseRunZero = 0.0;
@@ -98,8 +98,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       hRaysPerSample = hRaysPerSampleSave;
 
-      unsigned hRaysPerSampleDump = 0;
-      while(true){
+      unsigned hRaysPerSampleDump = 0; while(true){
 	unsigned run = 0;
 	hRaysPerSampleDump = importanceSampling(
 						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
@@ -162,7 +161,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
       }
       // Update progressbar
       //if((sample_i+1) % 10 == 0) fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
-      fancyProgressBar(sample_i-minSample_i, maxSample_i / (gpu_i + 1), 60, progressStartTime);
+      fancyProgressBar(maxSample_i / (gpu_i + 1));
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];

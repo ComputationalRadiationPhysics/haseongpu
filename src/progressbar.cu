@@ -1,14 +1,15 @@
 #include "progressbar.h"
 #include <unistd.h>
-#include <ctime>
+//#include <ctime>
 #include <logging.h>
 #include <cmath>
 #include <iomanip>
 #include <fstream>
+#include <sys/time.h>
 
-void printWave(std::ostream &stream,unsigned part,int progress,int length){
+void printWave(std::ostream &stream, unsigned tic, int progress, int length){
   for(int i=0;i<progress ;++i){
-    switch((part-i) % 12){
+    switch((tic+i) % 12){
       case 0: stream << "ø"; break;
       case 1: stream << "¤"; break;
       case 2: stream << "º"; break;
@@ -29,65 +30,109 @@ void printWave(std::ostream &stream,unsigned part,int progress,int length){
 }
 
 void simpleProgressBar(unsigned part, unsigned full){
-	unsigned length = 80;
+  unsigned length = 80;
 
-	float percentage = (float(part)+1) / float(full);
+  float percentage = (float(part)+1) / float(full);
 
-	dout(V_INFO | V_NOLABEL) << "\r";
-	dout(V_INFO) << "Progress: [";
-	for(int i=0 ; i < (percentage*length) ; i++){
-		dout(V_INFO | V_NOLABEL) << "#";
-	}
-	for(int i=0;i< length-(percentage*length) ;i++){
-		dout(V_INFO | V_NOLABEL) << " ";
-	}
-	dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
+  dout(V_INFO | V_NOLABEL) << "\r";
+  dout(V_INFO) << "Progress: [";
+  for(int i=0 ; i < (percentage*length) ; i++){
+    dout(V_INFO | V_NOLABEL) << "#";
+  }
+  for(int i=0;i< length-(percentage*length) ;i++){
+    dout(V_INFO | V_NOLABEL) << " ";
+  }
+  dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
 }
 
 
-void fancyProgressBar(unsigned part, unsigned full, unsigned length, time_t starttime){
+unsigned long long timevalDiffInMillis(timeval start, timeval end){
+  unsigned long long t = 1000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000;
+  return t;
+}
 
-	float percentage = (float(part)+1) / float(full);
 
-	dout(V_INFO | V_NOLABEL) << "\r";
-	dout(V_INFO) << "Progress: [";
-  
-  printWave(dout(V_INFO | V_NOLABEL), part, int(percentage*length), length);
+void fancyProgressBar(const unsigned nTotal){
 
-	double timeSpent = difftime(time(0),starttime);
-	int timeTotal = timeSpent/percentage;
-	int timeRemaining = timeTotal-timeSpent;
-	dout(V_INFO | V_NOLABEL) << "] " << std::setfill(' ') << std::setw(3) << int(percentage*100) << "% (" << part+1 << "/" << full << ") after " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "s remaining)" << std::flush;
+  const int length = 50;
+
+  static timeval startTime;
+  static unsigned part = 0;
+  if(part==0){ gettimeofday(&startTime,NULL); }
+  static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
+  static unsigned tic  = 0;
+  timeval now;
+  gettimeofday(&now,NULL);
+  ++part;
+
+  //limit the update intervall (not faster than every 35ms)
+  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
+  if(millisSpent > 35*tic || part==nTotal){
+    ++tic;
+
+    const float percentage = float(part) / float(nTotal);
+    const float timeSpent = float(millisSpent) / 1000;
+    const float timeTotal = timeSpent/percentage;
+    const int timeRemaining = timeTotal-timeSpent;
+
+    dout(V_INFO | V_NOLABEL) << "\r";
+    dout(V_INFO) << "Progress: [";
+    printWave(dout(V_INFO | V_NOLABEL), tic, int(percentage*length), length);
+    dout(V_INFO | V_NOLABEL) << "] ";
+
+    dout(V_INFO | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
+    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << nTotal << ")";
+    dout(V_INFO | V_NOLABEL) << " after " << int(timeSpent) << "s";
+    dout(V_INFO | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
+    dout(V_INFO | V_NOLABEL) << std::flush;
+  }
 }
 
 
 void fileProgressBar(unsigned nTotal, std::string path){
-	int length = 50;
-	static unsigned part = 0;
-	static const time_t starttime = time(0);
-	static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
-	std::ofstream filestream;
 
-	++part;
-	const float percentage = float(part) / float(nTotal);
+  const int length = 50;
 
-		if(!filestream.is_open()){
-			filestream.open(path.c_str(),std::ofstream::trunc);
-		}
-  
-		filestream << "Progress: [";
-    printWave(filestream,part,int(percentage*length),length);
-		filestream << "] ";
+  std::ofstream filestream;
+  static timeval startTime;
+  static unsigned part = 0;
+  if(part==0){ gettimeofday(&startTime,NULL); }
+  static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
+  static unsigned tic  = 0;
+  timeval now;
+  gettimeofday(&now,NULL);
+  ++part;
 
-		// write progress in percent
-		filestream << std::setfill(' ') << std::setw(3) << unsigned(percentage*100) << "% (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << nTotal << ")" << std::endl;
+  //limit the update intervall (not faster than every 35ms)
+  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
+  if(millisSpent > 35*tic || part==nTotal){
+    ++tic;
 
-		// go to next line and write time
-		const double timeSpent = difftime(time(0),starttime);
-		const int timeTotal = timeSpent/percentage;
-		const int timeRemaining = timeTotal-timeSpent;
-		filestream << "Runtime " << int(timeSpent) << "s (" << timeTotal << "s total, " << timeRemaining << "s remaining)" << std::flush;
+    if(!filestream.is_open()){
+      filestream.open(path.c_str(),std::ofstream::trunc);
+    }
 
-		filestream.close();
+    const float percentage = float(part) / float(nTotal);
+    const float timeSpent = float(millisSpent) / 1000;
+    const float timeTotal = timeSpent/percentage;
+    const int timeRemaining = timeTotal-timeSpent;
+    const time_t finish = now.tv_sec + timeRemaining;
+
+    // write progressbar
+    filestream << "Progress: [";
+    printWave(filestream,tic,int(percentage*length),length);
+    filestream << "] ";
+
+    // write progress in numbers
+    filestream << std::setfill(' ') << std::setw(3) << unsigned(percentage*100) << "%";
+    filestream << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << nTotal << ")" << std::endl;
+    filestream << "running " << int(timeSpent) << "s";
+
+    // write remaining time estimates
+    filestream << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)" << std::endl;
+    filestream << "estimated completion: " << ctime(&finish);
+
+    filestream.close();
+  }
 }
 
