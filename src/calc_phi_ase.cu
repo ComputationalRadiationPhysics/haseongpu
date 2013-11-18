@@ -82,14 +82,14 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
-  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED));
+  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED+minSample_i));
 
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
     //time_t progressStartTime = time(0);
     //calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      float mseRunZero = 0.0;
+      //float mseRunZero = 0.0;
       // MSE BUG TEST
       //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
       //dout(V_DEBUG) << "SAMPLE " << sample_i << std::endl;
@@ -97,7 +97,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
       hRaysPerSample = hRaysPerSampleSave;
 
       unsigned hRaysPerSampleDump = 0; while(true){
-	unsigned run = 0;
+	//unsigned run = 0;
 	hRaysPerSampleDump = importanceSampling(
 						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
 						raw_pointer_cast(&dImportance[0]), 
