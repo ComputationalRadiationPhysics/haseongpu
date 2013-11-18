@@ -147,15 +147,20 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
 
 	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
+
 	// MSE TESTs
-	//dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
-	 //if(mseTmp > mse.at(sampleOffset)){
-	 //  double a = dPhiAse[sampleOffset];
-	 //  double b = dPhiAseSquare[sampleOffset];
-	 //  dout(V_DEBUG) << "\nRaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
-	 //  dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
-	 //  dout(V_DEBUG) << mseTmp << " > " << mse.at(sampleOffset) << "(" << sample_i << ")\n" << std::endl;
-	 //}
+	 if(mseTmp > mse.at(sampleOffset)){
+     // this happens in calcExpectation
+     double ca = dPhiAseSquare[sampleOffset] / hRaysPerSampleDump;
+     double cb = (dPhiAse[sampleOffset] / hRaysPerSampleDump) * (dPhiAse[sampleOffset] / hRaysPerSampleDump);
+
+     dout(V_WARNING) << "MSE_BUG for sample " << sample_i << ": " << mseTmp << " > " << mse.at(sampleOffset) << std::endl;
+	   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
+	   dout(V_DEBUG) << "RaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
+     dout(V_DEBUG) << "phiAseSquare / raysPerSample = " << ca << std::endl; 
+     dout(V_DEBUG) << "(phiAse / raysPerSample) * (phiAse / raysPerSample) = " << cb << std::endl; 
+
+	 }
         mse.at(sampleOffset) = mseTmp;
 
         if(mse.at(sampleOffset) < mseThreshold.at(wave_i))     break;
@@ -168,7 +173,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      fancyProgressBar(maxSample_i / (gpu_i + 1));
+      //fancyProgressBar(maxSample_i / (gpu_i + 1));
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
