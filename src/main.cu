@@ -6,6 +6,7 @@
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
 #include <algorithm> /* max_element */
+#include <numeric> /* accumulate*/
 
 // User header files
 #include <calc_phi_ase.h>
@@ -286,6 +287,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
     dout(V_STAT) << "max. MSE          : " << maxExpectation << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgExpectation << std::endl;
+    dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
     dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;

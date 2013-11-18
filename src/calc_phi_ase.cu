@@ -89,7 +89,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
     //time_t progressStartTime = time(0);
     //calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      float mseRunZero = 0.0;
+
       // MSE BUG TEST
       //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
       //dout(V_DEBUG) << "SAMPLE " << sample_i << std::endl;
@@ -97,7 +97,6 @@ float calcPhiAse ( unsigned &hRaysPerSample,
       hRaysPerSample = hRaysPerSampleSave;
 
       unsigned hRaysPerSampleDump = 0; while(true){
-	unsigned run = 0;
 	hRaysPerSampleDump = importanceSampling(
 						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
 						raw_pointer_cast(&dImportance[0]), 
@@ -148,11 +147,6 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
 
 	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
-//	if(run == 0){
-//	  mseRunZero = mseTmp;
-//	  run++;
-//	}
-
 	// MSE TESTs
 	//dout(V_DEBUG) << "MSE: " << mseTmp << " with " << hRaysPerSampleDump << " rays,[" << dPhiAse[sampleOffset] << " || " << dPhiAseSquare[sampleOffset] << "]"<< std::endl;
 	 //if(mseTmp > mse.at(sampleOffset)){
@@ -174,13 +168,12 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      //fancyProgressBar(maxSample_i / (gpu_i + 1));
+      fancyProgressBar(maxSample_i / (gpu_i + 1));
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
       hPhiAse.at(sampleOffset)   /= hRaysPerSampleDump * 4.0f * M_PI;
       totalRays.at(sampleOffset)  = hRaysPerSampleDump;
-//    mse.at(sampleOffset) = mseRunZero;
 
     }
     
