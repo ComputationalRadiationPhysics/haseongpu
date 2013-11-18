@@ -1,17 +1,17 @@
 #PBS -q k20
-#PBS -l nodes=12:ppn=8
+#PBS -l nodes=1:ppn=8
 #PBS -N ase_flux_MPI
-#PBS -l walltime=00:10:00
+#PBS -l walltime=01:00:00
 #PBS -d .
 
 # SETTINGS #################
 MAXGPUS="1"
-RAYSPERSAMPLE="100000"
-MAXRAYS="100000"
+RAYSPERSAMPLE="10000"
+MAXRAYS="10000000"
 MIN_SAMPLE_I=0
 MAX_SAMPLE_I=3209
 MODE="mpi"
-GPU_PER_NODE="4"
+GPU_PER_NODE="2"
 ############################
 
 cd ~/octrace
