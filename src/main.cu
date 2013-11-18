@@ -107,6 +107,7 @@ int main(int argc, char **argv){
   RunMode mode = NONE;
   int minSampleRange = 0;
   int maxSampleRange = 0;
+  time_t starttime   = time(0);
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
@@ -291,7 +292,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
-    dout(V_STAT) << "Runtime           : " << runtime << "s\n\n" << std::endl;
+    dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s\n\n" << std::endl;
   }
 
   // Write experiment data
