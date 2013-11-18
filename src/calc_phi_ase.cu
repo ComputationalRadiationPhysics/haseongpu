@@ -131,7 +131,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
               sample_i, 
               hSigmaA[wave_i], 
               hSigmaE[wave_i] );
-        }else{
+        }
+	else{
           calcSamplePhiAseWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
               dMesh, 
               raw_pointer_cast(&dIndicesOfPrisms[0]), 
@@ -173,7 +174,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
 
       }
       // Update progressbar
-      fancyProgressBar(maxSample_i / (gpu_i + 1));
+      //fancyProgressBar(maxSample_i / (gpu_i + 1));
 
       // get phiASE
       hPhiAse.at(sampleOffset) = dPhiAse[sampleOffset];
@@ -205,7 +206,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
   //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
 
-  dout(V_INFO | V_NOLABEL) << "\n" << std::endl;
+  //dout(V_INFO | V_NOLABEL) << "\n" << std::endl;
   // Free Memory
   cudaFree(devMTGPStates);
   cudaFree(devKernelParams);

@@ -136,15 +136,13 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 
   switch(rank){
   case HEAD_NODE:
-    std::cerr << "Start Head node" << std::endl;
     mpiHead(hPhiAse, size-1);
-    for(unsigned i = 0; i < hPhiAse.size(); ++i){
-      dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
-    }
+     for(unsigned i = 0; i < hPhiAse.size(); ++i){
+       dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
+     }
     break;
 
   default:
-    std::cerr << "Start Compute node" << std::endl;
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
 	       dMesh,
