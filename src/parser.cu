@@ -152,7 +152,11 @@ int checkParameterValidity(
     return 1;
   }
 
-  *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
+  if(*maxRaysPerSample < raysPerSample){
+    dout(V_WARNING) << "maxRays < raysPerSample. Increasing maxRays to " << raysPerSample << " (will be non-adaptive!)" << std::endl;
+    *maxRaysPerSample = raysPerSample;
+  }
+
 if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
     return 1;
   }
