@@ -8,48 +8,56 @@
 #include <progressbar.h>
 #include <algorithm>
 
+// Nodes
 #define HEAD_NODE 0
+
+// Tags
 #define RESULT_TAG 1
 #define SAMPLE_REQUEST_TAG 2
 #define SAMPLE_SEND_TAG 3
-#define SAMPLE_RANGE 4
-#define RESULT_LENGTH 4
-#define SAMPLE_LENGTH 2
+#define RUNTIME_TAG 4
+
+// MSG SIZES
+#define RESULT_MSG_LENGTH 4
+#define SAMPLE_MSG_LENGTH 2
 
 void mpiHead(std::vector<float> &results, 
 	     std::vector<double> &mse,
 	     std::vector<unsigned> &totalRays,
-	     unsigned numberOfComputeNodes){
+	     std::vector<float> &runtime,
+	     unsigned numberOfComputeNodes,
+	     int sampleRange){
   MPI_Status status;
-  float res[RESULT_LENGTH] = {0,0,0,0};
-  int sample_i[SAMPLE_LENGTH] = {0,0};
+  float res[RESULT_MSG_LENGTH] = {0,0,0,0};
+  int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
   unsigned finished = 0;
-  sample_i[1] = SAMPLE_RANGE;
+  sample_i[1] = sampleRange;
+
   while(finished < numberOfComputeNodes){
-    MPI_Recv(res, RESULT_LENGTH, MPI_FLOAT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+    MPI_Recv(res, RESULT_MSG_LENGTH, MPI_FLOAT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
     switch(status.MPI_TAG){
+    case RUNTIME_TAG:
+      runtime.push_back(res[0]);
+      finished++;
+      break;
+
     case RESULT_TAG:
-      //std::cout << "Received result" << std::endl;
       results.at((unsigned)res[0])   = res[1];
       mse.at((unsigned)res[0])       = res[2];
       totalRays.at((unsigned)res[0]) = (unsigned)res[3];
-
-      fileProgressBar(results.size(),"output/progress");
+      //fileProgressBar(results.size(),"output/progress");
       break;
 
     case SAMPLE_REQUEST_TAG:
       if(sample_i[0] == (int)results.size()){
 	int abortMPI[2] = {-1,-1};
-	//std::cout << "Send abort" << std::endl;
-	MPI_Send(abortMPI, SAMPLE_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	finished++;
+	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
       }
       else{
-	//std::cout << "Send sample point " << sample_i[0]<< " to "<< status.MPI_SOURCE << std::endl;
-	MPI_Send(sample_i, SAMPLE_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(SAMPLE_RANGE + sample_i[0], (int) results.size());
-	sample_i[1] = std::min(SAMPLE_RANGE + sample_i[1], (int) results.size());
+	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
+	sample_i[0] = std::min(sampleRange + sample_i[0], (int) results.size());
+	sample_i[1] = std::min(sampleRange + sample_i[1], (int) results.size());
 	
       }
       break;
@@ -63,6 +71,13 @@ void mpiHead(std::vector<float> &results,
 
 }
 
+/**
+ * This MPI-node make phiASE computations.
+ * It will request a sample point range from
+ * MPI head node, and send their results back
+ * sequentially.
+ *
+ **/
 void mpiCompute(unsigned &hostRaysPerSample,
 		const unsigned maxRaysPerSample,
 		const Mesh& dMesh,
@@ -76,21 +91,21 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		std::vector<unsigned> &totalRays,
 		unsigned gpu_i,
 		float &runtime){
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   while(true){
     MPI_Status status;
-    int sample_i[SAMPLE_LENGTH] = {0,0};
-    //std::cout << "Rank[" << rank << "] send sample request" << std::endl;
-    MPI_Send(sample_i, SAMPLE_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
-    MPI_Recv(sample_i, SAMPLE_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
-    //std::cout << "Rank[" << rank << "] received sample: " << sample_i[0] << std::endl;
+    int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
+    float totalRuntime = 0;
+    float res[RESULT_MSG_LENGTH] = {0,0,0,0}; 
+    MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
+    MPI_Recv(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
 
     if(sample_i[0] == -1){
+      res[0] = runtime;
+      MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RUNTIME_TAG, MPI_COMM_WORLD); 
       break;
     }
     else{
-      float res[RESULT_LENGTH] = {0,0,0,0}; 
+
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
 		   dMesh,
@@ -112,8 +127,8 @@ void mpiCompute(unsigned &hostRaysPerSample,
 	res[1] = hPhiAse.at(i);
 	res[2] = mse.at(i);
 	res[3] = totalRays.at(i);
-	//std::cout << "Rank[" << rank << "] send result " << sample_i[0] << " : " << res[1] << std::endl;
-	MPI_Send(res, RESULT_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
+	totalRuntime += runtime;
+	MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
       }
 
     }
@@ -137,9 +152,6 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      unsigned maxSample_i){
 
 
-  int rank;
-  int size;
-  float runtime;
 
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){
@@ -148,15 +160,19 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     return 1;
   }
 
+  int rank;
+  int size;
+  float runtime;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  std::vector<float> runtimes(size,0);
 
   switch(rank){
   case HEAD_NODE:
-    mpiHead(hPhiAse, mse, totalRays, size-1);
-     for(unsigned i = 0; i < hPhiAse.size(); ++i){
-       dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
-     }
+    mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil(maxSample_i / (float)(size-1)));
+     // for(unsigned i = 0; i < hPhiAse.size(); ++i){
+     //   dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
+     // }
     break;
 
   default:
@@ -173,8 +189,11 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 	       totalRays,
 	       gpu_i,
 	       runtime);
+    
+    cudaDeviceReset();      
+    MPI_Finalize();
+    exit(0);
     break;
-
   };
 
 
