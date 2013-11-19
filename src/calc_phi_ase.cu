@@ -115,7 +115,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
         // }
 
         // Start Kernel
-	CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
+	CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
         if(useReflections){
           calcSamplePhiAse<<< gridDim, blockDim >>>( devMTGPStates,
               dMesh, 
