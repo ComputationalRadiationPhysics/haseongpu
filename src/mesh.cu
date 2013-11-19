@@ -249,8 +249,8 @@ __device__ int Mesh::getNeighbor(unsigned triangle, int edge) const{
  */
 __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState) const{
   Point startPoint = {0,0,0};
-  double u = curand_uniform(&globalState[blockIdx.x]);
-  double v = curand_uniform(&globalState[blockIdx.x]);
+  double u = curand_uniform_double(&globalState[blockIdx.x]);
+  double v = curand_uniform_double(&globalState[blockIdx.x]);
 
   if((u+v)>1)
   {
@@ -263,7 +263,7 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
   int t3 = triangles[triangle + 2 * numberOfTriangles];
 
   // convert the random startpoint into coordinates
-  startPoint.z = (level + curand_uniform(&globalState[blockIdx.x])) * thickness;
+  startPoint.z = (level + curand_uniform_double(&globalState[blockIdx.x])) * thickness;
   startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
   startPoint.y = (points[t1+numberOfPoints] * u) + (points[t2+numberOfPoints] * v) + (points[t3+numberOfPoints] * w);
 
