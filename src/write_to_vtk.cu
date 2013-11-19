@@ -89,7 +89,7 @@ int writeToVtk(const Mesh& mesh,
 }
 
 int writePrismToVtk(const Mesh& mesh,
-	       const std::vector<unsigned> prismData,
+	       const std::vector<double> prismData,
 	       const std::string pfilename,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
@@ -165,6 +165,7 @@ int writePrismToVtk(const Mesh& mesh,
 
   return 0;
 }
+
 
 std::vector<double> compareVtk(std::vector<double> compare, std::string filename, const unsigned numberOfSamples){
   std::ifstream filestream;
