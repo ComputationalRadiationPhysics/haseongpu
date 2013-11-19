@@ -115,7 +115,6 @@ float calcPhiAse ( unsigned hRaysPerSample,
         // }
 
         // Start Kernel
-	cudaDeviceSynchronize();
 	CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
         if(useReflections){
           calcSamplePhiAse<<< gridDim, blockDim >>>( devMTGPStates,
@@ -144,7 +143,6 @@ float calcPhiAse ( unsigned hRaysPerSample,
               hSigmaA[wave_i], 
               hSigmaE[wave_i] );
         }
-	cudaDeviceSynchronize();
 
 	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
 

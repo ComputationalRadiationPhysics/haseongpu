@@ -11,7 +11,7 @@ MAXRAYS="100000000"
 MIN_SAMPLE_I=0
 MAX_SAMPLE_I=3209
 MODE="mpi"
-GPU_PER_NODE="4"
+GPU_PER_NODE="2"
 ############################
 
 cd ~/octrace
