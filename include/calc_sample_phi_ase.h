@@ -41,30 +41,30 @@
  * @param sigmaE
  *
  **/
-__global__ void calcSamplePhiAse(curandStateMtgp32* globalState, 
+__global__ void calcSampleGainSum(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
 				 const unsigned* numberOfReflections,
 				 const double* importance,
 				 const unsigned raysPerSample,
-				 float *phiAse,
-				 float *phiAseSquare,
+				 float *gainSum,
+				 float *gainSumSquare,
 				 const unsigned sample_i,
-				 double sigmaA,
-				 double sigmaE
+				 const double sigmaA,
+				 const double sigmaE
 				 );
 
-__global__ void calcSamplePhiAseWithoutReflections(curandStateMtgp32* globalState, 
+__global__ void calcSampleGainSumWithoutReflections(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
 				 const double* importance,
 				 const unsigned raysPerSample,
-				 float *phiAse,
-				 float *phiAseSquare,
+				 float *gainSum,
+				 float *gainSumSquare,
 				 const unsigned sample_i,
-				 double sigmaA,
-				 double sigmaE
+				 const double sigmaA,
+				 const double sigmaE
 				 );
 #endif /* calc_sample_phi_ase_H */
