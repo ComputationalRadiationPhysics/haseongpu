@@ -165,10 +165,10 @@ float calcPhiAse ( unsigned hRaysPerSample,
         mse.at(sampleOffset) = mseTmp;
 
         if(mse.at(sampleOffset) < mseThreshold.at(wave_i))        break;
-        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample) break;
+        if(hRaysPerSample * 100 > (unsigned long)maxRaysPerSample) break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
-        hRaysPerSample             *= 10;
+        hRaysPerSample             *= 100;
         dPhiAse[sampleOffset]       = 0;
         dPhiAseSquare[sampleOffset] = 0;
 
