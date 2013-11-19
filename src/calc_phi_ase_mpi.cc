@@ -21,10 +21,10 @@
 #define RESULT_MSG_LENGTH 4
 #define SAMPLE_MSG_LENGTH 2
 
-void mpiHead(std::vector<float> &results, 
+void mpiHead(std::vector<float> &phiASE, 
 	     std::vector<double> &mse,
 	     std::vector<unsigned> &totalRays,
-	     std::vector<float> &runtime,
+	     std::vector<float> &runtimes,
 	     unsigned numberOfComputeNodes,
 	     int sampleRange){
   MPI_Status status;
@@ -38,26 +38,26 @@ void mpiHead(std::vector<float> &results,
 
     switch(status.MPI_TAG){
     case RUNTIME_TAG:
-      runtime.push_back(res[0]);
+      runtimes.push_back(res[0]);
       finished++;
       break;
 
     case RESULT_TAG:
-      results.at((unsigned)res[0])   = res[1];
+      phiASE.at((unsigned)res[0])   = res[1];
       mse.at((unsigned)res[0])       = res[2];
       totalRays.at((unsigned)res[0]) = (unsigned)res[3];
-      //fileProgressBar(results.size(),"output/progress");
+      //fileProgressBar(phiASE.size(),"output/progress");
       break;
 
     case SAMPLE_REQUEST_TAG:
-      if(sample_i[0] == (int)results.size()){
+      if(sample_i[0] == (int)phiASE.size()){
 	int abortMPI[2] = {-1,-1};
 	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
       }
       else{
 	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(sampleRange + sample_i[0], (int) results.size());
-	sample_i[1] = std::min(sampleRange + sample_i[1], (int) results.size());
+	sample_i[0] = std::min(sample_i[0] + sampleRange, (int) phiASE.size());
+	sample_i[1] = std::min(sample_i[1] + sampleRange, (int) phiASE.size());
 	
       }
       break;
@@ -169,10 +169,13 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 
   switch(rank){
   case HEAD_NODE:
-    mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil(maxSample_i / (float)(size-1)));
-     // for(unsigned i = 0; i < hPhiAse.size(); ++i){
-     //   dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
-     // }
+    //mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil((maxSample_i + 1)  / (float)(size-1)));
+    mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, 1);
+    // for(unsigned i = 0; i < hPhiAse.size(); ++i){
+    //   dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
+    // }
+    cudaDeviceReset();   
+    MPI_Finalize();
     break;
 
   default:
@@ -196,8 +199,6 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
   };
 
-
-  MPI_Finalize();
   return runtime;
 }
 

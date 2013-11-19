@@ -89,7 +89,7 @@ __global__ void calcSamplePhiAseWithoutReflections(curandStateMtgp32* globalStat
 
     double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
 
-	gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
+    gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
 
     gainSum       += gain;
@@ -98,5 +98,8 @@ __global__ void calcSamplePhiAseWithoutReflections(curandStateMtgp32* globalStat
   }
   atomicAdd(&(phiAse[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSum));
   atomicAdd(&(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]), float(gainSumSquare));
+  // if(phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples] > 100000000){
+  //   printf("phiAse² > 100000000: ",phiAseSquare[sample_i  + wave_i * mesh.numberOfSamples]);
+  // }
 
 }

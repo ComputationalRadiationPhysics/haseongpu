@@ -28,7 +28,7 @@ double calcExpectation(const double phiAse, const double phiAseSquare, const uns
 }
 
 
-float calcPhiAse ( unsigned &hRaysPerSample,
+float calcPhiAse ( unsigned hRaysPerSample,
 		   const unsigned maxRaysPerSample,
 		   const Mesh& dMesh,
 		   const Mesh& hMesh,
@@ -57,7 +57,7 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   unsigned numberOfWavelengths    = hSigmaE.size();
-  bool distributeRandomly         = true;
+  bool distributeRandomly         = false;
   dim3 blockDim(128);             
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
@@ -82,23 +82,22 @@ float calcPhiAse ( unsigned &hRaysPerSample,
   CUDA_CALL(cudaMalloc((void **)&devMTGPStates, gridDim.x  * sizeof(curandStateMtgp32)));
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
-  CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
+  //CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
 
   // Calculate Phi Ase for each wavelength
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
-    //time_t progressStartTime = time(0);
-    //calculation for each sample point
+
+    // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-
-      // MSE BUG TEST
-      //for(unsigned sample_i = 71; sample_i < 72; ++sample_i){
-      //dout(V_DEBUG) << "SAMPLE " << sample_i << std::endl;
+    //unsigned sample_i = 20;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
+      unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
-
-      unsigned hRaysPerSampleDump = 0; while(true){
-	hRaysPerSampleDump = importanceSampling(
-						sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
+      
+      int run = 0;
+      while(true){
+	run++;
+	hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
 						raw_pointer_cast(&dImportance[0]), 
 						raw_pointer_cast(&dRaysPerPrism[0]),
 						distributeRandomly, blockDim, gridDim
@@ -116,7 +115,8 @@ float calcPhiAse ( unsigned &hRaysPerSample,
         // }
 
         // Start Kernel
-
+	cudaDeviceSynchronize();
+	CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
         if(useReflections){
           calcSamplePhiAse<<< gridDim, blockDim >>>( devMTGPStates,
               dMesh, 
@@ -144,27 +144,30 @@ float calcPhiAse ( unsigned &hRaysPerSample,
               hSigmaA[wave_i], 
               hSigmaE[wave_i] );
         }
-
+	cudaDeviceSynchronize();
 
 	float mseTmp = calcExpectation(dPhiAse[sampleOffset], dPhiAseSquare[sampleOffset], hRaysPerSampleDump);
 
-	// MSE TESTs
-	 if(mseTmp > mse.at(sampleOffset)){
-     // this happens in calcExpectation
-     double ca = dPhiAseSquare[sampleOffset] / hRaysPerSampleDump;
-     double cb = (dPhiAse[sampleOffset] / hRaysPerSampleDump) * (dPhiAse[sampleOffset] / hRaysPerSampleDump);
+	//MSE TESTs
+	// if(mseTmp > mse.at(sampleOffset)){
+	//   // this happens in calcExpectation
+	//   double ca = dPhiAseSquare[sampleOffset] / hRaysPerSampleDump;
+	//   double cb = (dPhiAse[sampleOffset] / hRaysPerSampleDump) * (dPhiAse[sampleOffset] / hRaysPerSampleDump);
 
-     dout(V_WARNING) << "MSE_BUG for sample " << sample_i << ": " << mseTmp << " > " << mse.at(sampleOffset) << std::endl;
-	   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
-	   dout(V_DEBUG) << "RaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
-     dout(V_DEBUG) << "phiAseSquare / raysPerSample = " << ca << std::endl; 
-     dout(V_DEBUG) << "(phiAse / raysPerSample) * (phiAse / raysPerSample) = " << cb << std::endl; 
+	//   dout(V_WARNING) << "MSE_BUG for sample " << sample_i << ": " << mseTmp << " > " << mse.at(sampleOffset) << std::endl;
+	//   dout(V_DEBUG) << "Run: " << run << std::endl;
+	//   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
+	//   dout(V_DEBUG) << "RaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
+	//   dout(V_DEBUG) << "phiAseSquare / raysPerSample = " << ca << std::endl; 
+	//   dout(V_DEBUG) << "(phiAse / raysPerSample) * (phiAse / raysPerSample) = " << cb << std::endl; 
+	//   dout(V_DEBUG) << "sqrt(abs((a - b) / raysPerSample)) = " << sqrt(abs((ca - cb) / hRaysPerSampleDump)) << std::endl; 
+	//   dout(V_DEBUG) << std::endl;
+	// }
 
-	 }
         mse.at(sampleOffset) = mseTmp;
 
-        if(mse.at(sampleOffset) < mseThreshold.at(wave_i))     break;
-        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample)break;
+        if(mse.at(sampleOffset) < mseThreshold.at(wave_i))        break;
+        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample) break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
         hRaysPerSample             *= 10;
