@@ -94,9 +94,9 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   unsigned maxRaysPerSample = 0;
-  float maxExpectation = 0;
-  float  avgExpectation = 0;
-  unsigned highExpectation = 0;
+  float maxMSE = 0;
+  float  avgMSE = 0;
+  unsigned highMSE = 0;
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
@@ -296,14 +296,14 @@ int main(int argc, char **argv){
   }
 
   if(verbosity & V_STAT){
-    // Filter maxExpectation
+    // Filter maxMSE
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
-      maxExpectation = max(maxExpectation, *it);
-      avgExpectation += *it;
+      maxMSE = max(maxMSE, *it);
+      avgMSE += *it;
       if(*it > mseThreshold.at(0))
-        highExpectation++;
+        highMSE++;
     }
-    avgExpectation /= mse.size();
+    avgMSE /= mse.size();
 
     //Print statistics
     std::cout.imbue(std::locale(""));
@@ -317,15 +317,15 @@ int main(int argc, char **argv){
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
     dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
-    dout(V_STAT) << "max. MSE          : " << maxExpectation << std::endl;
-    dout(V_STAT) << "avg. MSE          : " << avgExpectation << std::endl;
-    dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
+    dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
+    dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
+    dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
     dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
     dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s" << std::endl;
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
       dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-      ray_histogram(totalRays,raysPerSample,maxRaysPerSample,highExpectation);
+      ray_histogram(totalRays,raysPerSample,maxRaysPerSample,highMSE);
     }
   }
   return 0;
