@@ -21,6 +21,7 @@
 #include <test_environment.h>
 
 #include <logging.h>
+#include <ray_histogram.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
@@ -111,7 +112,6 @@ int main(int argc, char **argv){
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
-  std::cout.imbue(std::locale(""));
 
   // Wavelength data
   std::vector<double> sigmaA;
@@ -271,30 +271,6 @@ int main(int argc, char **argv){
 
   // }
 
-  if(verbosity & V_STAT){
-    // Filter maxExpectation
-    for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
-      maxExpectation = max(maxExpectation, *it);
-      avgExpectation += *it;
-      if(*it > mseThreshold.at(0))
-        highExpectation++;
-    }
-    avgExpectation /= mse.size();
-
-    //Print statistics
-    dout(V_STAT | V_NOLABEL) << std::endl;
-    dout(V_STAT) << "Statistics\n" << std::endl;
-    dout(V_STAT) << "Prism             : " << (int) hMesh.numberOfPrisms << std::endl;
-    dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
-    dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
-    dout(V_STAT) << "max. MSE          : " << maxExpectation << std::endl;
-    dout(V_STAT) << "avg. MSE          : " << avgExpectation << std::endl;
-    dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
-    dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
-    dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
-    dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
-    dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s\n\n" << std::endl;
-  }
 
   // Write experiment data
   // writeMatlabOutput(
@@ -313,12 +289,45 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writeToVtk(hMesh, dndtAse, "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpPhiAse, "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, mse, "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpTotalRays, "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, dndtAse, "output/vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpPhiAse, "output/vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, mse, "output/vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpTotalRays, "output/vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
   }
 
+  if(verbosity & V_STAT){
+    // Filter maxExpectation
+    for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
+      maxExpectation = max(maxExpectation, *it);
+      avgExpectation += *it;
+      if(*it > mseThreshold.at(0))
+        highExpectation++;
+    }
+    avgExpectation /= mse.size();
+
+    //Print statistics
+    std::cout.imbue(std::locale(""));
+    dout(V_STAT | V_NOLABEL) << std::endl;
+    dout(V_STAT) << "=== Statistics ===" << std::endl;
+    dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
+    dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
+    dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
+    dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
+    if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
+    dout(V_STAT | V_NOLABEL) << std::endl;
+    dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
+    dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
+    dout(V_STAT) << "max. MSE          : " << maxExpectation << std::endl;
+    dout(V_STAT) << "avg. MSE          : " << avgExpectation << std::endl;
+    dout(V_STAT) << "too high MSE      : " << highExpectation << std::endl;
+    dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
+    dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s" << std::endl;
+    dout(V_STAT) << std::endl;
+    if(maxRaysPerSample > raysPerSample){
+      dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
+      ray_histogram(totalRays,raysPerSample,maxRaysPerSample,highExpectation);
+    }
+  }
   return 0;
 
 }
