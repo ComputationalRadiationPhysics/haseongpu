@@ -111,6 +111,7 @@ int main(int argc, char **argv){
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
+  std::cout.imbue(std::locale(""));
 
   // Wavelength data
   std::vector<double> sigmaA;
