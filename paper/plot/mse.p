@@ -7,15 +7,17 @@ set border 3
 set grid
 
 set xlabel "MSE"
-#set ylabel "number of sample points"
+set logscale y
+
 
 set key opaque
 set xtics 0,0.0025,0.01
 set ytics 0,100,300
 set xrange [0.00025:0.01]
-set yrange [0:300]
+set yrange [1:300]
 
-set ytics nomirror 
+set ytics nomirror
+set xtics nomirror
 
 set grid  front lw 2
 
