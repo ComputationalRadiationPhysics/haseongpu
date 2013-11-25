@@ -6,9 +6,12 @@
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
 #include <algorithm> /* max_element */
+#include <numeric> /* accumulate*/
 
 // User header files
 #include <calc_phi_ase.h>
+#include <calc_phi_ase_threaded.h>
+#include <calc_phi_ase_mpi.h>
 #include <parser.h>
 #include <write_to_vtk.h>
 #include <write_matlab_output.h>
@@ -16,11 +19,14 @@
 #include <cudachecks.h>
 #include <mesh.h>
 #include <test_environment.h>
-#include <thread.h>
-#include <write_value_to_file.h>
+
+#include <logging.h>
+#include <ray_histogram.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
+
 
 /** 
  * @brief Queries for devices on the running mashine and collects
@@ -33,7 +39,7 @@
  * 
  * @return vector of possible devices
  */
-std::vector<unsigned> getCorrectDevice(int verbose){
+std::vector<unsigned> getCorrectDevice(unsigned maxGpus){
   cudaDeviceProp prop;
   int minMajor = MIN_COMPUTE_CAPABILITY_MAJOR;
   int minMinor = MIN_COMPUTE_CAPABILITY_MINOR;
@@ -44,32 +50,35 @@ std::vector<unsigned> getCorrectDevice(int verbose){
   CUDA_CHECK_RETURN( cudaGetDeviceCount(&count));
 
   // Check devices for compute capability and if device is busy
-  for(int i=0; i<count; ++i){
+  unsigned devicesAllocated = 0;
+  for(int i=0; i < count; ++i){
     CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, i) );
     if( (prop.major > minMajor) || (prop.major == minMajor && prop.minor >= minMinor) ){
       cudaSetDevice(i);
-      int* test;
-      if(cudaMalloc((void**) &test, sizeof(int)) == cudaSuccess){
+      int* occupy; //TODO: occupy gets allocated, but never cudaFree'd -> small memory leak!
+      if(cudaMalloc((void**) &occupy, sizeof(int)) == cudaSuccess){
         devices.push_back(i);
-        cudaFree(test);
-        cudaDeviceReset();
+        devicesAllocated++;
+        if(devicesAllocated == maxGpus)
+          break;
+
       }
+
     }
+
   }
 
   if(devices.size() == 0){
-    fprintf(stderr,"\nNone of the free CUDA-capable devices is sufficient!\n");
+    dout(V_ERROR) << "None of the free CUDA-capable devices is sufficient!" << std::endl;
     exit(1);
   }
 
   cudaSetDevice(devices.at(0));
 
-  if(verbose > 0){
-    fprintf(stderr,"\nFound %d available CUDA devices with Compute Capability >= %d.%d):\n", int(devices.size()), minMajor,minMinor);
-    for(unsigned i=0; i<devices.size(); ++i){
-      CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
-      fprintf(stderr,"[%d] %s (Compute Capability %d.%d)\n", devices[i], prop.name, prop.major, prop.minor);
-    }
+  dout(V_INFO) << "Found " << int(devices.size()) << " available CUDA devices with Compute Capability >= " << minMajor << "." << minMinor << "):" << std::endl;
+  for(unsigned i=0; i<devices.size(); ++i){
+    CUDA_CHECK_RETURN( cudaGetDeviceProperties(&prop, devices[i]) );
+    dout(V_INFO) << "[" << devices[i] << "] " << prop.name << " (Compute Capability " << prop.major << "." << prop.minor << ")" << std::endl;
   }
 
   return devices;
@@ -81,12 +90,13 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
   return gain_local * phiAse / mesh.crystalFluorescence;
 }
 
+
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   unsigned maxRaysPerSample = 0;
-  float maxExpectation = 0;
-  float  avgExpectation = 0;
-  unsigned highExpectation = 0;
+  float maxMSE = 0;
+  float  avgMSE = 0;
+  unsigned highMSE = 0;
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
@@ -98,24 +108,27 @@ int main(int argc, char **argv){
   RunMode mode = NONE;
   int minSampleRange = 0;
   int maxSampleRange = 0;
+  time_t starttime   = time(0);
 
   std::string experimentPath;
+  verbosity = 31; //ALL //TODO: remove in final code
 
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
   std::vector<float> mseThreshold;
 
-  // Set/Test device to run experiment with
-  devices = getCorrectDevice(1);
-
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
       &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange);
 
-  // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus,minSampleRange,maxSampleRange)) return 1;
+  // Set/Test device to run experiment with
+  //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
+  //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
+  devices = getCorrectDevice(maxGpus);
 
+  // sanity checks
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
@@ -129,6 +142,8 @@ int main(int argc, char **argv){
   Mesh hMesh;
   std::vector<Mesh> dMesh(maxGpus);
 
+  // TODO: split into hMesh and dMesh parsing 
+  // -> parse dMesh only where needed
   if(Mesh::parseMultiGPU(hMesh, dMesh, experimentPath, devices, maxGpus)) return 1;
 
   // Solution vector
@@ -138,23 +153,19 @@ int main(int argc, char **argv){
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
 
   // Run Experiment
-  std::vector<float> runtimes(maxGpus, 0);
   std::vector<pthread_t> threadIds(maxGpus, 0);
-
-  unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
-  float samplePerGpu = samplesPerNode / (float) maxGpus;
+  std::vector<float> runtimes(maxGpus, 0);
   switch(mode){
     case RAY_PROPAGATION_GPU:
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+        const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
+        const float samplePerGpu = samplesPerNode / (float) maxGpus;
         unsigned minSample_i = gpu_i * samplePerGpu;
         unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
-        //if(maxSampleRange == 0){
-        //  minSample_i = sample_i;
-        //  maxSample_i = sample_i + 1;
-        //}else{
-          minSample_i += minSampleRange;
-          maxSample_i += minSampleRange; 
-        //}
+
+        minSample_i += minSampleRange;
+        maxSample_i += minSampleRange; 
+
         threadIds[gpu_i] = calcPhiAseThreaded( raysPerSample,
             maxRaysPerSample,
             dMesh.at(devices.at(gpu_i)),
@@ -163,25 +174,43 @@ int main(int argc, char **argv){
             sigmaE,
             mseThreshold,
             useReflections,
-            phiAse,
-            mse,
+            phiAse, 
+            mse, 
             totalRays,
             devices.at(gpu_i),
             minSample_i,
             maxSample_i,
             runtimes.at(gpu_i)
             );
-
       }
       joinAll(threadIds);
       for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
         runtime = max(*it, runtime);
       }
       cudaDeviceReset();      
-      runmode="Ray Propagation New GPU";
+      runmode="Ray Propagation GPU";
       break;
 
-    case FOR_LOOPS:
+    case RAY_PROPAGATION_MPI:
+      runtime = calcPhiAseMPI( raysPerSample,
+          maxRaysPerSample,
+          dMesh.at(0),
+          hMesh,
+          sigmaA,
+          sigmaE,
+          mseThreshold,
+          useReflections,
+          phiAse,
+          mse,
+          totalRays,
+          devices.at(0),
+          maxSampleRange
+          );
+      runmode = "RAY PROPAGATION MPI";
+      break;
+
+    case FOR_LOOPS: //Possibly deprecated!
+      // TODO: make available for MPI?
       runtime = forLoopsClad( &dndtAse,
           raysPerSample,
           &hMesh,
@@ -217,53 +246,31 @@ int main(int argc, char **argv){
       exit(0);
   }
 
-  // Filter maxExpectation
-  for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
-    maxExpectation = max(maxExpectation, *it);
-    avgExpectation += *it;
-    if(*it > mseThreshold.at(0))
-      highExpectation++;
-  }
-  avgExpectation /= mse.size();
 
-
-  // Print Solutions
-  for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
-    fprintf(stderr, "\n\nC Solutions %d\n", wave_i);
-    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-      int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
-      if(silent && sample_i <=10)
-        fprintf(stderr, "C Dndt ASE[%d]: %.80f %.10f\n", sample_i, dndtAse.at(sampleOffset), mse.at(sampleOffset));
-    }
-    for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-      int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      fprintf(stderr, "C PHI ASE[%d]: %.80f %.10f\n", sample_i, phiAse.at(sampleOffset), mse.at(sampleOffset));
-      if(silent){
+  if(verbosity & V_DEBUG){
+    // Print Solutions
+    for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
+      dout(V_DEBUG) << "\n\nSolutions " <<  wave_i << std::endl;
+      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+        dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
+        if(sample_i <=10)
+          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;
+      }
+      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
+        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sampleOffset) << " " << mse.at(sampleOffset) <<std::endl;
         if(sample_i >= 10) break;
       }
     }
   }
 
   // Compare with vtk
-  if(compareLocation!="") {
-    std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  // if(compareLocation!="") {
+  //   std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
 
-  }
+  // }
 
-  // Print statistics
-  fprintf(stderr, "\n");
-  fprintf(stderr, "C Statistics\n");
-  fprintf(stderr, "C Prism             : %d\n", (int) hMesh.numberOfPrisms);
-  fprintf(stderr, "C Samples           : %d\n", (int) dndtAse.size());
-  fprintf(stderr, "C MSE threshold     : %f\n", *(std::max_element(mseThreshold.begin(),mseThreshold.end())));
-  fprintf(stderr, "C max. MSE          : %f\n", maxExpectation);
-  fprintf(stderr, "C avg. MSE          : %f\n", avgExpectation);
-  fprintf(stderr, "C too high MSE      : %d\n", highExpectation);
-  fprintf(stderr, "C Runmode           : %s \n", runmode.c_str());
-  fprintf(stderr, "C Nr of GPUs        : %d \n", maxGpus);
-  fprintf(stderr, "C Runtime           : %f s\n", runtime);
-  fprintf(stderr, "\n");
 
   // Write experiment data
   // writeMatlabOutput(
@@ -276,24 +283,51 @@ int main(int argc, char **argv){
   //     hMesh.numberOfLevels
   //     );
 
-  // Write output in single files
-  for(unsigned wave_i=0 ; wave_i < sigmaE.size() ; ++wave_i){
-    for(unsigned sample_i = minSampleRange; sample_i < minSampleRange+samplesPerNode ; sample_i++){
-      unsigned sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-      writeValueToFile(phiAse.at(sampleOffset),"output/results/","wavelength",wave_i,"sample",sample_i);
-    }
-  }
 
   // FOR OUTPUT
-  std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
-  std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
+  if(writeVtk){
+    std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
+    std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-  if(writeVtk) writeToVtk(hMesh, dndtAse, "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, tmpPhiAse, "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, mse, "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-  if(writeVtk) writeToVtk(hMesh, tmpTotalRays, "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, dndtAse, "output/vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpPhiAse, "output/vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, mse, "output/vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpTotalRays, "output/vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+  }
 
+  if(verbosity & V_STAT){
+    // Filter maxMSE
+    for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
+      maxMSE = max(maxMSE, *it);
+      avgMSE += *it;
+      if(*it > mseThreshold.at(0))
+        highMSE++;
+    }
+    avgMSE /= mse.size();
+
+    //Print statistics
+    std::cout.imbue(std::locale(""));
+    dout(V_STAT | V_NOLABEL) << std::endl;
+    dout(V_STAT) << "=== Statistics ===" << std::endl;
+    dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
+    dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
+    dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
+    dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
+    if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
+    dout(V_STAT | V_NOLABEL) << std::endl;
+    dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
+    dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
+    dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
+    dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
+    dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
+    dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
+    dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s" << std::endl;
+    dout(V_STAT) << std::endl;
+    if(maxRaysPerSample > raysPerSample){
+      dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
+      ray_histogram(totalRays,raysPerSample,maxRaysPerSample,highMSE);
+    }
+  }
   return 0;
+
 }
-
-

@@ -7,7 +7,7 @@
 #include <cstdlib> /* atof */
 #include <vector> 
 
-enum RunMode { NONE, RAY_PROPAGATION_GPU, FOR_LOOPS, TEST };
+enum RunMode { NONE, RAY_PROPAGATION_GPU, FOR_LOOPS, RAY_PROPAGATION_MPI, TEST };
 
 /**
  * @brief Parses a given file(filename) line by line.

@@ -1,10 +1,10 @@
 #include "map_rays_to_prisms.h"
 #include <stdio.h>
 #include <assert.h>
-#include <iostream>
 #include <iterator>
 #include <thrust/scan.h>
 #include <thrust/device_vector.h>
+#include <logging.h>
 
 
 using thrust::device_vector;
@@ -129,8 +129,8 @@ void mapRaysToPrisms(
   //some timing
   //int timeGPU = after_GPU - before_GPU;
   //int timeCPU = after_CPU - before_CPU;
-  //std::cout << "time GPU including malloc: " << timeGPU/1000 << "k Cycles" << std::endl;
-  //std::cout << "time CPU: " << timeCPU/1000 << "k Cycles" << std::endl;
+  //dout(V_STAT) << "time GPU including malloc: " << timeGPU/1000 << "k Cycles" << std::endl;
+  //dout(V_STAT) << "time CPU: " << timeCPU/1000 << "k Cycles" << std::endl;
 
   // some errorchecking
   //for(unsigned i=0; i<indicesOfPrisms2.size(); ++i){

@@ -8,6 +8,7 @@
 #include <string>
 #include <time.h> /* time, time_t */
 #include <sstream> /* std::stringstream */
+#include <logging.h>
 
 int writeToVtk(const Mesh& mesh,
 	       const std::vector<double> ase,
@@ -30,7 +31,7 @@ int writeToVtk(const Mesh& mesh,
   std::stringstream filenameStream;
   filenameStream  << pfilename << "_" << (int) currentTime << ".vtk";
 
-  std::cerr << "C Write experiment data to vtk-file " << filenameStream.str() << std::endl;
+  dout(V_INFO) << "Write experiment data to vtk-file " << filenameStream.str() << std::endl;
   std::ofstream vtkFile;
 
   vtkFile.open(filenameStream.str().c_str());
@@ -88,7 +89,7 @@ int writeToVtk(const Mesh& mesh,
 }
 
 int writePrismToVtk(const Mesh& mesh,
-	       const std::vector<unsigned> prismData,
+	       const std::vector<double> prismData,
 	       const std::string pfilename,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
@@ -108,7 +109,7 @@ int writePrismToVtk(const Mesh& mesh,
   std::stringstream filenameStream;
   filenameStream  << pfilename << "_" << (int) currentTime << ".vtk";
 
-  std::cerr << "C Write experiment data to vtk-file " << filenameStream.str() << std::endl;
+  dout(V_INFO) << "Write experiment data to vtk-file " << filenameStream.str() << std::endl;
   std::ofstream vtkFile;
 
   vtkFile.open(filenameStream.str().c_str());
@@ -165,6 +166,7 @@ int writePrismToVtk(const Mesh& mesh,
   return 0;
 }
 
+
 std::vector<double> compareVtk(std::vector<double> compare, std::string filename, const unsigned numberOfSamples){
   std::ifstream filestream;
   std::string line;
@@ -182,7 +184,7 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
   if(!filename.compare("")){
     return std::vector<double>();
   }
-  std::cerr << "C Compare solution with " << filename << std::endl;
+  dout(V_INFO) << "Compare solution with " << filename << std::endl;
 
   for(unsigned i = 0; i < numberOfSamples; ++i){
     aseTotal += compare.at(i);
@@ -217,7 +219,7 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
           minDiff = diff;
 
         if(diff >= smallDiff){
-          std::cerr << "C ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << compare.at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
+          dout(V_WARNING) << "ASE relative difference[" << ase_i << "]: " << diff  << "%" << "[" << compare.at(ase_i) << ", " << value  << "]"<<" > " << smallDiff << "%" << std::endl;
         }
         compare.at(ase_i) = diff;
         ase_i++;
@@ -228,13 +230,13 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
 
   }
   else{
-    std::cerr << "C Can't open file " << filename << " for comparison" << std::endl;
+    dout(V_WARNING) << "Can't open file " << filename << " for comparison" << std::endl;
     return std::vector<double>();
   }
 
-  std::cerr << "C ASE max. difference: " << maxDiff << "%" << std::endl;
-  std::cerr << "C ASE min. difference: " << minDiff << "%" << std::endl;
-  std::cerr << "C ASE tot. avg difference: " << totalDiff / compare.size() << "%" << std::endl;
+  dout(V_STAT) << "ASE max. difference: " << maxDiff << "%" << std::endl;
+  dout(V_STAT) << "ASE min. difference: " << minDiff << "%" << std::endl;
+  dout(V_STAT) << "ASE tot. avg difference: " << totalDiff / compare.size() << "%" << std::endl;
   filestream.close();
   return compare;
 }

@@ -2,6 +2,7 @@
 #include <string> /* string */
 #include <vector> /* vector */
 #include <stdio.h> /*fprintf*/
+#include <logging.h> 
 
 void parseCommandLine(
     const int argc,
@@ -34,7 +35,7 @@ void parseCommandLine(
   }
   for (unsigned i = 0; i < parameters.size(); ++i) {
     std::pair < std::string, std::string > p = parameters.at(i);
-    fprintf(stderr, "arg[%d]: (%s,%s)\n", i, p.first.c_str(), p.second.c_str());
+    dout(V_INFO) << "arg[" << i << "]: (" << p.first << "," << p.second << ")" << std::endl;
 
     // Parse number of rays
     if (p.first == "--rays") {
@@ -78,6 +79,8 @@ void parseCommandLine(
         *mode = FOR_LOOPS;
       if (p.second == "test_environment")
         *mode = TEST;
+      if (p.second == "mpi")
+        *mode = RAY_PROPAGATION_MPI;
 
     }
 
@@ -96,6 +99,9 @@ void parseCommandLine(
       *maxSample_i = atoi(p.second.c_str());
     }
 
+    if (p.first == "--verbosity"){
+      verbosity = unsigned(atoi(p.second.c_str()));
+    }
 
   }
 }
@@ -113,35 +119,45 @@ int checkParameterValidity(
     ) {
 
   if (argc <= 1) {
-    fprintf(stderr, "C No commandline arguments found\n");
-    fprintf(stderr, "C Usage    : ./octrace --mode=[runmode]\n"); 
-    fprintf(stderr, "C                      --rays=[number of rays]\n"); 
-    fprintf(stderr, "C                      --experiment=[location to experiment-data]\n");
-    fprintf(stderr, "C                      --compare=[location of vtk-file to compare with]\n");
-    fprintf(stderr, "C                      --maxrays=[max number of rays for adaptive sampling]\n");
-    fprintf(stderr, "C                      --maxgpus=[max number of gpus to use]\n");
-    fprintf(stderr, "C Runmodes : for_loops\n");
-    fprintf(stderr, "             ray_propagation_gpu\n");
-    fprintf(stderr, "             test_environment\n");
+    dout(V_ERROR) << "No commandline arguments found" << std::endl;
+    dout(V_ERROR) << "Usage    : ./octrace --mode=[runmode]" << std::endl;
+    dout(V_ERROR) << "                     --rays=[number of rays]" << std::endl;
+    dout(V_ERROR) << "                     --experiment=[location to experiment-data]" << std::endl;
+    dout(V_ERROR) << "                     --compare=[location of vtk-file to compare with]" << std::endl;
+    dout(V_ERROR) << "                     --maxrays=[max number of rays for adaptive sampling]" << std::endl;
+    dout(V_ERROR) << "                     --maxgpus=[max number of gpus to use]" << std::endl;
+    dout(V_ERROR) << "                     --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
+    dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
+    dout(V_ERROR) << "           mpi" << std::endl;
+    dout(V_ERROR) << "           test_environment\n" << std::endl;
+    dout(V_ERROR) << "Verbosity levels: 0 (quiet)" << std::endl; 
+    dout(V_ERROR) << "                  1 (error)" << std::endl; 
+    dout(V_ERROR) << "                  2 (warning)" << std::endl; 
+    dout(V_ERROR) << "                  4 (info)" << std::endl; 
+    dout(V_ERROR) << "                  8 (statistics)" << std::endl; 
+    dout(V_ERROR) << "                 16 (debug)" << std::endl; 
     return 1;
   }
   if (mode == NONE) {
-    fprintf(stderr, "C Please specify the runmode with --mode=\n");
+    dout(V_ERROR) << "Please specify the runmode with --mode=MODE" << std::endl;
     return 1;
   }
   if (raysPerSample == 0) {
-    fprintf(stderr, "C Please specify the number of rays per sample Point with --rays=\n");
+    dout(V_ERROR) << "Please specify the number of rays per sample Point with --rays=RAYS" << std::endl;
     return 1;
   }
   if (root.size() == 0) {
-    fprintf(stderr, "C Please specify the experiment's location with --experiment=\n");
+    dout(V_ERROR) << "Please specify the experiment's location with --experiment=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
 
-  *maxRaysPerSample = max(raysPerSample,*maxRaysPerSample);
+  if(*maxRaysPerSample < raysPerSample){
+    dout(V_WARNING) << "maxRays < raysPerSample. Increasing maxRays to " << raysPerSample << " (will be non-adaptive!)" << std::endl;
+    *maxRaysPerSample = raysPerSample;
+  }
 
-  if(*maxgpus > deviceCount){
-    fprintf(stderr, "C Warning: You don't have so many devices, use --maxgpus=%d", deviceCount);
+if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
     return 1;
   }
 
@@ -150,12 +166,24 @@ int checkParameterValidity(
   }
 
   if(minSample_i < 0){
-    fprintf(stderr, "C Warning: --min_sample_i < 0!");
+    dout(V_ERROR) << "--min_sample_i < 0!" << std::endl;
+    return 1;
   }
 
   if(maxSample_i < minSample_i){
-    fprintf(stderr, "C Warning: maxSample_i < minSample_i!");
+    dout(V_ERROR) << "maxSample_i < minSample_i!" << std::endl;
+    return 1;
   }
 
+  int samplesForNode = maxSample_i-minSample_i+1;
+  if(samplesForNode < *maxgpus){
+    dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
+     *maxgpus = samplesForNode;
+  }
+
+  if(verbosity >= 32){
+    verbosity = 31;
+    dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 31 (all). Levels can be bitmasked together." << std::endl;
+  }
   return 0;
 }

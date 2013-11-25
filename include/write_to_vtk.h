@@ -27,7 +27,7 @@ int writeToVtk(const Mesh& mesh,
 	       const float runtime);
 
 int writePrismToVtk(const Mesh& mesh,
-	       const std::vector<unsigned> prismData,
+	       const std::vector<double> prismData,
 	       const std::string filename, 
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,

@@ -1,4 +1,6 @@
-# GPUS  t n a   t a
+# non adaptive: 10M
+# adaptive: 10K - 100M ...MSE=0.0015
+# GPUS  tna	ta	taMPI
 1	1057	472
 4	294	175
 8	155	108

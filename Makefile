@@ -9,13 +9,14 @@ NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 NVCC_FLAGS = --use_fast_math
 GCC_FLAGS = -std=c++0x
-LIBS =  -lpthread -lcudart
+LIBS =  -lpthread -lcudart -lm
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
 
 ARCH = -arch=sm_20
 ARCH = -arch=sm_35
 ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
+
 
 # --maxrregcount=40
 
@@ -28,17 +29,19 @@ INCLUDES = include
 
 all: calcPhiASE
 
+bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
+	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
+
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
 
-
-calcPhiASE: $(OBJS) Makefile
+calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
 	mkdir -p bin
 	mkdir -p output
-	mkdir -p input
+	mkdir -p input mpi
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
-	g++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
+	mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
 
 clean:
@@ -54,3 +57,7 @@ final_build:
 	$(NVCC) $(SRCS) -dc -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS)
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	cp src/calcPhiASE.m .
+
+#mpi: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
+#	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
+
