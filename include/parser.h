@@ -84,7 +84,6 @@ void parseCommandLine(
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
     std::string *root,
-    bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,

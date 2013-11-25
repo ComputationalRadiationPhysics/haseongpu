@@ -174,9 +174,6 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   case HEAD_NODE:
     //mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil((maxSample_i + 1)  / (float)(size-1)));
     mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, 1);
-     for(unsigned i = 0; i < hPhiAse.size(); ++i){
-       dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
-     }
     cudaDeviceReset();   
     MPI_Finalize();
     break;
@@ -203,7 +200,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
   };
 
-  return runtime;
+  return size - 1;
 }
 
 

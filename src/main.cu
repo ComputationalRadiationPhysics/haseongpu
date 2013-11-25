@@ -101,7 +101,6 @@ int main(int argc, char **argv){
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
-  bool silent = false;
   bool writeVtk = false;
   bool useReflections = false;
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
@@ -110,6 +109,7 @@ int main(int argc, char **argv){
   int minSampleRange = 0;
   int maxSampleRange = 0;
   time_t starttime   = time(0);
+  unsigned usedGpus  = 0;
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
@@ -120,8 +120,8 @@ int main(int argc, char **argv){
   std::vector<float> mseThreshold;
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
-      &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
+  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath,
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -186,6 +186,7 @@ int main(int argc, char **argv){
             );
       }
       joinAll(threadIds);
+      usedGpus = maxGpus;
       for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
         runtime = max(*it, runtime);
       }
@@ -194,7 +195,7 @@ int main(int argc, char **argv){
       break;
 
     case RAY_PROPAGATION_MPI:
-      runtime = calcPhiAseMPI( raysPerSample,
+      usedGpus = calcPhiAseMPI( raysPerSample,
           maxRaysPerSample,
           maxRepetitions,
           dMesh.at(0),
@@ -323,7 +324,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
     dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
-    dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
+    dout(V_STAT) << "Nr of GPUs        : " << usedGpus << std::endl;
     dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s" << std::endl;
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
