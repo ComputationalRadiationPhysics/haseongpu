@@ -108,6 +108,7 @@ int main(int argc, char **argv){
   RunMode mode = NONE;
   int minSampleRange = 0;
   int maxSampleRange = 0;
+  time_t starttime   = time(0);
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
@@ -125,7 +126,6 @@ int main(int argc, char **argv){
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
   //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
   devices = getCorrectDevice(maxGpus);
-  time_t starttime   = time(0);
 
   // sanity checks
   if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange)) return 1;
