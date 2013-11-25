@@ -17,6 +17,7 @@
 #include <mesh.h>
 #include <progressbar.h> /*progressBar */
 #include <logging.h>
+#include <types.h>
 
 #define SEED 4321
 
@@ -171,8 +172,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
         }
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
-        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample) break;
-        hRaysPerSample             *= 10;
+        if(hRaysPerSample * RAY_MULTIPLICATOR > (unsigned long)maxRaysPerSample) break;
+        hRaysPerSample             *= RAY_MULTIPLICATOR;
 
       }
       // Update progressbar
