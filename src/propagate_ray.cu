@@ -71,6 +71,7 @@ __device__ double checkEdge(const unsigned triangle, const int edge, const Ray r
 __device__ int calcTriangleRayIntersection(double *length, const unsigned triangle,  const Ray ray, const unsigned level, const int forbiddenEdge, const Mesh &mesh){
   int edge = -1;
   // Check 3 edges of triangle
+  #pragma unroll 3
   for(int edge_i = 0; edge_i < 3; ++edge_i){
     if(edge_i != forbiddenEdge){
       double lengthTmp = checkEdge(triangle, edge_i, ray, mesh, *length);
