@@ -206,12 +206,13 @@
       .txt files contains all experiment data you need
       to run one experiment.
 
-    --mode=[for_loops|ray_propagation_gpu]
+    --mode=[for_loops|ray_propagation_gpu|mpi]
       Defines the runmode/algorithm to start the
       simulation with. Mode "for_loops" is the original
       algorithm based on single core cpu. Mode "ray_propagation_gpu"
       is the parallel algorithm based on nvidia cuda
-      devices.
+      devices with Pthreads. Mode "mpi" is a parallel mpi
+      implementation for clusters.
 
     --rays=
       Sets the minimum number of rays per sample-point in the
@@ -222,9 +223,6 @@
       of rays per sample-point will vary between minimum and
       maximum number of rays in dependance of a MSE-Threshold.
       (see MSEThreshold)
-
-    --silent
-      Don't print so much debug information.
 
     --compare=
       Is the location of a .vtk file with that you want to compare

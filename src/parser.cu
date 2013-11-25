@@ -10,7 +10,6 @@ void parseCommandLine(
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
     std::string *root,
-    bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,
@@ -57,11 +56,6 @@ void parseCommandLine(
         temp_root.append("/");
 
       *root = temp_root;
-    }
-
-    // Parse if we want less output
-    if (p.first == "--silent") {
-      *silent = true;
     }
 
     if (p.first == "--write-vtk") {
@@ -126,14 +120,16 @@ int checkParameterValidity(
 
   if (argc <= 1) {
     dout(V_ERROR) << "No commandline arguments found" << std::endl;
-    dout(V_ERROR) << "Usage    : ./octrace --mode=[runmode]" << std::endl;
-    dout(V_ERROR) << "                     --rays=[number of rays]" << std::endl;
-    dout(V_ERROR) << "                     --experiment=[location to experiment-data]" << std::endl;
-    dout(V_ERROR) << "                     --compare=[location of vtk-file to compare with]" << std::endl;
-    dout(V_ERROR) << "                     --maxrays=[max number of rays for adaptive sampling]" << std::endl;
-    dout(V_ERROR) << "                     --maxgpus=[max number of gpus to use]" << std::endl;
-    dout(V_ERROR) << "                     --verbosity=VERBOSITY_LEVEL" << std::endl;
-    dout(V_ERROR) << "                     --repetitions=MAX_REPETITIONS" << std::endl;
+    dout(V_ERROR) << "Usage    : ./calcPhiASE --mode=[runmode]" << std::endl;
+    dout(V_ERROR) << "                        --rays=[number of rays]" << std::endl;
+    dout(V_ERROR) << "                        --experiment=[location to experiment-data]" << std::endl;
+    dout(V_ERROR) << "                        --compare=[location of vtk-file to compare with]" << std::endl;
+    dout(V_ERROR) << "                        --maxrays=[max number of rays for adaptive sampling]" << std::endl;
+    dout(V_ERROR) << "                        --maxgpus=[max number of gpus to use]" << std::endl;
+    dout(V_ERROR) << "                        --min_sample_i=[index of first sample]" << std::endl;
+    dout(V_ERROR) << "                        --max_sample_i=[index of last sample]" << std::endl;
+    dout(V_ERROR) << "                        --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "                        --repetitions=MAX_REPETITIONS" << std::endl;
     dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
     dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
     dout(V_ERROR) << "           mpi" << std::endl;

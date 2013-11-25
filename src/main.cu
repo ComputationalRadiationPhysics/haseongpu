@@ -101,7 +101,6 @@ int main(int argc, char **argv){
   std::string runmode("");
   std::string compareLocation("");
   float runtime = 0.0;
-  bool silent = false;
   bool writeVtk = false;
   bool useReflections = false;
   std::vector<unsigned> devices; // will be assigned in getCOrrectDevice();
@@ -121,8 +120,8 @@ int main(int argc, char **argv){
   std::vector<float> mseThreshold;
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
-      &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
+  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath,
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
