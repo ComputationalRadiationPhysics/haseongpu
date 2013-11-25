@@ -110,6 +110,7 @@ int main(int argc, char **argv){
   int minSampleRange = 0;
   int maxSampleRange = 0;
   time_t starttime   = time(0);
+  unsigned usedGpus  = 0;
 
   std::string experimentPath;
   verbosity = 31; //ALL //TODO: remove in final code
@@ -186,6 +187,7 @@ int main(int argc, char **argv){
             );
       }
       joinAll(threadIds);
+      usedGpus = maxGpus;
       for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
         runtime = max(*it, runtime);
       }
@@ -194,7 +196,7 @@ int main(int argc, char **argv){
       break;
 
     case RAY_PROPAGATION_MPI:
-      runtime = calcPhiAseMPI( raysPerSample,
+      usedGpus = calcPhiAseMPI( raysPerSample,
           maxRaysPerSample,
           maxRepetitions,
           dMesh.at(0),
@@ -323,7 +325,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
     dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
-    dout(V_STAT) << "Nr of GPUs        : " << maxGpus << std::endl;
+    dout(V_STAT) << "Nr of GPUs        : " << usedGpus << std::endl;
     dout(V_STAT) << "Runtime           : " << difftime(time(0),starttime) << "s" << std::endl;
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
