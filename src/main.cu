@@ -330,6 +330,8 @@ int main(int argc, char **argv){
       dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
       ray_histogram(totalRays,raysPerSample,maxRaysPerSample,highMSE);
     }
+    dout(V_STAT) << std::endl;
+
   }
   return 0;
 
