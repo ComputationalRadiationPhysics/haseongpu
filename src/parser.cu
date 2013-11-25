@@ -10,14 +10,14 @@ void parseCommandLine(
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
     std::string *root,
-    bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
-    int *maxSample_i
+    int *maxSample_i,
+    unsigned *maxRepetitions
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -56,11 +56,6 @@ void parseCommandLine(
         temp_root.append("/");
 
       *root = temp_root;
-    }
-
-    // Parse if we want less output
-    if (p.first == "--silent") {
-      *silent = true;
     }
 
     if (p.first == "--write-vtk") {
@@ -103,6 +98,10 @@ void parseCommandLine(
       verbosity = unsigned(atoi(p.second.c_str()));
     }
 
+    if(p.first == "--repetitions"){
+      *maxRepetitions = unsigned(atoi(p.second.c_str()));
+    }
+
   }
 }
 
@@ -115,18 +114,22 @@ int checkParameterValidity(
     const RunMode mode,
     unsigned *maxgpus,
     const int minSample_i,
-    const int maxSample_i
+    const int maxSample_i,
+    const unsigned maxRepetitions
     ) {
 
   if (argc <= 1) {
     dout(V_ERROR) << "No commandline arguments found" << std::endl;
-    dout(V_ERROR) << "Usage    : ./octrace --mode=[runmode]" << std::endl;
-    dout(V_ERROR) << "                     --rays=[number of rays]" << std::endl;
-    dout(V_ERROR) << "                     --experiment=[location to experiment-data]" << std::endl;
-    dout(V_ERROR) << "                     --compare=[location of vtk-file to compare with]" << std::endl;
-    dout(V_ERROR) << "                     --maxrays=[max number of rays for adaptive sampling]" << std::endl;
-    dout(V_ERROR) << "                     --maxgpus=[max number of gpus to use]" << std::endl;
-    dout(V_ERROR) << "                     --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "Usage    : ./calcPhiASE --mode=[runmode]" << std::endl;
+    dout(V_ERROR) << "                        --rays=[number of rays]" << std::endl;
+    dout(V_ERROR) << "                        --experiment=[location to experiment-data]" << std::endl;
+    dout(V_ERROR) << "                        --compare=[location of vtk-file to compare with]" << std::endl;
+    dout(V_ERROR) << "                        --maxrays=[max number of rays for adaptive sampling]" << std::endl;
+    dout(V_ERROR) << "                        --maxgpus=[max number of gpus to use]" << std::endl;
+    dout(V_ERROR) << "                        --min_sample_i=[index of first sample]" << std::endl;
+    dout(V_ERROR) << "                        --max_sample_i=[index of last sample]" << std::endl;
+    dout(V_ERROR) << "                        --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "                        --repetitions=MAX_REPETITIONS" << std::endl;
     dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
     dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
     dout(V_ERROR) << "           mpi" << std::endl;
@@ -184,6 +187,9 @@ if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, us
   if(verbosity >= 32){
     verbosity = 31;
     dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 31 (all). Levels can be bitmasked together." << std::endl;
+  }
+  if(maxRepetitions < 1){
+    dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
   }
   return 0;
 }

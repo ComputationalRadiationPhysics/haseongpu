@@ -8,7 +8,7 @@ export CPLUS_INCLUDE_PATH=
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 NVCC_FLAGS = --use_fast_math
-GCC_FLAGS = -std=c++0x
+GCC_FLAGS = -std=c++0x -J 8
 LIBS =  -lpthread -lcudart -lm
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
@@ -30,7 +30,7 @@ INCLUDES = include
 all: calcPhiASE
 
 bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
-	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
+	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.5/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
 	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)

@@ -84,14 +84,14 @@ void parseCommandLine(
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
     std::string *root,
-    bool *silent,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
-	int *maxSample_i
+    int *maxSample_i,
+    unsigned *maxRepetitions
     );
 
 int checkParameterValidity(
@@ -103,7 +103,8 @@ int checkParameterValidity(
     const RunMode mode,
     unsigned *maxgpus,
 	const int minSample_i,
-	const int maxSample_i
+	const int maxSample_i,
+  const unsigned maxRepetitions
     );
 
 

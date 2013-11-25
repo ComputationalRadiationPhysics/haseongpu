@@ -80,6 +80,7 @@ void mpiHead(std::vector<float> &phiASE,
  **/
 void mpiCompute(unsigned &hostRaysPerSample,
 		const unsigned maxRaysPerSample,
+    const unsigned maxRepetitions,
 		const Mesh& dMesh,
 		const Mesh& hMesh,
 		const std::vector<double>& hSigmaA,
@@ -108,6 +109,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
+       maxRepetitions,
 		   dMesh,
 		   hMesh,
 		   hSigmaA,
@@ -139,6 +141,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const unsigned maxRaysPerSample,
+          const unsigned maxRepetitions,
 		      const Mesh& dMesh,
 		      const Mesh& hMesh,
 		      const std::vector<double>& hSigmaA,
@@ -171,9 +174,6 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   case HEAD_NODE:
     //mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil((maxSample_i + 1)  / (float)(size-1)));
     mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, 1);
-     for(unsigned i = 0; i < hPhiAse.size(); ++i){
-       dout(V_INFO) << i << " : " << hPhiAse.at(i) << std::endl;
-     }
     cudaDeviceReset();   
     MPI_Finalize();
     break;
@@ -181,6 +181,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   default:
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
+         maxRepetitions,
 	       dMesh,
 	       hMesh,
 	       hSigmaA,
@@ -199,7 +200,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
   };
 
-  return runtime;
+  return size - 1;
 }
 
 
