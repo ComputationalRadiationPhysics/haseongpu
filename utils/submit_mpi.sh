@@ -1,10 +1,10 @@
 #PBS -q k20
 #PBS -N ase_flux_MPI
 #PBS -l walltime=01:00:00
-#P_B_S -o output/
-#P_B_S -e output/
+#_PBS -o output/
+#_PBS -e output/
 #PBS -d .
-#P_B_S -l nodes=1:ppn=8
+#_PBS -l nodes=1:ppn=8
 
 # SETTINGS #################
 MAXGPUS="1"

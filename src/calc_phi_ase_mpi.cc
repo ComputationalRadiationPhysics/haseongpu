@@ -18,19 +18,21 @@
 #define RUNTIME_TAG 4
 
 // MSG SIZES
-#define RESULT_MSG_LENGTH 4
+#define RESULT_MSG_LENGTH 5
 #define SAMPLE_MSG_LENGTH 2
 
 void mpiHead(std::vector<float> &phiASE, 
 	     std::vector<double> &mse,
 	     std::vector<unsigned> &totalRays,
 	     std::vector<float> &runtimes,
+	     const Mesh& hMesh,
 	     unsigned numberOfComputeNodes,
 	     int sampleRange){
   MPI_Status status;
   float res[RESULT_MSG_LENGTH] = {0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
   unsigned finished = 0;
+  unsigned sampleOffset = 0;
   sample_i[1] = sampleRange;
 
   while(finished < numberOfComputeNodes){
@@ -43,9 +45,15 @@ void mpiHead(std::vector<float> &phiASE,
       break;
 
     case RESULT_TAG:
-      phiASE.at((unsigned)res[0])   = res[1];
-      mse.at((unsigned)res[0])       = res[2];
-      totalRays.at((unsigned)res[0]) = (unsigned)res[3];
+      // res[0] : wave_i
+      // res[1] : sample_i
+      // res[2] : phiASE
+      // res[3] : mse
+      // res[4] : totalRays
+      sampleOffset = (unsigned)(res[1] + hMesh.numberOfSamples * res[0]);
+      phiASE.at(sampleOffset)    = res[1];
+      mse.at(sampleOffset)       = res[2];
+      totalRays.at(sampleOffset) = (unsigned)res[3];
       //fileProgressBar(phiASE.size(),"output/progress");
       break;
 
@@ -109,7 +117,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
-       maxRepetitions,
+		   maxRepetitions,
 		   dMesh,
 		   hMesh,
 		   hSigmaA,
@@ -124,13 +132,18 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   sample_i[1],
 		   runtime);
 
-      for(int i=sample_i[0]; i < sample_i[1]; ++i){
-	res[0] = i; 
-	res[1] = hPhiAse.at(i);
-	res[2] = mse.at(i);
-	res[3] = totalRays.at(i);
-	totalRuntime += runtime;
-	MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
+      for(unsigned i=0; i < hSigmaE.size(); ++i){
+	for(int j=sample_i[0]; j < sample_i[1]; ++j){
+	  unsigned sampleOffset = (unsigned)(j + hMesh.numberOfSamples * i);
+	  res[0] = (float)i;
+	  res[1] = (float)j; 
+	  res[2] = hPhiAse.at(sampleOffset);
+	  res[3] = mse.at(sampleOffset);
+	  res[4] = (float)totalRays.at(sampleOffset);
+	  totalRuntime += runtime;
+	  MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
+	}
+
       }
 
     }
@@ -173,7 +186,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   switch(rank){
   case HEAD_NODE:
     //mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil((maxSample_i + 1)  / (float)(size-1)));
-    mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, 1);
+    mpiHead(hPhiAse, mse, totalRays, runtimes, hMesh, size-1, 1);
     cudaDeviceReset();   
     MPI_Finalize();
     break;
@@ -181,7 +194,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   default:
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
-         maxRepetitions,
+	       maxRepetitions,
 	       dMesh,
 	       hMesh,
 	       hSigmaA,

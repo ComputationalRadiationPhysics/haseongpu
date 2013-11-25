@@ -69,7 +69,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<float>    dGainSumSquare      (hMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
-
+  device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
   // OUTPUT DATA
   // thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
   // thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
@@ -99,7 +99,6 @@ float calcPhiAse ( unsigned hRaysPerSample,
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
         unsigned run = 0;
         while(run < maxRepetitions && mseTooHigh){
-          device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
           run++;
           hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
               raw_pointer_cast(&dImportance[0]), 
