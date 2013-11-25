@@ -231,5 +231,24 @@
 
     --write-vtk
       Write the ASE-Flux of the calculation to a .vtk file
+      
+    --maxgpus=
+      Set the maximum number of gpus. "mpi" mode should set this
+      to 1 and "ray_propagation_gpu" to the maximum number
+      of Gpus on the node. If you don't set it, it will
+      be set to the maximum automatically.
 
-           
+    --min_sample_i=
+      Index of the first sample point (normally 0).
+
+    --max_sample_i=
+      Index of the last sample point.
+          
+    --verbosity=
+      Add the following for different verbosity levels:
+      0  : quiet
+      1  : error
+      2  : warning
+      4  : info
+      8  : statistics
+      16 : debug
