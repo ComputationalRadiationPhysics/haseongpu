@@ -199,7 +199,11 @@ for i_slice=1:timeslice-1
     end
     %% ****************** ASE PART ***********************
 
-     [rand_array, phi_ASE, importance, N_rays] = for_loops(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh);
+     %%[rand_array, phi_ASE, importance, N_rays] = for_loops(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh);
+
+     %% parallel code
+     :
+     [rand_array, phi_ASE, importance, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh,laser,crystal,mesh_z);
 
 
     surface_total = sum(surface);

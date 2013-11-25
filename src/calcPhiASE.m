@@ -32,7 +32,23 @@
 % expected_values           real expectation-values for each samplepoint (aligned like phi_ASE)
 % N_rays                    number of rays that were used for each samplepoint
 
-function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
+%function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
+
+function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden,NumRays,N_tot,z_mesh,laser,crystal,mesh_z)
+
+%laser
+%crystal
+%mesh_z
+
+%clad_int, 
+%clad_number, 
+%clad_abs, 
+%refractiveIndices, 
+%reflectivities,
+%MaxRays,
+%mse_threshold,
+%use_reflections
+
 
 
 CURRENT_DIR = pwd;
