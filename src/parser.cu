@@ -17,7 +17,8 @@ void parseCommandLine(
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
-    int *maxSample_i
+    int *maxSample_i,
+    unsigned *maxRepetitions
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -103,6 +104,10 @@ void parseCommandLine(
       verbosity = unsigned(atoi(p.second.c_str()));
     }
 
+    if(p.first == "--repetitions"){
+      *maxRepetitions = unsigned(atoi(p.second.c_str()));
+    }
+
   }
 }
 
@@ -115,7 +120,8 @@ int checkParameterValidity(
     const RunMode mode,
     unsigned *maxgpus,
     const int minSample_i,
-    const int maxSample_i
+    const int maxSample_i,
+    const unsigned maxRepetitions
     ) {
 
   if (argc <= 1) {
@@ -127,6 +133,7 @@ int checkParameterValidity(
     dout(V_ERROR) << "                     --maxrays=[max number of rays for adaptive sampling]" << std::endl;
     dout(V_ERROR) << "                     --maxgpus=[max number of gpus to use]" << std::endl;
     dout(V_ERROR) << "                     --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "                     --repetitions=MAX_REPETITIONS" << std::endl;
     dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
     dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
     dout(V_ERROR) << "           mpi" << std::endl;
@@ -184,6 +191,9 @@ if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, us
   if(verbosity >= 32){
     verbosity = 31;
     dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 31 (all). Levels can be bitmasked together." << std::endl;
+  }
+  if(maxRepetitions < 1){
+    dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
   }
   return 0;
 }

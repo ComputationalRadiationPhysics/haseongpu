@@ -30,6 +30,7 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
 
 float calcPhiAse ( unsigned hRaysPerSample,
     const unsigned maxRaysPerSample,
+    const unsigned maxRepetitions,
     const Mesh& dMesh,
     const Mesh& hMesh,
     const std::vector<double>& hSigmaA,
@@ -63,7 +64,6 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample,  0);
-  device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
   device_vector<float>    dGainSum            (phiAse.size(),    0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
@@ -93,84 +93,87 @@ float calcPhiAse ( unsigned hRaysPerSample,
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
+      bool mseTooHigh=true;
 
-      int run = 0;
-      while(true){
-        run++;
-        hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
-            raw_pointer_cast(&dImportance[0]), 
-            raw_pointer_cast(&dRaysPerPrism[0]),
-            distributeRandomly, blockDim, gridDim
-            );
-
-        // Prism scheduling for gpu threads
-        mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
-
-        // OUTPUT DATA
-        // if(sample_i == 0){
-        //   thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
-        //   thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
-        // thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
-        //   midRaysPerSample=hRaysPerSample;
-        // }
-
+      while(mseTooHigh){
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
-        // Start Kernel
-        if(useReflections){
-          calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
-              dMesh, 
-              raw_pointer_cast(&dIndicesOfPrisms[0]), 
-              wave_i, 
-              raw_pointer_cast(&dNumberOfReflections[0]), 
-              raw_pointer_cast(&dImportance[0]),
-              hRaysPerSampleDump, 
-              raw_pointer_cast(&dGainSum[0]), 
-              raw_pointer_cast(&dGainSumSquare[0]),
-              sample_i, 
-              hSigmaA[wave_i], 
-              hSigmaE[wave_i] );
+        unsigned run = 0;
+        while(run < maxRepetitions && mseTooHigh){
+          device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
+          run++;
+          hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
+              raw_pointer_cast(&dImportance[0]), 
+              raw_pointer_cast(&dRaysPerPrism[0]),
+              distributeRandomly, blockDim, gridDim
+              );
+
+          // Prism scheduling for gpu threads
+          mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
+
+          // OUTPUT DATA
+          // if(sample_i == 0){
+          //   thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
+          //   thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
+          // thrust::copy(dRaysPerPrism.begin(), dRaysPerPrism.end(), hRaysPerPrism.begin());
+          //   midRaysPerSample=hRaysPerSample;
+          // }
+
+          // Start Kernel
+          dGainSum[sampleOffset]       = 0;
+          dGainSumSquare[sampleOffset] = 0;
+          if(useReflections){
+            calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
+                dMesh, 
+                raw_pointer_cast(&dIndicesOfPrisms[0]), 
+                wave_i, 
+                raw_pointer_cast(&dNumberOfReflections[0]), 
+                raw_pointer_cast(&dImportance[0]),
+                hRaysPerSampleDump, 
+                raw_pointer_cast(&dGainSum[0]), 
+                raw_pointer_cast(&dGainSumSquare[0]),
+                sample_i, 
+                hSigmaA[wave_i], 
+                hSigmaE[wave_i] );
+          }
+          else{
+            calcSampleGainSumWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
+                dMesh, 
+                raw_pointer_cast(&dIndicesOfPrisms[0]), 
+                wave_i, 
+                raw_pointer_cast(&dImportance[0]),
+                hRaysPerSampleDump, 
+                raw_pointer_cast(&dGainSum[0]), 
+                raw_pointer_cast(&dGainSumSquare[0]),
+                sample_i, 
+                hSigmaA[wave_i], 
+                hSigmaE[wave_i] );
+          }
+
+          float mseTmp = calcMSE(dGainSum[sampleOffset], dGainSumSquare[sampleOffset], hRaysPerSampleDump);
+
+          //MSE TESTs
+          // if(mseTmp > mse.at(sampleOffset)){
+          //   // this happens in calcMSE
+          //   double ca = dGainSumSquare[sampleOffset] / hRaysPerSampleDump;
+          //   double cb = (dGainSum[sampleOffset] / hRaysPerSampleDump) * (dGainSum[sampleOffset] / hRaysPerSampleDump);
+
+          //   dout(V_WARNING) << "MSE_BUG for sample " << sample_i << ": " << mseTmp << " > " << mse.at(sampleOffset) << std::endl;
+          //   dout(V_DEBUG) << "Run: " << run << std::endl;
+          //   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
+          //   dout(V_DEBUG) << "RaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
+          //   dout(V_DEBUG) << "phiAseSquare / raysPerSample = " << ca << std::endl; 
+          //   dout(V_DEBUG) << "(phiAse / raysPerSample) * (phiAse / raysPerSample) = " << cb << std::endl; 
+          //   dout(V_DEBUG) << "sqrt(abs((a - b) / raysPerSample)) = " << sqrt(abs((ca - cb) / hRaysPerSampleDump)) << std::endl; 
+          //   dout(V_DEBUG) << std::endl;
+          // }
+
+          mse.at(sampleOffset) = mseTmp;
+          if(mse.at(sampleOffset) < mseThreshold.at(wave_i)) mseTooHigh = false;
         }
-        else{
-          calcSampleGainSumWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
-              dMesh, 
-              raw_pointer_cast(&dIndicesOfPrisms[0]), 
-              wave_i, 
-              raw_pointer_cast(&dImportance[0]),
-              hRaysPerSampleDump, 
-              raw_pointer_cast(&dGainSum[0]), 
-              raw_pointer_cast(&dGainSumSquare[0]),
-              sample_i, 
-              hSigmaA[wave_i], 
-              hSigmaE[wave_i] );
-        }
-
-        float mseTmp = calcMSE(dGainSum[sampleOffset], dGainSumSquare[sampleOffset], hRaysPerSampleDump);
-
-        //MSE TESTs
-        // if(mseTmp > mse.at(sampleOffset)){
-        //   // this happens in calcMSE
-        //   double ca = dGainSumSquare[sampleOffset] / hRaysPerSampleDump;
-        //   double cb = (dGainSum[sampleOffset] / hRaysPerSampleDump) * (dGainSum[sampleOffset] / hRaysPerSampleDump);
-
-        //   dout(V_WARNING) << "MSE_BUG for sample " << sample_i << ": " << mseTmp << " > " << mse.at(sampleOffset) << std::endl;
-        //   dout(V_DEBUG) << "Run: " << run << std::endl;
-        //   dout(V_DEBUG) << "RaysPerSample: " << hRaysPerSample << std::endl;
-        //   dout(V_DEBUG) << "RaysPerSampleDump: "<< hRaysPerSampleDump << std::endl;
-        //   dout(V_DEBUG) << "phiAseSquare / raysPerSample = " << ca << std::endl; 
-        //   dout(V_DEBUG) << "(phiAse / raysPerSample) * (phiAse / raysPerSample) = " << cb << std::endl; 
-        //   dout(V_DEBUG) << "sqrt(abs((a - b) / raysPerSample)) = " << sqrt(abs((ca - cb) / hRaysPerSampleDump)) << std::endl; 
-        //   dout(V_DEBUG) << std::endl;
-        // }
-
-        mse.at(sampleOffset) = mseTmp;
-
-        if(mse.at(sampleOffset) < mseThreshold.at(wave_i))        break;
-        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample) break;
 
         // If the threshold is still too high, increase the number of rays and reset the previously calculated value
+        if(hRaysPerSample * 10 > (unsigned long)maxRaysPerSample) break;
         hRaysPerSample             *= 10;
-        dGainSum[sampleOffset]       = 0;
-        dGainSumSquare[sampleOffset] = 0;
 
       }
       // Update progressbar
