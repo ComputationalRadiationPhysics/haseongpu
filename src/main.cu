@@ -94,6 +94,7 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
   unsigned maxRaysPerSample = 0;
+  unsigned maxRepetitions = 4;
   float maxMSE = 0;
   float  avgMSE = 0;
   unsigned highMSE = 0;
@@ -120,7 +121,7 @@ int main(int argc, char **argv){
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath, &silent,
-      &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange);
+      &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -128,7 +129,7 @@ int main(int argc, char **argv){
   devices = getCorrectDevice(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
@@ -168,6 +169,7 @@ int main(int argc, char **argv){
 
         threadIds[gpu_i] = calcPhiAseThreaded( raysPerSample,
             maxRaysPerSample,
+            maxRepetitions,
             dMesh.at(devices.at(gpu_i)),
             hMesh,
             sigmaA,
@@ -194,6 +196,7 @@ int main(int argc, char **argv){
     case RAY_PROPAGATION_MPI:
       runtime = calcPhiAseMPI( raysPerSample,
           maxRaysPerSample,
+          maxRepetitions,
           dMesh.at(0),
           hMesh,
           sigmaA,

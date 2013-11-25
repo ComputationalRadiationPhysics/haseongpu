@@ -39,6 +39,7 @@
  **/
 float calcPhiAse ( unsigned hostRaysPerSample,
 		   const unsigned maxRaysPerSample,
+       const unsigned maxRepetitions,
 		   const Mesh& mesh,
 		   const Mesh& hostMesh,
 		   const std::vector<double>& sigmaA,

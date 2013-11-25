@@ -6,6 +6,7 @@
 
 float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const unsigned maxRaysPerSample,
+          const unsigned maxRepetitions,
 		      const Mesh& dMesh,
 		      const Mesh& hMesh,
 		      const std::vector<double>& hSigmaA,
