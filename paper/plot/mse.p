@@ -30,7 +30,7 @@ x = 3
 #fs transparent pattern 4 bo
    
 plot\
-      "mse_noimportance_hist.dat" u 2:3 t "no importance sampling" s bezier w filledcurves above x1 lw x lc rgb "forest-green"  fs transparent solid 0.5,\
+   "mse_noimportance_hist.dat" u 2:3 t "no importance sampling" s bezier w filledcurves above x1 lw x lc rgb "forest-green"  fs transparent solid 0.5,\
    "mse_noadaptive_hist.dat" u 2:3 t "importance sampling" s bezier w filledcurves above x1 lw x  lc rgb "blue" fs transparent solid 0.5
 
 
@@ -46,8 +46,8 @@ replot
 set term wxt enhanced font "Serif, 14"
 
 plot\
-      "mse_adaptive_hist.dat" u 2:3 t "adaptive sampling" s bezier w filledcurves above x1 lw x lc rgb "red"  fs transparent solid 0.5,\
-   "mse_noadaptive_hist.dat" u 2:3 t "non adaptive sampling" s bezier w filledcurves above x1 lw x  lc rgb "blue" fs transparent solid 0.5
+   "mse_adaptive_hist.dat" u 2:3 t   "importance + adaptive sampling" s bezier w filledcurves above x1 lw x lc rgb "red"  fs transparent solid 0.5,\
+   "mse_noadaptive_hist.dat" u 2:3 t "importance sampling" s bezier w filledcurves above x1 lw x  lc rgb "blue" fs transparent solid 0.5
 
 # Output
 set term pngcairo enhanced font "Serif, 14"

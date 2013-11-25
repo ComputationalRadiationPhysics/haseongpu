@@ -118,12 +118,11 @@ This method has a strong impact on the precision of the simulation
 and is able to reduce strong peaks in Monte Carlo simulations.
 
 To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
-\[\Phi_{ASE~diff} = |\Phi_{ASE~importance} - \Phi_{ASE~no~importance}|\] of the 
-result with and without importance sampling was calculated with 
-$10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then, the number of rays per sample point was increased for the simulation
-without importance sampling.
-The more rays are simulated, the smaller is $\Phi_{ASE~diff}$, which 
+\[\Phi_{ASE\Delta} = |\Phi_{ASE~I}(M) - \Phi_{ASE~\bar{I}}(N)|\] of the 
+result with ($I$) and without ($\bar{I}$) importance sampling was calculated with 
+$N,M = 10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
+Then, N was increased in two steps by 10 for the simulation without importance sampling.
+The more rays are simulated, the smaller is $\Phi_{ASE\Delta}$, which 
 means that the results get closer and therefore the simulation
 with importance sampling reaches same results with less
 rays per sample point. Thus, importance sampling can increase the
@@ -131,8 +130,8 @@ efficiency of Monte Carlo simulations by reducing variance
 and simulation runtime. 
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/phiASE_difference.png}}}
-  \caption{Difference of $\Phi_{ASE}$ with and without importance sampling}
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/phiASE_difference_new.png}}}
+  \caption{$\Phi_{ASE\Delta}$ compared with increasing N}
   \label{graphic:importance}
 \end{figure}
 
