@@ -12,7 +12,7 @@ set logscale y
 
 set key opaque
 set xtics 0,0.0025,0.01
-set ytics 0,100,300
+#set ytics 0,100,300
 set xrange [0.00025:0.01]
 set yrange [1:300]
 
