@@ -116,8 +116,6 @@ void mpiCompute(unsigned &hostRaysPerSample,
       break;
     }
     else{
-
-
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
 		   maxRepetitions,
@@ -134,7 +132,6 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   sample_i[0],
 		   sample_i[1],
 		   runtime);
-
 
       for(unsigned i=0; i < hSigmaE.size(); ++i){
 	for(int j=sample_i[0]; j < sample_i[1]; ++j){

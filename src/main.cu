@@ -316,6 +316,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
+    dout(V_STAT) << "Wavelength        : " << (int) sigmaE.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
     if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
     dout(V_STAT | V_NOLABEL) << std::endl;
