@@ -192,7 +192,8 @@ for i_slice=1:timeslice-1
 
         v = vertcat(v_1,v_2);
 
-        beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        % TODO: this was changed from griddata3. is this correct?
+        beta_vol(:,i_z) = griddata(x,y,z,v,xi,yi,zi);
 
         z = z + z_mesh;
         zi = zi + z_mesh;
@@ -202,14 +203,14 @@ for i_slice=1:timeslice-1
      %%[rand_array, phi_ASE, importance, N_rays] = for_loops(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh);
 
      %% parallel code
-     :
-     [rand_array, phi_ASE, importance, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh,laser,crystal,mesh_z);
+     [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh,laser,crystal,mesh_z);
 
 
     surface_total = sum(surface);
     volume_total = surface_total*crystal.length;
 
-    phi_ASE = phi_ASE./(4*3.1415);
+    %this is done in the C++ code already
+    %phi_ASE = phi_ASE./(4*3.1415);
 
     % now form a dn/dt|ASE out of it - multiply it with the gain (and integrate
     % it over the wavelength

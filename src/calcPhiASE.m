@@ -29,26 +29,75 @@
 % bool use_reflections      if reflections should be used
 %
 % phi_ASE                   phi_ASE values, multiple Wavelengths in different columns
-% expected_values           real expectation-values for each samplepoint (aligned like phi_ASE)
+% mse_values           real expectation-values for each samplepoint (aligned like phi_ASE)
 % N_rays                    number of rays that were used for each samplepoint
 
-%function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
+%function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
 
-function [phi_ASE, expected_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden,NumRays,N_tot,z_mesh,laser,crystal,mesh_z)
+function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden,NumRays,N_tot,z_mesh,laser,crystal,mesh_z)
 
+%%% Added to the interface %%%
 %laser
 %crystal
 %mesh_z
 
-%clad_int, 
-%clad_number, 
-%clad_abs, 
-%refractiveIndices, 
-%reflectivities,
-%MaxRays,
-%mse_threshold,
+
+%%% Defined here in the file %%%
+%MaxRays
+%mse_threshold
 %use_reflections
 
+
+%%% are not really defined and will be created with dummy values %%% 
+%clad_int
+%clad_number
+%clad_abs
+%refractiveIndices
+%reflectivities
+
+MaxRays = 10000;
+mse=0.005;
+use_reflections = false; 
+MAX_GPUS=1;
+
+used_dummy = false;
+
+%create dummy variables
+if(~exist('mse_threshold','var'))
+  %WARNING = 'The variable mse_threshold does not exist'
+  [a,b] = size(laser.s_ems);
+  mse_threshold = ones(1,a)*mse;
+  used_dummy=true;
+end
+
+%create dummy variables
+if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
+  %WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
+  [a,b] = size(sorted_int);
+  clad_int = ones(1,a);
+  clad_number = 3;
+  clad_abs = 5.5;
+  used_dummy=true;
+end
+
+%create dummy variables
+if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
+  %WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
+  refractiveIndices = [1.83,1,1.83,1];
+  [a,b] = size(sorted_int);
+  reflectivities = ones(1,a*2) * 0;
+  used_dummy=true;
+end
+
+% create the correct reflection-parameter for the c-function
+REFLECT='';
+if(use_reflections == true)
+    REFLECT=' --reflection';
+end
+
+if(used_dummy == true)
+  disp([ 'WARNING: Some variables were set as dummies' ]);
+end
 
 
 CURRENT_DIR = pwd;
@@ -61,49 +110,19 @@ TMP_FOLDER = [ '/' 'tmp' filesep 'calcPhiASE_tmp' ];
 % make sure that the input is clean 
 clean_IO_files(TMP_FOLDER);
 
-%TODO create real values in Matlab
-if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
-  WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
-  [a,b] = size(sorted_int);
-  clad_int = ones(1,a);
-  clad_number = 3;
-  clad_abs = 5.5;
-end
+% create the new input based on the MATLAB variables
+create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
 
-%TODO create real values in Matlab
-if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
-  WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
-  refractiveIndices = [1.83,1,1.83,1];
-  [a,b] = size(sorted_int);
-  reflectivities = ones(1,a*2) * 0;
-end
-
-%TODO create real values in Matlab
-if(~exist('mse_threshold','var'))
-  WARNING = 'The variable mse_threshold does not exist'
-  [a,b] = size(laser.s_ems);
-  mse_threshold = ones(1,a)*0.1;
-end
-
-
-  % create the new input based on the MATLAB variables
-  create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
-
-  % create the correct reflection-parameter for the c-function
-  REFLECT='';
-  if(use_reflections == true)
-    REFLECT=' --reflection';
-  end
 
   % do the propagation
-  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--silent ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER ]);
+  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER ' --min_sample_i=0 ' '--max_sample_i=3209 ' '--maxgpus=' num2str(MAX_GPUS) ]);
 
   % get the result
-  [ expected_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
+  [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
 
   % cleanup
-  clean_IO_files(TMP_FOLDER);
-% 
+  %clean_IO_files(TMP_FOLDER);
+  % 
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
@@ -226,23 +245,23 @@ end
 
 
 % takes the output from the CUDA code and fills it into a variable
-function [expectedValues,  N_rays, phi_ASE] = parse_calcPhiASE_output (FOLDER,CURRENT_DIR)
+function [mseValues,  N_rays, phi_ASE] = parse_calcPhiASE_output (FOLDER,CURRENT_DIR)
 cd (FOLDER);
 fid = fopen('phi_ASE.txt');
-arraySize = str2num(fgetl(fid))
+arraySize = str2num(fgetl(fid));
 phi_ASE = str2num(fgetl(fid));
 phi_ASE = reshape(phi_ASE,arraySize);
 fclose(fid);
 
-fid=fopen('expected_values.txt');
-arraySize=str2num(fgetl(fid))
-expectedValues = str2num(fgetl(fid));
-expectedValues = reshape(expectedValues,arraySize);
+fid=fopen('mse_values.txt');
+arraySize=str2num(fgetl(fid));
+mseValues = str2num(fgetl(fid));
+mseValues = reshape(mseValues,arraySize);
 fclose(fid);
 
 
 fid = fopen('N_rays.txt');
-arraySize = str2num(fgetl(fid))
+arraySize = str2num(fgetl(fid));
 N_rays = str2num(fgetl(fid));
 N_rays = reshape(N_rays,arraySize);
 fclose(fid);
