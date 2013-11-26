@@ -55,10 +55,13 @@ function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,n
 %refractiveIndices
 %reflectivities
 
-MaxRays = 10000;
-mse=0.005;
+MaxRays = 100000;
+mse=0.05;
 use_reflections = false; 
 MAX_GPUS=1;
+[a,b] = size(p);
+minSample=0;
+maxSample=(mesh_z*a)-1;
 
 used_dummy = false;
 
@@ -115,7 +118,7 @@ create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_i
 
 
   % do the propagation
-  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER ' --min_sample_i=0 ' '--max_sample_i=3209 ' '--maxgpus=' num2str(MAX_GPUS) ]);
+  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ]);
 
   % get the result
   [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
