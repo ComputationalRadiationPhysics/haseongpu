@@ -277,15 +277,16 @@ int main(int argc, char **argv){
 
 
   // Write experiment data
-  // writeMatlabOutput(
-  //     "output/",
-  //     phiAse,
-  //     totalRays,
-  //     mse,
-  //     sigmaE.size(),
-  //     hMesh.numberOfSamples,
-  //     hMesh.numberOfLevels
-  //     );
+  // output folder has to be the same as TMP_FOLDER in the calling MatLab script
+  writeMatlabOutput(
+      "/tmp/calcPhiASE_tmp/",
+      phiAse,
+      totalRays,
+      mse,
+      sigmaE.size(),
+      hMesh.numberOfSamples,
+      hMesh.numberOfLevels
+      );
 
 
   // FOR OUTPUT
