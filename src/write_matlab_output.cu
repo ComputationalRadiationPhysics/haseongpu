@@ -46,6 +46,6 @@ void writeMatlabOutput(
   write3dMatrix(N_rays,raysFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
   raysFile.close();
 
-  expectedValuesFile.open((experimentPath + "expected_values.txt").c_str());
+  expectedValuesFile.open((experimentPath + "mse_values.txt").c_str());
   write3dMatrix(expectedValues,expectedValuesFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
 }
