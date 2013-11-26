@@ -29,7 +29,7 @@ void mpiHead(std::vector<float> &phiASE,
 	     unsigned numberOfComputeNodes,
 	     int sampleRange){
   MPI_Status status;
-  float res[RESULT_MSG_LENGTH] = {0,0,0,0};
+  float res[RESULT_MSG_LENGTH] = {0,0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
   unsigned finished = 0;
   unsigned sampleOffset = 0;
@@ -45,27 +45,29 @@ void mpiHead(std::vector<float> &phiASE,
       break;
 
     case RESULT_TAG:
-      // res[0] : wave_i
-      // res[1] : sample_i
-      // res[2] : phiASE
-      // res[3] : mse
-      // res[4] : totalRays
+      /**
+       * res[0] : wave_i
+       * res[1] : sample_i
+       * res[2] : phiASE
+       * res[3] : mse
+       * res[4] : totalRays 
+       **/
       sampleOffset = (unsigned)(res[1] + hMesh.numberOfSamples * res[0]);
-      phiASE.at(sampleOffset)    = res[1];
-      mse.at(sampleOffset)       = res[2];
-      totalRays.at(sampleOffset) = (unsigned)res[3];
+      phiASE.at(sampleOffset)    = res[2];
+      mse.at(sampleOffset)       = res[3];
+      totalRays.at(sampleOffset) = (unsigned)res[4];
       //fileProgressBar(phiASE.size(),"output/progress");
       break;
 
     case SAMPLE_REQUEST_TAG:
-      if(sample_i[0] == (int)phiASE.size()){
+      if(sample_i[0] == (int)hMesh.numberOfSamples){
 	int abortMPI[2] = {-1,-1};
 	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
       }
       else{
 	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(sample_i[0] + sampleRange, (int) phiASE.size());
-	sample_i[1] = std::min(sample_i[1] + sampleRange, (int) phiASE.size());
+	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)hMesh.numberOfSamples);
+	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)hMesh.numberOfSamples);
 	
       }
       break;
@@ -104,7 +106,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
     MPI_Status status;
     int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
     float totalRuntime = 0;
-    float res[RESULT_MSG_LENGTH] = {0,0,0,0}; 
+    float res[RESULT_MSG_LENGTH] = {0,0,0,0,0}; 
     MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
     MPI_Recv(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
 
@@ -114,6 +116,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
       break;
     }
     else{
+
 
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
@@ -131,6 +134,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   sample_i[0],
 		   sample_i[1],
 		   runtime);
+
 
       for(unsigned i=0; i < hSigmaE.size(); ++i){
 	for(int j=sample_i[0]; j < sample_i[1]; ++j){
