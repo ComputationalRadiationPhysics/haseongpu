@@ -39,7 +39,7 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
 }
 
 
-__device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh &mesh){
+__device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  const int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh &mesh){
   float mirrorPlaneZ = 0;
   if(reflectionsLeft % 2 == 0){
     // Even reflectionCount is postponement

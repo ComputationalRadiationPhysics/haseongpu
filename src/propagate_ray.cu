@@ -154,7 +154,7 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
    case 3:
      // Upper surface
      *forbiddenEdge = 4;
-     if(*level != mesh.numberOfLevels) (*level)++;
+     if(*level != (mesh.numberOfLevels - 2)) (*level)++;
      break;
 
    case 4:

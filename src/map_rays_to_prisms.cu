@@ -29,7 +29,7 @@ __global__ void mapPrefixSumToPrisms(
   const unsigned reflection_i     = id / numberOfPrisms;
   const unsigned prism_i          = id % numberOfPrisms;
 
-  for(unsigned i=0; i<count ; ++i){
+  for(unsigned i=0; i < count ; ++i){
     indicesOfPrisms[startingPosition + i] = prism_i;     
     numberOfReflections[startingPosition + i] = reflection_i; 
   }

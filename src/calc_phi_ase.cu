@@ -66,8 +66,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Memory allocation/init and copy for device memory
-  device_vector<unsigned> dNumberOfReflections(maxRaysPerSample,  0);
-  device_vector<float>    dGainSum            (phiAse.size(),    0);
+  device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
+  device_vector<float>    dGainSum            (hMesh.numberOfSamples * numberOfWavelengths, 0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
@@ -91,8 +91,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
   for(unsigned wave_i = 0; wave_i < numberOfWavelengths; ++wave_i){
 
     // Calculation for each sample point
-    for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      //unsigned sample_i = 20;{
+    //for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
+    unsigned sample_i = 3370;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
@@ -108,9 +108,15 @@ float calcPhiAse ( unsigned hRaysPerSample,
 						  raw_pointer_cast(&dRaysPerPrism[0]),
 						  distributeRandomly, blockDim, gridDim
 						  );
-
+	  // if(dRaysPerPrism[6495] > 10000){
+	  //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
+	  //   exit(0);
+	  // }
+	  
           // Prism scheduling for gpu threads
           mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
+	  
+
 
           // OUTPUT DATA
           // if(sample_i == 0){
@@ -123,6 +129,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
           // Start Kernel
           dGainSum[sampleOffset]       = 0;
           dGainSumSquare[sampleOffset] = 0;
+	  
           if(useReflections){
             calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
 							dMesh, 
@@ -152,6 +159,13 @@ float calcPhiAse ( unsigned hRaysPerSample,
           }
 
           float mseTmp = calcMSE(dGainSum[sampleOffset], dGainSumSquare[sampleOffset], hRaysPerSampleDump);
+	  if(isnan(mseTmp)){
+	    dout(V_ERROR) << "mseTmp: " << mseTmp << " gainSum:" << dGainSum[sampleOffset] << " gainSum²:" << dGainSumSquare[sampleOffset] << " RaysPerSample:" << hRaysPerSampleDump <<std::endl;
+	  }
+
+	  assert(!isnan(dGainSum[sampleOffset]));
+	  assert(!isnan(dGainSumSquare[sampleOffset]));
+	  assert(!isnan(mseTmp));
 
           //MSE TESTs
           // if(mseTmp > mse.at(sampleOffset)){
@@ -179,7 +193,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
       }
       // Update progressbar
-      //fancyProgressBar(maxSample_i / (gpu_i + 1));
+      fancyProgressBar(maxSample_i);
 
       // get phiASE
       phiAse.at(sampleOffset) = dGainSum[sampleOffset];

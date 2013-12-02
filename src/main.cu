@@ -153,6 +153,10 @@ int main(int argc, char **argv){
   std::vector<double> mse(hMesh.numberOfSamples * sigmaE.size(), 1000);
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
 
+  // for(unsigned i = 0; i < hMesh.numberOfPrisms; ++i){
+  //   dout(V_DEBUG) << i << " " << hMesh.betaValues[i] << std::endl;
+  // }
+
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
   std::vector<float> runtimes(maxGpus, 0);
