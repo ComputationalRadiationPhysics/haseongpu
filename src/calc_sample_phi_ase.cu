@@ -45,6 +45,10 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     // Calculate reflections as different ray propagations
     double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + reflectionOffset];
+    
+    assert(!isnan(mesh.getBetaValue(startPrism)));
+    assert(!isnan(importance[startPrism + reflectionOffset]));
+    assert(!isnan(gain));
 
     gainSumTemp       += gain;
     gainSumSquareTemp += gain * gain;
