@@ -105,11 +105,30 @@ float calcPhiAse ( unsigned hRaysPerSample,
         unsigned run = 0;
         while(run < maxRepetitions && mseTooHigh){
           run++;
-          hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
-						  raw_pointer_cast(&dImportance[0]), 
-						  raw_pointer_cast(&dRaysPerPrism[0]),
-						  distributeRandomly, blockDim, gridDim
-						  );
+          float hSumPhi =  importanceSamplingPropagation(
+              sample_i,
+              reflectionSlices,
+              dMesh,
+              hSigmaA[wave_i],
+              hSigmaE[wave_i],
+              raw_pointer_cast(&dImportance[0]), 
+              blockDim,
+              gridDim);
+          hRaysPerSampleDump = importanceSamplingDistribution(
+              reflectionSlices,
+              dMesh,
+              hRaysPerSample,
+              raw_pointer_cast(&dImportance[0]), 
+              raw_pointer_cast(&dRaysPerPrism[0]),
+              hSumPhi,
+              distributeRandomly,
+              blockDim,
+              gridDim);
+//          hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
+//						  raw_pointer_cast(&dImportance[0]), 
+//						  raw_pointer_cast(&dRaysPerPrism[0]),
+//						  distributeRandomly, blockDim, gridDim
+//						  );
 	   // if(dRaysPerPrism[6495] > 10000){
 	   //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
 	   //   exit(0);

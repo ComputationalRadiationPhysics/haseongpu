@@ -142,27 +142,47 @@ __global__ void recalculateImportance(Mesh mesh,
   }
 }
 
-unsigned importanceSampling(unsigned sample_i,
+float importanceSamplingPropagation(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
-			    const unsigned raysPerSample,
 			    const double sigmaA,
 			    const double sigmaE,
 			    double *importance,
-			    unsigned *raysPerPrism,
-			    const bool distributeRandomly,
 			    dim3 blockDim,
 			    dim3 gridDim){
 
 
   float hSumPhi = 0;
+  float *dSumPhi = copyToDevice(hSumPhi);
+  dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
+
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, dSumPhi, sample_i, sigmaA, sigmaE));
+
+  hSumPhi = copyFromDevice(dSumPhi);
+  cudaFree(dSumPhi);
+
+  return hSumPhi;
+}
+
+unsigned importanceSamplingDistribution(
+			    const unsigned reflectionSlices,
+			    Mesh deviceMesh,
+			    const unsigned raysPerSample,
+			    double *importance,
+			    unsigned *raysPerPrism,
+				float hSumPhi,
+			    const bool distributeRandomly,
+			    dim3 blockDim,
+			    dim3 gridDim){
+
+
   unsigned hRaysDump = 0;
 
   float *dSumPhi = copyToDevice(hSumPhi);
   unsigned *dRaysDump = copyToDevice(hRaysDump);
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, dSumPhi, sample_i, sigmaA, sigmaE));
+
   CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism,importance, dSumPhi, raysPerSample, dRaysDump));
 
   // Distribute remaining rays randomly if wanted
