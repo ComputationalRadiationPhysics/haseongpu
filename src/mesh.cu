@@ -8,6 +8,27 @@
 #include <cudachecks.h>
 #include <mesh.h>
 #include <parser.h>
+#include <algorithm>
+
+template <class T, class B, class E>
+void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
+  if(equals){
+    assert(*std::min_element(v.begin(),v.end()) == minElement);
+    assert(*std::max_element(v.begin(),v.end()) == maxElement);
+  }else{
+    assert(*std::min_element(v.begin(),v.end()) >= minElement);
+    assert(*std::max_element(v.begin(),v.end()) <= maxElement);
+  }
+}
+
+template <class T, class B>
+void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
+  if(equals){
+    assert(*std::min_element(v.begin(),v.end()) == minElement);
+  }else{
+    assert(*std::min_element(v.begin(),v.end()) >= minElement);
+  }
+}
 
 
 Mesh::~Mesh() {
@@ -475,6 +496,7 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
   if(fileToVector(root + "refractive_indices.txt", refractiveIndices)) return 1;
   if(fileToVector(root + "reflectivities.txt", reflectivities)) return 1;
 
+  // assert input sizes
   assert(numberOfPoints == (points->size() / 2));
   assert(numberOfTriangles == triangleIndices->size() / 3);
   assert(positionsOfNormalVectors->size() == numberOfTriangles * 3);
@@ -491,6 +513,27 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
   assert(cellTypes->size()== numberOfTriangles);
   assert(refractiveIndices->size() == 4);
   assert(reflectivities->size() == (refractiveIndices->size()/2) * numberOfTriangles);
+  assert(cellTypes->size() == numberOfTriangles);
+
+  // assert input data validity
+  assertRange(*positionsOfNormalVectors,0u,unsigned(numberOfPoints-1),true);
+  assertMin(*betaValues,0,false);
+  assertRange(*forbidden,-1,2,true);
+  assertRange(*neighbors,-1,int(numberOfTriangles-1),true);
+  assertRange(*xOfNormals,-1,1,false);
+  assertRange(*yOfNormals,-1,1,false);
+  assertRange(*xOfTriangleCenter,*std::min_element(points->begin(),points->end()),*std::max_element(points->begin(),points->end()),false);
+  assertRange(*yOfTriangleCenter,*std::min_element(points->begin(),points->end()),*std::max_element(points->begin(),points->end()),false);
+  assertRange(*triangleIndices,0u,unsigned(numberOfPoints-1),true);
+  assertMin(*surfaces,0,false);
+  assertMin(*betaCells,0,false);
+  assertRange(*refractiveIndices,0,5,false);
+  assertRange(*reflectivities,0,1,false);
+
+
+
+
+
 
 
   fillHMesh(
