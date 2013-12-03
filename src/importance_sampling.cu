@@ -8,6 +8,7 @@
 #include <cudachecks.h>
 #include <cuda_utils.h>
 #include <reflection.h> /* ReflectionPlane */
+#include <thrust/device_vector.h>
 
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
@@ -126,11 +127,9 @@ __global__ void recalculateImportance(Mesh mesh,
 				      unsigned raysPerSample,
 				      double *importance){
 
-
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   unsigned reflection_i = blockIdx.z;
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-
 
   if(startPrism >= mesh.numberOfPrisms){
     return;
@@ -148,59 +147,71 @@ __global__ void recalculateImportance(Mesh mesh,
 float importanceSamplingPropagation(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
+				const unsigned numberOfPrisms,
 			    const double sigmaA,
 			    const double sigmaE,
-			    double *importance,
-			    dim3 blockDim,
-			    dim3 gridDim){
+			    thrust::device_vector<double>& importance
+				){
 
+  thrust::device_vector<float> dSumPhi(1,0);
+  int pBlock=128;
+  dim3 gridDimReflection(ceil(float(numberOfPrisms)/pBlock), 1, reflectionSlices);
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, pBlock >>>(
+			  deviceMesh, 
+			  thrust::raw_pointer_cast(&importance[0]), 
+			  thrust::raw_pointer_cast(&dSumPhi[0]), 
+			  sample_i, 
+			  sigmaA, 
+			  sigmaE
+			  ));
 
-  float hSumPhi = 0;
-  float *dSumPhi = copyToDevice(hSumPhi);
-  dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, dSumPhi, sample_i, sigmaA, sigmaE));
-
-  hSumPhi = copyFromDevice(dSumPhi);
-  cudaFree(dSumPhi);
-
-  return hSumPhi;
+  return dSumPhi[0];
 }
 
 unsigned importanceSamplingDistribution(
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
+				const unsigned numberOfPrisms,
 			    const unsigned raysPerSample,
-			    double *importance,
-			    unsigned *raysPerPrism,
-				float hSumPhi,
-			    const bool distributeRandomly,
-			    dim3 blockDim,
-			    dim3 gridDim){
+			    thrust::device_vector<double> &importance,
+			    thrust::device_vector<unsigned> &raysPerPrism,
+				const float hSumPhi,
+			    const bool distributeRandomly
+			    ){
 
+  thrust::device_vector<unsigned> dRaysDump(1,0);
+  thrust::device_vector<float> dSumPhi(1,hSumPhi);
 
-  unsigned hRaysDump = 0;
-
-  float *dSumPhi = copyToDevice(hSumPhi);
-  unsigned *dRaysDump = copyToDevice(hRaysDump);
-
-  dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism,importance, dSumPhi, raysPerSample, dRaysDump));
+  int dBlock=288;
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< dim3(ceil(float(numberOfPrisms)/dBlock)), dBlock >>>(
+			  deviceMesh, 
+			  thrust::raw_pointer_cast(&raysPerPrism[0]),
+			  thrust::raw_pointer_cast(&importance[0]), 
+			  thrust::raw_pointer_cast(&dSumPhi[0]),
+			  raysPerSample, 
+			  thrust::raw_pointer_cast(&dRaysDump[0])
+			  ));
 
   // Distribute remaining rays randomly if wanted
   if(distributeRandomly){
-    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, dRaysDump));
-    hRaysDump = raysPerSample;
+	int rBlock = 256;
+	int rGrid = ceil(float(raysPerSample-dRaysDump[0])/rBlock);
+    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< rGrid,rBlock >>>(
+				deviceMesh,
+				thrust::raw_pointer_cast(&raysPerPrism[0]),
+				raysPerSample,
+				thrust::raw_pointer_cast(&dRaysDump[0])
+				));
+	dRaysDump[0] = raysPerSample;
   }
-  else {
-    hRaysDump = copyFromDevice(dRaysDump);
-  }
 
-  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, hRaysDump, importance));
+  int iBlock=256;
+  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< dim3(ceil(float(numberOfPrisms/iBlock)),1,reflectionSlices), iBlock >>>(
+			  deviceMesh, 
+			  thrust::raw_pointer_cast(&raysPerPrism[0]), 
+			  dRaysDump[0],
+			  thrust::raw_pointer_cast(&importance[0])
+			  ));
 
-  cudaFree(dSumPhi);
-  cudaFree(dRaysDump);
-
-  return hRaysDump;
+  return dRaysDump[0];
 }

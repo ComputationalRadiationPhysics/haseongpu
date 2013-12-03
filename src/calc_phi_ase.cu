@@ -105,11 +105,10 @@ float calcPhiAse ( unsigned hRaysPerSample,
           sample_i,
           reflectionSlices,
           dMesh,
+          hMesh.numberOfPrisms,
           hSigmaA[wave_i],
           hSigmaE[wave_i],
-          raw_pointer_cast(&dImportanceSave[0]), 
-          blockDim,
-          gridDim);
+          dImportanceSave);
       while(mseTooHigh){
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
         unsigned run = 0;
@@ -119,13 +118,12 @@ float calcPhiAse ( unsigned hRaysPerSample,
           hRaysPerSampleDump = importanceSamplingDistribution(
               reflectionSlices,
               dMesh,
+              hMesh.numberOfPrisms,
               hRaysPerSample,
-              raw_pointer_cast(&dImportance[0]), 
-              raw_pointer_cast(&dRaysPerPrism[0]),
+              dImportance, 
+              dRaysPerPrism,
               hSumPhi,
-              distributeRandomly,
-              blockDim,
-              gridDim);
+              distributeRandomly);
           // if(dRaysPerPrism[6495] > 10000){
           //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
           //   exit(0);
