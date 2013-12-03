@@ -28,7 +28,6 @@ output
 tmp
 phi_ASE.txt
 N_rays.txt
-calcPhiASE.m
 expected_values.txt
 run_octrace.m
 paper/Makefile

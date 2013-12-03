@@ -6,6 +6,7 @@
 #include <fstream> /* ifstream */
 #include <cstdlib> /* atof */
 #include <vector> 
+#include <logging.h>
 
 enum RunMode { NONE, RAY_PROPAGATION_GPU, FOR_LOOPS, RAY_PROPAGATION_MPI, TEST };
 
@@ -32,6 +33,10 @@ int fileToVector(const std::string filename, std::vector<T> *v){
     while(fileStream.good()){
       std::getline(fileStream, line);
       value = (T) atof(line.c_str());
+      if(isnan(value)){
+	dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
+	exit(1);
+      }
       v->push_back(value);
     }
 

@@ -32,7 +32,7 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   unsigned reflections = (reflection_i + 1) / 2;
   ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
 
-  int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
@@ -42,14 +42,13 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
-  //gain = 1;
-
-  // DEBUG
-  //printf("C x:%f y:%f z:%f reflections: %u reflectionPlane %d gain: %f\n", samplePoint.x, samplePoint.y, samplePoint.z, reflections, reflectionPlane, gain);
-
+  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
   importance[startPrism + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
-  
+  if(mesh.getBetaValue(startPrism) < 0 || gain < 0){
+    printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
+  }
+
+
   atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
 
 }
@@ -73,17 +72,21 @@ __global__ void distributeRaysByImportance(Mesh mesh,
 
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms) return;
-  raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
 
+  raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
+  if(raysPerPrism[startPrism + reflectionOffset] > 100000){
+    printf("prism: %d raysPerPrism: %u sumPhi: %f raysPerSample: %u\n", startPrism, raysPerPrism[startPrism + reflectionOffset], *sumPhi, raysPerSample);
+  }
+  assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
   atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
 
 }
 
 /**
  * @brief takes a number of rays and distributes them randomly over the available prisms
+ *        Warning: Does not distribute to reflection slices !!!
  *
  * @param *raysPerPrism the number of rays for each prism (will be changed)
- *
  * @param *raysDump the number of rays which were already distributed
  *
  * for other parameters, see documentation of importanceSampling()
@@ -155,29 +158,29 @@ unsigned importanceSampling(unsigned sample_i,
 			    dim3 gridDim){
 
 
-  float hostSumPhi = 0;
-  unsigned hostRaysDump = 0;
+  float hSumPhi = 0;
+  unsigned hRaysDump = 0;
 
-  float *sumPhi = copyToDevice(hostSumPhi);
-  unsigned *raysDump = copyToDevice(hostRaysDump);
+  float *dSumPhi = copyToDevice(hSumPhi);
+  unsigned *dRaysDump = copyToDevice(hRaysDump);
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sumPhi, sample_i, sigmaA, sigmaE));
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism,importance, sumPhi, raysPerSample, raysDump));
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, dSumPhi, sample_i, sigmaA, sigmaE));
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism,importance, dSumPhi, raysPerSample, dRaysDump));
 
   // Distribute remaining rays randomly if wanted
   if(distributeRandomly){
-    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, raysDump));
-    hostRaysDump = raysPerSample;
+    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, dRaysDump));
+    hRaysDump = raysPerSample;
   }
   else {
-    hostRaysDump = copyFromDevice(raysDump);
+    hRaysDump = copyFromDevice(dRaysDump);
   }
 
-  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, hostRaysDump, importance));
+  CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, hRaysDump, importance));
 
-  cudaFree(sumPhi);
-  cudaFree(raysDump);
+  cudaFree(dSumPhi);
+  cudaFree(dRaysDump);
 
-  return hostRaysDump;
+  return hRaysDump;
 }

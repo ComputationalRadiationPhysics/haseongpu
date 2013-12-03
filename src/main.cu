@@ -153,6 +153,10 @@ int main(int argc, char **argv){
   std::vector<double> mse(hMesh.numberOfSamples * sigmaE.size(), 1000);
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
 
+  // for(unsigned i = 0; i < hMesh.numberOfPrisms; ++i){
+  //   dout(V_DEBUG) << i << " " << hMesh.betaValues[i] << std::endl;
+  // }
+
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
   std::vector<float> runtimes(maxGpus, 0);
@@ -317,6 +321,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
+    dout(V_STAT) << "Wavelength        : " << (int) sigmaE.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
     if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
     dout(V_STAT | V_NOLABEL) << std::endl;

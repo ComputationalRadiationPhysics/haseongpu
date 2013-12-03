@@ -30,21 +30,21 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
 
 
 float calcPhiAse ( unsigned hRaysPerSample,
-    const unsigned maxRaysPerSample,
-    const unsigned maxRepetitions,
-    const Mesh& dMesh,
-    const Mesh& hMesh,
-    const std::vector<double>& hSigmaA,
-    const std::vector<double>& hSigmaE,
-    const std::vector<float>& mseThreshold,
-    const bool useReflections,
-    std::vector<float> &phiAse,
-    std::vector<double> &mse,
-    std::vector<unsigned> &totalRays,
-    unsigned gpu_i,
-    unsigned minSample_i,
-    unsigned maxSample_i,
-    float &runtime){
+		   const unsigned maxRaysPerSample,
+		   const unsigned maxRepetitions,
+		   const Mesh& dMesh,
+		   const Mesh& hMesh,
+		   const std::vector<double>& hSigmaA,
+		   const std::vector<double>& hSigmaE,
+		   const std::vector<float>& mseThreshold,
+		   const bool useReflections,
+		   std::vector<float> &phiAse,
+		   std::vector<double> &mse,
+		   std::vector<unsigned> &totalRays,
+		   unsigned gpu_i,
+		   unsigned minSample_i,
+		   unsigned maxSample_i,
+		   float &runtime){
 
   // Optimization to use more L1 cache
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
@@ -53,24 +53,28 @@ float calcPhiAse ( unsigned hRaysPerSample,
   using thrust::device_vector;
   using thrust::raw_pointer_cast;
 
+
+
   // variable Definitions CPU
   time_t starttime                = time(0);
   unsigned hRaysPerSampleSave     = hRaysPerSample;
   unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   unsigned numberOfWavelengths    = hSigmaE.size();
-  bool distributeRandomly         = false;
+  // In some cases distributeRandomly has to be true !
+  // Otherwise bad or no ray distribution possible.
+  bool distributeRandomly         = true;
   dim3 blockDim(128);             
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Memory allocation/init and copy for device memory
-  device_vector<unsigned> dNumberOfReflections(maxRaysPerSample,  0);
-  device_vector<float>    dGainSum            (phiAse.size(),    0);
+  device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
+  device_vector<float>    dGainSum            (hMesh.numberOfSamples * numberOfWavelengths, 0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<float>    dGainSumSquare      (hMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
-
+  device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
   // OUTPUT DATA
   // thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
   // thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
@@ -90,7 +94,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      //unsigned sample_i = 20;{
+      //unsigned sample_i = 3749;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
@@ -100,17 +104,20 @@ float calcPhiAse ( unsigned hRaysPerSample,
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
         unsigned run = 0;
         while(run < maxRepetitions && mseTooHigh){
-          device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
           run++;
           hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, hRaysPerSample, hSigmaA[wave_i], hSigmaE[wave_i],
-              raw_pointer_cast(&dImportance[0]), 
-              raw_pointer_cast(&dRaysPerPrism[0]),
-              distributeRandomly, blockDim, gridDim
-              );
-
+						  raw_pointer_cast(&dImportance[0]), 
+						  raw_pointer_cast(&dRaysPerPrism[0]),
+						  distributeRandomly, blockDim, gridDim
+						  );
+	   // if(dRaysPerPrism[6495] > 10000){
+	   //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
+	   //   exit(0);
+	   // }
+	  
           // Prism scheduling for gpu threads
           mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
-
+	  
           // OUTPUT DATA
           // if(sample_i == 0){
           //   thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
@@ -122,35 +129,45 @@ float calcPhiAse ( unsigned hRaysPerSample,
           // Start Kernel
           dGainSum[sampleOffset]       = 0;
           dGainSumSquare[sampleOffset] = 0;
+	  
           if(useReflections){
             calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
-                dMesh, 
-                raw_pointer_cast(&dIndicesOfPrisms[0]), 
-                wave_i, 
-                raw_pointer_cast(&dNumberOfReflections[0]), 
-                raw_pointer_cast(&dImportance[0]),
-                hRaysPerSampleDump, 
-                raw_pointer_cast(&dGainSum[0]), 
-                raw_pointer_cast(&dGainSumSquare[0]),
-                sample_i, 
-                hSigmaA[wave_i], 
-                hSigmaE[wave_i] );
+							dMesh, 
+							raw_pointer_cast(&dIndicesOfPrisms[0]), 
+							wave_i, 
+							raw_pointer_cast(&dNumberOfReflections[0]), 
+							raw_pointer_cast(&dImportance[0]),
+							hRaysPerSampleDump, 
+							raw_pointer_cast(&dGainSum[0]), 
+							raw_pointer_cast(&dGainSumSquare[0]),
+							sample_i, 
+							hSigmaA[wave_i], 
+							hSigmaE[wave_i] );
           }
           else{
             calcSampleGainSumWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
-                dMesh, 
-                raw_pointer_cast(&dIndicesOfPrisms[0]), 
-                wave_i, 
-                raw_pointer_cast(&dImportance[0]),
-                hRaysPerSampleDump, 
-                raw_pointer_cast(&dGainSum[0]), 
-                raw_pointer_cast(&dGainSumSquare[0]),
-                sample_i, 
-                hSigmaA[wave_i], 
-                hSigmaE[wave_i] );
+									  dMesh, 
+									  raw_pointer_cast(&dIndicesOfPrisms[0]), 
+									  wave_i, 
+									  raw_pointer_cast(&dImportance[0]),
+									  hRaysPerSampleDump, 
+									  raw_pointer_cast(&dGainSum[0]), 
+									  raw_pointer_cast(&dGainSumSquare[0]),
+									  sample_i, 
+									  hSigmaA[wave_i], 
+									  hSigmaE[wave_i] );
           }
 
           float mseTmp = calcMSE(dGainSum[sampleOffset], dGainSumSquare[sampleOffset], hRaysPerSampleDump);
+
+	  // DEBUG
+	  if(isnan(mseTmp)){
+	    dout(V_ERROR) << "mseTmp: " << mseTmp << " gainSum:" << dGainSum[sampleOffset] << " gainSum²:" << dGainSumSquare[sampleOffset] << " RaysPerSample:" << hRaysPerSampleDump <<std::endl;
+	  }
+
+	  assert(!isnan(dGainSum[sampleOffset]));
+	  assert(!isnan(dGainSumSquare[sampleOffset]));
+	  assert(!isnan(mseTmp));
 
           //MSE TESTs
           // if(mseTmp > mse.at(sampleOffset)){
@@ -178,7 +195,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
       }
       // Update progressbar
-      //fancyProgressBar(maxSample_i / (gpu_i + 1));
+      fancyProgressBar(maxSample_i);
 
       // get phiASE
       phiAse.at(sampleOffset) = dGainSum[sampleOffset];
@@ -187,33 +204,33 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     }
 
-
-    }
-
-    // JUST OUTPUT
-    // std::vector<unsigned> reflectionsPerPrism(hMesh.numberOfPrisms, 0);
-    // std::vector<unsigned> raysPerPrism(hMesh.numberOfPrisms, 0);
-
-    // for(unsigned i=0; i < midRaysPerSample; ++i){
-    //   unsigned index = hIndicesOfPrisms[i];
-    //   reflectionsPerPrism[index] = max(reflectionsPerPrism[index], (hNumberOfReflections[i] + 1) / 2);
-    // }
-
-    // for(unsigned i=0; i < hMesh.numberOfPrisms; ++i){
-    //   for(unsigned j=0; j < reflectionSlices; ++j){
-    //     unsigned index = i + hMesh.numberOfPrisms * j;
-    //     raysPerPrism[i] += hRaysPerPrism[index];
-    //   }
-    // }
-
-    //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
-    //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
-
-    //dout(V_INFO | V_NOLABEL) << "\n" << std::endl;
-    // Free Memory
-    cudaFree(devMTGPStates);
-    cudaFree(devKernelParams);
-
-    runtime = difftime(time(0),starttime);
-    return runtime;
   }
+
+  // JUST OUTPUT
+  // std::vector<unsigned> reflectionsPerPrism(hMesh.numberOfPrisms, 0);
+  // std::vector<unsigned> raysPerPrism(hMesh.numberOfPrisms, 0);
+
+  // for(unsigned i=0; i < midRaysPerSample; ++i){
+  //   unsigned index = hIndicesOfPrisms[i];
+  //   reflectionsPerPrism[index] = max(reflectionsPerPrism[index], (hNumberOfReflections[i] + 1) / 2);
+  // }
+
+  // for(unsigned i=0; i < hMesh.numberOfPrisms; ++i){
+  //   for(unsigned j=0; j < reflectionSlices; ++j){
+  //     unsigned index = i + hMesh.numberOfPrisms * j;
+  //     raysPerPrism[i] += hRaysPerPrism[index];
+  //   }
+  // }
+
+  //writePrismToVtk(hMesh, reflectionsPerPrism, "octrace_0_reflections", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
+  //writePrismToVtk(hMesh, raysPerPrism, "octrace_0_rays", hRaysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, 0);
+
+  //dout(V_INFO | V_NOLABEL) << "\n" << std::endl;
+  // Free Memory
+  cudaFree(devMTGPStates);
+  cudaFree(devKernelParams);
+
+
+  runtime = difftime(time(0),starttime);
+  return runtime;
+}

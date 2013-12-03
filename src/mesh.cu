@@ -281,7 +281,12 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
  * @return a beta value
  */
 __device__ double Mesh::getBetaValue(unsigned triangle, unsigned level) const{
-  return betaValues[triangle + level*numberOfTriangles];
+  unsigned i = triangle + level * numberOfTriangles;
+    if(i > 7307){
+      printf("nT: %d T: %d L: %d B: %d\n", numberOfTriangles, triangle, level, i);
+    }
+
+  return betaValues[triangle + level * numberOfTriangles];
 }
 
 /**

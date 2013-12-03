@@ -56,10 +56,13 @@ void fancyProgressBar(const unsigned nTotal){
 
   const int length = 50;
 
+  static unsigned maxNTotal = 0;
+
   static timeval startTime;
   static unsigned part = 0;
   if(part==0){ gettimeofday(&startTime,NULL); }
-  static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
+  maxNTotal = max(maxNTotal, nTotal);
+  static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
   static unsigned tic  = 0;
   timeval now;
   gettimeofday(&now,NULL);
@@ -67,10 +70,10 @@ void fancyProgressBar(const unsigned nTotal){
 
   //limit the update intervall (not faster than every 35ms)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
-  if(millisSpent > 35*tic || part==nTotal){
+  if(millisSpent > 35*tic || part==maxNTotal){
     ++tic;
 
-    const float percentage = float(part) / float(nTotal);
+    const float percentage = float(part) / float(maxNTotal);
     const float timeSpent = float(millisSpent) / 1000;
     const float timeTotal = timeSpent/percentage;
     const int timeRemaining = timeTotal-timeSpent;
@@ -81,7 +84,7 @@ void fancyProgressBar(const unsigned nTotal){
     dout(V_INFO | V_NOLABEL) << "] ";
 
     dout(V_INFO | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
-    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << nTotal << ")";
+    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
     dout(V_INFO | V_NOLABEL) << " after " << int(timeSpent) << "s";
     dout(V_INFO | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
     dout(V_INFO | V_NOLABEL) << std::flush;
