@@ -42,16 +42,13 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
-  //gain = 1;
-
-  // DEBUG
-  if(isnan(mesh.getBetaValue(startPrism))){
-    printf("reflection_i: %u startPrism: %u\n", reflection_i, startPrism);
+  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
+  importance[startPrism + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
+  if(mesh.getBetaValue(startPrism) < 0 || gain < 0){
+    printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
   }
 
-  importance[startPrism + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
-  
+
   atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
 
 }
@@ -77,21 +74,19 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   if(startPrism >= mesh.numberOfPrisms) return;
 
   raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-  // if(raysPerPrism[startPrism + reflectionOffset] > 10000){
-  //   printf("raysperprism: %u imp: %f sumPhi: %f raysPerSample: %u reflection_i: %u\n", raysPerPrism[startPrism + reflectionOffset],importance[startPrism + reflectionOffset], *sumPhi, raysPerSample, reflection_i);
-  //   return;
-  // }
-  printf("%u\n", raysPerPrism[startPrism + reflectionOffset]);
-
+  if(raysPerPrism[startPrism + reflectionOffset] > 100000){
+    printf("prism: %d raysPerPrism: %u sumPhi: %f raysPerSample: %u\n", startPrism, raysPerPrism[startPrism + reflectionOffset], *sumPhi, raysPerSample);
+  }
+  assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
   atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
 
 }
 
 /**
  * @brief takes a number of rays and distributes them randomly over the available prisms
+ *        Warning: Does not distribute to reflection slices !!!
  *
  * @param *raysPerPrism the number of rays for each prism (will be changed)
- *
  * @param *raysDump the number of rays which were already distributed
  *
  * for other parameters, see documentation of importanceSampling()

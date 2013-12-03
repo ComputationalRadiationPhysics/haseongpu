@@ -232,8 +232,9 @@ __device__ double propagateRayWithReflection(Point startPoint,
     assert(reflectionAngle <= 90);
     assert(reflectionAngle >= 0 );
 
-    if(reflectionAngle <= totalReflectionAngle) 
+    if(reflectionAngle <= totalReflectionAngle){
       gain             *= reflectivity;
+    }
 
     startPoint          = reflectionPoint;
     reflectionPlane     = reflectionPlane == TOP_REFLECTION ? BOTTOM_REFLECTION : TOP_REFLECTION;

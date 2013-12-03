@@ -12,6 +12,7 @@ GCC_FLAGS = -std=c++0x -J 8
 LIBS =  -lpthread -lcudart -lm
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"
+THRUST_FLAGS = -D THRUST_DEBUG
 
 ARCH = -arch=sm_20
 ARCH = -arch=sm_35
@@ -24,7 +25,7 @@ ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
 SRCS = $(wildcard src/*.cu src/*/*.cu)
 OBJS = $(SRCS:src/%.cu=bin/%.o)
 TESTSRCS = $(wildcard tests/*.cu)
-DEBUG_FLAGS = -g -G 
+DEBUG_FLAGS = -g -G -lineinfo
 INCLUDES = include
 
 all: calcPhiASE
@@ -33,7 +34,8 @@ bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
 	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I include -o bin/calc_phi_ase_mpi.o
 
 bin/%.o: src/%.cu $(wildcard include/*.h)
-	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)
+	$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS) 
+#$(DEBUG_FLAGS) $(THRUST_FLAGS)
 
 calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
