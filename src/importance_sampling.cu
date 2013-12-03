@@ -74,9 +74,6 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   if(startPrism >= mesh.numberOfPrisms) return;
 
   raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-  if(raysPerPrism[startPrism + reflectionOffset] > 100000){
-    printf("prism: %d raysPerPrism: %u sumPhi: %f raysPerSample: %u\n", startPrism, raysPerPrism[startPrism + reflectionOffset], *sumPhi, raysPerSample);
-  }
   assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
   atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
 
