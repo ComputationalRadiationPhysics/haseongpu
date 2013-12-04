@@ -106,22 +106,23 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 %  \label{graphic:thread_detail}
 %\end{figure}
 
-\subsection{Importance sampling}
+\subsection{Importance sampling (IS)}
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
 before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
 to figure out which areas are more important to the result. 
+\textbf{(TODO describe how IS works in code)}
 The result of the importance sampling is a schedule for a specific sample point, that
 describes in which prism each ray starts.
 This method has a strong impact on the precision of the simulation
 and is able to reduce strong peaks in Monte Carlo simulations.
 
 To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
-\[\Phi_{ASE\Delta} = |\Phi_{ASE~I}(M) - \Phi_{ASE~\bar{I}}(N)|\] of the 
-result with ($I$) and without ($\bar{I}$) importance sampling was calculated with 
+\[\Phi_{ASE\Delta} = |\Phi_{ASE~IS}(M) - \Phi_{ASE~Uniform}(N)|\] of the 
+result with importance sampling ($IS$) and with uniform sampling ($Uniform$) was calculated with 
 $N,M = 10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then, N was increased in two steps by 10 for the simulation without importance sampling.
+Then, N was increased in two steps by 10 for the simulation with uniform sampling.
 The more rays are simulated, the smaller is $\Phi_{ASE\Delta}$, which 
 means that the simulation
 with importance sampling reaches same results with less
@@ -135,7 +136,7 @@ and simulation runtime.
   \label{graphic:importance}
 \end{figure}
 
-\subsection{Adaptive sampling}
+\subsection{Adaptive sampling (AS)}
 \label{subsec:adaptive_sampling}
 To assess the precision
 and therefore the difference between the true and calculated value,
@@ -149,9 +150,7 @@ Since most sample points $s_i$ have a low $MSE(s_i)$, there is no need
 to sample them with a high number of rays. Only some outliers need to
 be sampled with a higher resolution. This can be done with an adaptive
 method, which allows to remove strong peaks in the result
-of the simulation by either resampling these points with more rays
-or restarting the simulation with the same number of rays and a different
-random number generator.
+of the simulation by either resampling these points with more rays.
 
 For comparision, the impact of importance sampling
 on the MSE values is shown (see Figure~\ref{plot:importance2}). 
@@ -160,7 +159,7 @@ many sample points considerable.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_importance.png}}}
-  \caption{histogram of MSE values with and without importance sampling}
+  \caption{histogram of MSE values IS and Uniform sampling}
   \label{plot:importance2}
 \end{figure}
 By using also adaptive sampling, the MSE values are reduced to a specific MSE threshold.
@@ -171,10 +170,25 @@ to reduce calculation time.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/mse_adaptive.png}}}
-  \caption{histogram of MSE values with and without adaptive sampling}
+  \caption{histogram of MSE values IS and IS + AS}
   \label{plot:adaptive}
 \end{figure}
 The adaptive method will not reduce the average MSE over all sample points,
 but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
 
+\subsection{Repetitive sampling (RS)}
+Restarting the simulation with the same number of rays and a different
+random number generator.
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare.png}}}
+  \caption{Methods with same MSE value}
+  \label{graphic:methods_compare}
+\end{figure}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
+  \caption{Methods with same runtime}
+  \label{graphic:methods_compare2}
+\end{figure}
