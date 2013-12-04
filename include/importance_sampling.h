@@ -2,6 +2,7 @@
 #define importance_sampling_H
 
 #include <mesh.h>
+#include <thrust/device_vector.h>
 
 /**
  * @brief calculates an importance sampling for the given mesh and ray parameters
@@ -22,27 +23,29 @@
  *
  * @param *raysPerPrism for each prism, how many rays will be launced
  *
- * @param *indicesOfPrisms for each ray, from which prism will it start (currently unused)
- *
  * @param raysDump the rays which were mapped to a specific prism (pointer to memory location)
- *
- * @param threads the number of threads for the kernels
- *
- * @param blocks the number of blocks for the kernels
  *
  * @return the number of rays which are used for one sample point
  */
-unsigned importanceSampling(
-			    unsigned sample_i,
-			    unsigned maxReflections,
-			    Mesh deviceMesh,
-			    unsigned raysPerSample, 
-			    double sigmaA, 
-			    double sigmaE, 
-			    double *importance, 
-			    unsigned *raysPerPrism,
-			    bool distributeRandomly,
-			    dim3 threads,
-			    dim3 blocks);
+float importanceSamplingPropagation(
+    unsigned sample_i,
+    const unsigned reflectionSlices,
+    Mesh deviceMesh,
+    const unsigned numberOfPrisms,
+    const double sigmaA,
+    const double sigmaE,
+    thrust::device_vector<double> &importance
+    );
+
+unsigned importanceSamplingDistribution(
+    const unsigned reflectionSlices,
+    Mesh deviceMesh,
+    const unsigned numberOfPrisms,
+    const unsigned raysPerSample,
+    thrust::device_vector<double> &importance,
+    thrust::device_vector<unsigned> &raysPerPrism,
+    const float hSumPhi,
+    const bool distributeRandomly
+    );
 
 #endif /* importance_sampling_H */
