@@ -111,7 +111,8 @@ int main(int argc, char **argv){
   time_t starttime   = time(0);
   unsigned usedGpus  = 0;
 
-  std::string experimentPath;
+  std::string inputPath;
+  std::string outputPath;
   verbosity = 31; //ALL //TODO: remove in final code
 
   // Wavelength data
@@ -120,8 +121,8 @@ int main(int argc, char **argv){
   std::vector<float> mseThreshold;
 
   // Parse Commandline
-  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &experimentPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions);
+  parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &inputPath,
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -129,12 +130,12 @@ int main(int argc, char **argv){
   devices = getCorrectDevice(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath)) return 1;
 
   // Parse wavelengths from files
-  if(fileToVector(experimentPath + "sigma_a.txt", &sigmaA)) return 1;
-  if(fileToVector(experimentPath + "sigma_e.txt", &sigmaE)) return 1;
-  if(fileToVector(experimentPath + "mse_threshold.txt", &mseThreshold)) return 1;
+  if(fileToVector(inputPath + "sigma_a.txt", &sigmaA)) return 1;
+  if(fileToVector(inputPath + "sigma_e.txt", &sigmaE)) return 1;
+  if(fileToVector(inputPath + "mse_threshold.txt", &mseThreshold)) return 1;
   assert(sigmaA.size() == sigmaE.size());
   assert(mseThreshold.size() == sigmaE.size());
 
@@ -145,7 +146,7 @@ int main(int argc, char **argv){
 
   // TODO: split into hMesh and dMesh parsing 
   // -> parse dMesh only where needed
-  if(Mesh::parseMultiGPU(hMesh, dMesh, experimentPath, devices, maxGpus)) return 1;
+  if(Mesh::parseMultiGPU(hMesh, dMesh, inputPath, devices, maxGpus)) return 1;
 
   // Solution vector
   std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
@@ -163,6 +164,10 @@ int main(int argc, char **argv){
   switch(mode){
     case RAY_PROPAGATION_GPU:
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+	dout(V_DEBUG) << gpu_i << std::endl;
+	dout(V_DEBUG) << devices.size() << std::endl;
+	dout(V_DEBUG) << runtimes.size() << std::endl;
+	dout(V_DEBUG) << devices.at(0) << std::endl;
         const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
         const float samplePerGpu = samplesPerNode / (float) maxGpus;
         unsigned minSample_i = gpu_i * samplePerGpu;
@@ -174,7 +179,7 @@ int main(int argc, char **argv){
         threadIds[gpu_i] = calcPhiAseThreaded( raysPerSample,
             maxRaysPerSample,
             maxRepetitions,
-            dMesh.at(devices.at(gpu_i)),
+            dMesh.at(gpu_i),
             hMesh,
             sigmaA,
             sigmaE,
@@ -283,7 +288,7 @@ int main(int argc, char **argv){
   // Write experiment data
   // output folder has to be the same as TMP_FOLDER in the calling MatLab script
   writeMatlabOutput(
-      "/tmp/calcPhiASE_tmp/",
+      outputPath,
       phiAse,
       totalRays,
       mse,
@@ -298,10 +303,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writeToVtk(hMesh, dndtAse, "output/vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpPhiAse, "output/vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, mse, "output/vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpTotalRays, "output/vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, mse, outputPath + "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
   }
 
   if(verbosity & V_STAT){
