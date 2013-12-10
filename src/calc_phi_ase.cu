@@ -50,12 +50,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   cudaSetDevice(gpu_i);
 
-
-
   using thrust::device_vector;
   using thrust::raw_pointer_cast;
-
-
 
   // variable Definitions CPU
   time_t starttime                = time(0);
