@@ -120,8 +120,10 @@ __global__ void calcSampleGainSumWithoutReflections_old(curandStateMtgp32* globa
     Ray ray   = generateRay(startPoint, samplePoint);
 
     double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-
-    gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
+    
+    // Important because this is not done in propagteRay, but in
+    // propagateRaysWithReflection !!!
+    gain          /= ray.length * ray.length; 
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
 
     gainSumTemp       += gain;

@@ -111,8 +111,27 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
 before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
-to figure out which areas are more important to the result. 
-\textbf{(TODO describe how IS works in code)}
+to figure out which areas are more important to the result.
+
+The objective is to distribute N rays to P prims of the active gain medium.
+This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
+The rays per prism $rays_x$ and importance $imp_x$ is calculated as follows:
+\begin{align}
+  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i} \cdot N)}{\sum^{P}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
+imp_x &= 
+\begin{cases}
+\frac{T_x}{T_{total}} \cdot \frac{N}{rays_x} &rays_x > 0\\
+0 &\text{otherwise}
+\end{cases}
+\end{align}
+
+Using the distribution of $rays(p_x)$ leads to a 
+the modified gain calculation:
+\begin{align}
+  gain\_imp(\overrightarrow{r_{i,u,x}s_i})        &= gain(\overrightarrow{r_{i,u}s_i}) \cdot imp_x
+\end{align}
+
+
 The result of the importance sampling is a schedule for a specific sample point, that
 describes in which prism each ray starts.
 This method has a strong impact on the precision of the simulation
@@ -178,14 +197,39 @@ but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
 
 \subsection{Repetitive sampling (RS)}
-Restarting the simulation with the same number of rays and a different
-random number generator.
+Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the
+simulation for a sample point with the same number of rays and a different random number 
+generator. This can reduce the number of rays over all sample points and therefore
+also runtime.Thus, repetitive sampling is an optimization over the adaptive sampling. 
+
+Figure \ref{plot:repetitive} shows the sampling rate
+of the sample points in a histogram. Simulating with RS reduces
+simulations with $10^8$ rays by 319 sample points, resulting in 
+$3*10^{10}$ rays less to calculate. Because reducing the number of rays always
+reduces runtime, it explains the difference in runtime
+of 560s.
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/repetitive_sampling.png}}}
+  \caption{AS and RS compared by rays per sample point}
+  \label{plot:repetitive}
+\end{figure}
+
+\subsection{Benefits of sample methods}
+This section gives a comparision over the presented methods IS, AS and RS.
+In Figure \ref{graphic:methods_compare}, the runtime to reach a
+MSE value of 0.01 was measured. It is evident that AS and RS perform
+much better than Uniform or IS. 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare.png}}}
   \caption{Methods with same MSE value}
   \label{graphic:methods_compare}
 \end{figure}
+On the other hand, Figure \ref{graphic:methods_compare2} shows the MSE
+distribution on the gain medium by same runtime of 10s. Uniform and IS 
+produce higher MSE values than AS and RS.
+
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
