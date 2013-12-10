@@ -128,6 +128,7 @@ int main(int argc, char **argv){
   //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
   devices = getCorrectDevice(maxGpus);
 
+
   // sanity checks
   if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, experimentPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions)) return 1;
 

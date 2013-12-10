@@ -48,9 +48,9 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
   //gain = 1;
   importance[startPrism + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
-  if(mesh.getBetaValue(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
-    printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
-  }
+  //if(mesh.getBetaValue(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
+  //  printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
+  //}
 
 
   atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
@@ -90,14 +90,14 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   if(startPrism >= mesh.numberOfPrisms) return;
 
   raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-  if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
-	  printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
-  }
-  if(*sumPhi <= importance[startPrism+reflectionOffset]){
-	  printf("2importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
-  }
-
-  assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
+  //if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
+  //    printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
+  //}
+  //if(*sumPhi <= importance[startPrism+reflectionOffset]){
+  //    printf("2importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
+  //}
+  //
+  //assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
   atomicAdd(&raysDump[0], raysPerPrism[startPrism + reflectionOffset]);
 
 }

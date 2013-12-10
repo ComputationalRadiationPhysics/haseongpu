@@ -53,8 +53,6 @@ float calcPhiAse ( unsigned hRaysPerSample,
   using thrust::device_vector;
   using thrust::raw_pointer_cast;
 
-
-
   // variable Definitions CPU
   time_t starttime                = time(0);
   unsigned hRaysPerSampleSave     = hRaysPerSample;
@@ -64,18 +62,19 @@ float calcPhiAse ( unsigned hRaysPerSample,
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
   bool distributeRandomly         = true;
-  dim3 blockDim(128);             
+  dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
-  device_vector<float>    dGainSum            (hMesh.numberOfSamples * numberOfWavelengths, 0);
+  device_vector<float>    dGainSum            (1, 0);
+  device_vector<float>    dGainSumSquare      (1, 0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportanceSave     (hMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<float>    dGainSumSquare      (hMesh.numberOfSamples * numberOfWavelengths, 0); //OPTIMIZE: use only 1 value
   device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
+
   // OUTPUT DATA
   // thrust::host_vector<unsigned> hNumberOfReflections(maxRaysPerSample,0);
   // thrust::host_vector<unsigned> hIndicesOfPrisms(maxRaysPerSample,0);
@@ -141,8 +140,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
           // }
 
           // Start Kernel
-          dGainSum[sampleOffset]       = 0;
-          dGainSumSquare[sampleOffset] = 0;
+          dGainSum[0]       = 0;
+          dGainSumSquare[0] = 0;
 
           if(useReflections){
             calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
@@ -156,7 +155,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
                 raw_pointer_cast(&dGainSumSquare[0]),
                 sample_i, 
                 hSigmaA[wave_i], 
-                hSigmaE[wave_i] );
+                hSigmaE[wave_i],
+                raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
           else{
             calcSampleGainSumWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
@@ -169,18 +169,19 @@ float calcPhiAse ( unsigned hRaysPerSample,
                 raw_pointer_cast(&dGainSumSquare[0]),
                 sample_i, 
                 hSigmaA[wave_i], 
-                hSigmaE[wave_i] );
+                hSigmaE[wave_i],
+                raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
 
-          float mseTmp = calcMSE(dGainSum[sampleOffset], dGainSumSquare[sampleOffset], hRaysPerSampleDump);
+          float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
 
           // DEBUG
           if(isnan(mseTmp)){
-            dout(V_ERROR) << "mseTmp: " << mseTmp << " gainSum:" << dGainSum[sampleOffset] << " gainSum²:" << dGainSumSquare[sampleOffset] << " RaysPerSample:" << hRaysPerSampleDump <<std::endl;
+            dout(V_ERROR) << "mseTmp: " << mseTmp << " gainSum:" << dGainSum[0] << " gainSum²:" << dGainSumSquare[0] << " RaysPerSample:" << hRaysPerSampleDump <<std::endl;
           }
 
-          assert(!isnan(dGainSum[sampleOffset]));
-          assert(!isnan(dGainSumSquare[sampleOffset]));
+          assert(!isnan(dGainSum[0]));
+          assert(!isnan(dGainSumSquare[0]));
           assert(!isnan(mseTmp));
 
           //MSE TESTs
@@ -212,7 +213,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
       fancyProgressBar(maxSample_i);
 
       // get phiASE
-      phiAse.at(sampleOffset) = dGainSum[sampleOffset];
+      phiAse.at(sampleOffset) = dGainSum[0];
       phiAse.at(sampleOffset)   /= hRaysPerSampleDump * 4.0f * M_PI;
       totalRays.at(sampleOffset)  = hRaysPerSampleDump;
 
