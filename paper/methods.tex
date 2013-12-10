@@ -111,8 +111,27 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
 before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
-to figure out which areas are more important to the result. 
-\textbf{(TODO describe how IS works in code)}
+to figure out which areas are more important to the result.
+
+The objective is to distribute N rays to P prims of the active gain medium.
+This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
+The rays per prism $rays_x$ and importance $imp_x$ is calculated as follows:
+\begin{align}
+  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i} \cdot N)}{\sum^{P}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
+imp_x &= 
+\begin{cases}
+\frac{T_x}{T_{total}} \cdot \frac{N}{rays_x} &rays_x > 0\\
+0 &\text{otherwise}
+\end{cases}
+\end{align}
+
+Using the distribution of $rays(p_x)$ leads to a 
+the modified gain calculation:
+\begin{align}
+  gain\_imp(\overrightarrow{r_{i,u,x}s_i})        &= gain(\overrightarrow{r_{i,u}s_i}) \cdot imp_x
+\end{align}
+
+
 The result of the importance sampling is a schedule for a specific sample point, that
 describes in which prism each ray starts.
 This method has a strong impact on the precision of the simulation
