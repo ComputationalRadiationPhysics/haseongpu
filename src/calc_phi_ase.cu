@@ -95,7 +95,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      //unsigned sample_i = 3749;{
+      //unsigned sample_i = 1;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
