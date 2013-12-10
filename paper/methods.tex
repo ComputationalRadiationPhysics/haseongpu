@@ -178,14 +178,39 @@ but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
 
 \subsection{Repetitive sampling (RS)}
-Restarting the simulation with the same number of rays and a different
-random number generator.
+Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the
+simulation for a sample point with the same number of rays and a different random number 
+generator. This can reduce the number of rays over all sample points and therefore
+also runtime.Thus, repetitive sampling is an optimization over the adaptive sampling. 
+
+Figure \ref{plot:repetitive} shows the sampling rate
+of the sample points in a histogram. Simulating with RS reduces
+simulations with $10^8$ rays by 319 sample points, resulting in 
+$3*10^{10}$ rays less to calculate. Because reducing the number of rays always
+reduces runtime, it explains the difference in runtime
+of 560s.
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/repetitive_sampling.png}}}
+  \caption{AS and RS compared by rays per sample point}
+  \label{plot:repetitive}
+\end{figure}
+
+\subsection{Benefits of sample methods}
+This section gives a comparision over the presented methods IS, AS and RS.
+In Figure \ref{graphic:methods_compare}, the runtime to reach a
+MSE value of 0.01 was measured. It is evident that AS and RS perform
+much better than Uniform or IS. 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare.png}}}
   \caption{Methods with same MSE value}
   \label{graphic:methods_compare}
 \end{figure}
+On the other hand, Figure \ref{graphic:methods_compare2} shows the MSE
+distribution on the gain medium by same runtime of 10s. Uniform and IS 
+produce higher MSE values than AS and RS.
+
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
