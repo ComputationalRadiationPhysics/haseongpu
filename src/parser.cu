@@ -10,7 +10,7 @@ void parseCommandLine(
     char** argv,
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
-    std::string *root,
+    std::string *inputPath,
     bool *writeVtk,
     std::string *compareLocation,
     RunMode *mode,
@@ -18,7 +18,8 @@ void parseCommandLine(
     unsigned *maxgpus,
     int *minSample_i,
     int *maxSample_i,
-    unsigned *maxRepetitions
+    unsigned *maxRepetitions,
+    std::string *outputPath
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -47,16 +48,29 @@ void parseCommandLine(
       *maxRaysPerSample = atoi(p.second.c_str());
     }
 
-    if (p.first == "--experiment") {
-      std::string temp_root(p.second);
+    if(p.first == "--input") {
+      std::string temp_input(p.second);
 
       // Add slash at the end, if missing
-      if ((temp_root)[temp_root.size() - 1] == 'w')
-        temp_root.erase(temp_root.size() - 1, 1);
-      else if (temp_root[temp_root.size() - 1] != '/')
-        temp_root.append("/");
+      if ((temp_input)[temp_input.size() - 1] == 'w')
+        temp_input.erase(temp_input.size() - 1, 1);
+      else if (temp_input[temp_input.size() - 1] != '/')
+        temp_input.append("/");
 
-      *root = temp_root;
+      *inputPath = temp_input;
+    }
+
+    if( p.first =="--output") {
+
+      std::string temp_output(p.second);
+
+      // Add slash at the end, if missing
+      if ((temp_output)[temp_output.size() - 1] == 'w')
+        temp_output.erase(temp_output.size() - 1, 1);
+      else if (temp_output[temp_output.size() - 1] != '/')
+        temp_output.append("/");
+
+      *outputPath = temp_output;
     }
 
     if (p.first == "--write-vtk") {
@@ -110,20 +124,22 @@ int checkParameterValidity(
     const int argc,
     const unsigned raysPerSample,
     unsigned *maxRaysPerSample,
-    const std::string root,
+    const std::string inputPath,
     const unsigned deviceCount,
     const RunMode mode,
     unsigned *maxgpus,
     const int minSample_i,
     const int maxSample_i,
-    const unsigned maxRepetitions
+    const unsigned maxRepetitions,
+    const std::string outputPath
     ) {
 
   if (argc <= 1) {
     dout(V_ERROR) << "No commandline arguments found" << std::endl;
     dout(V_ERROR) << "Usage    : ./calcPhiASE --mode=[runmode]" << std::endl;
     dout(V_ERROR) << "                        --rays=[number of rays]" << std::endl;
-    dout(V_ERROR) << "                        --experiment=[location to experiment-data]" << std::endl;
+    dout(V_ERROR) << "                        --input=[location to experiment-data]" << std::endl;
+    dout(V_ERROR) << "                        --output=[location to write output data]" << std::endl;
     dout(V_ERROR) << "                        --compare=[location of vtk-file to compare with]" << std::endl;
     dout(V_ERROR) << "                        --maxrays=[max number of rays for adaptive sampling]" << std::endl;
     dout(V_ERROR) << "                        --maxgpus=[max number of gpus to use]" << std::endl;
@@ -147,14 +163,22 @@ int checkParameterValidity(
     dout(V_ERROR) << "Please specify the runmode with --mode=MODE" << std::endl;
     return 1;
   }
+
   if (raysPerSample == 0) {
     dout(V_ERROR) << "Please specify the number of rays per sample Point with --rays=RAYS" << std::endl;
     return 1;
   }
-  if (root.size() == 0) {
-    dout(V_ERROR) << "Please specify the experiment's location with --experiment=PATH_TO_EXPERIMENT" << std::endl;
+
+  if (inputPath.size() == 0) {
+    dout(V_ERROR) << "Please specify the experiment's location with --input=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
+
+  if (outputPath.size() == 0) {
+    dout(V_ERROR) << "Please specify the output location with --output=PATH_TO_EXPERIMENT" << std::endl;
+    return 1;
+  }
+
 
   if(*maxRaysPerSample < raysPerSample){
     dout(V_WARNING) << "maxRays < raysPerSample. Increasing maxRays to " << raysPerSample << " (will be non-adaptive!)" << std::endl;
