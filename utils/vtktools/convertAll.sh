@@ -8,7 +8,7 @@ fi
 PATTERN="$1"
 FILE="animation_$1.pvd"
 
-echo '<?xml version"1.0"?>' > $FILE
+echo '<?xml version="1.0"?>' > $FILE
 echo '<VTKFile type="Collection" version="0.1">' >> $FILE
 echo '  <Collection>' >> $FILE
 
