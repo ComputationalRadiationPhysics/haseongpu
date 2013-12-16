@@ -41,7 +41,9 @@ calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
 	mkdir -p bin
 	mkdir -p output
-	mkdir -p input mpi
+	mkdir -p output/calcPhiAseTmp
+	mkdir -p output/vtk
+	mkdir -p input
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
