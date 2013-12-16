@@ -52,7 +52,8 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 float *gainSumSquare,
 				 const unsigned sample_i,
 				 const double sigmaA,
-				 const double sigmaE
+				 const double sigmaE,
+				 unsigned *globalOffsetMultiplicator
 				 );
 
 __global__ void calcSampleGainSumWithoutReflections(curandStateMtgp32* globalState, 
@@ -65,6 +66,7 @@ __global__ void calcSampleGainSumWithoutReflections(curandStateMtgp32* globalSta
 				 float *gainSumSquare,
 				 const unsigned sample_i,
 				 const double sigmaA,
-				 const double sigmaE
+				 const double sigmaE,
+				 unsigned *globalOffsetMultiplicator
 				 );
 #endif /* calc_sample_phi_ase_H */

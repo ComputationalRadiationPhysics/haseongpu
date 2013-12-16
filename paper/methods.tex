@@ -106,22 +106,42 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
 %  \label{graphic:thread_detail}
 %\end{figure}
 
-\subsection{Importance sampling}
+\subsection{Importance sampling (IS)}
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
 before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
-to figure out which areas are more important to the result. 
+to figure out which areas are more important to the result.
+
+The objective is to distribute N rays to P prims of the active gain medium.
+This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
+The rays per prism $rays_x$ and importance $imp_x$ is calculated as follows:
+\begin{align}
+  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i} \cdot N)}{\sum^{P}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
+imp_x &= 
+\begin{cases}
+\frac{T_x}{T_{total}} \cdot \frac{N}{rays_x} &rays_x > 0\\
+0 &\text{otherwise}
+\end{cases}
+\end{align}
+
+Using the distribution of $rays(p_x)$ leads to a 
+the modified gain calculation:
+\begin{align}
+  gain\_imp(\overrightarrow{r_{i,u,x}s_i})        &= gain(\overrightarrow{r_{i,u}s_i}) \cdot imp_x
+\end{align}
+
+
 The result of the importance sampling is a schedule for a specific sample point, that
 describes in which prism each ray starts.
 This method has a strong impact on the precision of the simulation
 and is able to reduce strong peaks in Monte Carlo simulations.
 
 To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
-\[\Phi_{ASE\Delta} = |\Phi_{ASE~I}(M) - \Phi_{ASE~\bar{I}}(N)|\] of the 
-result with ($I$) and without ($\bar{I}$) importance sampling was calculated with 
+\[\Phi_{ASE\Delta} = |\Phi_{ASE~IS}(M) - \Phi_{ASE~Uniform}(N)|\] of the 
+result with importance sampling ($IS$) and with uniform sampling ($Uniform$) was calculated with 
 $N,M = 10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then, N was increased in two steps by 10 for the simulation without importance sampling.
+Then, N was increased in two steps by 10 for the simulation with uniform sampling.
 The more rays are simulated, the smaller is $\Phi_{ASE\Delta}$, which 
 means that the simulation
 with importance sampling reaches same results with less
@@ -135,7 +155,7 @@ and simulation runtime.
   \label{graphic:importance}
 \end{figure}
 
-\subsection{Adaptive sampling}
+\subsection{Adaptive sampling (AS)}
 \label{subsec:adaptive_sampling}
 To assess the precision
 and therefore the difference between the true and calculated value,
@@ -149,9 +169,7 @@ Since most sample points $s_i$ have a low $MSE(s_i)$, there is no need
 to sample them with a high number of rays. Only some outliers need to
 be sampled with a higher resolution. This can be done with an adaptive
 method, which allows to remove strong peaks in the result
-of the simulation by either resampling these points with more rays
-or restarting the simulation with the same number of rays and a different
-random number generator.
+of the simulation by either resampling these points with more rays.
 
 For comparision, the impact of importance sampling
 on the MSE values is shown (see Figure~\ref{plot:importance2}). 
@@ -160,7 +178,7 @@ many sample points considerable.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_importance.png}}}
-  \caption{histogram of MSE values with and without importance sampling}
+  \caption{histogram of MSE values IS and Uniform sampling}
   \label{plot:importance2}
 \end{figure}
 By using also adaptive sampling, the MSE values are reduced to a specific MSE threshold.
@@ -171,10 +189,50 @@ to reduce calculation time.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/mse_adaptive.png}}}
-  \caption{histogram of MSE values with and without adaptive sampling}
+  \caption{histogram of MSE values IS and IS + AS}
   \label{plot:adaptive}
 \end{figure}
 The adaptive method will not reduce the average MSE over all sample points,
 but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
 
+\subsection{Repetitive sampling (RS)}
+Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the
+simulation for a sample point with the same number of rays and a different random number 
+generator. This can reduce the number of rays over all sample points and therefore
+also runtime.Thus, repetitive sampling is an optimization over the adaptive sampling. 
+
+Figure \ref{plot:repetitive} shows the sampling rate
+of the sample points in a histogram. Simulating with RS reduces
+simulations with $10^8$ rays by 319 sample points, resulting in 
+$3*10^{10}$ rays less to calculate. Because reducing the number of rays always
+reduces runtime, it explains the difference in runtime
+of 560s.
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/repetitive_sampling.png}}}
+  \caption{AS and RS compared by rays per sample point}
+  \label{plot:repetitive}
+\end{figure}
+
+\subsection{Benefits of sample methods}
+In this section, the presented methods IS, AS and RS are compared in duration
+and precision.
+In Figure \ref{graphic:methods_compare}, the runtime to reach a
+MSE value of 0.01 was measured. It is evident that AS and RS perform
+much better than Uniform or IS. 
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare.png}}}
+  \caption{Methods with same MSE value}
+  \label{graphic:methods_compare}
+\end{figure}
+On the other hand, Figure \ref{graphic:methods_compare2} shows the MSE
+distribution on the gain medium by same runtime of 10s. Uniform and IS 
+produce higher MSE values than AS and RS.
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
+  \caption{Methods with same runtime}
+  \label{graphic:methods_compare2}
+\end{figure}

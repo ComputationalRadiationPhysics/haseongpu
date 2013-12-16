@@ -1,0 +1,13 @@
+# Setting
+# MSE = 0.005
+# 10K - 100M Rays
+# Repetitions 4
+# Maxgpus = 1
+#
+# rays		RS	AS	RS+	AS+
+# runtime:      19s     31s	600	1160
+1e+04		2521	2126	1471 	1328
+1e+05		678	787	351	360
+1e+06		11	269	541	401
+1e+07   	0	26	837	772
+1e+08	        0	2	30	349

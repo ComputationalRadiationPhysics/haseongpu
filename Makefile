@@ -8,7 +8,7 @@ export CPLUS_INCLUDE_PATH=
 NVCC = nvcc
 NVCC_FLAGS = --use_fast_math -Xptxas="-v"
 NVCC_FLAGS = --use_fast_math
-GCC_FLAGS = -std=c++0x -J 8
+GCC_FLAGS = -std=c++0x -J 8 -O2
 LIBS =  -lpthread -lcudart -lm
 
 DEV_FLAGS = --compiler-options="-Wall -Wextra"

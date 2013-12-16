@@ -8,11 +8,17 @@ set grid
 
 set key left
 set key opaque
-set xlabel "t"
+set xlabel "timestep"
 set ylabel "gain"
+#set xtics 0,0.1,1
+set xtics nomirror
+set ytics nomirror
 
 plot\
-"benchmark.dat" u (($1*$1) * 1.026)t "benchmark" with linespoints
+"benchmark_100k.dat" u (($1*$1) * 1.026) t "benchmark" with linespoints,\
+"benchmark_refl.dat" u (($1*$1) * 1.026) t "benchmark refl" with linespoints,\
+"benchmark_refl2.dat" u (($1*$1) * 1.026) t "benchmark refl2" with linespoints
+   
 
 # Output
 set term pngcairo enhanced font "Serif, 14"
