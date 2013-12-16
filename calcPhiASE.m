@@ -55,40 +55,51 @@ function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,n
 %refractiveIndices
 %reflectivities
 
-MaxRays = 10000;
-mse=0.005;
+MaxRays = 100000;
+mse=0.05;
 use_reflections = false; 
 MAX_GPUS=1;
+[a,b] = size(p);
+minSample=0;
+maxSample=(mesh_z*a)-1;
 
+used_dummy = false;
 
 %create dummy variables
 if(~exist('mse_threshold','var'))
-  WARNING = 'The variable mse_threshold does not exist'
+  %WARNING = 'The variable mse_threshold does not exist'
   [a,b] = size(laser.s_ems);
   mse_threshold = ones(1,a)*mse;
+  used_dummy=true;
 end
 
 %create dummy variables
 if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
-  WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
+  %WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
   [a,b] = size(sorted_int);
   clad_int = ones(1,a);
   clad_number = 3;
   clad_abs = 5.5;
+  used_dummy=true;
 end
 
 %create dummy variables
 if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
-  WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
+  %WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
   refractiveIndices = [1.83,1,1.83,1];
   [a,b] = size(sorted_int);
   reflectivities = ones(1,a*2) * 0;
+  used_dummy=true;
 end
 
 % create the correct reflection-parameter for the c-function
 REFLECT='';
 if(use_reflections == true)
     REFLECT=' --reflection';
+end
+
+if(used_dummy == true)
+  disp([ 'WARNING: Some variables were set as dummies' ]);
 end
 
 
@@ -107,7 +118,7 @@ create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_i
 
 
   % do the propagation
-  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --experiment=' TMP_FOLDER '--min_sample_i=0 ' '--max_sample_i=3209 ' '--maxgpus=' MAX_GPUS ]);
+  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER '--output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ]);
 
   % get the result
   [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
@@ -240,20 +251,20 @@ end
 function [mseValues,  N_rays, phi_ASE] = parse_calcPhiASE_output (FOLDER,CURRENT_DIR)
 cd (FOLDER);
 fid = fopen('phi_ASE.txt');
-arraySize = str2num(fgetl(fid))
+arraySize = str2num(fgetl(fid));
 phi_ASE = str2num(fgetl(fid));
 phi_ASE = reshape(phi_ASE,arraySize);
 fclose(fid);
 
 fid=fopen('mse_values.txt');
-arraySize=str2num(fgetl(fid))
+arraySize=str2num(fgetl(fid));
 mseValues = str2num(fgetl(fid));
 mseValues = reshape(mseValues,arraySize);
 fclose(fid);
 
 
 fid = fopen('N_rays.txt');
-arraySize = str2num(fgetl(fid))
+arraySize = str2num(fgetl(fid));
 N_rays = str2num(fgetl(fid));
 N_rays = reshape(N_rays,arraySize);
 fclose(fid);
