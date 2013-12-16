@@ -58,3 +58,4 @@ paper/*/*.bst
 paper/*/*.eps
 paper/*/*.spl
 paper/*/*.~lock.*
+utils/benchmark*/*.vtu
