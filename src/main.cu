@@ -164,10 +164,6 @@ int main(int argc, char **argv){
   switch(mode){
     case RAY_PROPAGATION_GPU:
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-	dout(V_DEBUG) << gpu_i << std::endl;
-	dout(V_DEBUG) << devices.size() << std::endl;
-	dout(V_DEBUG) << runtimes.size() << std::endl;
-	dout(V_DEBUG) << devices.at(0) << std::endl;
         const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
         const float samplePerGpu = samplesPerNode / (float) maxGpus;
         unsigned minSample_i = gpu_i * samplePerGpu;
