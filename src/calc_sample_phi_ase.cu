@@ -36,6 +36,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 const unsigned raysPerSample,
 				 float *gainSum, 
 				 float *gainSumSquare,
+				 unsigned *lostRays,
 				 const unsigned sample_i,
 				 const double sigmaA, 
 				 const double sigmaE,
@@ -63,7 +64,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     unsigned reflection_i           = numberOfReflections[rayNumber]; //numberOfReflectio == ReflectionSlice
     unsigned reflections            = (reflection_i + 1) / 2;
     ReflectionPlane reflectionPlane = (reflection_i % 2 == 0) ? BOTTOM_REFLECTION : TOP_REFLECTION;
-    unsigned startLevel             = startPrism/mesh.numberOfTriangles;
+    unsigned startLevel             = startPrism / mesh.numberOfTriangles;
     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
     unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
 
@@ -79,6 +80,9 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 
     gainSumTemp       += gain;
     gainSumSquareTemp += gain * gain;
+    if(gain == 0){
+      atomicInc(&(lostRays[0]), 1);
+    }
 
   }
   atomicAdd(&(gainSum[0]), float(gainSumTemp));

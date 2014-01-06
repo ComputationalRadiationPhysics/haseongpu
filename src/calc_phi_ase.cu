@@ -61,7 +61,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
   unsigned numberOfWavelengths    = hSigmaE.size();
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
-  bool distributeRandomly         = true;
+  bool distributeRandomly         = false;
   dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
@@ -69,6 +69,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
   device_vector<float>    dGainSum            (1, 0);
   device_vector<float>    dGainSumSquare      (1, 0);
+  device_vector<unsigned> dLostRays           (1, 0);
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
@@ -94,7 +95,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      //unsigned sample_i = 1;{
+    //unsigned sample_i = 0;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
@@ -113,6 +114,8 @@ float calcPhiAse ( unsigned hRaysPerSample,
         unsigned run = 0;
         while(run < maxRepetitions && mseTooHigh){
           run++;
+	  dLostRays[0] = 0;
+
           thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
           hRaysPerSampleDump = importanceSamplingDistribution(
               reflectionSlices,
@@ -153,6 +156,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
                 hRaysPerSampleDump, 
                 raw_pointer_cast(&dGainSum[0]), 
                 raw_pointer_cast(&dGainSumSquare[0]),
+                raw_pointer_cast(&dLostRays[0]),
                 sample_i, 
                 hSigmaA[wave_i], 
                 hSigmaE[wave_i],
@@ -172,6 +176,9 @@ float calcPhiAse ( unsigned hRaysPerSample,
                 hSigmaE[wave_i],
                 raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
+
+	  // Remove lost rays (reflections) from ray counter
+	  //hRaysPerSampleDump -= dLostRays[0];
 
           float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
 
