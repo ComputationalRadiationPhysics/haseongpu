@@ -34,15 +34,16 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   unsigned reflection_i = blockIdx.z;
   unsigned reflections = (reflection_i + 1) / 2;
   ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
-
   unsigned startPrism = threadIdx.x + blockIdx.x * blockDim.x;
+
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
-  unsigned startLevel = startPrism/(mesh.numberOfTriangles);
-  unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-  Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
-  Point samplePoint = mesh.getSamplePoint(sample_i);
+
+  unsigned startLevel       = startPrism/(mesh.numberOfTriangles);
+  unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
+  Point startPoint          = mesh.getCenterPoint(startTriangle, startLevel);
+  Point samplePoint         = mesh.getSamplePoint(sample_i);
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
   gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
