@@ -19,7 +19,7 @@ for i in $(ls -v $PATTERN*.vtk)
 do
   echo converting $i
   ./convertVTKtoVTU $i
-  OUTPUT="$(basename -s .vtk $i)"
+  OUTPUT="$(basename $i .vtk)"
   echo '    <DataSet timestep="'$j'" file="'$OUTPUT'.vtu"/>' >> $FILE
   j=$(($j+1))
 done
