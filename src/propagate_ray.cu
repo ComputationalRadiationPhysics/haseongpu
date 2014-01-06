@@ -217,9 +217,12 @@ __device__ double propagateRayWithReflection(Point startPoint,
   double distanceTotal = 0;
   double gain = 1.0;
 
+
+  // DEBUG
+  //int gid = threadIdx.x + blockIdx.x * blockDim.x;
   //printf("[%d] SP: %f %f %f\n", (reflections), startPoint.x,startPoint.y,startPoint.z);
-  int gid = threadIdx.x + blockIdx.x * blockDim.x;
   //printf("\n");
+
   for(unsigned reflection = 0; reflection < reflections; ++reflection){
     float reflectivity = mesh.getReflectivity(reflectionPlane, startTriangle);;
     float totalReflectionAngle = mesh.getReflectionAngle(reflectionPlane);
@@ -231,6 +234,8 @@ __device__ double propagateRayWithReflection(Point startPoint,
     Ray reflectionRay   = generateRay(startPoint, reflectionPoint);
     distanceTotal += reflectionRay.length;
     gain  *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+
+    // DEBUG
     // if(gid == 1353 ){
     //   printf("[%d][%d] SP: %f %f %f EP: %f %f %f RR: %f %f %f RP: %f %f %f A: %f TA: %f G: %f\n", 
     // 	     gid,
@@ -243,14 +248,15 @@ __device__ double propagateRayWithReflection(Point startPoint,
     // 	     totalReflectionAngle,
     // 	     gain);
     // }
+
     assert(reflectionAngle <= 90);
     assert(reflectionAngle >= 0 );
 
     if(reflectionAngle <= totalReflectionAngle){
       gain             *= reflectivity;
-      // if(gain == 0){
-      // 	return 0;
-      // }
+      if(gain == 0){
+	return 0;
+      }
     }
 
     startPoint          = reflectionPoint;
@@ -260,9 +266,12 @@ __device__ double propagateRayWithReflection(Point startPoint,
 
   Ray ray = generateRay(startPoint, endPoint);
   gain  *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-    // if(gid == 1353 && reflections == 14){
-    //   printf("G: %f\n", gain);
-    // }
+
+  // DEBUG
+  // if(gid == 1353 && reflections == 14){
+  //   printf("G: %f\n", gain);
+  // }
+
   distanceTotal += ray.length;
   
   

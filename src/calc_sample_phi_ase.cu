@@ -68,6 +68,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
     unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
 
+    //Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
     Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
 
     // Calculate reflections as different ray propagations
@@ -81,7 +82,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     gainSumTemp       += gain;
     gainSumSquareTemp += gain * gain;
     if(gain == 0){
-      atomicInc(&(lostRays[0]), 1);
+      atomicInc(&(lostRays[0]), raysPerSample);
     }
 
   }

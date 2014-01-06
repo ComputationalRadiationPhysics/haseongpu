@@ -61,7 +61,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
   unsigned numberOfWavelengths    = hSigmaE.size();
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
-  bool distributeRandomly         = false;
+  bool distributeRandomly         = true;
   dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
@@ -95,7 +95,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-    //unsigned sample_i = 0;{
+      //unsigned sample_i = 1;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       hRaysPerSample = hRaysPerSampleSave;
@@ -126,6 +126,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
               dRaysPerPrism,
               hSumPhi,
               distributeRandomly);
+	  // DEBUG
           // if(dRaysPerPrism[6495] > 10000){
           //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
           //   exit(0);
@@ -134,7 +135,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
           // Prism scheduling for gpu threads
           mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflections, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
 
-          // OUTPUT DATA
+          // DEBUG
           // if(sample_i == 0){
           //   thrust::copy(dNumberOfReflections.begin(),dNumberOfReflections.end(),hNumberOfReflections.begin());
           //   thrust::copy(dIndicesOfPrisms.begin(),dIndicesOfPrisms.end(),hIndicesOfPrisms.begin());
@@ -178,7 +179,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
           }
 
 	  // Remove lost rays (reflections) from ray counter
-	  //hRaysPerSampleDump -= dLostRays[0];
+	  hRaysPerSampleDump -= dLostRays[0];
 
           float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
 
