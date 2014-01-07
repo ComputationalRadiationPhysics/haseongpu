@@ -62,6 +62,7 @@ MAX_GPUS=1;
 [a,b] = size(p);
 minSample=0;
 maxSample=(mesh_z*a)-1;
+Repetitions=4;
 
 used_dummy = false;
 
@@ -102,6 +103,9 @@ if(used_dummy == true)
   disp([ 'WARNING: Some variables were set as dummies' ]);
 end
 
+if(~exist('Runmode','var'))
+  Runmode='ray_propagation_gpu';
+end
 
 CURRENT_DIR = pwd;
 FILENAME=[ mfilename('fullpath') '.m' ];
@@ -110,15 +114,24 @@ FILENAME=[ mfilename('fullpath') '.m' ];
 % create all the textfiles in a separate folder
 TMP_FOLDER = [ '/' 'tmp' filesep 'calcPhiASE_tmp' ];
 
+if(strcmpi(Runmode,'mpi'))
+  Prefix=[ 'mpiexec -npernode ' num2str(MAX_GPUS) ' ' ];
+  % reduce maxGPUs only after setting -npernode
+  MAX_GPUS=1;
+  % overwrite TMP_FOLDER => needs to be shared among ALL THE NODES!!
+  TMP_FOLDER=[ CALCPHIASE_DIR filesep 'mpi_tmp' ];
+else
+  Prefix='';
+end
+
 % make sure that the input is clean 
 clean_IO_files(TMP_FOLDER);
 
 % create the new input based on the MATLAB variables
 create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
 
-
   % do the propagation
-  system([ CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=ray_propagation_gpu ' '--rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ]);
+  system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ]);
 
   % get the result
   [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
