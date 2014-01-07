@@ -20,10 +20,7 @@
 #include <types.h>
 
 #define SEED 4321
-#define BEST_MSE 0
-#define BEST_ASE 1
-#define BEST_RAYNUMBER 2
-#define RAY_STEPS 10
+#define RAY_STEPS 5
 
 double calcMSE(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
@@ -32,15 +29,13 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
   return sqrt(abs((a - b) / raysPerSample));
 }
 
-std::vector<int> generateRaysPerSampleList(int minRaysPerSample, int maxRaysPerSample, int steps){
+std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
-
   raysPerSample.push_back(minRaysPerSample);
   if(minRaysPerSample == maxRaysPerSample)
     return raysPerSample;
 
-  int range = maxRaysPerSample - minRaysPerSample;
-  int step_wide = range / steps;
+  int step_wide  = (maxRaysPerSample - minRaysPerSample) / range;
 
   for(int i = 0; i < steps - 1; ++i){
     minRaysPerSample += step_wide;
@@ -49,6 +44,22 @@ std::vector<int> generateRaysPerSampleList(int minRaysPerSample, int maxRaysPerS
   }
   raysPerSample.push_back(maxRaysPerSample);
   
+  return raysPerSample;
+
+}
+
+std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
+  std::vector<int> raysPerSample;
+  if(minRaysPerSample == maxRaysPerSample){
+    raysPerSample.push_back(minRaysPerSample);
+    return raysPerSample;
+  }
+
+  for(int i = 0; i < steps; ++i){
+    int step_val = minRaysPerSample * pow((maxRaysPerSample / minRaysPerSample), (i / (float)(steps - 1)));
+    raysPerSample.push_back(step_val);
+
+  }
   return raysPerSample;
 
 }
@@ -89,13 +100,15 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Divide RaysPerSample range into steps
-  std::vector<int>  raysPerSampleList = generateRaysPerSampleList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
+  std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
   for(;raysPerSampleIter != raysPerSampleList.end(); raysPerSampleIter++){
-    dout(V_DEBUG) << *raysPerSampleIter << std::endl;
+    dout(V_DEBUG) << "RayStep " << *raysPerSampleIter << std::endl;
   }
+
   raysPerSampleIter = raysPerSampleList.begin();
+  return 0;
 
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
@@ -130,9 +143,6 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
       // DEBUG
       // unsigned sample_i = 1;{
-
-      std::vector<float> bestASE(3,10000);
-
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       raysPerSampleIter = raysPerSampleList.begin();
@@ -248,11 +258,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
           //   dout(V_DEBUG) << std::endl;
           // }
 
-          mse.at(sampleOffset) = mseTmp;
-          if(mse.at(sampleOffset) < bestASE[BEST_MSE]){
-            bestASE[BEST_MSE] = mse.at(sampleOffset);
-            bestASE[BEST_ASE] = dGainSum[0];
-            bestASE[BEST_RAYNUMBER] = hRaysPerSampleDump;
+          //mse.at(sampleOffset) = mseTmp;
+          if(mse.at(sampleOffset) > mseTmp){
+	    mse.at(sampleOffset) = mseTmp;
+	    phiAse.at(sampleOffset) = dGainSum[0]; 
+	    phiAse.at(sampleOffset)   /= *raysPerSampleIter * 4.0f * M_PI;
             totalRays.at(sampleOffset) = *raysPerSampleIter;
           }
           if(mse.at(sampleOffset) < mseThreshold.at(wave_i)) mseTooHigh = false;
@@ -266,16 +276,6 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       }
       // Update progressbar
       fancyProgressBar(maxSample_i);
-
-      // get phiASE
-      //phiAse.at(sampleOffset) = dGainSum[0];
-      //phiAse.at(sampleOffset)   /= hRaysPerSampleDump * 4.0f * M_PI;
-      //totalRays.at(sampleOffset)  = hRaysPerSampleDump;
-
-      phiAse.at(sampleOffset) = bestASE[BEST_ASE];
-      phiAse.at(sampleOffset)   /= bestASE[BEST_RAYNUMBER] * 4.0f * M_PI;
-      //totalRays.at(sampleOffset)  = bestASE[BEST_RAYNUMBER];
-
     }
     
   }
