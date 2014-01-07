@@ -52,7 +52,6 @@ std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysP
 std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
 
-
   if(minRaysPerSample == maxRaysPerSample){
     raysPerSample.push_back(minRaysPerSample);
     return raysPerSample;
@@ -145,7 +144,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
       // DEBUG
-      // unsigned sample_i = 1;{
+    //unsigned sample_i = 4;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       raysPerSampleIter = raysPerSampleList.begin();
@@ -160,6 +159,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
           hSigmaE[wave_i],
           dImportanceSave);
 
+
       while(mseTooHigh){
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
         unsigned run = 0;
@@ -169,15 +169,15 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
           thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
           hRaysPerSampleDump = importanceSamplingDistribution(
-              reflectionSlices,
-              dMesh,
-              hMesh.numberOfPrisms,
-              *raysPerSampleIter,
-              dImportance, 
-              dRaysPerPrism,
-              hSumPhi,
-              distributeRandomly);
-
+							      reflectionSlices,
+							      dMesh,
+							      hMesh.numberOfPrisms,
+							      *raysPerSampleIter,
+							      dImportance, 
+							      dRaysPerPrism,
+							      hSumPhi,
+							      distributeRandomly);
+	  
 	  // DEBUG
           // if(dRaysPerPrism[6495] > 10000){
           //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
