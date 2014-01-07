@@ -106,9 +106,10 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
-  for(;raysPerSampleIter != raysPerSampleList.end(); raysPerSampleIter++){
-    dout(V_DEBUG) << "RayStep " << *raysPerSampleIter << std::endl;
-  }
+  // DEBUG
+  // for(;raysPerSampleIter != raysPerSampleList.end(); raysPerSampleIter++){
+  //   dout(V_DEBUG) << "RayStep " << *raysPerSampleIter << std::endl;
+  // }
 
   raysPerSampleIter = raysPerSampleList.begin();
 
