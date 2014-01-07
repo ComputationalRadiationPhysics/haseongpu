@@ -93,8 +93,9 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
   for(;raysPerSampleIter != raysPerSampleList.end(); raysPerSampleIter++){
-    dout(V_DEBUG) << *raysPerSampleIter << std::endl;
+    dout(V_DEBUG) << "RayStep " << *raysPerSampleIter << std::endl;
   }
+
   raysPerSampleIter = raysPerSampleList.begin();
 
   // Memory allocation/init and copy for device memory
