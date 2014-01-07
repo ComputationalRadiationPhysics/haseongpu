@@ -24,7 +24,6 @@
  */
 __global__ void propagateFromTriangleCenter(const Mesh mesh,
 					    double *importance,
-					    float *sumPhi,
 					    const unsigned sample_i,
 					    const double sigmaA,
 					    const double sigmaE
@@ -52,9 +51,8 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   //if(mesh.getBetaValue(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
   //  printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
   //}
-
-
-  atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
+  //printf("gain %f\n", gain);
+  //atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
 
 }
 
@@ -68,7 +66,7 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
 __global__ void distributeRaysByImportance(Mesh mesh,
 					   unsigned *raysPerPrism,
 					   double *importance,
-					   float *sumPhi,
+					   double sumPhi,
 					   unsigned raysPerSample,
 					   unsigned *raysDump){
 
@@ -90,7 +88,12 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
   if(startPrism >= mesh.numberOfPrisms) return;
 
-  raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
+  // DEBUG
+  //printf("sumPhi: %f raysPerSample: %d prod: %f\n", *sumPhi, raysPerSample, (*sumPhi) * raysPerSample);
+
+  raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / sumPhi * raysPerSample);
+
+  // DEBUG
   //if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
   //    printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
   //}
@@ -98,7 +101,7 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   //    printf("2importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
   //}
   //
-  //assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
+  assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
   atomicAdd(&raysDump[0], raysPerPrism[startPrism + reflectionOffset]);
 
 }
@@ -115,12 +118,10 @@ __global__ void distributeRaysByImportance(Mesh mesh,
  */
 __global__ void distributeRemainingRaysRandomly(Mesh mesh,
 						unsigned *raysPerPrism,
-	//					unsigned raysPerSample,
-            unsigned raysLeft,
+						unsigned raysLeft,
 						unsigned *raysDump){
   
   int id = threadIdx.x + blockIdx.x * blockDim.x;
-  //int raysLeft = raysPerSample - (*raysDump);
 
   if(id < raysLeft){
     curandState randomState;
@@ -164,85 +165,86 @@ __global__ void recalculateImportance(Mesh mesh,
   else{
     importance[startPrism + reflectionOffset] = 0;
   }
+  
+  // if(importance[startPrism + reflectionOffset] > 0)
+  //   printf("importance: %f, raysPerPrism: %d\n", importance[startPrism + reflectionOffset], raysPerPrism[startPrism + reflectionOffset]);
 }
 
 float importanceSamplingPropagation(unsigned sample_i,
-			    const unsigned reflectionSlices,
-			    Mesh deviceMesh,
-				const unsigned numberOfPrisms,
-			    const double sigmaA,
-			    const double sigmaE,
-			    thrust::device_vector<double>& importance
-				){
+				    const unsigned reflectionSlices,
+				    Mesh deviceMesh,
+				    const unsigned numberOfPrisms,
+				    const double sigmaA,
+				    const double sigmaE,
+				    thrust::device_vector<double>& importance
+				    ){
 
-  thrust::device_vector<float> dSumPhi(1,0);
   int pBlock=128;
   dim3 gridDimReflection(ceil(float(numberOfPrisms)/pBlock), 1, reflectionSlices);
-  //dim3 gridDimReflection(200, 1, reflectionSlices);
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, pBlock >>>(
 			  deviceMesh, 
 			  thrust::raw_pointer_cast(&importance[0]), 
-			  thrust::raw_pointer_cast(&dSumPhi[0]), 
 			  sample_i, 
 			  sigmaA, 
 			  sigmaE
 			  ));
 
-  return dSumPhi[0];
+  return thrust::reduce(importance.begin(), importance.end(), 0.);
 }
 
 unsigned importanceSamplingDistribution(
-			    const unsigned reflectionSlices,
-			    Mesh deviceMesh,
-				const unsigned numberOfPrisms,
-			    const unsigned raysPerSample,
-			    thrust::device_vector<double> &importance,
-			    thrust::device_vector<unsigned> &raysPerPrism,
-				const float hSumPhi,
-			    const bool distributeRandomly
-			    ){
-
+					const unsigned reflectionSlices,
+					Mesh deviceMesh,
+					const unsigned numberOfPrisms,
+					const unsigned raysPerSample,
+					thrust::device_vector<double> &importance,
+					thrust::device_vector<unsigned> &raysPerPrism,
+					const float hSumPhi,
+					const bool distributeRandomly
+					){
+  
   thrust::device_vector<unsigned> dRaysDump(1,0);
-  thrust::device_vector<float> dSumPhi(1,hSumPhi);
 
   int dBlock=288;
+
   CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< dim3(ceil(float(numberOfPrisms)/dBlock),1,reflectionSlices), dBlock >>>(
-  //CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< dim3(200,1,reflectionSlices), dBlock >>>(
 			  deviceMesh, 
 			  thrust::raw_pointer_cast(&raysPerPrism[0]),
 			  thrust::raw_pointer_cast(&importance[0]), 
-			  thrust::raw_pointer_cast(&dSumPhi[0]),
+			  hSumPhi,
 			  raysPerSample, 
 			  thrust::raw_pointer_cast(&dRaysDump[0])
 			  ));
 
-  //TODO remove
-  //int corr = thrust::reduce(raysPerPrism.begin(),raysPerPrism.end(),0);
-  //assert(corr <= raysPerSample);
+  //TODO Comment for performance !
+  int corr = thrust::reduce(raysPerPrism.begin(),raysPerPrism.end(),0);
+  assert(corr <= raysPerSample);
   //dout(V_DEBUG) << "raysPerPrism distributed by importance: " << corr << std::endl;
   //assert(abs(thrust::reduce(importance.begin(),importance.end(),0.) - dSumPhi[0])<1);
   //dout(V_DEBUG) << "RaysDump calculated by AtomicAdd: " << dRaysDump[0] << std::endl;
-  // Distribute remaining rays randomly if wanted
+  //Distribute remaining rays randomly if wanted
+
   if(distributeRandomly){
 	int rBlock = 256;
   
 	unsigned raysLeft = raysPerSample - dRaysDump[0];
 	int rGrid = ceil(float(raysLeft)/rBlock);
 	//dout(V_DEBUG) << "RaysLeft: " << raysLeft << " rGrid.x: " << rGrid << std::endl;
-    CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< rGrid,rBlock >>>(
+	CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< rGrid,rBlock >>>(
 				deviceMesh,
 				thrust::raw_pointer_cast(&raysPerPrism[0]),
 				raysLeft,
 				thrust::raw_pointer_cast(&dRaysDump[0])
 				));
-	//dRaysDump[0] = raysPerSample;
-	//dout(V_DEBUG) << "dRaysDump: " <<dRaysDump[0]  << std::endl;
+    dRaysDump[0] = raysPerSample;
+    //dout(V_DEBUG) << "dRaysDump: " <<dRaysDump[0]  << std::endl;
   }
 
-  //unsigned err = thrust::reduce(raysPerPrism.begin(),raysPerPrism.end(),0);
-  //if(err > raysPerSample){
+  // DEBUG
+  // unsigned err = thrust::reduce(raysPerPrism.begin(),raysPerPrism.end(),0);
+  // if(err > raysPerSample){
   //  dout(V_ERROR) << "raysPerPrismSum: "<< err <<std::endl;
-  //}
+  // }
   int iBlock=256;
   CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< dim3(ceil(float(numberOfPrisms/iBlock)),1,reflectionSlices), iBlock >>>(
 			  deviceMesh, 
