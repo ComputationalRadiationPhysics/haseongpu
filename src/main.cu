@@ -312,7 +312,7 @@ int main(int argc, char **argv){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);
       avgMSE += *it;
-      if(*it > mseThreshold.at(0))
+      if(*it >= mseThreshold.at(0))
         highMSE++;
     }
     avgMSE /= mse.size();
