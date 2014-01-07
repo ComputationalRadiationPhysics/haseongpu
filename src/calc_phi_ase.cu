@@ -20,7 +20,7 @@
 #include <types.h>
 
 #define SEED 4321
-#define RAY_STEPS 10
+#define RAY_STEPS 5
 
 double calcMSE(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
@@ -29,15 +29,13 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
   return sqrt(abs((a - b) / raysPerSample));
 }
 
-std::vector<int> generateRaysPerSampleList(int minRaysPerSample, int maxRaysPerSample, int steps){
+std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
-
   raysPerSample.push_back(minRaysPerSample);
   if(minRaysPerSample == maxRaysPerSample)
     return raysPerSample;
 
-  int range = maxRaysPerSample - minRaysPerSample;
-  int step_wide = range / steps;
+  int step_wide  = (maxRaysPerSample - minRaysPerSample) / range;
 
   for(int i = 0; i < steps - 1; ++i){
     minRaysPerSample += step_wide;
@@ -46,6 +44,22 @@ std::vector<int> generateRaysPerSampleList(int minRaysPerSample, int maxRaysPerS
   }
   raysPerSample.push_back(maxRaysPerSample);
   
+  return raysPerSample;
+
+}
+
+std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
+  std::vector<int> raysPerSample;
+  if(minRaysPerSample == maxRaysPerSample){
+    raysPerSample.push_back(minRaysPerSample);
+    return raysPerSample;
+  }
+
+  for(int i = 0; i < steps; ++i){
+    int step_val = minRaysPerSample * pow((maxRaysPerSample / minRaysPerSample), (i / (float)(steps - 1)));
+    raysPerSample.push_back(step_val);
+
+  }
   return raysPerSample;
 
 }
@@ -86,7 +100,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Divide RaysPerSample range into steps
-  std::vector<int>  raysPerSampleList = generateRaysPerSampleList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
+  std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
   for(;raysPerSampleIter != raysPerSampleList.end(); raysPerSampleIter++){
@@ -94,6 +108,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   }
 
   raysPerSampleIter = raysPerSampleList.begin();
+  return 0;
 
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
