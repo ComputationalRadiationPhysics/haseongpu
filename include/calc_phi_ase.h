@@ -37,9 +37,9 @@
  * @param dndtAse Solution vector with dndt ASE values
  *
  **/
-float calcPhiAse ( unsigned hostRaysPerSample,
+float calcPhiAse ( const unsigned hostRaysPerSample,
 		   const unsigned maxRaysPerSample,
-       const unsigned maxRepetitions,
+		   const unsigned maxRepetitions,
 		   const Mesh& mesh,
 		   const Mesh& hostMesh,
 		   const std::vector<double>& sigmaA,
@@ -49,9 +49,9 @@ float calcPhiAse ( unsigned hostRaysPerSample,
 		   std::vector<float> &phiAse,
 		   std::vector<double> &mse,
 		   std::vector<unsigned> &totalRays,
-		   unsigned gpu_i,
-		   unsigned minSample_i,
-		   unsigned maxSample_i,
+		   const unsigned gpu_i,
+		   const unsigned minSample_i,
+		   const unsigned maxSample_i,
 		   float &runtime);
 
 
