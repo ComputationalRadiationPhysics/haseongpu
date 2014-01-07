@@ -338,7 +338,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
       dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-      ray_histogram(totalRays,maxRaysPerSample,highMSE);
+      ray_histogram(totalRays,maxRaysPerSample,mseThreshold[0],mse);
     }
     dout(V_STAT) << std::endl;
 

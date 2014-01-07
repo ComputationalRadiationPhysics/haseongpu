@@ -3,6 +3,6 @@
 
 #include <vector>
 
-void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const unsigned tooHighMse);
+void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const double mseThreshold, const std::vector<double> mseValues);
 
 #endif
