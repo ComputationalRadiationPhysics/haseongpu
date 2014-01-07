@@ -31,11 +31,12 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
 
 std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
+
   raysPerSample.push_back(minRaysPerSample);
   if(minRaysPerSample == maxRaysPerSample)
     return raysPerSample;
 
-  int step_wide  = (maxRaysPerSample - minRaysPerSample) / range;
+  int step_wide = (maxRaysPerSample - minRaysPerSample) / steps;
 
   for(int i = 0; i < steps - 1; ++i){
     minRaysPerSample += step_wide;
@@ -50,6 +51,8 @@ std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysP
 
 std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
+
+
   if(minRaysPerSample == maxRaysPerSample){
     raysPerSample.push_back(minRaysPerSample);
     return raysPerSample;
@@ -60,6 +63,7 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
     raysPerSample.push_back(step_val);
 
   }
+  
   return raysPerSample;
 
 }
@@ -108,7 +112,6 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   }
 
   raysPerSampleIter = raysPerSampleList.begin();
-  return 0;
 
   // Memory allocation/init and copy for device memory
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
