@@ -98,7 +98,7 @@ float calcPhiAse ( unsigned hRaysPerSample,
 
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-      std::vector<float> bestASE(1000,3);
+      std::vector<float> bestASE(3,10000);
       //unsigned sample_i = 1;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
