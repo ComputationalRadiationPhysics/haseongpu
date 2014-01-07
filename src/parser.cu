@@ -185,9 +185,9 @@ int checkParameterValidity(
     *maxRaysPerSample = raysPerSample;
   }
 
-  if(float(log10((float)*maxRaysPerSample/raysPerSample)) != float(floor(log10((float)*maxRaysPerSample/raysPerSample)))) {
-    dout(V_WARNING) << "maxRays "<< *maxRaysPerSample << " is not reachable by the multiplicator " << RAY_MULTIPLICATOR << " applied to " << raysPerSample << std::endl;
-  }
+  //if(float(log10((float)*maxRaysPerSample/raysPerSample)) != float(floor(log10((float)*maxRaysPerSample/raysPerSample)))) {
+  //  dout(V_WARNING) << "maxRays "<< *maxRaysPerSample << " is not reachable by the multiplicator " << RAY_MULTIPLICATOR << " applied to " << raysPerSample << std::endl;
+  //}
 
   if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
     return 1;
