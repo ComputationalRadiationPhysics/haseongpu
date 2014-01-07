@@ -254,6 +254,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
             bestASE[BEST_MSE] = mse.at(sampleOffset);
             bestASE[BEST_ASE] = dGainSum[0];
             bestASE[BEST_RAYNUMBER] = hRaysPerSampleDump;
+            totalRays.at(sampleOffset) = *raysPerSampleIter;
           }
           if(mse.at(sampleOffset) < mseThreshold.at(wave_i)) mseTooHigh = false;
         }
@@ -274,7 +275,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
       phiAse.at(sampleOffset) = bestASE[BEST_ASE];
       phiAse.at(sampleOffset)   /= bestASE[BEST_RAYNUMBER] * 4.0f * M_PI;
-      totalRays.at(sampleOffset)  = bestASE[BEST_RAYNUMBER];
+      //totalRays.at(sampleOffset)  = bestASE[BEST_RAYNUMBER];
 
     }
     

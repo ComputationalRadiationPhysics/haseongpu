@@ -67,7 +67,7 @@ void ray_histogram_old(const std::vector<unsigned> totalRays, const unsigned min
 
 }
 
-void ray_histogram(const std::vector<std::pair<unsigned,unsigned> > totalRays, const unsigned max, const unsigned tooHighMse){
+void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const unsigned tooHighMse){
   // length of the maximum number of samples (e.g. max==4210)
   int fillwidth = log10(max)+4;
 
@@ -78,9 +78,9 @@ void ray_histogram(const std::vector<std::pair<unsigned,unsigned> > totalRays, c
   std::map<unsigned,unsigned> hist;
   // if the entry doesn't exist, create it
   for(unsigned j=0; j<totalRays.size() ; ++j){
-    std::map<unsigned,unsigned>::iterator it = hist.find(totalRays.at(j).first);
+    std::map<unsigned,unsigned>::iterator it = hist.find(totalRays.at(j));
         if(it == hist.end()){
-      hist.insert(std::pair<unsigned,unsigned>(totalRays.at(j).first,1));
+      hist.insert(std::pair<unsigned,unsigned>(totalRays.at(j),1));
     }else{
       it->second++; 
     }
@@ -91,7 +91,7 @@ void ray_histogram(const std::vector<std::pair<unsigned,unsigned> > totalRays, c
 
   
   for(std::map<unsigned,unsigned>::iterator it = hist.begin(); it!=hist.end(); ++it){
-    dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') <<  it->first << " (" << std::setw(log10(totalRays.size())) << it->second << "x):";
+    dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') <<  it->first << " (" << std::setw(log10(totalRays.size())+3) << it->second << "x):";
 
     // set color = green
     dout(V_STAT | V_NOLABEL) << "\033[0;32m";
