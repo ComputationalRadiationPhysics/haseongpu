@@ -3,6 +3,6 @@
 
 #include <vector>
 
-void ray_histogram(const std::vector<unsigned> totalRays,const unsigned min, const unsigned max, const unsigned tooHighMse);
+void ray_histogram(const std::vector<std::pair<unsigned,unsigned> > totalRays, const unsigned max, const unsigned tooHighMse);
 
 #endif
