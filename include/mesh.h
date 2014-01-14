@@ -1,6 +1,7 @@
 #ifndef MESH_H
 #define MESH_H 
 
+#include <cuda_utils.h>
 #include <vector>
 #include <curand_kernel.h> /* curand_uniform */
 #include <string>
