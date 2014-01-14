@@ -117,7 +117,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   device_vector<unsigned> dNumberOfReflections(maxRaysPerSample, 0);
   device_vector<float>    dGainSum            (1, 0);
   device_vector<float>    dGainSumSquare      (1, 0);
-  device_vector<unsigned> dLostRays           (1, 0);
+  device_vector<unsigned> dLostRays           (1, 0); // OPTIMIZE: remove unnecessary parameter
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
@@ -166,7 +166,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
         unsigned run = 0;
         while(run < maxRepetitions && mseTooHigh){
           run++;
-	  dLostRays[0] = 0;
+          dLostRays[0] = 0;
 
           thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
           hRaysPerSampleDump = importanceSamplingDistribution(
@@ -232,7 +232,8 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
           }
 
 	  // Remove lost rays (reflections) from ray counter
-	  hRaysPerSampleDump -= dLostRays[0];
+    // Don't do this, if you want MonteCarlo to work properly!!
+	  //hRaysPerSampleDump -= dLostRays[0];
 
           float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
 
