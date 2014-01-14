@@ -27,7 +27,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -76,9 +76,9 @@
      showgrid="false"
      showguides="false"
      inkscape:guide-bbox="true"
-     inkscape:zoom="1.3906433"
-     inkscape:cx="349.8515"
-     inkscape:cy="267.5584"
+     inkscape:zoom="1.9666666"
+     inkscape:cx="438.24109"
+     inkscape:cy="227.56277"
      inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
@@ -118,7 +118,7 @@
      inkscape:label="annotations">
     <path
        style="fill:none;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#TriangleOutL)"
-       d="m 405.44514,137.02127 c -75.44519,30.13295 -69.66096,91.7614 -69.66102,91.76271"
+       d="m 405.44514,137.02127 c -66.097,18.62748 -57.70607,75.31217 -57.70613,75.31348"
        id="path3757"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
@@ -136,7 +136,7 @@
          style="font-size:27px">MSE threshold</tspan></text>
     <g
        id="g4243"
-       transform="matrix(0.96109891,0,0,0.99812481,18.246315,-117.6857)">
+       transform="matrix(0.92137508,0,0,0.95687063,42.525068,-99.23197)">
       <path
          sodipodi:nodetypes="cc"
          inkscape:connector-curvature="0"
@@ -153,13 +153,13 @@
     <text
        xml:space="preserve"
        style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
-       x="392.30496"
+       x="398.30496"
        y="252.43835"
        id="text4247"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan4249"
-         x="392.30496"
+         x="398.30496"
          y="252.43835"
          style="font-size:27px">Resampling</tspan></text>
   </g>

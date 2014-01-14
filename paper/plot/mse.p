@@ -7,6 +7,7 @@ set border 3
 set grid
 
 set xlabel "MSE"
+set ylabel "sample points"
 set logscale y
 
 

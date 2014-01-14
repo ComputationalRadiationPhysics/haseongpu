@@ -14,7 +14,10 @@
    id="svg5087"
    version="1.1"
    inkscape:version="0.48.4 r9939"
-   sodipodi:docname="repetitive_sampling.svg.2013_12_10_10_40_18.0.svg">
+   sodipodi:docname="repetitive_sampling.svg"
+   inkscape:export-filename="/home/admin-linux/octrace/paper/graphics/repetitive_sampling.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
   <metadata
      id="metadata5312">
     <rdf:RDF>
@@ -84,9 +87,9 @@
      showgrid="false"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:zoom="0.98333333"
-     inkscape:cx="194.04514"
-     inkscape:cy="199.90968"
+     inkscape:zoom="1.3906433"
+     inkscape:cx="444.56812"
+     inkscape:cy="240.6422"
      inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
@@ -281,9 +284,6 @@
         <text
            id="text5168"> 1600</text>
       </g>
-      <path
-         d="M162.7,422.4 L162.7,413.4  h0.01"
-         id="path5170" />
       <g
          transform="translate(162.7,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
@@ -291,9 +291,6 @@
         <text
            id="text5174">1e+04</text>
       </g>
-      <path
-         d="M245.1,422.4 L245.1,413.4  h0.01"
-         id="path5176" />
       <g
          transform="translate(245.1,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
@@ -301,9 +298,6 @@
         <text
            id="text5180">1e+05</text>
       </g>
-      <path
-         d="M327.6,422.4 L327.6,413.4  h0.01"
-         id="path5182" />
       <g
          transform="translate(327.6,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
@@ -311,9 +305,6 @@
         <text
            id="text5186">1e+06</text>
       </g>
-      <path
-         d="M410.1,422.4 L410.1,413.4  h0.01"
-         id="path5188" />
       <g
          transform="translate(410.1,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
@@ -321,9 +312,6 @@
         <text
            id="text5192">1e+07</text>
       </g>
-      <path
-         d="M492.5,422.4 L492.5,413.4  h0.01"
-         id="path5194" />
       <g
          transform="translate(492.5,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
@@ -481,25 +469,27 @@
          sodipodi:role="line"
          id="tspan3850"
          x="10.198378"
-         y="524.00287">3e10 rays </tspan><tspan
+         y="524.00287"
+         style="font-size:29.5000001px">3e+10 rays </tspan><tspan
          sodipodi:role="line"
          x="10.198378"
          y="564.00287"
-         id="tspan3852">difference</tspan></text>
+         id="tspan3852"
+         style="font-size:29.5000001px">difference</tspan></text>
   </g>
   <path
      sodipodi:type="arc"
-     style="fill:none;stroke:#000000;stroke-width:1.96523058000000006;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;opacity:0.5"
+     style="opacity:0.5;fill:none;stroke:#000000;stroke-width:1.96523058;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
      id="path5314"
      sodipodi:cx="494.55527"
      sodipodi:cy="374.4733"
      sodipodi:rx="41.527542"
      sodipodi:ry="58.78574"
      d="m 536.08281,374.4733 a 41.527542,58.78574 0 1 1 -83.05508,0 41.527542,58.78574 0 1 1 83.05508,0 z"
-     transform="matrix(1.1351506,0,0,0.94746262,-67.859001,21.831121)" />
+     transform="matrix(1.1351506,0,0,0.94746262,-69.096289,21.831121)" />
   <path
-     style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:none;marker-end:url(#TriangleOutS);opacity:0.5"
-     d="m 493.18644,279.38983 0,22.37288"
+     style="opacity:0.5;fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:none;marker-end:url(#TriangleOutS)"
+     d="m 489.18644,279.38983 0,22.37288"
      id="path3858"
      inkscape:connector-curvature="0" />
 </svg>
