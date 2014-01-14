@@ -1,5 +1,5 @@
-#ifndef CUDA_UTILS_H
-#define CUDA_UTILS_H
+#ifndef CUDA_UTILS2_H
+#define CUDA_UTILS2_H
 
 #include <vector>
 #include <iostream>
