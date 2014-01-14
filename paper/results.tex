@@ -104,8 +104,8 @@ and lower surfaces need to be coplanar due to the structure of the mesh
 Another limitation originates from the fact that each simulation uses a mapping
 from rays to their respective starting position. For a large number of rays,
 this can lead to a substancial amout of allocated memory. With the current
-hardware (Section \ref{testingEnvironment}) and implementation, each sample
-point can be simulated with a maximum of $6.5e8$ rays. To push this limit
+hardware (Section \ref{subsec:testingEnvironment}) and implementation, each sample
+point can be simulated with a maximum of $6.5\cdot10^8$ rays. To push this limit
 further, a more sophisticated mapping needs to be implemented. This could
 be done by simply splitting the mapping in different parts and calculating them
 iteratively.
