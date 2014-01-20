@@ -52,7 +52,7 @@ std::vector<int> generateRaysPerSampleLinList(int minRaysPerSample, int maxRaysP
 std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
   std::vector<int> raysPerSample;
 
-  if(minRaysPerSample == maxRaysPerSample){
+  if((minRaysPerSample == maxRaysPerSample) || steps < 2){
     raysPerSample.push_back(minRaysPerSample);
     return raysPerSample;
   }
