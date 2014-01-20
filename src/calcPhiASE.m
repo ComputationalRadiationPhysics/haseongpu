@@ -55,9 +55,10 @@ function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,n
 %refractiveIndices
 %reflectivities
 
-MaxRays = 100000;
+NumRays = 10000000;
+MaxRays = 100000000;
 mse=0.05;
-use_reflections = false; 
+use_reflections = true; 
 MAX_GPUS=1;
 [a,b] = size(p);
 minSample=0;
@@ -106,6 +107,8 @@ end
 if(~exist('Runmode','var'))
   Runmode='ray_propagation_gpu';
 end
+
+Runmode='mpi';
 
 CURRENT_DIR = pwd;
 FILENAME=[ mfilename('fullpath') '.m' ];
