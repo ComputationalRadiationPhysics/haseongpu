@@ -21,7 +21,6 @@
  */
 __global__ void propagateFromTriangleCenter(const Mesh mesh,
 					    double *importance,
-					    float *sumPhi,
 					    const unsigned sample_i,
 					    const double sigmaA,
 					    const double sigmaE
@@ -47,9 +46,6 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   if(mesh.getBetaValue(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
     printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
   }
-
-
-  atomicAdd(sumPhi, float(importance[startPrism + reflectionOffset]));
 
 }
 
@@ -145,7 +141,7 @@ __global__ void recalculateImportance(Mesh mesh,
   }
 }
 
-float importanceSamplingPropagation(unsigned sample_i,
+void importanceSamplingPropagation(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
 			    const double sigmaA,
@@ -155,16 +151,9 @@ float importanceSamplingPropagation(unsigned sample_i,
 			    dim3 gridDim){
 
 
-  float hSumPhi = 0;
-  float *dSumPhi = copyToDevice(hSumPhi);
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sample_i, sigmaA, sigmaE));
 
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, dSumPhi, sample_i, sigmaA, sigmaE));
-
-  hSumPhi = copyFromDevice(dSumPhi);
-  cudaFree(dSumPhi);
-
-  return hSumPhi;
 }
 
 unsigned importanceSamplingDistribution(

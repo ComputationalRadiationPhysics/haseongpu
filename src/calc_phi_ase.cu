@@ -151,15 +151,17 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       raysPerSampleIter = raysPerSampleList.begin();
       bool mseTooHigh=true;
 
-      float hSumPhi =  importanceSamplingPropagation(
-						     sample_i,
-						     reflectionSlices,
-						     dMesh,
-						     hSigmaA[wave_i],
-						     hSigmaE[wave_i],
-						     raw_pointer_cast(&dImportanceSave[0]), 
-						     blockDim,
-						     gridDim);
+      importanceSamplingPropagation(
+				    sample_i,
+				    reflectionSlices,
+				    dMesh,
+				    hSigmaA[wave_i],
+				    hSigmaE[wave_i],
+				    raw_pointer_cast(&dImportanceSave[0]), 
+				    blockDim,
+				    gridDim);
+
+      float hSumPhi = thrust::reduce(dImportanceSave.begin(), dImportanceSave.end(),0.);
 
       while(mseTooHigh){
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));

@@ -44,7 +44,7 @@
 //			    bool distributeRandomly,
 //			    dim3 threads,
 //			    dim3 blocks);
-float importanceSamplingPropagation(unsigned sample_i,
+void importanceSamplingPropagation(unsigned sample_i,
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
 			    const double sigmaA,
@@ -58,7 +58,7 @@ unsigned importanceSamplingDistribution(
 			    const unsigned raysPerSample,
 			    double *importance,
 			    unsigned *raysPerPrism,
-				float hSumPhi,
+			    float hSumPhi,
 			    const bool distributeRandomly,
 			    dim3 blockDim,
 			    dim3 gridDim);
