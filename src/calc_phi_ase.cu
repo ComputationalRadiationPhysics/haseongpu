@@ -151,14 +151,14 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       raysPerSampleIter = raysPerSampleList.begin();
       bool mseTooHigh=true;
 
-      float hSumPhi = importanceSamplingPropagation(
-          sample_i,
-          reflectionSlices,
-          dMesh,
-          hMesh.numberOfPrisms,
-          hSigmaA[wave_i],
-          hSigmaE[wave_i],
-          dImportanceSave);
+      // float hSumPhi = importanceSamplingPropagation(
+      //     sample_i,
+      //     reflectionSlices,
+      //     dMesh,
+      //     hMesh.numberOfPrisms,
+      //     hSigmaA[wave_i],
+      //     hSigmaE[wave_i],
+      //     dImportanceSave);
 
 
       while(mseTooHigh){
@@ -167,17 +167,22 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
         while(run < maxRepetitions && mseTooHigh){
           run++;
           dLostRays[0] = 0;
+          hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, *raysPerSampleIter, hSigmaA[wave_i], hSigmaE[wave_i],
+						  raw_pointer_cast(&dImportance[0]), 
+						  raw_pointer_cast(&dRaysPerPrism[0]),
+						  distributeRandomly, blockDim, gridDim
+						  );
 
-          thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
-          hRaysPerSampleDump = importanceSamplingDistribution(
-							      reflectionSlices,
-							      dMesh,
-							      hMesh.numberOfPrisms,
-							      *raysPerSampleIter,
-							      dImportance, 
-							      dRaysPerPrism,
-							      hSumPhi,
-							      distributeRandomly);
+          //thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
+          // hRaysPerSampleDump = importanceSamplingDistribution(
+	  // 						      reflectionSlices,
+	  // 						      dMesh,
+	  // 						      hMesh.numberOfPrisms,
+	  // 						      *raysPerSampleIter,
+	  // 						      dImportance, 
+	  // 						      dRaysPerPrism,
+	  // 						      hSumPhi,
+	  // 						      distributeRandomly);
 	  
 	  // DEBUG
           // if(dRaysPerPrism[6495] > 10000){
