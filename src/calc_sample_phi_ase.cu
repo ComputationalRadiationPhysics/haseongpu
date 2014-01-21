@@ -87,7 +87,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 
   }
   atomicAdd(&(gainSum[0]), float(gainSumTemp));
-  atomicAdd(&(gainSum[0]), float(gainSumSquareTemp));
+  atomicAdd(&(gainSumSquare[0]), float(gainSumSquareTemp));
 
 }
 
