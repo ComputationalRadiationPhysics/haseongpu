@@ -32,17 +32,35 @@
  *
  * @return the number of rays which are used for one sample point
  */
-unsigned importanceSampling(
-			    unsigned sample_i,
-			    unsigned maxReflections,
+//unsigned importanceSampling(
+//			    unsigned sample_i,
+//			    unsigned maxReflections,
+//			    Mesh deviceMesh,
+//			    unsigned raysPerSample, 
+//			    double sigmaA, 
+//			    double sigmaE, 
+//			    double *importance, 
+//			    unsigned *raysPerPrism,
+//			    bool distributeRandomly,
+//			    dim3 threads,
+//			    dim3 blocks);
+void importanceSamplingPropagation(unsigned sample_i,
+			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
-			    unsigned raysPerSample, 
-			    double sigmaA, 
-			    double sigmaE, 
-			    double *importance, 
+			    const double sigmaA,
+			    const double sigmaE,
+			    double *importance,
+			    dim3 blockDim,
+			    dim3 gridDim);
+unsigned importanceSamplingDistribution(
+			    const unsigned reflectionSlices,
+			    Mesh deviceMesh,
+			    const unsigned raysPerSample,
+			    double *importance,
 			    unsigned *raysPerPrism,
-			    bool distributeRandomly,
-			    dim3 threads,
-			    dim3 blocks);
+			    float hSumPhi,
+			    const bool distributeRandomly,
+			    dim3 blockDim,
+			    dim3 gridDim);
 
 #endif /* importance_sampling_H */
