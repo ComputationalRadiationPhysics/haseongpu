@@ -145,21 +145,21 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     // Calculation for each sample point
     for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
       // DEBUG
-    //unsigned sample_i = 4;{
+      //unsigned sample_i = 4;{
       unsigned sampleOffset  = sample_i + hMesh.numberOfSamples * wave_i;
       unsigned hRaysPerSampleDump = 0; 
       raysPerSampleIter = raysPerSampleList.begin();
       bool mseTooHigh=true;
 
-      // float hSumPhi = importanceSamplingPropagation(
-      //     sample_i,
-      //     reflectionSlices,
-      //     dMesh,
-      //     hMesh.numberOfPrisms,
-      //     hSigmaA[wave_i],
-      //     hSigmaE[wave_i],
-      //     dImportanceSave);
-
+      float hSumPhi =  importanceSamplingPropagation(
+						     sample_i,
+						     reflectionSlices,
+						     dMesh,
+						     hSigmaA[wave_i],
+						     hSigmaE[wave_i],
+						     raw_pointer_cast(&dImportanceSave[0]), 
+						     blockDim,
+						     gridDim);
 
       while(mseTooHigh){
         CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
@@ -167,23 +167,19 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
         while(run < maxRepetitions && mseTooHigh){
           run++;
           dLostRays[0] = 0;
-          hRaysPerSampleDump = importanceSampling(sample_i, reflectionSlices, dMesh, *raysPerSampleIter, hSigmaA[wave_i], hSigmaE[wave_i],
-						  raw_pointer_cast(&dImportance[0]), 
-						  raw_pointer_cast(&dRaysPerPrism[0]),
-						  distributeRandomly, blockDim, gridDim
-						  );
 
-          //thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
-          // hRaysPerSampleDump = importanceSamplingDistribution(
-	  // 						      reflectionSlices,
-	  // 						      dMesh,
-	  // 						      hMesh.numberOfPrisms,
-	  // 						      *raysPerSampleIter,
-	  // 						      dImportance, 
-	  // 						      dRaysPerPrism,
-	  // 						      hSumPhi,
-	  // 						      distributeRandomly);
-	  
+	  thrust::copy(dImportanceSave.begin(),dImportanceSave.end(),dImportance.begin());
+          hRaysPerSampleDump = importanceSamplingDistribution(
+							      reflectionSlices,
+							      dMesh,
+							      *raysPerSampleIter,
+							      raw_pointer_cast(&dImportance[0]), 
+							      raw_pointer_cast(&dRaysPerPrism[0]),
+							      hSumPhi,
+							      distributeRandomly,
+							      blockDim,
+							      gridDim);
+          
 	  // DEBUG
           // if(dRaysPerPrism[6495] > 10000){
           //   dout(V_DEBUG) << "Too high raysPerprism " << dRaysPerPrism[6495] << " sample_i: " << sample_i <<std::endl;
@@ -207,37 +203,37 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
           if(useReflections){
             calcSampleGainSum<<< gridDim, blockDim >>>( devMTGPStates,
-                dMesh, 
-                raw_pointer_cast(&dIndicesOfPrisms[0]), 
-                wave_i, 
-                raw_pointer_cast(&dNumberOfReflections[0]), 
-                raw_pointer_cast(&dImportance[0]),
-                hRaysPerSampleDump, 
-                raw_pointer_cast(&dGainSum[0]), 
-                raw_pointer_cast(&dGainSumSquare[0]),
-                raw_pointer_cast(&dLostRays[0]),
-                sample_i, 
-                hSigmaA[wave_i], 
-                hSigmaE[wave_i],
-                raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
+							dMesh, 
+							raw_pointer_cast(&dIndicesOfPrisms[0]), 
+							wave_i, 
+							raw_pointer_cast(&dNumberOfReflections[0]), 
+							raw_pointer_cast(&dImportance[0]),
+							hRaysPerSampleDump, 
+							raw_pointer_cast(&dGainSum[0]), 
+							raw_pointer_cast(&dGainSumSquare[0]),
+							raw_pointer_cast(&dLostRays[0]),
+							sample_i, 
+							hSigmaA[wave_i], 
+							hSigmaE[wave_i],
+							raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
           else{
             calcSampleGainSumWithoutReflections<<< gridDim, blockDim >>>( devMTGPStates,
-                dMesh, 
-                raw_pointer_cast(&dIndicesOfPrisms[0]), 
-                wave_i, 
-                raw_pointer_cast(&dImportance[0]),
-                hRaysPerSampleDump, 
-                raw_pointer_cast(&dGainSum[0]), 
-                raw_pointer_cast(&dGainSumSquare[0]),
-                sample_i, 
-                hSigmaA[wave_i], 
-                hSigmaE[wave_i],
-                raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
+									  dMesh, 
+									  raw_pointer_cast(&dIndicesOfPrisms[0]), 
+									  wave_i, 
+									  raw_pointer_cast(&dImportance[0]),
+									  hRaysPerSampleDump, 
+									  raw_pointer_cast(&dGainSum[0]), 
+									  raw_pointer_cast(&dGainSumSquare[0]),
+									  sample_i, 
+									  hSigmaA[wave_i], 
+									  hSigmaE[wave_i],
+									  raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
 
 	  // Remove lost rays (reflections) from ray counter
-    // Don't do this, if you want MonteCarlo to work properly!!
+	  // Don't do this, if you want MonteCarlo to work properly!!
 	  //hRaysPerSampleDump -= dLostRays[0];
 
           float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
