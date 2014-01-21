@@ -52,6 +52,7 @@ unsigned long long timevalDiffInMillis(timeval start, timeval end){
 }
 
 
+// works with a threaded approach or if called directly from within the mpiHead function
 void fancyProgressBar(const unsigned nTotal){
 
   const int length = 50;
@@ -67,6 +68,47 @@ void fancyProgressBar(const unsigned nTotal){
   timeval now;
   gettimeofday(&now,NULL);
   ++part;
+
+  //limit the update intervall (not faster than every 35ms)
+  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
+  if(millisSpent > 35*tic || part==maxNTotal){
+    ++tic;
+
+    const float percentage = float(part) / float(maxNTotal);
+    const float timeSpent = float(millisSpent) / 1000;
+    const float timeTotal = timeSpent/percentage;
+    const int timeRemaining = timeTotal-timeSpent;
+
+    dout(V_INFO | V_NOLABEL) << "\r";
+    dout(V_INFO) << "Progress: [";
+    printWave(dout(V_INFO | V_NOLABEL), tic, int(percentage*length), length);
+    dout(V_INFO | V_NOLABEL) << "] ";
+
+    dout(V_INFO | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
+    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
+    dout(V_INFO | V_NOLABEL) << " after " << int(timeSpent) << "s";
+    dout(V_INFO | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
+    dout(V_INFO | V_NOLABEL) << std::flush;
+  }
+}
+
+// works with MPI, but not necessarily with a threaded approach
+void fancyProgressBar(const unsigned current, const unsigned nTotal){
+
+  const int length = 50;
+
+  static unsigned maxNTotal = 0;
+
+  static timeval startTime;
+  static unsigned part = 0;
+  if(part==0){ gettimeofday(&startTime,NULL); }
+  maxNTotal = max(maxNTotal, nTotal);
+  static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
+  static unsigned tic  = 0;
+  timeval now;
+  gettimeofday(&now,NULL);
+  part=current;
+  //++part;
 
   //limit the update intervall (not faster than every 35ms)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
