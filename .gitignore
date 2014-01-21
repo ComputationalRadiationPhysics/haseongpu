@@ -59,3 +59,6 @@ paper/*/*.eps
 paper/*/*.spl
 paper/*/*.~lock.*
 utils/benchmark*/*.vtu
+/calcPhiASE.m
+/shared
+utils/start_exp.sh
