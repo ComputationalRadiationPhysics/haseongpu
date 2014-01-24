@@ -4,6 +4,10 @@
 clear all;
 
 tic
+isOctave = exist('OCTAVE_VERSION') ~= 0;
+if (isOctave)
+   page_output_immediately(1);
+end
 % this is the first test of the ASE-routines
 % main battle-plan:
 % a) make the grid using distmesh
@@ -147,6 +151,7 @@ end
 % return;
 
 for i_slice=1:timeslice-1
+    disp(['']);
     disp(['TimeSlice ' num2str(i_slice) 'calculation started']);
     % ******************* BETA PUMP TEST ******************************
     % make a test with the gain routine "gain.m" for each of the points
@@ -192,8 +197,11 @@ for i_slice=1:timeslice-1
 
         v = vertcat(v_1,v_2);
 
-        % TODO: this was changed from griddata3. is this correct?
-        beta_vol(:,i_z) = griddata(x,y,z,v,xi,yi,zi);
+        if (isOctave)
+          beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        else
+          beta_vol(:,i_z) = griddata(x,y,z,v,xi,yi,zi);
+        end
 
         z = z + z_mesh;
         zi = zi + z_mesh;

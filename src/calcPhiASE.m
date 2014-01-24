@@ -298,6 +298,11 @@ warning off all;
 A = exist(TMP_FOLDER,'dir');
 
 if A == 7
+    isOctave = exist('OCTAVE_VERSION') ~= 0;
+    if(isOctave)
+      confirm_recursive_rmdir (0);
+    end
+
     rmdir(TMP_FOLDER,'s');
   end
 
