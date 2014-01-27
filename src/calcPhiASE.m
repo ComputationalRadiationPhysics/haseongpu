@@ -134,7 +134,11 @@ clean_IO_files(TMP_FOLDER);
 create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
 
   % do the propagation
-  system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ]);
+  status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ]);
+
+  if(status ~= 0)
+    error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
+  end
 
   % get the result
   [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
