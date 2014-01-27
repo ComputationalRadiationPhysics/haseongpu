@@ -211,8 +211,7 @@ int main(int argc, char **argv){
           phiAse,
           mse,
           totalRays,
-          devices.at(0),
-          maxSampleRange
+          devices.at(0)
           );
       runmode = "RAY PROPAGATION MPI";
       break;
