@@ -9,7 +9,8 @@
 #define V_INFO 4
 #define V_STAT 8
 #define V_DEBUG 16
-#define V_NOLABEL 32
+#define V_PROGRESS 32
+#define V_NOLABEL 64
 
 #define COLOR_ERROR 31
 #define COLOR_WARN 31

@@ -209,12 +209,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	  
       }
       // Update progressbar
-      // works for Runmode=='mpi'
-      fancyProgressBar(sample_i,hMesh.numberOfSamples);
-      // works for Runmode=='ray_propagation_gpu'
-      //fancyProgressBar(hMesh.numberOfSamples);
+      if(verbosity & V_PROGRESS){
+        fancyProgressBar(hMesh.numberOfSamples);
+      }
     }
-    
+
   }
   
   // Free Memory

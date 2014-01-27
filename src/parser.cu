@@ -213,9 +213,9 @@ int checkParameterValidity(
      *maxgpus = unsigned(samplesForNode);
   }
 
-  if(verbosity >= 32){
-    verbosity = 31;
-    dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 31 (all). Levels can be bitmasked together." << std::endl;
+  if(verbosity >= 64){
+    verbosity = 63;
+    dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 63 (all). Levels can be bitmasked together." << std::endl;
   }
   if(maxRepetitions < 1){
     dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;

@@ -25,7 +25,9 @@
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
+
+// default without V_DEBUG
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.h
 
 
 /** 
@@ -113,7 +115,7 @@ int main(int argc, char **argv){
 
   std::string inputPath;
   std::string outputPath;
-  verbosity = 31; //ALL //TODO: remove in final code
+  verbosity = 63; //ALL //TODO: remove in final code
 
   // Wavelength data
   std::vector<double> sigmaA;
