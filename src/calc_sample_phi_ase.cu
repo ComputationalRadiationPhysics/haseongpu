@@ -27,16 +27,15 @@ __device__ unsigned getRayNumberBlockbased(unsigned* blockOffset,unsigned raysPe
 
 }
 
-__global__ void calcSampleGainSum(curandStateMtgp32* globalState,
+__global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 				 const Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
-				 const unsigned* numberOfReflections,
+				 const unsigned* numberOfReflectionSlices,
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum, 
 				 float *gainSumSquare,
-				 unsigned *lostRays,
 				 const unsigned sample_i,
 				 const double sigmaA, 
 				 const double sigmaE,
@@ -50,18 +49,13 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
   __shared__ unsigned blockOffset[4];
 
   // One thread can compute multiple rays
-  // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
-  //int gid = threadIdx.x + blockIdx.x * blockDim.x;
-  //unsigned stride = 0;
-  //while ((rayNumber = gid + stride) < raysPerSample) {
-  //  stride += blockDim.x * gridDim.x;
   while (true) {
 	rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
 	if(rayNumber >= raysPerSample) break;
 
     // Get triangle/prism to start ray from
     unsigned startPrism             = indicesOfPrisms[rayNumber];
-    unsigned reflection_i           = numberOfReflections[rayNumber]; //numberOfReflectio == ReflectionSlice
+    unsigned reflection_i           = numberOfReflectionSlices[rayNumber]; //numberOfReflectio == ReflectionSlice
     unsigned reflections            = (reflection_i + 1) / 2;
     ReflectionPlane reflectionPlane = (reflection_i % 2 == 0) ? BOTTOM_REFLECTION : TOP_REFLECTION;
     unsigned startLevel             = startPrism / mesh.numberOfTriangles;
@@ -81,9 +75,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 
     gainSumTemp       += gain;
     gainSumSquareTemp += gain * gain;
-    if(gain == 0){
-      atomicInc(&(lostRays[0]), raysPerSample);
-    }
+
 
   }
   atomicAdd(&(gainSum[0]), float(gainSumTemp));
@@ -91,56 +83,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 
 }
 
-__global__ void calcSampleGainSumWithoutReflections_old(curandStateMtgp32* globalState,
-				 const Mesh mesh, 
-				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum, 
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double sigmaA, 
-				 const double sigmaE,
-				 unsigned *globalOffsetMultiplicator
-				 ) {
-
-  int gid = threadIdx.x + blockIdx.x * blockDim.x;
-  int rayNumber = 0;
-  unsigned stride = 0;
-  double gainSumTemp = 0;
-  double gainSumSquareTemp = 0;
-  Point samplePoint = mesh.getSamplePoint(sample_i);
-  // One thread can compute multiple rays
-  // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
-  while ((rayNumber = gid + stride) < raysPerSample) {
-    stride += blockDim.x * gridDim.x;
-
-    // Get triangle/prism to start ray from
-    unsigned startPrism             = indicesOfPrisms[rayNumber];
-    unsigned startLevel             = startPrism/mesh.numberOfTriangles;
-    unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-
-    Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
-    Ray ray   = generateRay(startPoint, samplePoint);
-
-    double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-    
-    // Important because this is not done in propagteRay, but in
-    // propagateRaysWithReflection !!!
-    gain          /= ray.length * ray.length; 
-    gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
-
-    gainSumTemp       += gain;
-    gainSumSquareTemp += gain * gain;
-
-  }
-  atomicAdd(&(gainSum[0]), float(gainSumTemp));
-  atomicAdd(&(gainSumSquare[0]), float(gainSumSquareTemp));
-
-}
-
-__global__ void calcSampleGainSumWithoutReflections(curandStateMtgp32* globalState,
+__global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 const Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 

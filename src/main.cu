@@ -129,7 +129,6 @@ int main(int argc, char **argv){
   //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
   devices = getCorrectDevice(maxGpus);
 
-
   // sanity checks
   if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath)) return 1;
 
@@ -155,15 +154,11 @@ int main(int argc, char **argv){
   std::vector<double> mse(hMesh.numberOfSamples * sigmaE.size(), 1000);
   std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
 
-  // DEBUG
-  // for(unsigned i = 0; i < hMesh.numberOfPrisms; ++i){
-  //   dout(V_DEBUG) << i << " " << hMesh.betaValues[i] << std::endl;
-  // }
-
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
   std::vector<float> runtimes(maxGpus, 0);
   switch(mode){
+    // TODO: Replace completly by MPI
     case RAY_PROPAGATION_GPU:
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
         const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
@@ -237,22 +232,6 @@ int main(int argc, char **argv){
       runmode = "For Loops";
       break;
 
-    case TEST:
-      testEnvironment(raysPerSample,
-          maxRaysPerSample,
-          dMesh.at(0),
-          hMesh,
-          sigmaA,
-          sigmaE,
-          mseThreshold.at(0),
-          useReflections,
-          dndtAse,
-          phiAse,
-          mse
-          );
-      cudaDeviceReset();
-      runmode="Test Environment";
-      break;
     default:
       exit(0);
   }
@@ -281,7 +260,6 @@ int main(int argc, char **argv){
   //   std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
 
   // }
-
 
   // Write experiment data
   // output folder has to be the same as TMP_FOLDER in the calling MatLab script

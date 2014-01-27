@@ -56,7 +56,6 @@ void mpiHead(std::vector<float> &phiASE,
       phiASE.at(sampleOffset)    = res[2];
       mse.at(sampleOffset)       = res[3];
       totalRays.at(sampleOffset) = (unsigned)res[4];
-      //fileProgressBar(phiASE.size(),"output/progress");
       break;
 
     case SAMPLE_REQUEST_TAG:
@@ -90,7 +89,7 @@ void mpiHead(std::vector<float> &phiASE,
  **/
 void mpiCompute(unsigned &hostRaysPerSample,
 		const unsigned maxRaysPerSample,
-    const unsigned maxRepetitions,
+		const unsigned maxRepetitions,
 		const Mesh& dMesh,
 		const Mesh& hMesh,
 		const std::vector<double>& hSigmaA,
@@ -155,7 +154,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const unsigned maxRaysPerSample,
-          const unsigned maxRepetitions,
+		      const unsigned maxRepetitions,
 		      const Mesh& dMesh,
 		      const Mesh& hMesh,
 		      const std::vector<double>& hSigmaA,
@@ -186,7 +185,6 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 
   switch(rank){
   case HEAD_NODE:
-    //mpiHead(hPhiAse, mse, totalRays, runtimes, size-1, ceil((maxSample_i + 1)  / (float)(size-1)));
     mpiHead(hPhiAse, mse, totalRays, runtimes, hMesh, size-1, 1);
     cudaDeviceReset();   
     MPI_Finalize();

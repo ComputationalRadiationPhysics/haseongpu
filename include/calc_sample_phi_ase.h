@@ -41,7 +41,7 @@
  * @param sigmaE
  *
  **/
-__global__ void calcSampleGainSum(curandStateMtgp32* globalState, 
+__global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
@@ -50,14 +50,13 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 const unsigned raysPerSample,
 				 float *gainSum,
 				 float *gainSumSquare,
-				 unsigned *lostRays,
 				 const unsigned sample_i,
 				 const double sigmaA,
 				 const double sigmaE,
 				 unsigned *globalOffsetMultiplicator
 				 );
 
-__global__ void calcSampleGainSumWithoutReflections(curandStateMtgp32* globalState, 
+__global__ void calcSampleGainSum(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
 				 const unsigned wave_i, 
