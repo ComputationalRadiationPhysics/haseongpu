@@ -18,13 +18,16 @@
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
-#include <test_environment.h>
 
 #include <logging.h>
 #include <ray_histogram.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
+#define MAX_INTERPOLATION 1000
+#define LAMBDA_START 905
+#define LAMBDA_STOP 1095
+
 unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
 
 
@@ -90,6 +93,78 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
   return gain_local * phiAse / mesh.crystalFluorescence;
 }
 
+unsigned getNextSmallerIndex(std::vector<double> v, double t){
+  unsigned index = 0;
+  for(unsigned i = 0; i < v.size(); ++i){
+    if(v.at(i) < t) index = i;
+    else break;
+  }
+  return index;
+}
+
+unsigned getNextBiggerIndex(std::vector<double> v, double t){
+  for(unsigned i = 0; i < v.size(); ++i){
+    if(v.at(i) > t)
+      return i;
+  }
+  return 0;
+}
+
+std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop){
+  assert(interpolation_range >= sigma_y.size());
+  assert(lambda_stop > lambda_start);
+  std::vector<double> interpolation_y(interpolation_range, 0);
+
+  const double lambda_range = lambda_stop - lambda_start;
+  assert(sigma_y.size() >= lambda_range);
+
+  // Generate sigma_x
+  std::vector<double> sigma_x;
+  for(unsigned i = lambda_start; i <= lambda_stop; ++i){
+    sigma_x.push_back(i);
+  }
+
+  
+  for(unsigned i = 0; i < interpolation_range; ++i){
+    double interpolation_x = lambda_start + (i * (lambda_range / interpolation_range));
+
+    // Get index of points before and after
+    double sigma_smaller_i = getNextSmallerIndex(sigma_x, interpolation_x);
+    double sigma_bigger_i = getNextBiggerIndex(sigma_x, interpolation_x);
+    int sigma_diff = sigma_bigger_i - sigma_smaller_i;
+
+    if(sigma_diff == 1){
+      // Linear interpolation
+      double sigma_smaller_x = lambda_start + sigma_smaller_i;
+      double sigma_bigger_x = lambda_start + sigma_bigger_i;
+      assert(sigma_y.size() >= sigma_smaller_i);
+
+      double sigma_smaller_y = sigma_y.at(sigma_smaller_i);
+      double sigma_bigger_y = sigma_y.at(sigma_bigger_i);
+
+      double m = (sigma_bigger_y - sigma_smaller_y) / (sigma_bigger_x / sigma_smaller_x);
+      double b = sigma_smaller_y - (m * sigma_smaller_x);
+      interpolation_y.at(i) = m * interpolation_x + b;
+
+      //dout(V_DEBUG) << "SMALLER: " << sigma_smaller_x << " X: " << interpolation_x << " BIGGER: " << sigma_bigger_x << std::endl;
+      dout(V_DEBUG) << "SMALLER: " << sigma_smaller_y << " Y: " << interpolation_y.at(i) << " BIGGER: " << sigma_bigger_y << std::endl;
+      
+    }
+    else if(sigma_diff == 2){
+      // No interpolation needed
+      interpolation_y.at(i) = sigma_y.at(sigma_smaller_i + 1);
+    }
+    else {
+      dout(V_ERROR) << "Index of smaller and bigger sigma too seperated" << std::endl;
+      exit(0);
+    }
+    
+  }
+
+  
+  return interpolation_y;
+}
+
 
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
@@ -139,6 +214,10 @@ int main(int argc, char **argv){
   assert(sigmaA.size() == sigmaE.size());
   assert(mseThreshold.size() == sigmaE.size());
 
+  // Interpolate sigmaA / sigmaE function
+  std::vector<double> sigmaAInterpolation = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  std::vector<double> sigmaEInterpolation = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  return 0;
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
@@ -174,8 +253,8 @@ int main(int argc, char **argv){
             maxRepetitions,
             dMesh.at(gpu_i),
             hMesh,
-            sigmaA,
-            sigmaE,
+            sigmaAInterpolation,
+            sigmaEInterpolation,
             mseThreshold,
             useReflections,
             phiAse, 
@@ -202,8 +281,8 @@ int main(int argc, char **argv){
           maxRepetitions,
           dMesh.at(0),
           hMesh,
-          sigmaA,
-          sigmaE,
+          sigmaAInterpolation,
+          sigmaEInterpolation,
           mseThreshold,
           useReflections,
           phiAse,
