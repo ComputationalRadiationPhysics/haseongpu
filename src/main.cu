@@ -219,9 +219,9 @@ int main(int argc, char **argv){
   std::vector<double> sigmaEInterpolation = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
 
   // Calc max sigmaA / sigmaE
-  double maxSigmaE = 0;
-  double maxSigmaA = 0;
-  for(unsigned i = 0; i > sigmaE.size(); ++i){
+  double maxSigmaE = 0.0;
+  double maxSigmaA = 0.0;
+  for(unsigned i = 0; i < sigmaE.size(); ++i){
     if(sigmaE.at(i) > maxSigmaE){
       maxSigmaE = sigmaE.at(i);
       maxSigmaA = sigmaA.at(i);
@@ -354,7 +354,7 @@ int main(int argc, char **argv){
       1,
       hMesh.numberOfSamples,
       hMesh.numberOfLevels
-      );
+		    );
 
 
   // FOR OUTPUT

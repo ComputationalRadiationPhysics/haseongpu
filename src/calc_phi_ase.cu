@@ -89,7 +89,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   // Calc max sigmaA / sigmaE
   double maxSigmaE = 0;
   double maxSigmaA = 0;
-  for(unsigned i = 0; i > hSigmaE.size(); ++i){
+  for(unsigned i = 0; i < hSigmaE.size(); ++i){
     if(hSigmaE.at(i) > maxSigmaE){
       maxSigmaE = hSigmaE.at(i);
       maxSigmaA = hSigmaA.at(i);
