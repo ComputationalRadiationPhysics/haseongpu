@@ -24,7 +24,6 @@ void writeMatlabOutput(
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
-    const unsigned numberOfWavelengths,
     const unsigned numberOfSamples,
     const unsigned numberOfLevels
     );

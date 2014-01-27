@@ -29,7 +29,6 @@ void writeMatlabOutput(
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
-    const unsigned numberOfWavelengths,
     const unsigned numberOfSamples,
     const unsigned numberOfLevels){
 
@@ -39,14 +38,14 @@ void writeMatlabOutput(
   const unsigned samplesPerLevel = numberOfSamples/numberOfLevels;
 
   aseFile.open((experimentPath + "phi_ASE.txt").c_str());
-  write3dMatrix(ase,aseFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
+  write3dMatrix(ase,aseFile,samplesPerLevel,numberOfLevels,1);
   aseFile.close();
 
   raysFile.open((experimentPath + "N_rays.txt").c_str());
-  write3dMatrix(N_rays,raysFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
+  write3dMatrix(N_rays,raysFile,samplesPerLevel,numberOfLevels,1);
   raysFile.close();
 
   expectedValuesFile.open((experimentPath + "mse_values.txt").c_str());
-  write3dMatrix(expectedValues,expectedValuesFile,samplesPerLevel,numberOfLevels,numberOfWavelengths);
+  write3dMatrix(expectedValues,expectedValuesFile,samplesPerLevel,numberOfLevels,1);
   expectedValuesFile.close();
 }
