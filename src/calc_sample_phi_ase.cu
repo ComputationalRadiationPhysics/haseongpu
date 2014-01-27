@@ -28,24 +28,24 @@ __device__ unsigned getRayNumberBlockbased(unsigned* blockOffset,unsigned raysPe
 }
 
 __device__ __inline__ unsigned genRndSigmas(unsigned length, curandStateMtgp32* globalState) {
-	return unsigned(curand_uniform(&globalState[blockIdx.x])*length);
+  return unsigned(curand_uniform(&globalState[blockIdx.x])*(length-1));
 }
 
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
-				 const Mesh mesh, 
-				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
-				 const unsigned* numberOfReflectionSlices,
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum, 
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double *sigmaA, 
-				 const double *sigmaE,
-         const unsigned maxInterpolation,
-				 unsigned *globalOffsetMultiplicator
-				 ) {
+						const Mesh mesh, 
+						const unsigned* indicesOfPrisms, 
+						const unsigned wave_i, 
+						const unsigned* numberOfReflectionSlices,
+						const double* importance,
+						const unsigned raysPerSample,
+						float *gainSum, 
+						float *gainSumSquare,
+						const unsigned sample_i,
+						const double *sigmaA, 
+						const double *sigmaE,
+						const unsigned maxInterpolation,
+						unsigned *globalOffsetMultiplicator
+						) {
 
   int rayNumber = 0;
   double gainSumTemp = 0;
@@ -127,13 +127,13 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     unsigned x                      = genRndSigmas(maxInterpolation,globalState);
     assert(x<maxInterpolation);
 
-	  double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[x], sigmaE[x]);
+    double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[x], sigmaE[x]);
 
-	  gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
-	  gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
+    gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
+    gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
 
-	  gainSumTemp       += gain;
-	  gainSumSquareTemp += gain * gain;
+    gainSumTemp       += gain;
+    gainSumSquareTemp += gain * gain;
 
   }
   atomicAdd(&(gainSum[0]), float(gainSumTemp));

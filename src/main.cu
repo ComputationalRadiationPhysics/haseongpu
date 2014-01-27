@@ -147,7 +147,7 @@ std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, con
       interpolation_y.at(i) = m * interpolation_x + b;
 
       //dout(V_DEBUG) << "SMALLER: " << sigma_smaller_x << " X: " << interpolation_x << " BIGGER: " << sigma_bigger_x << std::endl;
-      dout(V_DEBUG) << "SMALLER: " << sigma_smaller_y << " Y: " << interpolation_y.at(i) << " BIGGER: " << sigma_bigger_y << std::endl;
+      //dout(V_DEBUG) << "SMALLER: " << sigma_smaller_y << " Y: " << interpolation_y.at(i) << " BIGGER: " << sigma_bigger_y << std::endl;
       
     }
     else if(sigma_diff == 2){
@@ -217,7 +217,16 @@ int main(int argc, char **argv){
   // Interpolate sigmaA / sigmaE function
   std::vector<double> sigmaAInterpolation = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
   std::vector<double> sigmaEInterpolation = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-  return 0;
+
+  // Calc max sigmaA / sigmaE
+  double maxSigmaE = 0;
+  double maxSigmaA = 0;
+  for(unsigned i = 0; i > sigmaE.size(); ++i){
+    if(sigmaE.at(i) > maxSigmaE){
+      maxSigmaE = sigmaE.at(i);
+      maxSigmaA = sigmaA.at(i);
+    }
+  }
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
@@ -228,10 +237,10 @@ int main(int argc, char **argv){
   if(Mesh::parseMultiGPU(hMesh, dMesh, inputPath, devices, maxGpus)) return 1;
 
   // Solution vector
-  std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<double> mse(hMesh.numberOfSamples * sigmaE.size(), 1000);
-  std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> dndtAse(hMesh.numberOfSamples, 0);
+  std::vector<float>  phiAse(hMesh.numberOfSamples, 0);
+  std::vector<double> mse(hMesh.numberOfSamples, 100000);
+  std::vector<unsigned> totalRays(hMesh.numberOfSamples, 0);
 
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
@@ -318,20 +327,15 @@ int main(int argc, char **argv){
 
   if(verbosity & V_DEBUG){
     // Print Solutions
-    for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
-      dout(V_DEBUG) << "\n\nSolutions " <<  wave_i << std::endl;
       for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-        dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
+        dndtAse.at(sample_i) = calcDndtAse(hMesh, maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
         if(sample_i <=10)
-          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;
+          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sample_i) << " " << mse.at(sample_i) << std::endl;
       }
       for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sampleOffset) << " " << mse.at(sampleOffset) <<std::endl;
+        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sample_i) << " " << mse.at(sample_i) <<std::endl;
         if(sample_i >= 10) break;
       }
-    }
   }
 
   // Compare with vtk
@@ -347,7 +351,7 @@ int main(int argc, char **argv){
       phiAse,
       totalRays,
       mse,
-      sigmaE.size(),
+      1,
       hMesh.numberOfSamples,
       hMesh.numberOfLevels
       );
@@ -381,7 +385,6 @@ int main(int argc, char **argv){
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
-    dout(V_STAT) << "Wavelength        : " << (int) sigmaE.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
     if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
     dout(V_STAT | V_NOLABEL) << std::endl;
