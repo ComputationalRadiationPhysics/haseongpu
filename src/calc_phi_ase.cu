@@ -93,8 +93,10 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<double>   dPreImportance     (hMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<double>   dPreImportance      (hMesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
+  device_vector<double>   dSigmaA             (hSigmaA.begin(),hSigmaA.end());
+  device_vector<double>   dSigmaE             (hSigmaE.begin(),hSigmaE.end());
 
   // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
@@ -160,8 +162,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 								     raw_pointer_cast(&dGainSum[0]), 
 								     raw_pointer_cast(&dGainSumSquare[0]),
 								     sample_i, 
-								     hSigmaA[wave_i], 
-								     hSigmaE[wave_i],
+								     //hSigmaA[wave_i], 
+								     //hSigmaE[wave_i],
+                     raw_pointer_cast(&dSigmaA[0]),
+                     raw_pointer_cast(&dSigmaE[0]),
+                     hSigmaA.size(),
 								     raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
           else{
@@ -174,8 +179,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 						       raw_pointer_cast(&dGainSum[0]), 
 						       raw_pointer_cast(&dGainSumSquare[0]),
 						       sample_i, 
-						       hSigmaA[wave_i], 
-						       hSigmaE[wave_i],
+						       //hSigmaA[wave_i], 
+						       //hSigmaE[wave_i],
+                   raw_pointer_cast(&dSigmaA[0]),
+                   raw_pointer_cast(&dSigmaE[0]),
+                   hSigmaA.size(),
 						       raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
           }
 
