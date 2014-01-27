@@ -351,7 +351,6 @@ int main(int argc, char **argv){
       phiAse,
       totalRays,
       mse,
-      1,
       hMesh.numberOfSamples,
       hMesh.numberOfLevels
       );
