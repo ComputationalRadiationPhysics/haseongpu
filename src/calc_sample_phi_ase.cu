@@ -34,7 +34,6 @@ __device__ __inline__ unsigned genRndSigmas(unsigned length, curandStateMtgp32* 
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 						const Mesh mesh, 
 						const unsigned* indicesOfPrisms, 
-						const unsigned wave_i, 
 						const unsigned* numberOfReflectionSlices,
 						const double* importance,
 						const unsigned raysPerSample,
@@ -72,7 +71,6 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
     unsigned x       = genRndSigmas(maxInterpolation,globalState);
 
     // Calculate reflections as different ray propagations
-    //double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
     double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[x], sigmaE[x]);
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + reflectionOffset];
     
@@ -93,7 +91,6 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 const Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum, 
