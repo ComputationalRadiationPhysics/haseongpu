@@ -19,7 +19,7 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
-    std::string *outputPath
+    std::string *outputPath,
     double *mseThreshold
     ) {
 
