@@ -32,7 +32,6 @@
 % mse_values           real expectation-values for each samplepoint (aligned like phi_ASE)
 % N_rays                    number of rays that were used for each samplepoint
 
-%function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,NumRays,clad_int, clad_number, clad_abs, refractiveIndices, reflectivities,MaxRays,mse_threshold,use_reflections)
 
 function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden,NumRays,N_tot,z_mesh,laser,crystal,mesh_z)
 
@@ -57,7 +56,7 @@ function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,n
 
 NumRays = 10000000;
 MaxRays = 100000000;
-mse=0.05;
+mse_threshold=0.05;
 use_reflections = true; 
 MAX_GPUS=1;
 N_PER_NODE=4;
@@ -67,14 +66,6 @@ maxSample=(mesh_z*a)-1;
 Repetitions=4;
 
 used_dummy = false;
-
-%create dummy variables
-if(~exist('mse_threshold','var'))
-  %WARNING = 'The variable mse_threshold does not exist'
-  [a,b] = size(laser.s_ems);
-  mse_threshold = ones(1,a)*mse;
-  used_dummy=true;
-end
 
 %create dummy variables
 if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
@@ -132,10 +123,10 @@ end
 clean_IO_files(TMP_FOLDER);
 
 % create the new input based on the MATLAB variables
-create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,TMP_FOLDER,CURRENT_DIR);
+create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
 
   % do the propagation
-  status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ]);
+  status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ' --mse-threshold=' num2str(mse_threshold) ]);
 
   if(status ~= 0)
     error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
@@ -150,7 +141,7 @@ create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_i
 end
 
 %takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,mse_threshold,FOLDER,CURRENT_DIR)
+function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
 
 mkdir(FOLDER);
 cd(FOLDER);
@@ -258,10 +249,6 @@ fclose(x);
 
 x=fopen('reflectivities.txt','w');
 fprintf(x,'%.50f\n',reflectivities);
-fclose(x);
-
-x=fopen('mse_threshold.txt','w');
-fprintf(x,'%.15f\n',mse_threshold);
 fclose(x);
 
 cd(CURRENT_DIR);
