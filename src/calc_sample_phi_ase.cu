@@ -65,13 +65,11 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
     unsigned startLevel             = startPrism / mesh.numberOfTriangles;
     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
     unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
-
-    //Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
-    Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
-    unsigned x       = genRndSigmas(maxInterpolation,globalState);
+    Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
+    unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
 
     // Calculate reflections as different ray propagations
-    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[x], sigmaE[x]);
+    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + reflectionOffset];
     
     assert(!isnan(mesh.getBetaValue(startPrism)));
@@ -111,20 +109,19 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
   // One thread can compute multiple rays
   // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
   while(true){
-	  rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
-	  if(rayNumber>=raysPerSample) break;
+    rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
+    if(rayNumber>=raysPerSample) break;
 
-	  // Get triangle/prism to start ray from
-	  unsigned startPrism             = indicesOfPrisms[rayNumber];
-	  unsigned startLevel             = startPrism/mesh.numberOfTriangles;
-	  unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-
+    // Get triangle/prism to start ray from
+    unsigned startPrism             = indicesOfPrisms[rayNumber];
+    unsigned startLevel             = startPrism/mesh.numberOfTriangles;
+    unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
     Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
     Ray ray                         = generateRay(startPoint, samplePoint);
-    unsigned x                      = genRndSigmas(maxInterpolation,globalState);
+    unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
     assert(x<maxInterpolation);
 
-    double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[x], sigmaE[x]);
+    double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
 
     gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
