@@ -41,8 +41,11 @@ for i_s=1:50
         mode.extr =1;
 
         % laser wavelength
-        sigma_abs_L=laser.s_abs;
-        sigma_ems_L=laser.s_ems;
+	[laser.max_ems, i] = max(laser.s_ems);
+        laser.max_abs = laser.s_abs(i);
+
+        sigma_abs_L=laser.max_abs;
+        sigma_ems_L=laser.max_ems;
         beta_min = zeros(25,1);
         beta_min(:) = sigma_abs_L/(sigma_abs_L+sigma_ems_L);
         grid_z_beta_min = 0:crystal.length/24:crystal.length;

@@ -60,6 +60,7 @@ MaxRays = 100000000;
 mse=0.05;
 use_reflections = true; 
 MAX_GPUS=1;
+N_PER_NODE=4;
 [a,b] = size(p);
 minSample=0;
 maxSample=(mesh_z*a)-1;
@@ -118,7 +119,7 @@ FILENAME=[ mfilename('fullpath') '.m' ];
 TMP_FOLDER = [ '/' 'tmp' filesep 'calcPhiASE_tmp' ];
 
 if(strcmpi(Runmode,'mpi'))
-  Prefix=[ 'mpiexec -npernode ' num2str(MAX_GPUS) ' ' ];
+  Prefix=[ 'mpiexec -npernode ' num2str(N_PER_NODE) ' ' ];
   % reduce maxGPUs only after setting -npernode
   MAX_GPUS=1;
   % overwrite TMP_FOLDER => needs to be shared among ALL THE NODES!!
