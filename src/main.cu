@@ -112,9 +112,14 @@ unsigned getNextBiggerIndex(std::vector<double> v, double t){
 
 std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop){
   assert(interpolation_range >= sigma_y.size());
-  assert(lambda_stop > lambda_start);
-  std::vector<double> interpolation_y(interpolation_range, 0);
+  assert(lambda_stop >= lambda_start);
 
+  // Monochromatic case
+  if(sigma_y.size() == 1){
+    return std::vector<double>(1, sigma_y.at(0));
+  }
+
+  std::vector<double> y(interpolation_range, 0);
   const double lambda_range = lambda_stop - lambda_start;
   assert(sigma_y.size() >= lambda_range);
 
@@ -123,36 +128,36 @@ std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, con
   for(unsigned i = lambda_start; i <= lambda_stop; ++i){
     sigma_x.push_back(i);
   }
-
   
   for(unsigned i = 0; i < interpolation_range; ++i){
-    double interpolation_x = lambda_start + (i * (lambda_range / interpolation_range));
+    double x = lambda_start + (i * (lambda_range / interpolation_range));
 
-    // Get index of points before and after
-    double sigma_smaller_i = getNextSmallerIndex(sigma_x, interpolation_x);
-    double sigma_bigger_i = getNextBiggerIndex(sigma_x, interpolation_x);
-    int sigma_diff = sigma_bigger_i - sigma_smaller_i;
+    // Get index of points before and after x
+    double y1_i = getNextSmallerIndex(sigma_x, x);
+    double y2_i = getNextBiggerIndex(sigma_x, x);
+    int sigma_diff = y2_i - y1_i;
 
     if(sigma_diff == 1){
-      // Linear interpolation
-      double sigma_smaller_x = lambda_start + sigma_smaller_i;
-      double sigma_bigger_x = lambda_start + sigma_bigger_i;
-      assert(sigma_y.size() >= sigma_smaller_i);
+      // First point p1=(x1/y1) before x
+      double x1 = lambda_start + y1_i;
+      double y1 = sigma_y.at(y1_i);
 
-      double sigma_smaller_y = sigma_y.at(sigma_smaller_i);
-      double sigma_bigger_y = sigma_y.at(sigma_bigger_i);
+      // Second point p2=(x2/y2) after x
+      double x2 = lambda_start + y2_i;
+      double y2 = sigma_y.at(y2_i);
+      assert(sigma_y.size() >= y1_i);
 
-      double m = (sigma_bigger_y - sigma_smaller_y) / (sigma_bigger_x / sigma_smaller_x);
-      double b = sigma_smaller_y - (m * sigma_smaller_x);
-      interpolation_y.at(i) = m * interpolation_x + b;
+      // linear function between p1 and p2 (y=mx+b)
+      double m = (y2 - y1) / (x2 / x1);
+      double b = y1 - (m * x1);
 
-      //dout(V_DEBUG) << "SMALLER: " << sigma_smaller_x << " X: " << interpolation_x << " BIGGER: " << sigma_bigger_x << std::endl;
-      //dout(V_DEBUG) << "SMALLER: " << sigma_smaller_y << " Y: " << interpolation_y.at(i) << " BIGGER: " << sigma_bigger_y << std::endl;
-      
+      // Interpolate y from linear function
+      y.at(i) = m * x + b;
+
     }
     else if(sigma_diff == 2){
       // No interpolation needed
-      interpolation_y.at(i) = sigma_y.at(sigma_smaller_i + 1);
+      y.at(i) = sigma_y.at(y1_i + 1);
     }
     else {
       dout(V_ERROR) << "Index of smaller and bigger sigma too seperated" << std::endl;
@@ -160,9 +165,8 @@ std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, con
     }
     
   }
-
   
-  return interpolation_y;
+  return y;
 }
 
 
@@ -189,11 +193,12 @@ int main(int argc, char **argv){
   std::string inputPath;
   std::string outputPath;
   verbosity = 31; //ALL //TODO: remove in final code
+  double mseThreshold = 0;
 
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
-  double mseThreshold = 0;
+
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &inputPath,
