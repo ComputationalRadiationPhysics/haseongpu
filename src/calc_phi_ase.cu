@@ -139,10 +139,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       while(run < maxRepetitions && mseTooHigh){
 	run++;
 
-	thrust::copy(dPreImportance.begin(),dPreImportance.end(),dImportance.begin());
+	//thrust::copy(dPreImportance.begin(),dPreImportance.end(),dImportance.begin());
 	hRaysPerSampleDump = importanceSamplingDistribution(reflectionSlices,
 							    dMesh,
 							    *raysPerSampleIter,
+							    raw_pointer_cast(&dPreImportance[0]), 
 							    raw_pointer_cast(&dImportance[0]), 
 							    raw_pointer_cast(&dRaysPerPrism[0]),
 							    hSumPhi,

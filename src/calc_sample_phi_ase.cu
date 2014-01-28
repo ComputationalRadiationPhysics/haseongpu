@@ -119,7 +119,7 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
     Ray ray                         = generateRay(startPoint, samplePoint);
     unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
-    assert(x<maxInterpolation);
+    assert(sigma_i < maxInterpolation);
 
     double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
 
