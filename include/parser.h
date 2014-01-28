@@ -97,7 +97,8 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
-    std::string *outputPath
+    std::string *outputPath,
+    double *mseThreshold
     );
 
 int checkParameterValidity(
@@ -111,7 +112,8 @@ int checkParameterValidity(
     const int minSample_i,
     const int maxSample_i,
     const unsigned maxRepetitions,
-    const std::string outputPath
+    const std::string outputPath,
+    double *mseThreshold
     );
 
 

@@ -15,17 +15,17 @@ struct calcDndtAseArgs
 		  const Mesh& phostMesh,
 		  const std::vector<double>& psigmaA,
 		  const std::vector<double>& psigmaE,
-		  const std::vector<float>& pMseThreshold,
+		  const double pMseThreshold,
 		  const bool puseReflections,
 		  std::vector<float> &pphiAse,
 		  std::vector<double> &pMse,
-      std::vector<unsigned> &pTotalRays,
+		  std::vector<unsigned> &pTotalRays,
 		  unsigned pgpu_i,
 		  unsigned pminSample_i,
 		  unsigned pmaxSample_i,
 		  float &pruntime): hostRaysPerSample(phostRaysPerSample),
 				    maxRaysPerSample(pmaxRaysPerSample),
-            maxRepetitions(pmaxRepetitions),
+				    maxRepetitions(pmaxRepetitions),
 				    mesh(pmesh),
 				    hostMesh(phostMesh),
 				    sigmaA(psigmaA),
@@ -48,7 +48,7 @@ struct calcDndtAseArgs
   const Mesh& hostMesh;
   const std::vector<double>& sigmaA;
   const std::vector<double>& sigmaE;
-  const std::vector<float>& mseThreshold;
+  const double mseThreshold;
   const bool useReflections;
   std::vector<float> &phiAse;
   std::vector<double> &mse;
@@ -63,7 +63,7 @@ void *entryPoint(void* arg){
   calcDndtAseArgs *a = (calcDndtAseArgs*) arg;
   calcPhiAse( a->hostRaysPerSample,
    	      a->maxRaysPerSample,
-          a->maxRepetitions,
+	      a->maxRepetitions,
    	      a->mesh,
    	      a->hostMesh,
    	      a->sigmaA,
@@ -72,7 +72,7 @@ void *entryPoint(void* arg){
    	      a->useReflections,
    	      a->phiAse,
    	      a->mse,
-          a->totalRays,
+	      a->totalRays,
    	      a->gpu_i,
    	      a->minSample_i,
    	      a->maxSample_i,
@@ -83,12 +83,12 @@ void *entryPoint(void* arg){
 
 pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      const unsigned maxRaysPerSample,
-            const unsigned maxRepetitions,
+			      const unsigned maxRepetitions,
 			      const Mesh& mesh,
 			      const Mesh& hostMesh,
 			      const std::vector<double>& sigmaA,
 			      const std::vector<double>& sigmaE,
-			      const std::vector<float>& mseThreshold,
+			      const double mseThreshold,
 			      const bool useReflections,
 			      std::vector<float> &phiAse,
 			      std::vector<double> &mse,
@@ -99,7 +99,7 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      float &runtime){
   calcDndtAseArgs *args = new calcDndtAseArgs(hostRaysPerSample,
 					      maxRaysPerSample,
-                maxRepetitions,
+					      maxRepetitions,
 					      mesh,
 					      hostMesh,
 					      sigmaA,
@@ -108,7 +108,7 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 					      useReflections,
 					      phiAse,
 					      mse,
-                totalRays,
+					      totalRays,
 					      gpu_i,
 					      minSample_i,
 					      maxSample_i,
