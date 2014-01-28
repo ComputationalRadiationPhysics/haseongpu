@@ -54,7 +54,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 		  const Mesh& hMesh,
 		  const std::vector<double>& hSigmaA,
 		  const std::vector<double>& hSigmaE,
-		  const std::vector<float>& mseThreshold,
+		  const double mseThreshold,
 		  const bool useReflections,
 		  std::vector<float> &phiAse,
 		  std::vector<double> &mse,
@@ -199,7 +199,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	  phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
 	  totalRays.at(sample_i) = *raysPerSampleIter;
 	}
-	if(mse.at(sample_i) < mseThreshold.at(0)) mseTooHigh = false;
+	if(mse.at(sample_i) < mseThreshold) mseTooHigh = false;
       }
 
       // Increase rays per sample or break, when mseThreshold was not met

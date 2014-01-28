@@ -20,6 +20,7 @@ void parseCommandLine(
     int *maxSample_i,
     unsigned *maxRepetitions,
     std::string *outputPath
+    double *mseThreshold
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -117,6 +118,10 @@ void parseCommandLine(
       *maxRepetitions = unsigned(atoi(p.second.c_str()));
     }
 
+    if(p.first == "--mse-threshold"){
+      *mseThreshold = float(atof(p.second.c_str()));
+    }
+
   }
 }
 
@@ -131,7 +136,8 @@ int checkParameterValidity(
     const int minSample_i,
     const int maxSample_i,
     const unsigned maxRepetitions,
-    const std::string outputPath
+    const std::string outputPath,
+    double *mseThreshold
     ) {
 
   if (argc <= 1) {
@@ -220,5 +226,10 @@ int checkParameterValidity(
   if(maxRepetitions < 1){
     dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
   }
+
+  if(*mseThreshold == 0){
+    *mseThreshold = 1000;
+  }
+
   return 0;
 }

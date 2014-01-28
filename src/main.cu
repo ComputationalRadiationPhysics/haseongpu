@@ -193,11 +193,11 @@ int main(int argc, char **argv){
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
-  std::vector<float> mseThreshold;
+  double mseThreshold = 0;
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath);
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -205,14 +205,12 @@ int main(int argc, char **argv){
   devices = getCorrectDevice(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(inputPath + "sigma_a.txt", &sigmaA)) return 1;
   if(fileToVector(inputPath + "sigma_e.txt", &sigmaE)) return 1;
-  if(fileToVector(inputPath + "mse_threshold.txt", &mseThreshold)) return 1;
   assert(sigmaA.size() == sigmaE.size());
-  assert(mseThreshold.size() == sigmaE.size());
 
   // Interpolate sigmaA / sigmaE function
   std::vector<double> sigmaAInterpolation = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
@@ -361,10 +359,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, mse, outputPath + "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, mse, outputPath + "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
   if(verbosity & V_STAT){
@@ -372,7 +370,7 @@ int main(int argc, char **argv){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);
       avgMSE += *it;
-      if(*it >= mseThreshold.at(0))
+      if(*it >= mseThreshold)
         highMSE++;
     }
     avgMSE /= mse.size();
@@ -388,7 +386,7 @@ int main(int argc, char **argv){
     if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
-    dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
+    dout(V_STAT) << "MSE threshold     : " << mseThreshold << std::endl;
     dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
     dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
@@ -397,7 +395,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
       dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-      ray_histogram(totalRays,maxRaysPerSample,mseThreshold[0],mse);
+      ray_histogram(totalRays,maxRaysPerSample,mseThreshold,mse);
     }
     dout(V_STAT) << std::endl;
 
