@@ -4,4 +4,4 @@ INCLUDES=/usr/include/$(VTK)
 LIBS=/usr/lib/$(VTK)
 
 all:
-	g++ convertVTKtoVTU.cpp -I $(INCLUDES)  -L $(LIBS)  -l vtkIO -o convertVTKtoVTU
+	g++ convertVTKtoVTU.cpp -I $(INCLUDES)  -L $(LIBS)  -l vtkIO -o convertVTKtoVTU -Wno-deprecated
