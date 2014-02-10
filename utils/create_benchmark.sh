@@ -15,7 +15,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd $DIR
 mkdir $DEST
-echo $(pwd)
 
 # create the template structure
 cp -r benchmark_template/* $DEST/.
@@ -27,6 +26,9 @@ cp ../bin/calcPhiASE $DEST/bin/.
 # prepare the VTK-Tools
 cp vtktools/* $DEST/.
 cd $DEST
-make
 
-echo $(pwd)
+if [ "$(hostname)" = "hypnos" ] ; then
+  make 1>/dev/null
+else
+  echo "You are not on hypnos, therefore the VTK-tools can not be automatically compiled (that's sad but ok)"
+fi
