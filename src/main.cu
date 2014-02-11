@@ -392,6 +392,8 @@ int main(int argc, char **argv){
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
     dout(V_STAT) << "MSE threshold     : " << mseThreshold << std::endl;
+    dout(V_STAT) << "Wavelength        : " << sigmaA.size() << std::endl;
+    dout(V_STAT) << "int. Wavelength   : " << sigmaAInterpolation.size() << std::endl;
     dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
     dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
