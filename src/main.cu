@@ -28,7 +28,9 @@
 #define LAMBDA_START 905
 #define LAMBDA_STOP 1095
 
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
+
+// default without V_DEBUG
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.h
 
 
 /** 
@@ -192,8 +194,8 @@ int main(int argc, char **argv){
 
   std::string inputPath;
   std::string outputPath;
-  verbosity = 31; //ALL //TODO: remove in final code
   double mseThreshold = 0;
+  verbosity = 63; //ALL //TODO: remove in final code
 
   // Wavelength data
   std::vector<double> sigmaA;
@@ -300,8 +302,7 @@ int main(int argc, char **argv){
           phiAse,
           mse,
           totalRays,
-          devices.at(0),
-          maxSampleRange
+          devices.at(0)
           );
       runmode = "RAY PROPAGATION MPI";
       break;

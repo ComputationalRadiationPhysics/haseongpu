@@ -205,21 +205,18 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       raysPerSampleIter++;
       if(raysPerSampleIter == raysPerSampleList.end())
 	break;
+      
+      if(verbosity & V_PROGRESS){
+        fancyProgressBar(hMesh.numberOfSamples);
+      }
 	  
     }
-    // Update progressbar
-    // works for Runmode=='mpi'
-    fancyProgressBar(sample_i,hMesh.numberOfSamples);
-    // works for Runmode=='ray_propagation_gpu'
-    //fancyProgressBar(hMesh.numberOfSamples);
+
   }
     
-
-  
   // Free Memory
   cudaFree(devMTGPStates);
   cudaFree(devKernelParams);
-
 
   runtime = difftime(time(0),starttime);
   return runtime;

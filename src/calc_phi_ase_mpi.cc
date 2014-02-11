@@ -55,6 +55,7 @@ void mpiHead(std::vector<float> &phiASE,
       phiASE.at(sampleOffset)    = res[1];
       mse.at(sampleOffset)       = res[2];
       totalRays.at(sampleOffset) = (unsigned)res[3];
+      fancyProgressBar(hMesh.numberOfSamples);
       break;
 
     case SAMPLE_REQUEST_TAG:
@@ -160,14 +161,13 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
-		      unsigned gpu_i,
-		      unsigned maxSample_i){
+		      unsigned gpu_i){
 
 
 
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){
-    std::cerr << "Error starting MPI program." << std::endl;
+    dout(V_ERROR) << "Error starting MPI program." << std::endl;
     MPI_Abort(MPI_COMM_WORLD,mpiError);
     return 1;
   }
@@ -187,6 +187,10 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
 
   default:
+    // disable Information verbosity for other nodes than HEADNODE
+    // (should have similar output anyway)
+    verbosity &= ~V_PROGRESS;
+
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
 	       maxRepetitions,
