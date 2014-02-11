@@ -75,7 +75,6 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   time_t starttime                = time(0);
   unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
-  //unsigned numberOfWavelengths    = hSigmaE.size();
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
   bool distributeRandomly         = true;
@@ -139,7 +138,6 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       while(run < maxRepetitions && mseTooHigh){
 	run++;
 
-	//thrust::copy(dPreImportance.begin(),dPreImportance.end(),dImportance.begin());
 	hRaysPerSampleDump = importanceSamplingDistribution(reflectionSlices,
 							    dMesh,
 							    *raysPerSampleIter,
