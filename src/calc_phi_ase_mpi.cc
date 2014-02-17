@@ -21,6 +21,18 @@
 #define RESULT_MSG_LENGTH 5
 #define SAMPLE_MSG_LENGTH 2
 
+/**
+ * @brief Manages communication with compute nodes.
+ *        There are 4 possible messages :
+ *        1. Compute node request sample
+ *        2. Compute node sends results
+ *        3. Head sends sample
+ *        4. Head sends abort signal
+ *
+ * @param phiASE    return for phi ASE
+ * @param mse       return for Mean squared error
+ * @param totalRays return for raysPerSample
+ */
 void mpiHead(std::vector<float> &phiASE, 
 	     std::vector<double> &mse,
 	     std::vector<unsigned> &totalRays,
@@ -31,19 +43,21 @@ void mpiHead(std::vector<float> &phiASE,
   MPI_Status status;
   float res[RESULT_MSG_LENGTH] = {0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
-  unsigned finished = 0;
+  unsigned finishedComputeNodes = 0;
   unsigned sampleOffset = 0;
   sample_i[1] = sampleRange;
 
-  while(finished < numberOfComputeNodes){
+  while(finishedComputeNodes < numberOfComputeNodes){
     MPI_Recv(res, RESULT_MSG_LENGTH, MPI_FLOAT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
     switch(status.MPI_TAG){
+      // Compute node finished and sends runtime
     case RUNTIME_TAG:
       runtimes.push_back(res[0]);
-      finished++;
+      finishedComputeNodes++;
       break;
 
+      // Compute node sends its results for sample_i
     case RESULT_TAG:
       /**
        * res[0] : sample_i
@@ -58,15 +72,18 @@ void mpiHead(std::vector<float> &phiASE,
       fancyProgressBar(hMesh.numberOfSamples);
       break;
 
+      // Compute node requests new sample point for computation
     case SAMPLE_REQUEST_TAG:
       if(sample_i[0] == (int)hMesh.numberOfSamples){
+	// No sample points left, abort computation
 	int abortMPI[2] = {-1,-1};
 	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
       }
       else{
+	// Send next sample range
 	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)hMesh.numberOfSamples);
-	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)hMesh.numberOfSamples);
+	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)hMesh.numberOfSamples); // min_sample_i
+	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)hMesh.numberOfSamples); // max_sample_i
 	
       }
       break;
@@ -81,10 +98,10 @@ void mpiHead(std::vector<float> &phiASE,
 }
 
 /**
- * This MPI-node make phiASE computations.
- * It will request a sample point range from
- * MPI head node, and send their results back
- * sequentially.
+ * @brief This MPI-node make phiASE computations.
+ *        It will request a sample point range from
+ *        MPI head node, and send their results back
+ *        sequentially.
  *
  **/
 void mpiCompute(unsigned &hostRaysPerSample,
@@ -109,12 +126,15 @@ void mpiCompute(unsigned &hostRaysPerSample,
     MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
     MPI_Recv(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
 
+
     if(sample_i[0] == -1){
+      // Abort message received => send runtime
       res[0] = runtime;
       MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RUNTIME_TAG, MPI_COMM_WORLD); 
       break;
     }
     else{
+      // Sample range received => calculate
       calcPhiAse ( hostRaysPerSample,
 		   maxRaysPerSample,
 		   maxRepetitions,
@@ -149,6 +169,16 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 }
 
+
+/**
+ * @brief The Nodes will split up in one head node
+ *        and the others as compute nodes. The head
+ *        node distributes the available sample
+ *        points by demand.
+ *
+ * @return number of used compute nodes
+ *
+ **/
 float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,
@@ -163,8 +193,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      std::vector<unsigned> &totalRays,
 		      unsigned gpu_i){
 
-
-
+  // Init MPI
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){
     dout(V_ERROR) << "Error starting MPI program." << std::endl;
@@ -172,6 +201,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     return 1;
   }
 
+  // Get size and rank
   int rank;
   int size;
   float runtime;
@@ -179,12 +209,15 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   std::vector<float> runtimes(size,0);
 
+  // Rank 0 will be head node
+  // all other ranks will be compute nodes
   switch(rank){
   case HEAD_NODE:
     mpiHead(hPhiAse, mse, totalRays, runtimes, hMesh, size-1, 1);
     cudaDeviceReset();   
     MPI_Finalize();
     break;
+
 
   default:
     // disable Information verbosity for other nodes than HEADNODE
