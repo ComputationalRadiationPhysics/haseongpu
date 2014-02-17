@@ -19,29 +19,41 @@ techniques and their implementations are explained.
 \subsubsection{Sample Points on multiple GPUs}
 \label{subsubsec:multigpu}
 
-Each Monte Carlo experiment (see setion \ref{eq:monte_carlo_ase}), calculates the $\Phi_{ASE}(s_i)$ 
-value of a sample point $s_i$ independent from each other.
-Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as its own CUDA kernel
-and therefore sample points can be distributed to several devices.
+Each Monte Carlo experiment (see section \ref{eq:monte_carlo_ase}), calculates
+the $\Phi_{ASE}(s_i)$ value of a sample point $s_i$ independently from each
+other. Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as a
+self-contained CUDA kernel and therefore sample points can be distributed to
+several devices.
 
-Consider having $k$ GPUs on a node available, 
-$k$ \emph{pthreads} are spawned on the host, like it
-is shown in Figure \ref{graphic:multigpu}. A GPU and a
-disjunct subset of sample points are assigned to every pthread, so that every
-sample point is distributed exactly to one pthread.
-From this point on, the pthreads run in parallel and start a
-CUDA kernel for every sample point in their subset.
-The kernels inside a pthread are called sequentially,
-thus the number of pthreads is limited by the number of sample points, when 
-every GPU simulates exacly one sample point.
-\textbf{TODO MPI Threads}
+Consider a MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
+node is used as a headnode responsible for distributing the workload. The
+headnode holds a queue of all sample points. Each node requests a new sample
+point and begins the calculation. As soon as the calculation is finished, a node
+is able to request new work indepently from the other nodes (Figure
+\ref{graphic:multigpu}). This form of load balancing is especially important in a
+scenario with differing workloads for each sample point (see section
+\ref{subsec:adaptive_sampling}).
 
-As a result the speedup for multiple
-GPUs is almost linear, which was tested with up to 4 GPUs.
+As a result, the speedup is almost linear in the number of GPUs. This was
+verified with up to 64 nodes.
+%Consider having $k$ GPUs on a node available, 
+%$k$ \emph{pthreads} are spawned on the host, like it
+%is shown in Figure \ref{graphic:multigpu}. A GPU and a
+%disjunct subset of sample points are assigned to every pthread, so that every
+%sample point is distributed exactly to one pthread.
+%From this point on, the pthreads run in parallel and start a
+%CUDA kernel for every sample point in their subset.
+%The kernels inside a pthread are called sequentially,
+%thus the number of pthreads is limited by the number of sample points, when 
+%every GPU simulates exacly one sample point.
+%\textbf{TODO MPI Threads}
+%
+%As a result the speedup for multiple
+%GPUs is almost linear, which was tested with up to 4 GPUs.
     
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning2.png}}}
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning3.png}}}
   \caption{partitioning of the workload to multiple devices}
   \label{graphic:multigpu}
 \end{figure}
