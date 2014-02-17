@@ -146,13 +146,13 @@ void importanceSamplingPropagation(unsigned sample_i,
 			    Mesh deviceMesh,
 			    const double sigmaA,
 			    const double sigmaE,
-			    double *importance,
+			    double *preImportance,
 			    dim3 blockDim,
 			    dim3 gridDim){
 
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, importance, sample_i, sigmaA, sigmaE));
+  CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, preImportance, sample_i, sigmaA, sigmaE));
 
 }
 
@@ -160,9 +160,10 @@ unsigned importanceSamplingDistribution(
 			    const unsigned reflectionSlices,
 			    Mesh deviceMesh,
 			    const unsigned raysPerSample,
+			    double *preImportance,
 			    double *importance,
 			    unsigned *raysPerPrism,
-				float hSumPhi,
+			    float hSumPhi,
 			    const bool distributeRandomly,
 			    dim3 blockDim,
 			    dim3 gridDim){
@@ -175,7 +176,7 @@ unsigned importanceSamplingDistribution(
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
 
-  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism,importance, dSumPhi, raysPerSample, dRaysDump));
+  CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, preImportance, dSumPhi, raysPerSample, dRaysDump));
 
   // Distribute remaining rays randomly if wanted
   if(distributeRandomly){

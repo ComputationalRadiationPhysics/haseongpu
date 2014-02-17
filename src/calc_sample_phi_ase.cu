@@ -27,20 +27,24 @@ __device__ unsigned getRayNumberBlockbased(unsigned* blockOffset,unsigned raysPe
 
 }
 
+__device__ __inline__ unsigned genRndSigmas(unsigned length, curandStateMtgp32* globalState) {
+  return unsigned(curand_uniform(&globalState[blockIdx.x])*(length-1));
+}
+
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
-				 const Mesh mesh, 
-				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
-				 const unsigned* numberOfReflectionSlices,
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum, 
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double sigmaA, 
-				 const double sigmaE,
-				 unsigned *globalOffsetMultiplicator
-				 ) {
+						const Mesh mesh, 
+						const unsigned* indicesOfPrisms, 
+						const unsigned* numberOfReflectionSlices,
+						const double* importance,
+						const unsigned raysPerSample,
+						float *gainSum, 
+						float *gainSumSquare,
+						const unsigned sample_i,
+						const double *sigmaA, 
+						const double *sigmaE,
+						const unsigned maxInterpolation,
+						unsigned *globalOffsetMultiplicator
+						) {
 
   int rayNumber = 0;
   double gainSumTemp = 0;
@@ -61,12 +65,11 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
     unsigned startLevel             = startPrism / mesh.numberOfTriangles;
     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
     unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
-
-    //Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
-    Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
+    Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
+    unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
 
     // Calculate reflections as different ray propagations
-    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
+    double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
     gain          *= mesh.getBetaValue(startPrism) * importance[startPrism + reflectionOffset];
     
     assert(!isnan(mesh.getBetaValue(startPrism)));
@@ -86,14 +89,14 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
 				 const Mesh mesh, 
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum, 
 				 float *gainSumSquare,
 				 const unsigned sample_i,
-				 const double sigmaA, 
-				 const double sigmaE,
+				 const double* sigmaA, 
+				 const double* sigmaE,
+         const unsigned maxInterpolation,
 				 unsigned *globalOffsetMultiplicator
 				 ) {
 
@@ -106,24 +109,25 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
   // One thread can compute multiple rays
   // The current ray which we compute is based on the gid and an offset (number of threads*blocks)
   while(true){
-	  rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
-	  if(rayNumber>=raysPerSample) break;
+    rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
+    if(rayNumber>=raysPerSample) break;
 
-	  // Get triangle/prism to start ray from
-	  unsigned startPrism             = indicesOfPrisms[rayNumber];
-	  unsigned startLevel             = startPrism/mesh.numberOfTriangles;
-	  unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
+    // Get triangle/prism to start ray from
+    unsigned startPrism             = indicesOfPrisms[rayNumber];
+    unsigned startLevel             = startPrism/mesh.numberOfTriangles;
+    unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
+    Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
+    Ray ray                         = generateRay(startPoint, samplePoint);
+    unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
+    assert(sigma_i < maxInterpolation);
 
-	  Point startPoint = mesh.genRndPoint(startTriangle, startLevel, globalState);
-	  Ray ray   = generateRay(startPoint, samplePoint);
+    double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
 
-	  double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+    gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
+    gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
 
-	  gain          /= ray.length * ray.length; // important, since usually done in the reflection device function!
-	  gain          *= mesh.getBetaValue(startPrism) * importance[startPrism];
-
-	  gainSumTemp       += gain;
-	  gainSumSquareTemp += gain * gain;
+    gainSumTemp       += gain;
+    gainSumSquareTemp += gain * gain;
 
   }
   atomicAdd(&(gainSum[0]), float(gainSumTemp));

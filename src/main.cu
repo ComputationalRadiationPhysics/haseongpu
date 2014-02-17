@@ -18,14 +18,19 @@
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
-#include <test_environment.h>
 
 #include <logging.h>
 #include <ray_histogram.h>
 
 #define MIN_COMPUTE_CAPABILITY_MAJOR 2
 #define MIN_COMPUTE_CAPABILITY_MINOR 0
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING; // extern through logging.h
+#define MAX_INTERPOLATION 1000
+#define LAMBDA_START 905
+#define LAMBDA_STOP 1095
+
+
+// default without V_DEBUG
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.h
 
 
 /** 
@@ -90,6 +95,82 @@ double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, c
   return gain_local * phiAse / mesh.crystalFluorescence;
 }
 
+unsigned getNextSmallerIndex(std::vector<double> v, double t){
+  unsigned index = 0;
+  for(unsigned i = 0; i < v.size(); ++i){
+    if(v.at(i) < t) index = i;
+    else break;
+  }
+  return index;
+}
+
+unsigned getNextBiggerIndex(std::vector<double> v, double t){
+  for(unsigned i = 0; i < v.size(); ++i){
+    if(v.at(i) > t)
+      return i;
+  }
+  return 0;
+}
+
+std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop){
+  assert(interpolation_range >= sigma_y.size());
+  assert(lambda_stop >= lambda_start);
+
+  // Monochromatic case
+  if(sigma_y.size() == 1){
+    return std::vector<double>(1, sigma_y.at(0));
+  }
+
+  std::vector<double> y(interpolation_range, 0);
+  const double lambda_range = lambda_stop - lambda_start;
+  assert(sigma_y.size() >= lambda_range);
+
+  // Generate sigma_x
+  std::vector<double> sigma_x;
+  for(unsigned i = lambda_start; i <= lambda_stop; ++i){
+    sigma_x.push_back(i);
+  }
+  
+  for(unsigned i = 0; i < interpolation_range; ++i){
+    double x = lambda_start + (i * (lambda_range / interpolation_range));
+
+    // Get index of points before and after x
+    double y1_i = getNextSmallerIndex(sigma_x, x);
+    double y2_i = getNextBiggerIndex(sigma_x, x);
+    int sigma_diff = y2_i - y1_i;
+
+    if(sigma_diff == 1){
+      // First point p1=(x1/y1) before x
+      double x1 = lambda_start + y1_i;
+      double y1 = sigma_y.at(y1_i);
+
+      // Second point p2=(x2/y2) after x
+      double x2 = lambda_start + y2_i;
+      double y2 = sigma_y.at(y2_i);
+      assert(sigma_y.size() >= y1_i);
+
+      // linear function between p1 and p2 (y=mx+b)
+      double m = (y2 - y1) / (x2 / x1);
+      double b = y1 - (m * x1);
+
+      // Interpolate y from linear function
+      y.at(i) = m * x + b;
+
+    }
+    else if(sigma_diff == 2){
+      // No interpolation needed
+      y.at(i) = sigma_y.at(y1_i + 1);
+    }
+    else {
+      dout(V_ERROR) << "Index of smaller and bigger sigma too seperated" << std::endl;
+      exit(0);
+    }
+    
+  }
+  
+  return y;
+}
+
 
 int main(int argc, char **argv){
   unsigned raysPerSample = 0;
@@ -113,16 +194,17 @@ int main(int argc, char **argv){
 
   std::string inputPath;
   std::string outputPath;
-  verbosity = 31; //ALL //TODO: remove in final code
+  double mseThreshold = 0;
+  verbosity = 63; //ALL //TODO: remove in final code
 
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
-  std::vector<float> mseThreshold;
+
 
   // Parse Commandline
   parseCommandLine(argc, argv, &raysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath);
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -130,15 +212,26 @@ int main(int argc, char **argv){
   devices = getCorrectDevice(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath)) return 1;
+  if(checkParameterValidity(argc, raysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
 
   // Parse wavelengths from files
   if(fileToVector(inputPath + "sigma_a.txt", &sigmaA)) return 1;
   if(fileToVector(inputPath + "sigma_e.txt", &sigmaE)) return 1;
-  if(fileToVector(inputPath + "mse_threshold.txt", &mseThreshold)) return 1;
   assert(sigmaA.size() == sigmaE.size());
-  assert(mseThreshold.size() == sigmaE.size());
 
+  // Interpolate sigmaA / sigmaE function
+  std::vector<double> sigmaAInterpolation = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  std::vector<double> sigmaEInterpolation = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+
+  // Calc max sigmaA / sigmaE
+  double maxSigmaE = 0.0;
+  double maxSigmaA = 0.0;
+  for(unsigned i = 0; i < sigmaE.size(); ++i){
+    if(sigmaE.at(i) > maxSigmaE){
+      maxSigmaE = sigmaE.at(i);
+      maxSigmaA = sigmaA.at(i);
+    }
+  }
 
   // Parse experientdata and fill mesh
   Mesh hMesh;
@@ -149,10 +242,10 @@ int main(int argc, char **argv){
   if(Mesh::parseMultiGPU(hMesh, dMesh, inputPath, devices, maxGpus)) return 1;
 
   // Solution vector
-  std::vector<double> dndtAse(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<float>  phiAse(hMesh.numberOfSamples * sigmaE.size(), 0);
-  std::vector<double> mse(hMesh.numberOfSamples * sigmaE.size(), 1000);
-  std::vector<unsigned> totalRays(hMesh.numberOfSamples * sigmaE.size(), 0);
+  std::vector<double> dndtAse(hMesh.numberOfSamples, 0);
+  std::vector<float>  phiAse(hMesh.numberOfSamples, 0);
+  std::vector<double> mse(hMesh.numberOfSamples, 100000);
+  std::vector<unsigned> totalRays(hMesh.numberOfSamples, 0);
 
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
@@ -174,8 +267,8 @@ int main(int argc, char **argv){
             maxRepetitions,
             dMesh.at(gpu_i),
             hMesh,
-            sigmaA,
-            sigmaE,
+            sigmaAInterpolation,
+            sigmaEInterpolation,
             mseThreshold,
             useReflections,
             phiAse, 
@@ -202,15 +295,14 @@ int main(int argc, char **argv){
           maxRepetitions,
           dMesh.at(0),
           hMesh,
-          sigmaA,
-          sigmaE,
+          sigmaAInterpolation,
+          sigmaEInterpolation,
           mseThreshold,
           useReflections,
           phiAse,
           mse,
           totalRays,
-          devices.at(0),
-          maxSampleRange
+          devices.at(0)
           );
       runmode = "RAY PROPAGATION MPI";
       break;
@@ -239,20 +331,15 @@ int main(int argc, char **argv){
 
   if(verbosity & V_DEBUG){
     // Print Solutions
-    for(unsigned wave_i = 0; wave_i < sigmaE.size(); ++wave_i){
-      dout(V_DEBUG) << "\n\nSolutions " <<  wave_i << std::endl;
       for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-        dndtAse.at(sampleOffset) = calcDndtAse(hMesh, sigmaA.at(wave_i), sigmaE.at(wave_i), phiAse.at(sampleOffset), sample_i);
+        dndtAse.at(sample_i) = calcDndtAse(hMesh, maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
         if(sample_i <=10)
-          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sampleOffset) << " " << mse.at(sampleOffset) << std::endl;
+          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sample_i) << " " << mse.at(sample_i) << std::endl;
       }
       for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-        int sampleOffset = sample_i + hMesh.numberOfSamples * wave_i;
-        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sampleOffset) << " " << mse.at(sampleOffset) <<std::endl;
+        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sample_i) << " " << mse.at(sample_i) <<std::endl;
         if(sample_i >= 10) break;
       }
-    }
   }
 
   // Compare with vtk
@@ -268,10 +355,9 @@ int main(int argc, char **argv){
       phiAse,
       totalRays,
       mse,
-      sigmaE.size(),
       hMesh.numberOfSamples,
       hMesh.numberOfLevels
-      );
+		    );
 
 
   // FOR OUTPUT
@@ -279,10 +365,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, mse, outputPath + "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
-    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold.at(0), useReflections, runtime);
+    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, mse, outputPath + "vtk/mse", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", raysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
   if(verbosity & V_STAT){
@@ -290,7 +376,7 @@ int main(int argc, char **argv){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);
       avgMSE += *it;
-      if(*it >= mseThreshold.at(0))
+      if(*it >= mseThreshold)
         highMSE++;
     }
     avgMSE /= mse.size();
@@ -302,12 +388,13 @@ int main(int argc, char **argv){
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
-    dout(V_STAT) << "Wavelength        : " << (int) sigmaE.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << raysPerSample;
     if(maxRaysPerSample > raysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(totalRays.begin(), totalRays.end(), 0.) << std::endl;
-    dout(V_STAT) << "MSE threshold     : " << *(std::max_element(mseThreshold.begin(),mseThreshold.end())) << std::endl;
+    dout(V_STAT) << "MSE threshold     : " << mseThreshold << std::endl;
+    dout(V_STAT) << "Wavelength        : " << sigmaA.size() << std::endl;
+    dout(V_STAT) << "int. Wavelength   : " << sigmaAInterpolation.size() << std::endl;
     dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
     dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
     dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
@@ -316,7 +403,7 @@ int main(int argc, char **argv){
     dout(V_STAT) << std::endl;
     if(maxRaysPerSample > raysPerSample){
       dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-      ray_histogram(totalRays,maxRaysPerSample,mseThreshold[0],mse);
+      ray_histogram(totalRays,maxRaysPerSample,mseThreshold,mse);
     }
     dout(V_STAT) << std::endl;
 

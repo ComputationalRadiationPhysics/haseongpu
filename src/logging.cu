@@ -30,9 +30,14 @@ std::ostream& dout(unsigned activation_level) {
     return std::cout << "\033[0" << "m[STATISTIC] ";
   }
 
+  if(activation_level & V_PROGRESS){
+    return std::cout << "\033[0" << "m[PROGRESS] ";
+  }
+
   if(activation_level & V_DEBUG){
     return std::cerr << "\033[0;" << COLOR_DEBUG << "m[DEBUG] ";
   }
+
 
   return std::cout;
 }

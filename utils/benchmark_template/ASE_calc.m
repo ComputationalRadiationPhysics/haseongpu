@@ -47,11 +47,13 @@ pump.r = 1.5; % pump radius
 pump.exp = 20; % pump exponent
 
 % laser
-laser.s_abs = 1.10e-21; %cm2(1.16e-21 pour DA)
-laser.s_ems = 2.40e-20; %cm2(2.48e-20)
+laser.s_abs = load('sigma_a.txt');%1.10e-21; %cm2(1.16e-21 pour DA)
+laser.s_ems = load('sigma_e.txt');%2.40e-20; %cm2(2.48e-20)
 laser.I = 1e6; % laser intensity
 laser.T = 1e-8; % laser duration
 laser.wavelength = 1030e-9; % lasing wavelength in m
+[laser.max_ems, i] = max(laser.s_ems);
+laser.max_abs = laser.s_abs(i);
 
 % modus definitions
 mode.BRM = 1; % 1 Backreflection, 0 Transmissionmode
@@ -225,7 +227,7 @@ for i_slice=1:timeslice-1
     for i_p=1:size(p,1)
         for i_z=1:mesh_z
     %         at first calculate the local gain
-            g_l = -(N_tot*laser.s_abs - N_tot*beta_cell(i_p,i_z)*(laser.s_ems+laser.s_abs));
+            g_l = -(N_tot*laser.max_abs - N_tot*beta_cell(i_p,i_z)*(laser.max_ems+laser.max_abs));
             dndt_ASE(i_p,i_z) = g_l*phi_ASE(i_p,i_z)/crystal.tfluo;
         end
     end

@@ -44,29 +44,29 @@
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
 				 const unsigned* numberOfReflections,
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum,
 				 float *gainSumSquare,
 				 const unsigned sample_i,
-				 const double sigmaA,
-				 const double sigmaE,
+				 const double *sigmaA,
+				 const double *sigmaE,
+         const unsigned maxInterpolation,
 				 unsigned *globalOffsetMultiplicator
 				 );
 
 __global__ void calcSampleGainSum(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned wave_i, 
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum,
 				 float *gainSumSquare,
 				 const unsigned sample_i,
-				 const double sigmaA,
-				 const double sigmaE,
+				 const double *sigmaA,
+				 const double *sigmaE,
+         const unsigned maxInterpolation,
 				 unsigned *globalOffsetMultiplicator
 				 );
 #endif /* calc_sample_phi_ase_H */

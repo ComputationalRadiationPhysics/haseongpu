@@ -6,8 +6,10 @@
 function [beta_crystal,beta_store,pulse,Ntot_gradient]=beta_int(beta_crystal,pulse,const,crystal,steps,int_field,mode)
 
 % declarations
-sigma_abs = int_field.s_abs; %cm^2
-sigma_ems = int_field.s_ems; %cm^2
+[int_field.max_ems, i] = max(int_field.s_ems);
+int_field.max_abs = int_field.s_abs(i);
+sigma_abs = int_field.max_abs; %cm^2
+sigma_ems = int_field.max_ems; %cm^2
 
 % discritization
 steps_time = steps.time;

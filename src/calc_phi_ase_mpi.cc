@@ -29,7 +29,7 @@ void mpiHead(std::vector<float> &phiASE,
 	     unsigned numberOfComputeNodes,
 	     int sampleRange){
   MPI_Status status;
-  float res[RESULT_MSG_LENGTH] = {0,0,0,0,0};
+  float res[RESULT_MSG_LENGTH] = {0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
   unsigned finished = 0;
   unsigned sampleOffset = 0;
@@ -46,16 +46,16 @@ void mpiHead(std::vector<float> &phiASE,
 
     case RESULT_TAG:
       /**
-       * res[0] : wave_i
-       * res[1] : sample_i
-       * res[2] : phiASE
-       * res[3] : mse
-       * res[4] : totalRays 
+       * res[0] : sample_i
+       * res[1] : phiASE
+       * res[2] : mse
+       * res[3] : totalRays 
        **/
-      sampleOffset = (unsigned)(res[1] + hMesh.numberOfSamples * res[0]);
-      phiASE.at(sampleOffset)    = res[2];
-      mse.at(sampleOffset)       = res[3];
-      totalRays.at(sampleOffset) = (unsigned)res[4];
+      sampleOffset = (unsigned)(res[0]);
+      phiASE.at(sampleOffset)    = res[1];
+      mse.at(sampleOffset)       = res[2];
+      totalRays.at(sampleOffset) = (unsigned)res[3];
+      fancyProgressBar(hMesh.numberOfSamples);
       break;
 
     case SAMPLE_REQUEST_TAG:
@@ -94,7 +94,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		const Mesh& hMesh,
 		const std::vector<double>& hSigmaA,
 		const std::vector<double>& hSigmaE,
-		const std::vector<float>& mseThreshold,
+		const double mseThreshold,
 		const bool useReflections,
 		std::vector<float> &hPhiAse,
 		std::vector<double> &mse,
@@ -105,7 +105,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
     MPI_Status status;
     int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
     float totalRuntime = 0;
-    float res[RESULT_MSG_LENGTH] = {0,0,0,0,0}; 
+    float res[RESULT_MSG_LENGTH] = {0,0,0,0}; 
     MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
     MPI_Recv(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
 
@@ -132,19 +132,16 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   sample_i[1],
 		   runtime);
 
-      for(unsigned i=0; i < hSigmaE.size(); ++i){
 	for(int j=sample_i[0]; j < sample_i[1]; ++j){
-	  unsigned sampleOffset = (unsigned)(j + hMesh.numberOfSamples * i);
-	  res[0] = (float)i;
-	  res[1] = (float)j; 
-	  res[2] = hPhiAse.at(sampleOffset);
-	  res[3] = mse.at(sampleOffset);
-	  res[4] = (float)totalRays.at(sampleOffset);
+	  unsigned sampleOffset = (unsigned)(j);
+	  res[0] = (float)j; 
+	  res[1] = hPhiAse.at(sampleOffset);
+	  res[2] = mse.at(sampleOffset);
+	  res[3] = (float)totalRays.at(sampleOffset);
 	  totalRuntime += runtime;
 	  MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
 	}
 
-      }
 
     }
 
@@ -159,19 +156,18 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const Mesh& hMesh,
 		      const std::vector<double>& hSigmaA,
 		      const std::vector<double>& hSigmaE,
-		      const std::vector<float>& mseThreshold,
+		      const double mseThreshold,
 		      const bool useReflections,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
-		      unsigned gpu_i,
-		      unsigned maxSample_i){
+		      unsigned gpu_i){
 
 
 
   int mpiError = MPI_Init(NULL,NULL);
   if(mpiError != MPI_SUCCESS){
-    std::cerr << "Error starting MPI program." << std::endl;
+    dout(V_ERROR) << "Error starting MPI program." << std::endl;
     MPI_Abort(MPI_COMM_WORLD,mpiError);
     return 1;
   }
@@ -191,6 +187,10 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     break;
 
   default:
+    // disable Information verbosity for other nodes than HEADNODE
+    // (should have similar output anyway)
+    verbosity &= ~V_PROGRESS;
+
     mpiCompute(hRaysPerSample,
 	       maxRaysPerSample,
 	       maxRepetitions,

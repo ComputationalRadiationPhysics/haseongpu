@@ -11,12 +11,11 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const Mesh& hMesh,
 		      const std::vector<double>& hSigmaA,
 		      const std::vector<double>& hSigmaE,
-		      const std::vector<float>& mseThreshold,
+		      const double mseThreshold,
 		      const bool useReflections,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
-		      unsigned gpu_i,
-		      unsigned maxSample_i);
+		      unsigned gpu_i);
 
 #endif /* calcPhiAseMPI */

@@ -34,15 +34,15 @@ void simpleProgressBar(unsigned part, unsigned full){
 
   float percentage = (float(part)+1) / float(full);
 
-  dout(V_INFO | V_NOLABEL) << "\r";
-  dout(V_INFO) << "Progress: [";
+  dout(V_PROGRESS | V_NOLABEL) << "\r";
+  dout(V_PROGRESS) << "Progress: [";
   for(int i=0 ; i < (percentage*length) ; i++){
-    dout(V_INFO | V_NOLABEL) << "#";
+    dout(V_PROGRESS | V_NOLABEL) << "#";
   }
   for(int i=0;i< length-(percentage*length) ;i++){
-    dout(V_INFO | V_NOLABEL) << " ";
+    dout(V_PROGRESS | V_NOLABEL) << " ";
   }
-  dout(V_INFO | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
+  dout(V_PROGRESS | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
 }
 
 
@@ -79,20 +79,20 @@ void fancyProgressBar(const unsigned nTotal){
     const float timeTotal = timeSpent/percentage;
     const int timeRemaining = timeTotal-timeSpent;
 
-    dout(V_INFO | V_NOLABEL) << "\r";
-    dout(V_INFO) << "Progress: [";
-    printWave(dout(V_INFO | V_NOLABEL), tic, int(percentage*length), length);
-    dout(V_INFO | V_NOLABEL) << "] ";
+    dout(V_PROGRESS | V_NOLABEL) << "\r";
+    dout(V_PROGRESS) << "Progress: [";
+    printWave(dout(V_PROGRESS | V_NOLABEL), tic, int(percentage*length), length);
+    dout(V_PROGRESS | V_NOLABEL) << "] ";
 
-    dout(V_INFO | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
-    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
-    dout(V_INFO | V_NOLABEL) << " after " << int(timeSpent) << "s";
-    dout(V_INFO | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
-    dout(V_INFO | V_NOLABEL) << std::flush;
+    dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
+    dout(V_PROGRESS | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
+    dout(V_PROGRESS | V_NOLABEL) << " after " << int(timeSpent) << "s";
+    dout(V_PROGRESS | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
+    dout(V_PROGRESS | V_NOLABEL) << std::flush;
   }
 }
 
-// works with MPI, but not necessarily with a threaded approach
+// works with multiple (non-threaded) callers, but not necessarily with a threaded approach
 void fancyProgressBar(const unsigned current, const unsigned nTotal){
 
   const int length = 50;
@@ -108,7 +108,6 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
   timeval now;
   gettimeofday(&now,NULL);
   part=current;
-  //++part;
 
   //limit the update intervall (not faster than every 35ms)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
@@ -120,16 +119,16 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
     const float timeTotal = timeSpent/percentage;
     const int timeRemaining = timeTotal-timeSpent;
 
-    dout(V_INFO | V_NOLABEL) << "\r";
-    dout(V_INFO) << "Progress: [";
-    printWave(dout(V_INFO | V_NOLABEL), tic, int(percentage*length), length);
-    dout(V_INFO | V_NOLABEL) << "] ";
+    dout(V_PROGRESS | V_NOLABEL) << "\r";
+    dout(V_PROGRESS) << "Progress: [";
+    printWave(dout(V_PROGRESS | V_NOLABEL), tic, int(percentage*length), length);
+    dout(V_PROGRESS | V_NOLABEL) << "] ";
 
-    dout(V_INFO | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
-    dout(V_INFO | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
-    dout(V_INFO | V_NOLABEL) << " after " << int(timeSpent) << "s";
-    dout(V_INFO | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
-    dout(V_INFO | V_NOLABEL) << std::flush;
+    dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
+    dout(V_PROGRESS | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
+    dout(V_PROGRESS | V_NOLABEL) << " after " << int(timeSpent) << "s";
+    dout(V_PROGRESS | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
+    dout(V_PROGRESS | V_NOLABEL) << std::flush;
   }
 }
 
