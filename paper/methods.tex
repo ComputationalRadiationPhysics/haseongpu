@@ -103,15 +103,25 @@ verified with up to 64 nodes.
   \caption{steps for a single ray within a CUDA thread}
   \label{graphic:algorithm_steps}
 \end{figure}
-   % Furthermore, rays are grouped together in such a way that they have a
-   % similar origin, which improves performance through better utilisation of the
-   % GPU L1 cache.
 
-    Furthermore, successive threads start rays from a similar origin, which
-    results in similar paths through the mesh structure and therefore similar
-    prisms. This leads to better utilisation of the GPU L1 cache and higher
-    performance.
-    \textbf{(TODO Blockbased scheduling / load balancing)}
+Furthermore, successive threads start rays from a similar origin, which results
+in similar paths through the mesh structure and therefore similar prisms. This
+leads to better utilisation of the GPU L1 cache and higher performance.
+
+Since each distinct ray potentially has a different path through the gain
+medium, the execution times between threads will differ substantially. In case
+of a static mapping from threads to rays (i.e. strided access), one thread can
+end up calculating many rays with long paths. If there are still many of those
+rays remaining, the thread has to continue working for a long time, while all
+other threads are already finished. These idle threads are unable to
+participate, leaving many resources on the device unused.
+
+To improve load balancing between the threads, each thread block fetches a
+workload equal to its size and executes it completely before determining a new
+workload. Therefore, if a single thread calculates a ray with a very long path,
+only threads in the same block depend on the duration of one long ray.
+Meanwhile, threads in other blocks can pick up more work. Thus, most resources
+can contribute to the computation.
     
 %\begin{figure}[H]
 %  \centerline
