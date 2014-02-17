@@ -34,6 +34,7 @@ CUDA kernel for every sample point in their subset.
 The kernels inside a pthread are called sequentially,
 thus the number of pthreads is limited by the number of sample points, when 
 every GPU simulates exacly one sample point.
+\textbf{TODO MPI Threads}
 
 As a result the speedup for multiple
 GPUs is almost linear, which was tested with up to 4 GPUs.
@@ -98,6 +99,7 @@ GPUs is almost linear, which was tested with up to 4 GPUs.
     results in similar paths through the mesh structure and therefore similar
     prisms. This leads to better utilisation of the GPU L1 cache and higher
     performance.
+    \textbf{(TODO Blockbased scheduling / load balancing)}
     
 %\begin{figure}[H]
 %  \centerline

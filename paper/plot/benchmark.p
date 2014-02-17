@@ -16,7 +16,9 @@ set ytics nomirror
 
 plot\
 "benchmark_100k.dat" u (($1*$1) * 1.026) t "benchmark" with linespoints,\
-"benchmark_refl.dat" u (($1*$1) * 1.026) t "benchmark refl" with linespoints
+"benchmark_refl.dat" u (($1*$1) * 1.026) t "benchmark refl" with linespoints,\
+"benchmark_polychromatic.dat" u (($1*$1) * 1.026) t "benchmark poly" with linespoints,\
+"benchmark_polychromatic_refl.dat" u (($1*$1) * 1.026) t "benchmark poly refl" with linespoints
 
 # Output
 set term pngcairo enhanced font "Serif, 14"
