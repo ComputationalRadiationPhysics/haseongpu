@@ -21,7 +21,6 @@ points and 5400 prisms respectively.
 \begin{itemize}
 
   \item NEXT PAPER ???
-  \item TODO
 
   \item \textbf{Image: gain VS time for one single point. Overlay between
     experiment/daniels sim/our sim}
@@ -31,7 +30,14 @@ points and 5400 prisms respectively.
       \caption{gain of single sample point in 50 timessteps}
       \label{plot:benchmark}
     \end{figure}
+    \begin{figure}[H]
+      \centerline{
+        \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
+      \caption{sliced gain medium in 4 timessteps}
+      \label{plot:benchmark}
+    \end{figure}
 
+  \item TODO: scale for timesteps needed ?
 
   \item comparison with previous values from Daniel's thesis
 
@@ -78,6 +84,7 @@ multiple devices scales well, even with the adaptive algorithm. (Figure
   \caption{efficiency on multiple devices}
   \label{plot:gpu_scaling}
 \end{figure}
+\textbf{TODO: update scaling plot}\\
 Adaptive sampling usually does not only eliminate outliers, but even reduce the
 needed time to do so: By using the idea of a pre-defined $MSE$-threshold, the
 precision of the simulation can be adjusted in terms of this threshold rather than
@@ -97,6 +104,7 @@ succeeded to stay below the given threshold with very little additional effort.
 \end{figure}
 \subsection{Limitations and future work}
 \label{subsec:limitations}
+\textbf{TODO: also for longer runtime (Figure \ref{plot:adaptive_runtime})}
 Future work should address reflections on the lateral sides of the gain medium
 to allow the simulation of lateral feedback. The current implementation only
 supports reflections on the upper and lower surface. Furthermore, these upper
