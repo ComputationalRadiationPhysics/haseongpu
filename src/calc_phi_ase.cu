@@ -79,6 +79,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   // Otherwise bad or no ray distribution possible.
   bool distributeRandomly         = true;
   dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
+                                  // MUST be 128, since in the kernel we use a bitshift << 7
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Divide RaysPerSample range into steps
@@ -206,10 +207,11 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
       if(raysPerSampleIter == raysPerSampleList.end())
 	break;
       
-      if(verbosity & V_PROGRESS){
-        fancyProgressBar(hMesh.numberOfSamples);
-      }
 	  
+    }
+
+    if(verbosity & V_PROGRESS){
+      fancyProgressBar(hMesh.numberOfSamples);
     }
 
   }
