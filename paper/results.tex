@@ -102,9 +102,10 @@ succeeded to stay below the given threshold with very little additional effort.
   \caption{runtime comparison of adaptive and non-adaptive }
   \label{plot:adaptive_runtime}
 \end{figure}
+\textbf{TODO: also for longer runtime (Figure \ref{plot:adaptive_runtime})}
+
 \subsection{Limitations and future work}
 \label{subsec:limitations}
-\textbf{TODO: also for longer runtime (Figure \ref{plot:adaptive_runtime})}
 Future work should address reflections on the lateral sides of the gain medium
 to allow the simulation of lateral feedback. The current implementation only
 supports reflections on the upper and lower surface. Furthermore, these upper
@@ -118,13 +119,3 @@ point can be simulated with a maximum of $6.5\cdot10^8$ rays. To push this limit
 further, a more sophisticated mapping needs to be implemented. This could
 be done by simply splitting the mapping in different parts and calculating them
 iteratively.
-Lastly, the simulation of multiple wavelengths is not done in parallel but
-rather sequentially. This would be algorithmically possible, but since the GPUs
-are already saturated by a single wavelength, multiple parallel wavelengths on a
-single GPU don't reduce overall simulation duration. In addition, the parallel
-wavlength computation would need more GPU memory, which is already a bottleneck
-as seen abovesaturated by a single wavelength, multiple parallel wavelengths on
-a single GPU don't reduce overall simulation duration. In addition, the parallel
-wavlength computation would need more GPU memory, which is already a bottleneck
-as seen above. Therefore, multiple wavelengths would linearly reduce the number
-of possible rays per sample point.
