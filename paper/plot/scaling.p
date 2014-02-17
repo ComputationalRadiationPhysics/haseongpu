@@ -4,19 +4,20 @@ set key top right
 set grid xtics
 set grid ytics
 set xlabel "GPUs"
-#set ylabel "speedup"
-set ylabel "efficency"
-set xtics 8,8,64
+set ylabel "speedup"
+#set ylabel "efficency"
+set xtics 7,8,63
 #set ytics 0,4,64
 #set yrange [1:64]
-set yrange [0:1]
-set xrange [1:64]
+#set yrange [0:1]
+set xrange [0:64]
 #set yrange [0:1]
 
 
 plot \
-"scaling.dat" u 1:((472/$3)/$1) w linespoints t "efficency adaptive" lw 3 ps 2 pt 57,\
-"scaling.dat" u 1:((1057/$2)/$1) w linespoints t "efficency non adaptive" lc rgb "blue" lw 3 ps 2 pt 37
+"scaling.dat" u 1:(7858/$3) w linespoints t "speedup non adaptive" lw 3 ps 2 pt 57
+#"scaling.dat" u 1:((7858/$3)/$1) w linespoints t "efficency non adaptive" lw 3 ps 2 pt 57
+#"scaling.dat" u 1:((1057/$2)/$1) w linespoints t "efficency non adaptive" lc rgb "blue" lw 3 ps 2 pt 37
 
 
 # Output
