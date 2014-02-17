@@ -3,10 +3,10 @@
 
 The application is available as a commandline-tool and reads
 its simulation data from plain text files. It was improved by polychromatic
-wavelengths, adaptive sampling, multigpu computation and 
+wavelengths, adaptive sampling, repetetive sampling, multigpu computation and 
 reflections towards the orginal application from D. Albach \cite{ASE2010}.
 
-For an easy access the offered MATLAB interface (see \ref{label:matlab_interface}) 
+For an easy access the offered MATLAB compatible interface (see \ref{label:matlab_interface}) 
 is highly recommended. Experienced users with the intention to call the application
 directly, should consult the README file, the provided 
 example code or the source code for more details.
@@ -26,10 +26,8 @@ necessary in advance:
   \item Include calcPhiASE.m from the application directory into your MATLAB path
   \item Call calcPhiASE function from the MATLAB script: \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
 \end{enumerate}
-In \ref{label:input}, a brief overview about the
-arguments of the calcPhisAse function can be found 
-or see the README file for more interface details.
-
+A detailed description about the MATLAB compatible interface
+is given in the README file and should be consulted.
 
 %\subsection{MATLAB interface}
 %\label{label:matlab_interface}
@@ -43,54 +41,54 @@ or see the README file for more interface details.
 %a MATLAB script:
 
 
-\subsubsection{Input Arguments}
-Mesh information needs to be generated in advance
-to save calculation time, because usually $\Phi$-ASE calculations
-run over several timesteps on the same mesh. Thus the following
-data need to be provided by the MATLAB script:
-\begin{itemize}
-  \label{label:input}
-  \item Mesh information
-    \begin{itemize}
-    \item Set of triangles $\mathcal{T}$
-    \item Normal vectors of prism (triangle) sides
-    \item Center points of the triangles
-    \item Surfaces of triangles
-    \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
-    \item Thickness of a mesh slice 
-    \item Number of slices
-    \item Refractive index of mesh and volume around
-    \item Reflectivities of mesh planes bottom and top
-    \end{itemize}
+%% \subsubsection{Input Arguments}
+%% Mesh information needs to be generated in advance
+%% to save calculation time, because usually $\Phi$-ASE calculations
+%% run over several timesteps on the same mesh. Thus the following
+%% data need to be provided by the MATLAB script:
+%% \begin{itemize}
+%%   \label{label:input}
+%%   \item Mesh information
+%%     \begin{itemize}
+%%     \item Set of triangles $\mathcal{T}$
+%%     \item Normal vectors of prism (triangle) sides
+%%     \item Center points of the triangles
+%%     \item Surfaces of triangles
+%%     \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
+%%     \item Thickness of a mesh slice 
+%%     \item Number of slices
+%%     \item Refractive index of mesh and volume around
+%%     \item Reflectivities of mesh planes bottom and top
+%%     \end{itemize}
 
-  \item Properties 
-    \begin{itemize}
-      \item Stimuli in the sample points and volume/prisms $\beta$
-      \item Crystal Fluorescence of the active gain medium $\tau_{f}$
-      \item Cladding of the mesh (use of different materials)
-      \item Doping of the active gain medium $N_{tot}$
-    \end{itemize}
+%%   \item Properties 
+%%     \begin{itemize}
+%%       \item Stimuli in the sample points and volume/prisms $\beta$
+%%       \item Crystal Fluorescence of the active gain medium $\tau_{f}$
+%%       \item Cladding of the mesh (use of different materials)
+%%       \item Doping of the active gain medium $N_{tot}$
+%%     \end{itemize}
 
-  \item Laser information
-    \begin{itemize}
-      \item laser absorption $\sigma_a$
-      \item laser emission $\sigma_e$
-    \end{itemize}
+%%   \item Laser information
+%%     \begin{itemize}
+%%       \item laser absorption $\sigma_a$
+%%       \item laser emission $\sigma_e$
+%%     \end{itemize}
 
-  \item Algorithm information
-    \begin{itemize}
-      \item Maximal number of rays for adaptive sampling
-      \item MSE-threshold for adaptive sampling
-      \item Decide whether to activate reflections
-    \end{itemize}
+%%   \item Algorithm information
+%%     \begin{itemize}
+%%       \item Maximal number of rays for adaptive sampling
+%%       \item MSE-threshold for adaptive sampling
+%%       \item Decide whether to activate reflections
+%%     \end{itemize}
     
-\end{itemize}
+%% \end{itemize}
 
-\subsubsection{Output}
-The MATLAB function returns data 
-for each sample point as follows:
-\begin{itemize}
-  \item $\Phi_{ASE}$ values
-  \item MSE values
-  \item Number of Rays of Monte Carlo simulation
-\end{itemize}
+%% \subsubsection{Output}
+%% The MATLAB function returns data 
+%% for each sample point as follows:
+%% \begin{itemize}
+%%   \item $\Phi_{ASE}$ values
+%%   \item MSE values
+%%   \item Number of Rays of Monte Carlo simulation
+%% \end{itemize}

@@ -26,7 +26,7 @@ be calculated as described in \cite{ASE2010}:
 where $G_{r\rightarrow s_i}$ denotes the amplification between
 position $r$ and $s_i$ as a line integral on the vector
 $\overrightarrow{rs_i}$.  One approach to solve the integral is to use Monte
-Carlo integration. For a single wavelenght \textbf{(TODO polychromatic)}, the equation is rewritten as a sum:
+Carlo integration. For a single wavelenght, the equation is rewritten as a sum:
 \begin{equation}
   \label{eq:monte_carlo_ase}
   \Phi_{ASE}(s_i) = 
@@ -36,7 +36,7 @@ Carlo integration. For a single wavelenght \textbf{(TODO polychromatic)}, the eq
 where $N$ is the number of Monte Carlo simulations (the number of \emph{rays}
 simulated) and $gain(\overrightarrow{r_{i,u}s_i})$ is the amplification along the
 path $\overrightarrow{r_{i,u}s_i}$ of a single ray as it will be described in
-formula \eqref{eq:gain}.
+formula \eqref{eq:gain}. 
 
 
 \subsection{The gain medium mesh} \label{subsec:meshSampling}
@@ -104,7 +104,7 @@ knowledge about the mesh structure:
 
 \end{description}
 
-This process is iterated for each prism on the path between $r_{,u}i$ and the
+This process is iterated for each prism on the path between $r_{i,u}$ and the
 desired sample point $s_i$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
 gain calculation: For each prism $x$, the contribution to the gain is calculated
@@ -116,14 +116,15 @@ as a function of $l_x$:
   e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
 \end{equation}
 where $\beta_x$ is the stimulus in the current
-prism. \textbf{TODO Polychromatic $\sigma_e \sigma_a$ .}
+prism and $\sigma_e$, $\sigma_a$ are emission and absorption
+values from a random wavelength over the polychromatic spectrum.
 
 The gain for the whole ray can then be computed as
 
 \begin{equation}
 \label{eq:gain}
   gain(\overrightarrow{r_{i,u}s_i}) =  
-  \frac{\beta_i}{ |\overrightarrow{r_{i,u}s_i}|^2} \cdot \prod^npartial\_gain(n) 
+  \frac{\prod^npartial\_gain(n)}{ |\overrightarrow{r_{i,u}s_i}|^2}  
 \end{equation}
 
 
