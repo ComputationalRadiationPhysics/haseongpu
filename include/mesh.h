@@ -1,3 +1,11 @@
+/**
+ * @author Erik Zenker
+ * @author Carlchristian Eckert
+ * @author Marius Melzer
+ * @licence GPLv3
+ *
+ */
+
 #ifndef MESH_H
 #define MESH_H 
 
@@ -5,6 +13,8 @@
 #include <vector>
 #include <curand_kernel.h> /* curand_uniform */
 #include <string>
+
+#include <reflection.h>
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
@@ -21,8 +31,6 @@ struct Point {
   double x;
   double y;
   double z;
-
-
 };
 
 typedef Point Vector;
@@ -34,15 +42,12 @@ struct Ray {
   Point p;
   Vector dir;
   float length;
-  
 };
 
 struct NormalRay {
   TwoDimPoint p;
   TwoDimDir dir;
 };
-
-
 
 /**
  * @brief Contains the structure of the crystal
@@ -102,6 +107,13 @@ struct NormalRay {
  *             structure is VERY similar to triangles: 
  *             [ triangle1p0, triangle2p0, ... triangleNp0, triangle1p1, triangle2p1, ... ]
  *
+ * refractiveIndices [0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
+ * 
+ * reflectivities Contains the reflectivities for upper and lower surface of gain medium
+ *                Structure is based on 2 layers of triangles:
+ *                [refl_tri1_bott, refl_tri2_bott, ...,refl_triN_bott, refl_tri1_top, refl_tri2_top, ..., refl_triN_top]
+ * 
+ * totalReflectionAngles [0]-> bottomTotalReflectionAngle, [1]-> topTotalReflectionAngle
  */
 struct Mesh {
 
@@ -114,16 +126,17 @@ struct Mesh {
   double  *betaCells;
   unsigned *cellTypes;
 
-  float  * refractiveIndices; //[0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
-  float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
-  float  * totalReflectionAngles;
-
-  //indexstructs
+  // Indexstructs
   unsigned *triangles;
   int *neighbors;
   unsigned *normalPoint;
 
-  //constants
+  // Reflection
+  float  * refractiveIndices; 
+  float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
+  float  * totalReflectionAngles;
+
+  // Constants
   double cladAbsorption;
   float surfaceTotal;
   float thickness;
@@ -152,8 +165,8 @@ struct Mesh {
   unsigned getMaxReflections(int reflectionPlane) const;
   unsigned getMaxReflections() const;
 
-  __device__ __host__ float getReflectivity(int reflectionPlane, unsigned triangle) const;
-  __device__ __host__ float getReflectionAngle(int reflectionPlane) const;
+  __device__ __host__ float getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const;
+  __device__ __host__ float getReflectionAngle(ReflectionPlane reflectionPlane) const;
 
 
   static int parseMultiGPU(Mesh& hMesh, 
@@ -163,7 +176,5 @@ struct Mesh {
 			   unsigned maxGpus
 			   );
 };
-
-//double calculateMaxDiameter(std::vector<double> points) const;
 
 #endif /* MESH_H */

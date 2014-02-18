@@ -4,11 +4,13 @@
 #include <assert.h>
 #include <cfloat>
 #include <cmath>
+#include <algorithm>
 
 #include <cudachecks.h>
 #include <mesh.h>
 #include <parser.h>
-#include <algorithm>
+#include <reflection.h>
+
 
 template <class T, class B, class E>
 void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
@@ -639,7 +641,7 @@ double calculateMaxDiameter(const double* points, const unsigned offset) {
 	return getMaxDistance(extrema);
 }
 
-unsigned Mesh::getMaxReflections (int reflectionPlane) const{
+unsigned Mesh::getMaxReflections (ReflectionPlane reflectionPlane) const{
 	double d = calculateMaxDiameter(points,numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h = numberOfLevels * thickness; 
@@ -653,11 +655,11 @@ unsigned Mesh::getMaxReflections() const{
 	return max(top,bottom);
 }
 
-__device__ __host__ float Mesh::getReflectivity(int reflectionPlane, unsigned triangle) const{
+__device__ __host__ float Mesh::getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const{
 	switch(reflectionPlane){
-		case -1:
+		case BOTTOM_REFLECTION:
 			return reflectivities[triangle];
-		case 1:
+		case TOP_REFLECTION:
 			return reflectivities[triangle + numberOfTriangles];
 	}
 	return 0;
