@@ -137,7 +137,8 @@
      struct(s_abs, VALUES, s_ems, VALUES)
 
    * crystal [float]
-     Describes the crystalFluorescence of the active gain medium.
+     Is a structure for the crystal parameters 
+     crystal.tfluo describes the crystalFluorescence of the active gain medium.
 
    * betaCells [float]
      Stimulus in the sample points.
