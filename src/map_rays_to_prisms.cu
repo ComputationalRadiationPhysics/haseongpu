@@ -1,16 +1,42 @@
 #include "map_rays_to_prisms.h"
-#include <stdio.h>
-#include <assert.h>
-#include <iterator>
 #include <thrust/scan.h>
-#include <thrust/device_vector.h>
-#include <logging.h>
-
-
+#include <thrust/device_vector.h> 
 using thrust::device_vector;
 using thrust::host_vector;
 using thrust::raw_pointer_cast;
 
+/**
+ * @brief takes a prefix sum (obtained by an exclusive scan over raysPerPrism) 
+ *        and writes it into a unary representation. The value from the 
+ *        prefixSum at index i describes the offset where to start writing,
+ *        whereas i itself is the new value to be stored in the output array.
+ *
+ *        example:
+ *        raysPerPrism [3,0,2,1] 
+ *
+ *        -> exclusive prefixSum [0,3,3,5] 
+ *
+ *        beginning from place 0 in the output should be 0 (length 3 according to raysPerPrism[0])
+ *        beginning from place 3 in the output should be 1 (EMPTY range at raysPerPrism[1])
+ *        beginning from place 3 in the output should be 2 (length 2 according to raysPerPrism[2])
+ *        beginning from place 5 in the output should be 3 (length 1 according to raysPerPrism[3])
+ *        
+ *        resulting output arrays:
+ *        [0 0 0 2 2 3] (indicesOfPrisms)
+ *
+ *        output numberOfReflections is handled in a similar way
+ *
+ *
+ * @param numberOfPrisms the number of prisms. numberOfPrisms * reflectionSlices
+ *                       must be equal to the the length of the prefixSum.
+ * @param raysPerSample the size of indicesOfPrisms/numberOfReflections. Actually 
+ *                      identical to the sum of all values in raysPerPrism
+ * @param reflectionSlices the number of reflectionSlices. see numberOfPrisms
+ * @param raysPerPrism the input array from which prefixSum was generated
+ * @param prefixSum the prefixSum generated from raysPerPrism
+ * @param indicesOfPrisms a pointer to the OUTPUT generated like described in the example
+ * @param numberOfReflections a pointer to the OUTPUT similar to indicesOfPrisms
+ */
 __global__ void mapPrefixSumToPrisms(
     const unsigned numberOfPrisms,
     const unsigned raysPerSample,
@@ -22,6 +48,7 @@ __global__ void mapPrefixSumToPrisms(
     ){
 
   int id = threadIdx.x + (blockIdx.x * blockDim.x);
+  // break if we have too many threads (this is likely)
   if(id >= numberOfPrisms*reflectionSlices) return;
 
   const unsigned count            = raysPerPrism[id];
@@ -29,26 +56,23 @@ __global__ void mapPrefixSumToPrisms(
   const unsigned reflection_i     = id / numberOfPrisms;
   const unsigned prism_i          = id % numberOfPrisms;
 
-  //if(startingPosition+count >= raysPerSample && count>0){
-  //  printf("startingPosition: %u count: %u raysPerPrism[%d]:%u \n",startingPosition,count,id,raysPerPrism[id]);
-  //}
   for(unsigned i=0; i < count ; ++i){
     indicesOfPrisms[startingPosition + i] = prism_i;     
     numberOfReflections[startingPosition + i] = reflection_i; 
   }
 }
 
-
-void GPU_algorithm(
-    const unsigned numberOfPrisms, 
-    const unsigned raysPerSample,
-    const unsigned reflectionSlices,
-    const device_vector<unsigned>& raysPerPrism, 
-    device_vector<unsigned> &prefixSum, 
+void mapRaysToPrisms(
     device_vector<unsigned> &indicesOfPrisms, 
-    device_vector<unsigned> &numberOfReflections
-    )
-{
+    device_vector<unsigned> &numberOfReflections,
+    const device_vector<unsigned> &raysPerPrism, 
+    device_vector<unsigned> &prefixSum, 
+    const unsigned reflectionSlices,
+    const unsigned raysPerSample,
+    const unsigned numberOfPrisms
+    ){
+
+  // blocksize chosen by occupancyCalculator
   const unsigned blocksize = 256;
   const unsigned gridsize  = (raysPerPrism.size()+blocksize-1)/blocksize;
 
@@ -63,80 +87,4 @@ void GPU_algorithm(
       raw_pointer_cast( &indicesOfPrisms[0] ),
       raw_pointer_cast( &numberOfReflections[0] )
       );
-}
-
-
-void CPU_algorithm(
-    const unsigned numberOfPrisms, 
-    const unsigned raysPerSample,
-    const unsigned reflectionSlices,
-    const host_vector<unsigned>& raysPerPrism, 
-    host_vector<unsigned>& indicesOfPrisms, 
-    host_vector<unsigned>& numberOfReflections
-    ){
-
-  unsigned absoluteRay = 0;
-  for(unsigned reflection_i=0; reflection_i < reflectionSlices ; ++reflection_i){
-    unsigned reflectionOffset = reflection_i * numberOfPrisms;
-
-    for(unsigned prism_i=0 ; prism_i < numberOfPrisms; ++prism_i){
-      for(unsigned ray_i=0; ray_i < raysPerPrism[prism_i + reflectionOffset]; ++ray_i){
-        indicesOfPrisms[absoluteRay]     = prism_i;
-        numberOfReflections[absoluteRay] = reflection_i;
-        ++absoluteRay;
-        assert(absoluteRay <= raysPerSample);
-      }
-    }
-  }
-}
-
-
-void mapRaysToPrisms(
-    device_vector<unsigned> &indicesOfPrisms,
-    device_vector<unsigned> &numberOfReflections,
-    const device_vector<unsigned> &raysPerPrism,
-    device_vector<unsigned> &prefixSum,
-    const unsigned reflectionSlices,
-    const unsigned raysPerSample,
-    const unsigned numberOfPrisms
-    ){
-
-  //time_t before_GPU = clock();
-  GPU_algorithm(
-      numberOfPrisms,
-      raysPerSample,
-      reflectionSlices,
-      raysPerPrism,
-      prefixSum,
-      indicesOfPrisms,
-      numberOfReflections
-      );
-  //time_t after_GPU = clock();
-
-  // only for error-checking!
-  //time_t before_CPU = clock();
-  //host_vector<unsigned> indicesOfPrisms2(indicesOfPrisms);
-  //host_vector<unsigned> numberOfReflections2(numberOfReflections);
-  //CPU_algorithm(
-  //   numberOfPrisms,
-  //   raysPerSample,
-  //   reflectionSlices,
-  //   host_vector<unsigned>(raysPerPrism),
-  //   indicesOfPrisms2, 
-  //   numberOfReflections2
-  //   );
-  //indicesOfPrisms = indicesOfPrisms2;
-  //numberOfReflections = numberOfReflections2; 
-  //time_t after_CPU = clock();
-
-  //some timing
-  //int timeGPU = after_GPU - before_GPU;
-  //int timeCPU = after_CPU - before_CPU;
-  //dout(V_STAT) << "time GPU including malloc: " << timeGPU/1000 << "k Cycles" << std::endl;
-  //dout(V_STAT) << "time CPU: " << timeCPU/1000 << "k Cycles" << std::endl;
-
-  // some errorchecking
-  //for(unsigned i=0; i<indicesOfPrisms2.size(); ++i){
-  //  assert(indicesOfPrisms2[i] == indicesOfPrisms[i]);
-  //}
 }
