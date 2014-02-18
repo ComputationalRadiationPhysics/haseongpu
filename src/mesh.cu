@@ -32,7 +32,6 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
   }
 }
 
-
 Mesh::~Mesh() {
 //  if(points) delete points;
 //  if(betaValues) delete betaValues;
@@ -48,12 +47,6 @@ Mesh::~Mesh() {
 //  if(refractiveIndices) delete refractiveIndices;
 //  if(reflectivities) delete reflectivities;
 }
-
-
-
-
-
-
 
 /**
  * @brief fills the host mesh with the correct datastructures
@@ -247,7 +240,6 @@ void fillDMesh(
  * @brief fetch the id of an adjacent triangle
  *
  * @param triangle the index of the triangle of which you want the neighbor
- *
  * @param edge the side of the triangle, for whih you want the neighbor
  *
  * @return the index of the neighbor triangle
@@ -260,9 +252,7 @@ __device__ int Mesh::getNeighbor(unsigned triangle, int edge) const{
  * @brief generate a random point within a prism
  *
  * @param triangle the triangle to describe the desired prism
- *
  * @param the level of the desired prism
- *
  * @param *globalState a global state for the Mersenne Twister PRNG
  *
  * @return random 3D point inside the desired prism
@@ -298,7 +288,6 @@ __device__ Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStat
  * @brief get a betaValue for a specific triangle and level
  *
  * @param triangle the id of the desired triangle
- *
  * @param level the level of the desired prism
  *
  * @return a beta value
@@ -327,7 +316,6 @@ __device__ double Mesh::getBetaValue(unsigned prism) const{
  * @brief generates a normal vector for a given side of a triangle
  *
  * @param triangle the desired triangle
- *
  * @param the edge (0,1,2) of the triangle
  *
  * @return a normal vector with length 1
@@ -351,11 +339,11 @@ __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge) const{
  *
  * @return the Point with correct 3D coordinates
  */
-__device__ Point Mesh::getSamplePoint(unsigned sample) const{
+__device__ Point Mesh::getSamplePoint(unsigned sample_i) const{
   Point p = {0,0,0};
-  unsigned level = sample/numberOfPoints;
+  unsigned level = sample_i/numberOfPoints;
   p.z = level*thickness;
-  unsigned pos = sample - (numberOfPoints*level);
+  unsigned pos = sample_i - (numberOfPoints * level);
   p.x = points[pos];
   p.y = points[pos + numberOfPoints];
   return p;
@@ -365,7 +353,6 @@ __device__ Point Mesh::getSamplePoint(unsigned sample) const{
  * @brief get a Point in the center of a prism
  *
  * @param triangle the id of the desired triangle
- *
  * @param level the level of the desired prism
  *
  * @return a point with the coordinates (3D) of the prism center
@@ -381,7 +368,6 @@ __device__ Point Mesh::getCenterPoint(unsigned triangle,unsigned level) const{
  * @brief gets the edge-id which will be forbidden
  *
  * @param trianle the index of the triangle you are currently in
- *
  * @param edge the index of the edge through which you are leaving the triangle
  *
  * @return the id of the edge, which will be forbidden in the new triangle
@@ -403,41 +389,23 @@ __device__ unsigned Mesh::getCellType(unsigned triangle) const{
  * @brief creates the Mesh datastructures on the host and on all possible devices for the propagation
  *
  * @param *hMesh the host mesh
- *
  * @param **dMesh an array of device meshes (one for each device) 
- *
  * @param *triangleIndices indices of the points which form a triangle
- *
  * @param numberOfTriangles the number of triangles
- *
  * @param numberOfLeves the number of layers of the mesh
- *
  * @param numberOfPoints the number of vertices in one layer of the mesh
- *
  * @param thicknessOfPrism  the thickness of one layer of the mesh
- *
  * @param *points coordinates of the vertices in one layer of the mesh
- * 
  * @param *betaValues constant values for each meshed prism
- *
  * @param *xOfTriangleCenter the x coordinates of each triangle's center
- *
  * @param *yOfTriangleCenter the y coordinates of each triangle's center
- *
  * @param *positionsOfNormalVectors indices to the points (points), where the normals xOfNormals,yOfNormals start
- *
  * @param *xOfNormals the x components of a normal vector for each of the 3 sides of a triangle
- *
  * @param *yOfNormals the y components of a normal vector for each of the 3 sides of a triangle
- *
  * @param *forbidden the sides of the triangle from which a ray "entered" the triangle
- *
  * @param *neighbors indices to the adjacent triangles in triangleIndices
- *
  * @param *surfaces the sizes of the surface of each prism
- *
  * @param *devices array of device indices for all possible devices 
- *
  * @param maxGpus maximal number of devices to allocate
  */
 int Mesh::parseMultiGPU(Mesh& hMesh,
@@ -532,12 +500,6 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
   assertRange(*refractiveIndices,0,5,false);
   assertRange(*reflectivities,0,1,false);
 
-
-
-
-
-
-
   fillHMesh(
       hMesh,
       numberOfTriangles, 
@@ -565,34 +527,33 @@ int Mesh::parseMultiGPU(Mesh& hMesh,
       cladAbsorption
   );
 
-  for( unsigned i=0; i<maxGpus; i++){
+  for( unsigned i=0; i < maxGpus; i++){
     CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
-    fillDMesh(
-        hMesh,
-        dMesh.at(i),
-        triangleIndices,
-        numberOfTriangles,
-        numberOfLevels,
-        numberOfPoints,
-        thicknessOfPrism,
-        points,
-        xOfTriangleCenter,
-        yOfTriangleCenter,
-        positionsOfNormalVectors,
-        xOfNormals,
-        yOfNormals,
-        forbidden,
-        neighbors,
-        surfaces,
-        betaValues,
-        betaCells,
-        cellTypes,
-		refractiveIndices,
-		reflectivities,
-        nTot,
-        crystalFluorescence,
-        cladNumber,
-        cladAbsorption
+    fillDMesh(hMesh,
+	      dMesh.at(i),
+	      triangleIndices,
+	      numberOfTriangles,
+	      numberOfLevels,
+	      numberOfPoints,
+	      thicknessOfPrism,
+	      points,
+	      xOfTriangleCenter,
+	      yOfTriangleCenter,
+	      positionsOfNormalVectors,
+	      xOfNormals,
+	      yOfNormals,
+	      forbidden,
+	      neighbors,
+	      surfaces,
+	      betaValues,
+	      betaCells,
+	      cellTypes,
+	      refractiveIndices,
+	      reflectivities,
+	      nTot,
+	      crystalFluorescence,
+	      cladNumber,
+	      cladAbsorption
     );
     cudaDeviceSynchronize();
   }
