@@ -1,213 +1,172 @@
-% calcPhiASE
-% calculates the phi_ASE values for a given input
-%first, enter all parameters for the mesh:
-% p
-% normals_x
-% normals_y
-% forbidden
-% normals_p
-% sorted_int
-% t_int
-% z_mesh 
-% mesh_z
-% N_tot
-% beta_vol
-% laser                      struct: parameters for the laser (wavelength sigmas)
-% crystal                    struct: contains the crystal parameters (flourescence)
-% beta_cell
-% surface
-% x_center
-% y_center
-% NumRays                     the minimal number of rays to start for each samplepoint
-% clad_int
-% clad_number
-% clad_abs
-% refractiveIndices         the refractive indices for each surface [top_inner, top_outer, bottom_inner, bottom_outer]
-% reflectivities            the amount of reflection in case there is no total internal reflection)
-% MaxRays                   the maximum number of rays for each samplepoint
-% mse_threshold             the maximum allowed expectation (see calc_dndt_ase.cu) for each samplepoint (calculation will be restarted with more rays, if expectation not low enough)
-% bool use_reflections      if reflections should be used
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% calcPhiASE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% phi_ASE                   phi_ASE values, multiple Wavelengths in different columns
-% mse_values           real expectation-values for each samplepoint (aligned like phi_ASE)
-% N_rays                    number of rays that were used for each samplepoint
+% calculates the phiASE values for a given input
+% most meshing paramers are given through the function parameters.
+% However, many parameters for optimization of the computation are
+% set in the beginning of the function (adjust as needed)
+% 
+% for most mesh parameters see README file
+%
+% @return phiASE the ASE-Flux for all the given sample points
+% @return mseValues the MeanSquaredError values corresponding to phiASE
+% @return raysUsedPerSample the number of rays used to calculate each phiASE value
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(points,trianglePointIndices,betaCells,betaVolume,triangleNormalsX,triangleNormalsY,triangleNeighbors,triangleSurfaces,triangleCenterX,triangleCenterY,triangleNormalPoint,forbiddenEdge,minRaysPerSample,nTot,thickness,laserParameter,crystal,numberOfLevels)
 
+%%%%% configuration of values that are not reachable by interface %%%%%%%%%
+maxGPUs=1;  % should be 1 for use with MPI, otherwise the number of devices in the node
+nPerNode=4; % for a MPI node with 4 devices
+Runmode='mpi';
+%Runmode='ray_propagation_gpu'; % runmode for the threaded approach
 
-function [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden,NumRays,N_tot,z_mesh,laser,crystal,mesh_z)
-
-%%% Added to the interface %%%
-%laser
-%crystal
-%mesh_z
-
-
-%%% Defined here in the file %%%
-%MaxRays
-%mse_threshold
-%use_reflections
-
-
-%%% are not really defined and will be created with dummy values %%% 
-%clad_int
-%clad_number
-%clad_abs
-%refractiveIndices
-%reflectivities
-
-NumRays = 10000000;
-MaxRays = 100000000;
-mse_threshold=0.05;
-use_reflections = true; 
-MAX_GPUS=1;
-N_PER_NODE=4;
-[a,b] = size(p);
-minSample=0;
-maxSample=(mesh_z*a)-1;
+maxRaysPerSample = 100000000;
+mseThreshold=0.05;
 Repetitions=4;
 
-used_dummy = false;
+useReflections = true; 
+refractiveIndices = [1.83,1,1.83,1];
+[nT,b] = size(triangleNeighbors);
+reflectivities = zeros(1,nT*2);
+claddingInt = ones(1,nT);
+claddingNumber = 3;
+claddingAbsorption = 5.5;
 
-%create dummy variables
-if(~exist('clad_int','var') || ~exist('clad_num','var') ||  ~exist('clad_abs','var'))
-  %WARNING = 'The variables "clad_int", "clad_num" or "clad_abs" (or a combination) do not exist'
-  [a,b] = size(sorted_int);
-  clad_int = ones(1,a);
-  clad_number = 3;
-  clad_abs = 5.5;
-  used_dummy=true;
-end
 
-%create dummy variables
-if(~exist('reflectivities','var') || ~exist('refractiveIndices','var'))
-  %WARNING = 'The variables "reflectivities" or "refractiveIndices" (or both) do not exist'
-  refractiveIndices = [1.83,1,1.83,1];
-  [a,b] = size(sorted_int);
-  reflectivities = ones(1,a*2) * 0;
-  used_dummy=true;
-end
+%%%%%%%% overwriting values from the interface %%%%%%%%%%%%
+minRaysPerSample = 10000000;
 
-% create the correct reflection-parameter for the c-function
-REFLECT='';
-if(use_reflections == true)
+
+%%%%%%%%%%%%% auto-generating some more input %%%%%%%%%%%%%
+minSample=0;
+[nP,b] = size(points);
+maxSample=(numberOfLevels*nP)-1;
+
+if(useReflections == true)
     REFLECT=' --reflection';
+else
+    REFLECT='';
 end
-
-if(used_dummy == true)
-  disp([ 'WARNING: Some variables were set as dummies' ]);
-end
-
-if(~exist('Runmode','var'))
-  Runmode='ray_propagation_gpu';
-end
-
-Runmode='mpi';
-
-CURRENT_DIR = pwd;
-FILENAME=[ mfilename('fullpath') '.m' ];
-[ CALCPHIASE_DIR, NAME , EXTENSION ] = fileparts(FILENAME);
-
-% create all the textfiles in a separate folder
-TMP_FOLDER = [ '/' 'tmp' filesep 'calcPhiASE_tmp' ];
 
 if(strcmpi(Runmode,'mpi'))
-  Prefix=[ 'mpiexec -npernode ' num2str(N_PER_NODE) ' ' ];
-  % reduce maxGPUs only after setting -npernode
-  MAX_GPUS=1;
-  % overwrite TMP_FOLDER => needs to be shared among ALL THE NODES!!
-  TMP_FOLDER=[ CALCPHIASE_DIR filesep 'mpi_tmp' ];
+  Prefix=[ 'mpiexec -npernode ' num2str(nPerNode) ' ' ];
+  maxGPUs=1;
 else
   Prefix='';
 end
 
-% make sure that the input is clean 
+% create a tmp-folder in the same directory as this script
+FILENAME=[ mfilename('fullpath') '.m' ];
+[ CALCPHIASE_DIR, NAME , EXTENSION ] = fileparts(FILENAME);
+TMP_FOLDER=[ CALCPHIASE_DIR filesep 'input_tmp' ];
+
+
+%%%%%%%%%%%%%%%%%% doing the computation %%%%%%%%%%%%%%%%%%
+% make sure that the temporary folder is clean 
 clean_IO_files(TMP_FOLDER);
 
-% create the new input based on the MATLAB variables
-create_calcPhiASE_input(p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,TMP_FOLDER,CURRENT_DIR);
+% create new input in the temporary folder
+create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,x_center,triangleCenterY,claddingInt,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
 
-  % do the propagation
-  status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(NumRays) ' --maxrays=' num2str(MaxRays) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(MAX_GPUS) ' --repetitions=' num2str(Repetitions) ' --mse-threshold=' num2str(mse_threshold) ]);
+% do the propagation
+status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(minRaysPerSample) ' --maxrays=' num2str(maxRaysPerSample) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(maxGPUs) ' --repetitions=' num2str(Repetitions) ' --mse-threshold=' num2str(mseThreshold) ]);
 
-  if(status ~= 0)
+if(status ~= 0)
     error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
-  end
-
-  % get the result
-  [ mse_values, N_rays, phi_ASE ] = parse_calcPhiASE_output(TMP_FOLDER,CURRENT_DIR);
-
-  % cleanup
-  %clean_IO_files(TMP_FOLDER);
-  % 
 end
 
-%takes all the variables and puts them into textfiles, so the CUDA code can parse them
-function create_calcPhiASE_input (p,normals_x,normals_y,forbidden,normals_p,sorted_int,t_int,z_mesh,mesh_z,N_tot,beta_vol,laser,crystal,beta_cell,surface,x_center,y_center,clad_int,clad_number,clad_abs,refractiveIndices,reflectivities,FOLDER,CURRENT_DIR)
+% get the result
+[ mseValues, raysUsedPerSample, phiASE ] = parse_calcPhiASE_output(TMP_FOLDER);
+
+% cleanup
+clean_IO_files(TMP_FOLDER);
+
+end
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%% parse_calcPhiASE_output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% takes all the variables and puts them into textfiles
+% so the CUDA code can parse them. Take care that the
+% names of the textfiles match those in the parsing function
+% 
+% for most parameters, see calcPhiASE (above)
+% @param FOLDER the folder in which to create the input files (usually a
+%               temporary folder visible by all the participating nodes)
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function create_calcPhiASE_input (points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingInt,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,FOLDER)
+CURRENT_DIR = pwd;
 
 mkdir(FOLDER);
 cd(FOLDER);
 
 x=fopen('p_in.txt','w');
-fprintf(x,'%.50f\n',p);
+fprintf(x,'%.50f\n',points);
 fclose(x);
 
 x=fopen('n_x.txt','w');
-fprintf(x,'%.50f\n',normals_x);
+fprintf(x,'%.50f\n',triangleNormalsX);
 fclose(x);
 
 x=fopen('n_y.txt','w');
-fprintf(x,'%.50f\n',normals_y);
+fprintf(x,'%.50f\n',triangleNormalsY);
 fclose(x);
 
 x=fopen('forbidden.txt','w');
-fprintf(x,'%d\n',forbidden);
+fprintf(x,'%d\n',forbiddenEdge);
 fclose(x);
 
 x=fopen('n_p.txt','w');
-fprintf(x,'%d\n',normals_p);
+fprintf(x,'%d\n',triangleNormalPoint);
 fclose(x);
 
 x=fopen('neighbors.txt','w');
-fprintf(x,'%d\n',sorted_int);
+fprintf(x,'%d\n',triangleNeighbors);
 fclose(x);
 
 x=fopen('t_in.txt','w');
-fprintf(x,'%d\n',t_int);
+fprintf(x,'%d\n',trianglePointIndices);
 fclose(x);
 
 % thickness of one slice!
 x=fopen('z_mesh.txt','w');
-fprintf(x,'%.50f\n',z_mesh);
+fprintf(x,'%.50f\n',thickness);
 fclose(x);
 
 % number of slices
 x=fopen('mesh_z.txt','w');
-fprintf(x,'%d\n',mesh_z);
+fprintf(x,'%d\n',numberOfLevels);
 fclose(x);
 
 x=fopen('size_t.txt','w');
-[a,b] = size(t_int);
+[a,b] = size(trianglePointIndices);
 fprintf(x,'%d\n',a);
 fclose(x);
 
 x=fopen('size_p.txt','w');
-[a,b] = size(p);
+[a,b] = size(points);
 fprintf(x,'%d\n',a);
 fclose(x);
 
 x=fopen('n_tot.txt','w');
-fprintf(x,'%.50f\n',N_tot);
+fprintf(x,'%.50f\n',nTot);
 fclose(x);
 
 x=fopen('beta_v.txt','w');
-fprintf(x,'%.50f\n',beta_vol);
+fprintf(x,'%.50f\n',betaVolume);
 fclose(x);
 
 x=fopen('sigma_a.txt','w');
-fprintf(x,'%.50f\n',laser.s_abs);
+fprintf(x,'%.50f\n',laserParameter.s_abs);
 fclose(x);
 
 x=fopen('sigma_e.txt','w');
-fprintf(x,'%.50f\n',laser.s_ems);
+fprintf(x,'%.50f\n',laserParameter.s_ems);
 fclose(x);
 
 x=fopen('tfluo.txt','w');
@@ -215,32 +174,32 @@ fprintf(x,'%.50f\n',crystal.tfluo);
 fclose(x);
 
 x=fopen('beta_cell.txt','w');
-fprintf(x,'%.50f\n',beta_cell);
+fprintf(x,'%.50f\n',betaCells);
 fclose(x);
 
 x=fopen('surface.txt','w');
-fprintf(x,'%.50f\n',surface);
+fprintf(x,'%.50f\n',triangleSurfaces);
 fclose(x);
 
 x=fopen('x_center.txt','w');
-fprintf(x,'%.50f\n',x_center);
+fprintf(x,'%.50f\n',triangleCenterX);
 fclose(x);
 
 x=fopen('y_center.txt','w');
-fprintf(x,'%.50f\n',y_center);
+fprintf(x,'%.50f\n',triangleCenterY);
 fclose(x);
 
 
-x=fopen('clad_int.txt','w');
-fprintf(x,'%d\n',clad_int);
+x=fopen('claddingInt.txt','w');
+fprintf(x,'%d\n',claddingInt);
 fclose(x);
 
-x=fopen('clad_num.txt','w');
-fprintf(x,'%d\n',clad_number);
+x=fopen('claddingNumber.txt','w');
+fprintf(x,'%d\n',claddingNumber);
 fclose(x);
 
 x=fopen('clad_abs.txt','w');
-fprintf(x,'%.50f\n',clad_abs);
+fprintf(x,'%.50f\n',claddingAbsorption);
 fclose(x);
 
 x=fopen('refractive_indices.txt','w');
@@ -255,13 +214,25 @@ cd(CURRENT_DIR);
 end 
 
 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%% parse_calcPhiASE_output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % takes the output from the CUDA code and fills it into a variable
-function [mseValues,  N_rays, phi_ASE] = parse_calcPhiASE_output (FOLDER,CURRENT_DIR)
+% assumes that the matrix is saved as a 3D-matrix where the first line 
+% denotes the dimensions and the second line is the whole data
+%
+% @param FOLDER the folder which contains the output files
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [mseValues,  raysUsedPerSample, phiASE] = parse_calcPhiASE_output (FOLDER)
+CURRENT_DIR = pwd;
 cd (FOLDER);
 fid = fopen('phi_ASE.txt');
 arraySize = str2num(fgetl(fid));
-phi_ASE = str2num(fgetl(fid));
-phi_ASE = reshape(phi_ASE,arraySize);
+phiASE = str2num(fgetl(fid));
+phiASE = reshape(phiASE,arraySize);
 fclose(fid);
 
 fid=fopen('mse_values.txt');
@@ -273,31 +244,38 @@ fclose(fid);
 
 fid = fopen('N_rays.txt');
 arraySize = str2num(fgetl(fid));
-N_rays = str2num(fgetl(fid));
-N_rays = reshape(N_rays,arraySize);
+raysUsedPerSample = str2num(fgetl(fid));
+raysUsedPerSample = reshape(raysUsedPerSample,arraySize);
 fclose(fid);
 
 cd (CURRENT_DIR);
 end
 
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% clean_IO_files %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % deletes the temporary folder and the dndt_ASE.txt
+% 
+% @param TMP_FOLDER the folder to remove
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function clean_IO_files (TMP_FOLDER)
-
-% disable warnings for this (if file is nonexistant...)
-s = warning;
-warning off all;
-
-A = exist(TMP_FOLDER,'dir');
-
+A = exist(TMP_FOLDER,'dir'); % continue only if the folder exists!
 if A == 7
-    isOctave = exist('OCTAVE_VERSION') ~= 0;
-    if(isOctave)
-      confirm_recursive_rmdir (0);
-    end
+  s = warning;
+  warning off all;
 
+  isOctave = exist('OCTAVE_VERSION') ~= 0;
+  if(isOctave)
+    confirm_recursive_rmdir (0);
+  else
     rmdir(TMP_FOLDER,'s');
   end
 
   warning(s);
 end
 
+end
