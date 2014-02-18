@@ -241,22 +241,3 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
   return compare;
 }
 
-void writeVectorToFile(std::vector<double> v, std::string pFilename){
-
-  // Add time to filename
-  time_t currentTime;
-  time(&currentTime);
-  std::stringstream filenameStream;
-  filenameStream  << pFilename << "_" << (int) currentTime << ".dat";
-
-  // Init filestream
-  std::ofstream file;
-  file.open(filenameStream.str().c_str());
-
-  // Write vector data
-  for(std::vector<double>::iterator it = v.begin(); it != v.end(); ++it){
-    file << *it << std::endl;
-  }
-
-
-}
