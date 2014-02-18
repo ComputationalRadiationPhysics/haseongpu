@@ -3,6 +3,18 @@
 #include <vector>
 #include <iomanip>
 
+/**
+ * @brief write input data in a 3D-matrix which can be parsed by matlab with reshape
+ *        (see calcPhiASE.m)
+ *
+ * @param data the data to write into the matrix (as 1D vector)
+ *        layout of the vector: (2D matrix for z==0 in row-major order), (... for z==1 in row-major order) , ...
+ * @param file the destination file for the matrix
+ * @param rowCount the number of rows for the output matrix (x-dimension)
+ * @param columnCount the number of columns for the output matrix (y-dimension)
+ * @param pageCount the number of pages for the output matrix (z-dimension)
+ *
+ */
 template <typename T>
 void write3dMatrix(
     const std::vector<T>& data, 
@@ -13,7 +25,10 @@ void write3dMatrix(
     ){
   
   unsigned elementsPerPage = rowCount*columnCount;
+  // write first line, containing geometry information parsable by matlab
   file << rowCount << " " << columnCount << " " << pageCount << std::endl;
+
+  // write all elements linearly
   for(unsigned page_i = 0; page_i < pageCount; ++page_i){
     for(unsigned j = 0; j < elementsPerPage ; ++j){
       file << std::fixed << std::setprecision(20) << data.at(j + page_i * elementsPerPage) << " , ";

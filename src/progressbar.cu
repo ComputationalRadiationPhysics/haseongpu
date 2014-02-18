@@ -1,12 +1,23 @@
 #include "progressbar.h"
 #include <unistd.h>
-//#include <ctime>
 #include <logging.h>
 #include <cmath>
 #include <iomanip>
 #include <fstream>
 #include <sys/time.h>
 
+
+/**
+ * @brief prints a line of ascii-art in the style of a sine-wave
+ *
+ * @param stream the stream to which to write the output
+ * @param tic continuously increasing value related to the real outside time
+ * @param progress the progress of the whole process (i.e. 90, if the process ranges
+ *        from 0-100 and the progress is at 90%
+ *        progress must be <= length! (normalize progress in order to acheive this)
+ * @param length the length of the finished wave.
+ *        length must be at least as long as the progress!
+ */
 void printWave(std::ostream &stream, unsigned tic, int progress, int length){
   for(int i=0;i<progress ;++i){
     switch((tic+i) % 12){
@@ -46,21 +57,30 @@ void simpleProgressBar(unsigned part, unsigned full){
 }
 
 
+/**
+ * @brief give the difference of two time values in milliseconds
+ *
+ * @param start the starting time of the process to time
+ * @param end the time when the process did finish
+ * @return the difference (end-start) in milliseconds
+ *
+ */
 unsigned long long timevalDiffInMillis(timeval start, timeval end){
   unsigned long long t = 1000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000;
   return t;
 }
 
 
-// works with a threaded approach or if called directly from within the mpiHead function
 void fancyProgressBar(const unsigned nTotal){
 
   const int length = 50;
 
+  //use maxNTotal to find the global maximum between multiple calling threads
   static unsigned maxNTotal = 0;
-
   static timeval startTime;
   static unsigned part = 0;
+  
+  //find the starting time of the whole progress
   if(part==0){ gettimeofday(&startTime,NULL); }
   maxNTotal = max(maxNTotal, nTotal);
   static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
@@ -69,7 +89,7 @@ void fancyProgressBar(const unsigned nTotal){
   gettimeofday(&now,NULL);
   ++part;
 
-  //limit the update intervall (not faster than every 35ms)
+  //limit the update intervall (not faster than every 35ms, since that would be madness)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
   if(millisSpent > 35*tic || part==maxNTotal){
     ++tic;
@@ -92,15 +112,14 @@ void fancyProgressBar(const unsigned nTotal){
   }
 }
 
-// works with multiple (non-threaded) callers, but not necessarily with a threaded approach
 void fancyProgressBar(const unsigned current, const unsigned nTotal){
 
   const int length = 50;
-
   static unsigned maxNTotal = 0;
-
   static timeval startTime;
   static unsigned part = 0;
+
+  // get the starting time on the very first call
   if(part==0){ gettimeofday(&startTime,NULL); }
   maxNTotal = max(maxNTotal, nTotal);
   static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
@@ -109,7 +128,7 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
   gettimeofday(&now,NULL);
   part=current;
 
-  //limit the update intervall (not faster than every 35ms)
+  //limit the update intervall (not faster than every 35ms, since this would be madness)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
   if(millisSpent > 35*tic || part==maxNTotal){
     ++tic;
@@ -136,10 +155,10 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
 void fileProgressBar(unsigned nTotal, std::string path){
 
   const int length = 50;
-
   std::ofstream filestream;
   static timeval startTime;
   static unsigned part = 0;
+  //if this is the first call, set the start time 
   if(part==0){ gettimeofday(&startTime,NULL); }
   static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
   static unsigned tic  = 0;
@@ -147,7 +166,7 @@ void fileProgressBar(unsigned nTotal, std::string path){
   gettimeofday(&now,NULL);
   ++part;
 
-  //limit the update intervall (not faster than every 35ms)
+  //limit the update intervall (not faster than every 35ms, since that would be madness)
   unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
   if(millisSpent > 35*tic || part==nTotal){
     ++tic;
