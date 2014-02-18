@@ -152,16 +152,16 @@ void mpiCompute(unsigned &hostRaysPerSample,
 		   sample_i[1],
 		   runtime);
 
-	for(int j=sample_i[0]; j < sample_i[1]; ++j){
-	  unsigned sampleOffset = (unsigned)(j);
-	  res[0] = (float)j; 
-	  res[1] = hPhiAse.at(sampleOffset);
-	  res[2] = mse.at(sampleOffset);
-	  res[3] = (float)totalRays.at(sampleOffset);
-	  totalRuntime += runtime;
-	  MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
-	}
-
+      // Extract results and send it to head node
+      for(int j=sample_i[0]; j < sample_i[1]; ++j){
+	unsigned sampleOffset = (unsigned)(j);
+	res[0] = (float)j; 
+	res[1] = hPhiAse.at(sampleOffset);
+	res[2] = mse.at(sampleOffset);
+	res[3] = (float)totalRays.at(sampleOffset);
+	totalRuntime += runtime;
+	MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
+      }
 
     }
 
@@ -169,16 +169,6 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 }
 
-
-/**
- * @brief The Nodes will split up in one head node
- *        and the others as compute nodes. The head
- *        node distributes the available sample
- *        points by demand.
- *
- * @return number of used compute nodes
- *
- **/
 float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,

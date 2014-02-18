@@ -1,3 +1,11 @@
+/**
+ * @author Erik Zenker
+ * @author Carlchristian Eckert
+ * @author Marius Melzer
+ * @licence GPLv3
+ *
+ */
+
 #ifndef PARSER_H
 #define PARSER_H
 
@@ -117,4 +125,4 @@ int checkParameterValidity(
     );
 
 
-#endif
+#endif /* PARSER_H */
