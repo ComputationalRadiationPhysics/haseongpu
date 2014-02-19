@@ -11,8 +11,9 @@ set logscale x
 set logscale y
 
 plot \
-"adaptive_runtime.dat" u 4:3 t "runtime adaptive" w linespoints lw 3 ps 2 pt 57,\
-"adaptive_runtime.dat" u 2:1 t "runtime non adaptive" w linespoints lc rgb "blue" lw 3 ps 2 pt 37
+"adaptive_runtime.dat" u 2:1 t "IS" w linespoints lc rgb "blue" lw 3 ps 2 pt 37,\
+"adaptive_runtime.dat" u 4:3 t "IS + AS + RS" w linespoints lc rgb "orange" lw 3 ps 2 pt 57
+
 
 
 # Output

@@ -46,7 +46,7 @@
      inkscape:window-height="1029"
      id="namedview4"
      showgrid="false"
-     showguides="true"
+     showguides="false"
      inkscape:guide-bbox="true"
      inkscape:object-paths="true"
      inkscape:snap-intersection-paths="true"
@@ -55,9 +55,9 @@
      inkscape:snap-midpoints="true"
      inkscape:snap-object-midpoints="true"
      inkscape:snap-center="true"
-     inkscape:zoom="1.3906433"
-     inkscape:cx="303.5665"
-     inkscape:cy="300.61755"
+     inkscape:zoom="0.69532165"
+     inkscape:cx="389.29927"
+     inkscape:cy="156.11771"
      inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
@@ -98,10 +98,11 @@
     <rect
        style="fill:none;stroke:#000000;stroke-width:3;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
        id="rect2987"
-       width="37.796906"
-       height="184.85114"
-       x="144.6949"
-       y="95.943542" />
+       width="24.651184"
+       height="92.580315"
+       x="138.94217"
+       y="139.80814"
+       ry="0" />
     <text
        xml:space="preserve"
        style="font-size:32px;font-style:normal;font-weight:normal;text-align:end;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:end;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"

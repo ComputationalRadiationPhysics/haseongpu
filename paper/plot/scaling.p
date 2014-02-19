@@ -1,24 +1,27 @@
 #! /usr/bin/env gnuplot
 set term wxt enhanced font "Serif, 14"
-set key top right
+set key top left
 set grid xtics
 set grid ytics
 set xlabel "GPUs"
 set ylabel "speedup"
 #set ylabel "efficency"
-set xtics 7,8,63
+#set xtics 0,10,70
+#set ytics 0,8,70
 #set ytics 0,4,64
-#set yrange [1:64]
-set yrange [0:1]
-set xrange [0:64]
+set yrange [0:70]
+#set yrange [0:1]
+set xrange [0:70]
 #set yrange [0:1]
 
 
-plot \
-"scaling.dat" u 1:((7858/$3)/$1) w linespoints t "speedup non adaptive" lw 3 ps 2 pt 57,\
-"scaling.dat" u 1:((13350/$4)/$1) w linespoints t "speedup adaptive + repetitive" lw 3 ps 2 pt 57
-#"scaling.dat" u 1:((1057/$2)/$1) w linespoints t "efficency non adaptive" lc rgb "blue" lw 3 ps 2 pt 37
+f(x)=x
 
+
+plot \
+"scaling.dat" u 1:(7858/$3) w linespoints t "IS"  lc rgb "blue" lw 3 ps 2 pt 57,\
+"scaling.dat" u 1:(13619/$4) w linespoints t "IS + AS + RS"  lc rgb "orange" lw 3 ps 2 pt 57,\
+f(x) t "" lc rgb "black"
 
 # Output
 set term pngcairo enhanced font "Serif, 14"
