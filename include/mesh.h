@@ -14,40 +14,12 @@
 #include <curand_kernel.h> /* curand_uniform */
 #include <string>
 
-#include <reflection.h>
+#include <geometry.h>
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
 #define VERY_SMALL 0.0
 
-struct TwoDimPoint {
-  double x;
-  double y;
-};
-
-typedef TwoDimPoint TwoDimDir;
-
-struct Point {
-  double x;
-  double y;
-  double z;
-};
-
-typedef Point Vector;
-
-/**
- * @brief a Ray, defined by a startpoint, direction and length
- */
-struct Ray {
-  Point p;
-  Vector dir;
-  float length;
-};
-
-struct NormalRay {
-  TwoDimPoint p;
-  TwoDimDir dir;
-};
 
 /**
  * @brief Contains the structure of the crystal
@@ -162,7 +134,7 @@ struct Mesh {
   __device__ unsigned getCellType(unsigned triangle) const;
 
 
-  unsigned getMaxReflections(int reflectionPlane) const;
+  unsigned getMaxReflections(ReflectionPlane reflectionPlane) const;
   unsigned getMaxReflections() const;
 
   __device__ __host__ float getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const;

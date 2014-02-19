@@ -8,9 +8,8 @@
 #ifndef Reflection_H
 #define Reflection_H
 
-#include "mesh.h"
-
-enum ReflectionPlane {TOP_REFLECTION = 1, BOTTOM_REFLECTION = -1};
+#include <mesh.h>
+#include <geometry.h>
 
 /**
  * @brief Calculates the reflectionPoint and reflectionAngle with upper or lower surface

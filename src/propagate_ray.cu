@@ -1,10 +1,8 @@
 #include "propagate_ray.h"
 #include <mesh.h>
-#include <stdio.h>
 #include <geometry.h>
 #include <reflection.h> /* calcNextReflection */
 #include <cuda_runtime_api.h>
-#include <stdio.h> /* printf */
 #include <assert.h> /* assert */
 
 /**

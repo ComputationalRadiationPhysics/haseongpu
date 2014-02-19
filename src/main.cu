@@ -383,7 +383,7 @@ int main(int argc, char **argv){
 
   // Compare with vtk input
   // if(compareLocation!="") {
-  //   std::vector<double> compareAse = compareVtk(dndtAse, compareLocation, hMesh.numberOfSamples);
+  //   std::vector<double> compareAse = compareVtk(dndtAse, compareLocation);
 
   // }
 
@@ -404,10 +404,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writeToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writeToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writeToVtk(hMesh, mse, outputPath + "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writeToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(hMesh, mse, outputPath + "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
   //Print statistics

@@ -105,107 +105,131 @@ CURRENT_DIR = pwd;
 mkdir(FOLDER);
 cd(FOLDER);
 
+%x=fopen('points.txt','w');
 x=fopen('p_in.txt','w');
 fprintf(x,'%.50f\n',points);
 fclose(x);
 
+%x=fopen('triangleNormalsX.txt','w');
 x=fopen('n_x.txt','w');
 fprintf(x,'%.50f\n',triangleNormalsX);
 fclose(x);
 
+%x=fopen('triangleNormalsY.txt','w');
 x=fopen('n_y.txt','w');
 fprintf(x,'%.50f\n',triangleNormalsY);
 fclose(x);
 
+%x=fopen('forbiddenEdge.txt','w');
 x=fopen('forbidden.txt','w');
 fprintf(x,'%d\n',forbiddenEdge);
 fclose(x);
 
+%x=fopen('triangleNormalPoint.txt','w');
 x=fopen('n_p.txt','w');
 fprintf(x,'%d\n',triangleNormalPoint);
 fclose(x);
 
+%x=fopen('triangleNeighbors.txt','w');
 x=fopen('neighbors.txt','w');
 fprintf(x,'%d\n',triangleNeighbors);
 fclose(x);
 
+%x=fopen('trianglePointIndices.txt','w');
 x=fopen('t_in.txt','w');
 fprintf(x,'%d\n',trianglePointIndices);
 fclose(x);
 
 % thickness of one slice!
+%x=fopen('thickness.txt','w');
 x=fopen('z_mesh.txt','w');
 fprintf(x,'%.50f\n',thickness);
 fclose(x);
 
 % number of slices
+%x=fopen('numberOfLevels.txt','w');
 x=fopen('mesh_z.txt','w');
 fprintf(x,'%d\n',numberOfLevels);
 fclose(x);
 
+%x=fopen('numberOfTriangles.txt','w');
 x=fopen('size_t.txt','w');
 [a,b] = size(trianglePointIndices);
 fprintf(x,'%d\n',a);
 fclose(x);
 
+%x=fopen('numberOfPoints','w');
 x=fopen('size_p.txt','w');
 [a,b] = size(points);
 fprintf(x,'%d\n',a);
 fclose(x);
 
+%x=fopen('nTot.txt','w');
 x=fopen('n_tot.txt','w');
 fprintf(x,'%.50f\n',nTot);
 fclose(x);
 
+%x=fopen('betaVolume.txt','w');
 x=fopen('beta_v.txt','w');
 fprintf(x,'%.50f\n',betaVolume);
 fclose(x);
 
+%x=fopen('sigmaA.txt','w');
 x=fopen('sigma_a.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_abs);
 fclose(x);
 
+%x=fopen('sigmaE.txt','w');
 x=fopen('sigma_e.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_ems);
 fclose(x);
 
+%x=fopen('tFluo.txt','w');
 x=fopen('tfluo.txt','w');
 fprintf(x,'%.50f\n',crystal.tfluo);
 fclose(x);
 
+%x=fopen('betaCells.txt','w');
 x=fopen('beta_cell.txt','w');
 fprintf(x,'%.50f\n',betaCells);
 fclose(x);
 
+%x=fopen('triangleSurfaces.txt','w');
 x=fopen('surface.txt','w');
 fprintf(x,'%.50f\n',triangleSurfaces);
 fclose(x);
 
+%x=fopen('triangleCenterX.txt','w');
 x=fopen('x_center.txt','w');
 fprintf(x,'%.50f\n',triangleCenterX);
 fclose(x);
 
+%x=fopen('triangleCenterY.txt','w');
 x=fopen('y_center.txt','w');
 fprintf(x,'%.50f\n',triangleCenterY);
 fclose(x);
 
-
-x=fopen('claddingInt.txt','w');
+%x=fopen('claddingInt.txt','w');
+x=fopen('clad_int.txt','w');
 fprintf(x,'%d\n',claddingInt);
 fclose(x);
 
-x=fopen('claddingNumber.txt','w');
+%x=fopen('claddingNumber.txt','w');
+x=fopen('clad_num.txt','w');
 fprintf(x,'%d\n',claddingNumber);
 fclose(x);
 
+%x=fopen('claddingAbsorption.txt','w');
 x=fopen('clad_abs.txt','w');
 fprintf(x,'%.50f\n',claddingAbsorption);
 fclose(x);
 
+%x=fopen('refractiveIndices.txt','w');
 x=fopen('refractive_indices.txt','w');
 fprintf(x,'%3.5f\n',refractiveIndices);
 fclose(x);
 
+%x=fopen('reflectivities.txt','w');
 x=fopen('reflectivities.txt','w');
 fprintf(x,'%.50f\n',reflectivities);
 fclose(x);

@@ -611,8 +611,8 @@ unsigned Mesh::getMaxReflections (ReflectionPlane reflectionPlane) const{
 }
 
 unsigned Mesh::getMaxReflections() const{
-	unsigned top = getMaxReflections(1);
-	unsigned bottom = getMaxReflections(-1);
+	unsigned top = getMaxReflections(TOP_REFLECTION);
+	unsigned bottom = getMaxReflections(BOTTOM_REFLECTION);
 	return max(top,bottom);
 }
 
@@ -626,12 +626,12 @@ __device__ __host__ float Mesh::getReflectivity(ReflectionPlane reflectionPlane,
 	return 0;
 }
 
-__device__ __host__ float Mesh::getReflectionAngle(int reflectionPlane) const{
+__device__ __host__ float Mesh::getReflectionAngle(ReflectionPlane reflectionPlane) const{
 	switch(reflectionPlane){
-		case -1:
+		case BOTTOM_REFLECTION:
       return totalReflectionAngles[0];
 			//return asin(refractiveIndices[1]/refractiveIndices[0]);
-		case 1:
+		case TOP_REFLECTION:
       return totalReflectionAngles[1];
 			//return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
