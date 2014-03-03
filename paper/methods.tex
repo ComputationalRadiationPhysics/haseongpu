@@ -1,7 +1,18 @@
 \section{Methods}
 \numberwithin{equation}{section}
+
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_1.png}}}
+  \caption{Basic program flow: Matlab calls the C-Code in a loop to
+  simulate the timesteps. The C-code calls multiple GPU functions}
+  \label{graphic:pap1}
+\end{figure}
+
+
 This section explains methods used to reduce runtime and
 increase precision.
+
 
 \subsection{Simulation data}
 All plots and graphics of this sections
@@ -152,6 +163,13 @@ verified with up to 64 nodes.
 
 \subsection{Importance sampling (IS)}
 \label{subsec:importance_sampling}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step2_2.png}}}
+  \caption{After adding the importance sampling, the calculated importance 
+  influences the gain calculation}
+  \label{graphic:pap2}
+\end{figure}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be calculated 
 before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
@@ -200,6 +218,13 @@ and simulation runtime.
 
 \subsection{Adaptive sampling (AS)}
 \label{subsec:adaptive_sampling}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step3_2.png}}}
+  \caption{if the MSE is too high, both importance sampling and gain calculation
+  are restarted with a higher number of rays to increase sampling resolution}
+  \label{graphic:pap3}
+\end{figure}
 To assess the precision
 and therefore the difference between the true and calculated value,
 it is further determined the mean squared error (MSE):
@@ -245,6 +270,13 @@ methods gives lower error by same calculation time.
 
 
 \subsection{Repetitive sampling (RS)}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step4_2.png}}}
+  \caption{If the MSE is too high, gain calculation is restarted with another
+    random seed and the same number of rays. The calculated importance will stay the same.}
+  \label{graphic:pap4}
+\end{figure}
 Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the
 simulation for a sample point with the same number of rays and a different random number 
 generator. This can reduce the number of rays over all sample points and therefore
