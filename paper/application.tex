@@ -26,69 +26,69 @@ necessary in advance:
   \item Include calcPhiASE.m from the application directory into your MATLAB path
   \item Call calcPhiASE function from the MATLAB script: \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
 \end{enumerate}
-A detailed description about the MATLAB compatible interface
-is given in the README file and should be consulted.
 
-%\subsection{MATLAB interface}
-%\label{label:matlab_interface}
-%Because MATLAB is widely used in academic and research institutions, a MATLAB
-%interface is provided. 
+\subsubsection{Input Arguments}
+Mesh information needs to be generated in advance
+to save calculation time, because usually $\Phi$-ASE calculations
+run over several timesteps on the same mesh. Thus the following
+data need to be provided:
+\begin{description}
+  \label{label:input}
+  \item[Mesh information]\mbox{}
+    \begin{itemize}
+      \setlength{\itemindent}{-2.5em}
+    \item Structure (points, triangles, prisms)
+    \item Thickness of a mesh slice 
+    \item Number of planes
+    \item Refractive index of mesh and volume around
+    \item Reflectivities of mesh planes bottom and top
+    \end{itemize}
 
-%\subsubsection{Usage}
-%In \ref{label:input}, a brief overview about the
-%arguments of the calcPhisAse function can be found. See the README file for 
-%more interface details. Otherwise it is just a function call from
-%a MATLAB script:
+  \item[Properties]
+    \mbox{}
+    \begin{itemize}
+      \setlength{\itemindent}{-2.5em}
+      \item Stimuli in sample points and volume/prisms $\beta$
+      \item Crystal Fluorescence $\tau_{f}$
+      \item Cladding (use of different materials)
+      \item Doping of the active gain medium $N_{tot}$
+    \end{itemize}
 
+  \item[Laser information]
+    \mbox{}
+    \begin{itemize}
+      \setlength{\itemindent}{-2.5em}
+      \item laser absorption $\sigma_a$
+      \item laser emission $\sigma_e$
+    \end{itemize}
 
-%% \subsubsection{Input Arguments}
-%% Mesh information needs to be generated in advance
-%% to save calculation time, because usually $\Phi$-ASE calculations
-%% run over several timesteps on the same mesh. Thus the following
-%% data need to be provided by the MATLAB script:
-%% \begin{itemize}
-%%   \label{label:input}
-%%   \item Mesh information
-%%     \begin{itemize}
-%%     \item Set of triangles $\mathcal{T}$
-%%     \item Normal vectors of prism (triangle) sides
-%%     \item Center points of the triangles
-%%     \item Surfaces of triangles
-%%     \item Neighbor relation between triangles $n : \mathcal{T} \times \mathcal{T}$
-%%     \item Thickness of a mesh slice 
-%%     \item Number of slices
-%%     \item Refractive index of mesh and volume around
-%%     \item Reflectivities of mesh planes bottom and top
-%%     \end{itemize}
-
-%%   \item Properties 
-%%     \begin{itemize}
-%%       \item Stimuli in the sample points and volume/prisms $\beta$
-%%       \item Crystal Fluorescence of the active gain medium $\tau_{f}$
-%%       \item Cladding of the mesh (use of different materials)
-%%       \item Doping of the active gain medium $N_{tot}$
-%%     \end{itemize}
-
-%%   \item Laser information
-%%     \begin{itemize}
-%%       \item laser absorption $\sigma_a$
-%%       \item laser emission $\sigma_e$
-%%     \end{itemize}
-
-%%   \item Algorithm information
-%%     \begin{itemize}
-%%       \item Maximal number of rays for adaptive sampling
-%%       \item MSE-threshold for adaptive sampling
-%%       \item Decide whether to activate reflections
-%%     \end{itemize}
+   \item[Algorithm information]
+    \mbox{}
+    \begin{itemize}
+      \setlength{\itemindent}{-2.5em}
+       \item Maximal number of rays for adaptive sampling
+       \item MSE-threshold for adaptive sampling
+       \item Number of repetitions for repetitive sampling
+       \item Decide whether to activate reflections
+     \end{itemize}
     
-%% \end{itemize}
+ \end{description}
+A detailed description about the MATLAB compatible interface
+and therefore the needed arguments is given in the README file 
+and should be consulted.
 
-%% \subsubsection{Output}
-%% The MATLAB function returns data 
-%% for each sample point as follows:
-%% \begin{itemize}
-%%   \item $\Phi_{ASE}$ values
-%%   \item MSE values
-%%   \item Number of Rays of Monte Carlo simulation
-%% \end{itemize}
+\subsubsection{Output}
+The Simulation returns three variables:
+\begin{description}
+  \item[phiASE] is a list of $\Phi_{ASE}(s_i)$ 
+  \item[MSE] is a list of reached $MSE(s_i)$
+  \item[nRays] is a list of used rays for Monte Carlo experiment for each sample point
+    
+\end{description}
+The returned variables are represented as two-dimensional matrices in 
+which columns are plane indices the rows are point indices.
+For example: the variables for the used gain
+medium have 321 columns and 10 rows, what multiplies to
+3210 sample points. The value for the ith point and
+the jth level can then be obtained by Matlab with:
+\[value~=~values(i,j)\]

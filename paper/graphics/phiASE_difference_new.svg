@@ -31,11 +31,11 @@
      inkscape:window-height="1029"
      id="namedview140"
      showgrid="false"
-     showguides="false"
+     showguides="true"
      inkscape:guide-bbox="true"
      inkscape:zoom="0.58271605"
-     inkscape:cx="815.21313"
-     inkscape:cy="492.3458"
+     inkscape:cx="1630.6261"
+     inkscape:cy="489.7525"
      inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
@@ -105,6 +105,10 @@
        id="guide4361"
        position="532.59601,791.18081"
        orientation="1,0" />
+    <sodipodi:guide
+       orientation="1,0"
+       position="1398.6229,731.05932"
+       id="guide24662" />
   </sodipodi:namedview>
   <metadata
      id="metadata142">
@@ -530,16 +534,16 @@ CreationDate: Tue Oct 29 16:45:07 2013
      sodipodi:linespacing="125%"
      id="text3119"
      y="238.45251"
-     x="1380.1819"
+     x="1382.1819"
      style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
      xml:space="preserve"><tspan
-       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
+       style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
        y="238.45251"
-       x="1380.1819"
+       x="1382.1819"
        id="tspan3121"
        sodipodi:role="line"> N = 10<tspan
    id="tspan3112"
-   style="font-size:18.20025635px;baseline-shift:super">5</tspan> rays</tspan></text>
+   style="font-size:40px;baseline-shift:super">5</tspan> rays</tspan></text>
   <flowRoot
      transform="translate(611.34221,86.682194)"
      style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
@@ -569,31 +573,31 @@ CreationDate: Tue Oct 29 16:45:07 2013
   <text
      sodipodi:linespacing="125%"
      id="text3119-3"
-     y="471.43826"
-     x="1379.4388"
+     y="473.43826"
+     x="1397.4388"
      style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
      xml:space="preserve"><tspan
-       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
-       y="471.43826"
-       x="1379.4388"
+       style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
+       y="473.43826"
+       x="1397.4388"
        id="tspan3121-1"
        sodipodi:role="line">N = 10<tspan
    id="tspan3114"
-   style="font-size:18.20025635px;baseline-shift:super">6</tspan> rays</tspan></text>
+   style="font-size:40px;baseline-shift:super">6</tspan> rays</tspan></text>
   <text
      sodipodi:linespacing="125%"
      id="text3119-0"
-     y="705.63745"
-     x="1380.2253"
+     y="707.63745"
+     x="1398.2253"
      style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
      xml:space="preserve"><tspan
-       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
-       y="705.63745"
-       x="1380.2253"
+       style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
+       y="707.63745"
+       x="1398.2253"
        id="tspan3121-9"
        sodipodi:role="line">N = 10<tspan
    id="tspan3116"
-   style="font-size:18.20025635px;baseline-shift:super">7</tspan> rays</tspan></text>
+   style="font-size:40px;baseline-shift:super">7</tspan> rays</tspan></text>
   <path
      inkscape:connector-curvature="0"
      id="path3173"
@@ -603,12 +607,12 @@ CreationDate: Tue Oct 29 16:45:07 2013
      transform="matrix(0,-1,1,0,0,0)"
      sodipodi:linespacing="125%"
      id="text4971"
-     y="1340.4083"
+     y="1342.4083"
      x="-547.63745"
      style="font-size:32px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
      xml:space="preserve"><tspan
-       style="font-size:36px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
-       y="1340.4083"
+       style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif"
+       y="1342.4083"
        x="-547.63745"
        id="tspan4973"
        sodipodi:role="line">Increase N </tspan></text>
