@@ -11,7 +11,7 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   sodipodi:docname="PAP_basic_1_arrows1.svg"
+   sodipodi:docname="PAP_basic_2.svg"
    inkscape:version="0.48.4 r9939"
    version="1.1"
    id="svg2"
@@ -28,8 +28,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.7331474"
-     inkscape:cx="567.19514"
-     inkscape:cy="663.7575"
+     inkscape:cx="506.29214"
+     inkscape:cy="622.15604"
      inkscape:document-units="px"
      inkscape:current-layer="layer6"
      showgrid="false"
@@ -37,7 +37,7 @@
      inkscape:object-nodes="true"
      inkscape:snap-smooth-nodes="true"
      inkscape:snap-midpoints="true"
-     inkscape:window-width="1598"
+     inkscape:window-width="798"
      inkscape:window-height="879"
      inkscape:window-x="0"
      inkscape:window-y="19"
@@ -392,7 +392,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -408,11 +408,11 @@
        height="966.33179"
        width="1914.3541"
        id="rect2989"
-       style="fill:#b3ffac;fill-opacity:0.89019608;fill-rule:nonzero;stroke:#000000;stroke-width:5.41710329;stroke-linecap:butt;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;display:inline"
+       style="fill:#b3ffac;fill-opacity:0.89019607999999995;fill-rule:nonzero;stroke:#000000;stroke-width:5.417;stroke-linecap:butt;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;display:inline"
        ry="0" />
     <rect
        ry="0"
-       style="fill:#f1d5d6;fill-opacity:1;stroke:#000000;stroke-width:5.68045807000000025;stroke-linecap:butt;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;display:inline"
+       style="fill:#f1d5d6;fill-opacity:1;stroke:#000000;stroke-width:5.68;stroke-linecap:butt;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;display:inline"
        id="rect18554"
        width="1914.3541"
        height="657.76514"
@@ -485,23 +485,23 @@
     <text
        xml:space="preserve"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
-       x="-139.71066"
+       x="-147.71066"
        y="26.225386"
        id="text18550"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan18552"
-         x="-139.71066"
+         x="-147.71066"
          y="26.225386">Matlab</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
-       x="-147.62292"
+       x="-155.62292"
        y="209.97404"
        id="text18556"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
-         x="-147.62292"
+         x="-155.62292"
          y="209.97404"
          id="tspan18560">CalcPhiASE()</tspan></text>
     <text
@@ -529,13 +529,13 @@
     <text
        xml:space="preserve"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
-       x="-151.60178"
+       x="-159.60178"
        y="532.30957"
        id="text18587"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan18589"
-         x="-151.60178"
+         x="-159.60178"
          y="532.30957">calcGainSum()</tspan></text>
     <text
        xml:space="preserve"
@@ -573,26 +573,26 @@
     <text
        xml:space="preserve"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
-       x="-25.023083"
+       x="-3.0230827"
        y="69.296677"
        id="text20754"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan20756"
-         x="-25.023083"
+         x="-3.0230827"
          y="69.296677">for each time step</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text20758"
-       y="341.79898"
+       y="351.79898"
        x="59.942371"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
-         y="341.79898"
+         y="351.79898"
          x="59.942371"
          id="tspan20760"
          sodipodi:role="line">for each</tspan><tspan
-         y="369.29898"
+         y="379.29898"
          x="59.942371"
          sodipodi:role="line"
          id="tspan20762">sample point</tspan></text>
@@ -611,11 +611,11 @@
        sodipodi:linespacing="125%"
        id="text21954"
        y="531.15411"
-       x="45.012611"
+       x="63.012611"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
          y="531.15411"
-         x="45.012611"
+         x="63.012611"
          id="tspan21956"
          sodipodi:role="line">for each ray</tspan></text>
   </g>
@@ -636,13 +636,13 @@
        d="m -181.82951,548.10044 a 64.058403,252.85138 0 1 1 -7.8468,-457.208138"
        sodipodi:start="1.0665137"
        sodipodi:end="5.0813913"
-       transform="matrix(1.3094181,0,0,1.4693311,388.61653,-33.72388)"
+       transform="matrix(1.3094181,0,0,1.6180224,370.61653,-44.707998)"
        sodipodi:open="true" />
     <path
        transform="matrix(1.3094181,0,0,1.4666577,396.61653,159.12249)"
        sodipodi:end="5.2549838"
        sodipodi:start="1.0347993"
-       d="m -194.1198,383.09124 a 36.540977,65.562004 0 1 1 0.20687,-112.51302"
+       d="m -194.1198,383.09124 c -17.35083,18.49183 -39.77147,8.2458 -50.07789,-22.88516 -10.30641,-31.13095 -4.59579,-71.35817 12.75505,-89.85 11.57714,-12.33845 25.9982,-12.2531 37.52971,0.22214"
        sodipodi:ry="65.562004"
        sodipodi:rx="36.540977"
        sodipodi:cy="326.72366"
@@ -676,6 +676,19 @@
        d="m 218.91914,158.13848 0,85.33383"
        id="path21950"
        inkscape:connector-curvature="0" />
+    <path
+       sodipodi:open="true"
+       transform="matrix(0.91967381,0,0,0.80173228,302.95959,336.91884)"
+       sodipodi:end="5.1645774"
+       sodipodi:start="1.0665137"
+       d="M -181.82951,549.58996 A 64.058403,254.55267 0 1 1 -184.79186,97.7553"
+       sodipodi:ry="254.55267"
+       sodipodi:rx="64.058403"
+       sodipodi:cy="326.72366"
+       sodipodi:cx="-212.78122"
+       id="path3160"
+       style="fill:none;stroke:#000000;stroke-width:4.08511257;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker-start:none;marker-end:url(#TriangleOutM);display:inline"
+       sodipodi:type="arc" />
   </g>
   <g
      inkscape:groupmode="layer"
