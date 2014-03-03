@@ -13,13 +13,13 @@
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    inkscape:export-ydpi="90"
    inkscape:export-xdpi="90"
-   inkscape:export-filename="/home/carli/Dokumente/TUD/CUDA/projekt/git/octrace/paper/graphics/multigpu_partitioning3.png"
+   inkscape:export-filename="/home/carli/Dokumente/TUD/CUDA/projekt/git/octrace/paper/graphics/multigpu_partitioning4.png"
    width="824.38092"
    height="638.86719"
    id="svg2"
    version="1.1"
    inkscape:version="0.48.4 r9939"
-   sodipodi:docname="multigpu_partitioning3.svg">
+   sodipodi:docname="multigpu_partitioning4.svg">
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
@@ -37,7 +37,7 @@
      inkscape:object-nodes="true"
      inkscape:snap-smooth-nodes="true"
      inkscape:snap-midpoints="true"
-     inkscape:window-width="1598"
+     inkscape:window-width="798"
      inkscape:window-height="879"
      inkscape:window-x="0"
      inkscape:window-y="19"
