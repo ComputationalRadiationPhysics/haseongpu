@@ -21,7 +21,7 @@ Triangles               & 600\\
 \hline
 Prisms                  & 5400\\
 \hline
-Thickness               & 0.6 cm\\
+Height                  & 0.6 cm\\
 \hline
 Surface area            & 4 x 4 cm\\
 \hline
@@ -38,53 +38,11 @@ GPU implementation is not so much about changing the overall algorithm,
 but more about efficient utilisation of the GPU ressources. 
 By using CUDA\cite{cuda} as a parallel computing platform created by NVIDIA\cite{nvidia},
 it is possible to obtain high performance with a high level 
-programming model (similar to C++). Therefore the parallelization was pushed on CUDA-thread, 
+programming model (similar to C). Therefore the parallelization was pushed on CUDA-thread, 
 CUDA-block and multiple GPU level to reach a good speedup compared to 
 the sequential implementation.
 In the following, the used parallelization
 techniques and their implementations are explained.
-
-\subsubsection{Sample Points on multiple GPUs}
-\label{subsubsec:multigpu}
-
-Each Monte Carlo experiment (see section \ref{eq:monte_carlo_ase}), calculates
-the $\Phi_{ASE}(s_i)$ value of a sample point $s_i$ independently from each
-other. Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as a
-self-contained CUDA kernel and therefore sample points can be distributed to
-several devices.
-
-Consider a MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
-node is used as a headnode responsible for distributing the workload. The
-headnode holds a queue of all sample points. Each node requests a new sample
-point and begins the calculation. As soon as the calculation is finished, a node
-is able to request new work indepently from the other nodes (Figure
-\ref{graphic:multigpu}). This form of load balancing is especially important in a
-scenario with differing workloads for each sample point (see section
-\ref{subsec:adaptive_sampling}).
-
-As a result, the speedup is almost linear in the number of GPUs. This was
-verified with up to 64 nodes.
-%Consider having $k$ GPUs on a node available, 
-%$k$ \emph{pthreads} are spawned on the host, like it
-%is shown in Figure \ref{graphic:multigpu}. A GPU and a
-%disjunct subset of sample points are assigned to every pthread, so that every
-%sample point is distributed exactly to one pthread.
-%From this point on, the pthreads run in parallel and start a
-%CUDA kernel for every sample point in their subset.
-%The kernels inside a pthread are called sequentially,
-%thus the number of pthreads is limited by the number of sample points, when 
-%every GPU simulates exacly one sample point.
-%\textbf{TODO MPI Threads}
-%
-%As a result the speedup for multiple
-%GPUs is almost linear, which was tested with up to 4 GPUs.
-    
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning4.png}}}
-  \caption{partitioning of the workload to multiple devices}
-  \label{graphic:multigpu}
-\end{figure}
 
 \subsubsection{Rays as GPU threads}
     The Raytracing of every ray can be done independently through the mesh
@@ -92,6 +50,12 @@ verified with up to 64 nodes.
     boost performance. Figure \ref{graphic:kernel} demonstrates the distribution
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
     CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
+    The maximum amount of used thread blocks is bounded to the used
+    mersenne twister implementation\cite{mersenne_twister} as random number generator.
+    The number of threads per block was determined by the CUDA Occupancy 
+    Calculator\cite{occupancy_calculator} with the object to obtain the
+    maximum occupancy.
+    
     Since there are $N$ rays to calculate for each sample point, each thread
     traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
     corresponding gain values using the following cycle (see Figure
@@ -158,6 +122,34 @@ can contribute to the computation.
 %  \label{graphic:thread_detail}
 %\end{figure}
 
+\subsubsection{Sample Points on multiple GPUs}
+\label{subsubsec:multigpu}
+
+Each Monte Carlo experiment (see section \ref{eq:monte_carlo_ase}), calculates
+the $\Phi_{ASE}(s_i)$ value of a sample point $s_i$ independently from each
+other. Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as a
+self-contained CUDA kernel and therefore sample points can be distributed to
+several devices.
+
+Consider a MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
+node is used as a headnode responsible for distributing the workload. The
+headnode holds a queue of all sample points. Each node requests a new sample
+point and begins the calculation. As soon as the calculation is finished, a node
+is able to request new work indepently from the other nodes (Figure
+\ref{graphic:multigpu}). This form of load balancing is especially important in a
+scenario with varying workloads for each sample point (see section
+\ref{subsec:adaptive_sampling}).
+
+As a result, the speedup is almost linear in the number of GPUs. This was
+verified with up to 64 nodes.
+    
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning3.png}}}
+  \caption{partitioning of the workload to multiple devices}
+  \label{graphic:multigpu}
+\end{figure}
+
 \subsection{Importance sampling (IS)}
 \label{subsec:importance_sampling}
 Importance sampling is a well known technique in the domain
@@ -167,7 +159,7 @@ to figure out which areas are most important to the result.
 
 The objective is to distribute N rays to P prims of the active gain medium.
 This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
-The rays per prism $rays_x$ and importance $imp_x$ for sample point $s_i$ are calculated as follows:
+ The rays per prism $rays_x$ and importance $imp_x$ for sample point $s_i$ are calculated as follows:
 \begin{align}
   rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
 imp_x &= 
@@ -222,6 +214,10 @@ be sampled with a higher resolution. This can be done with an adaptive
 method, which allows to remove strong peaks in the result
 of the simulation by either resampling these points with more rays.
 
+Potential unbalanced load, because of variable number of rays per sample 
+in a multi GPU scenario, is reduced by the MPI load balancer (see section
+\ref{subsubsec:multigpu}).
+
 For comparision, the impact of importance sampling
 on the MSE values is shown (see Figure~\ref{plot:importance2}). 
 Importance sampling alone already reduces the MSE values for
@@ -246,6 +242,7 @@ to reduce calculation time.
 The adaptive method will not reduce the average MSE over all sample points,
 but it will reduce the maximal MSE values. Thus, using the adaptive
 methods gives lower error by same calculation time.
+
 
 \subsection{Repetitive sampling (RS)}
 Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the

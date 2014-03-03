@@ -4,7 +4,7 @@
 \subsection{Simulation data}
 For the sections \nameref{subsec:validation} and \nameref{subsec:benchmarking} 
 the simulation was changed to a flat 
-cylindrical gain medium (Figure \ref{graphic:samples_round}) with the following
+cylindrical gain medium (Figure \ref{graphic:samples_round}) to be able to compare the simulation results with real world experiments. The gain medium has the following
 properties:
 \\
 \\ 
@@ -20,7 +20,7 @@ Triangles               & 812\\
 \hline
 Prisms                  & 7308\\
 \hline
-Thickness               & 0.7 cm\\
+Height                  & 0.7 cm\\
 \hline
 Diameter                & 6 cm\\
 \hline
@@ -89,10 +89,12 @@ points and 5400 prisms respectively.
 \label{subsec:benchmarking}
 In Figure \ref{plot:runtime}, the runtimes of the original single threaded
 algorithm from \cite{ASE2010} are compared to the developed non-adaptive
-parallel ASE-flux algorithm with different numbers of rays to demonstrate
+parallel ASE-flux algorithm with varying numbers of rays to demonstrate
 scaling for different workloads. All simulations were done without using
 reflections. To increase the number of GPUs, MPI\cite{MPI} was used to distribute the
-sample points to all available devices. 
+sample points to all available devices. A sequential part of allocating
+devices on the nodes is the reason for no runtim improvement in the range
+of small ray numbers.
 
 %reflections. To increase the number of GPUs to 48, an \emph{array job} was
 %scheduled and the sampling points distributed evenly to the 12 Nodes (each
@@ -109,21 +111,7 @@ sample points to all available devices.
   \caption{runtime of sequential algorithm compared to parallel algorithm}
   \label{plot:runtime}
 \end{figure}
-For the adaptive algorithm, simulation times of different sample points can vary
-significantly (see Section \ref{subsec:adaptive_sampling}). Therefore, a uniform
-partitioning of the sample points among the nodes would result in an unbalanced
-workload and reduced efficency for the whole computation. Instead, one of the
-nodes acts as a \emph{head node} and manages workload distribution based on demand: As
-soon as one of the \emph{compute nodes} is idle, it will request more data to simulate.
-Apart from a constant initialization overhead, distributing the computation to
-multiple devices scales well, even with the adaptive algorithm. (Figure
-\ref{plot:gpu_scaling}).
-\begin{figure}[H]
-  \centerline{
-    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
-  \caption{efficiency on multiple devices}
-  \label{plot:gpu_scaling}
-\end{figure}
+
 Adaptive sampling usually does not only eliminate outliers, but even reduce the
 needed time to do so: By using the idea of a pre-defined $MSE$-threshold, the
 precision of the simulation can be adjusted in terms of this threshold rather than
@@ -142,7 +130,23 @@ succeeded to stay below the given threshold with very little additional effort.
   \label{plot:adaptive_runtime}
 \end{figure}
 
-\subsection{Limitations and future work}
+For the adaptive algorithm, simulation times of different sample points can vary
+significantly (see Section \ref{subsec:adaptive_sampling}). Therefore, a uniform
+partitioning of the sample points among the nodes would result in an unbalanced
+workload and reduced efficency for the whole computation. Instead, one of the
+nodes acts as a \emph{head node} and manages workload distribution based on demand: As
+soon as one of the \emph{compute nodes} is idle, it will request more data to simulate.
+Apart from a constant initialization overhead, distributing the computation to
+multiple devices scales well, even with the adaptive algorithm. (Figure
+\ref{plot:gpu_scaling}).
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.png}}}
+  \caption{speedup on multiple devices}
+  \label{plot:gpu_scaling}
+\end{figure}
+
+\subsection{Conclusion}
 \label{subsec:limitations}
 Future work should address reflections on the lateral sides of the gain medium
 to allow the simulation of lateral feedback. The current implementation only
