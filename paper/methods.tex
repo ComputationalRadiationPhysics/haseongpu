@@ -1,18 +1,8 @@
 \section{Methods}
 \numberwithin{equation}{section}
 
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_1.png}}}
-  \caption{Basic program flow: Matlab calls the C-Code in a loop to
-  simulate the timesteps. The C-code calls multiple GPU functions}
-  \label{graphic:pap1}
-\end{figure}
-
-
 This section explains methods used to reduce runtime and
 increase precision.
-
 
 \subsection{Simulation data}
 All plots and graphics of this sections
@@ -42,6 +32,27 @@ Spectrum                & Monochromatic\\
 \hline
 \end{tabular}
 
+
+\subsection{Program flow}
+\label{subsec:program_flow}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_1.png}}}
+  \caption{Basic program flow: Matlab calls the C-Code in a loop to
+  simulate the timesteps. The C-code calls multiple GPU functions}
+  \label{graphic:pap1}
+\end{figure}
+
+Figure \ref{graphic:pap1} describes the basic flow of the program: Simulation
+data for a single timestep is prepared in Matlab and then passed on to our
+C-Code (see Section \ref{sec:application} for further reference). All information about
+the Mesh is copied to random access memory (or the global memory of a GPU, if
+the GPU-based algorithm is used). This is necessary since it is not known
+beforehand, which prisms a ray will cross and therefore the whole mesh needs to
+be available. When the computation succeeds, all data is passed back to Matlab
+and the outer loop will proceed with the next timestep. 
+
+
 \subsection{Parallel methods}
 \label{subsec:parallel_methods}
 Moving from a single CPU to a multiple
@@ -51,9 +62,14 @@ By using CUDA\cite{cuda} as a parallel computing platform created by NVIDIA\cite
 it is possible to obtain high performance with a high level 
 programming model (similar to C). Therefore the parallelization was pushed on CUDA-thread, 
 CUDA-block and multiple GPU level to reach a good speedup compared to 
-the sequential implementation.
+the sequential implementation. 
+Figure \ref{graphic:pap1} already displays two embarrasingly parallel spots
+which can be exploited. Firstly, calculation of each ray for a single sample
+point is completely independent. Secondly, each sample point itself is
+independent from all other sample points. 
 In the following, the used parallelization
 techniques and their implementations are explained.
+
 
 \subsubsection{Rays as GPU threads}
     The Raytracing of every ray can be done independently through the mesh
@@ -65,7 +81,8 @@ techniques and their implementations are explained.
     mersenne twister implementation\cite{mersenne_twister} as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
     Calculator\cite{occupancy_calculator} with the object to obtain the
-    maximum occupancy.
+    maximum number of concurrently executed operations for the used hardware
+    (see Section \ref{subsec:testingEnvironment}.
     
     Since there are $N$ rays to calculate for each sample point, each thread
     traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
@@ -126,15 +143,14 @@ only threads in the same block depend on the duration of one long ray.
 Meanwhile, threads in other blocks can pick up more work. Thus, most resources
 can contribute to the computation.
     
-%\begin{figure}[H]
-%  \centerline
-%  {\resizebox{0.35\textwidth}{!}{\includegraphics{graphics/thread_detail1.png}}}
-%  \caption{Multiple gain calculations within a single CUDA thread}
-%  \label{graphic:thread_detail}
-%\end{figure}
-
 \subsubsection{Sample Points on multiple GPUs}
 \label{subsubsec:multigpu}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning3.png}}}
+  \caption{partitioning of the workload to multiple devices}
+  \label{graphic:multigpu}
+\end{figure}
 
 Each Monte Carlo experiment (see section \ref{eq:monte_carlo_ase}), calculates
 the $\Phi_{ASE}(s_i)$ value of a sample point $s_i$ independently from each
@@ -142,7 +158,7 @@ other. Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as a
 self-contained CUDA kernel and therefore sample points can be distributed to
 several devices.
 
-Consider a MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
+Consider an MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
 node is used as a headnode responsible for distributing the workload. The
 headnode holds a queue of all sample points. Each node requests a new sample
 point and begins the calculation. As soon as the calculation is finished, a node
@@ -154,12 +170,6 @@ scenario with varying workloads for each sample point (see section
 As a result, the speedup is almost linear in the number of GPUs. This was
 verified with up to 64 nodes.
     
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning3.png}}}
-  \caption{partitioning of the workload to multiple devices}
-  \label{graphic:multigpu}
-\end{figure}
 
 \subsection{Importance sampling (IS)}
 \label{subsec:importance_sampling}
@@ -171,9 +181,9 @@ verified with up to 64 nodes.
   \label{graphic:pap2}
 \end{figure}
 Importance sampling is a well known technique in the domain
-of statistics \cite{importanceSamplingSource}. It has to be calculated 
-before every  $\Phi_{ASE}$ kernel (see Figure \ref{graphic:multigpu}) and is used 
-to figure out which areas are most important to the result.
+of statistics \cite{importanceSamplingSource}. It has to be determined for each
+sample point before its $\Phi_{ASE}$ calculation (see Figure \ref{graphic:pap2},\ref{graphic:multigpu}) and is used 
+to decide which areas will have the most influence on the result.
 
 The objective is to distribute N rays to P prims of the active gain medium.
 This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
