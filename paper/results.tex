@@ -147,17 +147,31 @@ multiple devices scales well, even with the adaptive algorithm. (Figure
 \end{figure}
 
 \subsection{Conclusion}
-\label{subsec:limitations}
-Future work should address reflections on the lateral sides of the gain medium
-to allow the simulation of lateral feedback. The current implementation only
-supports reflections on the upper and lower surface. Furthermore, these upper
-and lower surfaces need to be coplanar due to the structure of the mesh
-(Section \ref{subsec:meshSampling}).
-Another limitation originates from the fact that each simulation uses a mapping
-from rays to their respective starting position. For a large number of rays,
-this can lead to a substancial amout of allocated memory. With the current
-hardware (Section \ref{subsec:testingEnvironment}) and implementation, each sample
-point can be simulated with a maximum of $6.5\cdot10^8$ rays. To push this limit
-further, a more sophisticated mapping needs to be implemented. This could
-be done by simply splitting the mapping in different parts and calculating them
-iteratively.
+\label{subsec:conclusion}
+This paper presented a fast and very scalable implementation of a simulation to
+estimate ASE flux in an active gain medium. It seeks to improve the work of
+laser physicists by enabling them to properly simulate the described effects
+with high speed and high resolution. Experimental details like cladding, surface
+coating, refractivites, polychromatic laser pulses and reflections on the upper
+and lower side can be modeled and simulated with various additional parameters.
+
+Future improvements could address reflections on the lateral sides of the gain
+medium. Also, it will be helpful to further increase the maximum number of rays
+(currently there is a maximum of $5\cdot10^8$ rays per sample point). For
+example, this could be done rather easily by splitting the simulated rays in
+groups and calculating these groups iteratively, combining the results
+afterwards.
+
+%Future work should address reflections on the lateral sides of the gain medium
+%to allow the simulation of lateral feedback. The current implementation only
+%supports reflections on the upper and lower surface. Furthermore, these upper
+%and lower surfaces need to be coplanar due to the structure of the mesh
+%(Section \ref{subsec:meshSampling}).
+%Another limitation originates from the fact that each simulation uses a mapping
+%from rays to their respective starting position. For a large number of rays,
+%this can lead to a substancial amout of allocated memory. With the current
+%hardware (Section \ref{subsec:testingEnvironment}) and implementation, each sample
+%point can be simulated with a maximum of $6.5\cdot10^8$ rays. To push this limit
+%further, a more sophisticated mapping needs to be implemented. This could
+%be done by simply splitting the mapping in different parts and calculating them
+%iteratively.
