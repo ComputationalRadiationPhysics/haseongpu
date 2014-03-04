@@ -212,8 +212,8 @@ To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
 \[\Phi_{ASE\Delta} = |\Phi_{ASE~IS}(M) - \Phi_{ASE~Uniform}(N)|\] of the 
 result with importance sampling ($IS$) and with uniform sampling ($Uniform$) was calculated with 
 $N,M = 10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then, N was increased in two steps by a factor of 10 for the simulation with uniform sampling.
-The more rays are simulated, the smaller is $\Phi_{ASE\Delta}$, which 
+Then, N was increased two times by a factor of 10 for the simulation with uniform sampling.
+The more rays are simulated, the smaller $\Phi_{ASE\Delta}$ becomes, which 
 means that the simulation
 with importance sampling achieves the same results with less
 rays per sample point. Thus, importance sampling can increase the
@@ -237,7 +237,8 @@ and simulation runtime.
 \end{figure}
 To assess the precision
 and therefore the difference between the true and calculated value,
-it is further determined the mean squared error (MSE):
+the mean squared error (MSE) is determined and serves as a core metric to
+describe sampling improvements:
 \begin{align}
      f(\vec{s_i}) &= \frac{1}{N} \sum_{u=0}^{N-1} gain(\overrightarrow{r_{i,u}s_i})\\
      f^2(s_i)     &= \frac{1}{N} \sum_{u=0}^{N-1} gain(\overrightarrow{r_{i,u}s_i})^2\\
@@ -245,9 +246,13 @@ it is further determined the mean squared error (MSE):
 \end{align}
 Since most sample points $s_i$ have a low $MSE(s_i)$, there is no need
 to sample them with a high number of rays. Only some outliers need to
-be sampled with a higher resolution. This can be done with an adaptive
+be sampled with a higher resolution to reduce the occuring variance. This can be done with an adaptive
 method, which allows to remove strong peaks in the result
-of the simulation by either resampling these points with more rays.
+of the simulation by resampling these points with more rays. The number of rays
+is increased with each iteration, until the desired MSE threshold is met or 
+a defined maximum number of rays is reached (Figure \ref{graphic:pap3}).
+Note that the importance sampling step needs to be executed again, since
+the number of rays changed and thus the distribution will differ slightly.
 
 Potential unbalanced load, because of variable number of rays per sample 
 in a multi GPU scenario, is reduced by the MPI load balancer (see section
@@ -263,7 +268,7 @@ many sample points considerable.
   \caption{histogram of MSE values IS and Uniform sampling}
   \label{plot:importance2}
 \end{figure}
-By using also adaptive sampling, the MSE values are reduced to a specific MSE threshold.
+By using also adaptive sampling, the MSE values are reduced to a user-defined MSE threshold.
 Figure \ref{plot:adaptive} shows the histogramm of MSE values for a MSE threshold
 of $0.005$. All sample points $s_i$ with $MSE(s_i) > 0.005$ were resampled with more rays
 per sample point to lower their MSE value. The other sample points remained unchanged
@@ -275,8 +280,9 @@ to reduce calculation time.
   \label{plot:adaptive}
 \end{figure}
 The adaptive method will not reduce the average MSE over all sample points,
-but it will reduce the maximal MSE values. Thus, using the adaptive
-methods gives lower error by same calculation time.
+but it will reduce the maximal MSE values of the outliers. Thus, using the adaptive
+method gives lower error and a better error distribution while maintaining
+roughly the same calculation time.
 
 
 \subsection{Repetitive sampling (RS)}
@@ -287,10 +293,15 @@ methods gives lower error by same calculation time.
     random seed and the same number of rays. The calculated importance will stay the same.}
   \label{graphic:pap4}
 \end{figure}
-Repetitive sampling lowers the MSE values without increasing the number of rays by restarting the
-simulation for a sample point with the same number of rays and a different random number 
-generator. This can reduce the number of rays over all sample points and therefore
-also runtime. Thus, repetitive sampling is an optimization over the adaptive sampling. 
+Some outliers of the Monte Carlo method are not related to an insufficient
+sampling resolution, but rather an unlucky seed for the random number generator.
+Repetitive sampling lowers the MSE values without increasing the number of rays,
+by resampling the sample point with a different seed while keeping the number of
+rays fixed. Only after several failed attempts, it will fall back to adaptive
+sampling (Figure \ref{graphic:pap4}). This can reduce the number of rays over all sample points and therefore
+also runtime. Thus, repetitive sampling is an optimization in addition to adaptive sampling. 
+Note, that repetitive sampling does not require to execute the importance
+sampling again (unlike adaptive sampling).
 
 Figure \ref{plot:repetitive} shows the sampling resolution
 of the sample points in a histogram. Simulating with RS reduces
@@ -306,9 +317,9 @@ of 560s.
 \end{figure}
 
 \subsection{Benefits of sample methods}
-In this section, the presented methods IS, AS and RS are compared by duration
+In this section, the presented methods IS, AS and RS are compared by runtime
 and precision.
-In Figure \ref{graphic:methods_compare}, the runtime to reach an
+In Figure \ref{graphic:methods_compare}, the time to reach an
 MSE value of 0.01 was measured. It is evident that AS and RS perform
 much better than Uniform or IS. 
 \begin{figure}[H]
