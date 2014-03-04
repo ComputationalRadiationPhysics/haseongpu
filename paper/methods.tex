@@ -81,9 +81,9 @@ techniques and their implementations are explained.
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
     CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
     The maximum amount of used thread blocks is bounded to the used
-    mersenne twister implementation\cite{mersenne_twister} as random number generator.
+    mersenne twister implementation (\cite{mersenne_twister}) as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
-    Calculator\cite{occupancy_calculator} with the object to obtain the
+    Calculator (\cite{occupancy_calculator}) with the object to obtain the
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}.
     
