@@ -40,7 +40,7 @@ Spectrum                & Monochromatic\\
 \label{subsec:program_flow}
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_1.png}}}
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_2.png}}}
   \caption{Basic program flow: Matlab calls the C-Code in a loop to
   simulate the timesteps. The C-code calls multiple GPU functions}
   \label{graphic:pap1}
@@ -75,17 +75,23 @@ techniques and their implementations are explained.
 
 
 \subsubsection{Rays as GPU threads}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail5.png}}}
+  \caption{one of 200 CUDA threadblocks to calculate $\Phi_{ASE}$}
+  \label{graphic:kernel}
+\end{figure}
     The Raytracing of every ray can be done independently through the mesh
     structure.  Exploiting this parallelism provides a great opportunity to
     boost performance. Figure \ref{graphic:kernel} demonstrates the distribution
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
     CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
-    The maximum amount of used thread blocks is bounded to the used
+    The maximum amount of used thread blocks is bounded by the used
     mersenne twister implementation (\cite{mersenne_twister}) as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
     Calculator (\cite{occupancy_calculator}) with the object to obtain the
     maximum number of concurrently executed operations for the used hardware
-    (see Section \ref{subsec:testingEnvironment}.
+    (see Section \ref{subsec:testingEnvironment}).
     
     Since there are $N$ rays to calculate for each sample point, each thread
     traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
@@ -110,29 +116,25 @@ techniques and their implementations are explained.
       \item Add gain to gain of the other rays in the thread
     \end{enumerate}
     After a maximum of $t$ iterations, the thread has computed its share and
-    adds its accumulated gain atomically to the results of the other threads
-    \eqref{eq:monte_carlo_ase}.
+    adds its locally accumulated gain to the results of the other threads in a
+    global reduce operation. This reduce is implemented as a sequential
+    atomicAdd operation (see formula \eqref{eq:monte_carlo_ase}).
 
-\begin{figure}[H]
-  \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail4.png}}}
-  \caption{one of 200 CUDA threadblocks to calculate $\Phi_{ASE}$}
-  \label{graphic:kernel}
-\end{figure}
 
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/iteration_detail4.png}}}
-  \caption{steps for a single ray within a CUDA thread}
+  \caption{steps for a single ray within a CUDA thread, corresponding to
+  $propagate\_ray(r_{i,u})$ from Figure \ref{graphic:pap1}}
   \label{graphic:algorithm_steps}
 \end{figure}
 
 Furthermore, successive threads start rays from a similar origin, which results
-in similar paths through the mesh structure and therefore similar prisms. This
+in similar paths through the mesh structure and therefore often the same prisms. This
 leads to better utilisation of the GPU L1 cache and higher performance.
 
 Since each distinct ray potentially has a different path through the gain
-medium, the execution times between threads will differ substantially. In case
+medium, the execution times between some threads will differ substantially. In case
 of a static mapping from threads to rays (i.e. strided access), one thread can
 end up calculating many rays with long paths. If there are still many of those
 rays remaining, the thread has to continue working for a long time, while all
@@ -150,7 +152,7 @@ can contribute to the computation.
 \label{subsubsec:multigpu}
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning3.png}}}
+  {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning5.png}}}
   \caption{partitioning of the workload to multiple devices}
   \label{graphic:multigpu}
 \end{figure}
@@ -178,14 +180,15 @@ verified with up to 64 nodes.
 \label{subsec:importance_sampling}
 \begin{figure}[H]
   \centerline
-  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step2_2.png}}}
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step2_3.png}}}
   \caption{After adding the importance sampling, the calculated importance 
   influences the gain calculation}
   \label{graphic:pap2}
 \end{figure}
 Importance sampling is a well known technique in the domain
 of statistics \cite{importanceSamplingSource}. It has to be determined for each
-sample point before its $\Phi_{ASE}$ calculation (see Figure \ref{graphic:pap2},\ref{graphic:multigpu}) and is used 
+sample point before its $\Phi_{ASE}$ calculation (see Figure \ref{graphic:pap2},
+Figure \ref{graphic:multigpu}) and is used 
 to decide which areas will have the most influence on the result.
 
 The objective is to distribute N rays to P prims of the active gain medium.
