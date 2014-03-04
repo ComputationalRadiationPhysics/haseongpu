@@ -1,15 +1,14 @@
 \section{Methods}
 \numberwithin{equation}{section}
 
-In this section a basic setup with simulation data is used to demonstrate
+In this section the basic algorithm is used to demonstrate
 program flow and memory hierarchy. The algorithm will be incrementally improved
 by first parallelizing it on accelerator cards, and later adding several
 techniques to improve sampling precision as well as runtime behaviour.
 
-\subsection{Simulation data}
 All plots and graphics in this section
 are based on the simulation of a single timestep using the same gain medium (similar to Figure
-\ref{graphic:samples_reduced}) and stimulus in
+\ref{graphic:samples_reduced}) and stimulus
 with the following properties:
 \\
 \\
@@ -70,7 +69,7 @@ Figure \ref{graphic:pap1} already displays two embarrasingly parallel spots
 which can be exploited. Firstly, calculation of each ray for a single sample
 point is completely independent. Secondly, each sample point itself is
 independent from all other sample points. 
-In the following, the used parallelization
+In the following, the underlying memory hierarchy, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Memory hierachy}
@@ -187,7 +186,7 @@ participate, leaving many resources on the device unused.
 To improve load balancing between the threads, each thread block fetches a
 workload equal to its size and executes it completely before determining a new
 workload. Therefore, if a single thread calculates a ray with a very long path,
-only threads in the same block depend on the duration of one long ray.
+only threads in the same block depend on the duration of this long ray.
 Meanwhile, threads in other blocks can pick up more work. Thus, most resources
 can contribute to the computation.
     
