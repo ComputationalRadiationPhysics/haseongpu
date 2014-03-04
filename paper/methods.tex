@@ -1,12 +1,15 @@
 \section{Methods}
 \numberwithin{equation}{section}
 
-This section explains methods used to reduce runtime and
-increase precision.
+In this section a basic setup with simulation data is used to demonstrate
+program flow and memory hierarchy. The algorithm will be incrementally improved
+by first parallelizing it on accelerator cards, and later adding several
+techniques to improve sampling precision as well as runtime behaviour.
 
 \subsection{Simulation data}
-All plots and graphics of this sections
-are based on simulations of the same gain medium (similar to Figure \ref{graphic:samples_reduced})
+All plots and graphics in this section
+are based on the simulation of a single timestep using the same gain medium (similar to Figure
+\ref{graphic:samples_reduced}) and stimulus in
 with the following properties:
 \\
 \\
