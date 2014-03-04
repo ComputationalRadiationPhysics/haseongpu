@@ -1,12 +1,15 @@
 \section{Methods}
 \numberwithin{equation}{section}
 
-This section explains methods used to reduce runtime and
-increase precision.
+In this section a basic setup with simulation data is used to demonstrate
+program flow and memory hierarchy. The algorithm will be incrementally improved
+by first parallelizing it on accelerator cards, and later adding several
+techniques to improve sampling precision as well as runtime behaviour.
 
 \subsection{Simulation data}
-All plots and graphics of this sections
-are based on simulations of the same gain medium (similar to Figure \ref{graphic:samples_reduced})
+All plots and graphics in this section
+are based on the simulation of a single timestep using the same gain medium (similar to Figure
+\ref{graphic:samples_reduced}) and stimulus in
 with the following properties:
 \\
 \\
@@ -121,9 +124,9 @@ reuse cached prism data of their shared memory.
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
     CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
     The maximum amount of used thread blocks is bounded to the used
-    mersenne twister implementation\cite{mersenne_twister} as random number generator.
+    mersenne twister implementation (\cite{mersenne_twister}) as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
-    Calculator\cite{occupancy_calculator} with the object to obtain the
+    Calculator (\cite{occupancy_calculator}) with the object to obtain the
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}.
     
