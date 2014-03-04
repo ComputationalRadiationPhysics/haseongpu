@@ -76,7 +76,9 @@ points and 5400 prisms respectively.
       \label{graphic:benchmark_4_timeslices}
     \end{figure}
 
+  \item \textbf{TODO} How to calc dndt ASE ?
   \item TODO: scale for timesteps needed ?
+  
 
   \item comparison with previous values from Daniel's thesis
 
@@ -92,9 +94,9 @@ algorithm from \cite{ASE2010} are compared to the developed non-adaptive
 parallel ASE-flux algorithm with varying numbers of rays to demonstrate
 scaling for different workloads. All simulations were done without using
 reflections. To increase the number of GPUs, MPI\cite{MPI} was used to distribute the
-sample points to all available devices. A sequential part of allocating
-devices on the nodes is the reason for no runtim improvement in the range
-of small ray numbers.
+sample points to all available devices. A sequential overhead for allocating
+devices on the nodes and not fully occupied GPUs are the reasons for the lack of runtime improvement, when 
+using a small number of rays.
 
 %reflections. To increase the number of GPUs to 48, an \emph{array job} was
 %scheduled and the sampling points distributed evenly to the 12 Nodes (each
@@ -123,10 +125,11 @@ This can be adjusted to yield similar simulation results as the non-adaptive
 implementation at a fraction of its runtime. Note that some values in the
 graphic actually display almost the same runtime, since the computation always
 succeeded to stay below the given threshold with very little additional effort.
+This is indicated by the black rectangle in Figure \ref{plot:adaptive_runtime}.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/adaptive_runtime.png}}}
-  \caption{runtime comparison of adaptive and non-adaptive }
+  \caption{MSE comparision for equal runtimes}
   \label{plot:adaptive_runtime}
 \end{figure}
 
@@ -136,8 +139,8 @@ partitioning of the sample points among the nodes would result in an unbalanced
 workload and reduced efficency for the whole computation. Instead, one of the
 nodes acts as a \emph{head node} and manages workload distribution based on demand: As
 soon as one of the \emph{compute nodes} is idle, it will request more data to simulate.
-Apart from a constant initialization overhead, distributing the computation to
-multiple devices scales well, even with the adaptive algorithm. (Figure
+Apart from a constant initialization overhead of 5s, distributing the computation to
+multiple devices scales well with all presented methods. (Figure
 \ref{plot:gpu_scaling}).
 \begin{figure}[H]
   \centerline{

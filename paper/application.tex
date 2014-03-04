@@ -29,10 +29,6 @@ necessary in advance:
 \end{enumerate}
 
 \subsubsection{Input Arguments}
-Mesh information needs to be generated in advance
-to save calculation time, because usually $\Phi$-ASE calculations
-run over several timesteps on the same mesh. Thus the following
-data need to be provided:
 \begin{description}
   \label{label:input}
   \item[Mesh information]\mbox{}
@@ -87,9 +83,9 @@ The Simulation returns three variables:
     
 \end{description}
 The returned variables are represented as two-dimensional matrices in 
-which columns are plane indices the rows are point indices.
-For example: the variables for the used gain
-medium have 321 columns and 10 rows, what multiplies to
-3210 sample points. The value for the ith point and
-the jth level can then be obtained by Matlab with:
+which columns are plane indices and rows are point indices.
+For example, the variables for the used gain
+medium have 321 rows and 10 columns, what multiplies to
+3210 sample points. The value for the $i$th point and
+the $j$th level can then be obtained by Matlab with:
 \[value~=~values(i,j)\]

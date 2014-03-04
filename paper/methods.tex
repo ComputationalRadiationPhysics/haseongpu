@@ -130,9 +130,9 @@ reuse cached prism data of their shared memory.
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
     CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
     The maximum amount of used thread blocks is bounded by the used
-    mersenne twister implementation (\cite{mersenne_twister}) as random number generator.
+    mersenne twister implementation \cite{mersenne_twister} as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
-    Calculator (\cite{occupancy_calculator}) with the object to obtain the
+    Calculator \cite{occupancy_calculator} with the objective to obtain the
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}).
     
@@ -196,7 +196,8 @@ can contribute to the computation.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning5.png}}}
-  \caption{partitioning of the workload to multiple devices}
+  \caption{partitioning of the workload to multiple devices. All nodes store the whole mesh in
+  global memory.}
   \label{graphic:multigpu}
 \end{figure}
 
@@ -303,8 +304,8 @@ a defined maximum number of rays is reached (Figure \ref{graphic:pap3}).
 Note that the importance sampling step needs to be executed again, since
 the number of rays changed and thus the distribution will differ slightly.
 
-Potential unbalanced load, because of variable number of rays per sample 
-in a multi GPU scenario, is reduced by the MPI load balancer (see section
+Potentially unbalanced load, caused by a varying number of rays per sample 
+in a multi GPU scenario is mitigated by the MPI load balancer (see Section
 \ref{subsubsec:multigpu}).
 
 For comparision, the impact of importance sampling
