@@ -71,6 +71,34 @@ In the following, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Memory hierachy}
+Memory on accelerators cards in general can be seperated
+in 3 classes of memory. 
+\begin{description}
+  \item[Global memory] several gigabytes, high latency and bandwidth, global access
+  \item[Shared memory] several kilobytes, medium latency, access by threads of a CUDA-Block
+  \item[Global memory] several 32 bit register, no latency, exclusiv thread access
+\end{description}
+
+Thus a high-performance application always involves 
+a sophicasted memory hierachy by providing data at
+the point in time when it is needed for calculation.
+
+All used data structures are one-dimensional 
+arrays accessible by memory patterns to avoid complex pointer arithmetic.
+In particular, the mesh consists of an array of points and an array of the indices
+to that points, where three of these indices shape a triangle.
+For the intersection and raystracing algorithms, normals and neighbors
+of all vertices are also included. 
+
+The required memory for thousand or millions of rays (each ray 4 Byte)
+consumes the biggest amount of global memory so far and sets with that
+a limit for simulation resolution. 
+
+It is not possible to store all mesh data on the small register
+memory, hence the mesh is stored in global memory and will
+be transfered prism per prism into the registers of the
+CUDA-threads (see Figure \ref{graphic:memory_hierarchy}).
+
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/memory_hierarchy.png}}}
@@ -78,6 +106,13 @@ techniques and their implementations are explained.
   \label{graphic:memory_hierarchy}
 \end{figure}
 
+Because the trace of rays can not be predicted in advance,
+the shared memory acts as L1 cache, caching
+prisms from global memory to share these prisms 
+with several warps.
+Rays with same start prism and therefore similar trace throught 
+the mesh are grouped in CUDA-blocks. Thus, warps in the same block can 
+reuse cached prism data of their shared memory.
 
 \subsubsection{Rays as GPU threads}
     The Raytracing of every ray can be done independently through the mesh
