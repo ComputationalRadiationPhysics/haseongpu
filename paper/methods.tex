@@ -70,6 +70,14 @@ independent from all other sample points.
 In the following, the used parallelization
 techniques and their implementations are explained.
 
+\subsubsection{Memory hierachy}
+\begin{figure}[H]
+  \centerline
+  {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/memory_hierarchy.png}}}
+  \caption{memory hierachy for a single CUDA-block}
+  \label{graphic:memory_hierarchy}
+\end{figure}
+
 
 \subsubsection{Rays as GPU threads}
     The Raytracing of every ray can be done independently through the mesh
