@@ -28,32 +28,34 @@ Height                  & 0.6 cm\\
 \hline
 Surface area            & 4 x 4 cm\\
 \hline
-Material                & YAG crystal\\
+Material                & $\text{YB}^3$:YAG crystal\\
+\hline
+Crystal doping          & $2at.\%$\\
 \hline
 Spectrum                & Monochromatic\\
+                        & $~\lambda = 1030nm$\\
+                        & $\sigma_e = 2.4e-20$\\ 
+                        & $\sigma_a =1.10e-21$\\
 \hline
 \end{tabular}
-
 
 \subsection{Program flow}
 \label{subsec:program_flow}
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_2.png}}}
-  \caption{Basic program flow: Matlab calls the C-Code in a loop to
-  simulate the timesteps. The C-code calls multiple GPU functions}
+  \caption{Basic program flow: MATLAB calls the C-Code in a loop to
+  simulate the timesteps. The C-application calls multiple GPU functions}
   \label{graphic:pap1}
 \end{figure}
 
-Figure \ref{graphic:pap1} describes the basic flow of the program: Simulation
-data for a single timestep is prepared in Matlab and then passed on to our
-C-Code (see Section \ref{sec:application} for further reference). All information about
-the Mesh is copied to random access memory (or the global memory of a GPU, if
-the GPU-based algorithm is used). This is necessary since it is not known
-beforehand, which prisms a ray will cross and therefore the whole mesh needs to
-be available. When the computation succeeds, all data is passed back to Matlab
-and the outer loop will proceed with the next timestep. 
-
+The basic programm flow (see Figure \ref{graphic:pap1}) starts
+by passing the prepared experiment data from MATLAB \cite{matlab}
+to the C-application (CalcPhiASE). All information about the mesh is then copied
+to the accelator card's memory and processed like described in 
+the section \nameref{subsubsec:rays}. When the computation succeeds, 
+all data is passed back to MATLAB and the outer loop will proceed 
+with the next timestep. 
 
 \subsection{Parallel methods}
 \label{subsec:parallel_methods}
@@ -118,6 +120,7 @@ the mesh are grouped in CUDA-blocks. Thus, warps in the same block can
 reuse cached prism data from their shared memory.
 
 \subsubsection{Rays as GPU threads}
+\label{subsubsec:rays}
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail5.png}}}
@@ -127,18 +130,18 @@ reuse cached prism data from their shared memory.
     The raytracing of every ray can be done independently through the mesh
     structure.  Exploiting this parallelism provides a great opportunity to
     boost performance. Figure \ref{graphic:kernel} demonstrates the distribution
-    of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
-    CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
-    The maximum amount of used thread blocks is bounded by the used
+    of rays. For each sample point $s_i$, a kernel consisting of a grid of 
+    maximal 200 CUDA blocks is spawned. Each of those blocks contains 128 CUDA threads.
+    The maximum amount of used blocks is bounded by the used
     mersenne twister implementation \cite{mersenne_twister} as random number generator.
     The number of threads per block was determined by the CUDA Occupancy 
     Calculator \cite{occupancy_calculator} with the objective to obtain the
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}).
     
-    \textbf{TODO} $t$ is no longer calculated that way!
-    Since there are $N$ rays to calculate for each sample point, each thread
-    traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
+    Dependendant on the used GPU, B blocks can be spawned
+    in parallel on a device and since there are $N$ rays to calculate for each sample point, each thread
+    traces up to $t = \lceil\frac {N}{B\cdot128}\rceil$ rays and computes the
     corresponding gain values using the following cycle (see Figure
     \ref{graphic:algorithm_steps}):
     

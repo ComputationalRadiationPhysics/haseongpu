@@ -3,8 +3,9 @@
 
 \subsection{Simulation data}
 For the sections \nameref{subsec:validation} and \nameref{subsec:benchmarking},
-the simulation was changed to a flat 
-cylindrical gain medium (Figure \ref{graphic:samples_round}) to be able to compare the simulation results with real world experiments. The gain medium has the following
+the simulation was changed to a flat cylindrical gain medium 
+(Figure \ref{graphic:samples_round}) to be able to compare the simulation
+results with real world experiments. The gain medium has the following
 properties:
 \\
 \\ 
@@ -24,7 +25,9 @@ Height                  & 0.7 cm\\
 \hline
 Diameter                & 6 cm\\
 \hline
-Material                & YAG crystal\\
+Material                & $\text{YB}^3$:YAG crystal\\
+\hline
+Crystal doping          & $2at.\%$\\
 \hline
 Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spectrum})\\
 \hline
@@ -50,44 +53,64 @@ Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spec
 \subsection{Setup of the testing environment}
 \label{subsec:testingEnvironment}
 
-
 The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
 each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
 and 4 NVIDIA Tesla K20M GPUs with 5GB GDDR5 RAM. Each GPU contains 2496 CUDA cores with a total
-peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE
-(\cite{torque}) with Maui (\cite{maui}) as scheduling backend. The modeled gain medium is a
-\textbf{TODO: Daniel should check/complete the description of the medium} YAG
-crystal with a square surface of $16cm^2$\textbf{(?)} and a thickness of
-$0.6cm$\textbf{(?)}. Its upper surface was sampled with 321 points, resulting in
-600 Delaunay triangles (see section \ref{subsec:meshSampling}). The mesh is
-extruded 9 times on the vertical axis, amounting to a total of 3210 sample
-points and 5400 prisms respectively.
+peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE\cite{torque} 
+with Maui\cite{maui} as scheduling backend. 
+
+% Allready explained in simulation data section
+%The modeled gain medium is a
+%\textbf{TODO: Daniel should check/complete the description of the medium} YAG
+%crystal with a square surface of $16cm^2$\textbf{(?)} and a thickness of
+%$0.6cm$\textbf{(?)}. Its upper surface was sampled with 321 points, resulting in
+%600 Delaunay triangles (see section \ref{subsec:meshSampling}). The mesh is
+%extruded 9 times on the vertical axis, amounting to a total of 3210 sample
+%points and 5400 prisms respectively.
 
 \subsection{Validation}
 \label{subsec:validation}
+Validation is an important mechanism to proof correctness for
+the results of a simulated experiment. By comparing the gain 
+of the simulation and the experiment, 
+it is possible to show the impact of reflections and polychromatic
+wavelength. Figure \ref{graphic:benchmark_4_timeslices} shows
+varying simulation configurations and their influence on the
+gain development over time.
 
-\begin{itemize}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/benchmark.png}}}
+  \caption{gain of single sample point in 50 timessteps}
+  \label{plot:benchmark}
+\end{figure}
+\textbf{TODO} measured values missing in benchmark plot\\
 
-    \begin{figure}[H]
-      \centerline{
-        \resizebox{0.5\textwidth}{!}{\includegraphics{plot/benchmark.png}}}
-      \caption{gain of single sample point in 50 timessteps}
-      \label{plot:benchmark}
-    \end{figure}
-    \begin{figure}[H]
-      \centerline{
-        \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
-      \caption{sliced gain medium in 5 timessteps}
-      \label{graphic:benchmark_4_timeslices}
-    \end{figure}
+On one hand sole simulation with reflections underestimates the gain value,
+because reflecting rays are potentially longer and consequently able
+to absorb more energy from the gain medium. 
+On the other hand sole simulation with a polychromatic spectrum overestimates the
+gain value, because the average emission intensity is lower then with monochromatic
+wavelength on $1030 nm$ (emission peak on Figure \ref{plot:polychromatic_spectrum}), 
+thus the reduced  ASE flux leads to a higher gain.
 
-  \item \textbf{TODO} How to calc dndt ASE ?
+A simulation configuration with reflection and polychromatic spectrum enabled,
+matches the measured values exactly and validates with this developed simulation.
+Using neither reflection nor the polychromatic spectrum compensate the discussed 
+under and overestimation luckily and matches therefore also the measured 
+values.
 
-  \item \textbf{TODO}comparison with previous values from Daniel's thesis
+\textbf{TODO} describe sliced gain medium
 
-  \item \textbf{TODO} comparison with results from an experiment
 
-\end{itemize}
+\begin{figure}[H]
+  \centerline{
+    \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
+  \caption{sliced gain medium in 5 timessteps}
+  \label{graphic:benchmark_4_timeslices}
+\end{figure}
+\textbf{TODO} How to calc dndt ASE ?\\
+
 
 
 \subsection{Benchmarking}

@@ -6,19 +6,20 @@ set key on
 set border 3
 set grid
 
-set key left
-set key opaque
-set xlabel "timestep"
+set key out
+set key center top
+#set key opaque
+set xlabel "time[ns]"
 set ylabel "gain"
 #set xtics 0,0.1,1
 set xtics nomirror
 set ytics nomirror
 
 plot\
-"benchmark_100k.dat" u (($1*$1) * 1.026) t "benchmark" with linespoints,\
-"benchmark_refl.dat" u (($1*$1) * 1.026) t "benchmark refl" with linespoints,\
-"benchmark_polychromatic.dat" u (($1*$1) * 1.026) t "benchmark poly" with linespoints,\
-"benchmark_polychromatic_refl.dat" u (($1*$1) * 1.026) t "benchmark poly refl" with linespoints
+"benchmark_100k.dat" u (($1*$1) * 1.026) t "monochromatic, no reflection" with linespoints,\
+"benchmark_refl.dat" u (($1*$1) * 1.026) t "monochromatic, with reflection" with linespoints,\
+"benchmark_polychromatic.dat" u (($1*$1) * 1.026) t "polychromatic, no reflection" with linespoints,\
+"benchmark_polychromatic_refl.dat" u (($1*$1) * 1.026) t "polychromatic, with reflection" with linespoints
 
 # Output
 set term pngcairo enhanced font "Serif, 14"
