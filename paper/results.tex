@@ -2,7 +2,7 @@
 \numberwithin{equation}{section}
 
 \subsection{Simulation data}
-For the sections \nameref{subsec:validation} and \nameref{subsec:benchmarking} 
+For the sections \nameref{subsec:validation} and \nameref{subsec:benchmarking},
 the simulation was changed to a flat 
 cylindrical gain medium (Figure \ref{graphic:samples_round}) to be able to compare the simulation results with real world experiments. The gain medium has the following
 properties:
@@ -59,10 +59,6 @@ points and 5400 prisms respectively.
 
 \begin{itemize}
 
-  \item NEXT PAPER ???
-
-  \item \textbf{Image: gain VS time for one single point. Overlay between
-    experiment/daniels sim/our sim}
     \begin{figure}[H]
       \centerline{
         \resizebox{0.5\textwidth}{!}{\includegraphics{plot/benchmark.png}}}
@@ -77,12 +73,10 @@ points and 5400 prisms respectively.
     \end{figure}
 
   \item \textbf{TODO} How to calc dndt ASE ?
-  \item TODO: scale for timesteps needed ?
-  
 
-  \item comparison with previous values from Daniel's thesis
+  \item \textbf{TODO}comparison with previous values from Daniel's thesis
 
-  \item (comparison with results from an experiment)
+  \item \textbf{TODO} comparison with results from an experiment
 
 \end{itemize}
 
@@ -92,11 +86,12 @@ points and 5400 prisms respectively.
 In Figure \ref{plot:runtime}, the runtimes of the original single threaded
 algorithm from \cite{ASE2010} are compared to the developed non-adaptive
 parallel ASE-flux algorithm with varying numbers of rays to demonstrate
-scaling for different workloads. All simulations were done without using
-reflections. To increase the number of GPUs, MPI\cite{MPI} was used to distribute the
-sample points to all available devices. A sequential overhead for allocating
-devices on the nodes and not fully occupied GPUs are the reasons for the lack of runtime improvement, when 
-using a small number of rays.
+scaling for different workloads. All simulations were done without
+reflections to ensure comparability. To increase the number of GPUs, MPI\cite{MPI} was used to distribute the
+sample points to all available devices. A sequential overhead for device
+allocation 
+on the nodes and not fully occupied GPUs are the reasons for the lack of runtime
+improvement for low workloads with a small number of rays.
 
 %reflections. To increase the number of GPUs to 48, an \emph{array job} was
 %scheduled and the sampling points distributed evenly to the 12 Nodes (each
@@ -138,7 +133,8 @@ significantly (see Section \ref{subsec:adaptive_sampling}). Therefore, a uniform
 partitioning of the sample points among the nodes would result in an unbalanced
 workload and reduced efficency for the whole computation. Instead, one of the
 nodes acts as a \emph{head node} and manages workload distribution based on demand: As
-soon as one of the \emph{compute nodes} is idle, it will request more data to simulate.
+soon as one of the \emph{compute nodes} is idle, it will request more data to
+simulate (Section \ref{subsubsec:multigpu}).
 Apart from a constant initialization overhead of 5s, distributing the computation to
 multiple devices scales well with all presented methods. (Figure
 \ref{plot:gpu_scaling}).

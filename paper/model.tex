@@ -44,14 +44,15 @@ formula \eqref{eq:gain}.
 In order to distribute the sample points on the medium, it is treated as
 a horizontal 2-dimensional plane, which can be sampled with a non-uniform
 density. This approach allows to increase the spatial resolution in certain
-areas of interest. Using Delaunay (\cite{delaunay_triangulation})
-triangulation, these sample points are connected into a 2D mesh of triangles.
+areas of interest. Using Delaunay triangulation \cite{delaunay_triangulation},
+these sample points are connected into a 2D mesh of triangles.
 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
-  \caption{non-uniform sampling of active gain medium in 2 slices}
+  \caption{non-uniform sampling of active gain medium in 2 slices, forming a
+  mesh of prisms}
   \label{graphic:samples_reduced}
 \end{figure}
 
