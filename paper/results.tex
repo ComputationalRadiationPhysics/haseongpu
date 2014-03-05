@@ -32,7 +32,7 @@ Crystal doping          & $2at.\%$\\
 Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spectrum})\\
 \hline
 \end{tabular}
-
+\textbf{TODO} Are these simdatas correct ?\\
 
 \begin{figure}[H]
   \centerline{
@@ -74,14 +74,15 @@ Validation is an important mechanism to proof correctness for
 the results of a simulated experiment. By comparing the gain 
 of the simulation and the experiment, 
 it is possible to show the impact of reflections and polychromatic
-wavelength. Figure \ref{graphic:benchmark_4_timeslices} shows
+wavelength. (\textbf{TODO} How were the measured values optained?) Figure \ref{graphic:benchmark_4_timeslices} shows
 varying simulation configurations and their influence on the
-gain development over time.
+gain development over time. Note that the plotted values are
+discrete and just connected with lines to guide to eye.
 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/benchmark.png}}}
-  \caption{gain of single sample point in 50 timessteps}
+  \caption{gain development in 50 timessteps}
   \label{plot:benchmark}
 \end{figure}
 \textbf{TODO} measured values missing in benchmark plot\\
@@ -100,18 +101,15 @@ Using neither reflection nor the polychromatic spectrum compensate the discussed
 under and overestimation luckily and matches therefore also the measured 
 values.
 
-\textbf{TODO} describe sliced gain medium
-
-
+The same simulation, reduced to five timesteps, is shown in Figure \ref{graphic:benchmark_4_timeslices}
+It illustrates $\frac{dn}{dt} ASE$ in the sliced gain medium with:
+\[ \frac{dn}{dt}ASE(s_i) = \frac{N_{tot} \cdot (\beta_{cell}(s_i) \cdot (\sigma_a + \sigma_e) - \Phi_{ASE}(s_i))}{\tau_f} \]
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
   \caption{sliced gain medium in 5 timessteps}
   \label{graphic:benchmark_4_timeslices}
 \end{figure}
-\textbf{TODO} How to calc dndt ASE ?\\
-
-
 
 \subsection{Benchmarking}
 \label{subsec:benchmarking}

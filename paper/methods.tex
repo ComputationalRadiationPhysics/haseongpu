@@ -38,13 +38,15 @@ Spectrum                & Monochromatic\\
                         & $\sigma_a =1.10e-21$\\
 \hline
 \end{tabular}
+\\
+\textbf{TODO} Are these simdatas correct ?\\
 
 \subsection{Program flow}
 \label{subsec:program_flow}
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step1_2.png}}}
-  \caption{Basic program flow: MATLAB calls the C-Code in a loop to
+  \caption{Basic program flow: MATLAB calls the C-application in a loop to
   simulate the timesteps. The C-application calls multiple GPU functions}
   \label{graphic:pap1}
 \end{figure}
