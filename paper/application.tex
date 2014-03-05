@@ -5,16 +5,16 @@
 The application is available as a commandline-tool and reads
 its simulation data from plain text files. It was improved by polychromatic
 wavelengths, adaptive sampling, repetetive sampling, multigpu computation and 
-reflections towards the orginal application from D. Albach \cite{ASE2010}.
+reflections as to the orginal application from D. Albach \cite{ASE2010}.
 
-For an easy access the offered MATLAB compatible interface (see \ref{label:matlab_interface}) 
+For an easy access, the offered MATLAB compatible interface (see \ref{label:matlab_interface}) 
 is highly recommended. Experienced users with the intention to call the application
-directly, should consult the README file, the provided 
+directly should consult the README file, the provided 
 example code or the source code for more details.
 
 \subsection{Installation and Usage}
 The application was tested and developed under a linux environment
-and runs on Nvidia graphics cards with capability 2.0 (fermi generation) or higher.
+and runs on Nvidia graphics cards with compute capability 2.0 (fermi generation) or higher.
 It can be built by running make inside the application directory, provided
 that make (tested with 3.82), gcc (up to 4.6.2) and cuda (5.0) are installed. 
 This will also setup a MATLAB file calcPhiASE.m in the application
@@ -71,21 +71,21 @@ necessary in advance:
     
  \end{description}
 A detailed description about the MATLAB compatible interface
-and therefore the required arguments is given in the README file 
+and the required arguments are given in the README file 
 and should be consulted.
 
 \subsubsection{Output}
 The Simulation returns three variables:
 \begin{description}
-  \item[phiASE] is a list of $\Phi_{ASE}(s_i)$ 
-  \item[MSE] is a list of reached $MSE(s_i)$
-  \item[nRays] is a list of used rays for Monte Carlo experiment for each sample point
+  \item[phiASE] is a matrix of $\Phi_{ASE}(s_i)$ 
+  \item[MSE] is a matrix of reached $MSE(s_i)$
+  \item[nRays] is a matrix of used rays for the Monte Carlo experiment for each sample point
     
 \end{description}
 The returned variables are represented as two-dimensional matrices in 
-which columns are plane indices and rows are point indices.
+which columns are slice indices and rows are point indices.
 For example, the variables for the used gain
 medium have 321 rows and 10 columns, what multiplies to
 3210 sample points. The value for the $i$th point and
-the $j$th level can then be obtained by Matlab with:
+the $j$th slice can then be obtained by Matlab with:
 \[value~=~values(i,j)\]

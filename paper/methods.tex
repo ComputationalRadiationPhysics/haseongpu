@@ -59,7 +59,7 @@ and the outer loop will proceed with the next timestep.
 \label{subsec:parallel_methods}
 Moving from a single CPU to a multiple
 GPU implementation is not so much about changing the overall algorithm,
-but more about efficient utilisation of the GPU ressources. 
+but more about efficient utilization of the GPU resources. 
 By using CUDA\cite{cuda} as a parallel computing platform created by NVIDIA\cite{nvidia},
 it is possible to obtain high performance with a high level 
 programming model (similar to C). Therefore the parallelization was pushed on CUDA-thread, 
@@ -73,33 +73,34 @@ In the following, the underlying memory hierarchy, the used parallelization
 techniques and their implementations are explained.
 
 \subsubsection{Memory hierachy}
-Memory on accelerators cards in general can be seperated
-in 3 classes of memory. 
+Memory on accelerator cards in general can be split
+in 3 classes: 
 \begin{description}
-  \item[Global memory] several gigabytes, high latency and bandwidth, global access
-  \item[Shared memory] several kilobytes, medium latency, access by threads of a CUDA-Block
-  \item[Global memory] several 32 bit register, no latency, exclusiv thread access
+  \item[Global memory] several gigabytes, high latency and bandwidth, global access for threads from all CUDA-blocks
+  \item[Shared memory] several kilobytes, medium latency, access by threads of one CUDA-block
+  \item[Global memory] several 32 bit registers, no latency, exclusive access of one thread
 \end{description}
 
-Thus a high-performance application always involves 
-a sophicasted memory hierachy by providing data at
-the point in time when it is needed for calculation.
+Thus, a high-performance application always involves using
+a sophisticated memory hierachy that provides data by
+the time it is needed for calculation.
 
 All used data structures are one-dimensional 
-arrays accessible by memory patterns to avoid complex pointer arithmetic.
+arrays that are accessible through programmer-friendly interfaces to avoid
+explicit pointer arithmetic.
 In particular, the mesh consists of an array of points and an array of the indices
-to that points, where three of these indices shape a triangle.
+to these points. Three of these indices shape a triangle.
 For the intersection and raystracing algorithms, normals and neighbors
-of all vertices are also included. 
+of all edges are also included. 
 
-The required memory for thousand or millions of rays (each ray 4 Byte)
-consumes the biggest amount of global memory so far and sets with that
+The required memory for thousands or millions of rays (each ray 4 Byte)
+consumes the biggest amount of global memory so far, thereby setting 
 a limit for simulation resolution. 
 
-It is not possible to store all mesh data on the small register
+It is not possible to store all mesh data in the small register
 memory, hence the mesh is stored in global memory and will
-be transfered prism per prism into the registers of the
-CUDA-threads (see Figure \ref{graphic:memory_hierarchy}).
+be transfered prism by prism into the registers of the
+CUDA-threads (see Figure \ref{graphic:memory_hierarchy}) when needed.
 
 \begin{figure}[H]
   \centerline
@@ -112,9 +113,9 @@ Because the trace of rays can not be predicted in advance,
 the shared memory acts as L1 cache, caching
 prisms from global memory to share these prisms 
 with several warps.
-Rays with same start prism and therefore similar trace throught 
+Rays with same start prism and therefore similar trace through 
 the mesh are grouped in CUDA-blocks. Thus, warps in the same block can 
-reuse cached prism data of their shared memory.
+reuse cached prism data from their shared memory.
 
 \subsubsection{Rays as GPU threads}
 \begin{figure}[H]
@@ -123,7 +124,7 @@ reuse cached prism data of their shared memory.
   \caption{one of 200 CUDA threadblocks to calculate $\Phi_{ASE}$}
   \label{graphic:kernel}
 \end{figure}
-    The Raytracing of every ray can be done independently through the mesh
+    The raytracing of every ray can be done independently through the mesh
     structure.  Exploiting this parallelism provides a great opportunity to
     boost performance. Figure \ref{graphic:kernel} demonstrates the distribution
     of rays. For each sample point $s_i$, a kernel consisting of a grid of 200
@@ -135,6 +136,7 @@ reuse cached prism data of their shared memory.
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}).
     
+    \textbf{TODO} $t$ is no longer calculated that way!
     Since there are $N$ rays to calculate for each sample point, each thread
     traces up to $t = \lceil\frac {N}{200\cdot128}\rceil$ rays and computes the
     corresponding gain values using the following cycle (see Figure
@@ -151,7 +153,7 @@ reuse cached prism data of their shared memory.
             and $x$\label{goto:5a}
           \item calculate length $l_x$ of partial ray $\overrightarrow{r_{i,u}r_x}$
           \item calculate $partial\_gain(x)$ \eqref{eq:partial_gain}
-          \item if the ray did not reach $s_i$, determine neigboring prism $x'$,
+          \item if the ray did not reach $s_i$, determine neighboring prism $x'$,
             set $x := x'$ and $r_x$ as the new start point. goto \ref{goto:5a} 
         \end{enumerate}
       \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
@@ -160,7 +162,7 @@ reuse cached prism data of their shared memory.
     After a maximum of $t$ iterations, the thread has computed its share and
     adds its locally accumulated gain to the results of the other threads in a
     global reduce operation. This reduce is implemented as a sequential
-    atomicAdd operation (see formula \eqref{eq:monte_carlo_ase}).
+    atomicAdd operation on the GPU \eqref{eq:monte_carlo_ase}.
 
 
 \begin{figure}[H]
@@ -171,9 +173,9 @@ reuse cached prism data of their shared memory.
   \label{graphic:algorithm_steps}
 \end{figure}
 
-Furthermore, successive threads start rays from a similar origin, which results
+Successive threads start rays from a similar origin, which results
 in similar paths through the mesh structure and therefore often the same prisms. This
-leads to better utilisation of the GPU L1 cache and higher performance.
+leads to better utilization of the GPU L1 cache and higher performance.
 
 Since each distinct ray potentially has a different path through the gain
 medium, the execution times between some threads will differ substantially. In case
@@ -202,11 +204,11 @@ can contribute to the computation.
 
 Each Monte Carlo experiment (see section \ref{eq:monte_carlo_ase}), calculates
 the $\Phi_{ASE}(s_i)$ value of a sample point $s_i$ independently from each
-other. Thus, every $\Phi_{ASE}(s_i)$ calculation can be executed as a
-self-contained CUDA kernel and therefore sample points can be distributed to
+other. Thus, every $calcGainSum(s_i)$ calculation is executed as a
+self-contained grid and therefore sample points can be distributed to
 several devices.
 
-Consider an MPI environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
+Consider an MPI\cite{MPI} environment with $k$ nodes, each hosting 1 GPU. Furthermore, one
 node is used as a headnode responsible for distributing the workload. The
 headnode holds a queue of all sample points. Each node requests a new sample
 point and begins the calculation. As soon as the calculation is finished, a node
@@ -235,10 +237,10 @@ Figure \ref{graphic:multigpu}) and is used
 to decide which areas will have the most influence on the result.
 
 The objective is to distribute N rays to P prims of the active gain medium.
-This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P\}$.
+This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P-1\}$.
  The rays per prism $rays_x$ and importance $imp_x$ for sample point $s_i$ are calculated as follows:
 \begin{align}
-  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
+  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P-1}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
 imp_x &= 
 \begin{cases}
 \frac{T_x}{T_{total}} \cdot \frac{N}{rays_x} &rays_x > 0\\
@@ -261,7 +263,7 @@ To show the impact of importance sampling in $\Phi_{ASE}(s_i)$, the difference
 \[\Phi_{ASE\Delta} = |\Phi_{ASE~IS}(M) - \Phi_{ASE~Uniform}(N)|\] of the 
 result with importance sampling ($IS$) and with uniform sampling ($Uniform$) was calculated with 
 $N,M = 10^5$ rays per sample point (see Figure \ref{graphic:importance}). 
-Then, N was increased two times by a factor of 10 for the simulation with uniform sampling.
+Then, N was increased two times by a factor of 10 for the simulation with uniform sampling, resulting in sampling with $10^6$ and $10^7$ rays.
 The more rays are simulated, the smaller $\Phi_{ASE\Delta}$ becomes, which 
 means that the simulation
 with importance sampling achieves the same results with less
@@ -301,7 +303,7 @@ of the simulation by resampling these points with more rays. The number of rays
 is increased with each iteration, until the desired MSE threshold is met or 
 a defined maximum number of rays is reached (Figure \ref{graphic:pap3}).
 Note that the importance sampling step needs to be executed again, since
-the number of rays changed and thus the distribution will differ slightly.
+the number of rays changed, leading to a slightly different distribution.
 
 Potentially unbalanced load, caused by a varying number of rays per sample 
 in a multi GPU scenario is mitigated by the MPI load balancer (see Section
@@ -310,18 +312,17 @@ in a multi GPU scenario is mitigated by the MPI load balancer (see Section
 For comparision, the impact of importance sampling
 on the MSE values is shown (see Figure~\ref{plot:importance2}). 
 Importance sampling alone already reduces the MSE values for
-many sample points considerable.
+many sample points significantly.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_importance.png}}}
-  \caption{histogram of MSE values IS and Uniform sampling}
+  \caption{histogram comparing MSE values for IS sampling and Uniform sampling}
   \label{plot:importance2}
 \end{figure}
 By using also adaptive sampling, the MSE values are reduced to a user-defined MSE threshold.
 Figure \ref{plot:adaptive} shows the histogramm of MSE values for a MSE threshold
 of $0.005$. All sample points $s_i$ with $MSE(s_i) > 0.005$ were resampled with more rays
-per sample point to lower their MSE value. The other sample points remained unchanged
-to reduce calculation time.
+per sample point to lower their MSE value. The other sample points could remain unchanged.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/mse_adaptive.png}}}
@@ -345,17 +346,17 @@ roughly the same calculation time.
 Some outliers of the Monte Carlo method are not related to an insufficient
 sampling resolution, but rather an unlucky seed for the random number generator.
 Repetitive sampling lowers the MSE values without increasing the number of rays,
-by resampling the sample point with a different seed while keeping the number of
-rays fixed. Only after several failed attempts, it will fall back to adaptive
+by resampling the sample point with a different seed. Only after several failed attempts, it will fall back to adaptive
 sampling (Figure \ref{graphic:pap4}). This can reduce the number of rays over all sample points and therefore
 also runtime. Thus, repetitive sampling is an optimization in addition to adaptive sampling. 
 Note, that repetitive sampling does not require to execute the importance
 sampling again (unlike adaptive sampling).
 
 Figure \ref{plot:repetitive} shows the sampling resolution
-of the sample points in a histogram. Simulating with RS reduces
+of the sample points in a histogram when using a MSE of 0.001. 
+The AS approach alone takes about 1160s to accomplish the desired result. Simulating with RS reduces
 simulations sampled with $10^8$ rays by 319 sample points, resulting in 
-$3\cdot10^{10}$ rays less to calculate. Because reducing the number of rays always
+$3\cdot10^{10}$ rays less to calculate and a runtime of 600s to reach the threshold. Because reducing the number of rays always
 reduces runtime, it explains the difference in runtime
 of 560s.
 \begin{figure}[H]
@@ -379,7 +380,7 @@ much better than Uniform or IS.
 \end{figure}
 Figure \ref{graphic:methods_compare2} shows the maximal MSE values
 of the gain medium for a fixed runtime of 10s. Uniform and IS 
-produce higher max. MSE value than AS or RS.
+produce higher maxima than AS or RS.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
