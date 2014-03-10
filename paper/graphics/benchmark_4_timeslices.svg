@@ -123,7 +123,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -142,7 +142,7 @@
          y="118.2719"
          x="30.295284"
          id="tspan4193"
-         sodipodi:role="line">200 ns</tspan></text>
+         sodipodi:role="line">200 µs</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4195"
@@ -153,7 +153,7 @@
          y="271.26373"
          x="31.253735"
          id="tspan4197"
-         sodipodi:role="line">400 ns</tspan></text>
+         sodipodi:role="line">400 µs</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4199"
@@ -164,7 +164,7 @@
          y="419.28259"
          x="31.253735"
          id="tspan4201"
-         sodipodi:role="line">600 ns</tspan></text>
+         sodipodi:role="line">600 µs</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4203"
@@ -175,7 +175,7 @@
          y="571.51184"
          x="29.253735"
          id="tspan4205"
-         sodipodi:role="line">800 ns</tspan></text>
+         sodipodi:role="line">800 µs</tspan></text>
     <text
        transform="translate(-16.50556,-5.9274745)"
        sodipodi:linespacing="125%"
@@ -226,7 +226,7 @@
          sodipodi:role="line"
          id="tspan10261"
          x="9.2537346"
-         y="721.51184">1000 ns</tspan></text>
+         y="721.51184">1000 µs</tspan></text>
     <image
        width="580.26056"
        height="145.93677"
