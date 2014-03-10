@@ -15,18 +15,10 @@ set grid noxtics noytics
 set xtics nomirror
 set ytics nomirror
 
-plot\
-"repetitive_sampling.dat" u 5:xtic(1) t "IS+AS in 1160s",\
-"repetitive_sampling.dat" u 4:xtic(1) t "IS+AS+RS in 600s" lt rgb "gold" 
-   
 # Output
 set term pngcairo enhanced font "Serif, 14"
 set output "repetitive_sampling.png"
-replot
-set term postscript
-set output "repetitive_sampling.ps"
-replot
-set term svg
-set output "repetitive_sampling.svg"
-replot
-set term x11
+
+plot\
+"repetitive_sampling.dat" u 5:xtic(1) t "IS+AS in 1160s",\
+"repetitive_sampling.dat" u 4:xtic(1) t "IS+AS+RS in 600s" lt rgb "gold" 
