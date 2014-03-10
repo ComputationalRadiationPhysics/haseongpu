@@ -1,4 +1,6 @@
 #! /usr/bin/env gnuplot
+clear
+reset
 set key opaque
 set key Left top left
 set key width -5

@@ -1,4 +1,6 @@
 #! /usr/bin/env gnuplot
+clear
+reset
 set term wxt enhanced font "Serif, 14"
 set key top left
 set grid xtics
