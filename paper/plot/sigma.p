@@ -12,8 +12,8 @@ set grid ytics xtics
 set xlabel "wavelength[nm]"
 
 # Output
-set term pngcairo enhanced font 'Serif,14'
 set output "sigma.png"
+set term pngcairo enhanced font 'Serif,14'
 
 plot\
 "sigma.dat" u 1:3 t "Emission" w lines lw 5 lt 1 lc rgb "green",\

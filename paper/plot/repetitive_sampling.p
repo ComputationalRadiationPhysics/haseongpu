@@ -1,7 +1,6 @@
 #! /usr/bin/env gnuplot
 clear
 reset
-set term wxt enhanced font "Serif, 14"
 set key on
 set title "MSE threshold = 0.001 with 3210 sample points"
 set xlabel "rays per sample point"

@@ -1,7 +1,6 @@
 #! /usr/bin/env gnuplot
 clear
 reset
-set term wxt enhanced font "Serif, 14"
 set key on
 set border 3
 set grid noxtics
