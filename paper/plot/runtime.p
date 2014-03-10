@@ -20,8 +20,8 @@ set term pngcairo enhanced font 'Serif,14'
 set output "runtime.png"
 
 plot \
-"runtime_cylindrical.dat" u 1:5 w linespoints axes x1y1 t "  1 x CPU IS "  lw 5 ps 3 pt 5 lc rgb "blue" lt 1,\
-"runtime_cylindrical.dat" u 1:4 w linespoints axes x1y1 t "  1 x GPU IS"  lw 5 ps 3 pt 7 lc rgb "black" lt 1,\
-"runtime_cylindrical.dat" u 1:3 w linespoints axes x1y1 t "  4 x GPU IS"  lw 5 ps 3 pt 11 lc rgb "violet" lt 1,\
-"runtime_cylindrical.dat" u 1:2 w linespoints axes x1y1 t "47 x GPU IS"  lw 5 ps 3 pt 13 lc rgb "cyan" lt 1
+"runtime_cylindrical.dat" u 1:5 w linespoints axes x1y1 t "  1 x CPU IS "  lw 5 ps 2 pt 5 lc rgb "blue" lt 1,\
+"runtime_cylindrical.dat" u 1:4 w linespoints axes x1y1 t "  1 x GPU IS"  lw 5 ps 2 pt 7 lc rgb "black" lt 1,\
+"runtime_cylindrical.dat" u 1:3 w linespoints axes x1y1 t "  4 x GPU IS"  lw 5 ps 2 pt 11 lc rgb "violet" lt 1,\
+"runtime_cylindrical.dat" u 1:2 w linespoints axes x1y1 t "47 x GPU IS"  lw 5 ps 2 pt 13 lc rgb "cyan" lt 1
 
