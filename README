@@ -270,7 +270,7 @@
 
 * 4 GPUs, 10K to 100K Rays, 4 Repetitions ...
 
-./bin/calcPhiASE --input=/my/experiment/ 
+./bin/calcPhiASE --input=/input/
 		 --output=/tmp/ 
 		 --mode=ray_propagation_gpu 
 		 --rays=10000 
@@ -283,7 +283,7 @@
 		 --mse-threshold=0.05
 
 * MPI with 4 GPUs per node
-mpiexec -npernode 4 ./bin/calcPhiASE  --input=/my/experiment/ 
+mpiexec -npernode 4 ./bin/calcPhiASE  --input=/input/
 		     		      --output=/tmp/ 
 				      --mode=mpi
 				      --rays=10000 

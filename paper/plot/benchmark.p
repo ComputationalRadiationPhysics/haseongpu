@@ -6,12 +6,18 @@ set key on
 set border 3
 set grid
 
-set key out
-set key center top
+set key top left
+set key width -6
+set key reverse
+#set key bot right
+#set key out
+#set key center top
 #set key opaque
 set xlabel "time[ns]"
 set ylabel "gain"
 #set xtics 0,0.1,1
+set ytics 0,1,5
+set yrange [0:5]
 set xtics nomirror
 set ytics nomirror
 
