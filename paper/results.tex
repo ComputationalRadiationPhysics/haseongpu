@@ -44,7 +44,7 @@ Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spec
 
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth} {!} {\includegraphics{plot/sigma.png}}
+    \resizebox{0.5\textwidth} {!} {\input{plot/sigma.tex}}
   }
   \caption{polychromatic spectrum}
   \label{plot:polychromatic_spectrum}
@@ -132,9 +132,19 @@ improvement for low workloads with a small number of rays.
 %taking several seconds to process a single job. Therefore, using a high number
 %of GPUs can lead to suboptimal performance in otherwise fast computations.
 %However, this becomes neglegible for very work intensive simulations.
+%\begin{figure}[H]
+%  \centerline{
+%    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/runtime.png}}}
+%  \caption{runtime of sequential algorithm compared to parallel algorithm}
+%  \label{plot:runtime}
+%\end{figure}
+
 \begin{figure}[H]
   \centerline{
-    \resizebox{0.5\textwidth}{!}{\includegraphics{plot/runtime.png}}}
+    \resizebox{0.5\textwidth}{!}{
+      \input{plot/runtime.tex}
+    }
+  }
   \caption{runtime of sequential algorithm compared to parallel algorithm}
   \label{plot:runtime}
 \end{figure}
@@ -190,6 +200,7 @@ medium. Also, it will be helpful to further increase the maximum number of rays
 example, this could be done rather easily by splitting the simulated rays in
 groups and calculating these groups iteratively, combining the results
 afterwards.
+
 
 %Future work should address reflections on the lateral sides of the gain medium
 %to allow the simulation of lateral feedback. The current implementation only

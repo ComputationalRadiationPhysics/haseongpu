@@ -10,14 +10,14 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="725.40997"
+   width="745.40997"
    height="840.01001"
    id="svg3387"
    version="1.1"
    inkscape:version="0.48.4 r9939"
    inkscape:export-filename="/home/admin-linux/octrace/paper/graphics/benchmark_4_timeslices.png"
-   inkscape:export-xdpi="90"
-   inkscape:export-ydpi="90"
+   inkscape:export-xdpi="180"
+   inkscape:export-ydpi="180"
    sodipodi:docname="benchmark_4_timeslices.svg">
   <sodipodi:namedview
      id="base"
@@ -26,13 +26,13 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.2334734"
-     inkscape:cx="497.30959"
-     inkscape:cy="757.99842"
+     inkscape:zoom="0.78965209"
+     inkscape:cx="460.58382"
+     inkscape:cy="338.80506"
      inkscape:document-units="px"
-     inkscape:current-layer="g10480"
+     inkscape:current-layer="layer1"
      showgrid="false"
-     showguides="false"
+     showguides="true"
      inkscape:guide-bbox="true"
      fit-margin-top="0"
      fit-margin-left="0"
@@ -40,7 +40,7 @@
      fit-margin-bottom="0"
      inkscape:window-width="1678"
      inkscape:window-height="1029"
-     inkscape:window-x="0"
+     inkscape:window-x="1680"
      inkscape:window-y="19"
      inkscape:window-maximized="1">
     <sodipodi:guide
@@ -123,7 +123,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -135,47 +135,47 @@
     <text
        sodipodi:linespacing="125%"
        id="text4191"
-       y="118.49474"
-       x="49.253735"
-       style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
+       y="118.2719"
+       x="30.295284"
+       style="font-size:31.38783455px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
-         y="118.49474"
-         x="49.253735"
+         y="118.2719"
+         x="30.295284"
          id="tspan4193"
-         sodipodi:role="line">10 ns</tspan></text>
+         sodipodi:role="line">200 ns</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4195"
        y="271.26373"
-       x="49.253735"
+       x="31.253735"
        style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
          y="271.26373"
-         x="49.253735"
+         x="31.253735"
          id="tspan4197"
-         sodipodi:role="line">20 ns</tspan></text>
+         sodipodi:role="line">400 ns</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4199"
        y="419.28259"
-       x="49.253735"
+       x="31.253735"
        style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
          y="419.28259"
-         x="49.253735"
+         x="31.253735"
          id="tspan4201"
-         sodipodi:role="line">30 ns</tspan></text>
+         sodipodi:role="line">600 ns</tspan></text>
     <text
        sodipodi:linespacing="125%"
        id="text4203"
        y="571.51184"
-       x="47.253735"
+       x="29.253735"
        style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
        xml:space="preserve"><tspan
          y="571.51184"
-         x="47.253735"
+         x="29.253735"
          id="tspan4205"
-         sodipodi:role="line">40 ns</tspan></text>
+         sodipodi:role="line">800 ns</tspan></text>
     <text
        transform="translate(-16.50556,-5.9274745)"
        sodipodi:linespacing="125%"
@@ -193,46 +193,46 @@
        height="145.77208"
        xlink:href="file:///home/admin-linux/octrace/paper/graphics/benchmark_1.png%3B.png"
        id="image10070"
-       x="154.29282"
+       x="174.29282"
        y="18.436283" />
     <image
        width="579.36511"
        height="145.71156"
        xlink:href="file:///home/admin-linux/octrace/paper/graphics/benchmark_2.png%3B.png"
        id="image10132"
-       x="154.29282"
+       x="174.29282"
        y="173.20825" />
     <image
        width="579.36511"
        height="145.71156"
        xlink:href="file:///home/admin-linux/octrace/paper/graphics/benchmark_3.png%3B.png"
        id="image10194"
-       x="154.29282"
+       x="174.29282"
        y="319.79645" />
     <image
        width="580.35681"
        height="145.96098"
        xlink:href="file:///home/admin-linux/octrace/paper/graphics/benchmark_4.png%3B.png"
        id="image10256"
-       x="154.29282"
+       x="174.29282"
        y="472.6517" />
     <text
        xml:space="preserve"
        style="font-size:32px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif"
-       x="47.253735"
+       x="9.2537346"
        y="721.51184"
        id="text10259"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan10261"
-         x="47.253735"
-         y="721.51184">50 ns</tspan></text>
+         x="9.2537346"
+         y="721.51184">1000 ns</tspan></text>
     <image
        width="580.26056"
        height="145.93677"
        xlink:href="file:///home/admin-linux/octrace/paper/graphics/benchmark_5.png"
        id="image10306"
-       x="154.29282"
+       x="174.29282"
        y="621.5119" />
     <g
        transform="translate(283.59476,-439.68302)"

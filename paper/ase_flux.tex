@@ -1,13 +1,19 @@
-\documentclass[3p]{elsarticle}
+\documentclass[3p,twocolumn]{elsarticle}
 
 \usepackage{graphicx}
+\usepackage{color}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{float}
 \usepackage{supertabular}
-\usepackage{multicol}
+%\usepackage{multicol}
 \usepackage{hyperref}
+\usepackage{float}
+
+%\floatstyle{simplerule}
+%\newfloat{floatbox}{thp}{lob}[section]
+%\floatname{floatbox}{Text Box}
 
 \begin{document}
 
@@ -38,7 +44,7 @@
 \input{abstract}
 \maketitle
 
-\begin{multicols}{2}
+%\begin{multicols}{2}
 
 \input{introduction}
 \input{model}
@@ -47,6 +53,6 @@
 \input{results}		
 \input{bibliography}
 
-\end{multicols}
+%\end{multicols}
 
 \end{document} 

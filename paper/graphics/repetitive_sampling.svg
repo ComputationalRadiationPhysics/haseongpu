@@ -87,13 +87,13 @@
      showgrid="false"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:zoom="1.3906433"
-     inkscape:cx="444.56812"
-     inkscape:cy="240.6422"
-     inkscape:window-x="0"
+     inkscape:zoom="1.9666666"
+     inkscape:cx="346.1531"
+     inkscape:cy="169.58625"
+     inkscape:window-x="1680"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg5087" />
+     inkscape:current-layer="g5114" />
   <title
      id="title5089">Gnuplot</title>
   <desc
@@ -289,35 +289,50 @@
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
          id="g5172">
         <text
-           id="text5174">1e+04</text>
+           id="text5174">10<tspan
+   style="font-size:65%;baseline-shift:super"
+   id="tspan3344">4</tspan>
+</text>
       </g>
       <g
          transform="translate(245.1,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
          id="g5178">
         <text
-           id="text5180">1e+05</text>
+           id="text5180">10<tspan
+   style="font-size:65%;baseline-shift:super"
+   id="tspan3346">5</tspan>
+</text>
       </g>
       <g
          transform="translate(327.6,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
          id="g5184">
         <text
-           id="text5186">1e+06</text>
+           id="text5186">10<tspan
+   style="font-size:65%;baseline-shift:super"
+   id="tspan3348">6</tspan>
+</text>
       </g>
       <g
          transform="translate(410.1,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
          id="g5190">
         <text
-           id="text5192">1e+07</text>
+           id="text5192">10<tspan
+   style="font-size:65%;baseline-shift:super"
+   id="tspan3350">7</tspan>
+</text>
       </g>
       <g
          transform="translate(492.5,444.9)"
          style="stroke:none; fill:black; font-family:Arial; font-size:12.00pt; text-anchor:middle"
          id="g5196">
         <text
-           id="text5198">1e+08</text>
+           id="text5198">10<tspan
+   style="font-size:65%;baseline-shift:super"
+   id="tspan3352">8</tspan>
+</text>
       </g>
       <path
          d="M80.2,54.1 L80.2,422.4 L575.0,422.4 L575.0,54.1 L80.2,54.1 Z  h0.01"
