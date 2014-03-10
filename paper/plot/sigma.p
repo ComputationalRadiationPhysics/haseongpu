@@ -5,9 +5,9 @@ set key opaque
 set key Left top left
 
 set title "Emission and absorption spectrum"
-set ylabel "intensity[?]"
+set ylabel "intensity[cm²]"
 set format y "%.1t · 10^{%T}"
-set xtics 905,45,1095
+set xtics 910,50
 set grid ytics xtics
 set xlabel "wavelength[nm]"
 
