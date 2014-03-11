@@ -5,6 +5,7 @@
 %
 % @author Daniel Albach
 % @date   2011-05-03
+% @licence: GPLv3
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -77,10 +78,10 @@ maxGPUs           = 4;
 nPerNode          = 4;
 %runmode           = 'mpi';
 runmode          = 'ray_propagation_gpu';
-useReflections    = true;
+useReflections    = false;
 refractiveIndices = [1.83,1,1.83,1];
 repetitions       = 4;
-maxRaysPerSample  = minRaysPerSample * 100;
+maxRaysPerSample  = minRaysPerSample * 10;
 mseThreshold      = 0.05;
 
 
@@ -158,10 +159,10 @@ vtk_wedge('beta_cell_1.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Definition of cladding %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Which index is the cladding?
-clad_number = 1;
-clad_number = int32(clad_number);
-[numberOfTriangles,b]       = size(t_int);
-clad        = ones(numberOfTriangles,1);
+clad_number           = 1;
+clad_number           = int32(clad_number);
+[numberOfTriangles,b] = size(t_int);
+clad                  = zeros(numberOfTriangles,1);
 
 % Absorption of the cladding
 clad_abs = 5.5;
@@ -194,10 +195,9 @@ length_Yb = size(Yb_points_t,1);
 % Make sure that clad is integer variable
 clad_int = int32(clad);
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main pump loop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i_slice=1:timeslice_tot-1
-    disp(['TimeSlice ' num2str(i_slice) ' calculation started']);
+    disp(['TimeSlice ' num2str(i_slice) ' of ' num2str(timeslice_tot-1) ' started']);
     % ******************* BETA PUMP TEST ******************************
     % make a test with the gain routine "gain.m" for each of the points
     % define the intensity at the nominal points of the grid and make the
@@ -292,11 +292,12 @@ for i_slice=1:timeslice_tot-1
         for i_z=1:mesh_z
             pos_Yb = Yb_points_t(i_p);
 	    % Calc local gain (g_l)
-            g_l = -(N_tot*laser.s_abs - N_tot*beta_cell(pos_Yb,i_z)*(laser.s_ems+laser.s_abs));
-            dndt_ASE(pos_Yb,i_z) = g_l*phi_ASE(pos_Yb,i_z)/crystal.tfluo;
+            g_l = -(N_tot*laser.max_abs - N_tot*beta_cell(pos_Yb,i_z)*(laser.max_ems+laser.max_abs));
+            dndt_ASE(pos_Yb,i_z) = g_l * phi_ASE(pos_Yb,i_z) / crystal.tfluo;
         end
     end
     
+
     
     % Now for the cladding points
     for i_p=1:length_clad
