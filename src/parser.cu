@@ -234,13 +234,26 @@ int checkParameterValidity(
 }
 
 void checkSampleRange(int* minSampleRange, int* maxSampleRange, const unsigned numberOfSamples){
-  if(*maxSampleRange >= int(numberOfSamples)){
-    dout(V_ERROR) << "maxSample_i is out of range! (There are only " << numberOfSamples << " samples)";
-  }
   if(*minSampleRange == -1 && *maxSampleRange== -1){
     dout(V_WARNING) << "minSample_i/maxSample_i not set! Assuming a sample range of " << std::endl;
     dout(V_WARNING) << "0 to " << numberOfSamples-1 << std::endl;
     *minSampleRange = 0;
     *maxSampleRange = numberOfSamples-1;
+    return;
+  }
+
+  if((*minSampleRange == -1 && *maxSampleRange != -1) || (*minSampleRange != -1 && *maxSampleRange == -1)){
+    dout(V_ERROR) << "check minSample_i/maxSample_i! (Allowed Range from 0 to " << numberOfSamples << ")";
+    exit(1);
+  }
+
+  if((*maxSampleRange >= int(numberOfSamples) || *maxSampleRange < (int)0)){
+    dout(V_ERROR) << "maxSample_i is out of range! (There are only " << numberOfSamples << " samples)";
+    exit(1);
+  }
+
+  if((*minSampleRange < -1 || *minSampleRange >= numberOfSamples)){
+    dout(V_ERROR) << "minSample_i is out of range! (There are only " << numberOfSamples << " samples)";
+    exit(1);
   }
 }
