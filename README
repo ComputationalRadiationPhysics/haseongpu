@@ -19,9 +19,13 @@
    + make
    + gcc 4.4.1
    + cuda 5.0
+
+   Optional:
+   + octave / matlab
+   + paraview
    
    Hardware:
-   + Nvidia device >= Compute capability 2.0 (at least fermi)
+   + Nvidia device >= Compute capability 2.0 (at least fermi generation)
 
 ## Installation ##
 
@@ -29,37 +33,44 @@
 
 ## Usage ##
 
-   Usually you run this programm by a matlab script, that does
-   the whole magic stuff for you. But you can also run it by hand,
-   see synopsis for details.
+   + MATLAB compatible interface
+   + C-Application interface
 
-## MATLAB interface ##
+## MATLAB compatible interface ##
 
-   * add calcPhiASE.m to your matlab path
-   * call calcPhiASE from your matlab script
+   * Add calcPhiASE.m to your matlab path
+   * Call calcPhiASE from your matlab script 
+     like following:
 
-   calcPhiASE(
-	points,
-	trianglePointIndices,
-	betaCell,
-	betaVolumen,
-	triangleNormalsX,
-	triangleNormalsY,
-	trinangleNeighbors,
-	surface,
-	triangleCenterX,
-	triangleCenterY,
-	triangleNormalPoint,
-	forbiddenEdge,
-	raysPerSample,
-	Ntot,
-	thickness,
-	laserParameter,
-	crystal,
-	numberOfLevel,
-	timestep)
+   [phiASE, MSE, nRays] = calcPhiASE(points,
+		  		     trianglePointIndices,
+				     betaCell,
+				     betaVolume,
+				     triangleNormalsX,
+				     triangleNormalsY,
+				     triangleNeighbors,
+				     triangleSurface,
+				     triangleCenterX,
+				     triangleCenterY,
+				     triangleNormalPoint,
+				     forbiddenEdge,
+				     minRaysPerSample,
+				     maxRaysPerSample,
+				     nTot,
+				     thickness,
+				     laserParameter,
+				     crystal,
+				     numberOfLevels)
+  
+  * The returned values are represented as
+    tow-dimensional matrices in which columns are
+    slice indices(levels) and rows are point
+    indices. The value for the ith point and jth 
+    slice can then be optained by MATLAB with:
+    	  
+	  value = values(i,j);
 
-### Argument description ### 
+### Input argument description ### 
     In the following all arguments of the MATLAB call are described.
     You will find on each point a head with datatype (an array when
     in brackets []), the size of the array and to which set of
@@ -192,7 +203,7 @@
 ## Synopsis ##
 
    Command:
-     ./octrace [OPTIONS] 
+     ./bin/calcPhiASE [OPTIONS] 
 
    Options:
     --input
