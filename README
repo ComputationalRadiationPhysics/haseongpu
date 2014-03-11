@@ -203,7 +203,7 @@
 ## Synopsis ##
 
    Command:
-     ./bin/calcPhiAse [OPTIONS] 
+     ./bin/calcPhiASE [OPTIONS] 
 
    Options:
     --input
