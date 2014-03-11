@@ -23,7 +23,13 @@ SRCS = $(wildcard src/*.cu src/*/*.cu)
 OBJS = $(SRCS:src/%.cu=bin/%.o)
 INCLUDES = include
 
-all: calcPhiASE
+all:	
+	mkdir -p bin
+	mkdir -p output
+	mkdir -p input
+	mkdir -p output/calcPhiAseTmp
+	mkdir -p output/vtk
+	make calcPhiASE
 
 bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
 	CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -lm -c $< -I $(INCLUDES) -o bin/calc_phi_ase_mpi.o
@@ -33,11 +39,6 @@ bin/%.o: src/%.cu $(wildcard include/*.h)
 
 calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
-	mkdir -p bin
-	mkdir -p output
-	mkdir -p output/calcPhiAseTmp
-	mkdir -p output/vtk
-	mkdir -p input
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
