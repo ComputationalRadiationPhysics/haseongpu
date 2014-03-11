@@ -60,8 +60,8 @@ mode.extr =0;  %no extraction!!
 const.N1per = 1.38e20;
 const.c = 3e8;
 const.h = 6.626e-34;
-numRays = 1e4;
-numRays = int32(numRays);
+minRaysPerSample = 1e4;
+minRaysPerSample = int32(minRaysPerSample);
 N_tot = const.N1per*crystal.doping;
 Ntot_gradient = zeros(crystal.levels, 1);      % doping gradient if not given by load!
 Ntot_gradient(:) = crystal.doping*const.N1per;
@@ -71,6 +71,18 @@ timeslice = 50;
 timeslice_tot = 150;
 timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
+
+% ASE application
+maxGPUs           = 1;
+nPerNode          = 4;
+runmode           = 'mpi';
+%Runmode          = 'ray_propagation_gpu';
+useReflections    = true;
+refractiveIndices = [1.83,1,1.83,1];
+repetitions       = 4;
+maxRaysPerSample  = minRaysPerSample * 100;
+mseThreshold      = 0.05;
+
 
 % Constants for short use
 c = const.c; %m/s
@@ -83,13 +95,15 @@ h = const.h; %Js
 load('pt.mat');
 
 % Create points and triangles from grid
-%set_variables(p,t);
+set_variables(p,t);
 load('variable.mat');
 
-% mesh dependand definitions
+% Mesh dependand definitions
 N_cells = size(t,1);
 beta_cell = zeros(size(p,1),mesh_z);
 beta_vol = zeros(N_cells,mesh_z-1);
+[nT,b]            = size(sorted_int);
+reflectivities    = zeros(1,nT*2);
 
 % In first timeslice phi_ASE stays 0
 phi_ASE=zeros(size(p,1),mesh_z);
@@ -228,7 +242,11 @@ for i_slice=1:timeslice_tot-1
 
         v = vertcat(v_1,v_2);
 
-        beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        if (isOctave)
+          beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        else
+          beta_vol(:,i_z) = griddata(x,y,z,v,xi,yi,zi);
+        end
 
         z = z + z_mesh;
         zi = zi + z_mesh;
@@ -236,48 +254,36 @@ for i_slice=1:timeslice_tot-1
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Call external ASE application %%%%%%%%%%%%%%%%%%%%
-    maxGPUs           = 1;
-    nPerNode          = 4;
-    runmode           = 'mpi';
-    %Runmode          = 'ray_propagation_gpu';
-    useReflections    = true;
-    refractiveIndices = [1.83,1,1.83,1];
-    [nT,b]            = size(sorted_int);
-    reflectivities    = zeros(1,nT*2);
-    repetitions       = 4;
-    maxRaysPerSample  = numRays * 100;
-    mseThreshold      = 0.05;
-
-     [phi_ASE, mse_values, N_rays] = calcPhiASE(
-       p,
-       t_int,
-       beta_cell,
-       beta_vol,
-       clad_int,
-       clad_number,
-       clad_abs,
-       useReflections,
-       refractiveIndices,
-       reflectivities,
-       normals_x,
-       normals_y,
-       sorted_int,
-       surface,
-       x_center,
-       y_center,
-       normals_p,
-       forbidden,
-       numRays,
-       maxRaysPerSample,
-       mseThreshold,
-       repetitions,
-       N_tot,
-       z_mesh,
-       laser,
-       crystal,
-       mesh_z,
-       runmode,
-       maxGPUs,
+     [phi_ASE, mse_values, N_rays] = calcPhiASE(...
+       p,...
+       t_int,...
+       beta_cell,...
+       beta_vol,...
+       clad_int,...
+       clad_number,...
+       clad_abs,...
+       useReflections,...
+       refractiveIndices,...
+       reflectivities,...
+       normals_x,...
+       normals_y,...
+       sorted_int,...
+       surface,...
+       x_center,...
+       y_center,...
+       normals_p,...
+       forbidden,...
+       minRaysPerSample,...
+       maxRaysPerSample,...
+       mseThreshold,...
+       repetitions,...
+       N_tot,...
+       z_mesh,...
+       laser,...
+       crystal,...
+       mesh_z,...
+       runmode,...
+       maxGPUs,...
        nPerNode);
 
 
@@ -319,7 +325,7 @@ for i_slice=1:timeslice_tot-1
         beta_crystal=beta_cell(i_p,:);
         pulse = zeros(steps.time,1);
         pump.I = intensity*exp(-sqrt(p(i_p,1)^2/pump.ry^2+p(i_p,2)^2/pump.rx^2)^pump.exp);
-        [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int3(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
+        [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
         beta_c_2(i_p,:) = beta_crystal(:);
     end
 
