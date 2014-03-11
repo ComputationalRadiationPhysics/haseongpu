@@ -33,8 +33,20 @@
 
 ## Usage ##
 
-   + MATLAB compatible interface
-   + C-Application interface
+   * MATLAB compatible interface
+   * C-Application interface
+
+## Quick MATLAB laser pump example ##
+
+  A small example for Phi ASE calculation
+  with a pumped crystal. The simulation
+  can be started by the following:
+
+  * run make
+  * change path "cd example/"
+  * run: "matlab laserPumpCladdingExample"
+  * watch progress
+  * take a look at the results (*.vtk) with paraview 
 
 ## MATLAB compatible interface ##
 
@@ -42,25 +54,36 @@
    * Call calcPhiASE from your matlab script 
      like following:
 
-   [phiASE, MSE, nRays] = calcPhiASE(points,
-		  		     trianglePointIndices,
-				     betaCell,
-				     betaVolume,
-				     triangleNormalsX,
-				     triangleNormalsY,
-				     triangleNeighbors,
-				     triangleSurface,
-				     triangleCenterX,
-				     triangleCenterY,
-				     triangleNormalPoint,
-				     forbiddenEdge,
-				     minRaysPerSample,
-				     maxRaysPerSample,
-				     nTot,
-				     thickness,
-				     laserParameter,
-				     crystal,
-				     numberOfLevels)
+   [phiASE, MSE, nRays] = calcPhiASE( points,
+     	    	 	  	      trianglePointIndices,
+				      betaCells,
+				      betaVolume,
+				      claddingCellTypes,
+				      claddingNumber,
+				      claddingAbsorption,
+				      useReflections,
+				      refractiveIndices,
+				      reflectivities,
+				      triangleNormalsX,
+				      triangleNormalsY,
+				      triangleNeighbors,
+				      triangleSurfaces,
+				      triangleCenterX,
+				      triangleCenterY,
+				      triangleNormalPoint,
+				      forbiddenEdge,
+				      minRaysPerSample,
+				      maxRaysPerSample,
+				      mseThreshold,
+				      repetitions,
+				      nTot,
+				      thickness,
+				      laserParameter,
+				      crystal,
+				      numberOfLevels,
+				      runmode,
+				      maxGPUs,
+				      nPerNode);
   
   * The returned values are represented as
     tow-dimensional matrices in which columns are
@@ -76,13 +99,55 @@
     in brackets []), the size of the array and to which set of
     numbers the array belongs.
 
-
    * points [float], in {0, ..., numberOfPoints}, size = numberOfPoints
      The coordinates of the triangle vertices. All x coordinates followed by all
      of the y coordinates of the triangle vertices
      structure: [x_1, x_2, ... x_n, y_1, y_2, ... y_n] (n == numberOfPoints)
 
-   * triangleNormalsX [float], size = numberOfTriangles * 3
+   * trianglePointIndices [int] in {0, ..., numberOfPoints}, size = numberOfTriangles * 3
+     Contains the indices to access the "points" datastructure 
+     (each triangle has 3 points as vertices). Each entry is an
+     index from 0 to numberOfPoints, corresponding to the positions 
+     of a vertex in "points".
+     Structure as follows:
+     [ triangle1A, triangle2A, ... triangleNA, triangle1B, triangle2B, ... triangleNB, triangle1C, ... ]
+     i.e. for triangles with vertices A,B,C there are all the indices
+     of the A-vertices, followed by all the B and C vertices.
+
+   * betaCells [float]
+     Stimulus in the sample points.
+
+   * betaVolume [float], size = numberOfTriangles * numberOfLevels - 1
+     Stimulus in the volume (prisms).
+     Beta values for all prisms ordered accordingly to the prismIDs:
+     prismID = triangleID + layer * numberOfTriangles.
+     Therefore, all betaValues for a layer are grouped together
+
+   * claddingCellTypes [int], size = numberOfTriangles
+     Sets cladding index for triangles {0,1,2,...}
+
+   * claddingNumber unsigned, size = 1
+     Set which cladding to use
+
+   * claddingAbsorption float, size = 1
+     Absorption coefficient of cladding
+
+   * useReflections bool, size = 1
+     Switch to activate reflections.
+
+   * refractiveIndices [float], size = 4
+     Describes the refractive indices of the active
+     gain medium top and bottom planes.
+     It is structured as follows:
+     {bottomInside, bottomOutside, topInside, topOutside}
+     bottomInside = topInside (because it is the same medium)
+
+   * reflectivities [float], in {0, ...,1}, size = 2 * numberOfTriangles
+     Defines the reflectivities of prism planes.
+     First the reflectivities of bottom plane and then the reflectivities
+     of top plane. Both it ordered by TriangleID.
+
+    * triangleNormalsX [float], size = numberOfTriangles * 3
      The x coordinate of the normal vectors for each triangle edge.
      It is ordered as follows:
      [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
@@ -93,6 +158,24 @@
      It is ordered as follows:
      [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
      i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
+
+   * triangleNeighbors [int], in {-1,0,1,2,4}, size = 5
+     Describes the neighnor relation of triangles to each other.
+     Each entry corresponds to a triangleID (see "triangles") which
+     is adjacent to the current triangle and edge.
+     Structure is similar to "forbidden":
+     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
+
+   * triangleSurfaces [float], size = numberOfTriangles
+     The sizes of the surfaces of each triangle, ordered by the triangleID.
+
+   * triangleCenterX [float], size = numberOfTriangles
+     The x coordinates of the center points for each triangle
+     ordered by TriangleID.
+
+   * triangleCenterY [float], size = numberOfTriangles
+     The y coordinates of the center points for each triangle
+     ordered by TriangleID.
 
    * triangleNormalPoint [unsigned], in {0, ...,  numberOfPoints}, size = numberOfTriangles * 3
      Contains indices to the point where the
@@ -110,38 +193,27 @@
      [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
      i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
 
-   * triangleNeighbors [int], in {-1,0,1,2,4}, size = 5
-     Describes the neighnor relation of triangles to each other.
-     Each entry corresponds to a triangleID (see "triangles") which
-     is adjacent to the current triangle and edge.
-     Structure is similar to "forbidden":
-     [ triangle1_edge0, triangle2_edge0, ... triangleN_edge0, triangle1_edge1, triangle2_edge1, ... ]
-   
-   * trianglePointIndices [int] in {0, ..., numberOfPoints}, size = numberOfTriangles * 3
-     Contains the indices to access the "points" datastructure 
-     (each triangle has 3 points as vertices). Each entry is an
-     index from 0 to numberOfPoints, corresponding to the positions 
-     of a vertex in "points".
-     Structure as follows:
-     [ triangle1A, triangle2A, ... triangleNA, triangle1B, triangle2B, ... triangleNB, triangle1C, ... ]
-     i.e. for triangles with vertices A,B,C there are all the indices
-     of the A-vertices, followed by all the B and C vertices.
+   * minRaysPerSample unsigned, size = 1
+     Minimal number of rays for adaptive sampling
+
+   * maxRaysPerSample unsigned, size = 1
+     Maximal number of rays for adaptive sampling
+ 
+   * mseThreshold float, size = 1
+      Sets the maximal MSE of the ASE value.
+      If a sample-point does not reach this MSE-threshold, the number 
+      of rays per sample-point will be increased upto maxRaysPerSample or
+      resampled with repetitive sampling.
+
+   * repetitions unsigned, size = 1
+     Sets the number of maximal repetitions when the
+     mseThreshold was not reached.
+
+   * nTot float, size = 1
+     Doping of the active gain medium
 
    * thickness float, size = 1
      Thickness of one prism level of the mesh.
-
-   * numberOfLevels unsigned, size = 1
-     Total number of levels of the mesh. Thus the total thickness
-     of the mesh is thickness * numberOfLevels!
-
-   * nTot float
-     Doping of the active gain medium
-
-  * betaVolume [float], size = numberOfTriangles * numberOfLevels - 1
-     Stimulus in the volume (prisms).
-     Beta values for all prisms ordered accordingly to the prismIDs:
-     prismID = triangleID + layer * numberOfTriangles.
-     Therefore, all betaValues for a layer are grouped together
 
    * laserParameter [float] 
      Is a structure for the laser parameters (wavelength sigmas)
@@ -151,54 +223,20 @@
      Is a structure for the crystal parameters 
      crystal.tfluo describes the crystalFluorescence of the active gain medium.
 
-   * betaCells [float]
-     Stimulus in the sample points.
+   * numberOfLevels unsigned, size = 1
+     Total number of levels of the mesh. Thus the total thickness
+     of the mesh is thickness * numberOfLevels!
 
-   * triangleSurfaces [float], size = numberOfTriangles
-     The sizes of the surfaces of each triangle, ordered by the triangleID.
+   * runmode
+     -> 'mpi'      use mpi to distribute workload (use nPerNode)
+     -> 'threaded' use pthreads to distribute workload locally
+     -> 'cpu'      use cpu algorithm (does not have all features)
 
-   * triangleCenterX [float], size = numberOfTriangles
-     The x coordinates of the center points for each triangle
-     ordered by TriangleID.
+   * maxGpus unsigned, size = 1
+     Maximal number of GPUs for threaded case
 
-   * triangleCenterY [float], size = numberOfTriangles
-     The y coordinates of the center points for each triangle
-     ordered by TriangleID.
-
-
-     ## MISSING IN MATLAB INTERFACE ##
-   * cladType [int], size = numberOfTriangles
-     Sets cladding index for triangles {0,1,2,...}
-
-   * cladNum unsigned, size = 1
-     Set which cladding to use
-
-   * cladAbs float, size = 1
-     Absorption coefficient of cladding
-
-   * refractiveIndices [float], size = 4
-     Describes the refractive indices of the active
-     gain medium top and bottom planes.
-     It is structured as follows:
-     {bottomInside, bottomOutside, topInside, topOutside}
-     bottomInside = topInside (because it is the same medium)
-
-   * reflectivities [float], in {0, ...,1}, size = 2 * numberOfTriangles
-     Defines the reflectivities of prism planes.
-     First the reflectivities of bottom plane and then the reflectivities
-     of top plane. Both it ordered by TriangleID.
-
-   * maxRays unsigned, size = 1
-     Maximal number of rays for adaptive sampling
- 
-   * mse_threshold float, size = number of wavelength
-      Sets the maximal MSE of the ASE value for each wavelength.
-      If a sample-point does not reach this MSE-threshold, the number 
-      of rays per sample-point will be increased upto maxrays.
-
-   * useReflections bool, size = 1
-     Switch to activate reflections
-    
+   * nPerNode
+     Number of devices per mpi-node
 
 ## Synopsis ##
 
@@ -217,10 +255,10 @@
       Is used to write vtk files and input for
       matlab script.
 
-    --mode=[for_loops|ray_propagation_gpu|mpi]
+    --runmode=[cpu|threaded|mpi]
       Defines the runmode/algorithm to start the
-      simulation with. Mode "for_loops" is the original
-      algorithm based on single core cpu. Mode "ray_propagation_gpu"
+      simulation with. Mode "cpu" is the original
+      algorithm based on single core cpu. Mode "threaded"
       is the parallel algorithm based on nvidia cuda
       devices with Pthreads. Mode "mpi" is a parallel mpi
       implementation for clusters.
@@ -241,7 +279,8 @@
       between different rays counts.
 
     --write-vtk
-      Write phiASE, dndtASE, mse, totalRays for every sample a .vtk file
+      Write phiASE, dndtASE, mse, totalRays for every sample a .vtk file in
+      the output subdirectory output/vtk/ should be created in advance.
       
     --maxgpus=
       Set the maximum number of gpus. "mpi" mode should set this
@@ -263,6 +302,7 @@
       4  : info
       8  : statistics
       16 : debug
+      32 : progress-bar
 
     --reflection
       Use reflection on upper and lower plane of gain
@@ -277,7 +317,7 @@
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
-## Example ##
+## Example C-Application ##
 
 * 4 GPUs, 10K to 100K Rays, 4 Repetitions ...
 

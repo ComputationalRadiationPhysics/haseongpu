@@ -3,7 +3,7 @@
 % can call pump and amplification with the same routine
 %                   Daniel Albach       2008/03/24
 
-function [beta_crystal,beta_store,pulse,Ntot_gradient]=beta_int(beta_crystal,pulse,const,crystal,steps,int_field,mode)
+function [beta_crystal,beta_store,pulse,Ntot_gradient]=beta_int(beta_crystal,pulse,const,crystal,steps,int_field,mode, Ntot_gradient)
 
 % declarations
 [int_field.max_ems, i] = max(int_field.s_ems);
