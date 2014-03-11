@@ -27,6 +27,7 @@ crystal.levels = 10;
 
 % Timesteps
 steps.time = 100;
+steps.crys = crystal.levels;
 
 % Pump parameter
 pump.s_abs = 0.76e-20;    % Absorption cross section in cm² (0.778e-20 pour DA)

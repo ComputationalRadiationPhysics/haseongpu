@@ -27,6 +27,7 @@ crystal.levels = 10;
 
 % Timesteps
 steps.time = 100;
+steps.crys = crystal.levels;
 
 % Pump parameter
 pump_stretch = 1;
@@ -79,11 +80,13 @@ h = const.h; %Js
 % Load the grid from file
 % the grid is done using the distmesh routines
 % use e.g. cr_60mm_30mm.m in meshing folder
-load pt.mat;
+load('pt.mat');
+who
 
 % Create points and triangles from grid
 set_variables(p,t);
-load variable.mat
+load('variable.mat');
+who
 
 % mesh dependand definitions
 N_cells = size(t,1);
@@ -115,7 +118,7 @@ for i_p=1:size(p,1)
    beta_crystal=beta_cell(i_p,:);
    pulse = zeros(steps.time,1);
    pump.I = intensity*exp(-sqrt(p(i_p,1)^2/pump.ry^2+p(i_p,2)^2/pump.rx^2)^pump.exp);
-   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int3(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
+   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
    beta_c_2(i_p,:)=beta_crystal(:);
 end
 
@@ -145,6 +148,8 @@ vtk_wedge('beta_cell_1.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
 % Which index is the cladding?
 clad_number = 1;
 clad_number = int32(clad_number);
+[numberOfTriangles,b]       = size(t_int);
+clad        = ones(numberOfTriangles,1);
 
 % Absorption of the cladding
 clad_abs = 5.5;
