@@ -53,7 +53,7 @@ laser.max_abs = laser.s_abs(i);
 % Mode parameter
 mode.BRM = 1;  % 1 Backreflection, 0 Transmissionmode
 mode.R = 1;    % reflectivity of the coating
-mode.extr =0;  %no extraction!!
+mode.extr =0;  % No extraction!!
 
 % Constants
 const.N1per = 1.38e20;
