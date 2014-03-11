@@ -73,10 +73,10 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 1;
+maxGPUs           = 4;
 nPerNode          = 4;
-runmode           = 'mpi';
-%Runmode          = 'ray_propagation_gpu';
+%runmode           = 'mpi';
+runmode          = 'ray_propagation_gpu';
 useReflections    = true;
 refractiveIndices = [1.83,1,1.83,1];
 repetitions       = 4;
@@ -130,7 +130,7 @@ for i_p=1:size(p,1)
    beta_crystal=beta_cell(i_p,:);
    pulse = zeros(steps.time,1);
    pump.I = intensity*exp(-sqrt(p(i_p,1)^2/pump.ry^2+p(i_p,2)^2/pump.rx^2)^pump.exp);
-   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
+   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int3(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
    beta_c_2(i_p,:)=beta_crystal(:);
 end
 
@@ -325,7 +325,7 @@ for i_slice=1:timeslice_tot-1
         beta_crystal=beta_cell(i_p,:);
         pulse = zeros(steps.time,1);
         pump.I = intensity*exp(-sqrt(p(i_p,1)^2/pump.ry^2+p(i_p,2)^2/pump.rx^2)^pump.exp);
-        [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
+        [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int3(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
         beta_c_2(i_p,:) = beta_crystal(:);
     end
 
