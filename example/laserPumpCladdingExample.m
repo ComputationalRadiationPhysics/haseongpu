@@ -83,7 +83,7 @@ h = const.h; %Js
 load('pt.mat');
 
 % Create points and triangles from grid
-%set_variables(p,t);
+set_variables(p,t);
 load('variable.mat');
 
 % mesh dependand definitions
