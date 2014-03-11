@@ -82,15 +82,13 @@ void parseCommandLine(
       *compareLocation = p.second;
     }
 
-    if (p.first == "--mode") {
-      if (p.second == "ray_propagation_gpu")
-        *mode = RAY_PROPAGATION_GPU;
-      if (p.second == "for_loops")
-        *mode = FOR_LOOPS;
-      if (p.second == "test_environment")
-        *mode = TEST;
+    if (p.first == "--runmode") {
+      if (p.second == "threaded")
+        *mode = GPU_THREADED;
+      if (p.second == "cpu")
+        *mode = CPU;
       if (p.second == "mpi")
-        *mode = RAY_PROPAGATION_MPI;
+        *mode = GPU_MPI;
 
     }
 
@@ -132,8 +130,8 @@ int checkParameterValidity(
     const unsigned deviceCount,
     const RunMode mode,
     unsigned *maxgpus,
-    const int minSample_i,
-    const int maxSample_i,
+    const int minSampleRange,
+    const int maxSampleRange,
     const unsigned maxRepetitions,
     const std::string outputPath,
     double *mseThreshold
@@ -141,31 +139,42 @@ int checkParameterValidity(
 
   if (argc <= 1) {
     dout(V_ERROR) << "No commandline arguments found" << std::endl;
-    dout(V_ERROR) << "Usage    : ./calcPhiASE --mode=[runmode]" << std::endl;
-    dout(V_ERROR) << "                        --rays=[number of rays]" << std::endl;
-    dout(V_ERROR) << "                        --input=[location to experiment-data]" << std::endl;
-    dout(V_ERROR) << "                        --output=[location to write output data]" << std::endl;
-    dout(V_ERROR) << "                        --compare=[location of vtk-file to compare with]" << std::endl;
-    dout(V_ERROR) << "                        --maxrays=[max number of rays for adaptive sampling]" << std::endl;
-    dout(V_ERROR) << "                        --maxgpus=[max number of gpus to use]" << std::endl;
-    dout(V_ERROR) << "                        --min_sample_i=[index of first sample]" << std::endl;
-    dout(V_ERROR) << "                        --max_sample_i=[index of last sample]" << std::endl;
-    dout(V_ERROR) << "                        --verbosity=VERBOSITY_LEVEL" << std::endl;
-    dout(V_ERROR) << "                        --repetitions=MAX_REPETITIONS" << std::endl;
-    dout(V_ERROR) << "Runmodes : for_loops" << std::endl;
-    dout(V_ERROR) << "           ray_propagation_gpu" << std::endl;
+    dout(V_ERROR) << "Usage: ./calcPhiASE ARGS [OPTARGS]" << std::endl;
+    dout(V_ERROR) << "" << std::endl;
+    dout(V_ERROR) << "ARGS (required)" << std::endl;
+    dout(V_ERROR) << "  --runmode=RUNMODE" << std::endl;
+    dout(V_ERROR) << "  --rays=RAYS" << std::endl;
+    dout(V_ERROR) << "  --maxrays=MAXRAYS" << std::endl;
+    dout(V_ERROR) << "  --input=FOLDER" << std::endl;
+    dout(V_ERROR) << "  --output=FOLDER" << std::endl;
+    dout(V_ERROR) << "" << std::endl;
+    dout(V_ERROR) << "OPTARGS (optional)" << std::endl;
+    dout(V_ERROR) << "  --maxgpus=N" << std::endl;
+    dout(V_ERROR) << "  --min_sample_i=<index of first sample>" << std::endl;
+    dout(V_ERROR) << "  --max_sample_i=<index of last sample>" << std::endl;
+    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
+    dout(V_ERROR) << "  --verbosity=VERBOSITY_LEVEL" << std::endl;
+    dout(V_ERROR) << "  --repetitions=MAX_REPETITIONS" << std::endl;
+    dout(V_ERROR) << "  --mse_threshold=THRESHOLD" << std::endl;
+    dout(V_ERROR) << "  --reflection" << std::endl;
+    dout(V_ERROR) << "  --write-vtk" << std::endl;
+    dout(V_ERROR) << "" << std::endl;
+    dout(V_ERROR) << "Runmodes : cpu" << std::endl;
+    dout(V_ERROR) << "           threaded" << std::endl;
     dout(V_ERROR) << "           mpi" << std::endl;
-    dout(V_ERROR) << "           test_environment\n" << std::endl;
     dout(V_ERROR) << "Verbosity levels: 0 (quiet)" << std::endl; 
     dout(V_ERROR) << "                  1 (error)" << std::endl; 
     dout(V_ERROR) << "                  2 (warning)" << std::endl; 
     dout(V_ERROR) << "                  4 (info)" << std::endl; 
     dout(V_ERROR) << "                  8 (statistics)" << std::endl; 
     dout(V_ERROR) << "                 16 (debug)" << std::endl; 
+    dout(V_ERROR) << "                 32 (progressbar)" << std::endl; 
+    dout(V_ERROR) << "" << std::endl; 
+    dout(V_ERROR) << "Please see README for more details!" << std::endl; 
     return 1;
   }
   if (mode == NONE) {
-    dout(V_ERROR) << "Please specify the runmode with --mode=MODE" << std::endl;
+    dout(V_ERROR) << "Please specify the runmode with --runmode=MODE" << std::endl;
     return 1;
   }
 
@@ -190,10 +199,6 @@ int checkParameterValidity(
     *maxRaysPerSample = raysPerSample;
   }
 
-  //if(float(log10((float)*maxRaysPerSample/raysPerSample)) != float(floor(log10((float)*maxRaysPerSample/raysPerSample)))) {
-  //  dout(V_WARNING) << "maxRays "<< *maxRaysPerSample << " is not reachable by the multiplicator " << RAY_MULTIPLICATOR << " applied to " << raysPerSample << std::endl;
-  //}
-
   if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
     return 1;
   }
@@ -202,18 +207,13 @@ int checkParameterValidity(
     *maxgpus = deviceCount;
   }
 
-  if(minSample_i < 0){
-    dout(V_ERROR) << "--min_sample_i < 0!" << std::endl;
+  if(maxSampleRange < minSampleRange){
+    dout(V_ERROR) << "maxSampleRange < minSampleRange!" << std::endl;
     return 1;
   }
 
-  if(maxSample_i < minSample_i){
-    dout(V_ERROR) << "maxSample_i < minSample_i!" << std::endl;
-    return 1;
-  }
-
-  int samplesForNode = maxSample_i-minSample_i+1;
-  if(samplesForNode < int(*maxgpus)){
+  int samplesForNode = maxSampleRange-minSampleRange+1;
+  if(samplesForNode < int(*maxgpus) && (minSampleRange != -1 || maxSampleRange != -1)){
     dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
      *maxgpus = unsigned(samplesForNode);
   }
@@ -231,4 +231,16 @@ int checkParameterValidity(
   }
 
   return 0;
+}
+
+void checkSampleRange(int* minSampleRange, int* maxSampleRange, const unsigned numberOfSamples){
+  if(*maxSampleRange >= int(numberOfSamples)){
+    dout(V_ERROR) << "maxSample_i is out of range! (There are only " << numberOfSamples << " samples)";
+  }
+  if(*minSampleRange == -1 && *maxSampleRange== -1){
+    dout(V_WARNING) << "minSample_i/maxSample_i not set! Assuming a sample range of " << std::endl;
+    dout(V_WARNING) << "0 to " << numberOfSamples-1 << std::endl;
+    *minSampleRange = 0;
+    *maxSampleRange = numberOfSamples-1;
+  }
 }

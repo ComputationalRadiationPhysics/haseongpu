@@ -16,7 +16,7 @@
 #include <vector> 
 #include <logging.h>
 
-enum RunMode { NONE, RAY_PROPAGATION_GPU, FOR_LOOPS, RAY_PROPAGATION_MPI, TEST };
+enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
 
 /**
  * @brief Parses a given file(filename) line by line.
@@ -124,5 +124,10 @@ int checkParameterValidity(
     double *mseThreshold
     );
 
+void checkSampleRange(
+	int* minSampleRange,
+	int* maxSampleRange,
+	const unsigned numberOfSamples
+	);
 
 #endif /* PARSER_H */

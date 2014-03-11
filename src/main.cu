@@ -228,15 +228,14 @@ int main(int argc, char **argv){
   std::vector<unsigned> devices; 
   unsigned maxGpus = 0;
   RunMode mode = NONE;
-  int minSampleRange = 0;
-  int maxSampleRange = 0;
+  int minSampleRange = -1;
+  int maxSampleRange = -1;
   time_t starttime   = time(0);
   unsigned usedGpus  = 0;
 
   std::string inputPath;
   std::string outputPath;
   double mseThreshold = 0;
-  verbosity = 63; //ALL //TODO: remove in final code
 
   // Wavelength data
   std::vector<double> sigmaA;
@@ -281,6 +280,8 @@ int main(int argc, char **argv){
   // -> parse dMesh only where needed
   if(Mesh::parseMultiGPU(hMesh, dMesh, inputPath, devices, maxGpus)) return 1;
 
+  checkSampleRange(&minSampleRange,&maxSampleRange,hMesh.numberOfSamples);
+
   // Solution vector
   std::vector<double> dndtAse(hMesh.numberOfSamples, 0);
   std::vector<float>  phiAse(hMesh.numberOfSamples, 0);
@@ -292,7 +293,7 @@ int main(int argc, char **argv){
   std::vector<float> runtimes(maxGpus, 0);
   switch(mode){
     // TODO: Replace completly by MPI
-    case RAY_PROPAGATION_GPU:
+    case GPU_THREADED:
       for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
         const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
         const float samplePerGpu = samplesPerNode / (float) maxGpus;
@@ -329,7 +330,7 @@ int main(int argc, char **argv){
       runmode="Ray Propagation GPU";
       break;
 
-    case RAY_PROPAGATION_MPI:
+    case GPU_MPI:
       usedGpus = calcPhiAseMPI( minRaysPerSample,
           maxRaysPerSample,
           maxRepetitions,
@@ -347,7 +348,7 @@ int main(int argc, char **argv){
       runmode = "RAY PROPAGATION MPI";
       break;
 
-    case FOR_LOOPS: //Possibly deprecated!
+    case CPU: //Possibly deprecated!
       // TODO: make available for MPI?
       runtime = forLoopsClad( &dndtAse,
           minRaysPerSample,
@@ -365,6 +366,7 @@ int main(int argc, char **argv){
       break;
 
     default:
+      dout(V_ERROR) << "No valid runmode!" << std::endl;
       exit(0);
   }
 
