@@ -1,7 +1,6 @@
 #include "parser.h"
 #include <string> /* string */
 #include <vector> /* vector */
-#include <stdio.h> /*fprintf*/
 #include <logging.h> 
 #include <types.h>
 

@@ -124,11 +124,11 @@ __device__ Ray calcNextRay(Ray ray, const double length){
  *
  **/
 __device__ double calcPrismGain(const unsigned triangle, const unsigned level, const double length, const Mesh &mesh, const double sigmaA, const double sigmaE){
-  if (mesh.getCellType(triangle) == mesh.cladNumber){
-    return exp(-(mesh.cladAbsorption) * length);
+  if (mesh.getCellType(triangle) == mesh.claddingNumber){
+    return exp(-(mesh.claddingAbsorption) * length);
   }
   else {
-     return (double) exp(mesh.nTot * (mesh.getBetaValue(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
+     return (double) exp(mesh.nTot * (mesh.getBetaVolume(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
    }
  
 }

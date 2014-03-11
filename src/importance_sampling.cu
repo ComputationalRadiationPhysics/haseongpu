@@ -42,9 +42,9 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
   gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
-  importance[startPrism + reflectionOffset] = mesh.getBetaValue(startPrism) * gain;
-  if(mesh.getBetaValue(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
-    printf("beta: %f importance: %f gain: %f\n", mesh.getBetaValue(startPrism), importance[startPrism + reflectionOffset], gain);
+  importance[startPrism + reflectionOffset] = mesh.getBetaVolume(startPrism) * gain;
+  if(mesh.getBetaVolume(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
+    printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(startPrism), importance[startPrism + reflectionOffset], gain);
   }
 
 }
@@ -134,7 +134,7 @@ __global__ void recalculateImportance(Mesh mesh,
   int startLevel = startPrism/(mesh.numberOfTriangles);
   int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
   if(raysPerPrism[startPrism + reflectionOffset] > 0){
-    importance[startPrism + reflectionOffset] = raysPerSample * mesh.surfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
+    importance[startPrism + reflectionOffset] = raysPerSample * mesh.triangleSurfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
   }
   else{
     importance[startPrism + reflectionOffset] = 0;

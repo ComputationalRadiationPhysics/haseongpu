@@ -12,25 +12,56 @@
 % @return raysUsedPerSample the number of rays used to calculate each phiASE value
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(points,trianglePointIndices,betaCells,betaVolume,triangleNormalsX,triangleNormalsY,triangleNeighbors,triangleSurfaces,triangleCenterX,triangleCenterY,triangleNormalPoint,forbiddenEdge,minRaysPerSample,nTot,thickness,laserParameter,crystal,numberOfLevels)
+function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(
+  points,
+  trianglePointIndices,
+  betaCells,
+  betaVolume,
+  %claddingCellTypes,
+  %claddingNumber,
+  %claddingAbsorption,
+  %useReflections,
+  %refractiveIndices,
+  %reflectivities,
+  triangleNormalsX,
+  triangleNormalsY,
+  triangleNeighbors,
+  triangleSurfaces,
+  triangleCenterX,
+  triangleCenterY,
+  triangleNormalPoint,
+  forbiddenEdge,
+  minRaysPerSample,
+  %maxRaysPerSample,
+  %mseThreshold,
+  %repetitions,
+  nTot,
+  thickness,
+  laserParameter,
+  crystal,
+  numberOfLevels,
+  %Runmode,
+  %maxGPUs,
+  %nPerNode
+  )
 
 %%%%% configuration of values that are not reachable by interface %%%%%%%%%
-maxGPUs=1;  % should be 1 for use with MPI, otherwise the number of devices in the node
-nPerNode=4; % for a MPI node with 4 devices
-Runmode='mpi';
+%maxGPUs=1;  % should be 1 for use with MPI, otherwise the number of devices in the node
+%nPerNode=4; % for a MPI node with 4 devices
+%Runmode='mpi';
 %Runmode='ray_propagation_gpu'; % runmode for the threaded approach
 
-maxRaysPerSample = 100000000;
-mseThreshold=0.05;
-Repetitions=4;
+%maxRaysPerSample = 100000000;
+%mseThreshold=0.05;
+%Repetitions=4;
 
-useReflections = true; 
-refractiveIndices = [1.83,1,1.83,1];
-[nT,b] = size(triangleNeighbors);
-reflectivities = zeros(1,nT*2);
-claddingInt = ones(1,nT);
-claddingNumber = 3;
-claddingAbsorption = 5.5;
+%useReflections = true; 
+%refractiveIndices = [1.83,1,1.83,1];
+%[nT,b] = size(triangleNeighbors);
+%reflectivities = zeros(1,nT*2);
+%claddingCellTypes = ones(1,nT);
+%claddingNumber = 3;
+%claddingAbsorption = 5.5;
 
 
 %%%%%%%% overwriting values from the interface %%%%%%%%%%%%
@@ -66,7 +97,7 @@ TMP_FOLDER=[ CALCPHIASE_DIR filesep 'input_tmp' ];
 clean_IO_files(TMP_FOLDER);
 
 % create new input in the temporary folder
-create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,x_center,triangleCenterY,claddingInt,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
+create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,x_center,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
 
 % do the propagation
 status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--mode=' Runmode ' --rays=' num2str(minRaysPerSample) ' --maxrays=' num2str(maxRaysPerSample) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(maxGPUs) ' --repetitions=' num2str(Repetitions) ' --mse-threshold=' num2str(mseThreshold) ]);
@@ -99,137 +130,112 @@ end
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function create_calcPhiASE_input (points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingInt,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,FOLDER)
+function create_calcPhiASE_input (points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,FOLDER)
 CURRENT_DIR = pwd;
 
 mkdir(FOLDER);
 cd(FOLDER);
 
-%x=fopen('points.txt','w');
-x=fopen('p_in.txt','w');
+x=fopen('points.txt','w');
 fprintf(x,'%.50f\n',points);
 fclose(x);
 
-%x=fopen('triangleNormalsX.txt','w');
-x=fopen('n_x.txt','w');
+x=fopen('triangleNormalsX.txt','w');
 fprintf(x,'%.50f\n',triangleNormalsX);
 fclose(x);
 
-%x=fopen('triangleNormalsY.txt','w');
-x=fopen('n_y.txt','w');
+x=fopen('triangleNormalsY.txt','w');
 fprintf(x,'%.50f\n',triangleNormalsY);
 fclose(x);
 
-%x=fopen('forbiddenEdge.txt','w');
-x=fopen('forbidden.txt','w');
+x=fopen('forbiddenEdge.txt','w');
 fprintf(x,'%d\n',forbiddenEdge);
 fclose(x);
 
-%x=fopen('triangleNormalPoint.txt','w');
-x=fopen('n_p.txt','w');
+x=fopen('triangleNormalPoint.txt','w');
 fprintf(x,'%d\n',triangleNormalPoint);
 fclose(x);
 
-%x=fopen('triangleNeighbors.txt','w');
-x=fopen('neighbors.txt','w');
+x=fopen('triangleNeighbors.txt','w');
 fprintf(x,'%d\n',triangleNeighbors);
 fclose(x);
 
-%x=fopen('trianglePointIndices.txt','w');
-x=fopen('t_in.txt','w');
+x=fopen('trianglePointIndices.txt','w');
 fprintf(x,'%d\n',trianglePointIndices);
 fclose(x);
 
 % thickness of one slice!
-%x=fopen('thickness.txt','w');
-x=fopen('z_mesh.txt','w');
+x=fopen('thickness.txt','w');
 fprintf(x,'%.50f\n',thickness);
 fclose(x);
 
 % number of slices
-%x=fopen('numberOfLevels.txt','w');
-x=fopen('mesh_z.txt','w');
+x=fopen('numberOfLevels.txt','w');
 fprintf(x,'%d\n',numberOfLevels);
 fclose(x);
 
-%x=fopen('numberOfTriangles.txt','w');
-x=fopen('size_t.txt','w');
+x=fopen('numberOfTriangles.txt','w');
 [a,b] = size(trianglePointIndices);
 fprintf(x,'%d\n',a);
 fclose(x);
 
-%x=fopen('numberOfPoints','w');
-x=fopen('size_p.txt','w');
+x=fopen('numberOfPoints','w');
 [a,b] = size(points);
 fprintf(x,'%d\n',a);
 fclose(x);
 
-%x=fopen('nTot.txt','w');
-x=fopen('n_tot.txt','w');
+x=fopen('nTot.txt','w');
 fprintf(x,'%.50f\n',nTot);
 fclose(x);
 
-%x=fopen('betaVolume.txt','w');
-x=fopen('beta_v.txt','w');
+x=fopen('betaVolume.txt','w');
 fprintf(x,'%.50f\n',betaVolume);
 fclose(x);
 
-%x=fopen('sigmaA.txt','w');
-x=fopen('sigma_a.txt','w');
+x=fopen('sigmaA.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_abs);
 fclose(x);
 
-%x=fopen('sigmaE.txt','w');
-x=fopen('sigma_e.txt','w');
+x=fopen('sigmaE.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_ems);
 fclose(x);
 
-%x=fopen('tFluo.txt','w');
-x=fopen('tfluo.txt','w');
+x=fopen('crystalTFluo.txt','w');
 fprintf(x,'%.50f\n',crystal.tfluo);
 fclose(x);
 
-%x=fopen('betaCells.txt','w');
-x=fopen('beta_cell.txt','w');
+x=fopen('betaCells.txt','w');
 fprintf(x,'%.50f\n',betaCells);
 fclose(x);
 
-%x=fopen('triangleSurfaces.txt','w');
-x=fopen('surface.txt','w');
+x=fopen('triangleSurfaces.txt','w');
 fprintf(x,'%.50f\n',triangleSurfaces);
 fclose(x);
 
-%x=fopen('triangleCenterX.txt','w');
-x=fopen('x_center.txt','w');
+x=fopen('triangleCenterX.txt','w');
 fprintf(x,'%.50f\n',triangleCenterX);
 fclose(x);
 
-%x=fopen('triangleCenterY.txt','w');
-x=fopen('y_center.txt','w');
+x=fopen('triangleCenterY.txt','w');
 fprintf(x,'%.50f\n',triangleCenterY);
 fclose(x);
 
-%x=fopen('claddingInt.txt','w');
-x=fopen('clad_int.txt','w');
-fprintf(x,'%d\n',claddingInt);
+x=fopen('claddingCellTypes.txt','w');
+fprintf(x,'%d\n',claddingCellTypes);
 fclose(x);
 
-%x=fopen('claddingNumber.txt','w');
-x=fopen('clad_num.txt','w');
+x=fopen('claddingNumber.txt','w');
 fprintf(x,'%d\n',claddingNumber);
 fclose(x);
 
-%x=fopen('claddingAbsorption.txt','w');
-x=fopen('clad_abs.txt','w');
+x=fopen('claddingAbsorption.txt','w');
 fprintf(x,'%.50f\n',claddingAbsorption);
 fclose(x);
 
-%x=fopen('refractiveIndices.txt','w');
-x=fopen('refractive_indices.txt','w');
+x=fopen('refractiveIndices.txt','w');
 fprintf(x,'%3.5f\n',refractiveIndices);
 fclose(x);
 
-%x=fopen('reflectivities.txt','w');
 x=fopen('reflectivities.txt','w');
 fprintf(x,'%.50f\n',reflectivities);
 fclose(x);

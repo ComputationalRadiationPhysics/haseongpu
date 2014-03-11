@@ -1,5 +1,4 @@
 // Libraries
-#include <stdio.h> /* fprintf, memcpy, strstr, strcmp */
 #include <assert.h> /* assert */
 #include <string> /* string */
 #include <vector> /* vector */
@@ -18,6 +17,7 @@
 #include <for_loops_clad.h>
 #include <cudachecks.h>
 #include <mesh.h>
+#include <stdexcept>
 
 #include <logging.h>
 #include <ray_histogram.h>
@@ -100,7 +100,7 @@ std::vector<unsigned> getFreeDevices(unsigned maxGpus){
  */
 double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, const float phiAse, const unsigned sample_i){
   double gain_local = mesh.nTot * mesh.betaCells[sample_i] * (sigmaE + sigmaA) - double(mesh.nTot * sigmaA);
-  return gain_local * phiAse / mesh.crystalFluorescence;
+  return gain_local * phiAse / mesh.crystalTFluo;
 }
 
 /**
@@ -255,8 +255,8 @@ int main(int argc, char **argv){
   if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
 
   // Parse wavelengths from files
-  if(fileToVector(inputPath + "sigma_a.txt", &sigmaA)) return 1;
-  if(fileToVector(inputPath + "sigma_e.txt", &sigmaE)) return 1;
+  if(fileToVector(inputPath + "sigmaA.txt", &sigmaA)) return 1;
+  if(fileToVector(inputPath + "sigmaE.txt", &sigmaE)) return 1;
   assert(sigmaA.size() == sigmaE.size());
 
   // Interpolate sigmaA / sigmaE function
@@ -360,7 +360,7 @@ int main(int argc, char **argv){
           hMesh.numberOfTriangles,
           hMesh.numberOfLevels,
           hMesh.thickness,
-          hMesh.crystalFluorescence);
+          hMesh.crystalTFluo);
       runmode = "For Loops";
       break;
 
@@ -420,7 +420,9 @@ int main(int argc, char **argv){
     }
     avgMSE /= mse.size();
 
-    std::cout.imbue(std::locale(""));
+    try{ std::cout.imbue(std::locale("")); }
+    catch(std::runtime_error e){}
+
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "=== Statistics ===" << std::endl;
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;

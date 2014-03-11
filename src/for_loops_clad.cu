@@ -84,16 +84,16 @@ float forLoopsClad(
 //  for further informations take a look on "mesh_cyl_rect.m"
   
   p_in = mesh->points;
-  t_in = mesh->triangles;
-  beta_v = mesh->betaValues;
+  t_in = mesh->trianglePointIndices;
+  beta_v = mesh->betaVolume;
   n_x = mesh->normalVec;
   n_y = &(mesh->normalVec[3 * mesh->numberOfTriangles]);
-  neighbors = mesh->neighbors;
-  surface_new = mesh->surfaces;
+  neighbors = mesh->triangleNeighbors;
+  surface_new = mesh->triangleSurfaces;
   center_x = mesh->centers;
   center_y = &(mesh->centers[mesh->numberOfTriangles]);
-  n_p = mesh->normalPoint;
-  forbidden = mesh->forbidden;
+  n_p = mesh->triangleNormalPoint;
+  forbidden = mesh->forbiddenEdge;
   
 // *************  INPUT ORDER END  *************
   
