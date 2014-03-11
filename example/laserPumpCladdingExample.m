@@ -60,8 +60,8 @@ mode.extr =0;  %no extraction!!
 const.N1per = 1.38e20;
 const.c = 3e8;
 const.h = 6.626e-34;
-NumRays = 1e4;
-NumRays = int32(NumRays);
+numRays = 1e4;
+numRays = int32(numRays);
 N_tot = const.N1per*crystal.doping;
 Ntot_gradient = zeros(crystal.levels, 1);      % doping gradient if not given by load!
 Ntot_gradient(:) = crystal.doping*const.N1per;
@@ -81,12 +81,10 @@ h = const.h; %Js
 % the grid is done using the distmesh routines
 % use e.g. cr_60mm_30mm.m in meshing folder
 load('pt.mat');
-who
 
 % Create points and triangles from grid
-set_variables(p,t);
+%set_variables(p,t);
 load('variable.mat');
-who
 
 % mesh dependand definitions
 N_cells = size(t,1);
@@ -185,7 +183,7 @@ clad_int = int32(clad);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main pump loop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i_slice=1:timeslice_tot-1
-    disp(['TimeSlice ' num2str(i_slice) 'calculation started']);
+    disp(['TimeSlice ' num2str(i_slice) ' calculation started']);
     % ******************* BETA PUMP TEST ******************************
     % make a test with the gain routine "gain.m" for each of the points
     % define the intensity at the nominal points of the grid and make the
@@ -240,14 +238,14 @@ for i_slice=1:timeslice_tot-1
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Call external ASE application %%%%%%%%%%%%%%%%%%%%
     maxGPUs           = 1;
     nPerNode          = 4;
-    Runmode           = 'mpi';
+    runmode           = 'mpi';
     %Runmode          = 'ray_propagation_gpu';
     useReflections    = true;
     refractiveIndices = [1.83,1,1.83,1];
-    [nT,b]            = size(triangleNeighbors);
+    [nT,b]            = size(sorted_int);
     reflectivities    = zeros(1,nT*2);
-    Repetitions       = 4;
-    maxRaysPerSample  = NumRays * 100;
+    repetitions       = 4;
+    maxRaysPerSample  = numRays * 100;
     mseThreshold      = 0.05;
 
      [phi_ASE, mse_values, N_rays] = calcPhiASE(
@@ -269,7 +267,7 @@ for i_slice=1:timeslice_tot-1
        y_center,
        normals_p,
        forbidden,
-       NumRays,
+       numRays,
        maxRaysPerSample,
        mseThreshold,
        repetitions,
@@ -278,7 +276,7 @@ for i_slice=1:timeslice_tot-1
        laser,
        crystal,
        mesh_z,
-       Runmode,
+       runmode,
        maxGPUs,
        nPerNode);
 

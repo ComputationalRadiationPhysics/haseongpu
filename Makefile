@@ -29,6 +29,8 @@ all:
 	mkdir -p input
 	mkdir -p output/calcPhiAseTmp
 	mkdir -p output/vtk
+	cp src/calcPhiASE.m .
+	cp src/calcPhiASE.m example/
 	make calcPhiASE
 
 bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
@@ -41,7 +43,6 @@ calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	rm -f bin/link.o
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
-	cp src/calcPhiASE.m .
 	cp bin/calcPhiASE example/bin/
 
 clean:
