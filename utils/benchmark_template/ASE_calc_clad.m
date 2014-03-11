@@ -79,11 +79,11 @@ h = const.h; %Js
 % Load the grid from file
 % the grid is done using the distmesh routines
 % use e.g. cr_60mm_30mm.m in meshing folder
-load pt.mat;
+load('pt.mat');
 
 % Create points and triangles from grid
 set_variables(p,t);
-load variable.mat
+load('variable.mat');
 
 % mesh dependand definitions
 N_cells = size(t,1);

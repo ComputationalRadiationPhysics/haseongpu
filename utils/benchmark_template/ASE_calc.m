@@ -207,18 +207,15 @@ for i_slice=1:timeslice-1
     save(['save_' num2str(i_slice) '.mat']);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Prepare next timeslice %%%%%%%%%%%%%%%%%%%%%%%%%%%
-
     temp = pump.T;
     time_beta = 1e-6;
     pump.T = time_beta;
-    
     temp_f = crystal.tfluo;
     crystal.tfluo = 1;
-    
     beta_c_2 = zeros(size(p,1),mesh_z);
-
     intensity = pump.I;
 
+    % Now call beta_int for each of the points
     for i_p=1:size(p,1)
         beta_crystal=beta_cell(i_p,:);
         pulse = zeros(steps.time,1);

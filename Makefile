@@ -42,6 +42,7 @@ calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
 	cp src/calcPhiASE.m .
+	cp bin/calcPhiASE example/bin/
 
 clean:
 	rm -f bin/*
