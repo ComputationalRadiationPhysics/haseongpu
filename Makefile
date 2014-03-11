@@ -25,6 +25,7 @@ INCLUDES = include
 
 all:	
 	mkdir -p bin
+	mkdir -p example/bin
 	mkdir -p output
 	mkdir -p input
 	mkdir -p output/calcPhiAseTmp

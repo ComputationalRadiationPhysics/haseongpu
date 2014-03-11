@@ -5,6 +5,7 @@
 %
 % @author Daniel Albach
 % @date   2011-05-03
+% @licence: GPLv3
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -60,8 +61,8 @@ mode.extr =0;  %no extraction!!
 const.N1per = 1.38e20;
 const.c = 3e8;
 const.h = 6.626e-34;
-numRays = 1e4;
-numRays = int32(numRays);
+minRaysPerSample = 1e4;
+minRaysPerSample = int32(minRaysPerSample);
 N_tot = const.N1per*crystal.doping;
 Ntot_gradient = zeros(crystal.levels, 1);      % doping gradient if not given by load!
 Ntot_gradient(:) = crystal.doping*const.N1per;
@@ -71,6 +72,18 @@ timeslice = 50;
 timeslice_tot = 150;
 timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
+
+% ASE application
+maxGPUs           = 4;
+nPerNode          = 4;
+%runmode           = 'mpi';
+runmode          = 'ray_propagation_gpu';
+useReflections    = false;
+refractiveIndices = [1.83,1,1.83,1];
+repetitions       = 4;
+maxRaysPerSample  = minRaysPerSample * 10;
+mseThreshold      = 0.05;
+
 
 % Constants for short use
 c = const.c; %m/s
@@ -86,10 +99,12 @@ load('pt.mat');
 set_variables(p,t);
 load('variable.mat');
 
-% mesh dependand definitions
+% Mesh dependand definitions
 N_cells = size(t,1);
 beta_cell = zeros(size(p,1),mesh_z);
 beta_vol = zeros(N_cells,mesh_z-1);
+[nT,b]            = size(sorted_int);
+reflectivities    = zeros(1,nT*2);
 
 % In first timeslice phi_ASE stays 0
 phi_ASE=zeros(size(p,1),mesh_z);
@@ -116,7 +131,7 @@ for i_p=1:size(p,1)
    beta_crystal=beta_cell(i_p,:);
    pulse = zeros(steps.time,1);
    pump.I = intensity*exp(-sqrt(p(i_p,1)^2/pump.ry^2+p(i_p,2)^2/pump.rx^2)^pump.exp);
-   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
+   [beta_crystal,beta_store,pulse,Ntot_gradient] = beta_int3(beta_crystal,pulse,const,crystal,steps,pump,mode,Ntot_gradient);
    beta_c_2(i_p,:)=beta_crystal(:);
 end
 
@@ -144,10 +159,10 @@ vtk_wedge('beta_cell_1.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Definition of cladding %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Which index is the cladding?
-clad_number = 1;
-clad_number = int32(clad_number);
-[numberOfTriangles,b]       = size(t_int);
-clad        = ones(numberOfTriangles,1);
+clad_number           = 1;
+clad_number           = int32(clad_number);
+[numberOfTriangles,b] = size(t_int);
+clad                  = zeros(numberOfTriangles,1);
 
 % Absorption of the cladding
 clad_abs = 5.5;
@@ -180,10 +195,9 @@ length_Yb = size(Yb_points_t,1);
 % Make sure that clad is integer variable
 clad_int = int32(clad);
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main pump loop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i_slice=1:timeslice_tot-1
-    disp(['TimeSlice ' num2str(i_slice) ' calculation started']);
+    disp(['TimeSlice ' num2str(i_slice) ' of ' num2str(timeslice_tot-1) ' started']);
     % ******************* BETA PUMP TEST ******************************
     % make a test with the gain routine "gain.m" for each of the points
     % define the intensity at the nominal points of the grid and make the
@@ -228,7 +242,11 @@ for i_slice=1:timeslice_tot-1
 
         v = vertcat(v_1,v_2);
 
-        beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        if (isOctave)
+          beta_vol(:,i_z) = griddata3(x,y,z,v,xi,yi,zi);
+        else
+          beta_vol(:,i_z) = griddata(x,y,z,v,xi,yi,zi);
+        end
 
         z = z + z_mesh;
         zi = zi + z_mesh;
@@ -236,48 +254,36 @@ for i_slice=1:timeslice_tot-1
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Call external ASE application %%%%%%%%%%%%%%%%%%%%
-    maxGPUs           = 1;
-    nPerNode          = 4;
-    runmode           = 'mpi';
-    %Runmode          = 'ray_propagation_gpu';
-    useReflections    = true;
-    refractiveIndices = [1.83,1,1.83,1];
-    [nT,b]            = size(sorted_int);
-    reflectivities    = zeros(1,nT*2);
-    repetitions       = 4;
-    maxRaysPerSample  = numRays * 100;
-    mseThreshold      = 0.05;
-
-     [phi_ASE, mse_values, N_rays] = calcPhiASE(
-       p,
-       t_int,
-       beta_cell,
-       beta_vol,
-       clad_int,
-       clad_number,
-       clad_abs,
-       useReflections,
-       refractiveIndices,
-       reflectivities,
-       normals_x,
-       normals_y,
-       sorted_int,
-       surface,
-       x_center,
-       y_center,
-       normals_p,
-       forbidden,
-       numRays,
-       maxRaysPerSample,
-       mseThreshold,
-       repetitions,
-       N_tot,
-       z_mesh,
-       laser,
-       crystal,
-       mesh_z,
-       runmode,
-       maxGPUs,
+     [phi_ASE, mse_values, N_rays] = calcPhiASE(...
+       p,...
+       t_int,...
+       beta_cell,...
+       beta_vol,...
+       clad_int,...
+       clad_number,...
+       clad_abs,...
+       useReflections,...
+       refractiveIndices,...
+       reflectivities,...
+       normals_x,...
+       normals_y,...
+       sorted_int,...
+       surface,...
+       x_center,...
+       y_center,...
+       normals_p,...
+       forbidden,...
+       minRaysPerSample,...
+       maxRaysPerSample,...
+       mseThreshold,...
+       repetitions,...
+       N_tot,...
+       z_mesh,...
+       laser,...
+       crystal,...
+       mesh_z,...
+       runmode,...
+       maxGPUs,...
        nPerNode);
 
 
@@ -286,11 +292,12 @@ for i_slice=1:timeslice_tot-1
         for i_z=1:mesh_z
             pos_Yb = Yb_points_t(i_p);
 	    % Calc local gain (g_l)
-            g_l = -(N_tot*laser.s_abs - N_tot*beta_cell(pos_Yb,i_z)*(laser.s_ems+laser.s_abs));
-            dndt_ASE(pos_Yb,i_z) = g_l*phi_ASE(pos_Yb,i_z)/crystal.tfluo;
+            g_l = -(N_tot*laser.max_abs - N_tot*beta_cell(pos_Yb,i_z)*(laser.max_ems+laser.max_abs));
+            dndt_ASE(pos_Yb,i_z) = g_l * phi_ASE(pos_Yb,i_z) / crystal.tfluo;
         end
     end
     
+
     
     % Now for the cladding points
     for i_p=1:length_clad
