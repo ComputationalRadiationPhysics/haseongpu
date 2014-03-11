@@ -17,12 +17,12 @@ function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(
   trianglePointIndices,
   betaCells,
   betaVolume,
-  %claddingCellTypes,
-  %claddingNumber,
-  %claddingAbsorption,
-  %useReflections,
-  %refractiveIndices,
-  %reflectivities,
+  claddingCellTypes,
+  claddingNumber,
+  claddingAbsorption,
+  useReflections,
+  refractiveIndices,
+  reflectivities,
   triangleNormalsX,
   triangleNormalsY,
   triangleNeighbors,
@@ -32,40 +32,18 @@ function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(
   triangleNormalPoint,
   forbiddenEdge,
   minRaysPerSample,
-  %maxRaysPerSample,
-  %mseThreshold,
-  %repetitions,
+  maxRaysPerSample,
+  mseThreshold,
+  repetitions,
   nTot,
   thickness,
   laserParameter,
   crystal,
   numberOfLevels,
-  %Runmode,
-  %maxGPUs,
-  %nPerNode
+  Runmode,
+  maxGPUs,
+  nPerNode
   )
-
-%%%%% configuration of values that are not reachable by interface %%%%%%%%%
-%maxGPUs=1;  % should be 1 for use with MPI, otherwise the number of devices in the node
-%nPerNode=4; % for a MPI node with 4 devices
-%Runmode='mpi';
-%Runmode='ray_propagation_gpu'; % runmode for the threaded approach
-
-%maxRaysPerSample = 100000000;
-%mseThreshold=0.05;
-%Repetitions=4;
-
-%useReflections = true; 
-%refractiveIndices = [1.83,1,1.83,1];
-%[nT,b] = size(triangleNeighbors);
-%reflectivities = zeros(1,nT*2);
-%claddingCellTypes = ones(1,nT);
-%claddingNumber = 3;
-%claddingAbsorption = 5.5;
-
-
-%%%%%%%% overwriting values from the interface %%%%%%%%%%%%
-minRaysPerSample = 10000000;
 
 
 %%%%%%%%%%%%% auto-generating some more input %%%%%%%%%%%%%

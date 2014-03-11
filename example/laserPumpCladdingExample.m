@@ -238,7 +238,49 @@ for i_slice=1:timeslice_tot-1
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Call external ASE application %%%%%%%%%%%%%%%%%%%%
-     [phi_ASE, mse_values, N_rays] = calcPhiASE(p,t_int,beta_cell,beta_vol,normals_x,normals_y,sorted_int,surface,x_center,y_center,normals_p,forbidden, NumRays, N_tot, z_mesh,laser,crystal,mesh_z,i_slice,clad_int,clad_number,clad_abs);
+    maxGPUs           = 1;
+    nPerNode          = 4;
+    Runmode           = 'mpi';
+    %Runmode          = 'ray_propagation_gpu';
+    useReflections    = true;
+    refractiveIndices = [1.83,1,1.83,1];
+    [nT,b]            = size(triangleNeighbors);
+    reflectivities    = zeros(1,nT*2);
+    Repetitions       = 4;
+    maxRaysPerSample  = NumRays * 100;
+    mseThreshold      = 0.05;
+
+     [phi_ASE, mse_values, N_rays] = calcPhiASE(
+       p,
+       t_int,
+       beta_cell,
+       beta_vol,
+       clad_int,
+       clad_number,
+       clad_abs,
+       useReflections,
+       refractiveIndices,
+       reflectivities,
+       normals_x,
+       normals_y,
+       sorted_int,
+       surface,
+       x_center,
+       y_center,
+       normals_p,
+       forbidden,
+       NumRays,
+       maxRaysPerSample,
+       mseThreshold,
+       repetitions,
+       N_tot,
+       z_mesh,
+       laser,
+       crystal,
+       mesh_z,
+       Runmode,
+       maxGPUs,
+       nPerNode);
 
 
     % Calc dn/dt ASE, change it to only the Yb:YAG points
