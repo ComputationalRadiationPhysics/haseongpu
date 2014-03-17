@@ -379,23 +379,14 @@ int main(int argc, char **argv){
       }
   }
 
-  // Compare with vtk input
-  // if(compareLocation!="") {
-  //   std::vector<double> compareAse = compareVtk(dndtAse, compareLocation);
-
-  // }
-
   // Write experiment data
   // output folder has to be the same as TMP_FOLDER in the calling MatLab script
-  writeMatlabOutput(
-      outputPath,
-      phiAse,
-      totalRays,
-      mse,
-      mesh[0].numberOfSamples,
-      mesh[0].numberOfLevels
-		    );
-
+  writeMatlabOutput(outputPath,
+		    phiAse,
+		    totalRays,
+		    mse,
+		    mesh[0].numberOfSamples,
+		    mesh[0].numberOfLevels);
 
   // Write solution to vtk files
   if(writeVtk){
