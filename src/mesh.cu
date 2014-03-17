@@ -32,208 +32,61 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
   }
 }
 
+Mesh::Mesh(// Constants
+	   double claddingAbsorption,
+	   float surfaceTotal,
+	   float thickness,
+	   float nTot,
+	   float crystalTFluo,
+	   unsigned numberOfTriangles,
+	   unsigned numberOfLevels,
+	   unsigned numberOfPrisms,
+	   unsigned numberOfPoints,
+	   unsigned numberOfSamples,
+	   unsigned claddingNumber,
+	   // Vectors
+	   std::vector<double> points,
+	   std::vector<double> normalVec,
+	   std::vector<double> betaVolume,
+	   std::vector<double> centers,
+	   std::vector<float> triangleSurfaces,
+	   std::vector<int> forbiddenEdge,
+	   std::vector<double> betaCells,
+	   std::vector<unsigned> claddingCellTypes,
+	   std::vector<float> refractiveIndices,
+	   std::vector<float> reflectivities,
+	   std::vector<float> totalReflectionAngles,
+	   std::vector<unsigned> trianglePointIndices,
+	   std::vector<int> triangleNeighbors,
+	   std::vector<unsigned> triangleNormalPoint) :
+  claddingAbsorption(claddingAbsorption),
+  surfaceTotal(surfaceTotal),
+  thickness(thickness),
+  nTot(nTot),
+  crystalTFluo(crystalTFluo),
+  numberOfTriangles(numberOfTriangles),
+  numberOfLevels(numberOfLevels),
+  numberOfPrisms(numberOfPrisms),
+  numberOfPoints(numberOfPoints),
+  numberOfSamples(numberOfSamples),
+  claddingNumber(claddingNumber),
+  points(points),
+  normalVec(normalVec),
+  betaVolume(betaVolume),
+  centers(centers),
+  triangleSurfaces(triangleSurfaces),
+  forbiddenEdge(forbiddenEdge),
+  betaCells(betaCells),
+  claddingCellTypes(claddingCellTypes),
+  refractiveIndices(refractiveIndices),
+  reflectivities(reflectivities),
+  totalReflectionAngles(totalReflectionAngles),
+  trianglePointIndices(trianglePointIndices),
+  triangleNeighbors(triangleNeighbors),
+  triangleNormalPoint(triangleNormalPoint){
+
+}
 Mesh::~Mesh() {
-//  if(points) delete points;
-//  if(betaVolume) delete betaVolume;
-//  if(normalVec) delete normalVec;
-//  if(centers) delete centers;
-//  if(triangleSurfaces) delete triangleSurfaces;
-//  if(forbiddenEdge) delete forbiddenEdge;
-//  if(betaCells) delete betaCells;
-//  if(trianglePointIndices) delete trianglePointIndices;  
-//  if(triangleNeighbors) delete triangleNeighbors;
-//  if(triangleNormalPoint) delete triangleNormalPoint;
-//  if(claddingCellTypes) delete claddingCellTypes;
-//  if(refractiveIndices) delete refractiveIndices;
-//  if(reflectivities) delete reflectivities;
-}
-
-/**
- * @brief fills the host mesh with the correct datastructures
- *
- * See parseMultiGPU for details on the parameters
- */
-void fillHMesh(
-    Mesh& hMesh,
-    unsigned numberOfTriangles, 
-    unsigned numberOfLevels,
-    unsigned numberOfPoints, 
-    float thickness,
-    std::vector<unsigned> *trianglePointIndices,
-    std::vector<double> *points,
-    std::vector<double> *triangleCenterX, 
-    std::vector<double> *triangleCenterY, 
-    std::vector<unsigned> *positionsOfNormal,
-    std::vector<double> *triangleNormalsX, 
-    std::vector<double> *triangleNormalsY,
-    std::vector<int> *forbiddenEdge, 
-    std::vector<int> *triangleNeighbors, 
-    std::vector<float> *triangleSurfaces,
-    std::vector<double> *betaVolume,
-    std::vector<double> *betaCells,
-    std::vector<unsigned> * claddingCellTypes,
-    std::vector<float> * refractiveIndices,
-    std::vector<float> * reflectivities,
-    float nTot,
-    float crystalTFluo,
-    unsigned claddingNumber,
-    double claddingAbsorption
-) {
-
-  hMesh.numberOfTriangles = numberOfTriangles;
-  hMesh.numberOfLevels = numberOfLevels;
-  hMesh.numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
-  hMesh.numberOfPoints = numberOfPoints;
-  hMesh.numberOfSamples = numberOfPoints * numberOfLevels;
-  hMesh.thickness = thickness;
-  hMesh.crystalTFluo = crystalTFluo;
-  hMesh.nTot = nTot;
-  hMesh.claddingNumber = claddingNumber;
-  hMesh.claddingAbsorption = claddingAbsorption;
-
-  std::vector<double> *hostCenters = new std::vector<double>(triangleCenterX->begin(), triangleCenterX->end());
-  hostCenters->insert(hostCenters->end(),triangleCenterY->begin(),triangleCenterY->end());
-
-  std::vector<double> *hostNormalVec = new std::vector<double>(triangleNormalsX->begin(), triangleNormalsX->end());
-  hostNormalVec->insert(hostNormalVec->end(),triangleNormalsY->begin(),triangleNormalsY->end());
-
-  hMesh.points = &(points->at(0));
-  hMesh.trianglePointIndices = &(trianglePointIndices->at(0));
-  hMesh.betaVolume = &(betaVolume->at(0));
-  hMesh.normalVec = &(hostNormalVec->at(0));
-  hMesh.centers = &(hostCenters->at(0));
-  hMesh.triangleSurfaces = &(triangleSurfaces->at(0));
-  hMesh.forbiddenEdge = &(forbiddenEdge->at(0));
-  hMesh.triangleNeighbors = &(triangleNeighbors->at(0));
-  hMesh.triangleNormalPoint = &(positionsOfNormal->at(0));
-  hMesh.betaCells = &(betaCells->at(0));
-  hMesh.claddingCellTypes = &(claddingCellTypes->at(0));
-  hMesh.refractiveIndices = &(refractiveIndices->at(0));
-  hMesh.reflectivities = &(reflectivities->at(0));
-
-  std::vector<float> *totalReflectionAngles = new std::vector<float>(refractiveIndices->size()/2,0);
-  for(unsigned i=0;i<refractiveIndices->size();i+=2){
-    totalReflectionAngles->at(i/2) = (180. / M_PI * asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
-  }
-  hMesh.totalReflectionAngles = &(totalReflectionAngles->at(0));
-
-}
-
-/**
- * @brief fills a device mesh with the correct datastructures
- *
- * See parseMultiGPU for details on the parameters
- */
-void fillDMesh(
-    Mesh& hMesh,
-    Mesh& dMesh, 
-    std::vector<unsigned> *trianglePointIndices, 
-    unsigned numberOfTriangles, 
-    unsigned numberOfLevels,
-    unsigned numberOfPoints, 
-    float thickness,
-    std::vector<double> *pointsVector, 
-    std::vector<double> *triangleCenterX, 
-    std::vector<double> *triangleCenterY, 
-    std::vector<unsigned> *triangleNormalPoint,
-    std::vector<double> *triangleNormalsX, 
-    std::vector<double> *triangleNormalsY,
-    std::vector<int> *forbiddenVector, 
-    std::vector<int> *triangleNeighborsVector, 
-    std::vector<float> *surfacesVector,
-    std::vector<double> *betaVolumeVector,
-    std::vector<double> *betaCells,
-    std::vector<unsigned> *claddingCellTypes,
-    std::vector<float> * refractiveIndices,
-    std::vector<float> * reflectivities,
-    float nTot,
-    float crystalTFluo,
-    unsigned claddingNumber,
-    double claddingAbsorption
-) {
-
-
-  // GPU variables
-  double totalSurface = 0.;
-
-  // constants
-  dMesh.numberOfTriangles = numberOfTriangles;
-  dMesh.numberOfLevels = numberOfLevels;
-  dMesh.numberOfPrisms = numberOfTriangles*(numberOfLevels-1);
-  dMesh.numberOfPoints = numberOfPoints;
-  dMesh.numberOfSamples = numberOfPoints*numberOfLevels;
-  dMesh.thickness = thickness;
-  dMesh.crystalTFluo = crystalTFluo;
-  dMesh.nTot = nTot;
-  dMesh.claddingAbsorption = claddingAbsorption;
-  dMesh.claddingNumber = claddingNumber;
-
-  for(unsigned i=0;i<numberOfTriangles;++i){
-    totalSurface+=double(surfacesVector->at(i));	
-  }
-  dMesh.surfaceTotal = float(totalSurface);
-
-
-  // values
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.points), 2 * hMesh.numberOfPoints * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.normalVec), 2 * 3 * hMesh.numberOfTriangles * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.betaVolume), hMesh.numberOfPrisms * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.centers), 2 * hMesh.numberOfTriangles * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.triangleSurfaces), hMesh.numberOfTriangles * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.forbiddenEdge), 3 * hMesh.numberOfTriangles * sizeof(int)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.betaCells), hMesh.numberOfPoints * hMesh.numberOfLevels * sizeof(double)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.claddingCellTypes), hMesh.numberOfTriangles * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.refractiveIndices), refractiveIndices->size() * sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.reflectivities), (refractiveIndices->size()/2)*(hMesh.numberOfTriangles) *sizeof(float)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.totalReflectionAngles), (refractiveIndices->size()/2) *sizeof(float)));
-
-  // indexStructs
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.trianglePointIndices), 3 * hMesh.numberOfTriangles * sizeof(unsigned)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.triangleNeighbors), 3 * hMesh.numberOfTriangles * sizeof(int)));
-  CUDA_CHECK_RETURN(cudaMalloc(&(dMesh.triangleNormalPoint), 3 * hMesh.numberOfTriangles * sizeof(unsigned)));
-
-
-  /// fill values
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.points, (double*) &(pointsVector->at(0)), 2 * hMesh.numberOfPoints * sizeof(double), cudaMemcpyHostToDevice));
-
-  std::vector<double> *hostNormalVec = new std::vector<double>(triangleNormalsX->begin(), triangleNormalsX->end());
-  hostNormalVec->insert(hostNormalVec->end(),triangleNormalsY->begin(),triangleNormalsY->end());
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.normalVec, (double*) &(hostNormalVec->at(0)), 2 * 3 * hMesh.numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
-  free(hostNormalVec);
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.betaVolume, (double*) &(betaVolumeVector->at(0)), hMesh.numberOfPrisms * sizeof(double), cudaMemcpyHostToDevice));
-
-  std::vector<double> *hostCenters = new std::vector<double>(triangleCenterX->begin(), triangleCenterX->end());
-  hostCenters->insert(hostCenters->end(),triangleCenterY->begin(),triangleCenterY->end());
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.centers, (double*) &(hostCenters->at(0)), 2 * hMesh.numberOfTriangles * sizeof(double), cudaMemcpyHostToDevice));
-  free(hostCenters);
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.triangleSurfaces, (float*) &(surfacesVector->at(0)), hMesh.numberOfTriangles * sizeof(float), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.forbiddenEdge, (int*) &(forbiddenVector->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.betaCells, (double*) &(betaCells->at(0)), hMesh.numberOfPoints * hMesh.numberOfLevels * sizeof(double), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.claddingCellTypes, (unsigned*) &(claddingCellTypes->at(0)), hMesh.numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.refractiveIndices, (float*) &(refractiveIndices->at(0)), refractiveIndices->size() * sizeof(float), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.reflectivities, (float*) &(reflectivities->at(0)), (hMesh.numberOfTriangles)* (refractiveIndices->size()/2) * sizeof(float), cudaMemcpyHostToDevice));
-
-  std::vector<float> *totalReflectionAngles = new std::vector<float>(refractiveIndices->size()/2,0);
-  for(unsigned i=0;i<refractiveIndices->size();i+=2){
-    totalReflectionAngles->at(i/2) = (180. / M_PI *  asin(refractiveIndices->at(i+1) / refractiveIndices->at(i)));
-  }
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.totalReflectionAngles, (float*) &(totalReflectionAngles->at(0)), refractiveIndices->size()/2 * sizeof(float), cudaMemcpyHostToDevice));
-  free(totalReflectionAngles);
-
-  // fill indexStructs
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.trianglePointIndices, (unsigned*) &(trianglePointIndices->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.triangleNeighbors,(int*) &(triangleNeighborsVector->at(0)), 3 * hMesh.numberOfTriangles * sizeof(int), cudaMemcpyHostToDevice));
-
-  CUDA_CHECK_RETURN(cudaMemcpy(dMesh.triangleNormalPoint, (unsigned*) &(triangleNormalPoint->at(0)), 3 * hMesh.numberOfTriangles * sizeof(unsigned), cudaMemcpyHostToDevice));
-
 }
 
 /**
@@ -385,207 +238,6 @@ __device__ unsigned Mesh::getCellType(unsigned triangle) const{
 }
 
 
-/**
- * @brief creates the Mesh datastructures on the host and on all possible devices for the propagation
- *
- * @param *hMesh the host mesh
- * @param **dMesh an array of device meshes (one for each device) 
- * @param *trianglePointIndices indices of the points which form a triangle
- * @param numberOfTriangles the number of trianglePointIndices
- * @param numberOfLeves the number of layers of the mesh
- * @param numberOfPoints the number of vertices in one layer of the mesh
- * @param thickness  the thickness of one layer of the mesh
- * @param *points coordinates of the vertices in one layer of the mesh
- * @param *betaVolume constant values for each meshed prism
- * @param *triangleCenterX the x coordinates of each triangle's center
- * @param *triangleCenterY the y coordinates of each triangle's center
- * @param *triangleNormalPoint indices to the points (points), where the normals triangleNormalsX,triangleNormalsY start
- * @param *triangleNormalsX the x components of a normal vector for each of the 3 sides of a triangle
- * @param *triangleNormalsY the y components of a normal vector for each of the 3 sides of a triangle
- * @param *forbiddenEdge the sides of the triangle from which a ray "entered" the triangle
- * @param *triangleNeighbors indices to the adjacent trianglePointIndices in trianglePointIndices
- * @param *triangleSurfaces the sizes of the surface of each prism
- * @param *devices array of device indices for all possible devices 
- * @param maxGpus maximal number of devices to allocate
- */
-int Mesh::parseMultiGPU(Mesh& hMesh,
-			std::vector<Mesh>& dMesh,
-			std::string root,
-			std::vector<unsigned> devices,
-			unsigned maxGpus) {
-
-  // Experimentdata
-  std::vector<double> * betaVolume = new std::vector<double>;
-  std::vector<double> * triangleNormalsX = new std::vector<double>;
-  std::vector<double> * triangleNormalsY = new std::vector<double>;
-  std::vector<unsigned> * trianglePointIndices = new std::vector<unsigned>;
-  std::vector<int> * forbiddenEdge = new std::vector<int>;
-  std::vector<int> * triangleNeighbors = new std::vector<int>;
-  std::vector<unsigned> * triangleNormalPoint = new std::vector<unsigned>;
-  std::vector<double> * points = new std::vector<double>;
-  std::vector<float> * triangleSurfaces = new std::vector<float>;
-  std::vector<double> *triangleCenterX = new std::vector<double>;
-  std::vector<double> *triangleCenterY = new std::vector<double>;
-  std::vector<double> * betaCells = new std::vector<double>;
-  std::vector<unsigned> * claddingCellTypes = new std::vector<unsigned>;
-  std::vector<float> * refractiveIndices = new std::vector<float>;
-  std::vector<float> * reflectivities = new std::vector<float>;
-
-  unsigned numberOfPoints = 0;
-  unsigned numberOfTriangles = 0;
-  unsigned numberOfLevels = 0;
-  unsigned claddingNumber;
-  float thickness = 1;
-  float nTot = 0;
-  float crystalTFluo = 0;
-  double claddingAbsorption = 0;
-
-
-  // Parse experimentdata from files
-  //if(fileToVector(root + "n_p.txt", triangleNormalPoint)) return 1;
-  //if(fileToVector(root + "beta_v.txt", betaVolume)) return 1;
-  //if(fileToVector(root + "forbidden.txt", forbidden)) return 1;
-  //if(fileToVector(root + "triangleNeighbors.txt", triangleNeighbors)) return 1;
-  //if(fileToVector(root + "n_x.txt", triangleNormalsX)) return 1;
-  //if(fileToVector(root + "n_y.txt", triangleNormalsY)) return 1;
-  //if(fileToVector(root + "x_center.txt", triangleCenterX)) return 1;
-  //if(fileToVector(root + "y_center.txt", triangleCenterY)) return 1;
-  //if(fileToVector(root + "p_in.txt", points)) return 1;
-  //if(fileToVector(root + "t_in.txt", trianglePointIndices)) return 1;
-  //if(fileToVector(root + "surface.txt", surfaces)) return 1;
-  //if(fileToValue(root + "size_p.txt", numberOfPoints)) return 1;
-  //if(fileToValue(root + "size_t.txt", numberOfTriangles)) return 1;
-  //if(fileToValue(root + "mesh_z.txt", numberOfLevels)) return 1;
-  //if(fileToValue(root + "z_mesh.txt", thickness)) return 1;
-  //if(fileToValue(root + "n_tot.txt", nTot)) return 1;
-  //if(fileToValue(root + "tfluo.txt", crystalTFluo)) return 1;
-  //if(fileToValue(root + "clad_num.txt", claddingNumber)) return 1;
-  //if(fileToValue(root + "clad_abs.txt", claddingAbsorption)) return 1;
-  //if(fileToVector(root + "beta_cell.txt", betaCells)) return 1;
-  //if(fileToVector(root + "clad_int.txt", claddingCellTypes)) return 1;
-  //if(fileToVector(root + "refractive_indices.txt", refractiveIndices)) return 1;
-  //if(fileToVector(root + "reflectivities.txt", reflectivities)) return 1;
-
-  //TODO
- if(fileToVector(root + "triangleNormalPoint.txt", triangleNormalPoint)) return 1;
- if(fileToVector(root + "betaVolume.txt", betaVolume)) return 1;
- if(fileToVector(root + "forbiddenEdge.txt", forbiddenEdge)) return 1;
- if(fileToVector(root + "triangleNeighbors.txt", triangleNeighbors)) return 1;
- if(fileToVector(root + "triangleNormalsX.txt", triangleNormalsX)) return 1;
- if(fileToVector(root + "triangleNormalsY.txt", triangleNormalsY)) return 1;
- if(fileToVector(root + "triangleCenterX.txt", triangleCenterX)) return 1;
- if(fileToVector(root + "triangleCenterY.txt", triangleCenterY)) return 1;
- if(fileToVector(root + "points.txt", points)) return 1;
- if(fileToVector(root + "trianglePointIndices.txt", trianglePointIndices)) return 1;
- if(fileToVector(root + "triangleSurfaces.txt", triangleSurfaces)) return 1;
- if(fileToValue(root + "numberOfPoints.txt", numberOfPoints)) return 1;
- if(fileToValue(root + "numberOfTriangles.txt", numberOfTriangles)) return 1;
- if(fileToValue(root + "numberOfLevels.txt", numberOfLevels)) return 1;
- if(fileToValue(root + "thickness.txt", thickness)) return 1;
- if(fileToValue(root + "nTot.txt", nTot)) return 1;
- if(fileToValue(root + "crystalTFluo.txt", crystalTFluo)) return 1;
- if(fileToValue(root + "claddingNumber.txt", claddingNumber)) return 1;
- if(fileToValue(root + "claddingAbsorption.txt", claddingAbsorption)) return 1;
- if(fileToVector(root + "betaCells.txt", betaCells)) return 1;
- if(fileToVector(root + "claddingCellTypes.txt", claddingCellTypes)) return 1;
- if(fileToVector(root + "refractiveIndices.txt", refractiveIndices)) return 1;
- if(fileToVector(root + "reflectivities.txt", reflectivities)) return 1;
-
-  // assert input sizes
-  assert(numberOfPoints == (points->size() / 2));
-  assert(numberOfTriangles == trianglePointIndices->size() / 3);
-  assert(triangleNormalPoint->size() == numberOfTriangles * 3);
-  assert(triangleCenterY->size() == numberOfTriangles);
-  assert(triangleCenterX->size() == numberOfTriangles);
-  assert(triangleSurfaces->size() == numberOfTriangles);
-  assert(betaVolume->size() == numberOfTriangles * (numberOfLevels-1));
-  assert(triangleNormalsX->size() == numberOfTriangles * 3);
-  assert(triangleNormalsY->size() == numberOfTriangles * 3);
-  assert(trianglePointIndices->size() == numberOfTriangles * 3);
-  assert(forbiddenEdge->size() == numberOfTriangles * 3);
-  assert(triangleNeighbors->size() == numberOfTriangles * 3);
-  assert(betaCells->size() == numberOfPoints * numberOfLevels);
-  assert(claddingCellTypes->size()== numberOfTriangles);
-  assert(refractiveIndices->size() == 4);
-  assert(reflectivities->size() == (refractiveIndices->size()/2) * numberOfTriangles);
-  assert(claddingCellTypes->size() == numberOfTriangles);
-
-  // assert input data validity
-  assertRange(*triangleNormalPoint,0u,unsigned(numberOfPoints-1),true);
-  assertMin(*betaVolume,0,false);
-  assertRange(*forbiddenEdge,-1,2,true);
-  assertRange(*triangleNeighbors,-1,int(numberOfTriangles-1),true);
-  assertRange(*triangleNormalsX,-1,1,false);
-  assertRange(*triangleNormalsY,-1,1,false);
-  assertRange(*triangleCenterX,*std::min_element(points->begin(),points->end()),*std::max_element(points->begin(),points->end()),false);
-  assertRange(*triangleCenterY,*std::min_element(points->begin(),points->end()),*std::max_element(points->begin(),points->end()),false);
-  assertRange(*trianglePointIndices,0u,unsigned(numberOfPoints-1),true);
-  assertMin(*triangleSurfaces,0,false);
-  assertMin(*betaCells,0,false);
-  assertRange(*refractiveIndices,0,5,false);
-  assertRange(*reflectivities,0,1,false);
-
-  fillHMesh(
-      hMesh,
-      numberOfTriangles, 
-      numberOfLevels,
-      numberOfPoints, 
-      thickness,
-      trianglePointIndices,
-      points,
-      triangleCenterX, 
-      triangleCenterY, 
-      triangleNormalPoint,
-      triangleNormalsX, 
-      triangleNormalsY,
-      forbiddenEdge, 
-      triangleNeighbors, 
-      triangleSurfaces,
-      betaVolume,
-      betaCells,
-      claddingCellTypes,
-	  refractiveIndices,
-	  reflectivities,
-      nTot,
-      crystalTFluo,
-      claddingNumber,
-      claddingAbsorption
-  );
-
-  for( unsigned i=0; i < maxGpus; i++){
-    CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
-    fillDMesh(hMesh,
-	      dMesh.at(i),
-	      trianglePointIndices,
-	      numberOfTriangles,
-	      numberOfLevels,
-	      numberOfPoints,
-	      thickness,
-	      points,
-	      triangleCenterX,
-	      triangleCenterY,
-	      triangleNormalPoint,
-	      triangleNormalsX,
-	      triangleNormalsY,
-	      forbiddenEdge,
-	      triangleNeighbors,
-	      triangleSurfaces,
-	      betaVolume,
-	      betaCells,
-	      claddingCellTypes,
-	      refractiveIndices,
-	      reflectivities,
-	      nTot,
-	      crystalTFluo,
-	      claddingNumber,
-	      claddingAbsorption
-    );
-    cudaDeviceSynchronize();
-  }
-  return 0;
-
-}
-
 double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) {
 	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
 }
@@ -628,11 +280,11 @@ double calculateMaxDiameter(const double* points, const unsigned offset) {
 }
 
 unsigned Mesh::getMaxReflections (ReflectionPlane reflectionPlane) const{
-	double d = calculateMaxDiameter(points,numberOfPoints);
-	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
-	double h = numberOfLevels * thickness; 
-	double z = d/tan(alpha);
-	return ceil(z/h);
+  double d = calculateMaxDiameter(points.toArray(),numberOfPoints);
+  float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
+  double h = numberOfLevels * thickness; 
+  double z = d/tan(alpha);
+  return ceil(z/h);
 }
 
 unsigned Mesh::getMaxReflections() const{
@@ -663,3 +315,18 @@ __device__ __host__ float Mesh::getReflectionAngle(ReflectionPlane reflectionPla
 	return  0;
 }
 
+__device__ __host__ void Mesh::test() const{
+  printf("Constants:\n");
+  printf("claddingAbsorption: %f\n", claddingAbsorption);
+  printf("surfaceTotal: %f\n", surfaceTotal);
+  printf("thickness: %f\n", thickness);
+  printf("nTot: %f\n", nTot);
+  printf("crystalTFluo: %f\n", crystalTFluo);
+  printf("numberOfTriangles: %u\n", numberOfTriangles);
+  printf("numberOfLevels: %u\n", numberOfLevels);
+  printf("numberOfPrisms: %u\n", numberOfPrisms);
+  printf("numberOfPoints: %u\n", numberOfPoints);
+  printf("numberOfSamples: %u\n", numberOfSamples);
+  printf("claddingNumber: %u\n", claddingNumber);
+  
+}

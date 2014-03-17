@@ -16,6 +16,8 @@
 #include <vector> 
 #include <logging.h>
 
+#include <mesh.h>
+
 enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
 
 /**
@@ -129,5 +131,10 @@ void checkSampleRange(
 	int* maxSampleRange,
 	const unsigned numberOfSamples
 	);
+
+std::vector<Mesh> parseMesh(std::string rootPath,
+			    std::vector<unsigned> devices,
+			    unsigned maxGpus);
+
 
 #endif /* PARSER_H */

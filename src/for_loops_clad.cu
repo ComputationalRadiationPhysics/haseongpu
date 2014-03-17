@@ -87,11 +87,11 @@ float forLoopsClad(
   t_in = mesh->trianglePointIndices;
   beta_v = mesh->betaVolume;
   n_x = mesh->normalVec;
-  n_y = &(mesh->normalVec[3 * mesh->numberOfTriangles]);
+  n_y = &(mesh->normalVec.toArray()[3 * mesh->numberOfTriangles]);
   neighbors = mesh->triangleNeighbors;
   surface_new = mesh->triangleSurfaces;
   center_x = mesh->centers;
-  center_y = &(mesh->centers[mesh->numberOfTriangles]);
+  center_y = &(mesh->centers.toArray()[mesh->numberOfTriangles]);
   n_p = mesh->triangleNormalPoint;
   forbidden = mesh->forbiddenEdge;
   

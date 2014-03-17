@@ -273,20 +273,16 @@ int main(int argc, char **argv){
   }
 
   // Parse experientdata and fill mesh
-  Mesh hMesh;
-  std::vector<Mesh> dMesh(maxGpus);
+  // TODO remove all dMesh / hMesh function calls by mesh
+  std::vector<Mesh> mesh = parseMesh(inputPath, devices, maxGpus);
 
-  // TODO: split into hMesh and dMesh parsing 
-  // -> parse dMesh only where needed
-  if(Mesh::parseMultiGPU(hMesh, dMesh, inputPath, devices, maxGpus)) return 1;
-
-  checkSampleRange(&minSampleRange,&maxSampleRange,hMesh.numberOfSamples);
+  checkSampleRange(&minSampleRange,&maxSampleRange,mesh[0].numberOfSamples);
 
   // Solution vector
-  std::vector<double> dndtAse(hMesh.numberOfSamples, 0);
-  std::vector<float>  phiAse(hMesh.numberOfSamples, 0);
-  std::vector<double> mse(hMesh.numberOfSamples, 100000);
-  std::vector<unsigned> totalRays(hMesh.numberOfSamples, 0);
+  std::vector<double> dndtAse(mesh[0].numberOfSamples, 0);
+  std::vector<float>  phiAse(mesh[0].numberOfSamples, 0);
+  std::vector<double> mse(mesh[0].numberOfSamples, 100000);
+  std::vector<unsigned> totalRays(mesh[0].numberOfSamples, 0);
 
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
@@ -306,8 +302,8 @@ int main(int argc, char **argv){
         threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
             maxRaysPerSample,
             maxRepetitions,
-            dMesh.at(gpu_i),
-            hMesh,
+            mesh[gpu_i],
+            mesh[0],
             sigmaAInterpolated,
             sigmaEInterpolated,
             mseThreshold,
@@ -334,8 +330,8 @@ int main(int argc, char **argv){
       usedGpus = calcPhiAseMPI( minRaysPerSample,
           maxRaysPerSample,
           maxRepetitions,
-          dMesh.at(0),
-          hMesh,
+          mesh[0],
+          mesh[0],
           sigmaAInterpolated,
           sigmaEInterpolated,
           mseThreshold,
@@ -352,16 +348,16 @@ int main(int argc, char **argv){
       // TODO: make available for MPI?
       runtime = forLoopsClad( &dndtAse,
           minRaysPerSample,
-          &hMesh,
-          hMesh.betaCells,
-          hMesh.nTot,
+          &mesh[0],
+          mesh[0].betaCells,
+          mesh[0].nTot,
           sigmaA.at(0),
           sigmaE.at(0),
-          hMesh.numberOfPoints,
-          hMesh.numberOfTriangles,
-          hMesh.numberOfLevels,
-          hMesh.thickness,
-          hMesh.crystalTFluo);
+          mesh[0].numberOfPoints,
+          mesh[0].numberOfTriangles,
+          mesh[0].numberOfLevels,
+          mesh[0].thickness,
+          mesh[0].crystalTFluo);
       runmode = "For Loops";
       break;
 
@@ -372,12 +368,12 @@ int main(int argc, char **argv){
 
   // Print Solution
   if(verbosity & V_DEBUG){
-      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
-        dndtAse.at(sample_i) = calcDndtAse(hMesh, maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
+      for(unsigned sample_i = 0; sample_i < mesh[0].numberOfSamples; ++sample_i){
+        dndtAse.at(sample_i) = calcDndtAse(mesh[0], maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
         if(sample_i <=10)
           dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sample_i) << " " << mse.at(sample_i) << std::endl;
       }
-      for(unsigned sample_i = 0; sample_i < hMesh.numberOfSamples; ++sample_i){
+      for(unsigned sample_i = 0; sample_i < mesh[0].numberOfSamples; ++sample_i){
         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sample_i) << " " << mse.at(sample_i) <<std::endl;
         if(sample_i >= 10) break;
       }
@@ -396,8 +392,8 @@ int main(int argc, char **argv){
       phiAse,
       totalRays,
       mse,
-      hMesh.numberOfSamples,
-      hMesh.numberOfLevels
+      mesh[0].numberOfSamples,
+      mesh[0].numberOfLevels
 		    );
 
 
@@ -406,10 +402,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writePointsToVtk(hMesh, dndtAse, outputPath + "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(hMesh, tmpPhiAse, outputPath + "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(hMesh, mse, outputPath + "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(hMesh, tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(mesh[0], dndtAse, outputPath + "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(mesh[0], tmpPhiAse, outputPath + "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(mesh[0], mse, outputPath + "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(mesh[0], tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
   //Print statistics
@@ -428,7 +424,7 @@ int main(int argc, char **argv){
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "=== Statistics ===" << std::endl;
     dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
-    dout(V_STAT) << "Prisms            : " << (int) hMesh.numberOfPrisms << std::endl;
+    dout(V_STAT) << "Prisms            : " << (int) mesh[0].numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << minRaysPerSample;
     if(maxRaysPerSample > minRaysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << maxRaysPerSample << " (adaptive)"; }

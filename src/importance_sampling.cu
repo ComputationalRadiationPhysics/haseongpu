@@ -127,12 +127,12 @@ __global__ void recalculateImportance(Mesh mesh,
   unsigned reflection_i = blockIdx.z;
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-
   if(startPrism >= mesh.numberOfPrisms){
     return;
   }
   int startLevel = startPrism/(mesh.numberOfTriangles);
   int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
+
   if(raysPerPrism[startPrism + reflectionOffset] > 0){
     importance[startPrism + reflectionOffset] = raysPerSample * mesh.triangleSurfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
   }
