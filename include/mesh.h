@@ -87,26 +87,56 @@
  * 
  * totalReflectionAngles [0]-> bottomTotalReflectionAngle, [1]-> topTotalReflectionAngle
  */
-struct Mesh {
+class Mesh {
+ public:
 
-  double *points;
-  double *betaVolume;
-  double *normalVec;
-  double *centers;
-  float  *triangleSurfaces;
-  int	 *forbiddenEdge;
-  double  *betaCells;
-  unsigned *claddingCellTypes;
+  //Mesh();
+  Mesh(// Constants
+       double claddingAbsorption,
+       float surfaceTotal,
+       float thickness,
+       float nTot,
+       float crystalTFluo,
+       unsigned numberOfTriangles,
+       unsigned numberOfLevels,
+       unsigned numberOfPrisms,
+       unsigned numberOfPoints,
+       unsigned numberOfSamples,
+       unsigned claddingNumber,
+       // Vectors
+       std::vector<double> points,
+       std::vector<double> normalVec,
+       std::vector<double> betaVolume,
+       std::vector<double> centers,
+       std::vector<float> triangleSurfaces,
+       std::vector<int> forbiddenEdge,
+       std::vector<double> betaCells,
+       std::vector<unsigned> claddingCellTypes,
+       std::vector<float> refractiveIndices,
+       std::vector<float> reflectivities,
+       std::vector<float> totalReflectionAngles,
+       std::vector<unsigned> trianglePointIndices,
+       std::vector<int> triangleNeighbors,
+       std::vector<unsigned> triangleNormalPoint);
+
+
+  constHybridVector<double>   points;
+  constHybridVector<double>   betaVolume;
+  constHybridVector<double>   normalVec;
+  constHybridVector<double>   centers;
+  constHybridVector<float>    triangleSurfaces;
+  constHybridVector<int>      forbiddenEdge;
+  constHybridVector<double>   betaCells;
+  constHybridVector<unsigned> claddingCellTypes;
+
+  constHybridVector<float>    refractiveIndices; 
+  constHybridVector<float>    reflectivities;   //based on triangleIndex, with offset from bottom/top
+  constHybridVector<float>    totalReflectionAngles;
 
   // Indexstructs
-  unsigned *trianglePointIndices;
-  int *triangleNeighbors;
-  unsigned *triangleNormalPoint;
-
-  // Reflection
-  float  * refractiveIndices; 
-  float  * reflectivities;   //based on triangleIndex, with offset from bottom/top
-  float  * totalReflectionAngles;
+  constHybridVector<unsigned> trianglePointIndices;
+  constHybridVector<int>      triangleNeighbors;
+  constHybridVector<unsigned> triangleNormalPoint;
 
   // Constants
   double claddingAbsorption;
@@ -140,13 +170,8 @@ struct Mesh {
   __device__ __host__ float getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const;
   __device__ __host__ float getReflectionAngle(ReflectionPlane reflectionPlane) const;
 
+  __device__ __host__ void test() const;
 
-  static int parseMultiGPU(Mesh& hMesh, 
-			   std::vector<Mesh>& dMesh, 
-			   std::string root,
-			   std::vector<unsigned> devices,
-			   unsigned maxGpus
-			   );
 };
 
 #endif /* MESH_H */

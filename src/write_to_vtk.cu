@@ -24,8 +24,8 @@ int writeToVtk(const Mesh& mesh,
 	       const float runtime,
          const std::string vtkType){
 
-  const double* vertexCoordinates = mesh.points;
-  const unsigned* triangles       = mesh.trianglePointIndices;
+  const double* vertexCoordinates = mesh.points.toArray();
+  const unsigned* triangles       = mesh.trianglePointIndices.toArray();
   const float    thicknessOfLevel = mesh.thickness;
   const unsigned verticesPerLevel = mesh.numberOfPoints;
   const unsigned trianglesPerLevel= mesh.numberOfTriangles;

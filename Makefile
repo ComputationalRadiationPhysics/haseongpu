@@ -26,13 +26,12 @@ INCLUDES = include
 
 all:	
 	@mkdir -p bin
-	@mkdir -p example/bin
-	@mkdir -p output
-	@mkdir -p input
-	@mkdir -p output/calcPhiAseTmp
-	@mkdir -p output/vtk
+	@mkdir -p example/matlab_example/bin
+	@mkdir -p example/c_example/bin
+	@mkdir -p example/c_example/output
+	@mkdir -p example/c_example/output/vtk
 	@cp src/calcPhiASE.m .
-	@cp src/calcPhiASE.m example/
+	@cp src/calcPhiASE.m example/matlab_example/
 	@make calcPhiASE
 
 bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
@@ -45,7 +44,8 @@ calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o
 	@rm -f bin/link.o
 	@$(NVCC) $(ARCH) bin/*.o -dlink -o bin/link.o
 	@mpic++ bin/*.o -o bin/calcPhiASE $(GCC_FLAGS) $(LIBS)
-	@cp bin/calcPhiASE example/bin/
+	@cp bin/calcPhiASE example/matlab_example/bin
+	@cp bin/calcPhiASE example/c_example/bin
 
 clean:
 	@rm -f bin/*

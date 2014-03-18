@@ -44,11 +44,10 @@
  *             or should be replaced by c++11 threads
  * @return     threadId
  */
-pthread_t calcPhiAseThreaded( unsigned &minRaysPerSample,
+pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
 			      const unsigned maxRaysPerSample,
 			      const unsigned maxRepetitions,
-			      const Mesh& dmesh,
-			      const Mesh& hMesh,
+			      const Mesh& mesh,
 			      const std::vector<double>& sigmaA,
 			      const std::vector<double>& sigmaE,
 			      const double mseThreshold,
@@ -56,9 +55,9 @@ pthread_t calcPhiAseThreaded( unsigned &minRaysPerSample,
 			      std::vector<float> &phiAse,
 			      std::vector<double> &mse,
 			      std::vector<unsigned> &totalRays,
-			      unsigned gpu_i,
-			      unsigned minSample_i,
-			      unsigned maxSample_i,
+			      const unsigned gpu_i,
+			      const unsigned minSample_i,
+			      const unsigned maxSample_i,
 			      float &runtime);
 /**
  * @brief Wait for all threads to finish
