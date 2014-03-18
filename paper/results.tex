@@ -107,15 +107,22 @@ Using neither reflection nor the polychromatic spectrum compensate the discussed
 under and overestimation luckily and matches therefore also the measured 
 values.
 
-The same simulation, reduced to five timesteps, is shown in Figure \ref{graphic:benchmark_4_timeslices}
-It illustrates $\frac{dn}{dt} ASE$ in the sliced gain medium with:
-\[ \frac{dn}{dt}ASE(s_i) = \frac{N_{tot} \cdot (\beta_{cell}(s_i) \cdot (\sigma_a + \sigma_e) - \Phi_{ASE}(s_i))}{\tau_f} \]
+The same simulation, reduced to five timesteps, is shown in Figure \ref{graphic:benchmark_4_timeslices}.
+Using \eqref{eq:phi_ase_daniel} and \eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in the sliced gain medium with:
+
+\begin{equation}
+  \label{eq:dndt}
+  \frac{dn}{dt}\bigg|_{ASE} = \int g_0(\lambda) \cdot \Phi_{ASE}(\lambda)~d\lambda
+\end{equation}
+
+
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
   \caption{sliced gain medium in 5 timessteps}
   \label{graphic:benchmark_4_timeslices}
 \end{figure}
+
 
 \subsection{Benchmarking}
 \label{subsec:benchmarking}
