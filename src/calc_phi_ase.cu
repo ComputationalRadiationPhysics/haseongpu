@@ -6,9 +6,6 @@
 #include <curand_kernel.h>
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-#include <types.h>
 
 #include <write_to_vtk.h>
 #include <calc_phi_ase.h>
@@ -19,6 +16,7 @@
 #include <mesh.h>
 #include <progressbar.h> /*progressBar */
 #include <logging.h>
+#include <thrust_device_vector_nowarn.h>
 
 
 #define SEED 4321

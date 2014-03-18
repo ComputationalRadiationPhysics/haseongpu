@@ -1,6 +1,6 @@
 #include "map_rays_to_prisms.h"
 #include <thrust/scan.h>
-#include <thrust/device_vector.h> 
+#include <thrust_device_vector_nowarn.h> 
 using thrust::device_vector;
 using thrust::host_vector;
 using thrust::raw_pointer_cast;

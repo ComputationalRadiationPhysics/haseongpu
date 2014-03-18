@@ -18,7 +18,7 @@
    Software:
    + make
    + gcc 4.4.1
-   + cuda 5.0
+   + cuda 5.5
 
    Optional:
    + octave / matlab
