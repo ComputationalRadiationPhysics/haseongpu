@@ -6,8 +6,7 @@
 #include <curand_kernel.h>
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
+#include <thrust_device_vector_nowarn.h>
 #include <write_to_vtk.h>
 #include <calc_phi_ase.h>
 #include <map_rays_to_prisms.h>
