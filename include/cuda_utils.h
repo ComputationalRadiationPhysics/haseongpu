@@ -1,9 +1,15 @@
-#ifndef CUDA_UTILS2_H
-#define CUDA_UTILS2_H
+#pragma once
 
 #include <vector>
 #include <iostream>
+
 #include <cudachecks.h>
+#include <logging.h>
+#include <vector>
+
+static const unsigned MIN_COMPUTE_CAPABILITY_MAJOR = 2;
+static const unsigned MIN_COMPUTE_CAPABILITY_MINOR = 0;
+
 
 /**
  * @brief Copy data from host to device
@@ -124,4 +130,15 @@ private:
 
 };
 
-#endif /* CUDA_UTILS_H */
+
+/** 
+ * @brief Queries for devices on the running mashine and collects
+ *        them on the devices array. Set the first device in this 
+ *        array as computation-device. On Errors the programm will
+ *        be stoped by exit(). 
+ * 
+ * @param maxGpus max. devices which should be allocated
+ * @return vector of possible devices
+ */
+std::vector<unsigned> getFreeDevices(unsigned maxGpus);
+

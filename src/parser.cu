@@ -319,7 +319,6 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
   for(unsigned i=0;i<numberOfTriangles;++i){
     totalSurface+=double(surfacesVector.at(i));	
   }
-  //mesh.surfaceTotal = float(totalSurface);
 
   // Vector Preprocessing
   std::vector<double> hostNormalVec(xOfNormals.begin(), xOfNormals.end());
