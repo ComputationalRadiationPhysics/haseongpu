@@ -102,7 +102,6 @@ int main(int argc, char **argv){
   }
 
   // Parse experientdata and fill mesh
-  // TODO remove all dMesh / hMesh function calls by mesh
   std::vector<Mesh> meshs = parseMesh(inputPath, devices, maxGpus);
 
   checkSampleRange(&minSampleRange,&maxSampleRange,meshs[0].numberOfSamples);
@@ -132,7 +131,6 @@ int main(int argc, char **argv){
             maxRaysPerSample,
             maxRepetitions,
             meshs[gpu_i],
-            meshs[0],
             sigmaAInterpolated,
             sigmaEInterpolated,
             mseThreshold,
@@ -159,7 +157,6 @@ int main(int argc, char **argv){
       usedGpus = calcPhiAseMPI( minRaysPerSample,
           maxRaysPerSample,
           maxRepetitions,
-          meshs[0],
           meshs[0],
           sigmaAInterpolated,
           sigmaEInterpolated,

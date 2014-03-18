@@ -10,9 +10,8 @@ struct calcDndtAseArgs
 {
   calcDndtAseArgs(unsigned &phostRaysPerSample,
 		  const unsigned pmaxRaysPerSample,
-      const unsigned pmaxRepetitions,
+		  const unsigned pmaxRepetitions,
 		  const Mesh& pmesh,
-		  const Mesh& phostMesh,
 		  const std::vector<double>& psigmaA,
 		  const std::vector<double>& psigmaE,
 		  const double pMseThreshold,
@@ -27,14 +26,13 @@ struct calcDndtAseArgs
 				    maxRaysPerSample(pmaxRaysPerSample),
 				    maxRepetitions(pmaxRepetitions),
 				    mesh(pmesh),
-				    hostMesh(phostMesh),
 				    sigmaA(psigmaA),
 				    sigmaE(psigmaE),
 				    mseThreshold(pMseThreshold),
 				    useReflections(puseReflections),
 				    phiAse(pphiAse),
 				    mse(pMse),
-            totalRays(pTotalRays),
+				    totalRays(pTotalRays),
 				    gpu_i(pgpu_i),
 				    minSample_i(pminSample_i),
 				    maxSample_i(pmaxSample_i),
@@ -45,7 +43,6 @@ struct calcDndtAseArgs
   const unsigned maxRaysPerSample;
   const unsigned maxRepetitions;
   const Mesh& mesh;
-  const Mesh& hostMesh;
   const std::vector<double>& sigmaA;
   const std::vector<double>& sigmaE;
   const double mseThreshold;
@@ -65,7 +62,6 @@ void *entryPoint(void* arg){
    	      a->maxRaysPerSample,
 	      a->maxRepetitions,
    	      a->mesh,
-   	      a->hostMesh,
    	      a->sigmaA,
    	      a->sigmaE,
    	      a->mseThreshold,
@@ -85,7 +81,6 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      const unsigned maxRaysPerSample,
 			      const unsigned maxRepetitions,
 			      const Mesh& mesh,
-			      const Mesh& hostMesh,
 			      const std::vector<double>& sigmaA,
 			      const std::vector<double>& sigmaE,
 			      const double mseThreshold,
@@ -101,7 +96,6 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 					      maxRaysPerSample,
 					      maxRepetitions,
 					      mesh,
-					      hostMesh,
 					      sigmaA,
 					      sigmaE,
 					      mseThreshold,

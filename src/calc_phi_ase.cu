@@ -52,8 +52,7 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
 float calcPhiAse (const unsigned hMinRaysPerSample,
 		  const unsigned maxRaysPerSample,
 		  const unsigned maxRepetitions,
-		  const Mesh& dMesh,
-		  const Mesh& hMesh,
+		  const Mesh& mesh,
 		  const std::vector<double>& hSigmaA,
 		  const std::vector<double>& hSigmaE,
 		  const double mseThreshold,
@@ -75,7 +74,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
   // variable Definitions CPU
   time_t starttime                = time(0);
-  unsigned maxReflections         = useReflections ? hMesh.getMaxReflections() : 0;
+  unsigned maxReflections         = useReflections ? mesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
@@ -102,10 +101,10 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   device_vector<unsigned> dNumberOfReflectionSlices(maxRaysPerSample, 0);
   device_vector<float>    dGainSum            (1, 0);
   device_vector<float>    dGainSumSquare      (1, 0);
-  device_vector<unsigned> dRaysPerPrism       (hMesh.numberOfPrisms * reflectionSlices, 1);
-  device_vector<unsigned> dPrefixSum          (hMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<double>   dImportance         (hMesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<double>   dPreImportance      (hMesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<unsigned> dRaysPerPrism       (mesh.numberOfPrisms * reflectionSlices, 1);
+  device_vector<unsigned> dPrefixSum          (mesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<double>   dImportance         (mesh.numberOfPrisms * reflectionSlices, 0);
+  device_vector<double>   dPreImportance      (mesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
   device_vector<double>   dSigmaA             (hSigmaA.begin(),hSigmaA.end());
   device_vector<double>   dSigmaE             (hSigmaE.begin(),hSigmaE.end());
@@ -126,7 +125,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
     importanceSamplingPropagation(sample_i,
 				  reflectionSlices,
-				  dMesh,
+				  mesh,
 				  maxSigmaA,
 				  maxSigmaE,
 				  raw_pointer_cast(&dPreImportance[0]), 
@@ -142,7 +141,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	run++;
 
 	hRaysPerSampleDump = importanceSamplingDistribution(reflectionSlices,
-							    dMesh,
+							    mesh,
 							    *raysPerSampleIter,
 							    raw_pointer_cast(&dPreImportance[0]), 
 							    raw_pointer_cast(&dImportance[0]), 
@@ -153,7 +152,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 							    gridDim);
           
 	// Prism scheduling for gpu threads
-	mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflectionSlices, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, hMesh.numberOfPrisms);
+	mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflectionSlices, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, mesh.numberOfPrisms);
 
 	// Start Kernel
 	dGainSum[0]       = 0;
@@ -161,7 +160,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 
 	if(useReflections){
 	  calcSampleGainSumWithReflection<<< gridDim, blockDim >>>(devMTGPStates,
-								   dMesh, 
+								   mesh, 
 								   raw_pointer_cast(&dIndicesOfPrisms[0]), 
 								   raw_pointer_cast(&dNumberOfReflectionSlices[0]), 
 								   raw_pointer_cast(&dImportance[0]),
@@ -176,7 +175,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	}
 	else{
 	  calcSampleGainSum<<< gridDim, blockDim >>>(devMTGPStates,
-						     dMesh, 
+						     mesh, 
 						     raw_pointer_cast(&dIndicesOfPrisms[0]), 
 						     raw_pointer_cast(&dImportance[0]),
 						     hRaysPerSampleDump, 
@@ -213,7 +212,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     }
 
     if(verbosity & V_PROGRESS){
-      fancyProgressBar(hMesh.numberOfSamples);
+      fancyProgressBar(mesh.numberOfSamples);
     }
 
   }
