@@ -8,7 +8,7 @@
 
 struct calcDndtAseArgs 
 {
-  calcDndtAseArgs(unsigned &phostRaysPerSample,
+  calcDndtAseArgs(const unsigned pminRaysPerSample,
 		  const unsigned pmaxRaysPerSample,
 		  const unsigned pmaxRepetitions,
 		  const Mesh& pmesh,
@@ -22,7 +22,7 @@ struct calcDndtAseArgs
 		  unsigned pgpu_i,
 		  unsigned pminSample_i,
 		  unsigned pmaxSample_i,
-		  float &pruntime): hostRaysPerSample(phostRaysPerSample),
+		  float &pruntime): minRaysPerSample(pminRaysPerSample),
 				    maxRaysPerSample(pmaxRaysPerSample),
 				    maxRepetitions(pmaxRepetitions),
 				    mesh(pmesh),
@@ -39,7 +39,7 @@ struct calcDndtAseArgs
 				    runtime(pruntime){
 
   }
-  unsigned &hostRaysPerSample;
+  const unsigned minRaysPerSample;
   const unsigned maxRaysPerSample;
   const unsigned maxRepetitions;
   const Mesh& mesh;
@@ -58,7 +58,7 @@ struct calcDndtAseArgs
 
 void *entryPoint(void* arg){
   calcDndtAseArgs *a = (calcDndtAseArgs*) arg;
-  calcPhiAse( a->hostRaysPerSample,
+  calcPhiAse( a->minRaysPerSample,
    	      a->maxRaysPerSample,
 	      a->maxRepetitions,
    	      a->mesh,
@@ -77,7 +77,7 @@ void *entryPoint(void* arg){
   return arg;
 }
 
-pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
+pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
 			      const unsigned maxRaysPerSample,
 			      const unsigned maxRepetitions,
 			      const Mesh& mesh,
@@ -88,11 +88,11 @@ pthread_t calcPhiAseThreaded( unsigned &hostRaysPerSample,
 			      std::vector<float> &phiAse,
 			      std::vector<double> &mse,
 			      std::vector<unsigned> &totalRays,
-			      unsigned gpu_i,
-			      unsigned minSample_i,
-			      unsigned maxSample_i,
+			      const unsigned gpu_i,
+			      const unsigned minSample_i,
+			      const unsigned maxSample_i,
 			      float &runtime){
-  calcDndtAseArgs *args = new calcDndtAseArgs(hostRaysPerSample,
+  calcDndtAseArgs *args = new calcDndtAseArgs(minRaysPerSample,
 					      maxRaysPerSample,
 					      maxRepetitions,
 					      mesh,

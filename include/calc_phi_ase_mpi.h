@@ -39,7 +39,7 @@
  *
  * @return number of used compute nodes
  */
-float calcPhiAseMPI ( unsigned &minRaysPerSample,
+float calcPhiAseMPI ( const unsigned minRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,
 		      const Mesh& mesh,
@@ -50,6 +50,6 @@ float calcPhiAseMPI ( unsigned &minRaysPerSample,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &hMse,
 		      std::vector<unsigned> &hTotalRays,
-		      unsigned gpu_i);
+		      const unsigned gpu_i);
 
 #endif /* calcPhiAseMPI_H */

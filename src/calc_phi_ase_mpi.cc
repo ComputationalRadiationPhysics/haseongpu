@@ -38,8 +38,8 @@ void mpiHead(std::vector<float> &phiASE,
 	     std::vector<unsigned> &totalRays,
 	     std::vector<float> &runtimes,
 	     const Mesh& mesh,
-	     unsigned numberOfComputeNodes,
-	     int sampleRange){
+	     const unsigned numberOfComputeNodes,
+	     const int sampleRange){
   MPI_Status status;
   float res[RESULT_MSG_LENGTH] = {0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
@@ -104,7 +104,7 @@ void mpiHead(std::vector<float> &phiASE,
  *        sequentially.
  *
  **/
-void mpiCompute(unsigned &hostRaysPerSample,
+void mpiCompute(const unsigned minRaysPerSample,
 		const unsigned maxRaysPerSample,
 		const unsigned maxRepetitions,
 		const Mesh& mesh,
@@ -134,7 +134,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
     }
     else{
       // Sample range received => calculate
-      calcPhiAse ( hostRaysPerSample,
+      calcPhiAse ( minRaysPerSample,
 		   maxRaysPerSample,
 		   maxRepetitions,
 		   mesh,
@@ -167,7 +167,7 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 }
 
-float calcPhiAseMPI ( unsigned &hRaysPerSample,
+float calcPhiAseMPI ( const unsigned minRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,
 		      const Mesh& mesh,
@@ -178,7 +178,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
-		      unsigned gpu_i){
+		      const unsigned gpu_i){
 
   // Init MPI
   int mpiError = MPI_Init(NULL,NULL);
@@ -211,7 +211,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     // (should have similar output anyway)
     verbosity &= ~V_PROGRESS;
 
-    mpiCompute(hRaysPerSample,
+    mpiCompute(minRaysPerSample,
 	       maxRaysPerSample,
 	       maxRepetitions,
 	       mesh,
