@@ -19,3 +19,8 @@ plot\
 "sigma.dat" u 1:3 t "Emission" w lines lw 5 lt 1 lc rgb "green",\
 "sigma.dat" u 1:2 t "Absorption" w lines lw 5 lt 1 lc rgb "red"
 
+# Output as pdf
+set terminal pdfcairo enhanced font "Serif, 14"
+set output "sigma.pdf"
+replot
+
