@@ -25,11 +25,13 @@ Height                  & 0.7 cm\\
 \hline
 Diameter                & 6 cm\\
 \hline
-Material                & $\text{Yb}^{3+}$:YAG\\
+Material                & $\text{Yb}^{3+}$:YAG ceramic\\
+\hline
+$\text{Yb}^{3+}$ doping & $2at.\%$\\
 \hline
 Cladding                & $\text{Cr}^{4+}$:YAG\\
 \hline
-Crystal doping          & $2at.\%$\\
+$\text{Cr}^{4+}$ doping & $0.25at.\%$\\
 \hline
 Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spectrum})\\
 \hline
@@ -60,16 +62,23 @@ and 4 NVIDIA Tesla K20M GPUs with 5GB GDDR5 RAM. Each GPU contains 2496 CUDA cor
 peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE\cite{torque} 
 with Maui\cite{maui} as scheduling backend. 
 
+% Allready explained in simulation data section
+%The modeled gain medium is a
+%\textbf{TODO: Daniel should check/complete the description of the medium} YAG
+%crystal with a square surface of $16cm^2$\textbf{(?)} and a thickness of
+%$0.7cm$\textbf{(?)}. Its upper surface was sampled with 321 points, resulting in
+%600 Delaunay triangles (see section \ref{subsec:meshSampling}). The mesh is
+%extruded 9 times on the vertical axis, amounting to a total of 3210 sample
+%points and 5400 prisms respectively.
+
 \subsection{Validation}
 \label{subsec:validation}
-Validation is an important mechanism to proof correctness for
-the results of a simulated experiment. By comparing the gain 
-of the simulation and the experiment, 
-it is possible to show the impact of reflections and polychromatic
-wavelength. (\textbf{TODO} How were the measured values optained?) Figure \ref{graphic:benchmark_4_timeslices} shows
+We compare the small signal gain at $1030 nm$
+derived by the simulation and the results from an experimental setup described in REF. 
+It is especially interesting to take a look on the impact of the reflections as well as the polychromatic
+approach in our model compared to experimental results. Figure \ref{plot:benchmark} shows
 varying simulation configurations and their influence on the
-gain development over time. Note that the plotted values are
-discrete and just connected with lines to guide to eye.
+gain development over time compared to an experimentally found gain measurement. Note that the plotted values are discrete and just connected with lines to guide the eye.
 
 \begin{figure}[H]
   \centerline{
@@ -83,36 +92,28 @@ discrete and just connected with lines to guide to eye.
   \label{plot:benchmark}
 \end{figure}
 
-On one hand sole simulation with reflections underestimates the gain value,
-because reflecting rays are potentially longer and consequently able
-to absorb more energy from the gain medium. 
-On the other hand sole simulation with a polychromatic spectrum overestimates the
-gain value, because the average emission intensity is lower then with monochromatic
-wavelength on $1030 nm$ (emission peak on Figure \ref{plot:polychromatic_spectrum}), 
-thus the reduced  ASE flux leads to a higher gain.
+Interestingly, monochromatic simulations without reflections show in this particular case very similar, but smaller, gain values when compared to the full case. Adding reflections overestimates the ASE impact in the monochromatic case and consequently shows a too small gain value. This is mainly attributed to reflected ray paths that are in average longer, especially due to total internal reflection, and consequently reduce the stored energy from the gain medium more severely. 
+Simulating only with a polychromatic spectrum overestimates the
+gain value on the other hand. As the average emission intensity is lower than the peak
+value at $1030 nm$ (see Figure \ref{plot:polychromatic_spectrum}), 
+the reduced ASE flux leads to a higher gain.
 
-A simulation configuration with reflection and polychromatic spectrum enabled,
-matches the measured values exactly and validates with this developed simulation.
-Using neither reflection nor the polychromatic spectrum compensate the discussed 
-under and overestimation luckily and matches therefore also the measured 
-values.
+Consequently a simulation configuration with reflection and polychromatic spectrum enabled 
+matches the measured values within the measurement uncertainty and validates our simulation approach.
 
-The same simulation, reduced to five timesteps, is shown in Figure \ref{graphic:benchmark_4_timeslices}.
+For the same simulation Figure \ref{graphic:benchmark_4_timeslices} shows five distinct timesteps.
 Using \eqref{eq:phi_ase_daniel} and \eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in the sliced gain medium with:
 
 \begin{equation}
   \label{eq:dndt}
   \frac{dn}{dt}\bigg|_{ASE} = \int g_0(\lambda) \cdot \Phi_{ASE}(\lambda)~d\lambda
 \end{equation}
-
-
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
   \caption{sliced gain medium in 5 timessteps}
   \label{graphic:benchmark_4_timeslices}
 \end{figure}
-
 
 \subsection{Benchmarking}
 \label{subsec:benchmarking}
