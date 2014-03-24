@@ -116,7 +116,7 @@ dndt_pump = (beta_cell);
 vtk_wedge('beta_cell_0.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
 vtk_wedge('dndt_pump_0.vtk',dndt_pump, p, t_int, mesh_z, z_mesh);
 vtk_wedge('dndt_ASE_0.vtk',dndt_ASE , p, t_int, mesh_z, z_mesh);
-save data_0.mat
+save('save_0.mat');
 
 temp = pump.T;
 time_beta = 1e-6;
