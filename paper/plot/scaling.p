@@ -23,6 +23,11 @@ set term pngcairo enhanced font "Serif, 14"
 set output "scaling.png"
 
 plot \
-"scaling.dat" u 1:(7858/$3) w linespoints t "IS"  lc rgb "blue" lw 3 ps 2 pt 57,\
-"scaling.dat" u 1:(13619/$4) w linespoints t "IS + AS + RS"  lc rgb "orange" lw 3 ps 2 pt 57,\
+"scaling.dat" u 1:(7858/$3) w linespoints t "IS"  lc rgb "blue" lw 4 ps 1.5 pt 57,\
+"scaling.dat" u 1:(13619/$4) w linespoints t "IS + AS + RS"  lc rgb "orange" lw 4 ps 1.5 pt 57,\
 f(x) t "" lc rgb "black"
+
+# Output as pdf
+set terminal pdfcairo enhanced font "Serif, 14"
+set output "scaling.pdf"
+replot

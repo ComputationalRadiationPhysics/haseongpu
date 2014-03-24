@@ -18,7 +18,7 @@
    Software:
    + make
    + gcc 4.4.1
-   + cuda 5.0
+   + cuda 5.5
 
    Optional:
    + octave / matlab
@@ -27,14 +27,17 @@
    Hardware:
    + Nvidia device >= Compute capability 2.0 (at least fermi generation)
 
+
 ## Installation ##
 
    run : make
+
 
 ## Usage ##
 
    * MATLAB compatible interface
    * C-Application interface
+
 
 ## Quick MATLAB laser pump example ##
 
@@ -43,10 +46,25 @@
   can be started by the following:
 
   * run make
-  * change path "cd example/"
-  * run: "matlab laserPumpCladdingExample"
+  * change path "cd example/matlab_example/"
+  * run 
+
+    	matlab laserPumpCladdingExample
+
   * watch progress
   * take a look at the results (*.vtk) with paraview 
+
+
+## Quick C-Application laser pump example ##
+
+  * run make
+  * change path "cd example/c_example/"
+  * run
+
+        ./bin/calcPhiASE --input=./input/cylindrical --output=./output --runmode=threaded --rays=10000
+
+  * watch progress
+
 
 ## MATLAB compatible interface ##
 
@@ -92,6 +110,7 @@
     slice can then be optained by MATLAB with:
     	  
 	  value = values(i,j);
+
 
 ### Input argument description ### 
     In the following all arguments of the MATLAB call are described.
@@ -238,6 +257,7 @@
    * nPerNode
      Number of devices per mpi-node
 
+
 ## Synopsis ##
 
    Command:
@@ -317,15 +337,16 @@
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
-## Example C-Application ##
+
+## C-Application Templates##
 
 * 4 GPUs, 10K to 100K Rays, 4 Repetitions ...
 
 ./bin/calcPhiASE --input=/input/
 		 --output=/tmp/ 
-		 --mode=ray_propagation_gpu 
+		 --runmode=threaded
 		 --rays=10000 
-		 --max_rays=100000 
+		 --maxrays=100000 
 		 --reflection
 		 --repetitions=4
 		 --maxgpu=4
@@ -336,9 +357,9 @@
 * MPI with 4 GPUs per node
 mpiexec -npernode 4 ./bin/calcPhiASE  --input=/input/
 		     		      --output=/tmp/ 
-				      --mode=mpi
+				      --runmode=mpi
 				      --rays=10000 
-				      --max_rays=100000 
+				      --maxrays=100000 
 				      --reflection
 				      --repetitions=4
 				      --maxgpu=1

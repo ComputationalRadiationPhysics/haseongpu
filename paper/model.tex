@@ -109,13 +109,17 @@ This process is iterated for each prism on the path between $r_{i,u}$ and the
 desired sample point $s_i$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
 gain calculation: For each prism $x$, the contribution to the gain is calculated
-as a function of $l_x$:
-
+as a function of $l_x$ with:
 \begin{equation}
 \label{eq:partial_gain}
-  partial\_gain(x) = 
-  e^{N_{tot} \cdot (\beta_x \cdot (\sigma_e + \sigma_a) - \sigma_a)) \cdot l_x}
+  partial\_gain(x) = e^{~g_0 \cdot l_x}
 \end{equation}
+with 
+\begin{equation}
+\label{eq:gain_local}
+  g_0 = N_{tot} \cdot (\beta_x(\sigma_e + \sigma_a) - \sigma_a) 
+\end{equation}
+for the quasi three-level laser \cite{Intro4},
 where $\beta_x$ is the stimulus in the current
 prism and $\sigma_e$, $\sigma_a$ are emission and absorption
 values from a random wavelength over the polychromatic spectrum.

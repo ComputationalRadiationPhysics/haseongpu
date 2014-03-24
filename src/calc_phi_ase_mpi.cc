@@ -37,9 +37,9 @@ void mpiHead(std::vector<float> &phiASE,
 	     std::vector<double> &mse,
 	     std::vector<unsigned> &totalRays,
 	     std::vector<float> &runtimes,
-	     const Mesh& hMesh,
-	     unsigned numberOfComputeNodes,
-	     int sampleRange){
+	     const Mesh& mesh,
+	     const unsigned numberOfComputeNodes,
+	     const int sampleRange){
   MPI_Status status;
   float res[RESULT_MSG_LENGTH] = {0,0,0,0};
   int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
@@ -69,12 +69,12 @@ void mpiHead(std::vector<float> &phiASE,
       phiASE.at(sampleOffset)    = res[1];
       mse.at(sampleOffset)       = res[2];
       totalRays.at(sampleOffset) = (unsigned)res[3];
-      fancyProgressBar(hMesh.numberOfSamples);
+      fancyProgressBar(mesh.numberOfSamples);
       break;
 
       // Compute node requests new sample point for computation
     case SAMPLE_REQUEST_TAG:
-      if(sample_i[0] == (int)hMesh.numberOfSamples){
+      if(sample_i[0] == (int)mesh.numberOfSamples){
 	// No sample points left, abort computation
 	int abortMPI[2] = {-1,-1};
 	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
@@ -82,8 +82,8 @@ void mpiHead(std::vector<float> &phiASE,
       else{
 	// Send next sample range
 	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)hMesh.numberOfSamples); // min_sample_i
-	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)hMesh.numberOfSamples); // max_sample_i
+	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)mesh.numberOfSamples); // min_sample_i
+	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)mesh.numberOfSamples); // max_sample_i
 	
       }
       break;
@@ -104,11 +104,10 @@ void mpiHead(std::vector<float> &phiASE,
  *        sequentially.
  *
  **/
-void mpiCompute(unsigned &hostRaysPerSample,
+void mpiCompute(const unsigned minRaysPerSample,
 		const unsigned maxRaysPerSample,
 		const unsigned maxRepetitions,
-		const Mesh& dMesh,
-		const Mesh& hMesh,
+		const Mesh& mesh,
 		const std::vector<double>& hSigmaA,
 		const std::vector<double>& hSigmaE,
 		const double mseThreshold,
@@ -135,11 +134,10 @@ void mpiCompute(unsigned &hostRaysPerSample,
     }
     else{
       // Sample range received => calculate
-      calcPhiAse ( hostRaysPerSample,
+      calcPhiAse ( minRaysPerSample,
 		   maxRaysPerSample,
 		   maxRepetitions,
-		   dMesh,
-		   hMesh,
+		   mesh,
 		   hSigmaA,
 		   hSigmaE,
 		   mseThreshold,
@@ -169,11 +167,10 @@ void mpiCompute(unsigned &hostRaysPerSample,
 
 }
 
-float calcPhiAseMPI ( unsigned &hRaysPerSample,
+float calcPhiAseMPI ( const unsigned minRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,
-		      const Mesh& dMesh,
-		      const Mesh& hMesh,
+		      const Mesh& mesh,
 		      const std::vector<double>& hSigmaA,
 		      const std::vector<double>& hSigmaE,
 		      const double mseThreshold,
@@ -181,7 +178,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
 		      std::vector<float> &hPhiAse,
 		      std::vector<double> &mse,
 		      std::vector<unsigned> &totalRays,
-		      unsigned gpu_i){
+		      const unsigned gpu_i){
 
   // Init MPI
   int mpiError = MPI_Init(NULL,NULL);
@@ -203,7 +200,7 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
   // all other ranks will be compute nodes
   switch(rank){
   case HEAD_NODE:
-    mpiHead(hPhiAse, mse, totalRays, runtimes, hMesh, size-1, 1);
+    mpiHead(hPhiAse, mse, totalRays, runtimes, mesh, size-1, 1);
     cudaDeviceReset();   
     MPI_Finalize();
     break;
@@ -214,11 +211,10 @@ float calcPhiAseMPI ( unsigned &hRaysPerSample,
     // (should have similar output anyway)
     verbosity &= ~V_PROGRESS;
 
-    mpiCompute(hRaysPerSample,
+    mpiCompute(minRaysPerSample,
 	       maxRaysPerSample,
 	       maxRepetitions,
-	       dMesh,
-	       hMesh,
+	       mesh,
 	       hSigmaA,
 	       hSigmaE,
 	       mseThreshold,

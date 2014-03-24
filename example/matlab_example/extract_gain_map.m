@@ -4,8 +4,20 @@
 % at first try with one distribution
 
 clear all; 
-for i_s=1:50
-    
+tic
+timeslices_tot = 150;
+
+
+for i_s=1:timeslices_tot
+    disp(['TimeSlice ' num2str(i_s)]);
+
+    isOctave = exist('OCTAVE_VERSION') ~= 0;
+    if (isOctave)
+      fflush(stdout);
+    else
+      drawnow('update');
+    end
+
     i_ss = i_s-1;
     
     filename=['save_' num2str(i_ss) '.mat'];
@@ -53,7 +65,12 @@ for i_s=1:50
         % time constants for the pump
         time_step_ex = laser.T/(steps.time-1);
         grid_t_ex = 0:time_step_ex:laser.T;
-        energy_pulse = trapz(grid_t_ex,pulse);
+
+	if (isOctave)
+	  energy_pulse = trapz(grid_t_ex, pulse');
+	else
+          energy_pulse = trapz(grid_t_ex, pulse);
+	end
 
         % energy dump for the plot
         energy_pulse_round(1,1)=energy_pulse;
@@ -101,6 +118,7 @@ end
 % now make an interpolation to make it plotable
 
 %% extract data
-for i_t=1:50
+for i_t=1:timeslices_tot
     gain_line(i_t,1)=gainmap_Interp(7,7,i_t);
 end
+toc

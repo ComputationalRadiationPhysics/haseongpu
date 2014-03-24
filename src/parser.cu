@@ -1,8 +1,13 @@
-#include "parser.h"
+
 #include <string> /* string */
 #include <vector> /* vector */
-#include <logging.h> 
 #include <types.h>
+#include <algorithm>
+#include <assert.h>
+
+#include <logging.h> 
+#include <mesh.h>
+#include <parser.h>
 
 void parseCommandLine(
     const int argc,
@@ -256,4 +261,229 @@ void checkSampleRange(int* minSampleRange, int* maxSampleRange, const unsigned n
     dout(V_ERROR) << "minSample_i is out of range! (There are only " << numberOfSamples << " samples)";
     exit(1);
   }
+}
+
+template <class T, class B, class E>
+void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
+  if(equals){
+    assert(*std::min_element(v.begin(),v.end()) == minElement);
+    assert(*std::max_element(v.begin(),v.end()) == maxElement);
+  }else{
+    assert(*std::min_element(v.begin(),v.end()) >= minElement);
+    assert(*std::max_element(v.begin(),v.end()) <= maxElement);
+  }
+}
+
+template <class T, class B>
+void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
+  if(equals){
+    assert(*std::min_element(v.begin(),v.end()) == minElement);
+  }else{
+    assert(*std::min_element(v.begin(),v.end()) >= minElement);
+  }
+}
+
+/**
+ * @brief fills a device mesh with the correct datastructures
+ *
+ * See parseMultiGPU for details on the parameters
+ */
+Mesh createMesh(const std::vector<unsigned> &triangleIndices, 
+		const unsigned numberOfTriangles, 
+		const unsigned numberOfLevels,
+		const unsigned numberOfPoints, 
+		const float thicknessOfPrism,
+		std::vector<double> &pointsVector, 
+		std::vector<double> &xOfTriangleCenter, 
+		std::vector<double> &yOfTriangleCenter, 
+		std::vector<unsigned> &positionsOfNormalVectors,
+		std::vector<double> &xOfNormals, 
+		std::vector<double> &yOfNormals,
+		std::vector<int> &forbiddenVector, 
+		std::vector<int> &neighborsVector, 
+		std::vector<float> &surfacesVector,
+		std::vector<double> &betaValuesVector,
+		std::vector<double> &betaCells,
+		std::vector<unsigned> &cellTypes,
+		std::vector<float> & refractiveIndices,
+		std::vector<float> & reflectivities,
+		const float nTot,
+		const float crystalFluorescence,
+		const unsigned cladNumber,
+		const double cladAbsorption
+	       ) {
+
+  // GPU variables
+  double totalSurface = 0.;
+
+  for(unsigned i=0;i<numberOfTriangles;++i){
+    totalSurface+=double(surfacesVector.at(i));	
+  }
+
+  // Vector Preprocessing
+  std::vector<double> hostNormalVec(xOfNormals.begin(), xOfNormals.end());
+  hostNormalVec.insert(hostNormalVec.end(),yOfNormals.begin(),yOfNormals.end());
+  std::vector<double> hostCenters(xOfTriangleCenter.begin(), xOfTriangleCenter.end());
+  hostCenters.insert(hostCenters.end(),yOfTriangleCenter.begin(),yOfTriangleCenter.end());
+  std::vector<float> totalReflectionAngles(refractiveIndices.size()/2,0);
+  for(unsigned i=0;i<refractiveIndices.size();i+=2){
+    totalReflectionAngles.at(i/2) = (180. / M_PI *  asin(refractiveIndices.at(i+1) / refractiveIndices.at(i)));
+  }
+
+   Mesh mesh( cladAbsorption,
+	     totalSurface,
+	     thicknessOfPrism,
+	     nTot,
+	     crystalFluorescence,
+	     numberOfTriangles,
+	     numberOfLevels,
+	     numberOfTriangles * (numberOfLevels-1),
+	     numberOfPoints,
+	     numberOfPoints * numberOfLevels,
+	     cladNumber,
+	     pointsVector,
+	     hostNormalVec,
+	     betaValuesVector,
+	     hostCenters,
+	     surfacesVector,
+	     forbiddenVector,
+	     betaCells,
+	     cellTypes,
+	     refractiveIndices,
+	     reflectivities,
+	     totalReflectionAngles,
+	     triangleIndices,
+	     neighborsVector,
+	     positionsOfNormalVectors);
+  return mesh;
+
+}
+
+/**
+ *
+ */
+std::vector<Mesh> parseMesh(std::string rootPath,
+			    std::vector<unsigned> devices,
+			    unsigned maxGpus) {
+
+  std::vector<Mesh> meshs;
+
+  // Experimentdata
+  std::vector<double>  betaVolume;
+  std::vector<double>  triangleNormalsX;
+  std::vector<double>  triangleNormalsY;
+  std::vector<unsigned>  trianglePointIndices;
+  std::vector<int>  forbiddenEdge;
+  std::vector<int>  triangleNeighbors;
+  std::vector<unsigned> triangleNormalPoint;
+  std::vector<double>  points;
+  std::vector<float>  triangleSurfaces;
+  std::vector<double> triangleCenterX;
+  std::vector<double> triangleCenterY;
+  std::vector<double>  betaCells;
+  std::vector<unsigned>  claddingCellTypes;
+  std::vector<float>  refractiveIndices;
+  std::vector<float>  reflectivities;
+
+  unsigned numberOfPoints = 0;
+  unsigned numberOfTriangles = 0;
+  unsigned numberOfLevels = 0;
+  unsigned claddingNumber;
+  float thickness = 1;
+  float nTot = 0;
+  float crystalTFluo = 0;
+  double claddingAbsorption = 0;
+
+  // Parse experimentdata from files
+  if(fileToVector(rootPath + "triangleNormalPoint.txt", &triangleNormalPoint)) return meshs;
+  if(fileToVector(rootPath + "betaVolume.txt", &betaVolume)) return meshs;
+  if(fileToVector(rootPath + "forbiddenEdge.txt", &forbiddenEdge)) return meshs;
+  if(fileToVector(rootPath + "triangleNeighbors.txt", &triangleNeighbors)) return meshs;
+  if(fileToVector(rootPath + "triangleNormalsX.txt", &triangleNormalsX)) return meshs;
+  if(fileToVector(rootPath + "triangleNormalsY.txt", &triangleNormalsY)) return meshs;
+  if(fileToVector(rootPath + "triangleCenterX.txt", &triangleCenterX)) return meshs;
+  if(fileToVector(rootPath + "triangleCenterY.txt", &triangleCenterY)) return meshs;
+  if(fileToVector(rootPath + "points.txt", &points)) return meshs;
+  if(fileToVector(rootPath + "trianglePointIndices.txt", &trianglePointIndices)) return meshs;
+  if(fileToVector(rootPath + "triangleSurfaces.txt", &triangleSurfaces)) return meshs;
+  if(fileToValue(rootPath  + "numberOfPoints.txt", numberOfPoints)) return meshs;
+  if(fileToValue(rootPath  + "numberOfTriangles.txt", numberOfTriangles)) return meshs;
+  if(fileToValue(rootPath  + "numberOfLevels.txt", numberOfLevels)) return meshs;
+  if(fileToValue(rootPath  + "thickness.txt", thickness)) return meshs;
+  if(fileToValue(rootPath  + "nTot.txt", nTot)) return meshs;
+  if(fileToValue(rootPath  + "crystalTFluo.txt", crystalTFluo)) return meshs;
+  if(fileToValue(rootPath  + "claddingNumber.txt", claddingNumber)) return meshs;
+  if(fileToValue(rootPath  + "claddingAbsorption.txt", claddingAbsorption)) return meshs;
+  if(fileToVector(rootPath + "betaCells.txt", &betaCells)) return meshs;
+  if(fileToVector(rootPath + "claddingCellTypes.txt", &claddingCellTypes)) return meshs;
+  if(fileToVector(rootPath + "refractiveIndices.txt", &refractiveIndices)) return meshs;
+  if(fileToVector(rootPath + "reflectivities.txt", &reflectivities)) return meshs;
+
+  // assert input sizes
+  assert(numberOfPoints == (points.size() / 2));
+  assert(numberOfTriangles == trianglePointIndices.size() / 3);
+  assert(triangleNormalPoint.size() == numberOfTriangles * 3);
+  assert(triangleCenterY.size() == numberOfTriangles);
+  assert(triangleCenterX.size() == numberOfTriangles);
+  assert(triangleSurfaces.size() == numberOfTriangles);
+  assert(betaVolume.size() == numberOfTriangles * (numberOfLevels-1));
+  assert(triangleNormalsX.size() == numberOfTriangles * 3);
+  assert(triangleNormalsY.size() == numberOfTriangles * 3);
+  assert(trianglePointIndices.size() == numberOfTriangles * 3);
+  assert(forbiddenEdge.size() == numberOfTriangles * 3);
+  assert(triangleNeighbors.size() == numberOfTriangles * 3);
+  assert(betaCells.size() == numberOfPoints * numberOfLevels);
+  assert(claddingCellTypes.size()== numberOfTriangles);
+  assert(refractiveIndices.size() == 4);
+  assert(reflectivities.size() == (refractiveIndices.size()/2) * numberOfTriangles);
+  assert(claddingCellTypes.size() == numberOfTriangles);
+
+  // assert input data validity
+  assertRange(triangleNormalPoint,0u,unsigned(numberOfPoints-1),true);
+  assertMin(betaVolume,0,false);
+  assertRange(forbiddenEdge,-1,2,true);
+  assertRange(triangleNeighbors,-1,int(numberOfTriangles-1),true);
+  assertRange(triangleNormalsX,-1,1,false);
+  assertRange(triangleNormalsY,-1,1,false);
+  assertRange(triangleCenterX,*std::min_element(points.begin(),points.end()),*std::max_element(points.begin(),points.end()),false);
+  assertRange(triangleCenterY,*std::min_element(points.begin(),points.end()),*std::max_element(points.begin(),points.end()),false);
+  assertRange(trianglePointIndices,0u,unsigned(numberOfPoints-1),true);
+  assertMin(triangleSurfaces,0,false);
+  assertMin(betaCells,0,false);
+  assertRange(refractiveIndices,0,5,false);
+  assertRange(reflectivities,0,1,false);
+
+  for( unsigned i=0; i < maxGpus; i++){
+    CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
+    meshs.push_back(
+		    createMesh(trianglePointIndices,
+			       numberOfTriangles,
+			       numberOfLevels,
+			       numberOfPoints,
+			       thickness,
+			       points,
+			       triangleCenterX,
+			       triangleCenterY,
+			       triangleNormalPoint,
+			       triangleNormalsX,
+			       triangleNormalsY,
+			       forbiddenEdge,
+			       triangleNeighbors,
+			       triangleSurfaces,
+			       betaVolume,
+			       betaCells,
+			       claddingCellTypes,
+			       refractiveIndices,
+			       reflectivities,
+			       nTot,
+			       crystalTFluo,
+			       claddingNumber,
+			       claddingAbsorption
+			       )
+		    );
+    cudaDeviceSynchronize();
+  }
+
+  return meshs;
+
 }

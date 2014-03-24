@@ -61,8 +61,6 @@ mode.extr =0;  %no extraction!!
 const.N1per = 1.38e20;
 const.c = 3e8;
 const.h = 6.626e-34;
-minRaysPerSample = 1e4;
-minRaysPerSample = int32(minRaysPerSample);
 N_tot = const.N1per*crystal.doping;
 Ntot_gradient = zeros(crystal.levels, 1);      % doping gradient if not given by load!
 Ntot_gradient(:) = crystal.doping*const.N1per;
@@ -74,15 +72,16 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 4;
+maxGPUs           = 1;
 nPerNode          = 4;
-%runmode           = 'mpi';
-runmode          = 'ray_propagation_gpu';
-useReflections    = false;
+runmode           = 'mpi';
+%runmode          = 'threaded';
+useReflections    = true;
 refractiveIndices = [1.83,1,1.83,1];
 repetitions       = 4;
-maxRaysPerSample  = minRaysPerSample * 10;
-mseThreshold      = 0.05;
+minRaysPerSample  = 1e5;
+maxRaysPerSample  = minRaysPerSample * 100;
+mseThreshold      = 0.005;
 
 
 % Constants for short use
