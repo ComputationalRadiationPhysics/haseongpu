@@ -75,10 +75,11 @@ with Maui\cite{maui} as scheduling backend.
 \label{subsec:validation}
 We compare the small signal gain at $1030 nm$
 derived by the simulation and the results from an experimental setup described in REF. 
-It is especially interesting to take a look on the impact of the reflections as well as the polychromatic
+It is especially interesting to take a look at the impact of the reflections as well as the polychromatic
 approach in our model compared to experimental results. Figure \ref{plot:benchmark} shows
 varying simulation configurations and their influence on the
-gain development over time compared to an experimentally found gain measurement. Note that the plotted values are discrete and just connected with lines to guide the eye.
+gain development over time, compared to an experimentally found gain measurement.
+Note that the plotted values are discrete and just connected with lines to guide the eye.
 
 \begin{figure}[H]
   \centerline{
@@ -92,14 +93,20 @@ gain development over time compared to an experimentally found gain measurement.
   \label{plot:benchmark}
 \end{figure}
 
-Interestingly, monochromatic simulations without reflections show in this particular case very similar, but smaller, gain values when compared to the full case. Adding reflections overestimates the ASE impact in the monochromatic case and consequently shows a too small gain value. This is mainly attributed to reflected ray paths that are in average longer, especially due to total internal reflection, and consequently reduce the stored energy from the gain medium more severely. 
-Simulating only with a polychromatic spectrum overestimates the
-gain value on the other hand. As the average emission intensity is lower than the peak
+Interestingly, in this particular case, monochromatic simulations without reflections (d) show very similar,
+but smaller, gain values when compared to the polychromatic simulation with reflections (c). 
+Adding reflections (e) overestimates the ASE impact
+in the monochromatic case and consequently shows a too small gain value. This is mainly attributed to
+reflected ray paths that are longer in average, especially due to total internal reflection.
+Thus, the stored energy from the gain medium is reduced more severely. 
+Simulating only with a polychromatic spectrum (a) overestimates the
+gain value. As the average emission intensity is lower than the peak
 value at $1030 nm$ (see Figure \ref{plot:polychromatic_spectrum}), 
 the reduced ASE flux leads to a higher gain.
 
-Consequently a simulation configuration with reflection and polychromatic spectrum enabled 
-matches the measured values within the measurement uncertainty and validates our simulation approach.
+Consequently, a simulation configuration with reflection and polychromatic spectrum (c) enabled 
+matches the measured values (b) within the measurement uncertainty and validates our simulation approach.
+
 
 For the same simulation Figure \ref{graphic:benchmark_4_timeslices} shows five distinct timesteps.
 Using \eqref{eq:phi_ase_daniel} and \eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in the sliced gain medium with:
