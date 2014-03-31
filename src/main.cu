@@ -1,3 +1,31 @@
+/**
+ * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ *
+ * This file is part of HASEonGPU
+ *
+ * HASEonGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * HASEonGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with HASEonGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * @mainpage HASEonGPU-Frame
+ *
+ * Project with HZDR for porting their ASE-code to a GPU cluster.
+ *
+ * @author Erik Zenker, Carlchristian Eckert, Marius Melzer
+ */
+
 // Libraries
 #include <assert.h> /* assert */
 #include <string> /* string */
@@ -107,9 +135,9 @@ int main(int argc, char **argv){
   checkSampleRange(&minSampleRange,&maxSampleRange,meshs[0].numberOfSamples);
 
   // Solution vector
-  std::vector<double> dndtAse(meshs[0].numberOfSamples, 0);
-  std::vector<float>  phiAse(meshs[0].numberOfSamples, 0);
-  std::vector<double> mse(meshs[0].numberOfSamples, 100000);
+  std::vector<double>   dndtAse(meshs[0].numberOfSamples, 0);
+  std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
+  std::vector<double>   mse(meshs[0].numberOfSamples, 100000);
   std::vector<unsigned> totalRays(meshs[0].numberOfSamples, 0);
 
   // Run Experiment
@@ -117,92 +145,92 @@ int main(int argc, char **argv){
   std::vector<float> runtimes(maxGpus, 0);
   switch(mode){
     // TODO: Replace completly by MPI
-    case GPU_THREADED:
-      for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-        const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
-        const float samplePerGpu = samplesPerNode / (float) maxGpus;
-        unsigned minSample_i = gpu_i * samplePerGpu;
-        unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
+  case GPU_THREADED:
+    for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+      const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
+      const float samplePerGpu = samplesPerNode / (float) maxGpus;
+      unsigned minSample_i = gpu_i * samplePerGpu;
+      unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
-        minSample_i += minSampleRange;
-        maxSample_i += minSampleRange; 
+      minSample_i += minSampleRange;
+      maxSample_i += minSampleRange; 
 
-        threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
-            maxRaysPerSample,
-            maxRepetitions,
-            meshs[gpu_i],
-            sigmaAInterpolated,
-            sigmaEInterpolated,
-            mseThreshold,
-            useReflections,
-            phiAse, 
-            mse, 
-            totalRays,
-            devices.at(gpu_i),
-            minSample_i,
-            maxSample_i,
-            runtimes.at(gpu_i)
-            );
-      }
-      joinAll(threadIds);
-      usedGpus = maxGpus;
-      for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
-        runtime = max(*it, runtime);
-      }
-      cudaDeviceReset();      
-      runmode="Ray Propagation GPU";
-      break;
+      threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
+					     maxRaysPerSample,
+					     maxRepetitions,
+					     meshs[gpu_i],
+					     sigmaAInterpolated,
+					     sigmaEInterpolated,
+					     mseThreshold,
+					     useReflections,
+					     phiAse, 
+					     mse, 
+					     totalRays,
+					     devices.at(gpu_i),
+					     minSample_i,
+					     maxSample_i,
+					     runtimes.at(gpu_i)
+					     );
+    }
+    joinAll(threadIds);
+    usedGpus = maxGpus;
+    for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
+      runtime = max(*it, runtime);
+    }
+    cudaDeviceReset();      
+    runmode="Ray Propagation GPU";
+    break;
 
-    case GPU_MPI:
-      usedGpus = calcPhiAseMPI( minRaysPerSample,
-          maxRaysPerSample,
-          maxRepetitions,
-          meshs[0],
-          sigmaAInterpolated,
-          sigmaEInterpolated,
-          mseThreshold,
-          useReflections,
-          phiAse,
-          mse,
-          totalRays,
-          devices.at(0)
-          );
-      runmode = "RAY PROPAGATION MPI";
-      break;
+  case GPU_MPI:
+    usedGpus = calcPhiAseMPI( minRaysPerSample,
+			      maxRaysPerSample,
+			      maxRepetitions,
+			      meshs[0],
+			      sigmaAInterpolated,
+			      sigmaEInterpolated,
+			      mseThreshold,
+			      useReflections,
+			      phiAse,
+			      mse,
+			      totalRays,
+			      devices.at(0)
+			      );
+    runmode = "RAY PROPAGATION MPI";
+    break;
 
-    case CPU: //Possibly deprecated!
-      // TODO: make available for MPI?
-      runtime = forLoopsClad( &dndtAse,
-          minRaysPerSample,
-          &meshs[0],
-          meshs[0].betaCells,
-          meshs[0].nTot,
-          sigmaA.at(0),
-          sigmaE.at(0),
-          meshs[0].numberOfPoints,
-          meshs[0].numberOfTriangles,
-          meshs[0].numberOfLevels,
-          meshs[0].thickness,
-          meshs[0].crystalTFluo);
-      runmode = "For Loops";
-      break;
+  case CPU: //Possibly deprecated!
+    // TODO: make available for MPI?
+    runtime = forLoopsClad( &dndtAse,
+			    minRaysPerSample,
+			    &meshs[0],
+			    meshs[0].betaCells,
+			    meshs[0].nTot,
+			    sigmaA.at(0),
+			    sigmaE.at(0),
+			    meshs[0].numberOfPoints,
+			    meshs[0].numberOfTriangles,
+			    meshs[0].numberOfLevels,
+			    meshs[0].thickness,
+			    meshs[0].crystalTFluo);
+    runmode = "For Loops";
+    break;
 
-    default:
-      dout(V_ERROR) << "No valid runmode!" << std::endl;
-      exit(0);
+  default:
+    dout(V_ERROR) << "No valid runmode!" << std::endl;
+    exit(0);
   }
 
   // Print Solution
   if(verbosity & V_DEBUG){
-      for(unsigned sample_i = 0; sample_i < meshs[0].numberOfSamples; ++sample_i){
-        dndtAse.at(sample_i) = calcDndtAse(meshs[0], maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
-        if(sample_i <=10)
-          dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sample_i) << " " << mse.at(sample_i) << std::endl;
-      }
-      for(unsigned sample_i = 0; sample_i < meshs[0].numberOfSamples; ++sample_i){
-        dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sample_i) << " " << mse.at(sample_i) <<std::endl;
-        if(sample_i >= 10) break;
-      }
+    for(unsigned sample_i = 0; sample_i < meshs[0].numberOfSamples; ++sample_i){
+      dndtAse.at(sample_i) = calcDndtAse(meshs[0], maxSigmaA, maxSigmaE, phiAse.at(sample_i), sample_i);
+      if(sample_i <=10)
+	dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << dndtAse.at(sample_i) << " " << mse.at(sample_i) << std::endl;
+    }
+    for(unsigned sample_i = 0; sample_i < meshs[0].numberOfSamples; ++sample_i){
+      dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << phiAse.at(sample_i) << " " << mse.at(sample_i) <<std::endl;
+      if(sample_i >= 10) break;
+    }
   }
 
   // Write experiment data
