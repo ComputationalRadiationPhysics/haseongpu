@@ -1,11 +1,11 @@
- HASEonGPU - Licenses
+ HASENonGPU - Licenses
 ================================================================================
 
 **Copyright 2014** Erik Zenker, Carlchristian Eckert, Marius Melzer,
 	    	       Daniel Albach
 
 
-HASEonGPU is a fast GPU-implementation of a Monte-Carlo
+HASENonGPU is a fast GPU-implementation of a Monte-Carlo
 based ASE-Flux simulation
 
 

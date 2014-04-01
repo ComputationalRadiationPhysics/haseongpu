@@ -1,7 +1,7 @@
-HASEonGPU 
+HASENonGPU 
 =======================================
 
-   **H**igh performance **A**mplified **S**pontaneous **E**mission **on GPU**
+   **H**igh performance **A**mplified **S**pontaneous **E**missio**N** **on GPU**
 
 Description
 -----------
@@ -10,13 +10,13 @@ Description
 Referencing
 -----------
 
-   HASEonGPU is a *scientific project*. If you **present and/or publish** scientific
-   results that used HASEonGPU, you should set this as a **reference**.
+   HASENonGPU is a *scientific project*. If you **present and/or publish** scientific
+   results that used HASENonGPU, you should set this as a **reference**.
 
 Software License
 ----------------
 
-   *HASEonGPU* is licensed under the **GPLv3+**.
+   *HASENonGPU* is licensed under the **GPLv3+**.
    Please refer to our [LICENSE.md](LICENSE.md)
 
 
