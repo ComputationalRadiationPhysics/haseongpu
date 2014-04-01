@@ -19,15 +19,17 @@
  */
 
 
-#include "write_to_vtk.h"
+
 #include <fstream> /* ofstream */
 #include <vector> /* vector */
 #include <iomanip> /* std::setprecision() */
-#include <mesh.h>
 #include <string>
 #include <time.h> /* time, time_t */
 #include <sstream> /* std::stringstream */
-#include <logging.h>
+
+#include <write_to_vtk.hpp>
+#include <logging.hpp>
+#include <mesh.hpp>
 
 
 /** 

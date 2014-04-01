@@ -27,10 +27,8 @@
  *
  */
 
-#ifndef importance_sampling_H
-#define importance_sampling_H
-
-#include <mesh.h>
+#pragma once
+#include <mesh.hpp>
 
 /**
  * @brief Calculates preImportance which needs only to be done once.
@@ -86,4 +84,3 @@ unsigned importanceSamplingDistribution(const unsigned reflectionSlices,
 					dim3 blockDim,
 					dim3 gridDim);
 
-#endif /* importance_sampling_H */

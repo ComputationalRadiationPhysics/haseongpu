@@ -34,10 +34,10 @@ all:
 	@cp src/calcPhiASE.m example/matlab_example/
 	@make calcPhiASE
 
-bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.h
+bin/calc_phi_ase_mpi.o: src/calc_phi_ase_mpi.cc include/calc_phi_ase_mpi.hpp
 	@CPLUS_INCLUDE_PATH=/opt/pkg/devel/cuda/5.0/include mpic++ -Wall -Wextra -Werror -lm -c $< -I $(INCLUDES) -o bin/calc_phi_ase_mpi.o
 
-bin/%.o: src/%.cu $(wildcard include/*.h)
+bin/%.o: src/%.cu $(wildcard include/*.hpp)
 	@$(NVCC) -dc $< -odir bin --include-path $(INCLUDES) $(ARCH) $(NVCC_FLAGS) $(DEV_FLAGS)  $(DEBUG_FLAGS) $(FINAL_BUILD)
 
 calcPhiASE: $(OBJS) Makefile bin/calc_phi_ase_mpi.o

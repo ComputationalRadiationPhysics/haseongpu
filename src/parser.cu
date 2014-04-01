@@ -22,13 +22,13 @@
 
 #include <string> /* string */
 #include <vector> /* vector */
-#include <types.h>
 #include <algorithm>
 #include <assert.h>
 
-#include <logging.h> 
-#include <mesh.h>
-#include <parser.h>
+#include <types.hpp>
+#include <logging.hpp> 
+#include <mesh.hpp>
+#include <parser.hpp>
 
 void parseCommandLine(
     const int argc,

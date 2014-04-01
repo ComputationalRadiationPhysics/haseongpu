@@ -19,22 +19,13 @@
  */
 
 
-#include <mesh.h>
+#pragma once
+#ifndef __GCC__
+#pragma GCC diagnostic push 
+#pragma GCC diagnostic ignored "-Wunused-parameter" 
+#endif
+#include <thrust/host_vector.h>
+#ifndef __GCC__
+#pragma GCC diagnostic pop
+#endif
 
-#ifndef for_loops_clad_H
-#define for_loops_clad_H
-float forLoopsClad(
-	std::vector<double> *dndtAse,
-	unsigned &raysPerSample,
-	Mesh *mesh,
-	double *betaCells,
-	float hostNTot,
-	double hostSigmaA,
-	double hostSigmaE,
-	unsigned hostNumberOfPoints,
-	unsigned hostNumberOfTriangles,
-	unsigned hostNumberOfLevels,
-	float hostThicknessOfPrism,
-	float hostCrystalFluorescence	);
-
-#endif /* for_loops_clad_H */

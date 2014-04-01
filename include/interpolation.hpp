@@ -19,19 +19,12 @@
  */
 
 
-#ifndef THRUST_NO_WARNINGS_CUSTOM_DEVICE_VECTOR
-#define THRUST_NO_WARNINGS_CUSTOM_DEVICE_VECTOR
+#pragma once
+#include <vector>
 
-#ifndef __GNUC__
-#pragma GCC diagnostic push 
-#pragma GCC diagnostic ignored "-Wunused-parameter" 
-#endif
+#define MAX_INTERPOLATION 1000
+#define LAMBDA_START 905
+#define LAMBDA_STOP 1095
 
-#include <thrust/device_vector.h>
+std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop);
 
-#ifndef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
-
-#endif

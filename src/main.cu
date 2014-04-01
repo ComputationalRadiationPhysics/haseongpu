@@ -38,22 +38,22 @@
 #include <stdexcept>
 
 // User header files
-#include <calc_phi_ase.h>
-#include <calc_phi_ase_threaded.h>
-#include <calc_phi_ase_mpi.h>
-#include <parser.h> /* RunMode */
-#include <write_to_vtk.h>
-#include <write_matlab_output.h>
-#include <for_loops_clad.h>
-#include <cudachecks.h>
-#include <mesh.h>
-#include <cuda_utils.h> /* getFreeDevices */
-#include <logging.h>
-#include <ray_histogram.h>
-#include <interpolation.h> /* interpolateWavelength*/
+#include <calc_phi_ase.hpp>
+#include <calc_phi_ase_threaded.hpp>
+#include <calc_phi_ase_mpi.hpp>
+#include <parser.hpp> /* RunMode */
+#include <write_to_vtk.hpp>
+#include <write_matlab_output.hpp>
+#include <for_loops_clad.hpp>
+#include <cudachecks.hpp>
+#include <mesh.hpp>
+#include <cuda_utils.hpp> /* getFreeDevices */
+#include <logging.hpp>
+#include <ray_histogram.hpp>
+#include <interpolation.hpp> /* interpolateWavelength*/
 
 // default without V_DEBUG
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.h
+unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
 
 /** 
  * @brief Calculates dndt ASE from phi ASE values

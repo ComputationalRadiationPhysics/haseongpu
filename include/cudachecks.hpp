@@ -19,9 +19,7 @@
  */
 
 
-#ifndef CUDACHECKS_H
-#define CUDACHECKS_H 
-
+#pragma once
 #include <stdio.h> /* fprintf, printf, stderr */
 #include <cuda_runtime_api.h> /* cuda constants etc. */
 #include <stdlib.h> /* exit */
@@ -48,4 +46,3 @@
       printf("Error at %s:%d\n",__FILE__,__LINE__);		\
       return EXIT_FAILURE;}} while(0)
 
-#endif /* CUDACHECKS_H */

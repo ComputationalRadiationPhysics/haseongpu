@@ -19,12 +19,11 @@
  */
 
 
-#include <interpolation.h>
-#include <logging.h>
-
 #include <vector>
 #include <assert.h>
 
+#include <interpolation.hpp>
+#include <logging.hpp>
 
 /**
  * @brief Returns the index of an value in vector v,

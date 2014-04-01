@@ -36,11 +36,9 @@
  *
  */
 
-#ifndef propagate_ray_H
-#define propagate_ray_H
-
-#include <mesh.h>
-#include <reflection.h> /* ReflectionPlane */
+#pragma once
+#include <mesh.hpp>
+#include <reflection.hpp> /* ReflectionPlane */
 
 /**
  * @brief Direct ray propagation without reflection
@@ -93,6 +91,5 @@ __device__ double propagateRayWithReflection(Point startPoint,
 					     const double sigmaA, 
 					     const double sigmaE);
 
-#endif /* propagate_ray_H */
 
 

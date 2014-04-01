@@ -20,13 +20,12 @@
 
 
 #pragma once
-
 #include <vector>
 #include <iostream>
 
-#include <cudachecks.h>
-#include <logging.h>
-#include <vector>
+#include <cudachecks.hpp>
+#include <logging.hpp>
+
 
 static const unsigned MIN_COMPUTE_CAPABILITY_MAJOR = 2;
 static const unsigned MIN_COMPUTE_CAPABILITY_MINOR = 0;

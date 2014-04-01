@@ -21,10 +21,11 @@
 
 #include <iostream>
 #include <iomanip>
-#include <logging.h>
 #include <vector>
-#include <types.h>
 #include <map>
+
+#include <logging.hpp>
+#include <types.hpp>
 
 void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const double mseThreshold, const std::vector<double> mseValues){
   // length of the maximum number of samples (e.g. max==4210)

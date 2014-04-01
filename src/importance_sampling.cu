@@ -18,17 +18,17 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <importance_sampling.h>
-#include <mesh.h>
 #include <stdio.h>
-#include <propagate_ray.h>
-#include <geometry.h>
 #include <assert.h>
 #include <curand_kernel.h>
-#include <cudachecks.h>
-#include <cuda_utils.h>
-#include <reflection.h> /* ReflectionPlane */
+
+#include <importance_sampling.hpp>
+#include <mesh.hpp>
+#include <propagate_ray.hpp>
+#include <geometry.hpp>
+#include <cudachecks.hpp>
+#include <cuda_utils.hpp>
+#include <reflection.hpp> /* ReflectionPlane */
 
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism

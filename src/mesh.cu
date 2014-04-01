@@ -27,10 +27,10 @@
 #include <cmath>
 #include <algorithm>
 
-#include <cudachecks.h>
-#include <mesh.h>
-#include <parser.h>
-#include <reflection.h>
+#include <cudachecks.hpp>
+#include <mesh.hpp>
+#include <parser.hpp>
+#include <reflection.hpp>
 
 
 template <class T, class B, class E>

@@ -18,14 +18,13 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <calc_phi_ase_threaded.h>
 #include <vector>
 #include <iostream>
 #include <pthread.h>
 
-#include <mesh.h>
-#include <calc_phi_ase.h>
+#include <calc_phi_ase_threaded.hpp>
+#include <mesh.hpp>
+#include <calc_phi_ase.hpp>
 
 struct calcDndtAseArgs 
 {

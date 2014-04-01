@@ -23,7 +23,8 @@
  * @author Carlchristian Eckert
  * @license GPLv3
  */
-#include <thrust_device_vector_nowarn.h>
+#pragma once
+#include <thrust_device_vector_nowarn.hpp>
 
 /**
  * @brief takes an array of values and writes it into a unary representation. The value

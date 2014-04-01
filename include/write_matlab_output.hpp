@@ -19,9 +19,7 @@
  */
 
 
-#ifndef WRITE_DNDT_ASE_H
-#define WRITE_DNDT_ASE_H
-
+#pragma once
 #include <vector>
 #include <string>
 
@@ -51,4 +49,3 @@ void writeMatlabOutput(
     const unsigned numberOfLevels
     );
 
-#endif 

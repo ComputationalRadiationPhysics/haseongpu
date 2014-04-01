@@ -19,15 +19,16 @@
  */
 
 
-#ifndef INTERPOLATION_H
-#define INTERPOLATION_H
+#pragma once
+#ifndef __GNUC__
+#pragma GCC diagnostic push 
+#pragma GCC diagnostic ignored "-Wunused-parameter" 
+#endif
 
-#include <vector>
+#include <thrust/device_vector.h>
 
-#define MAX_INTERPOLATION 1000
-#define LAMBDA_START 905
-#define LAMBDA_STOP 1095
+#ifndef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
-std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop);
 
-#endif /* INTERPOLATION_H */

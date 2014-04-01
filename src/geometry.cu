@@ -19,7 +19,7 @@
  */
 
 
-#include "geometry.h"
+#include "geometry.hpp"
 
 __host__ __device__ Vector direction(Point startPoint, Point endPoint){
   Vector v = {endPoint.x - startPoint.x, endPoint.y - startPoint.y, endPoint.z - startPoint.z};

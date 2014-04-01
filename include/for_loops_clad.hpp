@@ -18,18 +18,20 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+#include <mesh.hpp>
 
-#ifndef THRUST_NO_WARNINGS_CUSTOM_HOST_VECTOR
-#define THRUST_NO_WARNINGS_CUSTOM_HOST_VECTOR
+float forLoopsClad(
+	std::vector<double> *dndtAse,
+	unsigned &raysPerSample,
+	Mesh *mesh,
+	double *betaCells,
+	float hostNTot,
+	double hostSigmaA,
+	double hostSigmaE,
+	unsigned hostNumberOfPoints,
+	unsigned hostNumberOfTriangles,
+	unsigned hostNumberOfLevels,
+	float hostThicknessOfPrism,
+	float hostCrystalFluorescence	);
 
-#ifndef __GCC__
-#pragma GCC diagnostic push 
-#pragma GCC diagnostic ignored "-Wunused-parameter" 
-#endif
-#include <thrust/host_vector.h>
-#ifndef __GCC__
-#pragma GCC diagnostic pop
-#endif
-
-
-#endif

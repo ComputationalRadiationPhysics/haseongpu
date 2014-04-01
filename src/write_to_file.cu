@@ -19,10 +19,11 @@
  */
 
 
-#include "write_to_file.h"
 #include <fstream> /* ofstream */
 #include <sstream>
 #include <iomanip>
+
+#include <write_to_file.hpp>
 
 int writeValueToFile(
     const float value, 

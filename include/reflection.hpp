@@ -26,11 +26,9 @@
  *
  */
 
-#ifndef Reflection_H
-#define Reflection_H
-
-#include <mesh.h>
-#include <geometry.h>
+#pragma once
+#include <mesh.hpp>
+#include <geometry.hpp>
 
 /**
  * @brief Calculates the reflectionPoint and reflectionAngle with upper or lower surface
@@ -57,4 +55,4 @@ __device__ int calcNextReflection(const Point startPoint,
 				  double *reflectionAngle, 
 				  const Mesh &mesh);
 
-#endif /* Reflection_H */
+

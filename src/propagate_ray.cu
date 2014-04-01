@@ -19,12 +19,13 @@
  */
 
 
-#include "propagate_ray.h"
-#include <mesh.h>
-#include <geometry.h>
-#include <reflection.h> /* calcNextReflection */
 #include <cuda_runtime_api.h>
 #include <assert.h> /* assert */
+
+#include <propagate_ray.hpp>
+#include <mesh.hpp>
+#include <geometry.hpp>
+#include <reflection.hpp> /* calcNextReflection */
 
 /**
  * @brief Checks a level-plane(currentLevel * thickness) for intersection with an ray (zPos, zVec).

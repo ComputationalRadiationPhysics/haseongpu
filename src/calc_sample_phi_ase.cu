@@ -21,13 +21,12 @@
 
 //#include "calc_sample_phi_ase.h"
 #include <stdio.h> /* printf */
-#include <mesh.h>
-#include <geometry.h> /* generateRay */
-#include <propagate_ray.h> /* propagateRay */
 #include <assert.h> /* assert */
-#include <reflection.h> /* ReflectionPlane */
 
-
+#include <mesh.hpp>
+#include <geometry.hpp> /* generateRay */
+#include <propagate_ray.hpp> /* propagateRay */
+#include <reflection.hpp> /* ReflectionPlane */
 
 /**
  * @brief get the offset for accessing indicesOfPrisms and numberOfReflectionSlices (slow!).

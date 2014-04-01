@@ -25,9 +25,7 @@
  *
  * Library to define flexible verbosity based on a global variable
  */
-#ifndef OCTRACE_LOGGING_H
-#define OCTRACE_LOGGING_H
-
+#pragma once
 #include <iostream>
 
 #define V_QUIET 0
@@ -65,6 +63,3 @@ struct nullstream : std::ostream {
  *
  */
 std::ostream& dout(unsigned activation_level);
-
-
-#endif

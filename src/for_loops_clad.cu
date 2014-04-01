@@ -18,14 +18,14 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include "for_loops_clad.h"
 #include <math.h>
-#include "mt19937ar.h"
 #include <stdlib.h>
 #include <vector>
 #include <stdio.h>
-#include <mesh.h>
+
+#include <for_loops_clad.hpp>
+#include <mt19937ar.hpp>
+#include <mesh.hpp>
 
 #define ALIVE 1
 #define DEAD 0

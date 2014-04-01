@@ -27,17 +27,15 @@
  *
  */
 
-#ifndef PARSER_H
-#define PARSER_H
-
+#pragma once
 #include <string>  /* string */
 #include <iostream>
 #include <fstream> /* ifstream */
 #include <cstdlib> /* atof */
 #include <vector> 
-#include <logging.h>
 
-#include <mesh.h>
+#include <logging.hpp>
+#include <mesh.hpp>
 
 enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
 
@@ -158,4 +156,3 @@ std::vector<Mesh> parseMesh(std::string rootPath,
 			    unsigned maxGpus);
 
 
-#endif /* PARSER_H */

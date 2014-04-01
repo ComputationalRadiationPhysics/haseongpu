@@ -26,11 +26,10 @@
  *
  */
 
-#ifndef calcPhiAseMPI_H
-#define calcPhiAseMPI_H
-
+#pragma once
 #include <vector>
-#include <mesh.h>
+
+#include <mesh.hpp>
 
 /**
  * @brief A wrapper for calcPhiAse, that distributes sample points
@@ -73,4 +72,3 @@ float calcPhiAseMPI ( const unsigned minRaysPerSample,
 		      std::vector<unsigned> &hTotalRays,
 		      const unsigned gpu_i);
 
-#endif /* calcPhiAseMPI_H */

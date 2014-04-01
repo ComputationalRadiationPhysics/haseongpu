@@ -22,22 +22,19 @@
 /**
  * @author Erik Zenker
  * @author Carlchristian Eckert
+ * @author Marius Melzer
  * @licence GPLv3
  *
  */
 
-#ifndef THREAD_H
-#define THREAD_H
+#pragma once
+#include <vector>
 
-#include <mesh.h>
-
-#include <pthread.h> /* pthread_t */
-#include <vector> /* std::vector */
+#include <mesh.hpp>
 
 /**
- * @brief Wrapper for calcPhiAse on pthread base.
- *        This function will spawn a thread for
- *        each function call and start calcPhiAse.
+ * @brief Calculates Phi ASE. With minRaysPerSample < maxRaysPerSample
+ *        adaptive sampling can be used to improve performance.
  *
  * @param minRaysPerSample Lower bound for raysPerSample
  *                         in case of adaptive sampling.
@@ -61,29 +58,20 @@
  * @param maxSample_i      Biggest Index of sample point to calculate.
  * @param runtime          Reference to the needed runtime.
  *
- * @deprecated will be completly replaced by mpi
- *             or should be replaced by c++11 threads
- * @return     threadId
- */
-pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
-			      const unsigned maxRaysPerSample,
-			      const unsigned maxRepetitions,
-			      const Mesh& mesh,
-			      const std::vector<double>& sigmaA,
-			      const std::vector<double>& sigmaE,
-			      const double mseThreshold,
-			      const bool useReflections,
-			      std::vector<float> &phiAse,
-			      std::vector<double> &mse,
-			      std::vector<unsigned> &totalRays,
-			      const unsigned gpu_i,
-			      const unsigned minSample_i,
-			      const unsigned maxSample_i,
-			      float &runtime);
-/**
- * @brief Wait for all threads to finish
- *
- */
-void joinAll(std::vector<pthread_t> threadIds);
+ **/
+float calcPhiAse ( const unsigned minRaysPerSample,
+		   const unsigned maxRaysPerSample,
+		   const unsigned maxRepetitions,
+		   const Mesh& mesh,
+		   const std::vector<double>& sigmaA,
+		   const std::vector<double>& sigmaE,
+		   const double mseThreshold,
+		   const bool useReflections,
+		   std::vector<float> &hPhiAse,
+		   std::vector<double> &hMse,
+		   std::vector<unsigned> &hTotalRays,
+		   const unsigned gpu_i,
+		   const unsigned minSample_i,
+		   const unsigned maxSample_i,
+		   float &runtime);
 
-#endif /* THREAD_H */

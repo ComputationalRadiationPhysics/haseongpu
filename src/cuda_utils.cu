@@ -18,11 +18,11 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <cuda_utils.h>
-
-#include <logging.h>
 #include <vector>
+
+#include <cuda_utils.hpp>
+#include <logging.hpp>
+
 
 
 /** 

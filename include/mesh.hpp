@@ -27,15 +27,13 @@
  *
  */
 
-#ifndef MESH_H
-#define MESH_H 
-
-#include <cuda_utils.h>
+#pragma once
 #include <vector>
-#include <curand_kernel.h> /* curand_uniform */
 #include <string>
+#include <curand_kernel.h> /* curand_uniform */
 
-#include <geometry.h>
+#include <cuda_utils.hpp>
+#include <geometry.hpp>
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
@@ -195,4 +193,3 @@ class Mesh {
 
 };
 
-#endif /* MESH_H */

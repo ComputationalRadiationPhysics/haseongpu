@@ -19,9 +19,6 @@
  */
 
 
-#ifndef GEOMETRY_GPU_H
-#define GEOMETRY_GPU_H
-
 /**
  * @author Erik Zenker
  * @author Carlchristian Eckert
@@ -29,6 +26,8 @@
  *
  * @licence GPLv3
  **/
+
+#pragma once
 
 struct TwoDimPoint {
   double x;
@@ -66,4 +65,4 @@ __host__ __device__ float distance(Point startPoint, Point endPoint);
 __host__ __device__ Ray generateRay(Point startPoint, Point endPoint);
 __host__ __device__ Ray normalizeRay(Ray ray);
 
-#endif /* GEOMETRY_GPU_H */
+

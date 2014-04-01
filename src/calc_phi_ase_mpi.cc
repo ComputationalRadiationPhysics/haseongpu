@@ -17,17 +17,17 @@
  * along with HASENonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-
-
-#include <calc_phi_ase_mpi.h>
-#include <calc_phi_ase.h>
-#include <mesh.h>
-#include <vector>
 #include <mpi.h>
+#include <vector>
 #include <iostream>
-#include <logging.h>
-#include <progressbar.h>
 #include <algorithm>
+
+#include <calc_phi_ase_mpi.hpp>
+#include <calc_phi_ase.hpp>
+#include <mesh.hpp>
+#include <logging.hpp>
+#include <progressbar.hpp>
+
 
 // Nodes
 #define HEAD_NODE 0

@@ -19,10 +19,11 @@
  */
 
 
-#include "write_matlab_output.h"
 #include <fstream>
 #include <vector>
 #include <iomanip>
+
+#include <write_matlab_output.hpp>
 
 /**
  * @brief write input data in a 3D-matrix which can be parsed by matlab with reshape

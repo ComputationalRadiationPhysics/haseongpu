@@ -32,11 +32,9 @@
  *
  **/
 
-#ifndef calc_sample_phi_ase_H
-#define calc_sample_phi_ase_H
-
+#pragma once
 #include <curand_mtgp32dc_p_11213.h>
-#include <mesh.h>
+#include <mesh.hpp>
 
 /**
  * @brief: calculate the sum of all gains for a single sample point s_i, accounting
@@ -121,4 +119,3 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
          const unsigned maxInterpolation,
 				 unsigned *globalOffsetMultiplicator
 				 );
-#endif /* calc_sample_phi_ase_H */

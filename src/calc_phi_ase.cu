@@ -28,16 +28,16 @@
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
 
-#include <write_to_vtk.h>
-#include <calc_phi_ase.h>
-#include <map_rays_to_prisms.h>
-#include <cudachecks.h>
-#include <importance_sampling.h>
-#include <calc_sample_phi_ase.h>
-#include <mesh.h>
-#include <progressbar.h> /*progressBar */
-#include <logging.h>
-#include <thrust_device_vector_nowarn.h>
+#include <write_to_vtk.hpp>
+#include <calc_phi_ase.hpp>
+#include <map_rays_to_prisms.hpp>
+#include <cudachecks.hpp>
+#include <importance_sampling.hpp>
+#include <calc_sample_phi_ase.hpp>
+#include <mesh.hpp>
+#include <progressbar.hpp> /*progressBar */
+#include <logging.hpp>
+#include <thrust_device_vector_nowarn.hpp>
 
 
 #define SEED 4321

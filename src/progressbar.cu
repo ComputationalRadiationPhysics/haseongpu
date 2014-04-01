@@ -19,14 +19,14 @@
  */
 
 
-#include "progressbar.h"
 #include <unistd.h>
-#include <logging.h>
 #include <cmath>
 #include <iomanip>
 #include <fstream>
 #include <sys/time.h>
 
+#include <progressbar.hpp>
+#include <logging.hpp>
 
 /**
  * @brief prints a line of ascii-art in the style of a sine-wave

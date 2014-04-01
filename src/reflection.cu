@@ -19,11 +19,12 @@
  */
 
 
-#include <reflection.h>
-#include <mesh.h>
-#include <geometry.h>
 #include <assert.h>
 #include <math.h>
+
+#include <reflection.hpp>
+#include <mesh.hpp>
+#include <geometry.hpp>
 
 __device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   // Calc intesection angle with z-plane
@@ -62,7 +63,7 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
 /*
  * TOP_REFLECTION = 1 
  * BOTTOM_REFLECTION = -1
- * defined in reflection.h
+ * defined in reflection.hpp
  */
 __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  const int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh &mesh){
   float mirrorPlaneZ = 0;

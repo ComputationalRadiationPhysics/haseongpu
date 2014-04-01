@@ -1,4 +1,3 @@
-#pragma once
 /**
  * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
@@ -23,5 +22,6 @@
 // HASEN_ON_GPU_VERSION / 100 % 1000 is minor version
 // HASEN_ON_GPU_VERSION / 100000 is major version
 
+#pragma once
 #define HASEN_ON_GPU_VERSION 003000
 

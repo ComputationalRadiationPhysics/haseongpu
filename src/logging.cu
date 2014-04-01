@@ -18,9 +18,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <logging.h>
 #include <iostream>
+
+#include <logging.hpp>
+
 
 std::ostream& dout(unsigned activation_level) {
   static nullstream dummy;

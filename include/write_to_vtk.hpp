@@ -25,12 +25,11 @@
  * @license GPLv3
  */
 
+#pragma once
 #include <vector>
 #include <string>
-#include <mesh.h>
 
-#ifndef WRITE_TO_VTK_H
-#define WRITE_TO_VTK_H
+#include <mesh.hpp>
 
 /**
  * @brief creates a VTK file based on the mesh structure and 

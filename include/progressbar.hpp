@@ -29,9 +29,7 @@
  *
  **/
 
-#ifndef PROGRESS_BAR_H
-#define PROGRESS_BAR_H
-
+#pragma once
 #include <string>
 
 /**
@@ -78,6 +76,3 @@ void fancyProgressBar(const unsigned current,const unsigned nTotal);
  *
  */
 void fileProgressBar(const unsigned nTotal, const std::string path);
-
-
-#endif /* PROGRESS_BAR_H */
