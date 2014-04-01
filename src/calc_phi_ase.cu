@@ -33,7 +33,7 @@
 #include <map_rays_to_prisms.hpp>
 #include <cudachecks.hpp>
 #include <importance_sampling.hpp>
-#include <calc_sample_phi_ase.hpp>
+#include <calc_sample_gain_sum.hpp>
 #include <mesh.hpp>
 #include <progressbar.hpp> /*progressBar */
 #include <logging.hpp>

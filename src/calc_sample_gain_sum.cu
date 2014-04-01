@@ -24,6 +24,7 @@
 #include <assert.h> /* assert */
 
 #include <mesh.hpp>
+#include <calc_sample_gain_sum.hpp>
 #include <geometry.hpp> /* generateRay */
 #include <propagate_ray.hpp> /* propagateRay */
 #include <reflection.hpp> /* ReflectionPlane */
