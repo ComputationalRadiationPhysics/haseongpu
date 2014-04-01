@@ -84,4 +84,4 @@ pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
  */
 void joinAll(std::vector<pthread_t> threadIds);
 
-#endif /* THREAD_H */
+

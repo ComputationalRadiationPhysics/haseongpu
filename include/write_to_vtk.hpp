@@ -90,4 +90,4 @@ int writePrismToVtk(const Mesh& mesh,
 std::vector<double> compareVtk(std::vector<double> compare, std::string filename);
 
 
-#endif /* WRITE_TO_VTK_H */
+
