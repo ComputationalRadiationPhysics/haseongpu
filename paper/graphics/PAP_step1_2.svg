@@ -17,7 +17,7 @@
    id="svg2"
    height="1422.0428"
    width="3173.3669"
-   inkscape:export-filename="/home/carli/Dokumente/TUD/CUDA/projekt/git/octrace/paper/graphics/PAP_step1_2.png"
+   inkscape:export-filename="/home/admin-linux/octrace/paper/graphics/PAP_step1_2.png"
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90">
   <sodipodi:namedview
@@ -29,19 +29,19 @@
      inkscape:pageshadow="2"
      inkscape:zoom="0.7331474"
      inkscape:cx="279.0167"
-     inkscape:cy="793.0616"
+     inkscape:cy="1120.4173"
      inkscape:document-units="px"
-     inkscape:current-layer="layer6"
+     inkscape:current-layer="layer9"
      showgrid="false"
      inkscape:object-paths="true"
      inkscape:object-nodes="true"
      inkscape:snap-smooth-nodes="true"
      inkscape:snap-midpoints="true"
-     inkscape:window-width="798"
-     inkscape:window-height="879"
+     inkscape:window-width="1678"
+     inkscape:window-height="1029"
      inkscape:window-x="0"
      inkscape:window-y="19"
-     inkscape:window-maximized="0"
+     inkscape:window-maximized="1"
      showguides="false"
      inkscape:guide-bbox="true"
      fit-margin-left="100"
@@ -1375,7 +1375,7 @@
          sodipodi:role="line"
          id="tspan18552"
          x="-19.710659"
-         y="-41.774612">Matlab</tspan></text>
+         y="-41.774612">MATLAB</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:22px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Serif;-inkscape-font-specification:Serif;stroke-width:4;stroke-miterlimit:4;stroke-dasharray:none"
@@ -1826,7 +1826,7 @@
        sodipodi:cy="358.09064"
        sodipodi:rx="20.736343"
        sodipodi:ry="20.736343"
-       d="m 370.36073,358.09064 a 20.736343,20.736343 0 1 1 -41.47268,0 20.736343,20.736343 0 1 1 41.47268,0 z"
+       d="m 370.36073,358.09064 c 0,11.45236 -9.28397,20.73634 -20.73634,20.73634 -11.45237,0 -20.73634,-9.28398 -20.73634,-20.73634 0,-11.45237 9.28397,-20.73635 20.73634,-20.73635 11.45237,0 20.73634,9.28398 20.73634,20.73635 z"
        transform="matrix(0.56299131,0,0,0.56404319,191.09493,443.98385)" />
   </g>
   <g

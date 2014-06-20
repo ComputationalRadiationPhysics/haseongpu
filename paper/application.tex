@@ -5,25 +5,25 @@
 The application is available as a commandline-tool and reads
 its simulation data from plain text files. It was improved by polychromatic
 wavelengths, adaptive sampling, repetetive sampling, multigpu computation and 
-reflections as to the orginal application from D. Albach \cite{ASE2010}.
+reflections as to the orginal application from D.~Albach~\cite{ASE2010}.
 
-For an easy access, the offered MATLAB compatible interface (see \ref{label:matlab_interface}) 
+For an easy access, the offered MATLAB compatible interface (see~\ref{label:matlab_interface}) 
 is highly recommended. Experienced users with the intention to call the application
 directly should consult the README file, the provided 
 example code or the source code for more details.
 
 \subsection{Installation and Usage}
 The application was tested and developed under a linux environment
-and runs on Nvidia graphics cards with compute capability 2.0 (fermi generation) or higher.
+and runs on NVIDIA graphics cards with compute capability 2.0 (Fermi generation) or higher.
 It can be built by running make inside the application directory, provided
-that make (tested with 3.82), gcc (up to 4.6.2) and cuda (5.0) are installed. 
+that make (tested with 3.82), gcc (up to 4.6.2) and CUDA (5.0) are installed. 
 This will also setup a MATLAB file calcPhiASE.m in the application
 directory. 
 
 To run the application from MATLAB, two steps are
 necessary in advance:
 \begin{enumerate}
-  \label{label:matlab_interface}
+\label{label:matlab_interface}
   \item Include calcPhiASE.m from the application directory into your MATLAB path
   \item Call calcPhiASE function from the MATLAB script: \[[phiASE,~MSE,~nRays] = calcPhiASE(args)\]
 \end{enumerate}
@@ -33,7 +33,7 @@ An overview of the necessary input arguments is given
 in the list below:
 
 \begin{description}
-  \label{label:input}
+\label{label:input}
   \item[Mesh information]\mbox{}
     \begin{itemize}
       \setlength{\itemindent}{-2.5em}
@@ -89,6 +89,6 @@ The returned variables are represented as two-dimensional matrices in
 which columns are slice indices and rows are point indices.
 For example, the variables for the used gain
 medium have 321 rows and 10 columns, what multiplies to
-3210 sample points. The value for the $i$th point and
-the $j$th slice can then be obtained by Matlab with:
+3210 sample points. The value for the $i$-th point and
+the $j$-th slice can then be obtained by MATLAB with:
 \[value~=~values(i,j)\]
