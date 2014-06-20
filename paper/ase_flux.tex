@@ -11,13 +11,19 @@
 \usepackage{hyperref}
 \usepackage{float}
 
+% give the macro \cref
+\usepackage{cleveref}
+
+%allow custom hyphenation
+\usepackage{hyphenat}
+
 %\floatstyle{simplerule}
 %\newfloat{floatbox}{thp}{lob}[section]
 %\floatname{floatbox}{Text Box}
 
 \begin{document}
 
-\title{Parallel ASE-Flux}
+\title{Parallel ASE flux}
 
 \author[hzdr]{C. Eckert}
 \ead{c.eckert@hzdr.de}
@@ -52,6 +58,8 @@
 \input{application}
 \input{results}		
 \input{bibliography}
+
+\input{hyphenation}
 
 %\end{multicols}
 
