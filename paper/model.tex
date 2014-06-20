@@ -51,8 +51,9 @@ these sample points are connected into a 2D mesh of triangles.
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_reduced.png}}
   }
-  \caption{non-uniform sampling of active gain medium in 2 slices, forming a
-  mesh of prisms}
+  \caption{Non-uniform sampling of active gain medium in 2~slices,
+    forming a mesh of prisms. The area in the center of the gain medium
+    is sampled with a higher spatial resolution.}
   \label{graphic:samples_reduced}
 \end{figure}
 
@@ -65,7 +66,10 @@ prisms (Figure \ref{graphic:samples_reduced}).
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/delauny_4.png}}
   }
-  \caption{extruded plane of triangles}
+  \caption{The extruded plane of triangles forms a slice of
+    prisms. The thickness of a slice sets the level of detail in
+    z-direction. Extruding the plane several times fills up the volume
+    of the gain medium.}
   \label{graphic:extruded_mesh}
 \end{figure}
 
@@ -80,9 +84,16 @@ point $s_i$, the ray is traced along its path through the prisms (see Figure
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/prism_propagation_4.png}}
   }
-  \caption{propagation of a ray through the prism structure}
+
+
+  \caption{The propagation of the ray
+    $\protect\overrightarrow{r_{i,u}s_i}$ through the prism
+    structure on the same slice. The ray intersects once with a
+    vertical side at $r_x$. Thus, the ray is divided into two
+    partial rays with length $l_x$ and $l_i$.}
   \label{graphic:prism_propagation}
 \end{figure}
+
 
 Starting from point $r_{i,u}$ inside a prism, there are 5 possible intersection
 planes with the ray. One plane for the top and bottom surfaces and one for each
@@ -92,13 +103,13 @@ knowledge about the mesh structure:
 
 \begin{description}
 
-  \item[horizontal side]
+  \item[vertical side]
     the ray will remain in the same slice, but the next prism is based on a
     different triangle. This triangle is a \emph{neighbor} of the previous one.
     The relevant datastructure to determine the neighboring triangle is created
     during the Delauny triangulation in section \ref{subsec:meshSampling}.
 
-  \item[top/bottom plane]
+  \item[horizontal plane]
     if the ray is intersecting with the top or bottom plane of the prism, the
     next prism will be based on the same triangle as before, but in a different
     slice.
@@ -141,14 +152,19 @@ The gain for the whole ray can then be computed as
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/reflections_2.png}}
   }
-  \caption{total internal reflections on the gain medium surface}
+  \caption{A ray reflects twice on the inner surfaces of the gain
+    medium. Because the reflection angle~$\theta$ is bigger than
+    Brewster's angle $\theta_{B}$, total internal reflections occurs.}
   \label{graphic:reflections_2D}
 \end{figure}
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{./graphics/transmission1.png}}
   }
-  \caption{reflections with partial transmission on the gain medium surface}
+  \caption{A ray reflects twice on the inner surfaces of the gain
+    medium. Because the reflection angle~$\theta'$ is smaller than
+    Brewster's angle $\theta_{B}$, a part of the ray energy is
+    transmitted through the gain medium surface}
   \label{graphic:transmission_2D}
 \end{figure}
 In order to allow a more detailed simulation, the model is extended to include
