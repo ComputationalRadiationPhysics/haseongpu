@@ -108,8 +108,8 @@ knowledge about the mesh structure:
 This process is iterated for each prism on the path between $r_{i,u}$ and the
 desired sample point $s_i$. The intersections (like $r_x$) with prism surfaces
 define line segments of a certain length $l_x$. These segments are used for the
-gain calculation: For each prism $x$, the contribution to the gain is calculated
-as a function of $l_x$ with:
+gain calculation: For each prism $x$, the contribution to the gain is called
+partial gain and calculated as a function of $l_x$ with:
 \begin{equation}
 \label{eq:partial_gain}
   partial\_gain(x) = e^{~g_0 \cdot l_x}

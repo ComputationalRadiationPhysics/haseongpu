@@ -139,7 +139,7 @@ reuse cached prism data from their shared memory.
     maximum number of concurrently executed operations for the used hardware
     (see Section \ref{subsec:testingEnvironment}).
     
-    Dependendant on the used GPU, B blocks can be spawned
+    Dependendent on the used GPU, B blocks can be spawned
     in parallel on a device and since there are $N$ rays to calculate for each sample point, each thread
     traces up to $t = \lceil\frac {N}{B\cdot128}\rceil$ rays and computes the
     corresponding gain values using the following cycle (see Figure
@@ -153,11 +153,13 @@ reuse cached prism data from their shared memory.
       \item Calculate the partial gains for $\overrightarrow{r_{i,u}s_i}$:
         \begin{enumerate}
           \item find intersection between $\overrightarrow{r_{i,u}s_i}$
-            and $x$\label{goto:5a}
+            and $x$\label{5a}
           \item calculate length $l_x$ of partial ray $\overrightarrow{r_{i,u}r_x}$
           \item calculate $partial\_gain(x)$ \eqref{eq:partial_gain}
           \item if the ray did not reach $s_i$, determine neighboring prism $x'$,
-            set $x := x'$ and $r_x$ as the new start point. goto \ref{goto:5a} 
+            set $x := x'$, set $r_x$ as the new start point and repeat the 
+            previous steps~\ref{5a} to~\ref{5d}.
+            \label{5d}
         \end{enumerate}
       \item Calculate $gain(\overrightarrow{r_{i,u}s_i})$ \eqref{eq:gain}
       \item Add gain to gain of the other rays in the thread
@@ -239,11 +241,19 @@ sample point before its $\Phi_{ASE}$ calculation (see Figure \ref{graphic:pap2},
 Figure \ref{graphic:multigpu}) and is used 
 to decide which areas will have the most influence on the result.
 
-The objective is to distribute N rays to P prims of the active gain medium.
+The objective is to distribute N rays to P prims of the active gain medium, 
+where areas with more influence will receive more rays.
 This is done by introducing a center point $c_x$ and triangle surfaces $T_x$ for every prism $x$ with $x \in \{0,...,P-1\}$.
- The rays per prism $rays_x$ and importance $imp_x$ for sample point $s_i$ are calculated as follows:
+The rays per prism $rays_x$ correlates to the expected gain for $x$:
+
 \begin{align}
-  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P-1}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor\\
+  rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P-1}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor
+\end{align}
+
+To compensate varying values of $rays_x$, importance $imp_x$ is used as a weighting factor
+and extends \eqref{eq:gain} to \eqref{eq:gain_imp}.
+
+\begin{align}
 imp_x &= 
 \begin{cases}
 \frac{T_x}{T_{total}} \cdot \frac{N}{rays_x} &rays_x > 0\\
@@ -251,9 +261,9 @@ imp_x &=
 \end{cases}
 \end{align}
 
-Using importance sampling leads to the modified gain calculation:
 \begin{align}
-  gain\_imp(\overrightarrow{r_{i,u,x}s_i})        &= gain(\overrightarrow{r_{i,u}s_i}) \cdot imp_x
+\label{eq:gain_imp}
+gain\_imp(\overrightarrow{r_{i,u,x}s_i})        &= gain(\overrightarrow{r_{i,u}s_i}) \cdot imp_x
 \end{align}
 
 

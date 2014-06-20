@@ -2,9 +2,8 @@
 \numberwithin{equation}{section}
 
 \subsection{Simulation data}
-For the sections \nameref{subsec:validation} and \nameref{subsec:benchmarking},
-the simulation was changed to a flat cylindrical gain medium 
-(Figure \ref{graphic:samples_round}) to be able to compare the simulation
+In following sections, the setup was changed to a flat cylindrical gain medium 
+(Figure \ref{graphic:samples_round}) to compare the simulation
 results with real world experiments. The gain medium has the following
 properties:
 \\
@@ -93,19 +92,26 @@ Note that the plotted values are discrete and just connected with lines to guide
   \label{plot:benchmark}
 \end{figure}
 
-Interestingly, in this particular case, monochromatic simulations without reflections (d) show very similar,
-but smaller, gain values when compared to the polychromatic simulation with reflections (c). 
-Adding reflections (e) overestimates the ASE impact
-in the monochromatic case and consequently shows a too small gain value. This is mainly attributed to
-reflected ray paths that are longer in average, especially due to total internal reflection.
-Thus, the stored energy from the gain medium is reduced more severely. 
+In this particular case, monochromatic simulations without reflections
+(d) show very similar, but smaller, gain values in comparison to the
+polychromatic simulation with reflections (c).  Interestingly, results
+can get worse when more physical details are considered:
+
+Adding reflections (e) overestimates the ASE impact in the
+monochromatic case and consequently shows a too small gain value.
+This is mainly attributed to reflected ray paths that are longer in
+average, especially due to total internal reflection.
+Thus, the stored energy from the gain medium is reduced more severely.
+
 Simulating only with a polychromatic spectrum (a) overestimates the
 gain value. As the average emission intensity is lower than the peak
-value at $1030 nm$ (see Figure \ref{plot:polychromatic_spectrum}), 
-the reduced ASE flux leads to a higher gain.
+value at $1030 nm$ (see Figure \ref{plot:polychromatic_spectrum}), the
+reduced ASE flux leads to a higher gain.
 
-Consequently, a simulation configuration with reflection and polychromatic spectrum (c) enabled 
-matches the measured values (b) within the measurement uncertainty and validates our simulation approach.
+Finally, a simulation configuration with reflection and
+polychromatic spectrum (c) enabled, matches the measured values (b)
+within the measurement uncertainty and validates our simulation
+approach.
 
 
 For the same simulation Figure \ref{graphic:benchmark_4_timeslices} shows five distinct timesteps.
