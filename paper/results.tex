@@ -32,7 +32,7 @@ Cladding                & $\text{Cr}^{4+}$:YAG\\
 \hline
 $\text{Cr}^{4+}$ doping & $0.25at.\%$\\
 \hline
-Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spectrum})\\
+Spectrum                & Polychromatic (see Figure~\ref{plot:polychromatic_spectrum})\\
 \hline
 \end{tabular}
 
@@ -41,7 +41,7 @@ Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spec
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_round.png}}
   }
   \caption{non-uniform sampling of round active gain medium}
-  \label{graphic:samples_round}
+\label{graphic:samples_round}
 \end{figure}
 
 \begin{figure}[H]
@@ -49,14 +49,14 @@ Spectrum                & Polychromatic (see Figure \ref{plot:polychromatic_spec
     \resizebox{0.5\textwidth} {!} {\includegraphics{plot/sigma.pdf}}
   }
   \caption{polychromatic spectrum}
-  \label{plot:polychromatic_spectrum}
+\label{plot:polychromatic_spectrum}
 \end{figure}
 
 \subsection{Setup of the testing environment}
 \label{subsec:testingEnvironment}
 The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
 each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
-and 4~NVIDIA Tesla K20M GPUs with 5GB GDDR5 RAM. Each GPU contains 2496 CUDA cores with a total
+and 4~NVIDIA Tesla K20M GPUs with 5GB GDDR5 RAM\@. Each GPU contains 2496 CUDA cores with a total
 peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE~\cite{torque} 
 with Maui~\cite{maui} as scheduling backend. 
 
@@ -89,7 +89,7 @@ Note that the plotted values are discrete and just connected with lines to guide
     (c) polychromatic, with reflections
     (d) monochromatic, no reflections
     (e) monochromatic, with reflections}
-  \label{plot:benchmark}
+\label{plot:benchmark}
 \end{figure}
 
 In this particular case, monochromatic simulations without reflections
@@ -123,7 +123,7 @@ Using~\eqref{eq:phi_ase_daniel} and~\eqref{eq:gain_local}, it illustrates ${\fra
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
   \caption{sliced gain medium in 5 timessteps}
-  \label{graphic:benchmark_4_timeslices}
+\label{graphic:benchmark_4_timeslices}
 \end{figure}
 
 \subsection{Benchmarking}
@@ -160,7 +160,7 @@ improvement for low workloads with a small number of rays.
     }
   }
   \caption{runtime of sequential algorithm compared to parallel algorithm}
-  \label{plot:runtime}
+\label{plot:runtime}
 \end{figure}
 Adaptive sampling usually does not only eliminate outliers, but even reduce the
 needed time to do so: By using the idea of a pre-defined $MSE$-threshold, the
@@ -178,11 +178,11 @@ This is indicated by the black rectangle in Figure~\ref{plot:adaptive_runtime}.
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/adaptive_runtime.png}}}
   \caption{MSE comparision for equal runtimes}
-  \label{plot:adaptive_runtime}
+\label{plot:adaptive_runtime}
 \end{figure}
 
 For the adaptive algorithm, simulation times of different sample points can vary
-significantly (see Section \ref{subsec:adaptive_sampling}). Therefore, a uniform
+significantly (see \cref{subsec:adaptive_sampling}). Therefore, a uniform
 partitioning of the sample points among the nodes would result in an unbalanced
 workload and reduced efficency for the whole computation. Instead, one of the
 nodes acts as a headnode and manages workload distribution based on demand: As
@@ -194,7 +194,7 @@ multiple devices scales well with all presented methods. (Figure~\ref{plot:gpu_s
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.pdf}}}
   \caption{speedup on multiple devices}
-  \label{plot:gpu_scaling}
+\label{plot:gpu_scaling}
 \end{figure}
 
 \subsection{Conclusion}
