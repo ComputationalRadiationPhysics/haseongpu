@@ -57,7 +57,7 @@ Spectrum                & Polychromatic (see Figure~\ref{plot:polychromatic_spec
 
 \subsection{Setup of the testing environment}
 \label{subsec:testingEnvironment}
-The benchmarks were conducted on a GPU cluster consisting of 12 compute nodes,
+The benchmarks were conducted on a GPU cluster consisting of 16 compute nodes,
 each equipped with a quad core Intel Xeon CPU E5-2609 CPU (2.40GHz), 64GB RAM
 and 4~NVIDIA Tesla K20M GPUs with 5GB GDDR5 RAM\@. Each GPU contains 2496 CUDA cores with a total
 peak performance of 3520 GFLOP/s. Job submission is handled by TORQUE~\cite{torque} 
@@ -115,7 +115,7 @@ Finally, a simulation configuration with reflection and polychromatic
 spectrum~(c) enabled, matches the measured values~(b) within the
 measurement uncertainty and validates our simulation approach.
 
-For the same simulation Figure~\ref{graphic:benchmark_4_timeslices}
+For the same simulation, Figure~\ref{graphic:benchmark_4_timeslices}
 shows five distinct timesteps.  Using~\eqref{eq:phi_ase_daniel}
 and~\eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in
 the sliced gain medium with:
@@ -143,7 +143,7 @@ were done without reflections to ensure comparability. To increase the
 number of GPUs, MPI~\cite{MPI} was used to distribute the sample
 points to all available devices. A sequential overhead for device
 allocation on the nodes and not fully occupied GPUs are the reasons
-for the lack of runtime improvement for low workloads with a small
+for the lack of runtime improvement for small workloads with a low
 number of rays.
 
 %reflections. To increase the number of GPUs to 48, an \emph{array job} was
@@ -218,19 +218,48 @@ methods. (Figure~\ref{plot:gpu_scaling}).
 
 \subsection{Conclusion}
 \label{subsec:conclusion}
-This paper presented a fast and very scalable implementation of a simulation to
-estimate ASE flux in an active gain medium. It seeks to improve the work of
-laser physicists by enabling them to properly simulate the described effects
-with high speed and high resolution. Experimental details like cladding, surface
-coating, refractivites, polychromatic laser pulses and reflections on the upper
-and lower side can be modeled and simulated with various additional parameters.
+This paper presented an adaptive multi-node multi-GPU algorithm for a
+ASE flux simulation with dynamic load balancing that shows close to
+perfect strong scaling. It allows for large speedups in the order of
+two magnitudes compared to previously existing CPU implementations and
+precisely predicts experimental results. The algorithm is implemented
+on the Nvidia CUDA platform and uses ray tracing to perform a
+Monte Carlo integration inside the laser gain medium. Sampling
+resolution is dynamically and locally adapted to guarantee sampling
+quality and reduce computation time. Performance is further improved
+by importance sampling and random restarts.
 
-Future improvements could address reflections on the lateral sides of the gain
-medium. Also, it will be helpful to further increase the maximum number of rays
-(currently there is a maximum of $5\cdot10^8$ rays per sample point). For
-example, this could be done rather easily by splitting the simulated rays in
-groups and calculating these groups iteratively, combining the results
-afterwards.
+For easy integration into existing workflows, a MATLAB interface is
+provided.  Using this interface, experimental details like cladding,
+surface coating, refractivites, polychromatic laser pulses and
+reflections on the upper and lower surface can be modeled and simulated
+with various additional parameters.
+
+Future improvements could address reflections on the lateral sides of
+the gain medium. Also, it will be helpful to further increase the
+maximum number of rays (currently there is a maximum of $5\cdot10^8$
+rays per sample point). For example, this could be done rather easily
+by splitting the simulated rays in groups and calculating these groups
+iteratively, combining the results afterwards.
+
+The step towards scalable parallel simulations on HPC systems enables
+computations of ASE flux for the upcoming generation of high-power
+laser systems.
+
+
+%This paper presented a fast and very scalable implementation of a simulation to
+%estimate ASE flux in an active gain medium. It seeks to improve the work of
+%laser physicists by enabling them to properly simulate the described effects
+%with high speed and high resolution. Experimental details like cladding, surface
+%coating, refractivites, polychromatic laser pulses and reflections on the upper
+%and lower side can be modeled and simulated with various additional parameters.
+
+%Future improvements could address reflections on the lateral sides of the gain
+%medium. Also, it will be helpful to further increase the maximum number of rays
+%(currently there is a maximum of $5\cdot10^8$ rays per sample point). For
+%example, this could be done rather easily by splitting the simulated rays in
+%groups and calculating these groups iteratively, combining the results
+%afterwards.
 
 
 %Future work should address reflections on the lateral sides of the gain medium
