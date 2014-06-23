@@ -40,7 +40,8 @@ Spectrum                & Polychromatic (see Figure~\ref{plot:polychromatic_spec
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{graphics/samples_round.png}}
   }
-  \caption{non-uniform sampling of round active gain medium}
+  \caption{Non-uniform sampling of round active gain medium that was
+    used in a real world experiment.}
 \label{graphic:samples_round}
 \end{figure}
 
@@ -48,7 +49,9 @@ Spectrum                & Polychromatic (see Figure~\ref{plot:polychromatic_spec
   \centerline{
     \resizebox{0.5\textwidth} {!} {\includegraphics{plot/sigma.pdf}}
   }
-  \caption{polychromatic spectrum}
+  \caption{Polychromatic spectrum used in the experiment. In monochromatic setups
+  the maximal intensity of the emission spectrum at $1030nm$ is used as an
+  approximation.}
 \label{plot:polychromatic_spectrum}
 \end{figure}
 
@@ -84,11 +87,11 @@ Note that the plotted values are discrete and just connected with lines to guide
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark.pdf}}}
   \caption{Simulation compared to measurements:
-    (a) polychromatic, no reflections
-    (b) experimental measurement
-    (c) polychromatic, with reflections
-    (d) monochromatic, no reflections
-    (e) monochromatic, with reflections}
+    (a)~polychromatic no reflections;
+    (b)~experimental measurement;
+    (c)~polychromatic with reflections;
+    (d)~monochromatic no reflections;
+    (e)~monochromatic with reflections}
 \label{plot:benchmark}
 \end{figure}
 
@@ -100,21 +103,22 @@ can get worse when more physical details are considered:
 Adding reflections~(e) overestimates the ASE impact in the
 monochromatic case and consequently shows a too small gain value.
 This is mainly attributed to reflected ray paths that are longer in
-average, especially due to total internal reflection.
-Thus, the stored energy from the gain medium is reduced more severely.
+average, especially due to total internal reflection.  Thus, the
+stored energy from the gain medium is reduced more severely.
 
 Simulating only with a polychromatic spectrum~(a) overestimates the
 gain value. As the average emission intensity is lower than the peak
-value at $1030~nm$ (see Figure~\ref{plot:polychromatic_spectrum}), the
+value at $1030nm$ (see Figure~\ref{plot:polychromatic_spectrum}), the
 reduced ASE flux leads to a higher gain.
 
-Finally, a simulation configuration with reflection and
-polychromatic spectrum~(c) enabled, matches the measured values~(b)
-within the measurement uncertainty and validates our simulation
-approach.
+Finally, a simulation configuration with reflection and polychromatic
+spectrum~(c) enabled, matches the measured values~(b) within the
+measurement uncertainty and validates our simulation approach.
 
-For the same simulation Figure~\ref{graphic:benchmark_4_timeslices} shows five distinct timesteps.
-Using~\eqref{eq:phi_ase_daniel} and~\eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in the sliced gain medium with:
+For the same simulation Figure~\ref{graphic:benchmark_4_timeslices}
+shows five distinct timesteps.  Using~\eqref{eq:phi_ase_daniel}
+and~\eqref{eq:gain_local}, it illustrates ${\frac{dn}{dt}|}_{ASE}$ in
+the sliced gain medium with:
 \begin{equation}
   \label{eq:dndt}
   \frac{dn}{dt}\bigg|_{ASE} = \int g_0(\lambda) \cdot \Phi_{ASE}(\lambda)~d\lambda
@@ -122,21 +126,25 @@ Using~\eqref{eq:phi_ase_daniel} and~\eqref{eq:gain_local}, it illustrates ${\fra
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/benchmark_4_timeslices.png}}}
-  \caption{sliced gain medium in 5 timessteps}
+  \caption{Development of ${\frac{dn}{dt}|}_{ASE}$ in a sliced gain
+    medium for 5 selected timesteps, while the medium is
+    pumped. Values in the pumped area are increasing until the pump
+    stops.}
 \label{graphic:benchmark_4_timeslices}
 \end{figure}
 
 \subsection{Benchmarking}
 \label{subsec:benchmarking}
-In Figure~\ref{plot:runtime}, the runtimes of the original single threaded
-algorithm from~\cite{ASE2010} are compared to the developed non-adaptive
-parallel ASE flux algorithm with varying numbers of rays to demonstrate
-scaling for different workloads. All simulations were done without
-reflections to ensure comparability. To increase the number of GPUs, MPI~\cite{MPI} was used to distribute the
-sample points to all available devices. A sequential overhead for device
-allocation 
-on the nodes and not fully occupied GPUs are the reasons for the lack of runtime
-improvement for low workloads with a small number of rays.
+In Figure~\ref{plot:runtime}, the runtimes of the original single
+threaded algorithm from~\cite{ASE2010} are compared to the developed
+non-adaptive parallel ASE flux algorithm~(IS) with varying numbers of
+rays to demonstrate scaling for different workloads. All simulations
+were done without reflections to ensure comparability. To increase the
+number of GPUs, MPI~\cite{MPI} was used to distribute the sample
+points to all available devices. A sequential overhead for device
+allocation on the nodes and not fully occupied GPUs are the reasons
+for the lack of runtime improvement for low workloads with a small
+number of rays.
 
 %reflections. To increase the number of GPUs to 48, an \emph{array job} was
 %scheduled and the sampling points distributed evenly to the 12 Nodes (each
@@ -159,41 +167,52 @@ improvement for low workloads with a small number of rays.
       \includegraphics{plot/runtime.pdf}
     }
   }
-  \caption{runtime of sequential algorithm compared to parallel algorithm}
+  \caption{Runtime of sequential IS algorithm compared to parallel
+    IS algorithm.  Comparing single CPU and single GPU setups, the
+    runtime is reduced by two orders of magnitude for intensive 
+    workloads. Further improvements can be achieved by using more GPUs.}
 \label{plot:runtime}
 \end{figure}
-Adaptive sampling usually does not only eliminate outliers, but even reduce the
-needed time to do so: By using the idea of a pre-defined $MSE$-threshold, the
-precision of the simulation can be adjusted in terms of this threshold rather than
-simply increasing the number of rays for all the sample points. Since only a
-small subset of sample points actually needs to be sampled with a high
-resolution, a small increase in runtime can be sufficient to lower the maximal
-$MSE$ values below the desired threshold (Figure~\ref{plot:adaptive_runtime}).
-This can be adjusted to yield similar simulation results as the non-adaptive
-implementation at a fraction of its runtime. Note that some values in the
-graphic actually display almost the same runtime, since the computation always
-succeeded to stay below the given threshold with very little additional effort.
-This is indicated by the black rectangle in Figure~\ref{plot:adaptive_runtime}.
+Adaptive sampling usually does not only eliminate outliers, but even
+reduce the needed time to do so: By using the idea of a pre-defined
+$MSE$-threshold, the precision of the simulation can be adjusted in
+terms of this threshold rather than simply increasing the number of
+rays for all the sample points. Since only a small subset of sample
+points actually needs to be sampled with a high resolution, a small
+increase in runtime can be sufficient to lower the maximal $MSE$
+values below the desired threshold
+(Figure~\ref{plot:adaptive_runtime}). This can be adjusted to yield
+similar simulation results as the non-adaptive implementation at a
+fraction of its runtime. Note that some values in the graphic actually
+display almost the same runtime, since the computation always
+succeeded to stay below the given threshold with very little
+additional effort.  This is indicated by the black rectangle in
+Figure~\ref{plot:adaptive_runtime}.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/adaptive_runtime.png}}}
-  \caption{MSE comparision for equal runtimes}
+  \caption{Comparison of maximal MSE values of IS and IS+AS+RS.  The
+    same runtime yields lower maximal MSE values when adding AS and RS.}
 \label{plot:adaptive_runtime}
 \end{figure}
 
-For the adaptive algorithm, simulation times of different sample points can vary
-significantly (see \cref{subsec:adaptive_sampling}). Therefore, a uniform
-partitioning of the sample points among the nodes would result in an unbalanced
-workload and reduced efficency for the whole computation. Instead, one of the
-nodes acts as a headnode and manages workload distribution based on demand: As
-soon as one of the \emph{compute nodes} is idle, it will request more data to
-simulate (\cref{subsubsec:multigpu}).
-Apart from a constant initialization overhead of 5s, distributing the computation to
-multiple devices scales well with all presented methods. (Figure~\ref{plot:gpu_scaling}).
+For the adaptive algorithm, simulation times of different sample
+points can vary significantly (see
+\cref{subsec:adaptive_sampling}). Therefore, a uniform partitioning of
+the sample points among the nodes would result in an unbalanced
+workload and reduced efficency for the whole computation. Instead, one
+of the nodes acts as a headnode and manages workload distribution
+based on demand: As soon as one of the \emph{compute nodes} is idle,
+it will request more data to simulate (\cref{subsubsec:multigpu}).
+Apart from a constant initialization overhead of 5s, distributing the
+computation to multiple devices scales well with all presented
+methods. (Figure~\ref{plot:gpu_scaling}).
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/scaling.pdf}}}
-  \caption{speedup on multiple devices}
+  \caption{Scaling on multiple devices. Benchmarks with up to 64 GPUs
+    in a cluster show that load balancing results in linear behavior for all
+    presented methods.}
 \label{plot:gpu_scaling}
 \end{figure}
 

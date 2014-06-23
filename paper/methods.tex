@@ -126,16 +126,19 @@ from their shared memory.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/kernel_detail5.png}}}
-  \caption{One of 200 blocks to calculate $\Phi_{ASE}$. Each
-  thread calculates serveral traces sequentially.}
+  \caption{Inside each block, threads run in parallel.  Each
+    thread calculates serveral traces sequentially and accumulates its
+    gain values. The final gain value for $s_i$ is obtained by atomic
+    reduction over all threads.}
+
   \label{graphic:kernel}
 \end{figure}
     The raytracing of every ray can be done independently through the
     mesh structure.  Exploiting this parallelism provides a great
     opportunity to boost performance. Figure~\ref{graphic:kernel}
     demonstrates the parallel processing of rays. For each sample
-    point~$s_i$, a kernel consisting of a grid of maximal 200 CUDA
-    blocks is spawned. Each of those blocks contains 128 CUDA threads.
+    point~$s_i$, a kernel consisting of a grid of maximal 200
+    blocks is spawned. Each of those blocks contains 128 threads.
     The maximum amount of used blocks is bounded by the used mersenne
     twister implementation~\cite{mersenne_twister} as random number
     generator.  The number of threads per block was determined by the
@@ -178,8 +181,11 @@ from their shared memory.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/iteration_detail4.png}}}
-  \caption{steps for a single ray within a CUDA thread, corresponding to
-  $propagate\_ray(r_{i,u})$ from Figure~\ref{graphic:pap1}}
+  \caption{Lifecycle of a single ray within a thread, corresponding to
+    $propagateRay(r_{i,u})$ (see Figure~\ref{graphic:pap1}). The ray
+    propagates through the mesh structure: steps~\ref{5a} to~\ref{5d}
+    are repeated for each traversed prism on the path to $s_i$.}
+
   \label{graphic:algorithm_steps}
 \end{figure}
 Successive threads start rays from a similar origin, which results
@@ -206,8 +212,10 @@ can contribute to the computation.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/multigpu_partitioning5.png}}}
-  \caption{partitioning of the workload to multiple devices. All nodes store the whole mesh in
-  global memory.}
+  \caption{Partitioning of the workload to multiple devices. All nodes
+    store the whole mesh in global memory. The head node assigns
+    sample points to nodes on demand. After a node has finished
+    computation it will request another sample point.}
   \label{graphic:multigpu}
 \end{figure}
 Each Monte-Carlo experiment (see \cref{eq:monte_carlo_ase}), calculates
@@ -232,8 +240,10 @@ verified with up to 64 nodes.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step2_3.png}}}
-  \caption{After adding the importance sampling, the calculated importance 
-  influences the gain calculation}
+  \caption{Program flow is extended by importance sampling (IS). This
+    additional step influences the distribution of rays in
+    $calcGainSum(s_i)$. Varying values of rays per prism are compensated by
+    using $imp_x$ as a weighting factor on the gain calculation.}
   \label{graphic:pap2}
 \end{figure}
 Importance sampling is a well known technique in the domain
@@ -250,7 +260,7 @@ The rays per prism~$rays_x$ correlates to the expected gain for~$x$:
 \begin{align}
   rays_x       &= \left\lfloor\frac{gain(\overrightarrow{c_xs_i}) \cdot N}{\sum^{P-1}_{j=0} gain(\overrightarrow{c_js_i})}\right\rfloor
 \end{align}
-To compensate varying values of$rays_x$, importance $imp_x$ is used as a weighting factor
+To compensate varying values of $rays_x$, importance $imp_x$ is used as a weighting factor
 and extends \eqref{eq:gain} to \eqref{eq:gain_imp}.
 \begin{align}
 imp_x &= 
@@ -282,17 +292,22 @@ and simulation runtime.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.45\textwidth}{!}{\includegraphics{graphics/phiASE_difference_new.png}}}
-  \caption{$\Phi_{ASE\Delta}$ compared with increasing N}
+  \caption{Left: $\Phi_{ASE~IS}(10^5)$. Right:
+    $\Phi_{ASE\Delta}$. With increasing $N$, the difference between
+    $\Phi_{ASE~IS}(10^5)$ and $\Phi_{ASE~Uniform}(N)$ is constantly
+    decreasing.}
   \label{graphic:importance}
 \end{figure}
-
 \subsection{Adaptive sampling (AS)}
 \label{subsec:adaptive_sampling}
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step3_2.png}}}
-  \caption{if the MSE is too high, both importance sampling and gain calculation
-  are restarted with a higher number of rays to increase sampling resolution}
+  \caption{Program flow is extended by adaptive sampling
+    (AS). $MSE(s_i)$ is calculated and compared to a fixed
+    threshold. If the threshold is exceeded, both
+    $importanceSampling(s_i)$ and $calcGainSum(s_i)$ are restarted
+    with a higher number of rays to increase sampling resolution.}
   \label{graphic:pap3}
 \end{figure}
 To assess the precision
@@ -324,7 +339,9 @@ many sample points significantly.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{plot/mse_importance.png}}}
-  \caption{histogram comparing MSE values for IS sampling and Uniform sampling}
+  \caption{Histogram comparing MSE values of importance sampling~(IS)
+    and Uniform sampling. Importance sampling shifts the histogram
+    towards lower MSE values. }
   \label{plot:importance2}
 \end{figure}
 By using also adaptive sampling, the MSE values are reduced to a user-defined MSE threshold.
@@ -334,7 +351,10 @@ per sample point to lower their MSE value. The other sample points could remain 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/mse_adaptive.png}}}
-  \caption{histogram of MSE values IS and IS + AS}
+  \caption{Histogram comparing MSE values of importance sampling~(IS)
+    and importance samling with adaptive sampling~(IS+AS).  The
+    addition of adaptive sampling totally removes high MSE values from
+    the histogram.}
   \label{plot:adaptive}
 \end{figure}
 The adaptive method will not reduce the average MSE over all sample points,
@@ -347,8 +367,11 @@ roughly the same calculation time.
 \begin{figure}[H]
   \centerline
   {\resizebox{0.5\textwidth}{!}{\includegraphics{graphics/PAP_step4_2.png}}}
-  \caption{If the MSE is too high, gain calculation is restarted with another
-    random seed and the same number of rays. The calculated importance will stay the same.}
+  \caption{Program flow is extended by repetitive sampling~(RS).
+    $MSE(s_i)$ is calculated and compared to a fixed threshold. If the
+    threshold is exceeded, $calcGainSum(s_i)$ is restarted with
+    another random seed and the same number of rays. The calculated
+    importance values will stay the same.}
   \label{graphic:pap4}
 \end{figure}
 Some outliers of the Monte-Carlo method are not related to an insufficient
@@ -370,7 +393,12 @@ of 560s.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/repetitive_sampling.png}}}
-  \caption{AS and RS compared by rays per sample point}
+  \caption{Histogram comparing adaptive sampling~(IS+AS) and repetitive
+    sampling~(IS+AS+RS) by rays per sample point.  The addition of
+    repetitive sampling reduces the number of sample points that are
+    sampled with $10^8$ rays. Since this difference has a strong
+    impact on computation time, the duration of the simulation is
+    drastically reduced.}
   \label{plot:repetitive}
 \end{figure}
 
@@ -378,20 +406,22 @@ of 560s.
 In this section, the presented methods IS, AS and RS are compared by runtime
 and precision.
 In Figure~\ref{graphic:methods_compare}, the time to reach an
-MSE value of 0.01 was measured. It is evident that AS and RS perform
-much better than Uniform or IS. 
+MSE value of 0.01 was measured. It is evident that IS+AS and IS+AS+RS perform
+much better than Uniform or IS alone. 
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare.png}}}
-  \caption{Methods with same MSE value}
+  \caption{Comparison of runtimes for the presented methods with same
+    MSE value.  The addition of AS and RS greatly reduce runtime.}
   \label{graphic:methods_compare}
 \end{figure}
 Figure~\ref{graphic:methods_compare2} shows the maximal MSE values
 of the gain medium for a fixed runtime of 10s. Uniform and IS 
-produce higher maxima than AS or RS.
+produce higher maxima than IS+AS or IS+AS+RS.
 \begin{figure}[H]
   \centerline{
     \resizebox{0.5\textwidth}{!}{\includegraphics{graphics/methods_compare2.png}}}
-  \caption{max. MSE values for a fixed runtime of 10s}
+  \caption{Comparison of maximal MSE values for a fixed runtime of~10s. 
+    The addition of AS and RS greatly reduce maximal MSE.}
   \label{graphic:methods_compare2}
 \end{figure}
