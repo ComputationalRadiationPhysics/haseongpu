@@ -1,0 +1,27 @@
+
+\begin{frame}[allowframebreaks=0.8]{Pitfalls}
+  \begin{itemize}
+    \item The packages Beamer-3.10 and PGF-2.10 are required. Update your \TeX{}
+      installation if necessary.
+    \item The template works only with pdf\LaTeX{}. Therefore, graphics files
+      for inclusion should be provided in the PDF format for all kinds of
+      graphics (line graphics, bitmapped images, photographs), PNG for
+      artificially created bitmapped material and photographs, JPEG for
+      photographs. Existing EPS files can be converted to PDF using {\tt
+      epstopdf}, which should be part of every \TeX{} installation.
+    \item This template uses \alert{CM-Bright} as the main text font. It looks
+      good and, unlike CM-Sans which Beamer uses by default, it comes with a
+      suitable math font. Make sure that CM-Bright is installed as Type-1 font
+      in your \TeX{} system. For this, you need the packages `cm-super' and
+      `hfbright' (use the package manager of your \TeX{} system for
+      installation). Otherwise, the bitmapped version of the font is used and
+      the final PDF is of bad quality.
+    \item If you want Arial or Helvetica, as recommended by the corporate design
+      guidelines, you can adjust this in the header of the source file of this
+      document. As both fonts lack a matching math font, the template uses
+      CM-Bright for the glyphs in math mode. For Arial you need the `arial' and
+      for Helvetica the `helvet' \LaTeX{} packages. Package `hfbright' is needed
+      for the math glyphs.
+  \end{itemize}
+\end{frame}
+
