@@ -17,5 +17,7 @@ clean:
 	rm -f *.log
 	rm -f *.run.xml
 	rm -f *.pyg
+	rm -f *.snm
+	rm -f *.nav
 
 
