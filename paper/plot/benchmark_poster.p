@@ -1,11 +1,11 @@
 #! /usr/bin/env gnuplot
 clear
 reset
-set key on
+set key off
 set border 3
 set grid
 
-set key Left top right
+#set key Left top right
 #set key reverse
 set xlabel "time[µs]"
 set ylabel "gain"
@@ -22,8 +22,10 @@ set term pngcairo enhanced font "Serif, 14"
 set output "benchmark_poster.png"
 
 plot\
-"exp_ceramics.dat" u 1:2 t "experimental measurement" with lines lw 4 lt rgb "green",\
-"benchmark_cladding.dat" u 1:(($2*$2) * 1.0263) t "extended ASE simulation" with lines lw 4 lt rgb "blue"
+"benchmark_polychromatic.dat" u 1:(($2*$2) * 1.0263) t "(a)" with lines lw 4,\
+"exp_ceramics.dat" u 1:2 t "experimental measurement" with lines lw 4,\
+"benchmark_cladding.dat" u 1:(($2*$2) * 1.0263) t "extended ASE simulation" with lines lw 4,\
+"benchmark_refl.dat" u 1:(($2*$2) * 1.0263) t "(e)" with lines lw 4
 
 #"benchmark_cladding.dat" u 1:2 t "(c)" with lines lw 4,\
 #"benchmark_polychromatic_refl.dat" u 1:(($2*$2) * 1.0263) t "(c)" with lines lw 4,\
