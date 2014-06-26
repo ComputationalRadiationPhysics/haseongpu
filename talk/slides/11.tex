@@ -1,0 +1,46 @@
+\autobookmark
+\begin{frame}{Restarting the simulation to counter high MSE values}
+  \begin{columns}[T]
+
+    \begin{column}{.3\textwidth}
+      \textbf{graphic: RS Program Flow}
+      \myuncover{3}{3}{\textbf{graphic: RS histogram}}
+    \end{column}
+
+    \begin{column}{.7\textwidth}
+      \begin{itemize}
+          \myuncover{1}{3}{
+            \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
+          }
+          \myuncover{2}{3}{
+            \item Idea: it might be enough to introduce random restarts, since this is much faster than increasing the number of rays
+          }
+      \end{itemize}
+    \end{column}
+
+
+  \end{columns}
+\end{frame}
+
+%\begin{frame}{Predefined colours}
+%  The template defines a set of colours according to the CD guidelines:\par
+%  \begin{itemize}
+%      \begin{minipage}[t]{0.5\linewidth}
+%      \item \textcolor{hzdr-blue}{Helmholtz Blue}    
+%      \item \textcolor{hzdr-orange}{Rossendorf Orange}  
+%      \item \textcolor{hzdr-darkblue}{Helmholtz Dark Blue}
+%      \item \textcolor{hzdr-gray1}{Gray1}   
+%      \item \textcolor{hzdr-gray2}{Gray2}   
+%      \item \textcolor{hzdr-gray3}{Gray3}   
+%      \item \textcolor{hzdr-struct}{Structure of Matter}  
+%      \end{minipage}%
+%      \begin{minipage}[t]{0.5\linewidth}
+%      \item \textcolor{hzdr-health}{Health}  
+%      \item \textcolor{hzdr-energy}{Energy}  
+%      \item \textcolor{hzdr-earth}{Earth and Environment}   
+%      \item \textcolor{hzdr-keytec}{Key Technologies}  
+%      \item \textcolor{hzdr-aero}{Aeronautics, Space and Transport}
+%      \end{minipage}
+%  \end{itemize}
+%\end{frame}
+

@@ -103,8 +103,21 @@
 %the starred version `\partnerlogo*{}' inserts s-t-r-e-t-c-h-a-b-l-e space between the current
 %logo and the next one on its right side: this allows for logos/groups of logos to be
 %aligned flush-left on the page
-%\partnerlogo{\colorbox{gray}{\tiny Logo 1}}% some logo
-%\partnerlogo*{\colorbox{gray}{\tiny Logo 2}}% another logo with stretchable space on its right
+%\partnerlogo*{\colorbox{gray}{\tiny Logo 1}}% some logo
+\partnerlogo{
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.14\paperheight]{graphics/haseOnGPU.png}
+  }{
+    \includegraphics[height=0.06\paperheight]{graphics/haseOnGPU.png}
+  }
+}
+\partnerlogo{
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.1\paperheight]{graphics/ccoe_small.png}
+  }{
+    \includegraphics[height=0.05\paperheight]{graphics/ccoe_small.png}
+  }
+}
 \partnerlogo{% DD-concept logo; note that different versions are used on title and normal slides
   \ifthenelse{\theframenumber=0}{%  %title slide
     \includegraphics[height=0.08\paperheight]{DDC-weisse-schrift}%
@@ -128,11 +141,14 @@
   urlcolor=hzdr-darkblue
 }
 
+%\newcommand{mycom}[2]{}
+
 \begin{document}
 
-\frame{\titlepage}
+\newcommand{\myuncover}[2]{\uncover<{#1}-{#2}>}
+\renewcommand{\myuncover}[2]{}
 
-%\noautobookmark %don't add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
+\frame{\titlepage}
 
 \input{slides/01}
 \input{slides/02}

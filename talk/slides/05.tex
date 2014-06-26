@@ -1,28 +1,48 @@
-\fvset{fontsize=\small}
-\begin{SaveVerbatim}{tooltipUsage}
-  \tooltip[<link colour>]{<link text>}[<tip box colour>]{<tip text>}
-\end{SaveVerbatim}
+\autobookmark
+\begin{frame}{Monte Carlo integration is a scalable simulation method}
+  \begin{columns}[T]
 
-\begin{frame}{Tooltips}
+    \begin{column}{.5\textwidth}
+      \textbf{graphic:integration transformed into MC}
+    \end{column}
 
-  In addition to the standard Beamer class features, this template defines a
-  command for inserting Pop-Up boxes into the slide text:
+    \begin{column}{.5\textwidth}
+      \begin{itemize}
+        \item Monte Carlo integration can be transformed into a sum
+        \myuncover{2}{3}{
+          \begin{equation}
+            \int_{N}{f(x) dx} \Rightarrow \sum^{N}_{i=1}{f(i)}
+          \end{equation}
+        }
+        \myuncover{3}{3}{
+        \item All elements of the sum are mutually independent, which is great
+          for parallelization
+        }
+      \end{itemize}
+    \end{column}
 
-  \UseVerbatim{tooltipUsage}
-
-  Pop-ups work well in Adobe Reader. They can be dragged around and pinned down
-  at another location on the page; just click the link text. Longer tip text
-  spanning multiple lines should be placed into a \texttt{\string\parbox} which
-  should not be wider than \texttt{\string\linewidth}.
-
-  \vspace{2ex}
-
-  Here is an example text with pop-ups using default colours:
-
-  \vspace{1ex}
-
-  Einstein's \tooltip{formula}{$E=m c^2$} is well known. Another famous formula
-  is due to \tooltip{Pythagoras}{$a^2+b^2=c^2$}.
-
+  \end{columns}
 \end{frame}
+
+%\begin{frame}{Predefined colours}
+%  The template defines a set of colours according to the CD guidelines:\par
+%  \begin{itemize}
+%      \begin{minipage}[t]{0.5\linewidth}
+%      \item \textcolor{hzdr-blue}{Helmholtz Blue}    
+%      \item \textcolor{hzdr-orange}{Rossendorf Orange}  
+%      \item \textcolor{hzdr-darkblue}{Helmholtz Dark Blue}
+%      \item \textcolor{hzdr-gray1}{Gray1}   
+%      \item \textcolor{hzdr-gray2}{Gray2}   
+%      \item \textcolor{hzdr-gray3}{Gray3}   
+%      \item \textcolor{hzdr-struct}{Structure of Matter}  
+%      \end{minipage}%
+%      \begin{minipage}[t]{0.5\linewidth}
+%      \item \textcolor{hzdr-health}{Health}  
+%      \item \textcolor{hzdr-energy}{Energy}  
+%      \item \textcolor{hzdr-earth}{Earth and Environment}   
+%      \item \textcolor{hzdr-keytec}{Key Technologies}  
+%      \item \textcolor{hzdr-aero}{Aeronautics, Space and Transport}
+%      \end{minipage}
+%  \end{itemize}
+%\end{frame}
 
