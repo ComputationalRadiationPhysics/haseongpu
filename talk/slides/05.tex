@@ -1,0 +1,28 @@
+\fvset{fontsize=\small}
+\begin{SaveVerbatim}{tooltipUsage}
+  \tooltip[<link colour>]{<link text>}[<tip box colour>]{<tip text>}
+\end{SaveVerbatim}
+
+\begin{frame}{Tooltips}
+
+  In addition to the standard Beamer class features, this template defines a
+  command for inserting Pop-Up boxes into the slide text:
+
+  \UseVerbatim{tooltipUsage}
+
+  Pop-ups work well in Adobe Reader. They can be dragged around and pinned down
+  at another location on the page; just click the link text. Longer tip text
+  spanning multiple lines should be placed into a \texttt{\string\parbox} which
+  should not be wider than \texttt{\string\linewidth}.
+
+  \vspace{2ex}
+
+  Here is an example text with pop-ups using default colours:
+
+  \vspace{1ex}
+
+  Einstein's \tooltip{formula}{$E=m c^2$} is well known. Another famous formula
+  is due to \tooltip{Pythagoras}{$a^2+b^2=c^2$}.
+
+\end{frame}
+

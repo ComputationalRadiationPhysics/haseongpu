@@ -1,77 +1,153 @@
-\documentclass[12pt]{article}
+%
+% Template for videoprojector foils according to the HZDR corporate design
+% 
+% (C) 2011 Alexander Grahn, HZDR, Institut fuer Sicherheitsforschung
+%
+% Version 20131126
+%
+\documentclass[
+%  aspectratio=43, %default screen size (4:3); other values: 1610, 169, 149, 54, 32
+%  smaller, %uncomment this to fit more text onto the slides (similar to the CD suggestions)
+  intlimits %put limits of integrals above and below the integral symbol
+]{beamer}
 
-\title{HASEonGPU talk - AAC jena 2014}
-\author{E. Zenker, C. Eckert}
-\date{\today}
+%\usepackage[ngerman]{babel}
+\usepackage[UKenglish]{babel}
+
+%my favourite packages
+\usepackage[latin1]{inputenc} %type in accented characters easily, i. e. ä instead of \"a 
+%\usepackage{siunitx} %easy input & nice formatting of phys. quantities (number + SI unit)
+%\usepackage{latexsym}
+%\usepackage{amssymb}
+\usepackage{media9}
+%\usepackage{animate}
+\usepackage{ragged2e}\RaggedRight
+\usepackage{fancyvrb}
+\usepackage{ifthen}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% some optional settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%uncomment this if you want the title page text aligned flushleft; CD rules seem to
+%demand this, although it looks awful
+%\def\titleflushleft{}
+
+%uncomment this if you want frame titles centred
+%\def\frametitlecentered{}
+
+%uncomment this if you don't like the wallclock
+%\def\noclock{}
+
+%uncomment this if you don't like the navigation buttons
+%\def\nonavigation{}
+
+%uncomment this if you want Arial as the main text font (very ugly),
+%no matching math font, using CM-Bright for math text
+%\def\arial{}
+
+%uncomment this if you want Helvetica as the main text font (very ugly),
+%Helvetica is very similar to Arial; again, no matching math font, using CM-Bright for
+%math text
+%\def\helvetica{}
+
+%hzdr colours used for various text highlights; see manual `beameruserguide.pdf',
+%chapter 12 for further possibilities
+                                               %colour will be used in:
+\setbeamercolor{alerted text}{fg=hzdr-orange}  %\alert{text to be highlighted},
+                                               %\begin{alertenv} ... \end{alertenv}
+                                               %\begin{alertblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{alertblock}
+
+\setbeamercolor{example text}{fg=hzdr-darkblue}%\begin{exampleblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{exampleblock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%hzdr theme
+\makeatletter
+\def\input@path{{beamerthemehzdr/}}
+\makeatother
+\usetheme{hzdr}
+
+%%%%%%%%%%%% title, author, date, institute, additional logos %%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{HASEonGPU}
+\subtitle{An Open-Source ASE code for calculating the gain in high power laser media on GPU clusters}% may be left empty, of course
+
+%[short version of authors to be used in footlines]{long version in the title page}
+\author[C. Eckert, E. Zenker et al.]{
+\texorpdfstring{\underline{Carlchristian Eckert}\inst{1}}{},
+\texorpdfstring{\underline{Erik Zenker}\inst{1}}{}
+}
+
+
+%\date{\today}
+\date{15th July 2014}
+
+\institute[
+ %short version of main authors' institute, used in the footline
+ \iflanguage{ngerman}{%
+   Institut für Strahlenphysik%
+ }{%
+   Institute of Radiation Physics%
+ }%
+]{%
+ %used in the title page
+ \iflanguage{ngerman}{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institut für Strahlenphysik\\
+ }{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institute of Radiation Physics\\
+ }%
+}
+
+%every invocation of the macro \partnerlogo{...} adds YET ANOTHER partner logo to the
+%right of the already inserted partner logos;
+%the starred version `\partnerlogo*{}' inserts s-t-r-e-t-c-h-a-b-l-e space between the current
+%logo and the next one on its right side: this allows for logos/groups of logos to be
+%aligned flush-left on the page
+%\partnerlogo{\colorbox{gray}{\tiny Logo 1}}% some logo
+%\partnerlogo*{\colorbox{gray}{\tiny Logo 2}}% another logo with stretchable space on its right
+\partnerlogo{% DD-concept logo; note that different versions are used on title and normal slides
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.08\paperheight]{DDC-weisse-schrift}%
+  }{%                               %normal slides
+    \includegraphics[height=0.05\paperheight]{DDC-orig}%
+  }%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\hypersetup{%
+  breaklinks,colorlinks,
+  %pdfpagemode=FullScreen,
+  pdfhighlight=/P,
+  linkcolor=hzdr-darkblue,
+  linkcolor=hzdr-darkblue,
+  anchorcolor=hzdr-darkblue,
+  citecolor=hzdr-darkblue,
+  filecolor=hzdr-darkblue,
+  menucolor=hzdr-darkblue,
+  runcolor=hzdr-darkblue,
+  urlcolor=hzdr-darkblue
+}
 
 \begin{document}
-\maketitle
 
-\section{Outline}
-\begin{enumerate}
-\item ASE physics (not too much details!)
-  \begin{enumerate}
-  \item gain medium is pumped
-  \item spontaneous emission of photons
-  \item amplification of photons
-  \item loss of pumped energie (pump plot + 3D dndt ASE)
-  \item motivation for ASE flux calculation in laser physics
-    \begin{itemize}
-      \item wall plug efficiency, for efficient laser systems (use
-        cases)
-      \item higher resolution of gain medium
-      \item large gain media
-      \item fundamental process (no simplified formula)
-      \item there are no tools able to simulate ASE fast
-      \item ASE sim $\rightarrow$ Temp $\rightarrow$ optical,
-        mechanical transformation $\rightarrow$ ASE sim (multiscale
-        simulation)
-    \end{itemize}
-  \end{enumerate}
-\item simulating ASE with Monte Carlo (transition to parallel simulation)
-  \begin{enumerate}
-  \item describe meshed gain medium
-  \item $\Phi$ ASE formula
-  \item describe Monte Carlo integration in general (see wikipedia)
-  \item transformation of $\Phi$ ASE formula to Monte Carlo integration formula
-  \item Monte Carlo integration solved by raytracing
-  \end{enumerate}
-\item parallelization of Monte Carlo (main focus!)
-  \begin{enumerate}
-  \item Monte Carlo is suitable for usage of accelerator hardware (CUDA)
-  \item rays
-    \begin{enumerate}
-    \item processing of rays by threads
-    \item distribution of rays (IS, load balancing on ray level)
-    \item memory usage
-    \item MSE
-    \item AS + RS
-    \end{enumerate}
-  \item sample points
-    \begin{enumerate}
-    \item load balancing on sample point level (MPI)
-    \end{enumerate}
-  \end{enumerate}
-  \item result
-    \begin{enumerate}
-      \item validation
-        \begin{itemize}
-          \item experiment plot + simulated mesh and size of simulation
-          \item simulation plot (no fit!)
-          \item give feeling for runtime of whole simulation
-        \end{itemize}
-      \item runtime (CPU vs. GPU also for whole simulation aproximated)
-      \item scaling
-        \begin{itemize}
-          \item large gain media, require large cluster systems
-          \item almost perfect strong scaling of Monte Carlo code
-        \end{itemize}
-      \item conclusion
-        \begin{itemize}
-          \item future: ASE simulation of massive gain media
-          \item simulate loop for large gain media in reasonable amount of time
-        \end{itemize}
-    \end{enumerate}
-\end{enumerate}
+\frame{\titlepage}
+
+%\noautobookmark %don't add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
+
+\input{slides/01}
+\input{slides/02}
+\input{slides/03}
+\input{slides/04}
+\input{slides/05}
+\input{slides/06}
+\input{slides/07}
+\input{slides/08}
+\input{slides/09}
+\input{slides/10}
+\input{slides/11}
+\input{slides/12}
+\input{slides/13}
+\input{slides/14}
+\input{slides/15}
+
 \end{document}
-
