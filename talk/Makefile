@@ -1,8 +1,10 @@
+MAIN_DOCUMENT?=talk
+
 all: outline talk
 
 talk: *.tex
-	pdflatex talk.tex
-	pdflatex talk.tex
+	pdflatex $(MAIN_DOCUMENT).tex
+	pdflatex $(MAIN_DOCUMENT).tex
 
 outline: outline.tex
 	pdflatex outline.tex

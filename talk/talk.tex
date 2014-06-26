@@ -69,30 +69,32 @@
 \usetheme{hzdr}
 
 %%%%%%%%%%%% title, author, date, institute, additional logos %%%%%%%%%%%%%%%%%%%%%%%%%%%
-\title{Preparing beautiful presentations\\ in the HZDR style}
-\subtitle{---A \LaTeX{} template---} % may be left empty, of course
+\title{HASEonGPU}
+\subtitle{An Open-Source ASE code for calculating the gain in high power laser media on GPU clusters}% may be left empty, of course
 
 %[short version of authors to be used in footlines]{long version in the title page}
-\author[A. Grahn et al.]{\underline{Alexander Grahn}\inst{1}, John Doe\inst{2}, Jane Roe\inst{2}}
+\author[C. Eckert, E. Zenker et al.]{
+\texorpdfstring{\underline{Carlchristian Eckert}\inst{1}}{},
+\texorpdfstring{\underline{Erik Zenker}\inst{1}}{}
+}
 
-\date{\today}
-%\date{1st January 2011}
+
+%\date{\today}
+\date{15th July 2014}
 
 \institute[
  %short version of main authors' institute, used in the footline
  \iflanguage{ngerman}{%
-   Institut für Ressourcenökologie%
+   Institut für Strahlenphysik%
  }{%
-   Institute of Resource Ecology%
+   Institute of Radiation Physics%
  }%
 ]{%
  %used in the title page
  \iflanguage{ngerman}{%
-   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institut für Ressourcenökologie\\
-   \inst{2}Massachusetts Institute of Technology, Media Lab%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institut für Strahlenphysik\\
  }{%
-   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institute of Resource Ecology\\
-   \inst{2}Massachusetts Institute of Technology, Media Lab%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institute of Radiation Physics\\
  }%
 }
 
@@ -101,8 +103,8 @@
 %the starred version `\partnerlogo*{}' inserts s-t-r-e-t-c-h-a-b-l-e space between the current
 %logo and the next one on its right side: this allows for logos/groups of logos to be
 %aligned flush-left on the page
-\partnerlogo{\colorbox{gray}{\tiny Logo 1}}% some logo
-\partnerlogo*{\colorbox{gray}{\tiny Logo 2}}% another logo with stretchable space on its right
+%\partnerlogo{\colorbox{gray}{\tiny Logo 1}}% some logo
+%\partnerlogo*{\colorbox{gray}{\tiny Logo 2}}% another logo with stretchable space on its right
 \partnerlogo{% DD-concept logo; note that different versions are used on title and normal slides
   \ifthenelse{\theframenumber=0}{%  %title slide
     \includegraphics[height=0.08\paperheight]{DDC-weisse-schrift}%
@@ -130,10 +132,11 @@
 
 \frame{\titlepage}
 
+%\noautobookmark %don't add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
+
 \input{slides/01}
 \input{slides/02}
 \input{slides/03}
-\noautobookmark %don't add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
 \input{slides/04}
 \input{slides/05}
 \input{slides/06}
