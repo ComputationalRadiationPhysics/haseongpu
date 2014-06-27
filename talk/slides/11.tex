@@ -2,12 +2,14 @@
 \begin{frame}{Restarting the simulation to counter high MSE values}
   \begin{columns}[T]
 
-    \begin{column}{.3\textwidth}
-      \textbf{graphic: RS Program Flow}
-      \myuncover{3}{3}{\textbf{graphic: RS histogram}}
+    \begin{column}{.5\textwidth}
+      \includegraphics[height=0.35\paperheight]{graphics/PAP_step4_2.png}
+      \myuncover{3}{3}{
+        \includegraphics[height=0.35\paperheight]{graphics/repetitive_sampling.png}
+      }
     \end{column}
 
-    \begin{column}{.7\textwidth}
+    \begin{column}{.5\textwidth}
       \begin{itemize}
           \myuncover{1}{3}{
             \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
