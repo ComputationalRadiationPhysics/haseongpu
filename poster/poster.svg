@@ -12,7 +12,7 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   sodipodi:docname="poster.svg"
+   sodipodi:docname="poster.pdf"
    inkscape:version="0.48.5 r10040"
    version="1.1"
    id="svg17081"
@@ -25,9 +25,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.25"
-     inkscape:cx="1559.8247"
-     inkscape:cy="1568.5512"
+     inkscape:zoom="0.125"
+     inkscape:cx="4532.9723"
+     inkscape:cy="2891.0784"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -921,7 +921,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -3169,7 +3169,7 @@
          style="font-size:70px;fill:#ffffff"
          y="-2648.5334"
          x="160.20091"
-         sodipodi:role="line">Erik Zenker Carlchristian Eckert</tspan></text>
+         sodipodi:role="line">Erik Zenker, Carlchristian Eckert</tspan></text>
     <rect
        transform="translate(0,-3160.6299)"
        y="-0.22211251"
@@ -5985,33 +5985,33 @@
        style="font-size:39.92732239px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#00589c;fill-opacity:0.97254902;stroke:none;font-family:Sans"
        xml:space="preserve"><tspan
          id="tspan34394-9"
-         style="font-size:80px;fill:#00589c;fill-opacity:0.97254902000000021"
+         style="font-size:80px;fill:#00589c;fill-opacity:0.97254902"
          y="-335.82153"
          x="1660.1472"
          sodipodi:role="line">The method</tspan><tspan
-         style="font-size:20px;fill:#00589c;fill-opacity:0.97254901999999999"
-         y="-236.00322"
+         style="font-size:20px;fill:#00589c;fill-opacity:0.97254902"
+         y="-295.6265"
          x="1660.1472"
          sodipodi:role="line"
          id="tspan17688"> </tspan><tspan
          id="tspan5771"
          style="font-size:60px;fill:#000000;fill-opacity:0.97254902"
-         y="-155.97502"
+         y="-230.75652"
          x="1660.1472"
-         sodipodi:role="line">Raytracing through the gain medium by</tspan><tspan
+         sodipodi:role="line">Ray tracing through the gain medium by</tspan><tspan
          id="tspan5773"
          style="font-size:60px;fill:#000000;fill-opacity:0.97254902"
-         y="-80.975021"
+         y="-155.75652"
          x="1660.1472"
-         sodipodi:role="line">millions of rays per sample point in parallel</tspan><tspan
+         sodipodi:role="line">millions of rays in parallel</tspan><tspan
          id="tspan5763"
          style="font-size:79.85464478px;fill:#00589c;fill-opacity:0.97254902"
-         y="-5.9750218"
+         y="-80.756516"
          x="1660.1472"
          sodipodi:role="line" /><tspan
          id="tspan5765"
          style="font-size:79.85464478px;fill:#00589c;fill-opacity:0.97254902"
-         y="69.024979"
+         y="-5.7565165"
          x="1660.1472"
          sodipodi:role="line" /></text>
     <text
@@ -6707,7 +6707,7 @@
            id="rect5584"
            style="fill:#ffffff;fill-opacity:1;stroke:none" />
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4764">
           <path
              id="path4766"
@@ -6725,7 +6725,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4772">
           <path
              id="path4774"
@@ -6734,7 +6734,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4784">
           <path
              id="path4786"
@@ -6752,7 +6752,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4792">
           <path
              id="path4794"
@@ -6761,7 +6761,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4804">
           <path
              id="path4806"
@@ -6779,7 +6779,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4812">
           <path
              id="path4814"
@@ -6788,7 +6788,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4824">
           <path
              id="path4826"
@@ -6806,7 +6806,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4832">
           <path
              id="path4834"
@@ -6815,7 +6815,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4844">
           <path
              id="path4846"
@@ -6833,7 +6833,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4852">
           <path
              id="path4854"
@@ -6842,7 +6842,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869497,0,0,1.6262579,1630.0441,-2266.0271)"
            id="g4864">
           <path
              id="path4866"
@@ -6860,21 +6860,12 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.6242925,0,0,1.6242925,1616.7253,-2265.8159)"
            id="g4872">
           <path
              id="path4874"
              style="fill:none;stroke:#000000;stroke-width:0.25;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:3.79999995;stroke-opacity:1;stroke-dasharray:none"
              d="m 343.199,33.102 -4.301,0"
-             inkscape:connector-curvature="0" />
-        </g>
-        <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
-           id="g4884">
-          <path
-             id="path4886"
-             style="fill:none;stroke:#000000;stroke-width:0.15000001;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:3.79999995;stroke-opacity:1;stroke-dasharray:0.2, 2;stroke-dashoffset:0"
-             d="m 95.449,181.801 0,-122.699"
              inkscape:connector-curvature="0" />
         </g>
         <g
@@ -6888,15 +6879,6 @@
         </g>
         <g
            transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
-           id="g4892">
-          <path
-             id="path4894"
-             style="fill:none;stroke:#000000;stroke-width:0.25;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:3.79999995;stroke-opacity:1;stroke-dasharray:none"
-             d="m 95.449,181.801 0,-4.301"
-             inkscape:connector-curvature="0" />
-        </g>
-        <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
            id="g4896">
           <path
              id="path4898"
@@ -6905,7 +6887,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.9305628,0,0,1.9305628,1577.5236,-2321.5191)"
            id="g4904">
           <path
              id="path4906"
@@ -7031,7 +7013,7 @@
              style="font-size:15.15953541px;font-variant:normal;font-weight:normal;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:DejaVu Serif;-inkscape-font-specification:DejaVuSerif">1060</tspan>
         </text>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5865575,0,0,1.6242925,1630.0771,-2265.8159)"
            id="g4956">
           <path
              id="path4958"
@@ -7060,17 +7042,17 @@
         <text
            style="font-size:25.01456451px"
            id="text4980"
-           x="1809.3705"
-           y="-2151.8665">
+           x="1783.3705"
+           y="-2145.8665">
           <tspan
              id="tspan4982"
              sodipodi:role="line"
-             y="-2151.8665"
-             x="1809.3705 1823.0474 1840.8295 1846.8215 1856.4324 1866.0625 1872.0548 1883.3389"
-             style="font-size:19.45509529px;font-variant:normal;font-weight:normal;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:DejaVu Serif;-inkscape-font-specification:DejaVuSerif">Emission</tspan>
+             y="-2145.8665"
+             x="1783.3705 1797.0474 1814.8295 1820.8215 1830.4324 1840.0625 1846.0548 1857.3389"
+             style="font-size:18px;font-variant:normal;font-weight:normal;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:DejaVu Serif;-inkscape-font-specification:DejaVuSerif">Emission</tspan>
         </text>
         <g
-           transform="matrix(2.084547,0,0,2.084547,1612.0143,-2247.4199)"
+           transform="matrix(2.084547,0,0,2.084547,1570.0143,-2241.4199)"
            id="g4984">
           <path
              id="path4986"
@@ -7081,17 +7063,17 @@
         <text
            style="font-size:25.01456451px"
            id="text4988"
-           x="1809.3705"
-           y="-2129.2539">
+           x="1783.3705"
+           y="-2123.2539">
           <tspan
              id="tspan4990"
              sodipodi:role="line"
-             y="-2129.2539"
-             x="1809.3705 1822.9113 1834.9152 1844.5453 1855.8488 1864.8176 1876.8213 1884.3309 1890.3232 1901.6071"
-             style="font-size:19.45509529px;font-variant:normal;font-weight:normal;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:DejaVu Serif;-inkscape-font-specification:DejaVuSerif">Absorption</tspan>
+             y="-2123.2539"
+             x="1783.3705 1796.9113 1808.9152 1818.5453 1829.8488 1838.8176 1850.8213 1858.3309 1864.3232 1875.6071"
+             style="font-size:18px;font-variant:normal;font-weight:normal;writing-mode:lr-tb;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:DejaVu Serif;-inkscape-font-specification:DejaVuSerif">Absorption</tspan>
         </text>
         <g
-           transform="matrix(2.084547,0,0,2.084547,1612.0143,-2247.4199)"
+           transform="matrix(2.084547,0,0,2.084547,1570.0143,-2241.4199)"
            id="g4992">
           <path
              id="path4994"
@@ -7100,7 +7082,7 @@
              inkscape:connector-curvature="0" />
         </g>
         <g
-           transform="matrix(1.6242925,0,0,1.6242925,1626.7253,-2265.8159)"
+           transform="matrix(1.5869644,0,0,1.6242925,1630.0409,-2265.8159)"
            id="g4996">
           <path
              id="path4998"
@@ -7111,13 +7093,13 @@
         <text
            sodipodi:linespacing="125%"
            id="text5580"
-           y="-2182.1377"
-           x="1806"
+           y="-2180.7805"
+           x="1792.5967"
            style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
            xml:space="preserve"><tspan
              style="font-size:30px"
-             y="-2182.1377"
-             x="1806"
+             y="-2180.7805"
+             x="1792.5967"
              id="tspan5582"
              sodipodi:role="line">Polychromatic spectrum</tspan></text>
       </g>
@@ -7494,7 +7476,7 @@
                  y="95.219322"
                  clip-path="none" />
               <path
-                 style="fill:none;stroke:#000000;stroke-width:3;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:6, 3;stroke-dashoffset:0;display:inline"
+                 style="fill:none;stroke:#000000;stroke-width:2.99946236;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:5.99892471,2.99946236;stroke-dashoffset:0;display:inline;marker-start:url(#marker17325)"
                  d="m 240,156.6479 0,98"
                  id="path44820"
                  inkscape:connector-curvature="0" />
@@ -7505,7 +7487,7 @@
                id="layer5-7">
               <path
                  style="fill:none;stroke:#ff0000;stroke-width:3;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:none;marker-mid:none;marker-end:url(#TriangleOutM);display:inline"
-                 d="M 254.14521,215.70814 200.80663,88.3987"
+                 d="M 254.14521,215.70814 205.83262,96.435746"
                  id="path11411"
                  inkscape:connector-curvature="0"
                  transform="translate(-10,-20)"
@@ -7990,7 +7972,8 @@
           </defs>
           <g
              id="textext-b09502f6-11"
-             style="stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none">
+             style="stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none"
+             transform="translate(3.277688,-0.6555376)">
             <g
                id="g14538"
                style="fill:#000000;fill-opacity:1;stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none">
@@ -8095,18 +8078,6 @@
                  height="4212.9922"
                  style="stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none" />
             </g>
-            <g
-               id="g14568"
-               style="fill:#000000;fill-opacity:1;stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none">
-              <use
-                 id="use14570"
-                 y="136.259"
-                 x="279.323"
-                 xlink:href="#textext-b09502f6-10"
-                 width="2979.9211"
-                 height="4212.9922"
-                 style="stroke-width:0.58069277;stroke-miterlimit:4;stroke-dasharray:none" />
-            </g>
           </g>
         </g>
       </g>
@@ -8114,14 +8085,14 @@
     <text
        xml:space="preserve"
        style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
-       x="1012"
-       y="838.3623"
+       x="1010"
+       y="846.3623"
        id="text17869"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
          id="tspan17871"
-         x="1012"
-         y="838.3623">HASEonGPU to be published</tspan></text>
+         x="1010"
+         y="846.3623">HASEonGPU to be published, available at github.com/ComputationalRadiationPhysics </tspan></text>
   </g>
   <g
      sodipodi:insensitive="true"
