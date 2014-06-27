@@ -104,13 +104,13 @@
 %logo and the next one on its right side: this allows for logos/groups of logos to be
 %aligned flush-left on the page
 %\partnerlogo*{\colorbox{gray}{\tiny Logo 1}}% some logo
-\partnerlogo{
-  \ifthenelse{\theframenumber=0}{%  %title slide
-    \includegraphics[height=0.14\paperheight]{graphics/haseOnGPU.png}
-  }{
-    \includegraphics[height=0.06\paperheight]{graphics/haseOnGPU.png}
-  }
-}
+%\partnerlogo{
+%  \ifthenelse{\theframenumber=0}{%  %title slide
+%    \includegraphics[height=0.14\paperheight]{graphics/haseOnGPU.png}
+%  }{
+%    \includegraphics[height=0.06\paperheight]{graphics/haseOnGPU.png}
+%  }
+%}
 \partnerlogo{
   \ifthenelse{\theframenumber=0}{%  %title slide
     \includegraphics[height=0.1\paperheight]{graphics/ccoe_small.png}
@@ -146,7 +146,9 @@
 \begin{document}
 
 \newcommand{\myuncover}[2]{\uncover<{#1}-{#2}>}
+\newcommand{\myonly}[1]{\only<{#1}>}
 \renewcommand{\myuncover}[2]{}
+%\renewcommand{\myonly}[1]{}
 
 \frame{\titlepage}
 
@@ -165,5 +167,6 @@
 \input{slides/13}
 \input{slides/14}
 \input{slides/15}
+\input{slides/16}
 
 \end{document}
