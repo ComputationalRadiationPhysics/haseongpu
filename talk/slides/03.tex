@@ -1,22 +1,23 @@
 \autobookmark
-\begin{frame}{A fast simulation will enable new use cases}
-  \begin{columns}[T]
-
-    \begin{column}{.3\textwidth}
-      \textbf{graphic: cycle between ASE calculation and it's temperature influence}
+\begin{frame}{A fast simulation enables simulation of the ASE-temperature equilibrium}
+  \begin{columns}
+    \begin{column}{.5\textwidth}
+      \myonly{1}{\includegraphics[width=\textwidth]{graphics/ASE_temperature_equilibrium1.png}}
+      \myonly{2}{\includegraphics[width=\textwidth]{graphics/ASE_temperature_equilibrium2.png}}
+      \myonly{3-4}{\includegraphics[width=\textwidth]{graphics/ASE_temperature_equilibrium3.png}}
     \end{column}
-
-    \begin{column}{.7\textwidth}
+    \begin{column}{.5\textwidth}
       \begin{itemize}
-          \myuncover{1}{3}{
-          \item ASE influences temperature of the gain medium\\[1ex]
+          \myuncover{2}{4}{
+          \item The energy from ASE increases the temperature of the gain medium
           }
-          \myuncover{2}{3}{
+          \myuncover{3}{4}{
           \item The change in temperature creates mechanical and optical
-            changes, which influence the behaviour of the medium\\[1ex]
+            changes, which influence the ASE
           }
-          \myuncover{3}{3}{
-          \item This calculation is iterative, takes a long time. Only practival for very simplified models
+          \myuncover{4}{4}{
+          \item The calculation of ASE is time-consuming, making an iterative
+            computation very costly
           }
       \end{itemize}
     \end{column}
