@@ -25,11 +25,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.25"
-     inkscape:cx="2794.0634"
-     inkscape:cy="3027.6538"
+     inkscape:zoom="0.1767767"
+     inkscape:cx="3132.9764"
+     inkscape:cy="1928.4217"
      inkscape:document-units="mm"
-     inkscape:current-layer="g5586"
+     inkscape:current-layer="textext-b3725351-41"
      showgrid="false"
      borderlayer="false"
      showborder="true"
@@ -925,7 +925,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -2489,7 +2489,8 @@
           </g>
           <g
              id="g11653"
-             style="fill:#000000;fill-opacity:1">
+             style="fill:#000000;fill-opacity:1"
+             transform="translate(2.3561978,0)">
             <use
                id="use11655"
                y="125.454"
@@ -2848,6 +2849,18 @@
                width="2104.7244"
                height="2979.9211" />
           </g>
+          <g
+             style="fill:#000000;fill-opacity:1"
+             id="g4495"
+             transform="translate(-2.9452472,0)">
+            <use
+               height="2979.9211"
+               width="2104.7244"
+               xlink:href="#textext-b3725351-32"
+               x="358.42001"
+               y="125.454"
+               id="use4497" />
+          </g>
         </g>
       </g>
       <text
@@ -3166,14 +3179,14 @@
          sodipodi:role="line">gain in high power laser media on GPU clusters</tspan><tspan
          id="tspan4386"
          style="font-size:60px;fill:#ffffff"
-         y="-2746.001"
+         y="-2736.0334"
          x="160.20091"
-         sodipodi:role="line"> </tspan><tspan
+         sodipodi:role="line" /><tspan
          id="tspan4398"
          style="font-size:70px;fill:#ffffff"
-         y="-2661.0334"
+         y="-2648.5334"
          x="160.20091"
-         sodipodi:role="line">Erik Zenker, Carlchristian Eckert</tspan></text>
+         sodipodi:role="line">E. Zenker, C. Eckert, D. Albach, M. Bussmann</tspan></text>
     <rect
        transform="translate(0,-3160.6299)"
        y="-0.22211251"
@@ -6059,7 +6072,7 @@
          style="font-size:50px;fill:#cf6800;fill-opacity:1"
          y="-1599.2841"
          x="1013.0448"
-         sodipodi:role="line">   gain medium :</tspan><tspan
+         sodipodi:role="line">   gain medium</tspan><tspan
          id="tspan37660"
          style="font-size:50px;fill:#cf6800;fill-opacity:1"
          y="-1536.7841"
@@ -7890,7 +7903,7 @@
          id="tspan17871"
          x="998"
          y="804.3623"
-         style="font-size:35px">HASEonGPU to be published, Open-Source code available at </tspan><tspan
+         style="font-size:35px">HASEonGPU paper to be published, Open-Source code available at </tspan><tspan
          sodipodi:role="line"
          x="998"
          y="848.1123"
