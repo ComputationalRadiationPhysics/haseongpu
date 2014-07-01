@@ -1,22 +1,20 @@
 \autobookmark
-\begin{frame}{Adaptive number of rays to counter high MSE values}
+\begin{frame}[t]{Adaptive number of rays to counter high MSE values}
   \begin{columns}[T]
     \begin{column}{.5\textwidth}
-      \includegraphics[width=0.4\paperwidth]{graphics/PAP_step3_2.png}\\
-      \myuncover{2}{2}{\includegraphics[width=0.35\paperwidth]{graphics/mse_adaptive.png}}
+      \hfill
+      \myonly{1}{\includegraphics[width=.7\textwidth]{graphics/ray_distributions3.png}}
+      \myonly{2}{\includegraphics[width=.7\textwidth]{graphics/ray_distributions4.png}}\\[1ex]
+      \hfill
+      \myonly{1}{\includegraphics[width=.7\textwidth]{graphics/mse_adaptive.png}}
+      \myonly{2}{\includegraphics[width=.7\textwidth]{graphics/mse_adaptive.png}}
     \end{column}
     \begin{column}{.5\textwidth}
       \begin{itemize}
-          \myuncover{1}{2}{
-            \item If the MSE is too high, repeat processing for this sample point with more rays
-          }
-          \myuncover{2}{2}{
-            \item This adaptive sampling can limit the maximal MSE to a fixed threshold
-          }
+        \item If the MSE is too high, repeat processing for this sample point with more rays
+        \item This adaptive sampling can limit the maximal MSE to a fixed threshold
       \end{itemize}
     \end{column}
-
-
   \end{columns}
 \end{frame}
 
