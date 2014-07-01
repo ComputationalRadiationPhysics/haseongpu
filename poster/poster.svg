@@ -25,11 +25,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.1767767"
-     inkscape:cx="3132.9764"
-     inkscape:cy="1928.4217"
+     inkscape:zoom="0.25000001"
+     inkscape:cx="2199.8686"
+     inkscape:cy="1787.5276"
      inkscape:document-units="mm"
-     inkscape:current-layer="textext-b3725351-41"
+     inkscape:current-layer="layer1"
      showgrid="false"
      borderlayer="false"
      showborder="true"
@@ -42,7 +42,7 @@
      inkscape:snap-nodes="false"
      inkscape:window-width="1678"
      inkscape:window-height="1029"
-     inkscape:window-x="1688"
+     inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
      inkscape:snap-to-guides="true"
@@ -1027,7 +1027,7 @@
          y="-2380.2532"
          x="49.439438"
          sodipodi:role="line"
-         id="tspan17676"> </tspan><tspan
+         id="tspan17676">           </tspan><tspan
          id="tspan5739"
          style="font-size:60px;fill:#000000;fill-opacity:1"
          y="-2315.3833"
@@ -3257,7 +3257,7 @@
          style="font-size:20px;fill:#000000;fill-opacity:0.97254902"
          y="-2379.917"
          x="1655.3031"
-         sodipodi:role="line"> </tspan><tspan
+         sodipodi:role="line">    </tspan><tspan
          style="font-size:60px;fill:#000000;fill-opacity:0.97254902"
          y="-2315.0471"
          x="1655.3031"
@@ -3447,16 +3447,16 @@
          y="-347.41608"
          x="46.455757"
          sodipodi:role="line">massive laser gain media</tspan><tspan
-         id="tspan5757"
-         style="font-size:20px;fill:#000000;fill-opacity:1"
-         y="-307.22104"
-         x="46.455757"
-         sodipodi:role="line"> </tspan><tspan
-         style="font-size:60px;fill:#000000;fill-opacity:1"
-         y="-242.35106"
+         style="font-size:20.00000008px;fill:#000000;fill-opacity:1"
+         y="-267.35107"
          x="46.455757"
          sodipodi:role="line"
-         id="tspan17684">Increase size and spatial resolution</tspan></text>
+         id="tspan17684">           </tspan><tspan
+         style="font-size:60px;fill:#000000;fill-opacity:1"
+         y="-192.35106"
+         x="46.455757"
+         sodipodi:role="line"
+         id="tspan4501">Increase size and spatial resolution</tspan></text>
     <g
        transform="translate(33.342424,36.485281)"
        id="g34505">
@@ -6010,7 +6010,7 @@
          y="-295.6265"
          x="1660.1472"
          sodipodi:role="line"
-         id="tspan17688"> </tspan><tspan
+         id="tspan17688">   </tspan><tspan
          id="tspan5771"
          style="font-size:60px;fill:#000000;fill-opacity:0.97254902"
          y="-230.75652"
