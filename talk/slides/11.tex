@@ -1,27 +1,19 @@
 \autobookmark
-\begin{frame}{Restarting the simulation to counter high MSE values}
-  \begin{columns}[T]
-
-    \begin{column}{.5\textwidth}
-      \includegraphics[height=0.35\paperheight]{graphics/PAP_step4_2.png}
-      \myuncover{3}{3}{
-        \includegraphics[height=0.35\paperheight]{graphics/repetitive_sampling.png}
-      }
-    \end{column}
-
-    \begin{column}{.5\textwidth}
+\begin{frame}[t]{Restarting the simulation to counter high MSE values}
+      \myonly{1}{\includegraphics[width=.37\paperwidth]{graphics/ray_distributions3.png}}
+      \myonly{2}{\includegraphics[width=.37\paperwidth]{graphics/ray_distributions5.png}}
+      \myonly{1}{\includegraphics[width=.45\paperwidth]{graphics/mse_histogram_rs1.pdf}}
+      \myonly{2}{\includegraphics[width=.45\paperwidth]{graphics/mse_histogram_rs2.pdf}}
       \begin{itemize}
-          \myuncover{1}{3}{
-            \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
+          \myuncover{1}{2}{
+          \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
           }
-          \myuncover{2}{3}{
-            \item Idea: it might be enough to introduce random restarts, since this is much faster than increasing the number of rays
+          \myuncover{2}{2}{
+          \item Idea: it might be enough to introduce random restarts, since this is much faster than increasing the number of rays
           }
       \end{itemize}
-    \end{column}
 
 
-  \end{columns}
 \end{frame}
 
 %\begin{frame}{Predefined colours}
