@@ -9,7 +9,7 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="805.35333"
+   width="915.26978"
    height="599.22803"
    id="svg2"
    version="1.1"
@@ -23,10 +23,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.70710678"
-     inkscape:cx="505.59347"
-     inkscape:cy="546.6413"
+     inkscape:cx="615.02962"
+     inkscape:cy="212.47746"
      inkscape:document-units="px"
-     inkscape:current-layer="layer5"
+     inkscape:current-layer="layer10"
      showgrid="false"
      inkscape:snap-grids="false"
      inkscape:snap-to-guides="false"
@@ -44,11 +44,11 @@
      fit-margin-bottom="0">
     <sodipodi:guide
        orientation="1,0"
-       position="105.34835,602.16554"
+       position="105.34835,602.16553"
        id="guide3920" />
     <sodipodi:guide
        orientation="0,1"
-       position="136.34835,494.00001"
+       position="136.34835,494"
        id="guide3922" />
   </sodipodi:namedview>
   <defs
@@ -1079,8 +1079,7 @@
      id="layer10"
      inkscape:label="amplification"
      style="display:inline"
-     transform="translate(-1.65165,-2.9375)"
-     sodipodi:insensitive="true">
+     transform="translate(-1.65165,-2.9375)">
     <g
        id="g5391">
       <path
@@ -1382,6 +1381,14 @@
         </g>
       </g>
     </g>
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:none"
+       id="rect8767"
+       width="255.26555"
+       height="92.984535"
+       x="660.08423"
+       y="270.77692"
+       transform="translate(1.65165,2.9375)" />
     <g
        id="g5386">
       <text
