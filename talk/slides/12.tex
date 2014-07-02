@@ -1,28 +1,30 @@
 \autobookmark
-\begin{frame}{Sample points can be distributed in a cluster}
+\begin{frame}[t]{Sample points can be distributed in a cluster}
   \begin{columns}[T]
 
-    \begin{column}{.4\textwidth}
-      \myuncover{3}{4}{
-      \includegraphics[width=0.4\paperwidth]{graphics/multigpu_partitioning5.png}
-    }
+    \begin{column}{.5\textwidth}
+      \myonly{2}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_0.pdf}}
+      \myonly{3}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_1.pdf}}
+      \myonly{4-5}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_2.pdf}}
     \end{column}
 
-    \begin{column}{.6\textwidth}
+    \begin{column}{.5\textwidth}
       \begin{itemize}
-          \myuncover{1}{4}{
+          \myuncover{1}{5}{
             \item Until now: simulation of a single sample point on a single GPU
             \item All sample points are independent: let's use a cluster for that
           }
-          \myuncover{2}{4}{
+          \myuncover{2}{5}{
             \item Each GPU has all the necessary data
             \item MPI is used as communication framework
           }
-          \myuncover{3}{4}{
-            \item Compute nodes request work from head node
-            \item Head node tells each worker, which sample point to simulate next
+          \myuncover{3}{5}{
+            \item Head node assigns work to the GPU
           }
-          \myuncover{4}{4}{
+          \myuncover{4}{5}{
+            \item Add more GPUs as needed
+          }
+          \myuncover{5}{5}{
             \item Load balancing, even when some sample points take longer than others
           }
       \end{itemize}
