@@ -9,12 +9,12 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="915.26978"
-   height="599.22803"
+   width="920.00476"
+   height="599.53223"
    id="svg2"
    version="1.1"
    inkscape:version="0.48.5 r10040"
-   sodipodi:docname="gain_medium_pumped.svg">
+   sodipodi:docname="gain_medium_pumped_4.pdf">
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
@@ -23,16 +23,16 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.70710678"
-     inkscape:cx="615.02962"
-     inkscape:cy="212.47746"
+     inkscape:cx="242.28737"
+     inkscape:cy="213.16312"
      inkscape:document-units="px"
-     inkscape:current-layer="layer10"
+     inkscape:current-layer="g4726"
      showgrid="false"
      inkscape:snap-grids="false"
      inkscape:snap-to-guides="false"
-     inkscape:window-width="1678"
-     inkscape:window-height="1029"
-     inkscape:window-x="1688"
+     inkscape:window-width="1598"
+     inkscape:window-height="879"
+     inkscape:window-x="0"
      inkscape:window-y="19"
      inkscape:window-maximized="1"
      showguides="false"
@@ -44,11 +44,11 @@
      fit-margin-bottom="0">
     <sodipodi:guide
        orientation="1,0"
-       position="105.34835,602.16553"
+       position="104.54426,602.85119"
        id="guide3920" />
     <sodipodi:guide
        orientation="0,1"
-       position="136.34835,494"
+       position="135.54426,494.68566"
        id="guide3922" />
   </sodipodi:namedview>
   <defs
@@ -391,8 +391,7 @@
      id="layer1"
      inkscape:groupmode="layer"
      inkscape:label="gain medium"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
+     transform="translate(50.911733,-226.95593)">
     <g
        transform="translate(52.325902,240.4163)"
        id="g3767">
@@ -440,7 +439,8 @@
          sodipodi:role="line"
          id="tspan7492"
          x="69.150764"
-         y="802.80249">gain medium</tspan></text>
+         y="802.80249"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif">gain medium</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:4;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#TriangleOutM)"
        d="m 109.4285,765.2946 c 3.9737,-23.58298 8.28179,-49.79517 43.31118,-81.00357"
@@ -453,8 +453,7 @@
      inkscape:label="pumpen"
      id="layer2"
      inkscape:groupmode="layer"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
+     transform="translate(50.911733,-226.95593)">
     <path
        style="fill:#00ff00;stroke:#00ff00;stroke-width:20;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:none;marker-end:url(#TriangleOutS)"
        d="m 267,398.36218 0,150"
@@ -489,15 +488,15 @@
          sodipodi:role="line"
          id="tspan7761"
          x="494.84998"
-         y="458.84351">pump</tspan></text>
+         y="458.84351"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif">pump</tspan></text>
   </g>
   <g
      style="display:inline"
      inkscape:label="sparkles"
      id="layer4"
      inkscape:groupmode="layer"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
+     transform="translate(50.911733,-226.95593)">
     <path
        inkscape:connector-curvature="0"
        id="path4863"
@@ -598,8 +597,7 @@
      id="layer7"
      inkscape:label="laser2"
      style="display:none"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
+     transform="translate(50.911733,-226.95593)">
     <g
        id="g6741"
        transform="matrix(1.0336317,0,0,0.61510628,4.6250882,811.95628)">
@@ -692,8 +690,7 @@
      inkscape:label="pumped"
      id="layer3"
      inkscape:groupmode="layer"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
+     transform="translate(50.911733,-226.95593)">
     <g
        transform="translate(51.724813,239.79035)"
        id="g3767-1"
@@ -742,66 +739,11 @@
     </g>
   </g>
   <g
-     inkscape:label="laser"
-     id="layer5"
-     inkscape:groupmode="layer"
-     style="display:none"
-     transform="translate(51.715823,-226.57448)"
-     sodipodi:insensitive="true">
-    <g
-       transform="matrix(1.0336317,0,0,0.61510628,39.847839,573.17443)"
-       id="g6302">
-      <g
-         id="g6732">
-        <g
-           transform="translate(-37.231066,-476.62859)"
-           id="g6294">
-          <g
-             transform="matrix(0,0.40129643,-0.54296085,0,380.28019,192.06896)"
-             id="g5264"
-             style="fill:none;stroke-width:21.42313766;stroke-miterlimit:4;stroke-dasharray:none">
-            <clipPath
-               id="clipPath5326">
-              <rect
-                 width="600"
-                 height="110"
-                 clip-rule="nonzero"
-                 id="rect5328"
-                 x="0"
-                 y="0" />
-            </clipPath>
-            <path
-               clip-path="url(#cp2)"
-               d="m -50,95 c 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80"
-               id="path5269"
-               inkscape:connector-curvature="0"
-               style="fill:none;stroke:#e04040;stroke-width:21.42313766;stroke-miterlimit:4;stroke-dasharray:none" />
-          </g>
-          <path
-             style="fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:0;stroke-dasharray:none"
-             d="m 347.54298,430.46177 0,26.16295"
-             id="path5348"
-             inkscape:path-effect="#path-effect5350"
-             inkscape:original-d="m 347.54298,430.46177 0,26.16295"
-             inkscape:connector-curvature="0" />
-        </g>
-        <path
-           inkscape:connector-curvature="0"
-           inkscape:original-d="m 290.24396,-42.909005 44.29543,0 -22.19727,64.606428 z"
-           inkscape:path-effect="#path-effect6724"
-           id="path6722"
-           d="m 290.24396,-42.909005 44.29543,0 -22.19727,64.606428 -22.09816,-64.606428"
-           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1.25412846px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
-      </g>
-    </g>
-  </g>
-  <g
      inkscape:groupmode="layer"
      id="layer6"
      inkscape:label="zoom"
-     transform="translate(99.86659,161.7877)"
-     style="display:inline"
-     sodipodi:insensitive="true">
+     transform="translate(99.0625,161.40625)"
+     style="display:inline">
     <g
        id="g3894"
        style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none">
@@ -842,21 +784,20 @@
            id="tspan4369"
            x="34.94894"
            y="-130.84131"
-           style="text-align:center;text-anchor:middle">spontaneous</tspan><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;text-anchor:middle;font-family:Serif;-inkscape-font-specification:Serif">spontaneous</tspan><tspan
            sodipodi:role="line"
            x="34.94894"
            y="-80.841309"
            id="tspan4798"
-           style="text-align:center;text-anchor:middle">emission</tspan></text>
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;text-anchor:middle;font-family:Serif;-inkscape-font-specification:Serif">emission</tspan></text>
     </g>
   </g>
   <g
      inkscape:groupmode="layer"
      id="layer9"
      inkscape:label="emission"
-     transform="translate(99.86659,161.7877)"
-     style="display:inline"
-     sodipodi:insensitive="true">
+     transform="translate(99.0625,161.40625)"
+     style="display:inline">
     <g
        id="g5441">
       <path
@@ -972,11 +913,10 @@
   </g>
   <g
      style="display:inline"
-     transform="translate(99.86659,161.7877)"
+     transform="translate(99.0625,161.40625)"
      inkscape:label="zoom2"
      id="g4726"
-     inkscape:groupmode="layer"
-     sodipodi:insensitive="true">
+     inkscape:groupmode="layer">
     <g
        style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
        id="g4728"
@@ -1025,6 +965,14 @@
            id="tspan5024"
            style="text-align:center;text-anchor:middle">emission</tspan></text>
     </g>
+    <rect
+       transform="translate(-101.51824,-164.7252)"
+       style="fill:#ffffff;fill-opacity:1;stroke:none;display:inline"
+       id="rect8767"
+       width="255.26555"
+       height="92.984535"
+       x="661.7359"
+       y="275.71442" />
     <g
        transform="translate(564.97832,0)"
        id="g5088"
@@ -1062,12 +1010,12 @@
          y="-125.62379"
          id="text5098"
          sodipodi:linespacing="125%"><tspan
-           style="text-align:center;text-anchor:middle"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;text-anchor:middle;font-family:Serif;-inkscape-font-specification:Serif"
            sodipodi:role="line"
            id="tspan5100"
            x="13.081909"
            y="-125.62379">stimulated</tspan><tspan
-           style="text-align:center;text-anchor:middle"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;text-anchor:middle;font-family:Serif;-inkscape-font-specification:Serif"
            id="tspan5102"
            sodipodi:role="line"
            x="13.081909"
@@ -1079,7 +1027,7 @@
      id="layer10"
      inkscape:label="amplification"
      style="display:inline"
-     transform="translate(-1.65165,-2.9375)">
+     transform="translate(-2.45574,-3.31895)">
     <g
        id="g5391">
       <path
@@ -1381,16 +1329,9 @@
         </g>
       </g>
     </g>
-    <rect
-       style="fill:#ffffff;fill-opacity:1;stroke:none"
-       id="rect8767"
-       width="255.26555"
-       height="92.984535"
-       x="660.08423"
-       y="270.77692"
-       transform="translate(1.65165,2.9375)" />
     <g
-       id="g5386">
+       id="g5386"
+       transform="translate(-2,0)">
       <text
          sodipodi:linespacing="125%"
          id="text5152"
@@ -1401,12 +1342,66 @@
            y="341.18677"
            x="660.8277"
            id="tspan5154"
-           sodipodi:role="line">amplification</tspan></text>
+           sodipodi:role="line"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Serif;-inkscape-font-specification:Serif">amplification</tspan></text>
       <path
          inkscape:connector-curvature="0"
          id="path5158"
          d="m 764.91713,302.43677 0,-41.25"
          style="fill:none;stroke:#000000;stroke-width:4;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#TriangleOutM-58);display:inline" />
+    </g>
+  </g>
+  <g
+     inkscape:label="laser"
+     id="layer5"
+     inkscape:groupmode="layer"
+     style="display:none"
+     transform="translate(50.911733,-226.95593)">
+    <g
+       transform="matrix(1.0336317,0,0,0.61510628,58.232615,534.99066)"
+       id="g6302">
+      <g
+         id="g6732">
+        <g
+           transform="translate(-37.231066,-476.62859)"
+           id="g6294">
+          <g
+             transform="matrix(0,0.40129643,-0.54296085,0,380.28019,192.06896)"
+             id="g5264"
+             style="fill:none;stroke-width:21.42313766;stroke-miterlimit:4;stroke-dasharray:none">
+            <clipPath
+               id="clipPath5326">
+              <rect
+                 width="600"
+                 height="110"
+                 clip-rule="nonzero"
+                 id="rect5328"
+                 x="0"
+                 y="0" />
+            </clipPath>
+            <path
+               clip-path="url(#cp2)"
+               d="m -50,95 c 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80 35,0 65,80 100,80 35,0 65,-80 100,-80"
+               id="path5269"
+               inkscape:connector-curvature="0"
+               style="fill:none;stroke:#e04040;stroke-width:21.42313766;stroke-miterlimit:4;stroke-dasharray:none" />
+          </g>
+          <path
+             style="fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:0;stroke-dasharray:none"
+             d="m 347.54298,430.46177 0,26.16295"
+             id="path5348"
+             inkscape:path-effect="#path-effect5350"
+             inkscape:original-d="m 347.54298,430.46177 0,26.16295"
+             inkscape:connector-curvature="0" />
+        </g>
+        <path
+           inkscape:connector-curvature="0"
+           inkscape:original-d="m 290.24396,-42.909005 44.29543,0 -22.19727,64.606428 z"
+           inkscape:path-effect="#path-effect6724"
+           id="path6722"
+           d="m 290.24396,-42.909005 44.29543,0 -22.19727,64.606428 -22.09816,-64.606428"
+           style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1.25412846px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+      </g>
     </g>
   </g>
 </svg>

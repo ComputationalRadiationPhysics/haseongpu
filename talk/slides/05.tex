@@ -1,48 +1,31 @@
 \autobookmark
-\begin{frame}{Monte Carlo integration is a scalable simulation method}
-  \begin{columns}[T]
-
-    \begin{column}{.5\textwidth}
-      \textbf{graphic:integration transformed into MC}
-    \end{column}
-
-    \begin{column}{.5\textwidth}
-      \begin{itemize}
-        \item Monte Carlo integration can be transformed into a sum
-        \myuncover{2}{3}{
-          \begin{equation}
-            \int_{N}{f(x) dx} \Rightarrow \sum^{N}_{i=1}{f(i)}
-          \end{equation}
-        }
-        \myuncover{3}{3}{
-        \item All elements of the sum are mutually independent, which is great
-          for parallelization
-        }
-      \end{itemize}
-    \end{column}
-
-  \end{columns}
-\end{frame}
-
-%\begin{frame}{Predefined colours}
-%  The template defines a set of colours according to the CD guidelines:\par
-%  \begin{itemize}
-%      \begin{minipage}[t]{0.5\linewidth}
-%      \item \textcolor{hzdr-blue}{Helmholtz Blue}    
-%      \item \textcolor{hzdr-orange}{Rossendorf Orange}  
-%      \item \textcolor{hzdr-darkblue}{Helmholtz Dark Blue}
-%      \item \textcolor{hzdr-gray1}{Gray1}   
-%      \item \textcolor{hzdr-gray2}{Gray2}   
-%      \item \textcolor{hzdr-gray3}{Gray3}   
-%      \item \textcolor{hzdr-struct}{Structure of Matter}  
-%      \end{minipage}%
-%      \begin{minipage}[t]{0.5\linewidth}
-%      \item \textcolor{hzdr-health}{Health}  
-%      \item \textcolor{hzdr-energy}{Energy}  
-%      \item \textcolor{hzdr-earth}{Earth and Environment}   
-%      \item \textcolor{hzdr-keytec}{Key Technologies}  
-%      \item \textcolor{hzdr-aero}{Aeronautics, Space and Transport}
-%      \end{minipage}
+\begin{frame}[t]{Monte Carlo can be implemented with ray tracing}
+  \myonly{1}{\includegraphics[height=0.6\paperheight]{graphics/monte_carlo_description_2.pdf}}
+  \myonly{2}{\includegraphics[height=0.6\paperheight]{graphics/monte_carlo_description_3.pdf}}
+  \myonly{3}{\includegraphics[height=0.6\paperheight]{graphics/monte_carlo_description_4.pdf}}
+%
+%  \begin{columns}[T]
+%
+%    \begin{column}{.5\textwidth}
+%      \textbf{graphic: ASE crystal, with a photon travelling through it?}\\[2ex]
+%      \textbf{alternative: laser setup, pumping a gain medium?}
+%    \end{column}
+%
+%    \begin{column}{.5\textwidth}
+%      \begin{itemize}
+%      \myuncover{1}{3}{
+%        \item In laser physics, gain media are pumped by lasers\\[1ex]
+%      }
+%      \myuncover{2}{3}{
+%        \item Over time, electrons fall back into lower energy levels, causing
+%          the spontaneous emission of a photon\\[1ex]
+%      }
+%      \myuncover{3}{3}{
+%        \item Photon travels through the medium, where it is amplified by more
+%          photons that are released
+%      }
 %  \end{itemize}
-%\end{frame}
-
+%    \end{column}
+%
+%  \end{columns}
+\end{frame}
