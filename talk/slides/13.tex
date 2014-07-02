@@ -1,28 +1,21 @@
 \autobookmark
-\begin{frame}{Simulation has a strong agreement with experimental data}
-  \begin{columns}[T]
+\begin{frame}{Implementation is scalable on cluster systems}
+  \begin{columns}
 
     \begin{column}{.5\textwidth}
-      \myonly{1}{\includegraphics[width=0.5\paperwidth]{graphics/benchmark_results_0.pdf}}
-      \myonly{2-}{\includegraphics[width=0.5\paperwidth]{graphics/benchmark_results_1.pdf}}
-    \end{column}
+        \includegraphics[width=.5\paperwidth]{graphics/scaling.png}
+      \end{column}
 
-    \begin{column}{.5\textwidth}
-      \begin{itemize}
-          \myuncover{1}{3}{
-            \item Reminder: plot from experimental data
-          }
-          \myuncover{2}{3}{
-            \item Simulating the experiment gives the following graph, which
-              looks almost like a function fit, but isn't
-          }
-          \myuncover{3}{3}{
-            \item Simulation takes about 7h on 1 GPU
-          }
-      \end{itemize}
-    \end{column}
+      \begin{column}{.5\textwidth}
+        \begin{itemize}
+            \item Implementation scales almost perfectly with an increasing
+              number of GPUs in a cluster system
+            \item It is possible to simulate even large gain media with high
+              precision in a reasonable amount of time
+        \end{itemize}
+      \end{column}
 
-  \end{columns}
+    \end{columns}
 \end{frame}
 
 %\begin{frame}{Predefined colours}
