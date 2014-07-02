@@ -5,7 +5,11 @@
       \myonly{1}{\includegraphics[width=.5\paperwidth]{graphics/mse_histogram_is_as1.pdf}}
       \myonly{2}{\includegraphics[width=.5\paperwidth]{graphics/mse_histogram_is_as2.pdf}}
       \begin{itemize}
-        \item If the MSE is too high, repeat processing for this sample point with more rays
-        \item This adaptive sampling can limit the maximal MSE to a fixed threshold
+        \myuncover{1}{2}{
+        \item Even with importance sampling, high MSE peaks are possible
+        }
+        \myuncover{2}{2}{
+        \item To reach a fixed MSE threshold, the number of rays for the sample point is increased
+        }
       \end{itemize}
 \end{frame}
