@@ -11,7 +11,7 @@
 \usetikzlibrary{calc}
 \usepackage{calc}
 \usepackage{bookmark}
-\usepackage[font=Helv,timeinterval=60]{tdclocknew}
+%\usepackage[font=Helv,timeinterval=60]{tdclocknew}
 \useinnertheme{rectangles}
 \graphicspath{{beamerthemehzdr/logos/ddconcept/}%
 {beamerthemehzdr/logos/gesamtlogo/}%
@@ -189,7 +189,7 @@
   \node [anchor=north east,inner sep=0pt] at (current page.north east)
   {%
     \color{\beamernavigationcolorlight}%
-    \ifdefined\noclock\else{\initclock\raisebox{-0.5\height}{\tiny{\tdyear-\tdmonth-\tdday\quad\tdhours:\tdminutes\space}}}\fi%
+    %\ifdefined\noclock\else{\initclock\raisebox{-0.5\height}{\tiny{\tdyear-\tdmonth-\tdday\quad\tdhours:\tdminutes\space}}}\fi%
     \ifdefined\nonavigation\else{\raisebox{-0.5\height}{\insertfullscreensymbol\insertframenavigationsymbol}}\fi%
   };
   %stripes at the bottom

@@ -1,13 +1,20 @@
 \autobookmark
-\begin{frame}[t]{MSE TODO}
-  \begin{columns}
+\begin{frame}[t]{When is the simulation precise enough?}
+  \begin{columns}[T]
     \begin{column}{.5\textwidth}
-       \includegraphics[width=.5\paperwidth]{graphics/gain_medium_mse.pdf}
+       \includegraphics[width=.37\paperwidth]{graphics/gain_medium_mse.pdf}
     \end{column}
 
     \begin{column}{.5\textwidth}
       \begin{itemize}
-          \item MSE is higher for sample points in certain areas of interest 
+        \myuncover{1}{2}{
+          \item Certain areas of the gain medium produce a higher variance in amplification
+          \item \textcolor{hzdr-struct}{Mean Squared Error} is used to estimate simulation quality for each sample point
+        }
+        \myuncover{2}{2}{
+          \item Calculation is successful, when MSE is low enough for each sample point
+        }
+
       \end{itemize}
     \end{column}
   \end{columns}

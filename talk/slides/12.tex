@@ -3,22 +3,23 @@
   \begin{columns}[T]
 
     \begin{column}{.5\textwidth}
-      \myonly{2}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_0.pdf}}
-      \myonly{3}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_1.pdf}}
-      \myonly{4-5}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_2.pdf}}
+      \myonly{1}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_0.pdf}}
+      \myonly{2}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_1.pdf}}
+      \myonly{3}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_2.pdf}}
+      \myonly{4-}{\includegraphics[width=0.5\paperwidth]{graphics/load_balancing_MPI_3.pdf}}
     \end{column}
 
     \begin{column}{.5\textwidth}
       \begin{itemize}
           \myuncover{1}{5}{
             \item Until now: simulation of a single sample point on a single GPU
-            \item All sample points are independent: let's use a cluster for that
           }
           \myuncover{2}{5}{
+            \item All sample points are independent: let's use a cluster for that
             \item Each GPU has all the necessary data
-            \item MPI is used as communication framework
           }
           \myuncover{3}{5}{
+            \item MPI is used as communication framework
             \item Head node assigns work to the GPU
           }
           \myuncover{4}{5}{
