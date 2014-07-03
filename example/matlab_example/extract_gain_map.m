@@ -142,4 +142,7 @@ end
 for i_t=1:timeslices_tot
     gain_line(i_t,1)=gainmap_Interp(7,7,i_t);
 end
+x=fopen('gain_line.txt','w');
+fprintf(x,'%.50f\n',gain_line);
+fclose(x);
 toc
