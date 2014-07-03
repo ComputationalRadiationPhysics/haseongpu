@@ -29,7 +29,6 @@ all:
 	@mkdir -p example/matlab_example/bin
 	@mkdir -p example/c_example/bin
 	@mkdir -p example/c_example/output
-	@mkdir -p example/c_example/output/vtk
 	@cp src/calcPhiASE.m .
 	@cp src/calcPhiASE.m example/matlab_example/
 	@make calcPhiASE

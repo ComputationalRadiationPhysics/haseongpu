@@ -1,7 +1,7 @@
-HASENonGPU 
+HASEonGPU 
 =======================================
 
-   **H**igh performance **A**mplified **S**pontaneous **E**missio**N** **on GPU**
+   **H**igh performance **A**mplified **S**pontaneous **E**mission **on GPU**
 
 Description
 -----------
@@ -10,13 +10,13 @@ Description
 Referencing
 -----------
 
-   HASENonGPU is a *scientific project*. If you **present and/or publish** scientific
-   results that used HASENonGPU, you should set this as a **reference**.
+   HASEonGPU is a *scientific project*. If you **present and/or publish** scientific
+   results that used HASEonGPU, you should set this as a **reference**.
 
 Software License
 ----------------
 
-   *HASENonGPU* is licensed under the **GPLv3+**.
+   *HASEonGPU* is licensed under the **GPLv3+**.
    Please refer to our [LICENSE.md](LICENSE.md)
 
 
@@ -281,10 +281,8 @@ Synopsis
       .txt files contains all experiment data you need
       to run one experiment.
         
-    --output  
-      Absolute path to a writable location.
-      Is used to write vtk files and input for
-      matlab script.
+    --output Absolute path to a writable location.  Is used to write
+      input and output for matlab script.
 
     --runmode=[cpu|threaded|mpi]  
       Defines the runmode/algorithm to start the
@@ -304,15 +302,6 @@ Synopsis
       maximum number of rays in dependance of a MSE-Threshold.
       (see --mse-threshold)
 
-    --compare=  
-      Is the location of a .vtk file with that you want to compare
-      your solution. It is good to recognize stastical differences
-      between different rays counts.
-
-    --write-vtk  
-      Write phiASE, dndtASE, mse, totalRays for every sample a .vtk file in
-      the output subdirectory output/vtk/ should be created in advance.
-      
     --maxgpus=  
       Set the maximum number of gpus. "mpi" mode should set this
       to 1 and "ray_propagation_gpu" to the maximum number
