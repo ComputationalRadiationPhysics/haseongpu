@@ -1,0 +1,173 @@
+%
+% Template for videoprojector foils according to the HZDR corporate design
+% 
+% (C) 2011 Alexander Grahn, HZDR, Institut fuer Sicherheitsforschung
+%
+% Version 20131126
+%
+\documentclass[
+%  aspectratio=43, %default screen size (4:3); other values: 1610, 169, 149, 54, 32
+%  smaller, %uncomment this to fit more text onto the slides (similar to the CD suggestions)
+  intlimits %put limits of integrals above and below the integral symbol
+]{beamer}
+
+%\usepackage[ngerman]{babel}
+\usepackage[UKenglish]{babel}
+
+%my favourite packages
+\usepackage[latin1]{inputenc} %type in accented characters easily, i. e. ä instead of \"a 
+%\usepackage{siunitx} %easy input & nice formatting of phys. quantities (number + SI unit)
+%\usepackage{latexsym}
+%\usepackage{amssymb}
+\usepackage{media9}
+%\usepackage{animate}
+\usepackage{ragged2e}\RaggedRight
+\usepackage{fancyvrb}
+\usepackage{ifthen}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% some optional settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%uncomment this if you want the title page text aligned flushleft; CD rules seem to
+%demand this, although it looks awful
+%\def\titleflushleft{}
+
+%uncomment this if you want frame titles centred
+%\def\frametitlecentered{}
+
+%uncomment this if you don't like the wallclock
+%\def\noclock{}
+
+%uncomment this if you don't like the navigation buttons
+%\def\nonavigation{}
+
+%uncomment this if you want Arial as the main text font (very ugly),
+%no matching math font, using CM-Bright for math text
+%\def\arial{}
+
+%uncomment this if you want Helvetica as the main text font (very ugly),
+%Helvetica is very similar to Arial; again, no matching math font, using CM-Bright for
+%math text
+%\def\helvetica{}
+
+%hzdr colours used for various text highlights; see manual `beameruserguide.pdf',
+%chapter 12 for further possibilities
+                                               %colour will be used in:
+\setbeamercolor{alerted text}{fg=hzdr-orange}  %\alert{text to be highlighted},
+                                               %\begin{alertenv} ... \end{alertenv}
+                                               %\begin{alertblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{alertblock}
+
+\setbeamercolor{example text}{fg=hzdr-darkblue}%\begin{exampleblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{exampleblock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%hzdr theme
+\makeatletter
+\def\input@path{{beamerthemehzdr/}}
+\makeatother
+\usetheme{hzdr}
+
+%%%%%%%%%%%% title, author, date, institute, additional logos %%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{HASEonGPU}
+\subtitle{An Open-Source ASE code for calculating the gain in high power laser media on GPU clusters}% may be left empty, of course
+
+%[short version of authors to be used in footlines]{long version in the title page}
+\author[C. Eckert, E. Zenker et al.]{
+\texorpdfstring{\underline{Carlchristian Eckert}\inst{1}}{},
+\texorpdfstring{\underline{Erik Zenker}\inst{1}}{}
+}
+
+
+%\date{\today}
+\date{15th July 2014}
+
+\institute[
+ %short version of main authors' institute, used in the footline
+ \iflanguage{ngerman}{%
+   Institut für Strahlenphysik%
+ }{%
+   Institute of Radiation Physics%
+ }%
+]{%
+ %used in the title page
+ \iflanguage{ngerman}{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institut für Strahlenphysik\\
+ }{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institute of Radiation Physics\\
+ }%
+}
+
+%every invocation of the macro \partnerlogo{...} adds YET ANOTHER partner logo to the
+%right of the already inserted partner logos;
+%the starred version `\partnerlogo*{}' inserts s-t-r-e-t-c-h-a-b-l-e space between the current
+%logo and the next one on its right side: this allows for logos/groups of logos to be
+%aligned flush-left on the page
+%\partnerlogo*{\colorbox{gray}{\tiny Logo 1}}% some logo
+%\partnerlogo{
+%  \ifthenelse{\theframenumber=0}{%  %title slide
+%    \includegraphics[height=0.14\paperheight]{graphics/haseOnGPU.png}
+%  }{
+%    \includegraphics[height=0.06\paperheight]{graphics/haseOnGPU.png}
+%  }
+%}
+\partnerlogo{
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.1\paperheight]{graphics/ccoe_small.png}
+  }{
+    \includegraphics[height=0.05\paperheight]{graphics/ccoe_small.png}
+  }
+}
+\partnerlogo{% DD-concept logo; note that different versions are used on title and normal slides
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.08\paperheight]{DDC-weisse-schrift}%
+  }{%                               %normal slides
+    \includegraphics[height=0.05\paperheight]{DDC-orig}%
+  }%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\hypersetup{%
+  breaklinks,colorlinks,
+  %pdfpagemode=FullScreen,
+  pdfhighlight=/P,
+  linkcolor=hzdr-darkblue,
+  linkcolor=hzdr-darkblue,
+  anchorcolor=hzdr-darkblue,
+  citecolor=hzdr-darkblue,
+  filecolor=hzdr-darkblue,
+  menucolor=hzdr-darkblue,
+  runcolor=hzdr-darkblue,
+  urlcolor=hzdr-darkblue
+}
+
+%\newcommand{mycom}[2]{}
+
+\begin{document}
+
+\newcommand{\myuncover}[2]{\uncover<{#1}-{#2}>}
+\newcommand{\myonly}[1]{\only<{#1}>}
+%\renewcommand{\myuncover}[2]{}
+%\renewcommand{\myonly}[1]{}
+
+\frame{\titlepage}
+
+\input{slides/01}
+\input{slides/02}
+\input{slides/03}
+\input{slides/04}
+\input{slides/05}
+\input{slides/06}
+%\input{slides/07}
+%\input{slides/08}
+\input{slides/09}
+\input{slides/10}
+\input{slides/11}
+\input{slides/12}
+\input{slides/13}
+\input{slides/14}
+\input{slides/15}
+\input{slides/16}
+\input{slides/17}
+
+\end{document}

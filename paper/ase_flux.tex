@@ -11,13 +11,26 @@
 \usepackage{hyperref}
 \usepackage{float}
 
+% give the macro \cref
+\usepackage{cleveref}
+
+%allow custom hyphenation
+\usepackage{hyphenat}
+
 %\floatstyle{simplerule}
 %\newfloat{floatbox}{thp}{lob}[section]
 %\floatname{floatbox}{Text Box}
 
+% corrections
+%\newcommand{\E}[1]{\textcolor{red}{\textbf{{#1}}}}
+%\newcommand{\C}[1]{\textcolor{blue}{\textbf{{#1}}}}
+%\newenvironment{ERIK}{\color{red}}{\color{black}}
+%\newenvironment{CARLI}{\color{blue}}{\color{black}}
+
+
 \begin{document}
 
-\title{Parallel ASE-Flux}
+\title{HASEonGPU}
 
 \author[hzdr]{C. Eckert}
 \ead{c.eckert@hzdr.de}
@@ -41,6 +54,7 @@
 
 
 %abstract must be before maketitle
+\input{hyphenation}
 \input{abstract}
 \maketitle
 
@@ -52,6 +66,8 @@
 \input{application}
 \input{results}		
 \input{bibliography}
+
+
 
 %\end{multicols}
 

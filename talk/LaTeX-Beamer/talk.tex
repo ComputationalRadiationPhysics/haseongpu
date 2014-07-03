@@ -1,0 +1,233 @@
+%
+% Template for videoprojector foils according to the HZDR corporate design
+% 
+% (C) 2011 Alexander Grahn, HZDR, Institut fuer Sicherheitsforschung
+%
+% Version 20131126
+%
+\documentclass[
+%  aspectratio=43, %default screen size (4:3); other values: 1610, 169, 149, 54, 32
+%  smaller, %uncomment this to fit more text onto the slides (similar to the CD suggestions)
+  intlimits %put limits of integrals above and below the integral symbol
+]{beamer}
+
+%\usepackage[ngerman]{babel}
+\usepackage[UKenglish]{babel}
+
+%my favourite packages
+\usepackage[latin1]{inputenc} %type in accented characters easily, i. e. ä instead of \"a 
+%\usepackage{siunitx} %easy input & nice formatting of phys. quantities (number + SI unit)
+%\usepackage{latexsym}
+%\usepackage{amssymb}
+\usepackage{media9}
+%\usepackage{animate}
+\usepackage{ragged2e}\RaggedRight
+\usepackage{fancyvrb}
+\usepackage{ifthen}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% some optional settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%uncomment this if you want the title page text aligned flushleft; CD rules seem to
+%demand this, although it looks awful
+%\def\titleflushleft{}
+
+%uncomment this if you want frame titles centred
+%\def\frametitlecentered{}
+
+%uncomment this if you don't like the wallclock
+%\def\noclock{}
+
+%uncomment this if you don't like the navigation buttons
+%\def\nonavigation{}
+
+%uncomment this if you want Arial as the main text font (very ugly),
+%no matching math font, using CM-Bright for math text
+%\def\arial{}
+
+%uncomment this if you want Helvetica as the main text font (very ugly),
+%Helvetica is very similar to Arial; again, no matching math font, using CM-Bright for
+%math text
+%\def\helvetica{}
+
+%hzdr colours used for various text highlights; see manual `beameruserguide.pdf',
+%chapter 12 for further possibilities
+                                               %colour will be used in:
+\setbeamercolor{alerted text}{fg=hzdr-orange}  %\alert{text to be highlighted},
+                                               %\begin{alertenv} ... \end{alertenv}
+                                               %\begin{alertblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{alertblock}
+
+\setbeamercolor{example text}{fg=hzdr-darkblue}%\begin{exampleblock}{block title (highlighted)}
+                                               %  ...
+                                               %\end{exampleblock}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%hzdr theme
+\makeatletter
+\def\input@path{{beamerthemehzdr/}}
+\makeatother
+\usetheme{hzdr}
+
+%%%%%%%%%%%% title, author, date, institute, additional logos %%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{Preparing beautiful presentations\\ in the HZDR style}
+\subtitle{---A \LaTeX{} template---} % may be left empty, of course
+
+%[short version of authors to be used in footlines]{long version in the title page}
+\author[A. Grahn et al.]{\underline{Alexander Grahn}\inst{1}, John Doe\inst{2}, Jane Roe\inst{2}}
+
+\date{\today}
+%\date{1st January 2011}
+
+\institute[
+ %short version of main authors' institute, used in the footline
+ \iflanguage{ngerman}{%
+   Institut für Ressourcenökologie%
+ }{%
+   Institute of Resource Ecology%
+ }%
+]{%
+ %used in the title page
+ \iflanguage{ngerman}{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institut für Ressourcenökologie\\
+   \inst{2}Massachusetts Institute of Technology, Media Lab%
+ }{%
+   \inst{1}Helmholtz-Zentrum Dresden-Rossendorf, Institute of Resource Ecology\\
+   \inst{2}Massachusetts Institute of Technology, Media Lab%
+ }%
+}
+
+%every invocation of the macro \partnerlogo{...} adds YET ANOTHER partner logo to the
+%right of the already inserted partner logos;
+%the starred version `\partnerlogo*{}' inserts s-t-r-e-t-c-h-a-b-l-e space between the current
+%logo and the next one on its right side: this allows for logos/groups of logos to be
+%aligned flush-left on the page
+\partnerlogo{\colorbox{gray}{\tiny Logo 1}}% some logo
+\partnerlogo*{\colorbox{gray}{\tiny Logo 2}}% another logo with stretchable space on its right
+\partnerlogo{% DD-concept logo; note that different versions are used on title and normal slides
+  \ifthenelse{\theframenumber=0}{%  %title slide
+    \includegraphics[height=0.08\paperheight]{DDC-weisse-schrift}%
+  }{%                               %normal slides
+    \includegraphics[height=0.05\paperheight]{DDC-orig}%
+  }%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\hypersetup{%
+  breaklinks,colorlinks,
+  %pdfpagemode=FullScreen,
+  pdfhighlight=/P,
+  linkcolor=hzdr-darkblue,
+  linkcolor=hzdr-darkblue,
+  anchorcolor=hzdr-darkblue,
+  citecolor=hzdr-darkblue,
+  filecolor=hzdr-darkblue,
+  menucolor=hzdr-darkblue,
+  runcolor=hzdr-darkblue,
+  urlcolor=hzdr-darkblue
+}
+
+%%%%%%%%%%%% document content starts here  %%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}{Introduction}
+This template is based on the popular \LaTeX{} Beamer class. It tries to mimic the official presentation template outlined in the corporate design guidelines (\url{https://www.fzd.de/pls/rois/Cms?pNid=2220}).\\[1ex]
+Some minor settings such as additional logos or the document font can be adjusted in the heading section of this document's source file.\\[1ex]
+The directory {\tt LaTeX-Beamer} should be used as the master. Make a copy of it for every new presentation.\\[1ex]
+Please mail suggestions, improvements or feature requests to \url{a.grahn@hzdr.de}.\\[1ex]
+\end{frame}
+
+\begin{frame}[allowframebreaks=0.8]{Pitfalls}
+  \begin{itemize}
+    \item The packages Beamer-3.10 and PGF-2.10 are required. Update your \TeX{} installation if necessary.
+    \item The template works only with pdf\LaTeX{}. Therefore, graphics files for inclusion should be provided in the PDF format for all kinds of graphics (line graphics, bitmapped images, photographs), PNG for artificially created bitmapped material and photographs, JPEG for photographs. Existing EPS files can be converted to PDF using {\tt epstopdf}, which should be part of every \TeX{} installation.
+    \item This template uses \alert{CM-Bright} as the main text font. It looks good and, unlike CM-Sans which Beamer uses by default, it comes with a suitable math font. Make sure that CM-Bright is installed as Type-1 font in your \TeX{} system. For this, you need the packages `cm-super' and `hfbright' (use the package manager of your \TeX{} system for installation). Otherwise, the bitmapped version of the font is used and the final PDF is of bad quality.
+    \item If you want Arial or Helvetica, as recommended by the corporate design guidelines, you can adjust this in the header of the source file of this document. As both fonts lack a matching math font, the template uses CM-Bright for the glyphs in math mode. For Arial you need the `arial' and for Helvetica the `helvet' \LaTeX{} packages. Package `hfbright' is needed for the math glyphs.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Predefined colours}
+  The template defines a set of colours according to the CD guidelines:\par
+  \begin{itemize}
+  \begin{minipage}[t]{0.5\linewidth}
+    \item \textcolor{hzdr-blue}{Helmholtz Blue}    
+    \item \textcolor{hzdr-orange}{Rossendorf Orange}  
+    \item \textcolor{hzdr-darkblue}{Helmholtz Dark Blue}
+    \item \textcolor{hzdr-gray1}{Gray1}   
+    \item \textcolor{hzdr-gray2}{Gray2}   
+    \item \textcolor{hzdr-gray3}{Gray3}   
+    \item \textcolor{hzdr-struct}{Structure of Matter}  
+  \end{minipage}%
+  \begin{minipage}[t]{0.5\linewidth}
+    \item \textcolor{hzdr-health}{Health}  
+    \item \textcolor{hzdr-energy}{Energy}  
+    \item \textcolor{hzdr-earth}{Earth and Environment}   
+    \item \textcolor{hzdr-keytec}{Key Technologies}  
+    \item \textcolor{hzdr-aero}{Aeronautics, Space and Transport}
+  \end{minipage}
+  \end{itemize}
+\end{frame}
+
+\noautobookmark %don't add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
+
+\begin{frame}{Frame Title}{Frame Subtitle}
+\autobookmark %reset to default behaviour (adding frame titles as bookmarks)
+
+  By default, frame titles are automatically added as bookmarks to the \Acrobatmenu{ShowHideBookmarks}{\mbox{{\tiny$\nearrow$} Bookmarks}} tab of Adobe Reader. You can use {\tt \string\noautobookmark}\\ to temporarily disable this behaviour, as in this slide. The command {\tt \string\autobookmark} returns to the default behaviour.\\[1ex]
+
+  Some math text:
+  \begin{equation}
+    E = m c^2
+  \end{equation}
+  \begin{equation}
+    \rho = \frac{m}{V}
+  \end{equation}
+  \begin{equation}
+    \omega = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}
+  \end{equation}
+  \begin{equation}
+    \int_0^1 2x\,\mathrm{d}x = 1
+  \end{equation}
+\end{frame}
+
+\autobookmark %add frame titles as bookmarks to the `Bookmarks' tab of Adobe Reader
+
+\begin{frame}{Embedded video example} %using package `media9'
+  
+  \begin{center}
+    \includemedia[
+      width=0.4\linewidth,height=0.3\linewidth,
+      activate=pageopen,
+      addresource=random.mp4,
+      flashvars={
+         source=random.mp4
+         &loop=true
+      }
+    ]{}{VPlayer.swf}
+  \end{center}
+\end{frame}
+
+\fvset{fontsize=\small}
+\begin{SaveVerbatim}{tooltipUsage}
+\tooltip[<link colour>]{<link text>}[<tip box colour>]{<tip text>}
+\end{SaveVerbatim}
+
+\begin{frame}{Tooltips}
+
+  In addition to the standard Beamer class features, this template defines a command for inserting Pop-Up boxes into the slide text:
+
+  \UseVerbatim{tooltipUsage}
+
+  Pop-ups work well in Adobe Reader. They can be dragged around and pinned down at another location on the page; just click the link text. Longer tip text spanning multiple lines should be placed into a \texttt{\string\parbox} which should not be wider than \texttt{\string\linewidth}.
+
+  \vspace{2ex}
+
+  Here is an example text with pop-ups using default colours:
+
+  \vspace{1ex}
+
+  Einstein's \tooltip{formula}{$E=m c^2$} is well known. Another famous formula is due to \tooltip{Pythagoras}{$a^2+b^2=c^2$}.
+  
+\end{frame}
+\end{document}
