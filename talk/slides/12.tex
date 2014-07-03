@@ -11,22 +11,19 @@
 
     \begin{column}{.5\textwidth}
       \begin{itemize}
-          \myuncover{1}{5}{
-            \item Until now: simulation of a single sample point on a single GPU
+          \myuncover{1}{4}{
+            \item Until now: simulation of all sample points on one GPU
           }
-          \myuncover{2}{5}{
-            \item All sample points are independent: let's use a cluster for that
+          \myuncover{2}{4}{
+            \item Let's distribute the sample points on a cluster
             \item Each GPU has all the necessary data
           }
-          \myuncover{3}{5}{
+          \myuncover{3}{4}{
             \item MPI is used as communication framework
             \item Head node assigns work to the GPU
           }
-          \myuncover{4}{5}{
+          \myuncover{4}{4}{
             \item Add more GPUs as needed
-          }
-          \myuncover{5}{5}{
-            \item Load balancing, even when some sample points take longer than others
           }
       \end{itemize}
     \end{column}

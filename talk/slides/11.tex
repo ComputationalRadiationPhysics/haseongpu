@@ -6,10 +6,11 @@
       \myonly{2}{\includegraphics[width=.45\paperwidth]{graphics/mse_histogram_rs2.pdf}}
       \begin{itemize}
           \myuncover{1}{2}{
-          \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
+%          \item Sometimes, increasing the number of rays is not necessary, because the high MSE was caused by a really unlucky seed for the PRNG
+          \item A bad random seed can produce high MSE values, causing an increased number of rays
           }
           \myuncover{2}{2}{
-          \item Idea: it might be enough to introduce random restarts, since this is much faster than increasing the number of rays
+          \item Random restarts can sometimes be as successful as increasing the number of rays
           }
       \end{itemize}
 \end{frame}
