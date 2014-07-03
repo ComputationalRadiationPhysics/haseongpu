@@ -1,7 +1,7 @@
 HASEonGPU 
 =======================================
 
-   **H**igh performance **A**mplified **S**pontaneous **E**mission **on GPU**
+<b>H</b>igh performance <b>A</b>mplified <b>S</b>pontaneous <b>E</b>mission <b>on GPU</b>
 
 Description
 -----------
@@ -76,40 +76,40 @@ Usage
    + Call calcPhiASE from your matlab script 
      like following:
 
-    [phiASE, MSE, nRays] = calcPhiASE(
-   
-                                        points,  
-     	    	 	  	                trianglePointIndices,  
-				                        betaCells,  
-				                        betaVolume,  
-				                        claddingCellTypes,  
-				                        claddingNumber,  
-				                        claddingAbsorption,  
-				                        useReflections,  
-				                        refractiveIndices,  
-				                        reflectivities,  
-				                        triangleNormalsX,  
-				                        triangleNormalsY,  
-				                        triangleNeighbors,  
-				                        triangleSurfaces,  
-				                        triangleCenterX,  
-				                        triangleCenterY,  
-				                        triangleNormalPoint,  
-				                        forbiddenEdge,  
-				                        minRaysPerSample,  
-				                        maxRaysPerSample,  
-				                        mseThreshold,  
-				                        repetitions,  
-				                        nTot,  
-				                        thickness,  
-				                        laserParameter,  
-				                        crystal,  
-				                        numberOfLevels,  
-				                        runmode,  
-				                        maxGPUs,  
-				                        nPerNode
-				                   );  
-   
+```matlab
+[phiASE, MSE, nRays] = calcPhiASE(
+                                    points,  
+                                    trianglePointIndices,           
+                                    betaCells,  
+                                    betaVolume,  
+                                    claddingCellTypes,  
+                                    claddingNumber,  
+                                    claddingAbsorption,  
+                                    useReflections,  
+                                    refractiveIndices,  
+                                    reflectivities,  
+                                    triangleNormalsX,  
+                                    triangleNormalsY,  
+                                    triangleNeighbors,  
+                                    triangleSurfaces,  
+                                    triangleCenterX,  
+                                    triangleCenterY,  
+                                    triangleNormalPoint,  
+                                    forbiddenEdge,  
+                                    minRaysPerSample,  
+                                    maxRaysPerSample,  
+                                    mseThreshold,  
+                                    repetitions,  
+                                    nTot,  
+                                    thickness,  
+                                    laserParameter,  
+                                    crystal,  
+                                    numberOfLevels,  
+                                    runmode,  
+                                    maxGPUs,  
+                                    nPerNode
+                                );  
+```
   + The returned values are represented as
     tow-dimensional matrices in which columns are
     slice indices(levels) and rows are point
@@ -120,10 +120,11 @@ Usage
 
 
 ### Input argument description
-    In the following all arguments of the MATLAB call are described.
-    You will find on each point a head with datatype (an array when
-    in brackets []), the size of the array and to which set of
-    numbers the array belongs.
+
+In the following all arguments of the MATLAB call are described.
+You will find on each point a head with datatype (an array when
+in brackets []), the size of the array and to which set of
+numbers the array belongs.
 
    + __points__ [float], in {0, ..., numberOfPoints}, size = numberOfPoints  
      The coordinates of the triangle vertices. All x coordinates followed by all
