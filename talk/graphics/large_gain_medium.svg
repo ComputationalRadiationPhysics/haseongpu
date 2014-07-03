@@ -15,7 +15,7 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.48.5 r10040"
-   sodipodi:docname="Neues Dokument 1">
+   sodipodi:docname="large_gain_medium.svg">
   <defs
      id="defs4">
     <marker
@@ -55,10 +55,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.49497475"
-     inkscape:cx="6.3494605"
+     inkscape:cx="105.34441"
      inkscape:cy="588.18104"
      inkscape:document-units="px"
-     inkscape:current-layer="g4586"
+     inkscape:current-layer="layer3"
      showgrid="false"
      showguides="false"
      inkscape:guide-bbox="true"
@@ -88,11 +88,6 @@
       </cc:Work>
     </rdf:RDF>
   </metadata>
-  <g
-     inkscape:groupmode="layer"
-     id="layer3"
-     inkscape:label="arrow"
-     transform="translate(-113.82536,-27.978024)" />
   <g
      inkscape:label="small"
      inkscape:groupmode="layer"
@@ -2538,7 +2533,32 @@ AAAAAACAQxB6AAAAAAAAAIf8/62CyM8s5yhNAAAAAElFTkSuQmCC
 "
        height="163.4263"
        width="203.42856" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="arrow"
+     transform="translate(-113.82536,-27.978024)"
+     style="display:inline">
+    <g
+       id="g4586"
+       transform="translate(3.25392,-55.026997)">
+      <path
+         style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 423.25392,458.39249 -57.32616,-77.27667 32.57742,0 0,-159.60411 49.49747,0 0,159.60411 32.32489,0 z"
+         id="path4592"
+         inkscape:connector-curvature="0"
+         transform="translate(-3.25392,55.026997)" />
+    </g>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="big"
+     transform="translate(-113.82536,-27.978024)"
+     style="display:inline">
     <image
+       style="display:inline"
        width="610.28564"
        height="490.2789"
        xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA/QAAAMtCAYAAAAxFDqFAAAABHNCSVQICAgIfAhkiAAAIABJREFU
@@ -4978,20 +4998,5 @@ AAAAAACAQxB6AAAAAAAAAIf8/62CyM8s5yhNAAAAAElFTkSuQmCC
        id="image2996"
        x="113.82536"
        y="467.98032" />
-    <g
-       id="g4586"
-       transform="translate(3.25392,-55.026997)">
-      <path
-         style="fill:none;stroke:#000000;stroke-width:10;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
-         d="m 423.25392,458.39249 -57.32616,-77.27667 32.57742,0 0,-159.60411 49.49747,0 0,159.60411 32.32489,0 z"
-         id="path4592"
-         inkscape:connector-curvature="0"
-         transform="translate(-3.25392,55.026997)" />
-    </g>
   </g>
-  <g
-     inkscape:groupmode="layer"
-     id="layer2"
-     inkscape:label="big"
-     transform="translate(-113.82536,-27.978024)" />
 </svg>
