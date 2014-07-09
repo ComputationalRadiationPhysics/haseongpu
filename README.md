@@ -62,7 +62,7 @@ Usage
   5. take a look at the results (*.vtk) with paraview 
 
 
-### Quick C-Application laser pump example 
+### Quick C-Application ASE flux example 
 
   1. run : `make`
   2. change path "cd example/c_example/"
