@@ -8,7 +8,7 @@ export CPLUS_INCLUDE_PATH=
 NVCC = nvcc
 
 # build flags
-LIBS =  -lpthread -lcudart -lm -lcurand
+LIBS =  -lpthread -lcudart -lm
 ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
  #NVCC_FLAGS = --use_fast_math -Xptxas="-v"
  #DEBUG_FLAGS = -g -G -lineinfo -D THRUST_DEBUG
