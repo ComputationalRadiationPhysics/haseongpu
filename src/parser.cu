@@ -30,6 +30,13 @@
 #include <mesh.hpp>
 #include <parser.hpp>
 
+// includes for commandline parsing
+#include <boost/program_options.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/cmdline.hpp>
+#include <boost/program_options/variables_map.hpp>
+
+
 void parseCommandLine(
     const int argc,
     char** argv,
@@ -49,109 +56,93 @@ void parseCommandLine(
     unsigned *lambdaResolution
     ) {
 
-  std::vector<std::pair<std::string, std::string> > parameters;
+  std::string rMode;
+  namespace po = boost::program_options;
+  po::options_description desc( "Allowed options" );
+  desc.add_options()
+    ( "help,h",
+      "print this help message and exit" )
+    ( "verbosity,v",
+      po::value<unsigned> ( &verbosity )->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT),
+      "Set the verbosity levels:\n\
+      \t 0 (quiet)\n\
+      \t 1 (error)\n\
+      \t 2 (warning)\n\
+      \t 4 (info)\n\
+      \t 8 (statistics)\n\
+      \t 16 (debug)\n\
+      \t 32 (progressbar)\n")
+    ( "runmode", po::value<std::string> (&rMode)->default_value("threaded"),
+      "Set the runmode (mpi, cpu, threaded)")
+    ( "reflection", po::value<bool> (useReflections)->default_value(true),
+      "use reflections or not")
+    ( "rays", po::value<unsigned> (raysPerSample)->default_value(100000),
+      "The minimal number of rays to use for each sample point")
+    ( "maxrays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
+      "The maximal number of rays to use for each sample point")
+    ( "input", po::value<std::string> (inputPath)->default_value("input"),
+      "The path to a folder that contains the input files")
+    ( "output", po::value<std::string> (outputPath)->default_value("output"),
+      "The path to a folder that contains the output files")
+    ( "maxgpus", po::value<unsigned> (maxgpus)->default_value(1),
+      "The maximum number of GPUs to b used on a single node. Should be left unchanged for runmode=mpi")
+    ( "min_sample_i", po::value<int> (minSample_i),
+      "The the minimal index of sample points to simulate")
+    ( "max_sample_i", po::value<int> (maxSample_i),
+      "The the maximal index of sample points to simulate")
+    ( "mse_threshold", po::value<double> (mseThreshold)->default_value(0.05),
+      "The MSE threshold used for adaptive/repetitive sampling")
+    ( "lambda-resolution", po::value<unsigned> (lambdaResolution),
+      "The number of samples used to interpolate spectral intensities")
+    ( "repetitions", po::value<unsigned> (maxRepetitions)->default_value(4),
+      "The number of repetitions to try, before the number of rays is increased by adaptive sampling");
 
-  // Parse Commandline
-  for (int i = 1; i < argc; ++i) {
+  po::variables_map vm;
+  po::store(po::parse_command_line( argc, argv, desc ), vm);
+  po::notify(vm);
 
-    char* pos = strtok(argv[i], "=");
-    std::pair < std::string, std::string > p(std::string(pos), std::string(""));
-    pos = strtok(NULL, "=");
-    if (pos != NULL) {
-      p.second = std::string(pos);
-    }
-    parameters.push_back(p);
-  }
-  for (unsigned i = 0; i < parameters.size(); ++i) {
-    std::pair < std::string, std::string > p = parameters.at(i);
-    dout(V_INFO) << "arg[" << i << "]: (" << p.first << "," << p.second << ")" << std::endl;
-
-    // Parse number of rays
-    if (p.first == "--rays") {
-      *raysPerSample = atoi(p.second.c_str());
-    }
-
-    if (p.first == "--maxrays"){
-      *maxRaysPerSample = atoi(p.second.c_str());
-    }
-
-    if(p.first == "--input") {
-      std::string temp_input(p.second);
-
-      // Add slash at the end, if missing
-      if ((temp_input)[temp_input.size() - 1] == 'w')
-        temp_input.erase(temp_input.size() - 1, 1);
-      else if (temp_input[temp_input.size() - 1] != '/')
-        temp_input.append("/");
-
-      *inputPath = temp_input;
-    }
-
-    if( p.first =="--output") {
-
-      std::string temp_output(p.second);
-
-      // Add slash at the end, if missing
-      if ((temp_output)[temp_output.size() - 1] == 'w')
-        temp_output.erase(temp_output.size() - 1, 1);
-      else if (temp_output[temp_output.size() - 1] != '/')
-        temp_output.append("/");
-
-      *outputPath = temp_output;
-    }
-
-    if (p.first == "--write-vtk") {
-      *writeVtk = true;
-    }
-
-    // Parse what vtk file to compare with
-    if (p.first == "--compare") {
-      *compareLocation = p.second;
-    }
-
-    if (p.first == "--runmode") {
-      if (p.second == "threaded")
-        *mode = GPU_THREADED;
-      if (p.second == "cpu")
-        *mode = CPU;
-      if (p.second == "mpi")
-        *mode = GPU_MPI;
-
-    }
-
-    if (p.first == "--reflection"){
-      *useReflections = true;
-    }
-
-    if (p.first == "--maxgpus"){
-      *maxgpus = atoi(p.second.c_str());
-    }
-
-    if (p.first == "--min_sample_i"){
-      *minSample_i = atoi(p.second.c_str());
-    }
-    if (p.first == "--max_sample_i"){
-      *maxSample_i = atoi(p.second.c_str());
-    }
-
-    if (p.first == "--verbosity"){
-      verbosity = unsigned(atoi(p.second.c_str()));
-    }
-
-    if(p.first == "--repetitions"){
-      *maxRepetitions = unsigned(atoi(p.second.c_str()));
-    }
-
-    if(p.first == "--mse-threshold"){
-      *mseThreshold = float(atof(p.second.c_str()));
-    }
-
-    if(p.first == "--lambda-resolution"){
-      *lambdaResolution = unsigned(atoi(p.second.c_str()));
-    }
+  if (rMode == "threaded")
+    *mode = GPU_THREADED;
+  else if (rMode == "cpu")
+    *mode = CPU;
+  else if (rMode == "mpi")
+    *mode = GPU_MPI;
+  else
+    *mode = NONE;
 
 
-  }
+//    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
+//    write-vtk
+
+}
+void printCommandLine(
+    unsigned raysPerSample,
+    unsigned maxRaysPerSample,
+    std::string inputPath,
+    bool writeVtk,
+    std::string compareLocation,
+    RunMode mode,
+    bool useReflections,
+    unsigned maxgpus,
+    int minSample_i,
+    int maxSample_i,
+    unsigned maxRepetitions,
+    std::string outputPath,
+    double mseThreshold){
+    
+  dout(V_INFO) << "raysPerSample: " << raysPerSample << std::endl;
+  dout(V_INFO) << "maxRaysPerSample: " << maxRaysPerSample << std::endl;
+  dout(V_INFO) << "inputPath: " << inputPath << std::endl;
+  dout(V_INFO) << "outputPath: " << outputPath << std::endl;
+  dout(V_INFO) << "writeVtk: " << writeVtk << std::endl;
+  dout(V_INFO) << "compareLocation: " << compareLocation << std::endl;
+  dout(V_INFO) << "mode: " << mode << std::endl;
+  dout(V_INFO) << "useReflections: " << useReflections << std::endl;
+  dout(V_INFO) << "maxgpus: " << maxgpus << std::endl;
+  dout(V_INFO) << "minSample_i: " << minSample_i << std::endl;
+  dout(V_INFO) << "maxSample_i:" << maxSample_i << std::endl;
+  dout(V_INFO) << "maxRepetitions: " << maxRepetitions << std::endl;
+  dout(V_INFO) << "mseThreshold: " << mseThreshold << std::endl;
 }
 
 int checkParameterValidity(
@@ -169,44 +160,8 @@ int checkParameterValidity(
     double *mseThreshold
     ) {
 
-  if (argc <= 1) {
-    dout(V_ERROR) << "No commandline arguments found" << std::endl;
-    dout(V_ERROR) << "Usage: ./calcPhiASE ARGS [OPTARGS]" << std::endl;
-    dout(V_ERROR) << "" << std::endl;
-    dout(V_ERROR) << "ARGS (required)" << std::endl;
-    dout(V_ERROR) << "  --runmode=RUNMODE" << std::endl;
-    dout(V_ERROR) << "  --rays=RAYS" << std::endl;
-    dout(V_ERROR) << "  --maxrays=MAXRAYS" << std::endl;
-    dout(V_ERROR) << "  --input=FOLDER" << std::endl;
-    dout(V_ERROR) << "  --output=FOLDER" << std::endl;
-    dout(V_ERROR) << "" << std::endl;
-    dout(V_ERROR) << "OPTARGS (optional)" << std::endl;
-    dout(V_ERROR) << "  --maxgpus=N" << std::endl;
-    dout(V_ERROR) << "  --min_sample_i=<index of first sample>" << std::endl;
-    dout(V_ERROR) << "  --max_sample_i=<index of last sample>" << std::endl;
-    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
-    dout(V_ERROR) << "  --verbosity=VERBOSITY_LEVEL" << std::endl;
-    dout(V_ERROR) << "  --repetitions=MAX_REPETITIONS" << std::endl;
-    dout(V_ERROR) << "  --mse_threshold=THRESHOLD" << std::endl;
-    dout(V_ERROR) << "  --reflection" << std::endl;
-    dout(V_ERROR) << "  --write-vtk" << std::endl;
-    dout(V_ERROR) << "" << std::endl;
-    dout(V_ERROR) << "Runmodes : cpu" << std::endl;
-    dout(V_ERROR) << "           threaded" << std::endl;
-    dout(V_ERROR) << "           mpi" << std::endl;
-    dout(V_ERROR) << "Verbosity levels: 0 (quiet)" << std::endl; 
-    dout(V_ERROR) << "                  1 (error)" << std::endl; 
-    dout(V_ERROR) << "                  2 (warning)" << std::endl; 
-    dout(V_ERROR) << "                  4 (info)" << std::endl; 
-    dout(V_ERROR) << "                  8 (statistics)" << std::endl; 
-    dout(V_ERROR) << "                 16 (debug)" << std::endl; 
-    dout(V_ERROR) << "                 32 (progressbar)" << std::endl; 
-    dout(V_ERROR) << "" << std::endl; 
-    dout(V_ERROR) << "Please see README for more details!" << std::endl; 
-    return 1;
-  }
   if (mode == NONE) {
-    dout(V_ERROR) << "Please specify the runmode with --runmode=MODE" << std::endl;
+    dout(V_ERROR) << "Runmode must be either \"mpi\", \"threaded\" or \"cpu\" " << std::endl;
     return 1;
   }
 
@@ -284,7 +239,7 @@ void checkSampleRange(int* minSampleRange, int* maxSampleRange, const unsigned n
     exit(1);
   }
 
-  if((*minSampleRange < -1 || *minSampleRange >= numberOfSamples)){
+  if((*minSampleRange < -1 || *minSampleRange >= (int)numberOfSamples)){
     dout(V_ERROR) << "minSample_i is out of range! (There are only " << numberOfSamples << " samples)";
     exit(1);
   }

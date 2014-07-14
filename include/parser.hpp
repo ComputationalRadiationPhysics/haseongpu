@@ -133,6 +133,22 @@ void parseCommandLine(
     unsigned *lambdaResolution
     );
 
+void printCommandLine(
+    unsigned raysPerSample,
+    unsigned maxRaysPerSample,
+    std::string inputPath,
+    bool writeVtk,
+    std::string compareLocation,
+    RunMode mode,
+    bool useReflections,
+    unsigned maxgpus,
+    int minSample_i,
+    int maxSample_i,
+    unsigned maxRepetitions,
+    std::string outputPath,
+    double mseThreshold
+    );
+
 int checkParameterValidity(
     const int argc,
     const unsigned raysPerSample,
