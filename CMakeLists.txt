@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 2.8.10.1)
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
   "$ENV{MPI_ROOT}" "$ENV{CUDA_ROOT}" "$ENV{BOOST_ROOT}")
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/utils/cmake/modules/" ${CMAKE_MODULE_PATH})
+
 ###############################################################################
 # CUDA
 ###############################################################################
