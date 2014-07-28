@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8.10.1)
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
   "$ENV{MPI_ROOT}" "$ENV{CUDA_ROOT}" "$ENV{BOOST_ROOT}")
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/utils/cmake/modules/" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/utils/cmake/modules/" ${CMAKE_MODULE_PATH})
 
 ###############################################################################
 # CUDA
@@ -152,7 +152,7 @@ endif(HASE_RELEASE)
 ###############################################################################
 function(warn_path_cuda PATH_VARIABLE)
   string(TOLOWER "$ENV{${PATH_VARIABLE}}" CPLUS_TOLOWER)
-  string(FIND "${CPLUS_TOLOWER}" "cuda/include" CPLUS_TOLOWER_FOUND)
+  string(FIND "${CPLUS_TOLOWER}" "cuda" CPLUS_TOLOWER_FOUND)
   if(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
     message(WARNING 
       "Your ${PATH_VARIABLE} seems to contain CUDA includes."
@@ -199,6 +199,7 @@ add_custom_target(
   COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/${HASEonGPU_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/bin
   COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/${HASEonGPU_NAME}.m ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example
   COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/${HASEonGPU_NAME}.m ${CMAKE_CURRENT_SOURCE_DIR}/.
+  DEPENDS ${HASEonGPU_NAME}
   )
 
 add_custom_target(
