@@ -148,9 +148,31 @@ endif(HASE_RELEASE)
 
 
 ###############################################################################
+# Warning for Thrust-related Bug
+###############################################################################
+function(warn_path_cuda PATH_VARIABLE)
+  string(TOLOWER "$ENV{${PATH_VARIABLE}}" CPLUS_TOLOWER)
+  string(FIND "${CPLUS_TOLOWER}" "cuda/include" CPLUS_TOLOWER_FOUND)
+  if(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
+    message(WARNING 
+      "Your ${PATH_VARIABLE} seems to contain CUDA includes."
+      "This might result in the following error:\n"
+      "'error: kernel launches from templates are not allowed in system files'\n"
+      "To fix the problem, remove the CUDA includes from the path."
+      "(A better place for these includes might be your CPATH)\n"
+      "source: https://code.google.com/p/thrust/issues/detail?id=359#c5 \n"
+      "issue:  https://github.com/ComputationalRadiationPhysics/haseongpu/issues/26"
+      "CPATH:  https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html \n")
+  endif(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
+endfunction(warn_path_cuda)
+
+warn_path_cuda("CPLUS_INCLUDE_PATH")
+warn_path_cuda("C_INCLUDE_PATH")
+
+
+###############################################################################
 # Executables
 ###############################################################################
-
 set(HASEonGPU_NAME "calcPhiASE")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -164,11 +186,9 @@ cuda_add_executable(${HASEonGPU_NAME} ${SRCFILES})
 target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
 
 
-
 ###############################################################################
 # more targets (make examples, make new, make doc)
 ###############################################################################
-
 add_custom_target(
   examples
   ALL
