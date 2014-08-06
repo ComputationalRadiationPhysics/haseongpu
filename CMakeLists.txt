@@ -50,6 +50,10 @@ if(CUDA_KEEP_FILES)
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" --keep --keep-dir "${PROJECT_BINARY_DIR}/nvcc_tmp")
 endif(CUDA_KEEP_FILES)
 
+# save the current configuration to be used with the linker.
+# any further additions to CUDA_NVCC_FLAGS will NOT be passed to
+# the linker. See the modified FindCUDA.cmake module
+set(CUDA_NVCC_LINKER_FLAGS ${CUDA_NVCC_FLAGS})
 
 ###############################################################################
 # Boost
@@ -59,9 +63,10 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
 # nvcc + boost 1.55 work around
-#if(Boost_VERSION EQUAL 105500)
-#  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; \"-DBOOST_NOINLINE=__attribute__((noinline))\" ")
-#endif(Boost_VERSION EQUAL 105500)
+# This must NOT be passed to the nvcc linker, but only to the compiler
+if(Boost_VERSION EQUAL 105500)
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} \"-DBOOST_NOINLINE=__attribute__((noinline))\" ")
+endif(Boost_VERSION EQUAL 105500)
 
 
 ################################################################################

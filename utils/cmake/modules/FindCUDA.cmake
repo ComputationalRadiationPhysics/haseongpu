@@ -1434,7 +1434,12 @@ function(CUDA_LINK_SEPARABLE_COMPILATION_OBJECTS output_file cuda_target options
       endforeach()
     endforeach()
     # Add our general CUDA_NVCC_FLAGS with the configuration specifig flags
-    set(nvcc_flags ${CUDA_NVCC_FLAGS} ${config_specific_flags} ${nvcc_flags})
+    #was before: set(nvcc_flags ${CUDA_NVCC_FLAGS} ${config_specific_flags} ${nvcc_flags})
+    # since we added something to the CUDA_NVCC_FLAGS that the linker does not like,
+    # we created the new variable CUDA_NVCC_LINKER_FLAGS, that contains only things that
+    # the linker can understand.
+    # This is a ugly workaround for a bug in Boost 1.55 and should be removed as soon as possible
+    set(nvcc_flags ${CUDA_NVCC_LINKER_FLAGS} ${config_specific_flags} ${nvcc_flags})
 
     file(RELATIVE_PATH output_file_relative_path "${CMAKE_BINARY_DIR}" "${output_file}")
 
