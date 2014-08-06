@@ -25,6 +25,7 @@ Dependencies
 
    + Software:
      + make
+     + cmake 2.8.10
      + gcc 4.4.1
      + cuda 5.5
 
@@ -36,10 +37,14 @@ Dependencies
      + Nvidia device >= Compute capability 2.0 (at least fermi generation)
 
 
-Installation
-------------
+Compiling
+---------
 
-   + run : `make`
+   + clone the repository: `git clone https://github.com/slizzered/haseongpu.git`
+   + create the build directory: `mkdir haseongpu/build`
+   + go to build directory: `cd haseongpu/build`
+   + create Makefile `cmake ..`
+   + build project : `make`
  
 
 Usage
@@ -55,7 +60,7 @@ Usage
   with a pumped crystal. The simulation
   can be started by the following:
 
-  1. run : `make`
+  1. follow the compile instructions above
   2. change path "cd example/matlab_example/"
   3. run : `matlab laserPumpCladdingExample`
   4. watch progress
@@ -64,7 +69,7 @@ Usage
 
 ### Quick C-Application laser pump example 
 
-  1. run : `make`
+  1. follow the compile instructions above
   2. change path "cd example/c_example/"
   3. run : `./bin/calcPhiASE --input=./input/cylindrical --output=./output --runmode=threaded --rays=10000`
   4. watch progress
