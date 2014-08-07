@@ -40,7 +40,7 @@ Dependencies
 Compiling
 ---------
 
-   + clone the repository: `git clone https://github.com/slizzered/haseongpu.git`
+   + clone the repository: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
    + create the build directory: `mkdir haseongpu/build`
    + go to build directory: `cd haseongpu/build`
    + create Makefile `cmake ..`
