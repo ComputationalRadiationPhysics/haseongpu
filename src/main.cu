@@ -98,6 +98,7 @@ int main(int argc, char **argv){
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
+  std::vector<double> lambda;
 
   // Parse Commandline
   parseCommandLine(argc, argv, &minRaysPerSample, &maxRaysPerSample, &inputPath,
@@ -114,11 +115,17 @@ int main(int argc, char **argv){
   // Parse wavelengths from files
   if(fileToVector(inputPath + "sigmaA.txt", &sigmaA)) return 1;
   if(fileToVector(inputPath + "sigmaE.txt", &sigmaE)) return 1;
+  if(fileToVector(inputPath + "lambda.txt", &lambda)) return 1;
   assert(sigmaA.size() == sigmaE.size());
+  assert(sigmaA.size() == lambda.size());
 
   // Interpolate sigmaA / sigmaE function
-  std::vector<double> sigmaAInterpolated = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-  std::vector<double> sigmaEInterpolated = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  // std::vector<double> sigmaAInterpolated = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  // std::vector<double> sigmaEInterpolated = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+
+  std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambda, MAX_INTERPOLATION);
+  std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambda, MAX_INTERPOLATION);
+
 
   // Calc max sigmaA / sigmaE
   double maxSigmaE = 0.0;
@@ -254,7 +261,7 @@ int main(int argc, char **argv){
     writePointsToVtk(meshs[0], tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
-  //Print statistics
+  // Print statistics
   if(verbosity & V_STAT){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);
