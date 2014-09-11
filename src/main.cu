@@ -75,6 +75,7 @@ int main(int argc, char **argv){
   unsigned minRaysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   unsigned maxRepetitions = 4;
+  unsigned maxLambdaResolution = 1000;
   float maxMSE = 0;
   float  avgMSE = 0;
   unsigned highMSE = 0;
@@ -102,7 +103,7 @@ int main(int argc, char **argv){
 
   // Parse Commandline
   parseCommandLine(argc, argv, &minRaysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold);
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold, &maxLambdaResolution);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -120,11 +121,8 @@ int main(int argc, char **argv){
   assert(sigmaA.size() == lambda.size());
 
   // Interpolate sigmaA / sigmaE function
-  // std::vector<double> sigmaAInterpolated = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-  // std::vector<double> sigmaEInterpolated = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-
-  std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambda, MAX_INTERPOLATION);
-  std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambda, MAX_INTERPOLATION);
+  std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambda, maxLambdaResolution);
+  std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambda, maxLambdaResolution);
 
 
   // Calc max sigmaA / sigmaE
