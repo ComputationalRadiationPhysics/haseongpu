@@ -78,7 +78,7 @@ clean_IO_files(TMP_FOLDER);
 create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
 
 % do the propagation
-status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--runmode=' runmode ' --rays=' num2str(minRaysPerSample) ' --maxrays=' num2str(maxRaysPerSample) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(maxGPUs) ' --repetitions=' num2str(repetitions) ' --mse-threshold=' num2str(mseThreshold) ]);
+status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--runmode=' runmode ' --rays=' num2str(minRaysPerSample) ' --maxrays=' num2str(maxRaysPerSample) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(maxGPUs) ' --repetitions=' num2str(repetitions) ' --mse-threshold=' num2str(mseThreshold) ' --lambda-resolution=' num2str(laserParameter.l_res) ]);
 
 if(status ~= 0)
     error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
@@ -176,6 +176,14 @@ fclose(x);
 
 x=fopen('sigmaE.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_ems);
+fclose(x);
+
+x=fopen('lambdaA.txt','w');
+fprintf(x,'%.50f\n',laserParameter.l_abs);
+fclose(x);
+
+x=fopen('lambdaE.txt','w');
+fprintf(x,'%.50f\n',laserParameter.l_ems);
 fclose(x);
 
 x=fopen('crystalTFluo.txt','w');

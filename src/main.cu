@@ -33,7 +33,7 @@
 #include <vector> /* vector */
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
-#include <algorithm> /* max_element */
+#include <algorithm> /* std::max */
 #include <numeric> /* accumulate*/
 #include <stdexcept>
 
@@ -75,6 +75,7 @@ int main(int argc, char **argv){
   unsigned minRaysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   unsigned maxRepetitions = 4;
+  unsigned lambdaResolution = 0;
   float maxMSE = 0;
   float  avgMSE = 0;
   unsigned highMSE = 0;
@@ -98,10 +99,12 @@ int main(int argc, char **argv){
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
+  std::vector<double> lambdaA;
+  std::vector<double> lambdaE;
 
   // Parse Commandline
   parseCommandLine(argc, argv, &minRaysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold);
+		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold, &lambdaResolution);
 
   // Set/Test device to run experiment with
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
@@ -112,13 +115,20 @@ int main(int argc, char **argv){
   if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
 
   // Parse wavelengths from files
-  if(fileToVector(inputPath + "sigmaA.txt", &sigmaA)) return 1;
-  if(fileToVector(inputPath + "sigmaE.txt", &sigmaE)) return 1;
-  assert(sigmaA.size() == sigmaE.size());
+  if(fileToVector(inputPath + "sigmaA.txt",  &sigmaA))   return 1;
+  if(fileToVector(inputPath + "sigmaE.txt",  &sigmaE))   return 1;
+  if(fileToVector(inputPath + "lambdaA.txt", &lambdaA)) return 1;
+  if(fileToVector(inputPath + "lambdaE.txt", &lambdaE)) return 1;
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
+  
+  assert(sigmaA.size() == lambdaA.size());
+  assert(sigmaE.size() == lambdaE.size());
 
   // Interpolate sigmaA / sigmaE function
-  std::vector<double> sigmaAInterpolated = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-  std::vector<double> sigmaEInterpolated = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambdaA, lambdaResolution);
+  std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambdaE, lambdaResolution);
+  assert(sigmaAInterpolated.size() == sigmaEInterpolated.size());
 
   // Calc max sigmaA / sigmaE
   double maxSigmaE = 0.0;
@@ -254,7 +264,7 @@ int main(int argc, char **argv){
     writePointsToVtk(meshs[0], tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
-  //Print statistics
+  // Print statistics
   if(verbosity & V_STAT){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);

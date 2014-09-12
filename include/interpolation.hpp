@@ -27,4 +27,5 @@
 #define LAMBDA_STOP 1095
 
 std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop);
+std::vector<double> interpolateLinear(const std::vector<double> y, const std::vector<double> x, const unsigned nInterpolations);
 
