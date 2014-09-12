@@ -149,18 +149,18 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 }
 
 __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
-				 const Mesh mesh, 
-				 const unsigned* indicesOfPrisms, 
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum, 
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double* sigmaA, 
-				 const double* sigmaE,
-         const unsigned maxInterpolation,
-				 unsigned *globalOffsetMultiplicator
-				 ) {
+				  const Mesh mesh, 
+				  const unsigned* indicesOfPrisms, 
+				  const double* importance,
+				  const unsigned raysPerSample,
+				  float *gainSum, 
+				  float *gainSumSquare,
+				  const unsigned sample_i,
+				  const double* sigmaA, 
+				  const double* sigmaE,
+				  const unsigned lambdaResolution,
+				  unsigned *globalOffsetMultiplicator
+				  ) {
 
   int rayNumber = 0; 
   double gainSumTemp = 0;
@@ -182,8 +182,8 @@ __global__ void calcSampleGainSum(curandStateMtgp32* globalState,
     Ray ray                         = generateRay(startPoint, samplePoint);
 
 	// get a random index in the wavelength array
-    unsigned sigma_i                = genRndSigmas(maxInterpolation, globalState);
-    assert(sigma_i < maxInterpolation);
+    unsigned sigma_i                = genRndSigmas(lambdaResolution, globalState);
+    assert(sigma_i < lambdaResolution);
 
 	// calculate the gain for the whole ray at once
     double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);

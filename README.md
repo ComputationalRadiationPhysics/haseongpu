@@ -344,12 +344,13 @@ Synopsis
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
-    --lambda-resolution= Resolution of absorption and emission
-      spectrum to which the input spectrum will be interpolated
-      linear.  Interpolation is used to distribute spectrum values
-      equidistant over the wavelength.  Omitting this option or
-      setting a to small resolutionwill set the lambda resolution to
-      the maximum number of absorption or emission values.
+    --lambda-resolution= 
+      Resolution of absorption and emission spectrum to which the
+      input spectrum will be interpolated linear.  Interpolation is
+      used to distribute spectrum values equidistant over the
+      wavelength.  Omitting this option or setting a to small
+      resolutionwill set the lambda resolution to the maximum number
+      of absorption or emission values.
 
 C-Application Templates
 -----------------------
