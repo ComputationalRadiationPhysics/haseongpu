@@ -33,7 +33,7 @@
 #include <vector> /* vector */
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
-#include <algorithm> /* max_element */
+#include <algorithm> /* std::max */
 #include <numeric> /* accumulate*/
 #include <stdexcept>
 
@@ -75,7 +75,7 @@ int main(int argc, char **argv){
   unsigned minRaysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   unsigned maxRepetitions = 4;
-  unsigned lambdaResolution = 1000;
+  unsigned lambdaResolution = 0;
   float maxMSE = 0;
   float  avgMSE = 0;
   unsigned highMSE = 0;
@@ -119,6 +119,9 @@ int main(int argc, char **argv){
   if(fileToVector(inputPath + "sigmaE.txt",  &sigmaE))   return 1;
   if(fileToVector(inputPath + "lambdaA.txt", &lambdaA)) return 1;
   if(fileToVector(inputPath + "lambdaE.txt", &lambdaE)) return 1;
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
+  
   assert(sigmaA.size() == lambdaA.size());
   assert(sigmaE.size() == lambdaE.size());
 
