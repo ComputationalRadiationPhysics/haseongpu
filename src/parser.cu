@@ -80,9 +80,9 @@ void parseCommandLine(
       "The minimal number of rays to use for each sample point")
     ( "maxrays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
       "The maximal number of rays to use for each sample point")
-    ( "input", po::value<std::string> (inputPath)->default_value("input"),
+    ( "input", po::value<std::string> (inputPath)->default_value("input/"),
       "The path to a folder that contains the input files")
-    ( "output", po::value<std::string> (outputPath)->default_value("output"),
+    ( "output", po::value<std::string> (outputPath)->default_value("output/"),
       "The path to a folder that contains the output files")
     ( "maxgpus", po::value<unsigned> (maxgpus)->default_value(1),
       "The maximum number of GPUs to b used on a single node. Should be left unchanged for runmode=mpi")
@@ -109,6 +109,10 @@ void parseCommandLine(
     *mode = GPU_MPI;
   else
     *mode = NONE;
+
+  // append trailing folder separator, if necessary
+  if(inputPath->at(inputPath->size()-1) != '/') inputPath->append("/");
+  if(outputPath->at(outputPath->size()-1) != '/') outputPath->append("/");
 
 
 //    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
