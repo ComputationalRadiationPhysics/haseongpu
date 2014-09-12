@@ -128,7 +128,7 @@ void parseCommandLine(
     unsigned *maxRepetitions,
     std::string *outputPath,
     double *mseThreshold,
-    unsigned *maxLambdaResolution
+    unsigned *lambdaResolution
     );
 
 int checkParameterValidity(

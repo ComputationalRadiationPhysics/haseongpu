@@ -248,8 +248,9 @@ numbers the array belongs.
      Thickness of one prism level of the mesh.
 
    + __laserParameter__ [float]   
-     Is a structure for the laser parameters (wavelength sigmas)
-     struct(s_abs, VALUES, s_ems, VALUES)
+     Is a structure for the laser parameters (intensities sigma, wavelength lambda)
+     s_ems corresponds to l_ems and s_abs to l_abs
+     struct(s_abs, VALUES, s_ems, VALUES, l_abs, VALUES, l_ems, VALUES)
 
    + __crystal__ [float]  
      Is a structure for the crystal parameters 
@@ -343,6 +344,9 @@ Synopsis
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
+    --lambda-resolution=
+      Resolution of absorption and emission spectrum to
+      which the input spectrum will be interpolated linear.
 
 C-Application Templates
 -----------------------

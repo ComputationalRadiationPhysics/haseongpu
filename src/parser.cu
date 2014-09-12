@@ -46,7 +46,7 @@ void parseCommandLine(
     unsigned *maxRepetitions,
     std::string *outputPath,
     double *mseThreshold,
-    unsigned *maxLambdaResolution
+    unsigned *lambdaResolution
     ) {
 
   std::vector<std::pair<std::string, std::string> > parameters;
@@ -146,8 +146,8 @@ void parseCommandLine(
       *mseThreshold = float(atof(p.second.c_str()));
     }
 
-    if(p.first == "--max-lambda-resolution"){
-      *maxLambdaResolution = unsigned(atoi(p.second.c_str()));
+    if(p.first == "--lambda-resolution"){
+      *lambdaResolution = unsigned(atoi(p.second.c_str()));
     }
 
 
