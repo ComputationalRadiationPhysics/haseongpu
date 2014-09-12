@@ -67,6 +67,9 @@ pump.exp = 40;                         % Pump exponent
 % Laser parameter
 laser.s_abs = load('sigma_a.txt');      % Absorption spectrum cm2(1.16e-21 pour DA)
 laser.s_ems = load('sigma_e.txt');      % Emission spectrum in cm2(2.48e-20)
+laser.l_abs = load('lambda_a.txt');     % Wavelengths absoroption spectrum in nm (x values for absorption)
+laser.l_ems = load('lambda_e.txt');     % Wavelengths emission spectrum in nm (y values for emission)
+laser.l_res = 1000;                     % Resolution of linear interpolated spectrum
 laser.I = 1e6;                          % Laser intensity
 laser.T = 1e-8;                         % Laser duration
 laser.wavelength = 1030e-9;             % Lasing wavelength in m
