@@ -257,6 +257,9 @@ double propagation(double x_pos, double y_pos, double z_pos, double x_dest, doub
     
     // is not used
     N_refl=0;
+    forb_dump = 0;
+    cell_z_next = 0;
+    tri_next = 0;
 
     if(N_refl){
       printf("_");
