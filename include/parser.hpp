@@ -36,24 +36,10 @@
 
 #include <logging.hpp>
 #include <mesh.hpp>
+#include <nan_fix.hpp>
 
 enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
 
-/**
- * @brief this allows the use of isnan() for int
- * in the template function fileToVector()
- */
-inline bool isnan(const int i){
-    return false;
-}
-
-/**
- * @brief this allows the use of isnan() for unsigned
- * in the template function fileToVector()
- */
-inline bool isnan(const unsigned int i){
-    return false;
-}
 
 /**
  * @brief Parses a given file(filename) line by line.
@@ -78,7 +64,7 @@ int fileToVector(const std::string filename, std::vector<T> *v){
     while(fileStream.good()){
       std::getline(fileStream, line);
       value = (T) atof(line.c_str());
-      if(isnan(value)){
+      if(isNaN(value)){
 	dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
 	exit(1);
       }
