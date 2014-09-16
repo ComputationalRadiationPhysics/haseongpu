@@ -24,6 +24,7 @@
 #include <vector> /* vector */
 #include <algorithm>
 #include <assert.h>
+#include <stdlib.h>
 
 #include <types.hpp>
 #include <logging.hpp> 
@@ -74,35 +75,42 @@ void parseCommandLine(
       \t 16 (debug)\n\
       \t 32 (progressbar)\n")
     ( "device-mode", po::value<std::string> (&dMode)->default_value("gpu"),
-      "Set the runmode (cpu, gpu)")
+      "Set the device to run the calculation (cpu, gpu)")
     ( "parallel-mode", po::value<std::string> (&pMode)->default_value("threaded"),
-      "Set the runmode (mpi, threaded), only valid with device-mode=gpu")
+      "Set the preferred way of parellelization (mpi, threaded), only valid with device-mode=gpu")
     ( "reflection", po::value<bool> (useReflections)->default_value(true),
       "use reflections or not")
     ( "min-rays", po::value<unsigned> (raysPerSample)->default_value(100000),
       "The minimal number of rays to use for each sample point")
     ( "max-rays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
       "The maximal number of rays to use for each sample point")
-    ( "input-path", po::value<std::string> (inputPath)->default_value("input/"),
+    ( "input-path,i", po::value<std::string> (inputPath)->default_value("input/"),
       "The path to a folder that contains the input files")
-    ( "output-path", po::value<std::string> (outputPath)->default_value("output/"),
+    ( "output-path,o", po::value<std::string> (outputPath)->default_value("output/"),
       "The path to a folder that contains the output files")
-    ( "ngpus", po::value<unsigned> (maxgpus)->default_value(1),
+    ( "ngpus,g", po::value<unsigned> (maxgpus)->default_value(1),
       "The maximum number of GPUs to b used on a single node. Should be left unchanged for runmode=mpi")
     ( "min-sample-i", po::value<int> (minSample_i),
       "The the minimal index of sample points to simulate")
     ( "max-sample-i", po::value<int> (maxSample_i),
       "The the maximal index of sample points to simulate")
-    ( "mse-threshold", po::value<double> (mseThreshold)->default_value(0.1),
+    ( "mse-threshold,m", po::value<double> (mseThreshold)->default_value(0.1,"0.1"),
       "The MSE threshold used for adaptive/repetitive sampling")
     ( "spectral-resolution", po::value<unsigned> (lambdaResolution),
       "The number of samples used to interpolate spectral intensities")
-    ( "repetitions", po::value<unsigned> (maxRepetitions)->default_value(4),
+    ( "repetitions,r", po::value<unsigned> (maxRepetitions)->default_value(4),
       "The number of repetitions to try, before the number of rays is increased by adaptive sampling");
 
   po::variables_map vm;
   po::store(po::parse_command_line( argc, argv, desc ), vm);
   po::notify(vm);
+
+  if(vm.count("help")){
+    std::cout << "Usage: " << argv[0] << " [options] " << std::endl;
+    std::cout << std::endl;
+    std::cout << desc << std::endl;
+    exit(0);
+  }
 
   if (pMode == "threaded")
     *parallelMode = GPU_THREADED;
@@ -121,6 +129,7 @@ void parseCommandLine(
   // append trailing folder separator, if necessary
   if(inputPath->at(inputPath->size()-1) != '/') inputPath->append("/");
   if(outputPath->at(outputPath->size()-1) != '/') outputPath->append("/");
+
 
 
 //    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
@@ -147,8 +156,6 @@ void printCommandLine(
   dout(V_INFO) << "maxRaysPerSample: " << maxRaysPerSample << std::endl;
   dout(V_INFO) << "inputPath: " << inputPath << std::endl;
   dout(V_INFO) << "outputPath: " << outputPath << std::endl;
-  dout(V_INFO) << "writeVtk: " << writeVtk << std::endl;
-  dout(V_INFO) << "compareLocation: " << compareLocation << std::endl;
   dout(V_INFO) << "device-mode: " << dMode << std::endl;
   dout(V_INFO) << "parallel-mode: " << pMode << std::endl;
   dout(V_INFO) << "useReflections: " << useReflections << std::endl;
