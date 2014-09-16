@@ -44,8 +44,8 @@ void parseCommandLine(
     unsigned *maxRaysPerSample,
     std::string *inputPath,
     bool *writeVtk,
-    std::string *compareLocation,
-    RunMode *mode,
+    DeviceMode *deviceMode,
+    ParallelMode *parallelMode,
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
@@ -56,7 +56,8 @@ void parseCommandLine(
     unsigned *lambdaResolution
     ) {
 
-  std::string rMode;
+  std::string dMode;
+  std::string pMode;
   namespace po = boost::program_options;
   po::options_description desc( "Allowed options" );
   desc.add_options()
@@ -72,27 +73,29 @@ void parseCommandLine(
       \t 8 (statistics)\n\
       \t 16 (debug)\n\
       \t 32 (progressbar)\n")
-    ( "runmode", po::value<std::string> (&rMode)->default_value("threaded"),
-      "Set the runmode (mpi, cpu, threaded)")
+    ( "device-mode", po::value<std::string> (&dMode)->default_value("gpu"),
+      "Set the runmode (cpu, gpu)")
+    ( "parallel-mode", po::value<std::string> (&pMode)->default_value("threaded"),
+      "Set the runmode (mpi, threaded), only valid with device-mode=gpu")
     ( "reflection", po::value<bool> (useReflections)->default_value(true),
       "use reflections or not")
-    ( "rays", po::value<unsigned> (raysPerSample)->default_value(100000),
+    ( "min-rays", po::value<unsigned> (raysPerSample)->default_value(100000),
       "The minimal number of rays to use for each sample point")
-    ( "maxrays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
+    ( "max-rays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
       "The maximal number of rays to use for each sample point")
-    ( "input", po::value<std::string> (inputPath)->default_value("input/"),
+    ( "input-path", po::value<std::string> (inputPath)->default_value("input/"),
       "The path to a folder that contains the input files")
-    ( "output", po::value<std::string> (outputPath)->default_value("output/"),
+    ( "output-path", po::value<std::string> (outputPath)->default_value("output/"),
       "The path to a folder that contains the output files")
-    ( "maxgpus", po::value<unsigned> (maxgpus)->default_value(1),
+    ( "ngpus", po::value<unsigned> (maxgpus)->default_value(1),
       "The maximum number of GPUs to b used on a single node. Should be left unchanged for runmode=mpi")
-    ( "min_sample_i", po::value<int> (minSample_i),
+    ( "min-sample-i", po::value<int> (minSample_i),
       "The the minimal index of sample points to simulate")
-    ( "max_sample_i", po::value<int> (maxSample_i),
+    ( "max-sample-i", po::value<int> (maxSample_i),
       "The the maximal index of sample points to simulate")
-    ( "mse_threshold", po::value<double> (mseThreshold)->default_value(0.05),
+    ( "mse-threshold", po::value<double> (mseThreshold)->default_value(0.1),
       "The MSE threshold used for adaptive/repetitive sampling")
-    ( "lambda-resolution", po::value<unsigned> (lambdaResolution),
+    ( "spectral-resolution", po::value<unsigned> (lambdaResolution),
       "The number of samples used to interpolate spectral intensities")
     ( "repetitions", po::value<unsigned> (maxRepetitions)->default_value(4),
       "The number of repetitions to try, before the number of rays is increased by adaptive sampling");
@@ -101,15 +104,20 @@ void parseCommandLine(
   po::store(po::parse_command_line( argc, argv, desc ), vm);
   po::notify(vm);
 
-  if (rMode == "threaded")
-    *mode = GPU_THREADED;
-  else if (rMode == "cpu")
-    *mode = CPU;
-  else if (rMode == "mpi")
-    *mode = GPU_MPI;
+  if (pMode == "threaded")
+    *parallelMode = GPU_THREADED;
+  else if (pMode == "mpi")
+    *parallelMode = GPU_MPI;
   else
-    *mode = NONE;
+    *parallelMode = NO_PARALLEL_MODE;
 
+  if(dMode == "gpu")
+    *deviceMode = GPU_MODE;
+  else if (dMode == "cpu")
+    *deviceMode = CPU_MODE;
+  else
+    *deviceMode = NO_DEVICE_MODE;
+      
   // append trailing folder separator, if necessary
   if(inputPath->at(inputPath->size()-1) != '/') inputPath->append("/");
   if(outputPath->at(outputPath->size()-1) != '/') outputPath->append("/");
@@ -125,7 +133,8 @@ void printCommandLine(
     std::string inputPath,
     bool writeVtk,
     std::string compareLocation,
-    RunMode mode,
+    const DeviceMode dMode,
+    const ParallelMode pMode,
     bool useReflections,
     unsigned maxgpus,
     int minSample_i,
@@ -140,7 +149,8 @@ void printCommandLine(
   dout(V_INFO) << "outputPath: " << outputPath << std::endl;
   dout(V_INFO) << "writeVtk: " << writeVtk << std::endl;
   dout(V_INFO) << "compareLocation: " << compareLocation << std::endl;
-  dout(V_INFO) << "mode: " << mode << std::endl;
+  dout(V_INFO) << "device-mode: " << dMode << std::endl;
+  dout(V_INFO) << "parallel-mode: " << pMode << std::endl;
   dout(V_INFO) << "useReflections: " << useReflections << std::endl;
   dout(V_INFO) << "maxgpus: " << maxgpus << std::endl;
   dout(V_INFO) << "minSample_i: " << minSample_i << std::endl;
@@ -155,7 +165,8 @@ int checkParameterValidity(
     unsigned *maxRaysPerSample,
     const std::string inputPath,
     const unsigned deviceCount,
-    const RunMode mode,
+    const DeviceMode deviceMode,
+    const ParallelMode parallelMode,
     unsigned *maxgpus,
     const int minSampleRange,
     const int maxSampleRange,
@@ -164,8 +175,17 @@ int checkParameterValidity(
     double *mseThreshold
     ) {
 
-  if (mode == NONE) {
-    dout(V_ERROR) << "Runmode must be either \"mpi\", \"threaded\" or \"cpu\" " << std::endl;
+  if (deviceMode == NO_DEVICE_MODE) {
+    dout(V_ERROR) << "device-mode must be either \"gpu\" or \"cpu\" " << std::endl;
+    return 1;
+  }
+
+  if (deviceMode == CPU_MODE && parallelMode == GPU_MPI){
+    dout(V_WARNING) << "device-mode \"cpu\" does not support parallel-mode \"mpi\"! (will be ignored)" << std::endl;
+  }
+
+  if (parallelMode == NO_PARALLEL_MODE) {
+    dout(V_ERROR) << "parallel-mode must be either \"mpi\" or \"threaded\" " << std::endl;
     return 1;
   }
 
@@ -175,12 +195,12 @@ int checkParameterValidity(
   }
 
   if (inputPath.size() == 0) {
-    dout(V_ERROR) << "Please specify the experiment's location with --input=PATH_TO_EXPERIMENT" << std::endl;
+    dout(V_ERROR) << "Please specify the experiment's location with --input-path=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
 
   if (outputPath.size() == 0) {
-    dout(V_ERROR) << "Please specify the output location with --output=PATH_TO_EXPERIMENT" << std::endl;
+    dout(V_ERROR) << "Please specify the output location with --output-path=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
 
@@ -190,7 +210,7 @@ int checkParameterValidity(
     *maxRaysPerSample = raysPerSample;
   }
 
-  if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --maxgpus=" << deviceCount << std::endl;
+  if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --ngpus=" << deviceCount << std::endl;
     return 1;
   }
 
