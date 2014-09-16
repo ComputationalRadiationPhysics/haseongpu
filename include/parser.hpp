@@ -40,6 +40,22 @@
 enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
 
 /**
+ * @brief this allows the use of isnan() for int
+ * in the template function fileToVector()
+ */
+inline bool isnan(const int i){
+    return false;
+}
+
+/**
+ * @brief this allows the use of isnan() for unsigned
+ * in the template function fileToVector()
+ */
+inline bool isnan(const unsigned int i){
+    return false;
+}
+
+/**
  * @brief Parses a given file(filename) line by line.
  *        Each line should contain just one value
  *        and the value should be a number (short, unsigned,
