@@ -166,7 +166,7 @@ int main(int argc, char **argv){
       dout(V_ERROR) << "No valid device-mode!" << std::endl;
       exit(1);
 
-    case CPU_MODE: //Possibly deprecated!
+    case CPU_DEVICE_MODE: //Possibly deprecated!
       // TODO: make available for MPI?
       runtime = forLoopsClad( &dndtAse,
           minRaysPerSample,
@@ -183,10 +183,10 @@ int main(int argc, char **argv){
       runmode = "CPU Mode single threaded";
       break;
 
-    case GPU_MODE:
+    case GPU_DEVICE_MODE:
       switch(parallelMode){
         // TODO: Replace completly by MPI
-        case GPU_THREADED:
+        case THREADED_PARALLEL_MODE:
           for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
             const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
             const float samplePerGpu = samplesPerNode / (float) maxGpus;
@@ -222,7 +222,7 @@ int main(int argc, char **argv){
           runmode="GPU mode Threaded";
           break;
 
-        case GPU_MPI:
+        case MPI_PARALLEL_MODE:
           usedGpus = calcPhiAseMPI( minRaysPerSample,
               maxRaysPerSample,
               maxRepetitions,

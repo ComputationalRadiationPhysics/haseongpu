@@ -38,8 +38,8 @@
 #include <mesh.hpp>
 #include <nan_fix.hpp>
 
-enum DeviceMode { NO_DEVICE_MODE, GPU_MODE, CPU_MODE};
-enum ParallelMode { NO_PARALLEL_MODE, GPU_THREADED, GPU_MPI };
+enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
+enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE };
 
 
 /**

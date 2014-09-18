@@ -22,9 +22,8 @@
 
 #include <string> /* string */
 #include <vector> /* vector */
-#include <algorithm>
 #include <assert.h>
-#include <stdlib.h>
+#include <stdlib.h> /* exit() */
 
 #include <types.hpp>
 #include <logging.hpp> 
@@ -113,16 +112,16 @@ void parseCommandLine(
   }
 
   if (pMode == "threaded")
-    *parallelMode = GPU_THREADED;
+    *parallelMode = THREADED_PARALLEL_MODE;
   else if (pMode == "mpi")
-    *parallelMode = GPU_MPI;
+    *parallelMode = MPI_PARALLEL_MODE;
   else
     *parallelMode = NO_PARALLEL_MODE;
 
   if(dMode == "gpu")
-    *deviceMode = GPU_MODE;
+    *deviceMode = GPU_DEVICE_MODE;
   else if (dMode == "cpu")
-    *deviceMode = CPU_MODE;
+    *deviceMode = CPU_DEVICE_MODE;
   else
     *deviceMode = NO_DEVICE_MODE;
       
@@ -187,7 +186,7 @@ int checkParameterValidity(
     return 1;
   }
 
-  if (deviceMode == CPU_MODE && parallelMode == GPU_MPI){
+  if (deviceMode == CPU_DEVICE_MODE && parallelMode == MPI_PARALLEL_MODE){
     dout(V_WARNING) << "device-mode \"cpu\" does not support parallel-mode \"mpi\"! (will be ignored)" << std::endl;
   }
 
