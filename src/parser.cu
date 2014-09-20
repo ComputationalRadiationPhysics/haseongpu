@@ -88,7 +88,7 @@ void parseCommandLine(
     ( "output-path,o", po::value<std::string> (outputPath)->default_value("output/"),
       "The path to a folder that contains the output files")
     ( "ngpus,g", po::value<unsigned> (maxgpus)->default_value(1),
-      "The maximum number of GPUs to b used on a single node. Should be left unchanged for runmode=mpi")
+      "The maximum number of GPUs to b used on a single node. Should be left unchanged for --parallel-mode=mpi")
     ( "min-sample-i", po::value<int> (minSample_i),
       "The the minimal index of sample points to simulate")
     ( "max-sample-i", po::value<int> (maxSample_i),
