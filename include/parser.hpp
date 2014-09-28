@@ -38,7 +38,8 @@
 #include <mesh.hpp>
 #include <nan_fix.hpp>
 
-enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
+enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
+enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE };
 
 
 /**
@@ -121,8 +122,8 @@ void parseCommandLine(
     unsigned *maxRaysPerSample,
     std::string *inputPath,
     bool *writeVtk,
-    std::string *compareLocation,
-    RunMode *mode,
+    DeviceMode *deviceMode,
+    ParallelMode *parallelMode,
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
@@ -133,13 +134,31 @@ void parseCommandLine(
     unsigned *lambdaResolution
     );
 
+void printCommandLine(
+    unsigned raysPerSample,
+    unsigned maxRaysPerSample,
+    std::string inputPath,
+    bool writeVtk,
+    std::string compareLocation,
+    const DeviceMode deviceMode,
+    const ParallelMode parallelMode,
+    bool useReflections,
+    unsigned maxgpus,
+    int minSample_i,
+    int maxSample_i,
+    unsigned maxRepetitions,
+    std::string outputPath,
+    double mseThreshold
+    );
+
 int checkParameterValidity(
     const int argc,
     const unsigned raysPerSample,
     unsigned *maxRaysPerSample,
     const std::string inputPath,
     const unsigned deviceCount,
-    const RunMode mode,
+    const DeviceMode deviceMode,
+    const ParallelMode parallelMode,
     unsigned *maxgpus,
     const int minSample_i,
     const int maxSample_i,

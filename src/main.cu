@@ -41,7 +41,7 @@
 #include <calc_phi_ase.hpp>
 #include <calc_phi_ase_threaded.hpp>
 #include <calc_phi_ase_mpi.hpp>
-#include <parser.hpp> /* RunMode */
+#include <parser.hpp> /* DeviceMode, ParallelMode */
 #include <write_to_vtk.hpp>
 #include <write_matlab_output.hpp>
 #include <for_loops_clad.hpp>
@@ -86,7 +86,8 @@ int main(int argc, char **argv){
   bool useReflections = false;
   std::vector<unsigned> devices; 
   unsigned maxGpus = 0;
-  RunMode mode = NONE;
+  DeviceMode deviceMode = NO_DEVICE_MODE;
+  ParallelMode parallelMode = NO_PARALLEL_MODE;
   int minSampleRange = -1;
   int maxSampleRange = -1;
   time_t starttime   = time(0);
@@ -104,15 +105,20 @@ int main(int argc, char **argv){
 
   // Parse Commandline
   parseCommandLine(argc, argv, &minRaysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold, &lambdaResolution);
+		   &writeVtk, &deviceMode, &parallelMode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold, &lambdaResolution);
 
+  printCommandLine(minRaysPerSample, maxRaysPerSample, inputPath,
+		   writeVtk, compareLocation, deviceMode, parallelMode, useReflections, maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, mseThreshold);
   // Set/Test device to run experiment with
+  //
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
   //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
   devices = getFreeDevices(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
+  if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), deviceMode, parallelMode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
+
+  dout(V_INFO) << "parameter validity was checked!" << std::endl;
 
   // Parse wavelengths from files
   if(fileToVector(inputPath + "sigmaA.txt",  &sigmaA))   return 1;
@@ -154,82 +160,92 @@ int main(int argc, char **argv){
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
   std::vector<float> runtimes(maxGpus, 0);
-  switch(mode){
-    // TODO: Replace completly by MPI
-  case GPU_THREADED:
-    for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-      const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
-      const float samplePerGpu = samplesPerNode / (float) maxGpus;
-      unsigned minSample_i = gpu_i * samplePerGpu;
-      unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
-      minSample_i += minSampleRange;
-      maxSample_i += minSampleRange; 
+  switch(deviceMode){
+    case NO_DEVICE_MODE:
+      dout(V_ERROR) << "No valid device-mode!" << std::endl;
+      exit(1);
 
-      threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
-					     maxRaysPerSample,
-					     maxRepetitions,
-					     meshs[gpu_i],
-					     sigmaAInterpolated,
-					     sigmaEInterpolated,
-					     mseThreshold,
-					     useReflections,
-					     phiAse, 
-					     mse, 
-					     totalRays,
-					     devices.at(gpu_i),
-					     minSample_i,
-					     maxSample_i,
-					     runtimes.at(gpu_i)
-					     );
-    }
-    joinAll(threadIds);
-    usedGpus = maxGpus;
-    for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
-      runtime = max(*it, runtime);
-    }
-    cudaDeviceReset();      
-    runmode="Ray Propagation GPU";
-    break;
+    case CPU_DEVICE_MODE: //Possibly deprecated!
+      // TODO: make available for MPI?
+      runtime = forLoopsClad( &dndtAse,
+          minRaysPerSample,
+          &meshs[0],
+          meshs[0].betaCells,
+          meshs[0].nTot,
+          sigmaA.at(0),
+          sigmaE.at(0),
+          meshs[0].numberOfPoints,
+          meshs[0].numberOfTriangles,
+          meshs[0].numberOfLevels,
+          meshs[0].thickness,
+          meshs[0].crystalTFluo);
+      runmode = "CPU Mode single threaded";
+      break;
 
-  case GPU_MPI:
-    usedGpus = calcPhiAseMPI( minRaysPerSample,
-			      maxRaysPerSample,
-			      maxRepetitions,
-			      meshs[0],
-			      sigmaAInterpolated,
-			      sigmaEInterpolated,
-			      mseThreshold,
-			      useReflections,
-			      phiAse,
-			      mse,
-			      totalRays,
-			      devices.at(0)
-			      );
-    runmode = "RAY PROPAGATION MPI";
-    break;
+    case GPU_DEVICE_MODE:
+      switch(parallelMode){
+        // TODO: Replace completly by MPI
+        case THREADED_PARALLEL_MODE:
+          for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+            const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
+            const float samplePerGpu = samplesPerNode / (float) maxGpus;
+            unsigned minSample_i = gpu_i * samplePerGpu;
+            unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
-  case CPU: //Possibly deprecated!
-    // TODO: make available for MPI?
-    runtime = forLoopsClad( &dndtAse,
-			    minRaysPerSample,
-			    &meshs[0],
-			    meshs[0].betaCells,
-			    meshs[0].nTot,
-			    sigmaA.at(0),
-			    sigmaE.at(0),
-			    meshs[0].numberOfPoints,
-			    meshs[0].numberOfTriangles,
-			    meshs[0].numberOfLevels,
-			    meshs[0].thickness,
-			    meshs[0].crystalTFluo);
-    runmode = "For Loops";
-    break;
+            minSample_i += minSampleRange;
+            maxSample_i += minSampleRange; 
 
-  default:
-    dout(V_ERROR) << "No valid runmode!" << std::endl;
-    exit(0);
+            threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
+                maxRaysPerSample,
+                maxRepetitions,
+                meshs[gpu_i],
+                sigmaAInterpolated,
+                sigmaEInterpolated,
+                mseThreshold,
+                useReflections,
+                phiAse, 
+                mse, 
+                totalRays,
+                devices.at(gpu_i),
+                minSample_i,
+                maxSample_i,
+                runtimes.at(gpu_i)
+                );
+          }
+          joinAll(threadIds);
+          usedGpus = maxGpus;
+          for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
+            runtime = max(*it, runtime);
+          }
+          cudaDeviceReset();      
+          runmode="GPU mode Threaded";
+          break;
+
+        case MPI_PARALLEL_MODE:
+          usedGpus = calcPhiAseMPI( minRaysPerSample,
+              maxRaysPerSample,
+              maxRepetitions,
+              meshs[0],
+              sigmaAInterpolated,
+              sigmaEInterpolated,
+              mseThreshold,
+              useReflections,
+              phiAse,
+              mse,
+              totalRays,
+              devices.at(0)
+              );
+          runmode = "GPU mode MPI";
+          break;
+
+        default:
+          dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
+          exit(1);
+      }
+
   }
+
 
   // Print Solution
   if(verbosity & V_DEBUG){
@@ -279,7 +295,7 @@ int main(int argc, char **argv){
 
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "=== Statistics ===" << std::endl;
-    dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
+    dout(V_STAT) << "Runmode           : " << runmode << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) meshs[0].numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << minRaysPerSample;
