@@ -32,6 +32,7 @@ Dependencies
    + Optional:
      + octave / matlab
      + paraview
+     + OpenMPI 1.8 or compatible
    
    + Hardware:
      + Nvidia device >= Compute capability 2.0 (at least fermi generation)

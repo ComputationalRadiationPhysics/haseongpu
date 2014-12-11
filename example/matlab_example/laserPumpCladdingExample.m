@@ -96,11 +96,11 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 1;
+maxGPUs           = 4;
 nPerNode          = 4;
 deviceMode             = 'gpu';
-parallelMode           = 'mpi';
-%parallelMode          = 'threaded';
+%parallelMode           = 'mpi';
+parallelMode          = 'threaded';
 useReflections    = true;
 refractiveIndices = [1.83,1,1.83,1];
 repetitions       = 4;
