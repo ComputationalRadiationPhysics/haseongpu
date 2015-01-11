@@ -96,7 +96,7 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 4;
+maxGPUs           = 2;
 nPerNode          = 4;
 deviceMode             = 'gpu';
 %parallelMode           = 'mpi';

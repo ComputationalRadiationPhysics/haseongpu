@@ -52,3 +52,15 @@ clean:
 new: 
 	@make clean
 	@make
+
+archive:
+	rm -f program_sources.zip
+	zip -r program_sources.zip src
+	zip -r program_sources.zip example
+	zip -r program_sources.zip CMakeLists.txt
+	zip -r program_sources.zip include
+	zip -r program_sources.zip LICENSE.md
+	zip -r program_sources.zip README.md
+	zip -r program_sources.zip REFERENCE.md
+	zip -r program_sources.zip COPYING
+	zip -r program_sources.zip utils
