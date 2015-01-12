@@ -416,3 +416,88 @@ Active Team
   + Frank Liebold
   + Daniel Höhne
 
+
+File Descriptions
+-----------------
+
+ - `CMakeLists.txt` cmake file to generate a Makefile
+ - `src/` folder containing all the source code that is not a header
+  - `src/map_rays_to_prisms.cu` CUDA code to generate a schedule of which ray will be launched from which prism of the gain medium
+  - `src/calcPhiASE.m` MATLAB adapter script 
+  - `src/logging.cu` creates nicely readable output based on log-levels
+  - `src/importance_sampling.cu` CUDA parallelized importance sampling
+  - `src/geometry.cu` basic 3D geometry calculations
+  - `src/interpolation.cu` interpolation functions for wavelengths of polychromatic laser pulses
+  - `src/reflection.cu` CUDA functions to calculate reflections inside the gain medium
+  - `src/progressbar.cu` progressbar for the command line
+  - `src/parser.cu` parsing of command line arguments and textfiles
+  - `src/for_loops_clad.cu` old CPU code for ASE calculation
+  - `src/calc_phi_ase_mpi.cc` MPI workload distribution. Code for Master and Slaves
+  - `src/write_to_file.cu` writing formatted data to a file
+  - `src/ray_histogram.cu` print a histogram of the adaptive ray count to command line
+  - `src/calc_phi_ase_threaded.cu` pthreads workload distribution
+  - `src/mt19937ar.cu` CPU code for Mersenne Twister PRNG used by for_loops_clad.cu
+  - `src/write_to_vtk.cu` generate VTK-files from simulation results (deprecated)
+  - `src/propagate_ray.cu` CUDA code to propagate a single ray through the prism mesh structure
+  - `src/mesh.cu` class that holds the information and all parameters about the gain medium mesh
+  - `src/cuda_utils.cu` utility functions (getFreeDevice)
+  - `src/calc_sample_gain_sum.cu` CUDA code to calculate all the rays for a single sample point
+  - `src/calc_phi_ase.cu` CUDA code to calculate ASE for all the sample points 
+  - `src/main.cu` main entry file
+  - `src/write_matlab_output.cu` generate MATLAB-readable matrixes from the simulation data
+ - `example/` folder that contains executable examples
+  - `example/c_example/` folder that contains the commandline-example
+   - `example/c_example/input/` folder that contains input for 2 different experiments
+    - `example/c_example/input/cylindrical/` folder that contains data for the cylindrical gain medium. For details on the files, see detailed information above (Input argument description)
+    - `example/c_example/input/cuboid/` example input with a cuboid gain medium. contents similar to cylindrical example.
+   - `example/c_example/output/` folder to gather the output
+  - `example/matlab_example/` folder that contains the input data for the matlab example
+   - `example/matlab_example/lambda_e.txt` emission wavelengths
+   - `example/matlab_example/sigma_e.txt` emission crosssection
+   - `example/matlab_example/pt.mat` sampling points and delaynay-triangles of the gain medium
+   - `example/matlab_example/set_variables.m` generate information about the mesh
+   - `example/matlab_example/vtk_wedge.m` generate a VTK file from the mesh
+   - `example/matlab_example/laserPumpCladdingExample.m` experimental setup. Run this file to see the progress of a whole experiment
+   - `example/matlab_example/sve.mat` 
+   - `example/matlab_example/sigma_a.txt` absorption crosssection
+   - `example/matlab_example/gain.m` calculate gain distribution inside the gain medium
+   - `example/matlab_example/beta_int3.m` utility function to calculate gain distribution
+   - `example/matlab_example/extract_gain_map.m` calculate the gain for the sample point used in the actual measurement
+   - `example/matlab_example/beta_int.m` utility function to calculate gain distribution 
+   - `example/matlab_example/lambda_a.txt` absorption wavelengths
+ - `include/` folder containing all the header source code
+  - `include/calc_phi_ase_mpi.hpp`  header for calc_phi_ase_mpi.cu
+  - `include/mesh.hpp` header for mesh.cu
+  - `include/importance_sampling.hpp` header for importance_sampling.cu
+  - `include/ray_histogram.hpp` header for ray_histogram.cu
+  - `include/for_loops_clad.hpp` header for for_loops_clad.cu
+  - `include/mt19937ar.hpp` header for mt19937ar.cu
+  - `include/calc_phi_ase.hpp` header for calc_phi_ase.cu
+  - `include/write_matlab_output.hpp` header for write_matlab_output.cu
+  - `include/cuda_utils.hpp` header for cuda_utils.cu
+  - `include/logging.hpp` header for logging.cu
+  - `include/cudachecks.hpp` Macros to check the success state of CUDA calls
+  - `include/reflection.hpp` header for reflection.cu
+  - `include/parser.hpp` header for parser.cu
+  - `include/map_rays_to_prisms.hpp` header for map_rays_to_prisms.cu
+  - `include/calc_phi_ase_threaded.hpp` header for calc_phi_ase_threaded.cu
+  - `include/thrust_device_vector_nowarn.hpp` wrapper to switch off compiler warning that is produced by 3rd party library (CUDA Thrust)
+  - `include/propagate_ray.hpp` header for propagate_ray.cu
+  - `include/thrust_host_vector_nowarn.hpp` wrapper to switch off compiler warning that is produced by 3rd party library (CUDA Thrust)
+  - `include/calc_sample_gain_sum.hpp` header for calc_sample_gain_sum.cu
+  - `include/interpolation.hpp` header for interpolation.cu
+  - `include/version.hpp` version information for HASEonGPU
+  - `include/geometry.hpp` header for geometry.cu
+  - `include/write_to_file.hpp` header for write_to_file.cu
+  - `include/types.hpp` type definitions for HASEonGPU
+  - `include/progressbar.hpp` header for progressbar.cu
+  - `include/nan_fix.hpp` wrapper to allow usage of `isnan()` in a template
+  - `include/write_to_vtk.hpp` header for write_to_vtk.cu
+ - `LICENSE.md`  additional licensing information
+ - `README.md` this README file
+ - `REFERENCE.md`  Referencing information
+ - `COPYING` Full License information
+ - `utils/` folder that contains utility files
+  - `utils/cmake/`
+   - `utils/cmake/modules/` 3rd Party CMAKE module that was modified to circumvent a bug where the NVCC linker would crash on unknown arguments
+
