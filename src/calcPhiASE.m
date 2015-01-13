@@ -1,6 +1,26 @@
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ % Copyright 2014 Erik Zenker, Carlchristian Eckert
+ %
+ % This file is part of HASEonGPU
+ %
+ % HASEonGPU is free software: you can redistribute it and/or modify
+ % it under the terms of the GNU General Public License as published by
+ % the Free Software Foundation, either version 3 of the License, or
+ % (at your option) any later version.
+ %
+ % HASEonGPU is distributed in the hope that it will be useful,
+ % but WITHOUT ANY WARRANTY; without even the implied warranty of
+ % MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ % GNU General Public License for more details.
+ %
+ % You should have received a copy of the GNU General Public License
+ % along with HASEonGPU.
+ % If not, see <http://www.gnu.org/licenses/>.
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% calcPhiASE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% calculates the phiASE values for a given input
+% % calculates the phiASE values for a given input
 % most meshing paramers are given through the function parameters.
 % However, many parameters for optimization of the computation are
 % set in the beginning of the function (adjust as needed)
@@ -40,7 +60,8 @@ function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(...
   laserParameter,...
   crystal,...
   numberOfLevels,...
-  runmode,...
+  deviceMode,...
+  parallelMode,...
   maxGPUs,...
   nPerNode...
   )
@@ -52,12 +73,12 @@ minSample=0;
 maxSample=(numberOfLevels*nP)-1;
 
 if(useReflections == true)
-    REFLECT=' --reflection';
+    REFLECT=' --reflection=1';
 else
-    REFLECT='';
+    REFLECT=' --reflection=0';
 end
 
-if(strcmpi(runmode,'mpi'))
+if(strcmpi(parallelMode,'mpi'))
   Prefix=[ 'mpiexec -npernode ' num2str(nPerNode) ' ' ];
   maxGPUs=1;
 else
@@ -78,7 +99,7 @@ clean_IO_files(TMP_FOLDER);
 create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
 
 % do the propagation
-status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--runmode=' runmode ' --rays=' num2str(minRaysPerSample) ' --maxrays=' num2str(maxRaysPerSample) REFLECT ' --input=' TMP_FOLDER ' --output=' TMP_FOLDER ' --min_sample_i=' num2str(minSample) ' --max_sample_i=' num2str(maxSample) ' --maxgpus=' num2str(maxGPUs) ' --repetitions=' num2str(repetitions) ' --mse-threshold=' num2str(mseThreshold) ]);
+status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--parallel-mode=' parallelMode ' --device-mode=' deviceMode ' --min-rays=' num2str(minRaysPerSample) ' --max-rays=' num2str(maxRaysPerSample) REFLECT ' --input-path=' TMP_FOLDER ' --output-path=' TMP_FOLDER ' --min-sample-i=' num2str(minSample) ' --max-sample-i=' num2str(maxSample) ' --ngpus=' num2str(maxGPUs) ' --repetitions=' num2str(repetitions) ' --mse-threshold=' num2str(mseThreshold) ' --spectral-resolution=' num2str(laserParameter.l_res) ]);
 
 if(status ~= 0)
     error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
@@ -176,6 +197,14 @@ fclose(x);
 
 x=fopen('sigmaE.txt','w');
 fprintf(x,'%.50f\n',laserParameter.s_ems);
+fclose(x);
+
+x=fopen('lambdaA.txt','w');
+fprintf(x,'%.50f\n',laserParameter.l_abs);
+fclose(x);
+
+x=fopen('lambdaE.txt','w');
+fprintf(x,'%.50f\n',laserParameter.l_ems);
 fclose(x);
 
 x=fopen('crystalTFluo.txt','w');

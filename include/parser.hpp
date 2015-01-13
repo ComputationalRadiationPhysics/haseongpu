@@ -1,20 +1,20 @@
 /**
  * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
- * This file is part of HASENonGPU
+ * This file is part of HASEonGPU
  *
- * HASENonGPU is free software: you can redistribute it and/or modify
+ * HASEonGPU is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * HASENonGPU is distributed in the hope that it will be useful,
+ * HASEonGPU is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with HASENonGPU.
+ * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -36,8 +36,11 @@
 
 #include <logging.hpp>
 #include <mesh.hpp>
+#include <nan_fix.hpp>
 
-enum RunMode { NONE, GPU_THREADED, CPU, GPU_MPI };
+enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
+enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE };
+
 
 /**
  * @brief Parses a given file(filename) line by line.
@@ -62,7 +65,7 @@ int fileToVector(const std::string filename, std::vector<T> *v){
     while(fileStream.good()){
       std::getline(fileStream, line);
       value = (T) atof(line.c_str());
-      if(isnan(value)){
+      if(isNaN(value)){
 	dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
 	exit(1);
       }
@@ -119,15 +122,33 @@ void parseCommandLine(
     unsigned *maxRaysPerSample,
     std::string *inputPath,
     bool *writeVtk,
-    std::string *compareLocation,
-    RunMode *mode,
+    DeviceMode *deviceMode,
+    ParallelMode *parallelMode,
     bool *useReflections,
     unsigned *maxgpus,
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
     std::string *outputPath,
-    double *mseThreshold
+    double *mseThreshold,
+    unsigned *lambdaResolution
+    );
+
+void printCommandLine(
+    unsigned raysPerSample,
+    unsigned maxRaysPerSample,
+    std::string inputPath,
+    bool writeVtk,
+    std::string compareLocation,
+    const DeviceMode deviceMode,
+    const ParallelMode parallelMode,
+    bool useReflections,
+    unsigned maxgpus,
+    int minSample_i,
+    int maxSample_i,
+    unsigned maxRepetitions,
+    std::string outputPath,
+    double mseThreshold
     );
 
 int checkParameterValidity(
@@ -136,7 +157,8 @@ int checkParameterValidity(
     unsigned *maxRaysPerSample,
     const std::string inputPath,
     const unsigned deviceCount,
-    const RunMode mode,
+    const DeviceMode deviceMode,
+    const ParallelMode parallelMode,
     unsigned *maxgpus,
     const int minSample_i,
     const int maxSample_i,

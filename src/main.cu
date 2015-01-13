@@ -1,26 +1,26 @@
 /**
  * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
- * This file is part of HASENonGPU
+ * This file is part of HASEonGPU
  *
- * HASENonGPU is free software: you can redistribute it and/or modify
+ * HASEonGPU is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * HASENonGPU is distributed in the hope that it will be useful,
+ * HASEonGPU is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with HASENonGPU.
+ * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
 
 /**
- * @mainpage HASENonGPU - High performance Amplified Spontaneous EmissioN on GPU
+ * @mainpage HASEonGPU - High performance Amplified Spontaneous EmissioN on GPU
  *
  * Project with HZDR for porting their ASE-code to a GPU cluster.
  *
@@ -33,7 +33,7 @@
 #include <vector> /* vector */
 #include <stdlib.h> /* atoi */
 #include <pthread.h> /* pthread_t, pthread_join */
-#include <algorithm> /* max_element */
+#include <algorithm> /* std::max */
 #include <numeric> /* accumulate*/
 #include <stdexcept>
 
@@ -41,7 +41,7 @@
 #include <calc_phi_ase.hpp>
 #include <calc_phi_ase_threaded.hpp>
 #include <calc_phi_ase_mpi.hpp>
-#include <parser.hpp> /* RunMode */
+#include <parser.hpp> /* DeviceMode, ParallelMode */
 #include <write_to_vtk.hpp>
 #include <write_matlab_output.hpp>
 #include <for_loops_clad.hpp>
@@ -75,6 +75,7 @@ int main(int argc, char **argv){
   unsigned minRaysPerSample = 0;
   unsigned maxRaysPerSample = 0;
   unsigned maxRepetitions = 4;
+  unsigned lambdaResolution = 0;
   float maxMSE = 0;
   float  avgMSE = 0;
   unsigned highMSE = 0;
@@ -85,7 +86,8 @@ int main(int argc, char **argv){
   bool useReflections = false;
   std::vector<unsigned> devices; 
   unsigned maxGpus = 0;
-  RunMode mode = NONE;
+  DeviceMode deviceMode = NO_DEVICE_MODE;
+  ParallelMode parallelMode = NO_PARALLEL_MODE;
   int minSampleRange = -1;
   int maxSampleRange = -1;
   time_t starttime   = time(0);
@@ -98,27 +100,41 @@ int main(int argc, char **argv){
   // Wavelength data
   std::vector<double> sigmaA;
   std::vector<double> sigmaE;
+  std::vector<double> lambdaA;
+  std::vector<double> lambdaE;
 
   // Parse Commandline
   parseCommandLine(argc, argv, &minRaysPerSample, &maxRaysPerSample, &inputPath,
-		   &writeVtk, &compareLocation, &mode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold);
+		   &writeVtk, &deviceMode, &parallelMode, &useReflections, &maxGpus, &minSampleRange, &maxSampleRange, &maxRepetitions, &outputPath, &mseThreshold, &lambdaResolution);
 
+  printCommandLine(minRaysPerSample, maxRaysPerSample, inputPath,
+		   writeVtk, compareLocation, deviceMode, parallelMode, useReflections, maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, mseThreshold);
   // Set/Test device to run experiment with
+  //
   //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
   //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
   devices = getFreeDevices(maxGpus);
 
   // sanity checks
-  if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), mode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
+  if(checkParameterValidity(argc, minRaysPerSample, &maxRaysPerSample, inputPath, devices.size(), deviceMode, parallelMode, &maxGpus, minSampleRange, maxSampleRange, maxRepetitions, outputPath, &mseThreshold)) return 1;
+
+  dout(V_INFO) << "parameter validity was checked!" << std::endl;
 
   // Parse wavelengths from files
-  if(fileToVector(inputPath + "sigmaA.txt", &sigmaA)) return 1;
-  if(fileToVector(inputPath + "sigmaE.txt", &sigmaE)) return 1;
-  assert(sigmaA.size() == sigmaE.size());
+  if(fileToVector(inputPath + "sigmaA.txt",  &sigmaA))   return 1;
+  if(fileToVector(inputPath + "sigmaE.txt",  &sigmaE))   return 1;
+  if(fileToVector(inputPath + "lambdaA.txt", &lambdaA)) return 1;
+  if(fileToVector(inputPath + "lambdaE.txt", &lambdaE)) return 1;
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
+  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
+  
+  assert(sigmaA.size() == lambdaA.size());
+  assert(sigmaE.size() == lambdaE.size());
 
   // Interpolate sigmaA / sigmaE function
-  std::vector<double> sigmaAInterpolated = interpolateWavelength(sigmaA, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
-  std::vector<double> sigmaEInterpolated = interpolateWavelength(sigmaE, MAX_INTERPOLATION, LAMBDA_START, LAMBDA_STOP);
+  std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambdaA, lambdaResolution);
+  std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambdaE, lambdaResolution);
+  assert(sigmaAInterpolated.size() == sigmaEInterpolated.size());
 
   // Calc max sigmaA / sigmaE
   double maxSigmaE = 0.0;
@@ -144,82 +160,92 @@ int main(int argc, char **argv){
   // Run Experiment
   std::vector<pthread_t> threadIds(maxGpus, 0);
   std::vector<float> runtimes(maxGpus, 0);
-  switch(mode){
-    // TODO: Replace completly by MPI
-  case GPU_THREADED:
-    for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-      const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
-      const float samplePerGpu = samplesPerNode / (float) maxGpus;
-      unsigned minSample_i = gpu_i * samplePerGpu;
-      unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
-      minSample_i += minSampleRange;
-      maxSample_i += minSampleRange; 
+  switch(deviceMode){
+    case NO_DEVICE_MODE:
+      dout(V_ERROR) << "No valid device-mode!" << std::endl;
+      exit(1);
 
-      threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
-					     maxRaysPerSample,
-					     maxRepetitions,
-					     meshs[gpu_i],
-					     sigmaAInterpolated,
-					     sigmaEInterpolated,
-					     mseThreshold,
-					     useReflections,
-					     phiAse, 
-					     mse, 
-					     totalRays,
-					     devices.at(gpu_i),
-					     minSample_i,
-					     maxSample_i,
-					     runtimes.at(gpu_i)
-					     );
-    }
-    joinAll(threadIds);
-    usedGpus = maxGpus;
-    for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
-      runtime = max(*it, runtime);
-    }
-    cudaDeviceReset();      
-    runmode="Ray Propagation GPU";
-    break;
+    case CPU_DEVICE_MODE: //Possibly deprecated!
+      // TODO: make available for MPI?
+      runtime = forLoopsClad( &dndtAse,
+          minRaysPerSample,
+          &meshs[0],
+          meshs[0].betaCells,
+          meshs[0].nTot,
+          sigmaA.at(0),
+          sigmaE.at(0),
+          meshs[0].numberOfPoints,
+          meshs[0].numberOfTriangles,
+          meshs[0].numberOfLevels,
+          meshs[0].thickness,
+          meshs[0].crystalTFluo);
+      runmode = "CPU Mode single threaded";
+      break;
 
-  case GPU_MPI:
-    usedGpus = calcPhiAseMPI( minRaysPerSample,
-			      maxRaysPerSample,
-			      maxRepetitions,
-			      meshs[0],
-			      sigmaAInterpolated,
-			      sigmaEInterpolated,
-			      mseThreshold,
-			      useReflections,
-			      phiAse,
-			      mse,
-			      totalRays,
-			      devices.at(0)
-			      );
-    runmode = "RAY PROPAGATION MPI";
-    break;
+    case GPU_DEVICE_MODE:
+      switch(parallelMode){
+        // TODO: Replace completly by MPI
+        case THREADED_PARALLEL_MODE:
+          for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
+            const unsigned samplesPerNode = maxSampleRange-minSampleRange+1;
+            const float samplePerGpu = samplesPerNode / (float) maxGpus;
+            unsigned minSample_i = gpu_i * samplePerGpu;
+            unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
-  case CPU: //Possibly deprecated!
-    // TODO: make available for MPI?
-    runtime = forLoopsClad( &dndtAse,
-			    minRaysPerSample,
-			    &meshs[0],
-			    meshs[0].betaCells,
-			    meshs[0].nTot,
-			    sigmaA.at(0),
-			    sigmaE.at(0),
-			    meshs[0].numberOfPoints,
-			    meshs[0].numberOfTriangles,
-			    meshs[0].numberOfLevels,
-			    meshs[0].thickness,
-			    meshs[0].crystalTFluo);
-    runmode = "For Loops";
-    break;
+            minSample_i += minSampleRange;
+            maxSample_i += minSampleRange; 
 
-  default:
-    dout(V_ERROR) << "No valid runmode!" << std::endl;
-    exit(0);
+            threadIds[gpu_i] = calcPhiAseThreaded( minRaysPerSample,
+                maxRaysPerSample,
+                maxRepetitions,
+                meshs[gpu_i],
+                sigmaAInterpolated,
+                sigmaEInterpolated,
+                mseThreshold,
+                useReflections,
+                phiAse, 
+                mse, 
+                totalRays,
+                devices.at(gpu_i),
+                minSample_i,
+                maxSample_i,
+                runtimes.at(gpu_i)
+                );
+          }
+          joinAll(threadIds);
+          usedGpus = maxGpus;
+          for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
+            runtime = max(*it, runtime);
+          }
+          cudaDeviceReset();      
+          runmode="GPU mode Threaded";
+          break;
+
+        case MPI_PARALLEL_MODE:
+          usedGpus = calcPhiAseMPI( minRaysPerSample,
+              maxRaysPerSample,
+              maxRepetitions,
+              meshs[0],
+              sigmaAInterpolated,
+              sigmaEInterpolated,
+              mseThreshold,
+              useReflections,
+              phiAse,
+              mse,
+              totalRays,
+              devices.at(0)
+              );
+          runmode = "GPU mode MPI";
+          break;
+
+        default:
+          dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
+          exit(1);
+      }
+
   }
+
 
   // Print Solution
   if(verbosity & V_DEBUG){
@@ -254,7 +280,7 @@ int main(int argc, char **argv){
     writePointsToVtk(meshs[0], tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
-  //Print statistics
+  // Print statistics
   if(verbosity & V_STAT){
     for(std::vector<double>::iterator it = mse.begin(); it != mse.end(); ++it){
       maxMSE = max(maxMSE, *it);
@@ -269,7 +295,7 @@ int main(int argc, char **argv){
 
     dout(V_STAT | V_NOLABEL) << std::endl;
     dout(V_STAT) << "=== Statistics ===" << std::endl;
-    dout(V_STAT) << "Runmode           : " << runmode.c_str() << std::endl;
+    dout(V_STAT) << "Runmode           : " << runmode << std::endl;
     dout(V_STAT) << "Prisms            : " << (int) meshs[0].numberOfPrisms << std::endl;
     dout(V_STAT) << "Samples           : " << (int) dndtAse.size() << std::endl;
     dout(V_STAT) << "RaysPerSample     : " << minRaysPerSample;

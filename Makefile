@@ -12,7 +12,7 @@ LIBS =  -lpthread -lcudart -lm
 ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
  #NVCC_FLAGS = --use_fast_math -Xptxas="-v"
  #DEBUG_FLAGS = -g -G -lineinfo -D THRUST_DEBUG
-NVCC_FLAGS = --use_fast_math
+NVCC_FLAGS = --use_fast_math "-DBOOST_NOINLINE=__attribute__((noinline))"
 GCC_FLAGS = -std=c++0x -J 8 -O2
 #DEV_FLAGS = --compiler-options="-Wall -Wextra" 
 DEV_FLAGS = --compiler-options="-Wextra -Waddress -Warray-bounds -Wchar-subscripts -Wcomment -Wformat -Wmain -Wmissing-braces -Wparentheses -Wreturn-type -Wsequence-point -Wsign-compare -Wstrict-aliasing -Wstrict-overflow=1 -Wswitch -Wtrigraphs -Wuninitialized -Wunused-function -Wunused-label -Wunused-value -Wunused-variable -Wvolatile-register-var -Werror" 
@@ -52,3 +52,15 @@ clean:
 new: 
 	@make clean
 	@make
+
+archive:
+	rm -f program_sources.zip
+	zip -r program_sources.zip src
+	zip -r program_sources.zip example
+	zip -r program_sources.zip CMakeLists.txt
+	zip -r program_sources.zip include
+	zip -r program_sources.zip LICENSE.md
+	zip -r program_sources.zip README.md
+	zip -r program_sources.zip REFERENCE.md
+	zip -r program_sources.zip COPYING
+	zip -r program_sources.zip utils

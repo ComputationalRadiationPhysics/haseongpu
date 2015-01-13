@@ -1,20 +1,20 @@
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  % Copyright 2013 Daniel Albach, Erik Zenker, Carlchristian Eckert
  %
- % This file is part of HASENonGPU
+ % This file is part of HASEonGPU
  %
- % HASENonGPU is free software: you can redistribute it and/or modify
+ % HASEonGPU is free software: you can redistribute it and/or modify
  % it under the terms of the GNU General Public License as published by
  % the Free Software Foundation, either version 3 of the License, or
  % (at your option) any later version.
  %
- % HASENonGPU is distributed in the hope that it will be useful,
+ % HASEonGPU is distributed in the hope that it will be useful,
  % but WITHOUT ANY WARRANTY; without even the implied warranty of
  % MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  % GNU General Public License for more details.
  %
  % You should have received a copy of the GNU General Public License
- % along with HASENonGPU.
+ % along with HASEonGPU.
  % If not, see <http://www.gnu.org/licenses/>.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -67,6 +67,9 @@ pump.exp = 40;                         % Pump exponent
 % Laser parameter
 laser.s_abs = load('sigma_a.txt');      % Absorption spectrum cm2(1.16e-21 pour DA)
 laser.s_ems = load('sigma_e.txt');      % Emission spectrum in cm2(2.48e-20)
+laser.l_abs = load('lambda_a.txt');     % Wavelengths absoroption spectrum in nm (x values for absorption)
+laser.l_ems = load('lambda_e.txt');     % Wavelengths emission spectrum in nm (y values for emission)
+laser.l_res = 1000;                     % Resolution of linear interpolated spectrum
 laser.I = 1e6;                          % Laser intensity
 laser.T = 1e-8;                         % Laser duration
 laser.wavelength = 1030e-9;             % Lasing wavelength in m
@@ -93,10 +96,11 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 1;
+maxGPUs           = 2;
 nPerNode          = 4;
-runmode           = 'mpi';
-%runmode          = 'threaded';
+deviceMode             = 'gpu';
+%parallelMode           = 'mpi';
+parallelMode          = 'threaded';
 useReflections    = true;
 refractiveIndices = [1.83,1,1.83,1];
 repetitions       = 4;
@@ -302,7 +306,8 @@ for i_slice=1:timeslice_tot-1
        laser,...
        crystal,...
        mesh_z,...
-       runmode,...
+       deviceMode,...
+       parallelMode,...
        maxGPUs,...
        nPerNode);
 
