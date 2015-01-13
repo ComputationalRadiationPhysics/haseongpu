@@ -25,7 +25,6 @@
 #include <assert.h>
 #include <stdlib.h> /* exit() */
 
-#include <types.hpp>
 #include <logging.hpp> 
 #include <mesh.hpp>
 #include <parser.hpp>
