@@ -19,9 +19,9 @@
  */
 
 // HASE_ON_GPU_VERSION % 100 is sub-minor version 
-// HASE_ON_GPU_VERSION / 100 % 1000 is minor version
-// HASE_ON_GPU_VERSION / 100000 is major version
+// HASE_ON_GPU_VERSION / 100 % 100 is minor version
+// HASE_ON_GPU_VERSION / 10000 is major version
 
 #pragma once
-#define HASE_ON_GPU_VERSION 003000
+#define HASE_ON_GPU_VERSION 010100
 
