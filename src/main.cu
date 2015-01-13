@@ -1,26 +1,26 @@
 /**
  * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
- * This file is part of HASENonGPU
+ * This file is part of HASEonGPU
  *
- * HASENonGPU is free software: you can redistribute it and/or modify
+ * HASEonGPU is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * HASENonGPU is distributed in the hope that it will be useful,
+ * HASEonGPU is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with HASENonGPU.
+ * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
 
 /**
- * @mainpage HASENonGPU - High performance Amplified Spontaneous EmissioN on GPU
+ * @mainpage HASEonGPU - High performance Amplified Spontaneous EmissioN on GPU
  *
  * Project with HZDR for porting their ASE-code to a GPU cluster.
  *
