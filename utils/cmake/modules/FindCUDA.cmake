@@ -555,6 +555,7 @@ if(NOT CUDA_TOOLKIT_ROOT_DIR)
     NAMES nvcc nvcc.exe
     PATHS /usr/local/bin
           /usr/local/cuda/bin
+          /opt/cuda/bin
     DOC "Toolkit location."
     )
 
