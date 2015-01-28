@@ -46,6 +46,13 @@ Compiling
    + go to build directory: `cd haseongpu/build`
    + create Makefile `cmake ..`
    + build project : `make`
+
+### Current Compilation Status:
+
+| *branch* | *state* | *description* |
+| -------- | --------| ------------- |
+| **master** | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=master)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our stable new releases |
+| **dev**  | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=dev)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our development branch |
  
 
 Usage
