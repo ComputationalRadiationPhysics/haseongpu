@@ -1,0 +1,7 @@
+image: coin/archlinux
+
+script:
+  - mkdir build_tmp && cd build_tmp
+  - cmake ..
+  - make
+  - ls -l
