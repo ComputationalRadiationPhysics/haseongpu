@@ -18,32 +18,39 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-/**
- * @author Erik Zenker
- * @author Carlchristian Eckert
- * @licence GPLv3
- *
- */
-
-#pragma once
 #include <vector>
+#include <iostream>
+#include <thread>
 
 #include <mesh.hpp>
-#include <types.hpp>
+#include <calc_phi_ase.hpp>
 
-/**
- * @brief A wrapper for calcPhiAse, that distributes sample points
- *        to the available MPI nodes.The Nodes will split 
- *        up in one head node and the others as compute nodes. 
- *        The head node distributes the available sample
- *        points by demand.
- *
- *
- * @return number of used compute nodes
- */
-float calcPhiAseMPI (const ExperimentParameters &experiment,
-		     const ComputeParameters &compute,
-		     const Mesh& mesh,
-		     Result &result);
+
+static std::vector<std::thread> threadIds;
+
+
+void calcPhiAseThreaded( const ExperimentParameters &experiment,
+			 const ComputeParameters &compute,
+			 const Mesh& mesh,
+			 Result &result,
+			 const unsigned minSample_i,
+			 const unsigned maxSample_i,
+			 float &runtime){
+    
+    threadIds.push_back(std::thread(calcPhiAse,
+				    std::ref(experiment),
+				    std::ref(compute),
+				    std::ref(mesh),
+				    std::ref(result),
+				    minSample_i,
+				    maxSample_i,
+				    std::ref(runtime)));
+}
+
+ void joinAll(){
+     for(unsigned i=0; i < threadIds.size(); ++i){
+	 threadIds[i].join();
+     }
+ }
+
 

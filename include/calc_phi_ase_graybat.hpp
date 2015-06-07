@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -31,19 +31,19 @@
 
 #include <mesh.hpp>
 #include <types.hpp>
-
 /**
  * @brief A wrapper for calcPhiAse, that distributes sample points
- *        to the available MPI nodes.The Nodes will split 
- *        up in one head node and the others as compute nodes. 
- *        The head node distributes the available sample
- *        points by demand.
- *
+ *        to the available peers. The peers will split
+ *        up in one head peer and the others as compute peers. 
+ *        The slaves request sample points and the head  
+ *        distributes the available sample points by demand.
  *
  * @return number of used compute nodes
  */
-float calcPhiAseMPI (const ExperimentParameters &experiment,
-		     const ComputeParameters &compute,
-		     const Mesh& mesh,
-		     Result &result);
 
+
+
+float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
+			  const ComputeParameters &compute,
+			  const Mesh& mesh,
+			  Result &result );

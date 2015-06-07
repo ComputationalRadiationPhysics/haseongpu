@@ -1,6 +1,9 @@
 image: coin/archlinux
 
 script:
+  - cd include
+  - git clone -b topic-haseongpu https://github.com/erikzenker/graybat.git --depth=1
+  - cd ..
   - mkdir build_tmp && cd build_tmp
   - cmake -D CUDA_TOOLKIT_ROOT_DIR=/opt/cuda ..
   - make

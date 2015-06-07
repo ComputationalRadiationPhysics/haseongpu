@@ -38,7 +38,7 @@
 #include <progressbar.hpp> /*progressBar */
 #include <logging.hpp>
 #include <thrust_device_vector_nowarn.hpp>
-
+#include <types.hpp> /* ExperimentParameter, ComputeParameter, Result */
 
 #define SEED 4321
 #define RAY_STEPS 5
@@ -68,32 +68,24 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
 
 }
 
-float calcPhiAse (const unsigned hMinRaysPerSample,
-		  const unsigned maxRaysPerSample,
-		  const unsigned maxRepetitions,
-		  const Mesh& mesh,
-		  const std::vector<double>& hSigmaA,
-		  const std::vector<double>& hSigmaE,
-		  const double mseThreshold,
-		  const bool useReflections,
-		  std::vector<float> &phiAse,
-		  std::vector<double> &mse,
-		  std::vector<unsigned> &totalRays,
-		  const unsigned gpu_i,
-		  const unsigned minSample_i,
-		  const unsigned maxSample_i,
-		  float &runtime){
+float calcPhiAse ( const ExperimentParameters& experiment,
+		   const ComputeParameters& compute,
+		   const Mesh& mesh,
+		   Result& result,
+		   const unsigned minSample_i,
+		   const unsigned maxSample_i,
+		   float &runtime ){
 
   // Optimization to use more L1 cache
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  cudaSetDevice(gpu_i);
+  cudaSetDevice(compute.gpu_i);
 
   using thrust::device_vector;
   using thrust::raw_pointer_cast;
 
   // variable Definitions CPU
   time_t starttime                = time(0);
-  unsigned maxReflections         = useReflections ? mesh.getMaxReflections() : 0;
+  unsigned maxReflections         = experiment.useReflections ? mesh.getMaxReflections() : 0;
   unsigned reflectionSlices       = 1 + (2 * maxReflections);
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
@@ -103,30 +95,33 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
   dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
 
   // Divide RaysPerSample range into steps
-  std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(hMinRaysPerSample, maxRaysPerSample, RAY_STEPS);
+  std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
+								     experiment.maxRaysPerSample,
+								     RAY_STEPS);
+  
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
-  // Calc max sigmaA / sigmaE
-  double maxSigmaE = 0;
-  double maxSigmaA = 0;
-  for(unsigned i = 0; i < hSigmaE.size(); ++i){
-    if(hSigmaE.at(i) > maxSigmaE){
-      maxSigmaE = hSigmaE.at(i);
-      maxSigmaA = hSigmaA.at(i);
-    }
-  }
+  // // Calc max sigmaA / sigmaE
+  // double maxSigmaE = 0;
+  // double maxSigmaA = 0;
+  // for(unsigned i = 0; i < hSigmaE.size(); ++i){
+  //   if(hSigmaE.at(i) > maxSigmaE){
+  //     maxSigmaE = hSigmaE.at(i);
+  //     maxSigmaA = hSigmaA.at(i);
+  //   }
+  // }
 
   // Memory allocation/init and copy for device memory
-  device_vector<unsigned> dNumberOfReflectionSlices(maxRaysPerSample, 0);
+  device_vector<unsigned> dNumberOfReflectionSlices(experiment.maxRaysPerSample, 0);
   device_vector<float>    dGainSum            (1, 0);
   device_vector<float>    dGainSumSquare      (1, 0);
   device_vector<unsigned> dRaysPerPrism       (mesh.numberOfPrisms * reflectionSlices, 1);
   device_vector<unsigned> dPrefixSum          (mesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (mesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dPreImportance      (mesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<unsigned> dIndicesOfPrisms    (maxRaysPerSample,  0);
-  device_vector<double>   dSigmaA             (hSigmaA.begin(),hSigmaA.end());
-  device_vector<double>   dSigmaE             (hSigmaE.begin(),hSigmaE.end());
+  device_vector<unsigned> dIndicesOfPrisms    (experiment.maxRaysPerSample,  0);
+  device_vector<double>   dSigmaA             (experiment.sigmaA.begin(), experiment.sigmaA.end());
+  device_vector<double>   dSigmaE             (experiment.sigmaE.begin(),experiment.sigmaE.end());
 
   // CUDA Mersenne twister (can not have more than 200 blocks!)
   curandStateMtgp32 *devMTGPStates;
@@ -145,8 +140,8 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     importanceSamplingPropagation(sample_i,
 				  reflectionSlices,
 				  mesh,
-				  maxSigmaA,
-				  maxSigmaE,
+				  experiment.maxSigmaA,
+				  experiment.maxSigmaE,
 				  raw_pointer_cast(&dPreImportance[0]), 
 				  blockDim,
 				  gridDim);
@@ -156,7 +151,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
     while(mseTooHigh){
       CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
       unsigned run = 0;
-      while(run < maxRepetitions && mseTooHigh){
+      while(run < compute.maxRepetitions && mseTooHigh){
 	run++;
 
 	hRaysPerSampleDump = importanceSamplingDistribution(reflectionSlices,
@@ -177,7 +172,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	dGainSum[0]       = 0;
 	dGainSumSquare[0] = 0;
 
-	if(useReflections){
+	if(experiment.useReflections){
 	  calcSampleGainSumWithReflection<<< gridDim, blockDim >>>(devMTGPStates,
 								   mesh, 
 								   raw_pointer_cast(&dIndicesOfPrisms[0]), 
@@ -189,7 +184,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 								   sample_i, 
 								   raw_pointer_cast(&dSigmaA[0]),
 								   raw_pointer_cast(&dSigmaE[0]),
-								   hSigmaA.size(),
+								   experiment.sigmaA.size(),
 								   raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
 	}
 	else{
@@ -203,7 +198,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 						     sample_i, 
 						     raw_pointer_cast(&dSigmaA[0]),
 						     raw_pointer_cast(&dSigmaE[0]),
-						     hSigmaA.size(),
+						     experiment.sigmaA.size(),
 						     raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
 	}
 
@@ -213,13 +208,13 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 	assert(!isnan(dGainSumSquare[0]));
 	assert(!isnan(mseTmp));
 
-	if(mse.at(sample_i) > mseTmp){
-	  mse.at(sample_i) = mseTmp;
-	  phiAse.at(sample_i) = dGainSum[0]; 
-	  phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
-	  totalRays.at(sample_i) = *raysPerSampleIter;
+	if(result.mse.at(sample_i) > mseTmp){
+	  result.mse.at(sample_i) = mseTmp;
+	  result.phiAse.at(sample_i) = dGainSum[0]; 
+	  result.phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
+	  result.totalRays.at(sample_i) = *raysPerSampleIter;
 	}
-	if(mse.at(sample_i) < mseThreshold) mseTooHigh = false;
+	if(result.mse.at(sample_i) < experiment.mseThreshold) mseTooHigh = false;
       }
 
       // Increase rays per sample or break, when mseThreshold was not met

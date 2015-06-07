@@ -58,7 +58,8 @@ endif(CUDA_KEEP_FILES)
 ###############################################################################
 # Boost
 ###############################################################################
-find_package(Boost 1.50.0 COMPONENTS system program_options filesystem REQUIRED)
+find_package(Boost 1.50.0 COMPONENTS mpi system program_options filesystem REQUIRED)
+
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
@@ -179,7 +180,10 @@ warn_path_cuda("C_INCLUDE_PATH")
 ###############################################################################
 set(HASEonGPU_NAME "calcPhiASE")
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
+		    ${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
+
+
 cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
