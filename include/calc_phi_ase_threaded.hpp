@@ -27,10 +27,10 @@
  */
 
 #pragma once
-#include <pthread.h> /* pthread_t */
 #include <vector> /* std::vector */
 
 #include <mesh.hpp>
+#include <types.hpp>
 
 /**
  * @brief Wrapper for calcPhiAse on pthread base.
@@ -63,25 +63,18 @@
  *             or should be replaced by c++11 threads
  * @return     threadId
  */
-pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
-			      const unsigned maxRaysPerSample,
-			      const unsigned maxRepetitions,
+void calcPhiAseThreaded( const ExperimentParameters &experiment,
+			      const ComputeParameters &compute,
 			      const Mesh& mesh,
-			      const std::vector<double>& sigmaA,
-			      const std::vector<double>& sigmaE,
-			      const double mseThreshold,
-			      const bool useReflections,
-			      std::vector<float> &phiAse,
-			      std::vector<double> &mse,
-			      std::vector<unsigned> &totalRays,
-			      const unsigned gpu_i,
+			      Result &result,
 			      const unsigned minSample_i,
 			      const unsigned maxSample_i,
-			      float &runtime);
+			      float &runtime );
+			      
 /**
  * @brief Wait for all threads to finish
  *
  */
-void joinAll(std::vector<pthread_t> threadIds);
+void joinAll();
 
 

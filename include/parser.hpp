@@ -34,13 +34,11 @@
 #include <logging.hpp>
 #include <mesh.hpp>
 #include <nan_fix.hpp>
+#include <types.hpp>
 
 #include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
 namespace fs = boost::filesystem;
-
-enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
-enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE };
 
 
 /**
@@ -213,3 +211,9 @@ std::vector<Mesh> parseMesh(const fs::path rootPath,
 			    unsigned maxGpus);
 
 
+int parse( const int argc,
+	   char** argv,
+	   ExperimentParameters& experiment,
+	   ComputeParameters& compute,
+	   std::vector<Mesh>& mesh,
+	   Result& result);
