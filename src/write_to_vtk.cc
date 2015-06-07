@@ -47,7 +47,7 @@ int writeToVtk(const Mesh& mesh,
 	       const float expectationThreshold,
 	       const bool useReflections,
 	       const float runtime,
-         const std::string vtkType){
+	       const std::string vtkType){
 
   const double* vertexCoordinates = mesh.points.toArray();
   const unsigned* triangles       = mesh.trianglePointIndices.toArray();
