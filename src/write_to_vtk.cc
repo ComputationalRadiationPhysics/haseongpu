@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -176,7 +176,7 @@ int writePointsToVtk(
 
 
 
-std::vector<double> compareVtk(std::vector<double> compare, fs::path filename){
+std::vector<double> compareVtk(std::vector<double> compare, const fs::path filename){
   fs::ifstream filestream;
   std::string line;
   bool foundLine = false;

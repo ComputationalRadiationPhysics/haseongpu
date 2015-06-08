@@ -208,7 +208,7 @@ void checkSampleRange(
 	const unsigned numberOfSamples
 	);
 
-std::vector<Mesh> parseMesh(fs::path rootPath,
+std::vector<Mesh> parseMesh(const fs::path rootPath,
 			    std::vector<unsigned> devices,
 			    unsigned maxGpus);
 
