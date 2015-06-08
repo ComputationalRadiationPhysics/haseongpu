@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
