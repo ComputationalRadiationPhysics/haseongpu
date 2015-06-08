@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -20,12 +20,14 @@
 
 
 
-#include <fstream> /* ofstream */
 #include <vector> /* vector */
-#include <iomanip> /* std::setprecision() */
-#include <string>
+#include <iomanip> /* std::fixed, std::setprecision() */
+#include <string> /* std::to_string() */
 #include <time.h> /* time, time_t */
-#include <sstream> /* std::stringstream */
+
+#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/fstream.hpp> /* fs::ofstream, fs::ifstream */
+namespace fs = boost::filesystem;
 
 #include <write_to_vtk.hpp>
 #include <logging.hpp>
@@ -39,7 +41,7 @@
  */
 int writeToVtk(const Mesh& mesh,
 	       const std::vector<double> data,
-	       const std::string pfilename,
+	       fs::path filename,
 	       const unsigned raysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float expectationThreshold,
@@ -59,23 +61,24 @@ int writeToVtk(const Mesh& mesh,
   // Construct experiment information
   unsigned r = useReflections ? mesh.getMaxReflections() : 0;
   
-  std::stringstream experimentStream;
-  experimentStream << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime;
 
   // Add time to filename
   time_t currentTime;
   time(&currentTime);
-  std::stringstream filenameStream;
-  filenameStream  << pfilename << "_" << (int) currentTime << ".vtk";
+  filename += ("_");
+  filename += std::to_string((int) currentTime);
+  filename += (".vtk");
 
-  dout(V_INFO) << "Write experiment data to vtk-file " << filenameStream.str() << std::endl;
+  dout(V_INFO) << "Write experiment data to vtk-file " << filename << std::endl;
 
-  std::ofstream vtkFile;
-  vtkFile.open(filenameStream.str().c_str());
+  fs::ofstream vtkFile;
+  vtkFile.open(filename);
 
   // Write header of vtk file
   vtkFile << "# vtk DataFile Version 2.0" << std::endl;
-  vtkFile << experimentStream.str() << std::endl;
+  vtkFile << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample <<
+    " REFLECTIONS=" << r << " EXPECTATION=" << expectationThreshold <<
+    " RUNTIME=" << runtime << std::endl;
   vtkFile << "ASCII" << std::endl;
 
   // Write point data
@@ -127,7 +130,7 @@ int writeToVtk(const Mesh& mesh,
 int writePrismToVtk(
     const Mesh& mesh,
     const std::vector<double> prismData,
-    const std::string pfilename,
+    const fs::path filename,
     const unsigned raysPerSample,
     const unsigned maxRaysPerSample,
     const float expectationThreshold,
@@ -138,7 +141,7 @@ int writePrismToVtk(
   return writeToVtk(
       mesh,
       prismData,
-      pfilename,
+      filename,
       raysPerSample,
       maxRaysPerSample,
       expectationThreshold,
@@ -151,7 +154,7 @@ int writePrismToVtk(
 int writePointsToVtk(
     const Mesh& mesh,
     const std::vector<double> prismData,
-    const std::string pfilename,
+    const fs::path filename,
     const unsigned raysPerSample,
     const unsigned maxRaysPerSample,
     const float expectationThreshold,
@@ -162,7 +165,7 @@ int writePointsToVtk(
  return writeToVtk(
       mesh,
       prismData,
-      pfilename,
+      filename,
       raysPerSample,
       maxRaysPerSample,
       expectationThreshold,
@@ -173,8 +176,8 @@ int writePointsToVtk(
 
 
 
-std::vector<double> compareVtk(std::vector<double> compare, std::string filename){
-  std::ifstream filestream;
+std::vector<double> compareVtk(std::vector<double> compare, const fs::path filename){
+  fs::ifstream filestream;
   std::string line;
   bool foundLine = false;
   double value = 0;
@@ -196,7 +199,7 @@ std::vector<double> compareVtk(std::vector<double> compare, std::string filename
     aseTotal += compare.at(i);
   }
 
-  filestream.open(filename.c_str(), std::ifstream::in);
+  filestream.open(filename, fs::ifstream::in);
 
   if(filestream.is_open()){
     while(filestream.good()){

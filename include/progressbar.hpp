@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -31,6 +31,8 @@
 
 #pragma once
 #include <string>
+
+#include <boost/filesystem.hpp> /* boost::filesystem::path */
 
 /**
  * @brief writes the progress of an operation to dout(V_PROGRESS) (see logging.h),
@@ -75,4 +77,4 @@ void fancyProgressBar(const unsigned current,const unsigned nTotal);
  * @param path the name of the file to write
  *
  */
-void fileProgressBar(const unsigned nTotal, const std::string path);
+void fileProgressBar(const unsigned nTotal, const boost::filesystem::path path);

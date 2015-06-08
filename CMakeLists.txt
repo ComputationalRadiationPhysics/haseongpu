@@ -64,7 +64,7 @@ set(CUDA_NVCC_LINKER_FLAGS ${CUDA_NVCC_FLAGS})
 ###############################################################################
 # Boost
 ###############################################################################
-find_package(Boost 1.48.0 REQUIRED COMPONENTS program_options filesystem)
+find_package(Boost 1.48.0 COMPONENTS system program_options filesystem REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 

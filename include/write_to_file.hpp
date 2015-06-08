@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -29,6 +29,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem.hpp> /* boost::filesystem::path */
+
 /** 
  * @brief writes a value to a file, where the filename is appended with 2 longish indices
  *
@@ -41,7 +43,7 @@
  */
 int writeValueToFile(
     const float value, 
-    const std::string path, 
+    const boost::filesystem::path path,
     const std::string indexName1, 
     const int index1, 
     const std::string indexName2, 
@@ -56,4 +58,4 @@ int writeValueToFile(
  * @param pFilename the name of the output file
  *
  */
-void writeVectorToFile(std::vector<double> v, std::string pFilename);
+void writeVectorToFile(std::vector<double> v, boost::filesystem::path filename);
