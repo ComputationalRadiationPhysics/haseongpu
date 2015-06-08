@@ -37,6 +37,10 @@
 #include <numeric> /* accumulate*/
 #include <stdexcept>
 
+// Boost stuff
+#include <boost/filesystem.hpp> /* fs::path */
+namespace fs = boost::filesystem;
+
 // User header files
 #include <calc_phi_ase.hpp>
 #include <calc_phi_ase_threaded.hpp>
@@ -93,8 +97,8 @@ int main(int argc, char **argv){
   time_t starttime   = time(0);
   unsigned usedGpus  = 0;
 
-  std::string inputPath;
-  std::string outputPath;
+  fs::path inputPath;
+  fs::path outputPath;
   double mseThreshold = 0;
 
   // Wavelength data
@@ -121,10 +125,10 @@ int main(int argc, char **argv){
   dout(V_INFO) << "parameter validity was checked!" << std::endl;
 
   // Parse wavelengths from files
-  if(fileToVector(inputPath + "sigmaA.txt",  &sigmaA))   return 1;
-  if(fileToVector(inputPath + "sigmaE.txt",  &sigmaE))   return 1;
-  if(fileToVector(inputPath + "lambdaA.txt", &lambdaA)) return 1;
-  if(fileToVector(inputPath + "lambdaE.txt", &lambdaE)) return 1;
+  if(fileToVector(inputPath, "sigmaA.txt",  &sigmaA))   return 1;
+  if(fileToVector(inputPath, "sigmaE.txt",  &sigmaE))   return 1;
+  if(fileToVector(inputPath, "lambdaA.txt", &lambdaA)) return 1;
+  if(fileToVector(inputPath, "lambdaE.txt", &lambdaE)) return 1;
   lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
   lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
   
@@ -274,10 +278,10 @@ int main(int argc, char **argv){
     std::vector<double> tmpPhiAse(phiAse.begin(), phiAse.end());
     std::vector<double> tmpTotalRays(totalRays.begin(), totalRays.end());
 
-    writePointsToVtk(meshs[0], dndtAse, outputPath + "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(meshs[0], tmpPhiAse, outputPath + "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(meshs[0], mse, outputPath + "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
-    writePointsToVtk(meshs[0], tmpTotalRays, outputPath + "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(meshs[0], dndtAse, outputPath /= "vtk/dndt", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(meshs[0], tmpPhiAse, outputPath /= "vtk/phiase", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(meshs[0], mse, outputPath /= "vtk/mse", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
+    writePointsToVtk(meshs[0], tmpTotalRays, outputPath /= "vtk/total_rays", minRaysPerSample, maxRaysPerSample, mseThreshold, useReflections, runtime);
   }
 
   // Print statistics

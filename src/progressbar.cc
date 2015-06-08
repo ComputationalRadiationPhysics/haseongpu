@@ -25,8 +25,13 @@
 #include <fstream>
 #include <sys/time.h>
 
+#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/fstream.hpp> /* fs::fstream */
+
 #include <progressbar.hpp>
 #include <logging.hpp>
+
+namespace fs = boost::filesystem;
 
 /**
  * @brief prints a line of ascii-art in the style of a sine-wave
@@ -103,7 +108,7 @@ void fancyProgressBar(const unsigned nTotal){
   
   //find the starting time of the whole progress
   if(part==0){ gettimeofday(&startTime,NULL); }
-  maxNTotal = max(maxNTotal, nTotal);
+  maxNTotal = std::max(maxNTotal, nTotal);
   static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
   static unsigned tic  = 0;
   timeval now;
@@ -142,7 +147,7 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
 
   // get the starting time on the very first call
   if(part==0){ gettimeofday(&startTime,NULL); }
-  maxNTotal = max(maxNTotal, nTotal);
+  maxNTotal = std::max(maxNTotal, nTotal);
   static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
   static unsigned tic  = 0;
   timeval now;
@@ -173,10 +178,10 @@ void fancyProgressBar(const unsigned current, const unsigned nTotal){
 }
 
 
-void fileProgressBar(unsigned nTotal, std::string path){
+void fileProgressBar(unsigned nTotal, const fs::path path){
 
   const int length = 50;
-  std::ofstream filestream;
+  fs::ofstream filestream;
   static timeval startTime;
   static unsigned part = 0;
   //if this is the first call, set the start time 
@@ -193,7 +198,7 @@ void fileProgressBar(unsigned nTotal, std::string path){
     ++tic;
 
     if(!filestream.is_open()){
-      filestream.open(path.c_str(),std::ofstream::trunc);
+      filestream.open(path,std::ofstream::trunc);
     }
 
     const float percentage = float(part) / float(nTotal);

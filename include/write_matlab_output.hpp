@@ -23,6 +23,8 @@
 #include <vector>
 #include <string>
 
+#include <boost/filesystem.hpp> /* boost::filesystem::path */
+
 /**
  * @brief creates textfiles containing all the results as a 2D matrix
  *        (needs to be reshaped in matlab, see calcPhiASE.m)
@@ -41,7 +43,7 @@
  * @license GPLv3
  */
 void writeMatlabOutput(
-    const std::string experimentPath,
+    const boost::filesystem::path experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> mse_values,

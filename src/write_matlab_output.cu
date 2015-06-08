@@ -19,11 +19,14 @@
  */
 
 
-#include <fstream>
 #include <vector>
-#include <iomanip>
+#include <iomanip> /* std::setprecision(), std::fixed() */
 
 #include <write_matlab_output.hpp>
+
+#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/fstream.hpp> /* fs::fstream */
+namespace fs = boost::filesystem;
 
 /**
  * @brief write input data in a 3D-matrix which can be parsed by matlab with reshape
@@ -40,7 +43,7 @@
 template <typename T>
 void write3dMatrix(
     const std::vector<T>& data, 
-    std::ofstream &file,
+    fs::ofstream &file,
     const unsigned rowCount,
     const unsigned columnCount,
     const unsigned pageCount
@@ -62,27 +65,30 @@ void write3dMatrix(
 
 
 void writeMatlabOutput(
-    const std::string experimentPath,
+    const fs::path experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays, 
     const std::vector<double> expectedValues,
     const unsigned numberOfSamples,
     const unsigned numberOfLevels){
 
-  std::ofstream aseFile;
-  std::ofstream raysFile;
-  std::ofstream expectedValuesFile;
+  fs::ofstream aseFile;
+  fs::ofstream raysFile;
+  fs::ofstream expectedValuesFile;
   const unsigned samplesPerLevel = numberOfSamples/numberOfLevels;
 
-  aseFile.open((experimentPath + "phi_ASE.txt").c_str());
-  write3dMatrix(ase,aseFile,samplesPerLevel,numberOfLevels,1);
+  fs::path asePath(experimentPath);
+  aseFile.open(asePath /= "phi_ASE.txt");
+  write3dMatrix(ase, aseFile, samplesPerLevel, numberOfLevels, 1);
   aseFile.close();
 
-  raysFile.open((experimentPath + "N_rays.txt").c_str());
-  write3dMatrix(N_rays,raysFile,samplesPerLevel,numberOfLevels,1);
+  fs::path raysPath(experimentPath);
+  raysFile.open(raysPath /= "N_rays.txt");
+  write3dMatrix(N_rays, raysFile, samplesPerLevel, numberOfLevels, 1);
   raysFile.close();
 
-  expectedValuesFile.open((experimentPath + "mse_values.txt").c_str());
-  write3dMatrix(expectedValues,expectedValuesFile,samplesPerLevel,numberOfLevels,1);
+  fs::path msePath(experimentPath);
+  expectedValuesFile.open(msePath /= "mse_values.txt");
+  write3dMatrix(expectedValues, expectedValuesFile, samplesPerLevel, numberOfLevels, 1);
   expectedValuesFile.close();
 }
