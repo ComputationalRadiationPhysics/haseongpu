@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -89,7 +89,7 @@ int writePrismToVtk(const Mesh& mesh,
  * @return a vector containing the difference between "compare" and "data"
  *
  */
-std::vector<double> compareVtk(std::vector<double> compare, boost::filesystem::path filename);
+std::vector<double> compareVtk(std::vector<double> compare, const boost::filesystem::path filename);
 
 
 
