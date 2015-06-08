@@ -35,13 +35,17 @@
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <boost/filesystem.hpp> /* fs::path */
+namespace fs = boost::filesystem;
+
+
 
 void parseCommandLine(
     const int argc,
     char** argv,
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
-    std::string *inputPath,
+    fs::path *inputPath,
     bool *writeVtk,
     DeviceMode *deviceMode,
     ParallelMode *parallelMode,
@@ -50,7 +54,7 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
-    std::string *outputPath,
+    fs::path *outputPath,
     double *mseThreshold,
     unsigned *lambdaResolution
     ) {
@@ -82,9 +86,9 @@ void parseCommandLine(
       "The minimal number of rays to use for each sample point")
     ( "max-rays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
       "The maximal number of rays to use for each sample point")
-    ( "input-path,i", po::value<std::string> (inputPath)->default_value("input/"),
+    ( "input-path,i", po::value<fs::path> (inputPath)->default_value(fs::path("input/")),
       "The path to a folder that contains the input files")
-    ( "output-path,o", po::value<std::string> (outputPath)->default_value("output/"),
+    ( "output-path,o", po::value<fs::path> (outputPath)->default_value(fs::path("output/")),
       "The path to a folder that contains the output files")
     ( "ngpus,g", po::value<unsigned> (maxgpus)->default_value(1),
       "The maximum number of GPUs to b used on a single node. Should be left unchanged for --parallel-mode=mpi")
@@ -125,8 +129,8 @@ void parseCommandLine(
     *deviceMode = NO_DEVICE_MODE;
       
   // append trailing folder separator, if necessary
-  if(inputPath->at(inputPath->size()-1) != '/') inputPath->append("/");
-  if(outputPath->at(outputPath->size()-1) != '/') outputPath->append("/");
+  *outputPath /= "";
+  *inputPath /= "";
 
 
 
@@ -137,9 +141,9 @@ void parseCommandLine(
 void printCommandLine(
     unsigned raysPerSample,
     unsigned maxRaysPerSample,
-    std::string inputPath,
+    const fs::path inputPath,
     bool writeVtk,
-    std::string compareLocation,
+    const fs::path compareLocation,
     const DeviceMode dMode,
     const ParallelMode pMode,
     bool useReflections,
@@ -147,7 +151,7 @@ void printCommandLine(
     int minSample_i,
     int maxSample_i,
     unsigned maxRepetitions,
-    std::string outputPath,
+    const fs::path outputPath,
     double mseThreshold){
     
   dout(V_INFO) << "raysPerSample: " << raysPerSample << std::endl;
@@ -168,7 +172,7 @@ int checkParameterValidity(
     const int argc,
     const unsigned raysPerSample,
     unsigned *maxRaysPerSample,
-    const std::string inputPath,
+    const fs::path inputPath,
     const unsigned deviceCount,
     const DeviceMode deviceMode,
     const ParallelMode parallelMode,
@@ -176,7 +180,7 @@ int checkParameterValidity(
     const int minSampleRange,
     const int maxSampleRange,
     const unsigned maxRepetitions,
-    const std::string outputPath,
+    const fs::path outputPath,
     double *mseThreshold
     ) {
 
@@ -199,12 +203,12 @@ int checkParameterValidity(
     return 1;
   }
 
-  if (inputPath.size() == 0) {
+  if (!exists(inputPath) || !is_directory(inputPath) || is_empty(inputPath)) {
     dout(V_ERROR) << "Please specify the experiment's location with --input-path=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
 
-  if (outputPath.size() == 0) {
+  if (!exists(outputPath) || !is_directory(outputPath)) {
     dout(V_ERROR) << "Please specify the output location with --output-path=PATH_TO_EXPERIMENT" << std::endl;
     return 1;
   }
@@ -370,10 +374,11 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
 
 }
 
+
 /**
  *
  */
-std::vector<Mesh> parseMesh(std::string rootPath,
+std::vector<Mesh> parseMesh(const fs::path rootPath,
 			    std::vector<unsigned> devices,
 			    unsigned maxGpus) {
 
@@ -406,29 +411,30 @@ std::vector<Mesh> parseMesh(std::string rootPath,
   double claddingAbsorption = 0;
 
   // Parse experimentdata from files
-  if(fileToVector(rootPath + "triangleNormalPoint.txt", &triangleNormalPoint)) return meshs;
-  if(fileToVector(rootPath + "betaVolume.txt", &betaVolume)) return meshs;
-  if(fileToVector(rootPath + "forbiddenEdge.txt", &forbiddenEdge)) return meshs;
-  if(fileToVector(rootPath + "triangleNeighbors.txt", &triangleNeighbors)) return meshs;
-  if(fileToVector(rootPath + "triangleNormalsX.txt", &triangleNormalsX)) return meshs;
-  if(fileToVector(rootPath + "triangleNormalsY.txt", &triangleNormalsY)) return meshs;
-  if(fileToVector(rootPath + "triangleCenterX.txt", &triangleCenterX)) return meshs;
-  if(fileToVector(rootPath + "triangleCenterY.txt", &triangleCenterY)) return meshs;
-  if(fileToVector(rootPath + "points.txt", &points)) return meshs;
-  if(fileToVector(rootPath + "trianglePointIndices.txt", &trianglePointIndices)) return meshs;
-  if(fileToVector(rootPath + "triangleSurfaces.txt", &triangleSurfaces)) return meshs;
-  if(fileToValue(rootPath  + "numberOfPoints.txt", numberOfPoints)) return meshs;
-  if(fileToValue(rootPath  + "numberOfTriangles.txt", numberOfTriangles)) return meshs;
-  if(fileToValue(rootPath  + "numberOfLevels.txt", numberOfLevels)) return meshs;
-  if(fileToValue(rootPath  + "thickness.txt", thickness)) return meshs;
-  if(fileToValue(rootPath  + "nTot.txt", nTot)) return meshs;
-  if(fileToValue(rootPath  + "crystalTFluo.txt", crystalTFluo)) return meshs;
-  if(fileToValue(rootPath  + "claddingNumber.txt", claddingNumber)) return meshs;
-  if(fileToValue(rootPath  + "claddingAbsorption.txt", claddingAbsorption)) return meshs;
-  if(fileToVector(rootPath + "betaCells.txt", &betaCells)) return meshs;
-  if(fileToVector(rootPath + "claddingCellTypes.txt", &claddingCellTypes)) return meshs;
-  if(fileToVector(rootPath + "refractiveIndices.txt", &refractiveIndices)) return meshs;
-  if(fileToVector(rootPath + "reflectivities.txt", &reflectivities)) return meshs;
+  //fs::path triangleNormalPointPath(rootPath);
+  if(fileToVector(rootPath, "triangleNormalPoint.txt", &triangleNormalPoint)) return meshs;
+  if(fileToVector(rootPath, "betaVolume.txt", &betaVolume)) return meshs;
+  if(fileToVector(rootPath, "forbiddenEdge.txt", &forbiddenEdge)) return meshs;
+  if(fileToVector(rootPath, "triangleNeighbors.txt", &triangleNeighbors)) return meshs;
+  if(fileToVector(rootPath, "triangleNormalsX.txt", &triangleNormalsX)) return meshs;
+  if(fileToVector(rootPath, "triangleNormalsY.txt", &triangleNormalsY)) return meshs;
+  if(fileToVector(rootPath, "triangleCenterX.txt", &triangleCenterX)) return meshs;
+  if(fileToVector(rootPath, "triangleCenterY.txt", &triangleCenterY)) return meshs;
+  if(fileToVector(rootPath, "points.txt", &points)) return meshs;
+  if(fileToVector(rootPath, "trianglePointIndices.txt", &trianglePointIndices)) return meshs;
+  if(fileToVector(rootPath, "triangleSurfaces.txt", &triangleSurfaces)) return meshs;
+  if(fileToValue(rootPath, "numberOfPoints.txt", numberOfPoints)) return meshs;
+  if(fileToValue(rootPath, "numberOfTriangles.txt", numberOfTriangles)) return meshs;
+  if(fileToValue(rootPath, "numberOfLevels.txt", numberOfLevels)) return meshs;
+  if(fileToValue(rootPath, "thickness.txt", thickness)) return meshs;
+  if(fileToValue(rootPath, "nTot.txt", nTot)) return meshs;
+  if(fileToValue(rootPath, "crystalTFluo.txt", crystalTFluo)) return meshs;
+  if(fileToValue(rootPath, "claddingNumber.txt", claddingNumber)) return meshs;
+  if(fileToValue(rootPath, "claddingAbsorption.txt", claddingAbsorption)) return meshs;
+  if(fileToVector(rootPath, "betaCells.txt", &betaCells)) return meshs;
+  if(fileToVector(rootPath, "claddingCellTypes.txt", &claddingCellTypes)) return meshs;
+  if(fileToVector(rootPath, "refractiveIndices.txt", &refractiveIndices)) return meshs;
+  if(fileToVector(rootPath, "reflectivities.txt", &reflectivities)) return meshs;
 
   // assert input sizes
   assert(numberOfPoints == (points.size() / 2));
