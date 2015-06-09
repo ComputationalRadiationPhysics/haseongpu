@@ -1,21 +1,19 @@
 project(HASEonGPU)
-cmake_minimum_required(VERSION 2.8.10.1)
+cmake_minimum_required(VERSION 3.0.1)
 
 # helper for libs and packages
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
   "$ENV{MPI_ROOT}" "$ENV{CUDA_ROOT}" "$ENV{BOOST_ROOT}")
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/utils/cmake/modules/" ${CMAKE_MODULE_PATH})
+if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
+  message(FATAL_ERROR "GCC version must be at least 4.8.2")
+endif(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
+
 
 ###############################################################################
 # CUDA
 ###############################################################################
-find_package(CUDA 5.0 REQUIRED)
-
-if(CUDA_VERSION VERSION_LESS 5.5)
-  message(STATUS "CUDA Toolkit < 5.5 detected. We strongly recommend to still "
-    "use CUDA 5.5+ drivers (319.82 or higher)!")
-endif(CUDA_VERSION VERSION_LESS 5.5)
+find_package(CUDA 5.5 REQUIRED)
 
 set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
 # Separate C++ from CUDA file compilation (So we can use our own compiler)
@@ -56,22 +54,16 @@ if(CUDA_KEEP_FILES)
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" --keep --keep-dir "${PROJECT_BINARY_DIR}/nvcc_tmp")
 endif(CUDA_KEEP_FILES)
 
-# save the current configuration to be used with the linker.
-# any further additions to CUDA_NVCC_FLAGS will NOT be passed to
-# the linker. See the modified FindCUDA.cmake module
-set(CUDA_NVCC_LINKER_FLAGS ${CUDA_NVCC_FLAGS})
 
 ###############################################################################
 # Boost
 ###############################################################################
-find_package(Boost 1.48.0 COMPONENTS system program_options filesystem REQUIRED)
+find_package(Boost 1.50.0 COMPONENTS system program_options filesystem REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
-# nvcc + boost 1.55 work around
-# This must NOT be passed to the nvcc linker, but only to the compiler
 if(Boost_VERSION EQUAL 105500)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} \"-DBOOST_NOINLINE=__attribute__((noinline))\" ")
+  message(FATAL_ERROR "Boost 1.55 is not supported. Use a lower or a higher version instead!")
 endif(Boost_VERSION EQUAL 105500)
 
 
