@@ -25,9 +25,10 @@ Dependencies
 
    + Software:
      + make
-     + cmake 2.8.10
-     + gcc 4.4.1
-     + cuda 5.5
+     + cmake >= 3.0.1
+     + gcc >= 4.8.2
+     + cuda >= 5.5
+     + boost >= 1.50 ( **not** 1.55, due to a regression bug )
 
    + Optional:
      + octave / matlab
