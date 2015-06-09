@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -29,14 +29,15 @@
 
 #pragma once
 #include <string>  /* string */
-#include <iostream>
-#include <fstream> /* ifstream */
-#include <cstdlib> /* atof */
-#include <vector> 
+#include <vector>
 
 #include <logging.hpp>
 #include <mesh.hpp>
 #include <nan_fix.hpp>
+
+#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/fstream.hpp> /* fs::fstream */
+namespace fs = boost::filesystem;
 
 enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
 enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE };
@@ -49,25 +50,24 @@ enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE 
  *        int, float, double).
  *
  * @param filename file to parse
- * @param vector contains the parsed values 
+ * @param vector contains the parsed values
  *
  * @return 1 if parsing was succesful (file can be opened)
  * @return 0 otherwise
  **/
 template <class T>
-int fileToVector(const std::string filename, std::vector<T> *v){
+int fileToVector(const fs::path filename, std::vector<T> *v){
   std::string line;
-  std::ifstream fileStream; 
+  fs::ifstream fileStream;
   T value = 0.0;
 
-  fileStream.open(filename.c_str());
+  fileStream.open(filename);
   if(fileStream.is_open()){
     while(fileStream.good()){
-      std::getline(fileStream, line);
-      value = (T) atof(line.c_str());
+      fileStream >> value;
       if(isNaN(value)){
-	dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
-	exit(1);
+        dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
+        exit(1);
       }
       v->push_back(value);
     }
@@ -81,28 +81,46 @@ int fileToVector(const std::string filename, std::vector<T> *v){
   v->pop_back();
   fileStream.close();
   return 0;
-  
+
 }
+
+
+/**
+ * @brief overload to allow distinct directory and filename
+ *
+ * @param directory directory where file is located
+ * @param filename file to parse
+ * @param vector contains the parsed values
+ *
+ * @return 1 if parsing was succesful (file can be opened)
+ * @return 0 otherwise
+ **/
+template <class T>
+int fileToVector(const fs::path directory, const fs::path filename, std::vector<T> *v){
+  fs::path tempPath(directory);
+  return(fileToVector(tempPath /= filename, v));
+}
+
+
 /**
  * @brief Parses just one line(value) of a given file(filename).
  *        The value should be a number (short, unsigned,
  *        int, float, double).
  *
  * @param filename file to parse
- * @param value is the value which was parsed 
+ * @param value is the value which was parsed
  *
  * @return 1 if parsing was succesful (file can be opened)
  * @return 0 otherwise
  **/
 template <class T>
-int fileToValue(const std::string filename, T &value){
+int fileToValue(const fs::path filename, T &value){
   std::string line;
-  std::ifstream fileStream; 
+  fs::ifstream fileStream;
 
-  fileStream.open(filename.c_str());
+  fileStream.open(filename);
   if(fileStream.is_open()){
-      std::getline(fileStream, line);
-      value = (T) atof(line.c_str());
+    fileStream >> value;
   }
   else{
     dout(V_ERROR) << "Can't open file " << filename << std::endl;
@@ -111,7 +129,24 @@ int fileToValue(const std::string filename, T &value){
   }
   fileStream.close();
   return 0;
-  
+
+}
+
+
+/**
+ * @brief overload to allow distinct directory and filename
+ *
+ * @param directory directory where file is located
+ * @param filename file to parse
+ * @param value is the value which was parsed
+ *
+ * @return 1 if parsing was succesful (file can be opened)
+ * @return 0 otherwise
+ **/
+template <class T>
+int fileToValue(const fs::path directory, const fs::path filename, T &value){
+  fs::path tempPath(directory);
+  return(fileToValue(tempPath /= filename, value));
 }
 
 
@@ -120,7 +155,7 @@ void parseCommandLine(
     char** argv,
     unsigned *raysPerSample,
     unsigned *maxRaysPerSample,
-    std::string *inputPath,
+    fs::path *inputPath,
     bool *writeVtk,
     DeviceMode *deviceMode,
     ParallelMode *parallelMode,
@@ -129,7 +164,7 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
-    std::string *outputPath,
+    fs::path *outputPath,
     double *mseThreshold,
     unsigned *lambdaResolution
     );
@@ -137,9 +172,9 @@ void parseCommandLine(
 void printCommandLine(
     unsigned raysPerSample,
     unsigned maxRaysPerSample,
-    std::string inputPath,
+    fs::path inputPath,
     bool writeVtk,
-    std::string compareLocation,
+    fs::path compareLocation,
     const DeviceMode deviceMode,
     const ParallelMode parallelMode,
     bool useReflections,
@@ -147,7 +182,7 @@ void printCommandLine(
     int minSample_i,
     int maxSample_i,
     unsigned maxRepetitions,
-    std::string outputPath,
+    fs::path outputPath,
     double mseThreshold
     );
 
@@ -155,7 +190,7 @@ int checkParameterValidity(
     const int argc,
     const unsigned raysPerSample,
     unsigned *maxRaysPerSample,
-    const std::string inputPath,
+    const fs::path inputPath,
     const unsigned deviceCount,
     const DeviceMode deviceMode,
     const ParallelMode parallelMode,
@@ -163,7 +198,7 @@ int checkParameterValidity(
     const int minSample_i,
     const int maxSample_i,
     const unsigned maxRepetitions,
-    const std::string outputPath,
+    const fs::path outputPath,
     double *mseThreshold
     );
 
@@ -173,7 +208,7 @@ void checkSampleRange(
 	const unsigned numberOfSamples
 	);
 
-std::vector<Mesh> parseMesh(std::string rootPath,
+std::vector<Mesh> parseMesh(const fs::path rootPath,
 			    std::vector<unsigned> devices,
 			    unsigned maxGpus);
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -29,6 +29,8 @@
 #include <vector>
 #include <string>
 
+#include <boost/filesystem.hpp> /* boost::filesystem::path */
+
 #include <mesh.hpp>
 
 /**
@@ -48,7 +50,7 @@
  */
 int writePointsToVtk(const Mesh& mesh,
 	       const std::vector<double> ase,
-	       const std::string filename, 
+	       const boost::filesystem::path filename,
 	       const unsigned minRaysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float mseThreshold,
@@ -72,7 +74,7 @@ int writePointsToVtk(const Mesh& mesh,
  */
 int writePrismToVtk(const Mesh& mesh,
 	       const std::vector<double> prismData,
-	       const std::string filename, 
+	       const boost::filesystem::path filename,
 	       const unsigned minRaysPerSample,
 	       const unsigned maxRaysPerSample,
 	       const float mseThreshold,
@@ -87,7 +89,7 @@ int writePrismToVtk(const Mesh& mesh,
  * @return a vector containing the difference between "compare" and "data"
  *
  */
-std::vector<double> compareVtk(std::vector<double> compare, std::string filename);
+std::vector<double> compareVtk(std::vector<double> compare, const boost::filesystem::path filename);
 
 
 

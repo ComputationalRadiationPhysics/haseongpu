@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -19,15 +19,19 @@
  */
 
 
-#include <fstream> /* ofstream */
-#include <sstream>
-#include <iomanip>
+#include <sstream> /* std::stringstream */
+#include <string> /* std::to_string */
+#include <iomanip> /* setw(), setfill */
+
+#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/fstream.hpp> /* fs::fstream */
+namespace fs = boost::filesystem;
 
 #include <write_to_file.hpp>
 
 int writeValueToFile(
     const float value, 
-    const std::string path, 
+    const fs::path path,
     const std::string indexName1, 
     const int index1, 
     const std::string indexName2, 
@@ -38,8 +42,8 @@ int writeValueToFile(
   stringstream filenameStream;
   filenameStream << path << indexName1 << "_" << setfill('0') << setw(3) << index1 << "_" << indexName2 << setfill('0') << setw(6) << index2;
 
-  ofstream oFile;
-  oFile.open(filenameStream.str().c_str());
+  fs::ofstream oFile;
+  oFile.open(filenameStream.str());
   oFile << value << endl;
   oFile.close();
 
@@ -47,20 +51,22 @@ int writeValueToFile(
 }
 
 
-void writeVectorToFile(std::vector<double> v, std::string pFilename){
+void writeVectorToFile(std::vector<double> v, fs::path filename){
 
   // Add time to filename
   time_t currentTime;
   time(&currentTime);
-  std::stringstream filenameStream;
-  filenameStream  << pFilename << "_" << (int) currentTime << ".dat";
+  filename += "_";
+  filename += std::to_string((int) currentTime);
+  filename += ".dat";
 
   // Init filestream
-  std::ofstream file;
-  file.open(filenameStream.str().c_str());
+  fs::ofstream file;
+  file.open(filename);
 
   // Write vector data
   for(std::vector<double>::iterator it = v.begin(); it != v.end(); ++it){
     file << *it << std::endl;
   }
+  file.close();
 }

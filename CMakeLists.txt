@@ -18,6 +18,12 @@ if(CUDA_VERSION VERSION_LESS 5.5)
 endif(CUDA_VERSION VERSION_LESS 5.5)
 
 set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
+# Separate C++ from CUDA file compilation (So we can use our own compiler)
+set(CUDA_SEPARABLE_COMPILATION ON)
+# Do not propagate CXX flags to the nvcc host compiler (especially -std=c++11)
+set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+set(CUDA_HOST_COMPILER g++)
+
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_10" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_11" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_12" IS_CUDA_ARCH_UNSUPPORTED)
@@ -58,7 +64,7 @@ set(CUDA_NVCC_LINKER_FLAGS ${CUDA_NVCC_FLAGS})
 ###############################################################################
 # Boost
 ###############################################################################
-find_package(Boost 1.48.0 REQUIRED COMPONENTS program_options filesystem)
+find_package(Boost 1.48.0 COMPONENTS system program_options filesystem REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
@@ -94,6 +100,7 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 ################################################################################
 # GNU
 if(CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")  
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
@@ -185,7 +192,6 @@ cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
 
-set(CUDA_SEPARABLE_COMPILATION ON)
 cuda_add_executable(${HASEonGPU_NAME} ${SRCFILES})
 
 target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
