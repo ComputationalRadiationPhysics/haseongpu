@@ -1,0 +1,31 @@
+/**
+
+\page gol The Game of Life Example
+
+The following figure shows a sketch of the game of life
+simulation implemented with GrayBat support.  The Game of
+Life domain (20 x 20 cells) is decomposed very fine grain, such that,
+every cell is represented by a vertex in a two-dimensional grid and
+neighboring vertices are connected by edges (graybat::pattern::GridDiagonal). The graph is partioned
+into four partitions and mapped to four peers (graybat::pattern::GraphPartition). Therefore, each peer is
+responsible for the communication of 100 vertices with its
+neighbors. Finally, each two peers are mapped to a quad core processor
+on a dual socket system (graybat::communicationPolicy::BMPI). This is one possible sequence of mappings for a Game of
+Life simulation within the GrayBat framework. On each step changes are possible
+to adapt the simulation to other architectures, networks or
+algorithms.
+
+![](utils/doxygen/graphics/gol.svg)
+
+
+## See Also ##
+
+ - @ref gol.cc "GoL Sources
+ - @ref cage
+ - @ref communicationPolicy
+ - @ref graphPolicy
+ - @ref communicationPattern
+ - @ref mapping
+
+
+*/

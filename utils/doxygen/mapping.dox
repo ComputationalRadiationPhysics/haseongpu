@@ -1,0 +1,39 @@
+/**
+
+\page mapping Vertex Mapping
+
+[cage]: @ref cage
+
+A vertex mapping is a class functor which describes the mapping of a
+graph to peers. A mapping is used by the [cage] in its
+graybat::Cage::distribute function and can strongly influence the application
+performance.GrayBat defines a handful of predefined mappings:
+
+- graybat::mapping::Consecutive
+- graybat::mapping::GraphPartition
+- graybat::mapping::Random
+- graybat::mapping::Roundrobin
+
+
+Own vertex mappings can be build from the following mapping
+skeleton:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cc}
+namespace graybat {
+
+    namespace mapping {
+    
+		struct MappingSkeleton {
+	
+			template<typename T_Graph>
+			std::vector<typename T_Graph::Vertex> operator()(const unsigned processID, const unsigned processCount, T_Graph &graph) {...}
+			
+		};
+
+    } /* mapping */
+
+} /* graybat */
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*/

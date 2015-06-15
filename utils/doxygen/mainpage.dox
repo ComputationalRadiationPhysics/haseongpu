@@ -1,0 +1,43 @@
+/**
+
+\mainpage GrayBat
+
+
+[cage]: @ref cage 
+[gol]: @ref gol
+
+<b>Gr</b>aph <b>A</b>pproach  for Highl<b>y</b>  Generic Communication
+Schemes <b>B</b>ased on <b>A</b>daptive <b>T</b>opologies
+
+##Description##
+
+<b>GrayBat</b> is a C++ library that presents a graph-based communication
+approach, which enables a mapping of algorithms to communication
+patterns and further a mapping of these communication patterns to
+varying hardware architectures. Therefore, a flexible and configurable
+communication approach for parallel and distributed
+applications. These mappings are established as an intermediate layer
+between an application and communication libraries and are dynamically
+adptable during run-time.
+
+An application supported by GrayBat can be created with the following steps:
+
+1. Decide on how fine grain the application domain should be decomposed
+2. Model communication pattern of subdomains as a graph
+3. Choose mapping of graph vertices to peers
+4. Choose hardware to run the application on
+
+![](utils/doxygen/graphics/overview.svg)
+
+The [communication and graph environment][cage] (cage) is the central
+class of GrayBat.  The cage provides both communication and graph
+operations to enable communication based on graphs and is a good point
+to **get started**. Otherwise consider the [Game of Life][gol] example
+simulation which provides a full demonstration of utilizing GrayBat.
+
+##Further Links##
+
+- @ref cage
+- @ref gol
+
+*/

@@ -26,9 +26,9 @@ Dependencies
    + Software:
      + make
      + cmake >= 3.0.1
-     + gcc >= 4.8.2
-     + cuda >= 5.5
-     + boost >= 1.50 ( **not** 1.55, due to a regression bug )
+     + gcc >= 4.9.2
+     + cuda >= 11.0
+     + boost >= 3.0
 
    + Optional:
      + octave / matlab
@@ -47,6 +47,62 @@ Compiling
    + go to build directory: `cd haseongpu/build`
    + create Makefile `cmake ..`
    + build project : `make`
+
+GrayBat
+=======
+
+<b>Gr</b>aph <b>A</b>pproach  for Highl<b>y</b>  Generic Communication
+Schemes <b>B</b>ased on <b>A</b>daptive <b>T</b>opologies
+
+##Description##
+
+**GrayBat** is a C++ library that presents a graph-based communication
+approach, which enables a mapping of algorithms to communication
+patterns and further a mapping of these communication patterns to
+varying hardware architectures. Therefore, a flexible and configurable
+communication approach for parallel and distributed
+applications. These mappings are established as an intermediate layer
+between an application and communication libraries and are dynamically
+adptable during run-time.
+
+##Documentation##
+
+Have a look at the documentation that is available [here](https://ComputationalRadiationPhysics.github.io/graybat)
+
+##Referencing##
+
+GrayBat is a scientific project. If you **present and/or publish** scientific
+results that used GrayBat, you should set this as a **reference**.
+
+##Software License##
+
+
+GrayBat  is licensed under the <b>GPLv3+</b>. Please refer to our [LICENSE.md](LICENSE.md)
+
+
+##Dependencies##
+
+ * cmake 3.0.2
+ * Boost 1.57.0
+ * OpenMPI 1.8.0 (mpi communication policy)
+ * g++ 4.9.2
+ * metis 5.1 (graph partitioning)
+
+##Compiling##
+
+ * Clone the repository: `git clone https://github.com/computationalradiationphysics/graybat.git`
+ * Change directory: `cd graybat`
+ * Init git submodules: `git submodule init && git submodule update`
+ * Create the build directory: `mkdir -p build`
+ * Change to build directory: `cd build`
+ * Set compiler: `export CXX=[g++,clang++]`
+ * Create Makefile `cmake ..`
+ * Build project : `make [target]`
+
+##Tested Compilers##
+
+ * clang 3.5
+ * g++ 4.9.2
 
 ### Current Compilation Status:
 
@@ -333,21 +389,27 @@ numbers the array belongs.
      Sets the number of maximal repetitions when the
      mseThreshold was not reached.
 
+##Example Targets##
    + __nTot__ float, size = 1  
      Doping of the active gain medium
 
+ * **GoL**: Game of Life simulation
    + __thickness__ float, size = 1  
      Thickness of one prism level of the mesh.
 
+ * **doc**: Build documentation in doc/
    + __laserParameter__ [float]   
      Is a structure for the laser parameters (intensities sigma, wavelength lambda)
      s_ems corresponds to l_ems and s_abs to l_abs
      struct(s_abs, VALUES, s_ems, VALUES, l_abs, VALUES, l_ems, VALUES)
 
+ * **clean**: Cleanup build directory
    + __crystal__ [float]  
      Is a structure for the crystal parameters 
      crystal.tfluo describes the crystalFluorescence of the active gain medium.
 
+##Literature##
+ * Talk by Erik Zenker of his diploma defence [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.16306.svg)](http://dx.doi.org/10.5281/zenodo.16306)
    + __numberOfLevels__ unsigned, size = 1  
      Total number of levels of the mesh. Thus the total thickness
      of the mesh is thickness * numberOfLevels!
@@ -357,10 +419,12 @@ numbers the array belongs.
     + 'threaded' use pthreads to distribute workload locally
     + 'graybat'  use experimental graybat api (internally mpi)
 
+##Authors##
    + __deviceMode__
     + 'cpu'      use cpu algorithm (does not have all features)
     + 'gpu'      use gpu algorithm
 
+ * Erik Zenker (erikzenker@posteo.de)
    + __maxGpus__ unsigned, size = 1  
      Maximal number of GPUs for threaded case
 
