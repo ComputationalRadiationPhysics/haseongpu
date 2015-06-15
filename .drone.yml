@@ -2,6 +2,6 @@ image: coin/archlinux
 
 script:
   - mkdir build_tmp && cd build_tmp
-  - cmake ..
+  - cmake -D CUDA_TOOLKIT_ROOT_DIR=/opt/cuda ..
   - make
   - ls -l
