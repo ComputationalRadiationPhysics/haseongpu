@@ -1,0 +1,40 @@
+/**
+
+\page communicationPattern Communication Pattern
+
+[cage]: @ref cage 
+
+A communication pattern is a class functor which generates
+a graph. They are used to define the communication graph of a
+[cage]. GrayBat provides a handful of predefined pattern:
+
+- graybat::pattern::FullyConnected
+- graybat::pattern::GridDiagonal
+- graybat::pattern::Grid
+- graybat::pattern::HyperCube
+- graybat::pattern::Star
+
+Own communication pattern can be build from the following pattern
+skeleton:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cc}
+namespace graybat {
+
+  namespace pattern {
+
+    typedef unsigned                                                        VertexID;
+    typedef std::pair<VertexID, VertexID>                                   EdgeDescription;
+    typedef std::pair<std::vector<VertexID>, std::vector<EdgeDescription> > GraphDescription;
+
+	struct PatternSkeleton {
+
+		// Functor which returns a desired graph
+		GraphDescription operator()(){
+	};
+
+  } /* pattern */
+
+} /* graybat */
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*/

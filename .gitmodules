@@ -1,0 +1,3 @@
+[submodule "include/dout"]
+	path = dout
+	url = https://github.com/slizzered/dout.git

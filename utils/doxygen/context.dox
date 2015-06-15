@@ -1,0 +1,42 @@
+/**
+
+\page context Context
+
+[cage]: @ref cage
+[context]: @ref context
+[communication policy]: @ref communicationPolicy
+
+A context is a set of peers which are able to communicate with
+each other. A context need to be defined by a [communication policy],
+since every communication library defines a set of peers differently.
+The [cage] defines a strict interface of a context, but the
+implementation is left open to the [communication policy].
+
+The following listing provides a skeleton for a context
+class with all necessary methods:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cc}
+struc ContextSkeleton {
+
+	typedef unsigned ContextID;
+	typedef unsigned VAddr;
+
+	// Assignment operator
+	Context& operator=(const Context& otherContext) {...}
+
+	// Returns the number of peers in this context
+	size_t size() const {...}
+
+	// Returns the virtual address of the peer in this context
+	VAddr getVAddr() const {...}
+
+	// Returns the id of this context
+	ContextID getID() const {...}
+
+	// Returns whether the peer is member of the context
+	bool valid() const {...}
+
+};
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*/
