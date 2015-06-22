@@ -1,5 +1,7 @@
 // GrayBat
-#include <graybat.hpp>
+#include <Cage.hpp>
+#include <communicationPolicy/BMPI.hpp>
+#include <graphPolicy/BGL.hpp>
 
 // Mappings
 #include <mapping/Consecutive.hpp>
@@ -22,8 +24,6 @@
 #include <cmath>      /* sqrt */
 #include <cstdlib>    /* atoi */
 #include <numeric>    /* std::accumulate */
-
-std::array<unsigned,1> testValue {{1}};
 
 struct Cell {
     Cell() : isAlive{{0}}, aliveNeighbors(0){
@@ -102,10 +102,9 @@ int gol(const unsigned nCells, const unsigned nTimeSteps ) {
     typedef graybat::graphPolicy::BGL<Cell>    GP;
     
     // Cage
-    typedef graybat::Cage<CP, GP>   MyCage;
-    typedef typename MyCage::Event  Event;
-    typedef typename MyCage::Vertex Vertex;
-    typedef typename MyCage::Edge   Edge;
+    typedef graybat::Cage<CP, GP> Cage;
+    typedef typename Cage::Event  Event;
+    typedef typename Cage::Vertex Vertex;
 
     /***************************************************************************
      * Initialize Communication
@@ -115,7 +114,8 @@ int gol(const unsigned nCells, const unsigned nTimeSteps ) {
     const unsigned width  = height;
 
     // Create GoL Graph
-    MyCage grid(graybat::pattern::GridDiagonal(height, width));
+    Cage grid(graybat::pattern::GridDiagonal(height, width));
+
     
     // Distribute vertices
     grid.distribute(graybat::mapping::Consecutive());
