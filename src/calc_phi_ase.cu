@@ -225,9 +225,9 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 	  
     }
 
-    if(verbosity & V_PROGRESS){
-      fancyProgressBar(mesh.numberOfSamples);
-    }
+     if(verbosity & V_PROGRESS){
+       fancyProgressBar(mesh.numberOfSamples);
+     }
 
   }
     
