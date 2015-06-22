@@ -56,22 +56,38 @@ struct CommunicationVertex {
      * Communication Operations
      ****************************************************************************/
 
-    template <typename T>
-    void spread(const T& data, std::vector<Event> &events){
+    template <class T_Data>
+    void spread(const T_Data& data, std::vector<Event> &events){
 	cage.spread(*this, data, events);
     }
 
-    template <typename T>
-    void spread(const T& data){
+    template <class T_Data>
+    void spread(const T_Data& data){
 	cage.spread(*this, data);
     }
     
 
-    template <typename T>
-    void collect(T& data){
+    template <class T_Data>
+    void collect(T_Data& data){
 	cage.collect(*this, data);
 	
     }
+
+    template <class T_Data, class T_Functor>
+    void forward(T_Data& data, T_Functor f){
+	cage.collect(*this, data);
+	f(data);
+	cage.spread(*this, data);
+	
+    }
+
+    template <class T_Data, class T_Functor>
+    void forward(T_Data& data){
+	cage.collect(*this, data);
+	cage.spread(*this, data);
+	
+    }    
+    
 
     template <typename T_Op>
     typename T_Op::result_type accumulate(const T_Op op, const typename T_Op::result_type init){

@@ -1,7 +1,16 @@
 // GrayBat
+<<<<<<< HEAD
 #include <graybat.hpp>
 #include <mapping/Roundrobin.hpp>
 #include <pattern/StarBidirectional.hpp>
+=======
+#include <Cage.hpp>
+#include <communicationPolicy/BMPI.hpp>
+#include <graphPolicy/BGL.hpp>
+
+#include <mapping/Roundrobin.hpp>
+#include <pattern/BidirectionalStar.hpp>
+>>>>>>> 49f4bd3... Adapted graybat to haseongpu so it can be used
 #include <boost/optional.hpp> /* boost::optional */
 
 /**
@@ -24,21 +33,24 @@ int main() {
     typedef graybat::communicationPolicy::BMPI CP;
     
     // GraphPolicy
-    typedef graybat::graphPolicy::BGL<>    GP;
+    typedef graybat::graphPolicy::BGL<>        GP;
     
     // Cage
-    typedef graybat::Cage<CP, GP>   MyCage;
-    typedef typename MyCage::Event  Event;
-    typedef typename MyCage::Vertex Vertex;
-    typedef typename MyCage::Edge   Edge;
+    typedef graybat::Cage<CP, GP> Cage;
+    typedef typename Cage::Event  Event;
+    typedef typename Cage::Vertex Vertex;
+    typedef typename Cage::Edge   Edge;
 
     /***************************************************************************
      * Initialize Communication
      ****************************************************************************/
     // Create GoL Graph
-    MyCage cage(graybat::pattern::StarBidirectional(4));
+    Cage cage;
+
+    // Set communication pattern
+    cage.setGraph(graybat::pattern::BidirectionalStar(cage.getPeers().size()));
     
-    // Distribute vertices
+    // Map vertices to peers
     cage.distribute(graybat::mapping::Roundrobin());
 
     /***************************************************************************
@@ -61,30 +73,24 @@ int main() {
 		    std::cout << "Received " << hello[0] << std::endl;
 
 		    // Send reply back to client
-		    boost::optional<Edge> replyEdge = recvEdge.inverse();
-		    if(replyEdge){
-			cage.send(*replyEdge, world);
-			std::cout << "Send " << world[0] << std::endl;			
-		    }
-		
+		    cage.send(recvEdge.inverse(), world);
+		    std::cout << "Send " << world[0] << std::endl;			
 		}
+		
 	    }
 
 	    // Clients
 	    if(v != server){
-		// Send the hello request
 		for(Edge sendEdge : cage.getOutEdges(v)){
+		    // Send a hello
 		    cage.send(sendEdge, hello);
 		    std::cout << "Send " << hello[0] << std::endl;
 		
 		    // Get the reply
-		    boost::optional<Edge> replyEdge = sendEdge.inverse();
-		    if(replyEdge){
-			cage.recv(*replyEdge, world);
-			std::cout << "Received " << world[0] << std::endl;
-		    }
-
+		    cage.recv(sendEdge.inverse(), world);
+		    std::cout << "Received " << world[0] << std::endl;
 		}
+		
 	    }
 
 	}
