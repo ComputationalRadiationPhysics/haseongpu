@@ -62,7 +62,6 @@ int parse( const int argc,
     ParallelMode parallelMode = NO_PARALLEL_MODE;
     int minSampleRange = -1;
     int maxSampleRange = -1;
-    unsigned usedGpus  = 0;
     fs::path inputPath;
     fs::path outputPath;
     double mseThreshold = 0;
