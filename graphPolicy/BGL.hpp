@@ -67,6 +67,7 @@ namespace graybat {
 	    // Member
 	    BGLGraph* graph;
 	    std::vector<BGL<VertexProperty, EdgeProperty>> subGraphs;
+            std::vector<EdgeID> edgeIdMap;
 
 	public: 
 	    GraphID id;
@@ -92,6 +93,7 @@ namespace graybat {
 		    VertexID srcVertex    = std::get<0>(edge);
 		    VertexID targetVertex = std::get<1>(edge);
 		    EdgeID edgeID = boost::add_edge(srcVertex, targetVertex, (*graph)).first;
+                    edgeIdMap.push_back(edgeID);
 		    setEdgeProperty(edgeID, std::make_pair(edgeCount++, EdgeProperty()));
 		}
 
@@ -193,21 +195,34 @@ namespace graybat {
 		return (*graph)[edge];
 	    }
 
+            std::pair<unsigned, EdgeProperty>& getEdgeProperty(const unsigned edge){
+		return getEdgeProperty(edgeIdMap.at(edge));
+	    }
+
 	    /**
 	     * @brief Return the vertex to which *edge* points to.
 	     *
 	     */
-	    VertexID getEdgeTarget(EdgeID edge){
+	    VertexID getEdgeTarget(const EdgeID edge){
 		return boost::target(edge, (*graph));
 	    }
 
+	    VertexID getEdgeTarget(const unsigned edge){
+                return getEdgeTarget(edgeIdMap.at(edge));
+	    }
+            
 	    /**
 	     * @brief Return the vertex to which *edge* points from.
 	     *
 	     */
-	    VertexID getEdgeSource(EdgeID edge){
+	    VertexID getEdgeSource(const EdgeID edge){
 		return boost::source(edge, (*graph));
 	    }
+
+	    VertexID getEdgeSource(const unsigned edge){
+                return getEdgeSource(edgeIdMap.at(edge));
+	    }
+            
 	      
 	};
 
