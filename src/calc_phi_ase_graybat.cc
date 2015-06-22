@@ -58,36 +58,34 @@ void distributeSamples(Vertex master,
     
     for(auto sample = samples.begin(); sample != samples.end();){
 
-	for(Edge inEdge : cage.getInEdges(master)){
 
-	    // Receive request or results
-	  cage.recv(inEdge, resultMsg);
+        // Receive request or results
+        Edge inEdge = cage.recv(resultMsg);
 		
-	    if(resultMsg[0] == requestTag){
-		sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
+        if(resultMsg[0] == requestTag){
+            sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
 		
-		// Send next sample
-		cage.send(inEdge.inverse(), sampleMsg);
+            // Send next sample
+            cage.send(inEdge.inverse(), sampleMsg);
 
-		// TODO: should be removed
-		if(sample == samples.end())
-		  break;
+            // TODO: should be removed
+            if(sample == samples.end())
+                break;
 		
 	
-	    }
-	    else {
-		// Process result
-		unsigned sample_i      = (unsigned) (resultMsg[0]);
-		result.phiAse.at(sample_i)   = resultMsg[1];
-		result.mse.at(sample_i)       = resultMsg[2];
-		result.totalRays.at(sample_i) = (unsigned) resultMsg[3];
+        }
+        else {
+            // Process result
+            unsigned sample_i      = (unsigned) (resultMsg[0]);
+            result.phiAse.at(sample_i)   = resultMsg[1];
+            result.mse.at(sample_i)       = resultMsg[2];
+            result.totalRays.at(sample_i) = (unsigned) resultMsg[3];
 
-		// Update progress bar
-		fancyProgressBar(mesh.numberOfSamples);
+            // Update progress bar
+            fancyProgressBar(mesh.numberOfSamples);
 
-	    }
+        }
 		
-	}
 
     }
        
