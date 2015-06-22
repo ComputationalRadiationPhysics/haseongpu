@@ -148,7 +148,7 @@ namespace graybat {
                             *this);
             }
             else {
-                throw std::runtime_error("Edge between does not exist");
+                throw std::runtime_error("Edge between vertices does not exist");
             }
             
         }
