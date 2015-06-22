@@ -30,27 +30,27 @@ static std::vector<std::thread> threadIds;
 
 
 void calcPhiAseThreaded( const ExperimentParameters &experiment,
-			 const ComputeParameters &compute,
-			 const Mesh& mesh,
-			 Result &result,
-			 const unsigned minSample_i,
-			 const unsigned maxSample_i,
-			 float &runtime){
-    
+                         const ComputeParameters &compute,
+                         const Mesh& mesh,
+                         Result &result,
+                         const unsigned minSample_i,
+                         const unsigned maxSample_i,
+                         float &runtime){
+
     threadIds.push_back(std::thread(calcPhiAse,
-				    std::ref(experiment),
-				    std::ref(compute),
-				    std::ref(mesh),
-				    std::ref(result),
-				    minSample_i,
-				    maxSample_i,
-				    std::ref(runtime)));
+                                    std::ref(experiment),
+                                    std::ref(compute),
+                                    std::ref(mesh),
+                                    std::ref(result),
+                                    minSample_i,
+                                    maxSample_i,
+                                    std::ref(runtime)));
 }
 
- void joinAll(){
-     for(unsigned i=0; i < threadIds.size(); ++i){
-	 threadIds[i].join();
-     }
- }
+void joinAll(){
+    for(unsigned i=0; i < threadIds.size(); ++i){
+        threadIds[i].join();
+    }
+}
 
 

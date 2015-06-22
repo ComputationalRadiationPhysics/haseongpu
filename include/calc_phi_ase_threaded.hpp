@@ -64,13 +64,13 @@
  * @return     threadId
  */
 void calcPhiAseThreaded( const ExperimentParameters &experiment,
-			      const ComputeParameters &compute,
-			      const Mesh& mesh,
-			      Result &result,
-			      const unsigned minSample_i,
-			      const unsigned maxSample_i,
-			      float &runtime );
-			      
+                         const ComputeParameters &compute,
+                         const Mesh& mesh,
+                         Result &result,
+                         const unsigned minSample_i,
+                         const unsigned maxSample_i,
+                         float &runtime );
+                              
 /**
  * @brief Wait for all threads to finish
  *
