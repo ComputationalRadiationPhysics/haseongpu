@@ -61,14 +61,19 @@ void distributeSamples(Vertex master,
 	for(Edge inEdge : cage.getInEdges(master)){
 
 	    // Receive request or results
-	    cage.recv(inEdge, resultMsg);
+	  cage.recv(inEdge, resultMsg);
 		
 	    if(resultMsg[0] == requestTag){
 		sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
-
+		
 		// Send next sample
 		cage.send(inEdge.inverse(), sampleMsg);
-			
+
+		// TODO: should be removed
+		if(sample == samples.end())
+		  break;
+		
+	
 	    }
 	    else {
 		// Process result
@@ -102,6 +107,8 @@ void processSamples(const Vertex slave,
 
     typedef typename Cage::Edge Edge;
     
+    verbosity &= ~V_PROGRESS;
+
     // Messages
     std::array<float, 4> resultMsg;
     std::array<int, 1>   sampleMsg;
@@ -122,7 +129,7 @@ void processSamples(const Vertex slave,
 	cage.recv(outEdge.inverse(), sampleMsg);
 		    
 	if(sampleMsg.at(0) == abortTag){
-	    abort = true;
+	  abort = true;
 	}
 	else {
 	    calcPhiAse ( experiment,
@@ -143,8 +150,9 @@ void processSamples(const Vertex slave,
 	    cage.send(outEdge, resultMsg);
 						
 	}
-	
+
     }
+
  
 }
 
@@ -194,7 +202,9 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 	 * SLAVES
 	 *******************************************************************/
 	if(vertex != master){
-	    processSamples(vertex, master, cage, experiment, compute, mesh, result);
+	  processSamples(vertex, master, cage, experiment, compute, mesh, result);
+	  cage.~Cage();
+	  exit(0);
 
 	}	
 
