@@ -273,6 +273,7 @@ numbers the array belongs.
    + __parallelMode__  
     + 'mpi'      use mpi to distribute workload (use nPerNode)
     + 'threaded' use pthreads to distribute workload locally
+    + 'graybat'  use experimental graybat api (internally mpi)
 
    + __deviceMode__
     + 'cpu'      use cpu algorithm (does not have all features)

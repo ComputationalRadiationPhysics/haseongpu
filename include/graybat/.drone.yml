@@ -1,0 +1,41 @@
+image: coin/archlinux
+
+env:
+ global:
+   - INSTALL_DIR=~/GrayBat
+
+script:
+  - echo "# SCRIPT"
+  - pwd
+  - ls -lah
+  - pacman -Sy
+  - pacman -S gcc clang boost openmpi --noconfirm
+  - git submodule init
+  - git submodule update
+  - mkdir build
+  - cd build
+  - echo "Clang++ build test"
+  - export CXX=clang++
+  - cmake ..
+  - make Test
+  - ./Test
+  - make GoL
+  - mpiexec --allow-run-as-root ./GoL 90 10
+  - rm * -rf
+  - echo "G++ build test"
+  - export CXX=g++
+  - cmake ..
+  - make Test
+  - ./Test
+  - make GoL
+  - mpiexec --allow-run-as-root ./GoL 90 10
+
+before_script:
+  - echo "# BEFORE SCRIPT"
+  - pwd
+  - ls -lah
+
+after_script:
+  - echo "# AFTER SCRIPT"
+  - pwd
+  - ls -lah

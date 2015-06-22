@@ -54,9 +54,7 @@
  * @param mse       return for Mean squared error
  * @param totalRays return for raysPerSample
  */
-void mpiHead(std::vector<float> &phiASE, 
-	     std::vector<double> &mse,
-	     std::vector<unsigned> &totalRays,
+void mpiHead(Result &result,
 	     std::vector<float> &runtimes,
 	     const Mesh& mesh,
 	     const unsigned numberOfComputeNodes,
@@ -87,9 +85,9 @@ void mpiHead(std::vector<float> &phiASE,
        * res[3] : totalRays 
        **/
       sampleOffset = (unsigned)(res[0]);
-      phiASE.at(sampleOffset)    = res[1];
-      mse.at(sampleOffset)       = res[2];
-      totalRays.at(sampleOffset) = (unsigned)res[3];
+      result.phiAse.at(sampleOffset)    = res[1];
+      result.mse.at(sampleOffset)       = res[2];
+      result.totalRays.at(sampleOffset) = (unsigned)res[3];
       fancyProgressBar(mesh.numberOfSamples);
       break;
 
@@ -125,19 +123,11 @@ void mpiHead(std::vector<float> &phiASE,
  *        sequentially.
  *
  **/
-void mpiCompute(const unsigned minRaysPerSample,
-		const unsigned maxRaysPerSample,
-		const unsigned maxRepetitions,
-		const Mesh& mesh,
-		const std::vector<double>& hSigmaA,
-		const std::vector<double>& hSigmaE,
-		const double mseThreshold,
-		const bool useReflections,
-		std::vector<float> &hPhiAse,
-		std::vector<double> &mse,
-		std::vector<unsigned> &totalRays,
-		unsigned gpu_i,
-		float &runtime){
+void mpiCompute( const ExperimentParameters &experiment,
+		 const ComputeParameters &compute,
+		 const Mesh& mesh,
+		 Result &result,
+		 float &runtime ){
   while(true){
     MPI_Status status;
     int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
@@ -155,29 +145,21 @@ void mpiCompute(const unsigned minRaysPerSample,
     }
     else{
       // Sample range received => calculate
-      calcPhiAse ( minRaysPerSample,
-		   maxRaysPerSample,
-		   maxRepetitions,
-		   mesh,
-		   hSigmaA,
-		   hSigmaE,
-		   mseThreshold,
-		   useReflections,
-		   hPhiAse,
-		   mse,
-		   totalRays,
-		   gpu_i,
-		   sample_i[0],
-		   sample_i[1],
-		   runtime);
+	calcPhiAse ( experiment,
+		     compute,
+		     mesh,
+		     result,
+		     sample_i[0],
+		     sample_i[1],
+		     runtime);
 
       // Extract results and send it to head node
       for(int j=sample_i[0]; j < sample_i[1]; ++j){
 	unsigned sampleOffset = (unsigned)(j);
 	res[0] = (float)j; 
-	res[1] = hPhiAse.at(sampleOffset);
-	res[2] = mse.at(sampleOffset);
-	res[3] = (float)totalRays.at(sampleOffset);
+	res[1] = result.phiAse.at(sampleOffset);
+	res[2] = result.mse.at(sampleOffset);
+	res[3] = (float)result.totalRays.at(sampleOffset);
 	totalRuntime += runtime;
 	MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD); 
       }
@@ -188,18 +170,10 @@ void mpiCompute(const unsigned minRaysPerSample,
 
 }
 
-float calcPhiAseMPI ( const unsigned minRaysPerSample,
-		      const unsigned maxRaysPerSample,
-		      const unsigned maxRepetitions,
+float calcPhiAseMPI ( const ExperimentParameters &experiment,
+		      const ComputeParameters &compute,
 		      const Mesh& mesh,
-		      const std::vector<double>& hSigmaA,
-		      const std::vector<double>& hSigmaE,
-		      const double mseThreshold,
-		      const bool useReflections,
-		      std::vector<float> &hPhiAse,
-		      std::vector<double> &mse,
-		      std::vector<unsigned> &totalRays,
-		      const unsigned gpu_i){
+		      Result &result ){
 
   // Init MPI
   int mpiError = MPI_Init(NULL,NULL);
@@ -215,13 +189,18 @@ float calcPhiAseMPI ( const unsigned minRaysPerSample,
   float runtime;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  std::vector<float> runtimes(size,0);
+  std::vector<float> runtimes(size, 0);
 
   // Rank 0 will be head node
   // all other ranks will be compute nodes
   switch(rank){
   case HEAD_NODE:
-    mpiHead(hPhiAse, mse, totalRays, runtimes, mesh, size-1, 1);
+    mpiHead( result,
+	     runtimes,
+	     mesh,
+	     size-1,
+	     1);
+    
     cudaDeviceReset();   
     MPI_Finalize();
     break;
@@ -232,19 +211,11 @@ float calcPhiAseMPI ( const unsigned minRaysPerSample,
     // (should have similar output anyway)
     verbosity &= ~V_PROGRESS;
 
-    mpiCompute(minRaysPerSample,
-	       maxRaysPerSample,
-	       maxRepetitions,
-	       mesh,
-	       hSigmaA,
-	       hSigmaE,
-	       mseThreshold,
-	       useReflections,
-	       hPhiAse,
-	       mse,
-	       totalRays,
-	       gpu_i,
-	       runtime);
+    mpiCompute( experiment,
+		compute,
+		mesh,
+		result,
+		runtime );
     
     cudaDeviceReset();      
     MPI_Finalize();

@@ -109,6 +109,8 @@
 class Mesh {
  public:
 
+    Mesh(){}
+    
   //Mesh();
   Mesh(// Constants
        double claddingAbsorption,
