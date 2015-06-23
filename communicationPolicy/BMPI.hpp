@@ -156,9 +156,10 @@ namespace graybat {
                 }
 
 	    private:
-                const bool async;
 		mpi::request request;
                 mpi::status  status;
+                const bool async;
+
                 
                 
 	    };
