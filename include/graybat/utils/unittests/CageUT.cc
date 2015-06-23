@@ -4,7 +4,9 @@
 #include <boost/test/unit_test.hpp>
 
 // graybat
-#include <graybat.hpp>
+#include <Cage.hpp>
+#include <communicationPolicy/BMPI.hpp>
+#include <graphPolicy/BGL.hpp>
 #include <mapping/Random.hpp>
 #include <mapping/Consecutive.hpp>
 #include <pattern/FullyConnected.hpp>

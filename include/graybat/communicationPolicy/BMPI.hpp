@@ -18,6 +18,10 @@
 #include <boost/mpi/datatype.hpp>
 #include <boost/optional.hpp>
 
+// Send std::tuple
+#include <utils/serialize_tuple.hpp>
+
+
 
 namespace mpi = boost::mpi;
 
@@ -97,34 +101,67 @@ namespace graybat {
 	     *
 	     */
 	    class Event {
+                typedef unsigned Tag;                                            
+                typedef unsigned VAddr;
+                
 	    public:
-		Event(mpi::request request) : request(request){
+		Event(mpi::request request) : request(request), async(true){
 
 		}
+
+                Event(mpi::status status) : status(status), async(false){
+
+                }
+
 
 		~Event(){
 
 		}
 
 		void wait(){
-		    request.wait();
+                    if(async){
+                        request.wait();
+                    }
 	
 		}
 
 		bool ready(){
-		    boost::optional<mpi::status> status = request.test();
+                    if(async){
+                        boost::optional<mpi::status> status = request.test();
 
-		    if(status){
-			return true;
-		    }
-		    else {
-			return false;
-		    }
+                        if(status){
+                            return true;
+                        }
+                        else {
+                            return false;
+                        }
+                    }
+                    return true;
 
 		}
 
+                VAddr source(){
+                    if(async){
+                        status = request.wait();
+                    }
+                    return status.source();
+                }
+
+                Tag tag(){
+                    if(async){
+                        status = request.wait();
+                    }
+                    return status.tag();
+
+                }
+
 	    private:
 		mpi::request request;
+                mpi::status  status;
+                const bool async;
+
+                
+                
 	    };
 
 
@@ -243,6 +280,22 @@ namespace graybat {
 		context.comm.recv(srcUri, tag, recvData.data(), recvData.size());
 
 	    }
+
+            template <typename T_Recv>
+	    Event recv(const Context context, T_Recv& recvData){
+                //std::cerr << mpi::any_source << " " << mpi::any_tag << std::endl;
+                
+                //auto status = context.comm.recv(mpi::any_source, mpi::any_tag, recvData.data(), recvData.size());
+                auto status = context.comm.probe();
+                context.comm.recv(status.source(), status.tag(), recvData.data(), recvData.size());
+                return Event(status);
+                
+
+                //auto status = context.comm.recv(boost::mpi::any_source, boost::mpi::any_tag, recvData.data(), recvData.size());
+                //auto status = context.comm.recv(boost::mpi::any_source, boost::mpi::any_tag);
+
+	    }
+
 	    /** @} */
     
 	    /************************************************************************//**
