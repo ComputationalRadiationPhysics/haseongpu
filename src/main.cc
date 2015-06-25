@@ -82,7 +82,6 @@ int main(int argc, char **argv){
     double maxMSE       = 0;
     float  avgMSE       = 0;
     unsigned highMSE    = 0;
-    std::string runmode = ("");
     time_t starttime    = time(0);
 
     // Simulation data
@@ -105,12 +104,10 @@ int main(int argc, char **argv){
     /***************************************************************************
      * COMPUTATIONS
      **************************************************************************/    
-    switch(compute.deviceMode){
-    case NO_DEVICE_MODE:
-        dout(V_ERROR) << "No valid device-mode!" << std::endl;
-        exit(1);
-    case CPU_DEVICE_MODE: // Possibly deprecated! (Definitely deprecated!)
-
+    
+    if (compute.deviceMode == DeviceMode::CPU){
+            
+        // Possibly deprecated! (Definitely deprecated!)
         runtime = forLoopsClad( &(result.dndtAse),
                                 experiment.minRaysPerSample,
                                 &mesh,
@@ -123,14 +120,11 @@ int main(int argc, char **argv){
                                 mesh.numberOfLevels,
                                 mesh.thickness,
                                 mesh.crystalTFluo);
-        runmode = "CPU Mode single threaded";
-        break;
 
-    case GPU_DEVICE_MODE:
-        switch(compute.parallelMode){
+    }else if(compute.deviceMode == DeviceMode::GPU){
+            
+        if(compute.parallelMode == ParallelMode::THREADED){
 
-            // TODO: Replace completly by MPI
-        case THREADED_PARALLEL_MODE:
             for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
                 const unsigned samplesPerNode = compute.maxSampleRange - compute.minSampleRange+1;
                 const float samplePerGpu = samplesPerNode / (float) maxGpus;
@@ -143,47 +137,40 @@ int main(int argc, char **argv){
                 computes[gpu_i].gpu_i = gpu_i;
 
                 calcPhiAseThreaded( experiment,
-                                    computes[gpu_i],
-                                    meshs[gpu_i],
-                                    result,
-                                    minSample_i,
-                                    maxSample_i,
-                                    runtimes.at(gpu_i));
-
-
-
+                        computes[gpu_i],
+                        meshs[gpu_i],
+                        result,
+                        minSample_i,
+                        maxSample_i,
+                        runtimes.at(gpu_i));
             }
 
             joinAll();
             usedGPUs = maxGpus;
-            for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
-                runtime = std::max(*it, runtime);
-            }
+            runtime = *(std::max_element(runtimes.begin(),runtimes.end()));
             cudaDeviceReset();      
-            runmode="GPU mode Threaded";
-            break;
-
-        case MPI_PARALLEL_MODE:
+        }else if(compute.parallelMode == ParallelMode::MPI){
+                
             usedGPUs = calcPhiAseMPI( experiment,
                                       compute,
                                       mesh,
                                       result );
-            runmode = "GPU mode MPI";
-            break;
-          
-        case GRAYBAT_PARALLEL_MODE:
+
+        }else if(compute.parallelMode == ParallelMode::GRAYBAT){
+                
             usedGPUs = calcPhiAseGrayBat( experiment,
                                           compute,
                                           mesh,
                                           result );
-            runmode = "GPU mode GrayBat";
-            break;
 
-        default:
+        }else{
             dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
             exit(1);
         }
 
+    }else{
+        dout(V_ERROR) << "No valid device-mode!" << std::endl;
+        exit(1);
     }
 
 
@@ -227,7 +214,7 @@ int main(int argc, char **argv){
 
         writePointsToVtk( mesh,
                           result.dndtAse,
-                          compute.outputPath /= "vtk/dndt",
+                          compute.outputPath / "vtk/dndt",
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -236,7 +223,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           tmpPhiAse,
-                          compute.outputPath /= "vtk/phiase",
+                          compute.outputPath / "vtk/phiase",
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -245,7 +232,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           result.mse,
-                          compute.outputPath /= "vtk/mse",
+                          compute.outputPath / "vtk/mse",
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -254,7 +241,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           tmpTotalRays,
-                          compute.outputPath /= "vtk/total_rays",
+                          compute.outputPath / "vtk/total_rays",
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -279,7 +266,8 @@ int main(int argc, char **argv){
 
         dout(V_STAT | V_NOLABEL) << std::endl;
         dout(V_STAT) << "=== Statistics ===" << std::endl;
-        dout(V_STAT) << "Runmode           : " << runmode << std::endl;
+        dout(V_STAT) << "DeviceMode        : " << compute.deviceMode << std::endl;
+        dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
         dout(V_STAT) << "Prisms            : " << (int) mesh.numberOfPrisms << std::endl;
         dout(V_STAT) << "Samples           : " << (int) result.dndtAse.size() << std::endl;
         dout(V_STAT) << "RaysPerSample     : " << experiment.minRaysPerSample;

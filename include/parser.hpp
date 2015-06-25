@@ -36,9 +36,13 @@
 #include <nan_fix.hpp>
 #include <types.hpp>
 
+#include <boost/program_options.hpp> /* fs::path */
 #include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
+
+typedef std::map<std::string, po::variable_value> Modifiable_variables_map;
 
 
 /**
@@ -48,55 +52,34 @@ namespace fs = boost::filesystem;
  *        int, float, double).
  *
  * @param filename file to parse
- * @param vector contains the parsed values
- *
- * @return 1 if parsing was succesful (file can be opened)
- * @return 0 otherwise
+ * @return vector that contains the parsed values
  **/
 template <class T>
-int fileToVector(const fs::path filename, std::vector<T> *v){
-  std::string line;
-  fs::ifstream fileStream;
-  T value = 0.0;
+std::vector<T> fileToVector(fs::path filename){
+    fs::ifstream fileStream;
 
-  fileStream.open(filename);
-  if(fileStream.is_open()){
-    while(fileStream.good()){
-      fileStream >> value;
-      if(isNaN(value)){
-        dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
-        exit(1);
-      }
-      v->push_back(value);
+    fileStream.open(filename);
+
+    if(fileStream.is_open()){
+        std::vector<T> v;
+        T value = 0.0;
+        while(fileStream.good()){
+            fileStream >> value;
+            if(isNaN(value)){
+                dout(V_ERROR) << "NAN in input data: " << filename << std::endl;
+                exit(1);
+            }
+            v.push_back(value);
+        }
+        v.pop_back();
+        fileStream.close();
+        return v;
+
     }
-
-  }
-  else{
-    dout(V_ERROR) << "Can't open file " << filename << std::endl;
-    fileStream.close();
-    return 1;
-  }
-  v->pop_back();
-  fileStream.close();
-  return 0;
-
-}
-
-
-/**
- * @brief overload to allow distinct directory and filename
- *
- * @param directory directory where file is located
- * @param filename file to parse
- * @param vector contains the parsed values
- *
- * @return 1 if parsing was succesful (file can be opened)
- * @return 0 otherwise
- **/
-template <class T>
-int fileToVector(const fs::path directory, const fs::path filename, std::vector<T> *v){
-  fs::path tempPath(directory);
-  return(fileToVector(tempPath /= filename, v));
+    else{
+        dout(V_ERROR) << "Can't open file " << filename << std::endl;
+        exit(1);
+    }
 }
 
 
@@ -106,112 +89,43 @@ int fileToVector(const fs::path directory, const fs::path filename, std::vector<
  *        int, float, double).
  *
  * @param filename file to parse
- * @param value is the value which was parsed
- *
- * @return 1 if parsing was succesful (file can be opened)
- * @return 0 otherwise
+ * @return the value that was parsed
  **/
 template <class T>
-int fileToValue(const fs::path filename, T &value){
-  std::string line;
-  fs::ifstream fileStream;
+T fileToValue(fs::path filename){
+    fs::ifstream fileStream;
 
-  fileStream.open(filename);
-  if(fileStream.is_open()){
-    fileStream >> value;
-  }
-  else{
-    dout(V_ERROR) << "Can't open file " << filename << std::endl;
-    fileStream.close();
-    return 1;
-  }
-  fileStream.close();
-  return 0;
-
+    fileStream.open(filename);
+    if(fileStream.is_open()){
+        T value;
+        fileStream >> value;
+        fileStream.close();
+        return value;
+    }
+    else{
+        dout(V_ERROR) << "Can't open file " << filename << std::endl;
+        exit(1);
+    }
 }
 
 
-/**
- * @brief overload to allow distinct directory and filename
- *
- * @param directory directory where file is located
- * @param filename file to parse
- * @param value is the value which was parsed
- *
- * @return 1 if parsing was succesful (file can be opened)
- * @return 0 otherwise
- **/
-template <class T>
-int fileToValue(const fs::path directory, const fs::path filename, T &value){
-  fs::path tempPath(directory);
-  return(fileToValue(tempPath /= filename, value));
-}
+po::variables_map parseCommandLine(const int argc, char** argv);
 
 
-void parseCommandLine(
-    const int argc,
-    char** argv,
-    unsigned *raysPerSample,
-    unsigned *maxRaysPerSample,
-    fs::path *inputPath,
-    bool *writeVtk,
-    DeviceMode *deviceMode,
-    ParallelMode *parallelMode,
-    bool *useReflections,
-    unsigned *maxgpus,
-    int *minSample_i,
-    int *maxSample_i,
-    unsigned *maxRepetitions,
-    unsigned *adaptiveSteps,
-    fs::path *outputPath,
-    double *mseThreshold,
-    unsigned *lambdaResolution
+void printCommandLine(const Modifiable_variables_map);
+
+
+Modifiable_variables_map checkParameterValidity(Modifiable_variables_map, unsigned);
+
+
+Modifiable_variables_map checkSampleRange(
+    Modifiable_variables_map vm,
+    const unsigned numberOfSamples
     );
 
-void printCommandLine(
-    unsigned raysPerSample,
-    unsigned maxRaysPerSample,
-    fs::path inputPath,
-    bool writeVtk,
-    fs::path compareLocation,
-    const DeviceMode deviceMode,
-    const ParallelMode parallelMode,
-    bool useReflections,
-    unsigned maxgpus,
-    int minSample_i,
-    int maxSample_i,
-    unsigned maxRepetitions,
-    unsigned adaptiveSteps,
-    fs::path outputPath,
-    double mseThreshold
-    );
-
-int checkParameterValidity(
-    const int argc,
-    const unsigned raysPerSample,
-    unsigned *maxRaysPerSample,
-    const fs::path inputPath,
-    const unsigned deviceCount,
-    const DeviceMode deviceMode,
-    const ParallelMode parallelMode,
-    unsigned *maxgpus,
-    const int minSample_i,
-    const int maxSample_i,
-    const unsigned maxRepetitions,
-    const unsigned adaptiveSteps,
-    const fs::path outputPath,
-    double *mseThreshold
-    );
-
-void checkSampleRange(
-	int* minSampleRange,
-	int* maxSampleRange,
-	const unsigned numberOfSamples
-	);
 
 std::vector<Mesh> parseMesh(const fs::path rootPath,
-			    std::vector<unsigned> devices,
-			    unsigned maxGpus);
+			    std::vector<unsigned> devices);
 
 
 int parse( const int argc,
