@@ -79,7 +79,7 @@ int main(int argc, char **argv){
 
     // Statistics data
     float runtime       = 0.0;
-    float maxMSE        = 0;
+    double maxMSE       = 0;
     float  avgMSE       = 0;
     unsigned highMSE    = 0;
     std::string runmode = ("");
@@ -135,7 +135,7 @@ int main(int argc, char **argv){
                 const unsigned samplesPerNode = compute.maxSampleRange - compute.minSampleRange+1;
                 const float samplePerGpu = samplesPerNode / (float) maxGpus;
                 unsigned minSample_i = gpu_i * samplePerGpu;
-                unsigned maxSample_i = min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
+                unsigned maxSample_i = std::min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
                 minSample_i += compute.minSampleRange;
                 maxSample_i += compute.minSampleRange; 
@@ -157,7 +157,7 @@ int main(int argc, char **argv){
             joinAll();
             usedGPUs = maxGpus;
             for(std::vector<float>::iterator it = runtimes.begin(); it != runtimes.end(); ++it){
-                runtime = max(*it, runtime);
+                runtime = std::max(*it, runtime);
             }
             cudaDeviceReset();      
             runmode="GPU mode Threaded";
@@ -267,7 +267,7 @@ int main(int argc, char **argv){
      **************************************************************************/
     if(verbosity & V_STAT){
         for(std::vector<double>::iterator it = result.mse.begin(); it != result.mse.end(); ++it){
-            maxMSE = max(maxMSE, *it);
+            maxMSE = std::max(maxMSE, *it);
             avgMSE += *it;
             if(*it >= experiment.mseThreshold)
                 highMSE++;
