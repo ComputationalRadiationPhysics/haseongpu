@@ -12,16 +12,18 @@ struct ComputeParameters {
     ComputeParameters() {}
     
     ComputeParameters(  unsigned maxRepetitions,
-		        unsigned gpu_i,
-			DeviceMode deviceMode,
-			ParallelMode parallelMode,
-			bool writeVtk,
-			fs::path inputPath,
-			fs::path outputPath,
-			std::vector<unsigned> devices,
-			int minSampleRange,
-			int maxSampleRange) :
+            unsigned adaptiveSteps,
+            unsigned gpu_i,
+            DeviceMode deviceMode,
+            ParallelMode parallelMode,
+            bool writeVtk,
+            fs::path inputPath,
+            fs::path outputPath,
+            std::vector<unsigned> devices,
+            int minSampleRange,
+            int maxSampleRange) :
 	maxRepetitions(maxRepetitions),
+    adaptiveSteps(adaptiveSteps),
 	gpu_i(gpu_i),
 	deviceMode(deviceMode),
 	parallelMode(parallelMode),
@@ -33,6 +35,7 @@ struct ComputeParameters {
 	maxSampleRange(maxSampleRange){ }
 
     unsigned maxRepetitions;
+    unsigned adaptiveSteps;
     unsigned gpu_i;
     DeviceMode deviceMode;
     ParallelMode parallelMode;

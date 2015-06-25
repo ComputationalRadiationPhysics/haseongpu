@@ -132,7 +132,7 @@ Usage
   5. take a look at the results (*.vtk) with paraview 
 
 
-### Quick C-Application ASE flux example 
+### Quick C-Application laser pump example 
 
   1. follow the compile instructions above
   2. change path to repository root directory: `cd haseongpu`
@@ -170,6 +170,7 @@ Usage
                                     maxRaysPerSample,  
                                     mseThreshold,  
                                     repetitions,  
+                                    adaptiveSteps,
                                     nTot,  
                                     thickness,  
                                     laserParameter,  
@@ -389,27 +390,26 @@ numbers the array belongs.
      Sets the number of maximal repetitions when the
      mseThreshold was not reached.
 
-##Example Targets##
+   + __adaptiveSteps__ unsigned, size = 1  
+     Sets the number of adaptive steps. The range between min-rays and max-rays will be
+     split into that many parts. Setting it to 1 will result in no adaptive
+     steps and only minRaysPerSample is used.
+
    + __nTot__ float, size = 1  
      Doping of the active gain medium
 
- * **GoL**: Game of Life simulation
    + __thickness__ float, size = 1  
      Thickness of one prism level of the mesh.
 
- * **doc**: Build documentation in doc/
    + __laserParameter__ [float]   
      Is a structure for the laser parameters (intensities sigma, wavelength lambda)
      s_ems corresponds to l_ems and s_abs to l_abs
      struct(s_abs, VALUES, s_ems, VALUES, l_abs, VALUES, l_ems, VALUES)
 
- * **clean**: Cleanup build directory
    + __crystal__ [float]  
      Is a structure for the crystal parameters 
      crystal.tfluo describes the crystalFluorescence of the active gain medium.
 
-##Literature##
- * Talk by Erik Zenker of his diploma defence [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.16306.svg)](http://dx.doi.org/10.5281/zenodo.16306)
    + __numberOfLevels__ unsigned, size = 1  
      Total number of levels of the mesh. Thus the total thickness
      of the mesh is thickness * numberOfLevels!
@@ -419,12 +419,10 @@ numbers the array belongs.
     + 'threaded' use pthreads to distribute workload locally
     + 'graybat'  use experimental graybat api (internally mpi)
 
-##Authors##
    + __deviceMode__
     + 'cpu'      use cpu algorithm (does not have all features)
     + 'gpu'      use gpu algorithm
 
- * Erik Zenker (erikzenker@posteo.de)
    + __maxGpus__ unsigned, size = 1  
      Maximal number of GPUs for threaded case
 
@@ -513,6 +511,11 @@ Synopsis
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
+    --adaptive-steps= 
+      Number of adaptive steps. The range between min-rays and max-rays will be
+      split into that many parts. Setting --adaptive=1 will result in no adaptive
+      steps and only min-rays is used.
+
     --spectral-resolution= 
       Resolution of absorption and emission spectrum to which the
       input spectrum will be interpolated linear.  Interpolation is
@@ -533,7 +536,8 @@ C-Application Templates
     		 --max-rays=100000 
     		 --reflection  
     		 --repetitions=4  
-    		 --ngpus=4 
+    		 --adaptive-steps=4  
+    		 --ngpus=4  
     		 --min-sample-i=0  
     		 --max-sample-i=1234  
     		 --mse-threshold=0.05  
@@ -547,6 +551,7 @@ C-Application Templates
     		 --max-rays=100000  
     		 --reflection 
     		 --repetitions=4  
+    		 --adaptive-steps=4  
     	   --ngpus=1  
     		 --min-sample-i=0
     		 --max-sample-i=1234  

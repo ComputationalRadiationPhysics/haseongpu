@@ -41,7 +41,6 @@
 #include <types.hpp> /* ExperimentParameter, ComputeParameter, Result */
 
 #define SEED 4321
-#define RAY_STEPS 5
 
 double calcMSE(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
   double a = phiAseSquare / raysPerSample;
@@ -97,7 +96,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // Divide RaysPerSample range into steps
   std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
 								     experiment.maxRaysPerSample,
-								     RAY_STEPS);
+								     compute.adaptiveSteps);
   
   std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
