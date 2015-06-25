@@ -24,6 +24,7 @@
 #include <vector> /* vector */
 #include <assert.h>
 #include <stdlib.h> /* exit() */
+#include <sstream> /* stringstream */
 
 #include <logging.hpp> 
 #include <mesh.hpp>
@@ -39,112 +40,28 @@
 
 #include <boost/filesystem.hpp> /* fs::path */
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 
-int parse( const int argc,
-	   char** argv,
-	   ExperimentParameters& experiment,
-	   ComputeParameters& compute,
-	   std::vector<Mesh>& meshs,
-	   Result& result) {
+struct WavelengthData{
+    std::vector<double>sigmaAInterpolated;
+    std::vector<double>sigmaEInterpolated;
+    double maxSigmaA = 0;
+    double maxSigmaE = 0;
+};
 
 
-    unsigned minRaysPerSample = 0;
-    unsigned maxRaysPerSample = 0;
-    unsigned maxRepetitions = 4;
-    unsigned adaptiveSteps = 5;
-    unsigned lambdaResolution = 0;
-    std::string compareLocation("");
-    bool writeVtk = false;
-    bool useReflections = false;
-    std::vector<unsigned> devices; 
-    unsigned maxGpus = 0;
-    DeviceMode deviceMode = NO_DEVICE_MODE;
-    ParallelMode parallelMode = NO_PARALLEL_MODE;
-    int minSampleRange = -1;
-    int maxSampleRange = -1;
-    fs::path inputPath;
-    fs::path outputPath;
-    double mseThreshold = 0;
-
-    // Wavelength data
-    std::vector<double> sigmaA;
-    std::vector<double> sigmaE;
-    std::vector<double> lambdaA;
-    std::vector<double> lambdaE;
-
-    // Parse Commandline
-
-    // Can the following block be moved into
-    // a parse function with a thin interface ?
-
-    //
-    // BEGIN PARSE BLOCK
-    //
-    parseCommandLine(argc,
-		     argv,
-		     &minRaysPerSample, // exp
-		     &maxRaysPerSample, // exp
-		     &inputPath, // opt -
-		     &writeVtk,  // opt -
-		     &deviceMode,// opt -
-		     &parallelMode, // opt -
-		     &useReflections, // exp
-		     &maxGpus, // opt -
-		     &minSampleRange, // opt -
-		     &maxSampleRange, // opt -
-		     &maxRepetitions, // exp
-		     &adaptiveSteps, // exp
-		     &outputPath, // opt -
-		     &mseThreshold, // exp
-		     &lambdaResolution); // opt
-
-    printCommandLine(minRaysPerSample,
-		     maxRaysPerSample,
-		     inputPath,
-		     writeVtk,
-		     compareLocation,
-		     deviceMode,
-		     parallelMode,
-		     useReflections,
-		     maxGpus,
-		     minSampleRange,
-		     maxSampleRange,
-		     maxRepetitions,
-             adaptiveSteps,
-		     outputPath,
-		     mseThreshold);
-  
-    // Set/Test device to run experiment with
-    //
-    //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
-    //TODO: maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
-    devices = getFreeDevices(maxGpus);
-
-    // sanity checks
-    if(checkParameterValidity(argc,
-			      minRaysPerSample,
-			      &maxRaysPerSample,
-			      inputPath,
-			      devices.size(),
-			      deviceMode,
-			      parallelMode,
-			      &maxGpus,
-			      minSampleRange,
-			      maxSampleRange,
-			      maxRepetitions,
-                  adaptiveSteps,
-			      outputPath,
-			      &mseThreshold)) return 1;
-
-  
-    dout(V_INFO) << "parameter validity was checked!" << std::endl;
-
+WavelengthData calculateSigmas(
+        fs::path inputPath,
+        unsigned lambdaResolution
+        ){
+        
     // Parse wavelengths from files
-    if(fileToVector(inputPath, "sigmaA.txt",  &sigmaA))   return 1;
-    if(fileToVector(inputPath, "sigmaE.txt",  &sigmaE))   return 1;
-    if(fileToVector(inputPath, "lambdaA.txt", &lambdaA)) return 1;
-    if(fileToVector(inputPath, "lambdaE.txt", &lambdaE)) return 1;
+    std::vector<double> sigmaA  = fileToVector<double>(inputPath / "sigmaA.txt");
+    std::vector<double> sigmaE  = fileToVector<double>(inputPath / "sigmaE.txt");
+    std::vector<double> lambdaA = fileToVector<double>(inputPath / "lambdaA.txt");
+    std::vector<double> lambdaE = fileToVector<double>(inputPath / "lambdaE.txt");
+
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
   
@@ -152,318 +69,340 @@ int parse( const int argc,
     assert(sigmaE.size() == lambdaE.size());
 
     // Interpolate sigmaA / sigmaE function
-    std::vector<double> sigmaAInterpolated = interpolateLinear(sigmaA, lambdaA, lambdaResolution); // exp
-    std::vector<double> sigmaEInterpolated = interpolateLinear(sigmaE, lambdaE, lambdaResolution); // exp
-    assert(sigmaAInterpolated.size() == sigmaEInterpolated.size());
+    WavelengthData waveD;
+    waveD.sigmaAInterpolated = interpolateLinear(sigmaA, lambdaA, lambdaResolution);
+    waveD.sigmaEInterpolated = interpolateLinear(sigmaE, lambdaE, lambdaResolution);
+    assert(waveD.sigmaAInterpolated.size() == waveD.sigmaEInterpolated.size());
 
     // Calc max sigmaA / sigmaE
-    // TODO replace by some algorithm
-    double maxSigmaE = 0.0;
-    double maxSigmaA = 0.0;
     for(unsigned i = 0; i < sigmaE.size(); ++i){
-	if(sigmaE.at(i) > maxSigmaE){
-	    maxSigmaE = sigmaE.at(i);
-	    maxSigmaA = sigmaA.at(i);
-	}
+        if(sigmaE.at(i) > waveD.maxSigmaE){
+            waveD.maxSigmaE = sigmaE.at(i);
+            waveD.maxSigmaA = sigmaA.at(i);
+        }
     }
+    return waveD;
+}
 
-    // Parse experientdata and fill mesh
-    meshs = parseMesh(inputPath, devices, maxGpus);
 
-    checkSampleRange(&minSampleRange,&maxSampleRange,meshs[0].numberOfSamples);
+int parse( const int argc,
+        char** argv,
+        ExperimentParameters& experiment,
+        ComputeParameters& compute,
+        std::vector<Mesh>& meshs,
+        Result& result) {
 
-    // Solution vector
-    std::vector<double>   dndtAse(meshs[0].numberOfSamples, 0); 
-    std::vector<float>    phiAse(meshs[0].numberOfSamples, 0); // exp
-    std::vector<double>   mse(meshs[0].numberOfSamples, 100000); // exp
-    std::vector<unsigned> totalRays(meshs[0].numberOfSamples, 0); // exp
+    bool writeVtk = false;
 
-    //
-    // END PARSE BLOCK
-    //
+    Modifiable_variables_map vm = parseCommandLine(argc, argv);
 
-    experiment = ExperimentParameters ( minRaysPerSample,
-					maxRaysPerSample,
-					sigmaAInterpolated,
-					sigmaEInterpolated,
-					maxSigmaA,
-					maxSigmaE,
-					mseThreshold,
-					useReflections );
+    printCommandLine(vm);
 
-    compute = ComputeParameters ( maxRepetitions,
-        adaptiveSteps,
-        devices.at(0),
-        deviceMode,
-        parallelMode,
-        writeVtk,
-        inputPath,
-        outputPath,
-        devices,
-        minSampleRange,
-        maxSampleRange);
+    // Set/Test device to run experiment with
+    //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
+    //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
+    std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<unsigned>());
 
-    result = Result( phiAse, 
-		     mse, 
-		     totalRays,
-		     dndtAse );
+    vm = checkParameterValidity(vm, devices.size());
+
+    meshs = parseMesh(vm[ExpSwitch::input_path].as<fs::path>(), devices);
+
+    vm = checkSampleRange(vm, meshs[0].numberOfSamples);
+
+    WavelengthData waveD = calculateSigmas(
+            vm[ExpSwitch::input_path].as<fs::path>(),
+            vm.count(ExpSwitch::spectral) ? vm[ExpSwitch::spectral].as<unsigned>() : 0
+            );
+
+    experiment = ExperimentParameters ( vm[ExpSwitch::min_rays].as<unsigned>(),
+            vm[ExpSwitch::max_rays].as<unsigned>(),
+            waveD.sigmaAInterpolated,
+            waveD.sigmaEInterpolated,
+            waveD.maxSigmaA,
+            waveD.maxSigmaE,
+            vm[ExpSwitch::mse].as<double>(),
+            vm[ExpSwitch::reflection].as<bool>() );
+
+
+    compute = ComputeParameters ( vm[CompSwitch::repetitions].as<unsigned>(),
+            vm[CompSwitch::adaptive_steps].as<unsigned>(),
+            devices.at(0),
+            vm[CompSwitch::device_mode].as<std::string>(),
+            vm[CompSwitch::parallel_mode].as<std::string>(),
+            writeVtk,
+            vm[ExpSwitch::input_path].as<fs::path>(),
+            vm[ExpSwitch::output_path].as<fs::path>(),
+            devices,
+            vm[CompSwitch::min_sample_i].as<int>(),
+            vm[CompSwitch::max_sample_i].as<int>());
+
+
+    std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
+    std::vector<double>   mse(meshs[0].numberOfSamples, 100000);
+    std::vector<unsigned> totalRays(meshs[0].numberOfSamples, 0);
+    std::vector<double>   dndtAse(meshs[0].numberOfSamples, 0);
+
+    result = Result( phiAse,
+            mse,
+            totalRays,
+            dndtAse );
 
     return 0;
-
-}
-    
-
-
-
-void parseCommandLine(
-    const int argc,
-    char** argv,
-    unsigned *raysPerSample,
-    unsigned *maxRaysPerSample,
-    fs::path *inputPath,
-    bool *writeVtk,
-    DeviceMode *deviceMode,
-    ParallelMode *parallelMode,
-    bool *useReflections,
-    unsigned *maxgpus,
-    int *minSample_i,
-    int *maxSample_i,
-    unsigned *maxRepetitions,
-    unsigned *adaptiveSteps,
-    fs::path *outputPath,
-    double *mseThreshold,
-    unsigned *lambdaResolution
-    ) {
-
-  std::string dMode;
-  std::string pMode;
-  namespace po = boost::program_options;
-  po::options_description desc( "Allowed options" );
-  desc.add_options()
-    ( "help,h",
-      "print this help message and exit" )
-    ( "verbosity,v",
-      po::value<unsigned> ( &verbosity )->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT),
-      "Set the verbosity levels:\n\
-      \t 0 (quiet)\n\
-      \t 1 (error)\n\
-      \t 2 (warning)\n\
-      \t 4 (info)\n\
-      \t 8 (statistics)\n\
-      \t 16 (debug)\n\
-      \t 32 (progressbar)\n")
-    ( "device-mode", po::value<std::string> (&dMode)->default_value("gpu"),
-      "Set the device to run the calculation (cpu, gpu)")
-    ( "parallel-mode", po::value<std::string> (&pMode)->default_value("threaded"),
-      "Set the preferred way of parellelization (mpi, graybat, threaded), only valid with device-mode=gpu")
-    ( "reflection", po::value<bool> (useReflections)->default_value(true),
-      "use reflections or not")
-    ( "min-rays", po::value<unsigned> (raysPerSample)->default_value(100000),
-      "The minimal number of rays to use for each sample point")
-    ( "max-rays", po::value<unsigned> (maxRaysPerSample)->default_value(100000),
-      "The maximal number of rays to use for each sample point")
-    ( "input-path,i", po::value<fs::path> (inputPath)->default_value(fs::path("input/")),
-      "The path to a folder that contains the input files")
-    ( "output-path,o", po::value<fs::path> (outputPath)->default_value(fs::path("output/")),
-      "The path to a folder that contains the output files")
-    ( "ngpus,g", po::value<unsigned> (maxgpus)->default_value(1),
-      "The maximum number of GPUs to b used on a single node. Should be left unchanged for --parallel-mode=mpi")
-    ( "min-sample-i", po::value<int> (minSample_i),
-      "The the minimal index of sample points to simulate")
-    ( "max-sample-i", po::value<int> (maxSample_i),
-      "The the maximal index of sample points to simulate")
-    ( "mse-threshold,m", po::value<double> (mseThreshold)->default_value(0.1,"0.1"),
-      "The MSE threshold used for adaptive/repetitive sampling")
-    ( "spectral-resolution", po::value<unsigned> (lambdaResolution),
-      "The number of samples used to interpolate spectral intensities")
-    ( "repetitions,r", po::value<unsigned> (maxRepetitions)->default_value(4),
-      "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
-    ( "adaptive-steps,a", po::value<unsigned> (adaptiveSteps)->default_value(5),
-      "The number of adaptive sampling steps that are used to split the range between min-rays and max-rays");
-
-  po::variables_map vm;
-  po::store(po::parse_command_line( argc, argv, desc ), vm);
-  po::notify(vm);
-
-  if(vm.count("help")){
-    std::cout << "Usage: " << argv[0] << " [options] " << std::endl;
-    std::cout << std::endl;
-    std::cout << desc << std::endl;
-    exit(0);
-  }
-
-  if (pMode == "threaded")
-    *parallelMode = THREADED_PARALLEL_MODE;
-  else if (pMode == "mpi")
-    *parallelMode = MPI_PARALLEL_MODE;
-  else if (pMode == "graybat")
-    *parallelMode = GRAYBAT_PARALLEL_MODE;
-  else
-    *parallelMode = NO_PARALLEL_MODE;
-
-  if(dMode == "gpu")
-    *deviceMode = GPU_DEVICE_MODE;
-  else if (dMode == "cpu")
-    *deviceMode = CPU_DEVICE_MODE;
-  else
-    *deviceMode = NO_DEVICE_MODE;
-      
-  // append trailing folder separator, if necessary
-  *outputPath /= "";
-  *inputPath /= "";
-
-
-
-//    dout(V_ERROR) << "  --compare=<location of vtk-file to compare with>" << std::endl;
-//    write-vtk
-
-}
-void printCommandLine(
-    unsigned raysPerSample,
-    unsigned maxRaysPerSample,
-    const fs::path inputPath,
-    bool writeVtk,
-    const fs::path compareLocation,
-    const DeviceMode dMode,
-    const ParallelMode pMode,
-    bool useReflections,
-    unsigned maxgpus,
-    int minSample_i,
-    int maxSample_i,
-    unsigned maxRepetitions,
-    unsigned adaptiveSteps,
-    const fs::path outputPath,
-    double mseThreshold){
-    
-  dout(V_INFO) << "raysPerSample: " << raysPerSample << std::endl;
-  dout(V_INFO) << "maxRaysPerSample: " << maxRaysPerSample << std::endl;
-  dout(V_INFO) << "inputPath: " << inputPath << std::endl;
-  dout(V_INFO) << "outputPath: " << outputPath << std::endl;
-  dout(V_INFO) << "device-mode: " << dMode << std::endl;
-  dout(V_INFO) << "parallel-mode: " << pMode << std::endl;
-  dout(V_INFO) << "useReflections: " << useReflections << std::endl;
-  dout(V_INFO) << "maxgpus: " << maxgpus << std::endl;
-  dout(V_INFO) << "minSample_i: " << minSample_i << std::endl;
-  dout(V_INFO) << "maxSample_i:" << maxSample_i << std::endl;
-  dout(V_INFO) << "maxRepetitions: " << maxRepetitions << std::endl;
-  dout(V_INFO) << "adaptiveSteps: " << adaptiveSteps << std::endl;
-  dout(V_INFO) << "mseThreshold: " << mseThreshold << std::endl;
 }
 
-int checkParameterValidity(
-    const int argc,
-    const unsigned raysPerSample,
-    unsigned *maxRaysPerSample,
-    const fs::path inputPath,
-    const unsigned deviceCount,
-    const DeviceMode deviceMode,
-    const ParallelMode parallelMode,
-    unsigned *maxgpus,
-    const int minSampleRange,
-    const int maxSampleRange,
-    const unsigned maxRepetitions,
-    const unsigned adaptiveSteps,
-    const fs::path outputPath,
-    double *mseThreshold
-    ) {
 
-  if (deviceMode == NO_DEVICE_MODE) {
-    dout(V_ERROR) << "device-mode must be either \"gpu\" or \"cpu\" " << std::endl;
-    return 1;
-  }
+po::variables_map parseCommandLine(const int argc, char** argv) {
 
-  if (deviceMode == CPU_DEVICE_MODE && parallelMode == MPI_PARALLEL_MODE){
-    dout(V_WARNING) << "device-mode \"cpu\" does not support parallel-mode \"mpi\"! (will be ignored)" << std::endl;
-  }
+    po::options_description experiment_options( "Experiment Options" );
+    experiment_options.add_options()
+        ( std::string(ExpSwitch::input_path + ",i").c_str(),
+          po::value<fs::path> ()->default_value(fs::path("input")),
+          "The path to a folder that contains the input files")
+        ( std::string(ExpSwitch::output_path + ",o").c_str(),
+          po::value<fs::path> ()->default_value(fs::path("output")),
+          "The path to a folder that contains the output files")
+        ( ExpSwitch::min_rays.c_str(),
+          po::value<unsigned> ()->default_value(100000),
+          "The minimal number of rays to use for each sample point")
+        ( ExpSwitch::max_rays.c_str(),
+          po::value<unsigned> ()->default_value(100000),
+          "The maximal number of rays to use for each sample point")
+        ( std::string(ExpSwitch::mse + ",m").c_str(),
+          po::value<double> ()->default_value(0.1,"0.1"),
+          "The MSE threshold used for adaptive/repetitive sampling")
+        ( ExpSwitch::reflection.c_str(),
+          po::value<bool> ()->default_value(true),
+          "use reflections or not")
+        ( ExpSwitch::spectral.c_str(),
+          po::value<unsigned> (),
+          "The number of samples used to interpolate spectral intensities")
+        ;
 
-  if (parallelMode == NO_PARALLEL_MODE) {
-    dout(V_ERROR) << "parallel-mode must be either \"mpi\" or \"threaded\" " << std::endl;
-    return 1;
-  }
+    po::options_description compute_options( "Compute Options" );
+    compute_options.add_options()
+        ( CompSwitch::parallel_mode.c_str(),
+          po::value<std::string> ()->default_value("threaded"),
+          std::string("Set the preferred way of parellelization (mpi, graybat, threaded), only valid with --"
+              + CompSwitch::device_mode + "=gpu").c_str())
+        ( CompSwitch::device_mode.c_str(),
+          po::value<std::string> ()->default_value("gpu"),
+          "Set the device to run the calculation (cpu, gpu)")
+        ( std::string(CompSwitch::ngpus + ",g").c_str(),
+          po::value<unsigned> ()->default_value(1),
+          std::string("The maximum number of GPUs to b used on a single node. Should be left unchanged for --"
+              + CompSwitch::parallel_mode + "=mpi").c_str())
+        ( std::string(CompSwitch::repetitions + ",r").c_str(),
+          po::value<unsigned> ()->default_value(4),
+          "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
+        ( std::string(CompSwitch::adaptive_steps + ",a").c_str(),
+          po::value<unsigned> ()->default_value(5),
+          std::string("The number of adaptive sampling steps that are used to split the range between "
+              + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
+        ( CompSwitch::min_sample_i.c_str(),
+          po::value<int> ()->default_value(-1),
+          "The the minimal index of sample points to simulate")
+        ( CompSwitch::max_sample_i.c_str(),
+          po::value<int> ()->default_value(-1),
+          "The the maximal index of sample points to simulate")
+        ;
 
-  if (raysPerSample == 0) {
-    dout(V_ERROR) << "Please specify the number of rays per sample Point with --rays=RAYS" << std::endl;
-    return 1;
-  }
+    po::options_description generic_options( "Generic Options" );
+    generic_options.add_options()
+        ( "verbosity,v",
+          po::value<unsigned> ( &verbosity )->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT),
+          "Set the verbosity levels:\n\
+          \t 0 (quiet)\n\
+          \t 1 (error)\n\
+          \t 2 (warning)\n\
+          \t 4 (info)\n\
+          \t 8 (statistics)\n\
+          \t 16 (debug)\n\
+          \t 32 (progressbar)\n")
+        ;
 
-  if (!exists(inputPath) || !is_directory(inputPath) || is_empty(inputPath)) {
-    dout(V_ERROR) << "Please specify the experiment's location with --input-path=PATH_TO_EXPERIMENT" << std::endl;
-    return 1;
-  }
+    po::options_description cmd_only_options;
+    cmd_only_options.add_options()
+        ( "config,c",
+          po::value<fs::path> ()->default_value(fs::path("calcPhiASE.cfg")),
+          "location of an optional config file")
+        ( "help,h",
+          "print this help message and exit" )
+        ;
 
-  if (!exists(outputPath) || !is_directory(outputPath)) {
-    dout(V_ERROR) << "Please specify the output location with --output-path=PATH_TO_EXPERIMENT" << std::endl;
-    return 1;
-  }
+    po::options_description cmdline_options;
+    cmdline_options.add(experiment_options).add(compute_options).add(generic_options).add(cmd_only_options);
 
+    po::options_description configfile_options;
+    configfile_options.add(experiment_options).add(compute_options).add(generic_options);
 
-  if(*maxRaysPerSample < raysPerSample){
-    dout(V_WARNING) << "maxRays < raysPerSample. Increasing maxRays to " << raysPerSample << " (will be non-adaptive!)" << std::endl;
-    *maxRaysPerSample = raysPerSample;
-  }
+    po::variables_map vm;
+    po::store(po::parse_command_line( argc, argv, cmdline_options ), vm);
+    std::ifstream configPathStream(vm["config"].as<fs::path>().string());
+    po::store(po::parse_config_file( configPathStream, configfile_options ), vm);
 
-  if(*maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --ngpus=" << deviceCount << std::endl;
-    return 1;
-  }
+    if(vm.count("help")){
+        std::cout << "Usage: " << argv[0] << " [options] " << std::endl;
+        std::cout << std::endl;
+        std::cout << cmdline_options << std::endl;
+        exit(0);
+    }
 
-  if(*maxgpus == 0){
-    *maxgpus = deviceCount;
-  }
-
-  if(maxSampleRange < minSampleRange){
-    dout(V_ERROR) << "maxSampleRange < minSampleRange!" << std::endl;
-    return 1;
-  }
-
-  int samplesForNode = maxSampleRange-minSampleRange+1;
-  if(samplesForNode < int(*maxgpus) && (minSampleRange != -1 || maxSampleRange != -1)){
-    dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
-     *maxgpus = unsigned(samplesForNode);
-  }
-
-  if(verbosity >= 64){
-    verbosity = 63;
-    dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 63 (all). Levels can be bitmasked together." << std::endl;
-  }
-  if(maxRepetitions < 1){
-    dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
-  }
-
-  if(adaptiveSteps < 1){
-    dout(V_ERROR) << "At least 1 adaptive step is necessary!" << std::endl;
-  }
-
-  if(*mseThreshold == 0){
-    *mseThreshold = 1000;
-  }
-
-  return 0;
+    po::notify(vm);
+    return vm;
 }
 
-void checkSampleRange(int* minSampleRange, int* maxSampleRange, const unsigned numberOfSamples){
-  if(*minSampleRange == -1 && *maxSampleRange== -1){
-    dout(V_WARNING) << "minSample_i/maxSample_i not set! Assuming a sample range of " << std::endl;
-    dout(V_WARNING) << "0 to " << numberOfSamples-1 << std::endl;
-    *minSampleRange = 0;
-    *maxSampleRange = numberOfSamples-1;
-    return;
-  }
 
-  if((*minSampleRange == -1 && *maxSampleRange != -1) || (*minSampleRange != -1 && *maxSampleRange == -1)){
-    dout(V_ERROR) << "check minSample_i/maxSample_i! (Allowed Range from 0 to " << numberOfSamples << ")";
-    exit(1);
-  }
+void printCommandLine(const Modifiable_variables_map vm){
 
-  if((*maxSampleRange >= int(numberOfSamples) || *maxSampleRange < (int)0)){
-    dout(V_ERROR) << "maxSample_i is out of range! (There are only " << numberOfSamples << " samples)";
-    exit(1);
-  }
-
-  if((*minSampleRange < -1 || *minSampleRange >= (int)numberOfSamples)){
-    dout(V_ERROR) << "minSample_i is out of range! (There are only " << numberOfSamples << " samples)";
-    exit(1);
-  }
+    for (const auto& it : vm) {
+        std::stringstream ss;
+        auto& value = it.second.value();
+        if      (auto v = boost::any_cast<uint32_t>   (&value)) ss << *v;
+        else if (auto v = boost::any_cast<std::string>(&value)) ss << *v;
+        else if (auto v = boost::any_cast<int>        (&value)) ss << *v;
+        else if (auto v = boost::any_cast<bool>       (&value)) ss << *v;
+        else if (auto v = boost::any_cast<fs::path>   (&value)) ss << *v;
+        else if (auto v = boost::any_cast<double>     (&value)) ss << *v;
+        else{
+            dout(V_WARNING) << it.first << ": cast error" << std::endl;
+            continue;
+        }
+        dout(V_INFO) << it.first << ": " << ss.str() << std::endl;
+    }
 }
+
+
+Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, const unsigned deviceCount){
+        
+    double mseThreshold = vm[ExpSwitch::mse].as<double>();
+    unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<unsigned>();
+    unsigned maxgpus = vm[CompSwitch::ngpus].as<unsigned>();
+
+    const unsigned minRaysPerSample = vm[ExpSwitch::min_rays].as<unsigned>();
+    const fs::path inputPath = vm[ExpSwitch::input_path].as<fs::path>();
+    const fs::path outputPath = vm[ExpSwitch::output_path].as<fs::path>();
+    const std::string deviceMode = vm[CompSwitch::device_mode].as<std::string>();
+    const std::string parallelMode = vm[CompSwitch::parallel_mode].as<std::string>();
+    const int minSampleRange = vm [CompSwitch::min_sample_i].as<int>();
+    const int maxSampleRange = vm [CompSwitch::max_sample_i].as<int>();
+    const unsigned maxRepetitions = vm[CompSwitch::repetitions].as<unsigned>();
+    const unsigned adaptiveSteps = vm[CompSwitch::adaptive_steps].as<unsigned>();
+
+    if(deviceMode != DeviceMode::CPU && deviceMode != DeviceMode::GPU){
+        dout(V_ERROR) << CompSwitch::device_mode << " must be either \""
+            << DeviceMode::CPU << "\" or \"" << DeviceMode::GPU << "\"" << std::endl;
+        exit(1);
+    }
+
+    if (deviceMode == DeviceMode::CPU && parallelMode != ParallelMode::THREADED){
+        dout(V_WARNING) << CompSwitch::device_mode << " \"" << DeviceMode::CPU << "\" does only support "
+            << CompSwitch::parallel_mode << " \"threaded\"! (will be ignored)" << std::endl;
+    }
+
+    if (parallelMode != ParallelMode::GRAYBAT
+            && parallelMode != ParallelMode::MPI
+            && parallelMode != ParallelMode::THREADED) {
+        dout(V_ERROR) << CompSwitch::parallel_mode << " must be either \"" << ParallelMode::MPI << "\", \""
+            << ParallelMode::GRAYBAT << "\", or \"" << ParallelMode::THREADED << "\"" << std::endl;
+        exit(1);
+    }
+
+    if (minRaysPerSample == 0) {
+        dout(V_ERROR) << "Please specify the number of rays per sample Point with --" << ExpSwitch::min_rays << "=RAYS" << std::endl;
+        exit(1);
+    }
+
+    if (!exists(inputPath) || !is_directory(inputPath) || is_empty(inputPath)) {
+        dout(V_ERROR) << "Please specify the experiment's location with --" << ExpSwitch::input_path << "=PATH_TO_EXPERIMENT" << std::endl;
+        exit(1);
+    }
+
+    if (!exists(outputPath) || !is_directory(outputPath)) {
+        dout(V_ERROR) << "Please specify the output location with --" << ExpSwitch::output_path << "=PATH_TO_EXPERIMENT" << std::endl;
+        exit(1);
+    }
+
+    if(maxRaysPerSample < minRaysPerSample){
+        dout(V_WARNING) << ExpSwitch::max_rays << " < " << ExpSwitch::min_rays << ". Auto-increasing "
+            << ExpSwitch::min_rays << " (will be non-adaptive!)" << std::endl;
+        maxRaysPerSample = minRaysPerSample;
+    }
+
+    if(maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ngpus << "=" << deviceCount << std::endl;
+        exit(1);
+    }
+
+    if(maxgpus == 0){
+        maxgpus = deviceCount;
+    }
+
+    if(maxSampleRange < minSampleRange){
+        dout(V_ERROR) << CompSwitch::max_sample_i << " < " << CompSwitch::min_sample_i << "!" << std::endl;
+        exit(1);
+    }
+
+    int samplesForNode = maxSampleRange-minSampleRange+1;
+    if(samplesForNode < int(maxgpus) && (minSampleRange != -1 || maxSampleRange != -1)){
+        dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
+        maxgpus = unsigned(samplesForNode);
+    }
+
+    if(verbosity >= 64){
+        verbosity = 63;
+        dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 63 (all). Levels can be bitmasked together." << std::endl;
+    }
+    if(maxRepetitions < 1){
+        dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
+    }
+
+    if(adaptiveSteps < 1){
+        dout(V_ERROR) << "At least 1 adaptive step is necessary!" << std::endl;
+    }
+
+    if(mseThreshold == 0){
+        mseThreshold = 1000;
+    }
+
+    vm[ExpSwitch::max_rays].value() = boost::any(maxRaysPerSample);
+    vm[CompSwitch::ngpus].value() = boost::any(maxgpus);
+    vm[ExpSwitch::mse].value() = boost::any(mseThreshold);
+
+    return vm;
+}
+
+
+Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const unsigned numberOfSamples){
+    int minSampleRange = vm[CompSwitch::min_sample_i].as<int>();
+    int maxSampleRange = vm[CompSwitch::max_sample_i].as<int>();
+
+    if(minSampleRange == -1 && maxSampleRange== -1){
+        dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
+            << " not set! Assuming a sampling point range of " << "0 to " << numberOfSamples-1 << std::endl;
+        minSampleRange = 0;
+        maxSampleRange = numberOfSamples-1;
+        vm[CompSwitch::min_sample_i].value() = boost::any(minSampleRange);
+        vm[CompSwitch::max_sample_i].value() = boost::any(maxSampleRange);
+        return vm;
+    }
+
+    if((minSampleRange == -1 && maxSampleRange != -1) || (minSampleRange != -1 && maxSampleRange == -1)){
+        dout(V_ERROR) << "check " << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
+            << "! (Allowed Range from 0 to " << numberOfSamples << ")";
+        exit(1);
+    }
+
+    if((maxSampleRange >= int(numberOfSamples) || maxSampleRange < (int)0)){
+        dout(V_ERROR) << CompSwitch::max_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
+        exit(1);
+    }
+
+    if((minSampleRange < -1 || minSampleRange >= (int)numberOfSamples)){
+        dout(V_ERROR) << CompSwitch::min_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
+        exit(1);
+    }
+    return vm;
+}
+
 
 template <class T, class B, class E>
 void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
@@ -476,6 +415,7 @@ void assertRange(const std::vector<T> &v, const B minElement,const E maxElement,
   }
 }
 
+
 template <class T, class B>
 void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
   if(equals){
@@ -484,6 +424,7 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
     assert(*std::min_element(v.begin(),v.end()) >= minElement);
   }
 }
+
 
 /**
  * @brief fills a device mesh with the correct datastructures
@@ -566,62 +507,34 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
  *
  */
 std::vector<Mesh> parseMesh(const fs::path rootPath,
-			    std::vector<unsigned> devices,
-			    unsigned maxGpus) {
+			    std::vector<unsigned> devices) {
 
   std::vector<Mesh> meshs;
 
-  // Experimentdata
-  std::vector<double>  betaVolume;
-  std::vector<double>  triangleNormalsX;
-  std::vector<double>  triangleNormalsY;
-  std::vector<unsigned>  trianglePointIndices;
-  std::vector<int>  forbiddenEdge;
-  std::vector<int>  triangleNeighbors;
-  std::vector<unsigned> triangleNormalPoint;
-  std::vector<double>  points;
-  std::vector<float>  triangleSurfaces;
-  std::vector<double> triangleCenterX;
-  std::vector<double> triangleCenterY;
-  std::vector<double>  betaCells;
-  std::vector<unsigned>  claddingCellTypes;
-  std::vector<float>  refractiveIndices;
-  std::vector<float>  reflectivities;
-
-  unsigned numberOfPoints = 0;
-  unsigned numberOfTriangles = 0;
-  unsigned numberOfLevels = 0;
-  unsigned claddingNumber;
-  float thickness = 1;
-  float nTot = 0;
-  float crystalTFluo = 0;
-  double claddingAbsorption = 0;
-
   // Parse experimentdata from files
-  //fs::path triangleNormalPointPath(rootPath);
-  if(fileToVector(rootPath, "triangleNormalPoint.txt", &triangleNormalPoint)) return meshs;
-  if(fileToVector(rootPath, "betaVolume.txt", &betaVolume)) return meshs;
-  if(fileToVector(rootPath, "forbiddenEdge.txt", &forbiddenEdge)) return meshs;
-  if(fileToVector(rootPath, "triangleNeighbors.txt", &triangleNeighbors)) return meshs;
-  if(fileToVector(rootPath, "triangleNormalsX.txt", &triangleNormalsX)) return meshs;
-  if(fileToVector(rootPath, "triangleNormalsY.txt", &triangleNormalsY)) return meshs;
-  if(fileToVector(rootPath, "triangleCenterX.txt", &triangleCenterX)) return meshs;
-  if(fileToVector(rootPath, "triangleCenterY.txt", &triangleCenterY)) return meshs;
-  if(fileToVector(rootPath, "points.txt", &points)) return meshs;
-  if(fileToVector(rootPath, "trianglePointIndices.txt", &trianglePointIndices)) return meshs;
-  if(fileToVector(rootPath, "triangleSurfaces.txt", &triangleSurfaces)) return meshs;
-  if(fileToValue(rootPath, "numberOfPoints.txt", numberOfPoints)) return meshs;
-  if(fileToValue(rootPath, "numberOfTriangles.txt", numberOfTriangles)) return meshs;
-  if(fileToValue(rootPath, "numberOfLevels.txt", numberOfLevels)) return meshs;
-  if(fileToValue(rootPath, "thickness.txt", thickness)) return meshs;
-  if(fileToValue(rootPath, "nTot.txt", nTot)) return meshs;
-  if(fileToValue(rootPath, "crystalTFluo.txt", crystalTFluo)) return meshs;
-  if(fileToValue(rootPath, "claddingNumber.txt", claddingNumber)) return meshs;
-  if(fileToValue(rootPath, "claddingAbsorption.txt", claddingAbsorption)) return meshs;
-  if(fileToVector(rootPath, "betaCells.txt", &betaCells)) return meshs;
-  if(fileToVector(rootPath, "claddingCellTypes.txt", &claddingCellTypes)) return meshs;
-  if(fileToVector(rootPath, "refractiveIndices.txt", &refractiveIndices)) return meshs;
-  if(fileToVector(rootPath, "reflectivities.txt", &reflectivities)) return meshs;
+  std::vector<unsigned> triangleNormalPoint  = fileToVector<unsigned>(rootPath / "triangleNormalPoint.txt");
+  std::vector<double> betaVolume             = fileToVector<double>(rootPath / "betaVolume.txt");
+  std::vector<int> forbiddenEdge             = fileToVector<int>(rootPath / "forbiddenEdge.txt");
+  std::vector<int> triangleNeighbors         = fileToVector<int>(rootPath / "triangleNeighbors.txt");
+  std::vector<double> triangleNormalsX       = fileToVector<double>(rootPath / "triangleNormalsX.txt");
+  std::vector<double> triangleNormalsY       = fileToVector<double>(rootPath / "triangleNormalsY.txt");
+  std::vector<double> triangleCenterX        = fileToVector<double>(rootPath / "triangleCenterX.txt");
+  std::vector<double> triangleCenterY        = fileToVector<double>(rootPath / "triangleCenterY.txt");
+  std::vector<double> points                 = fileToVector<double>(rootPath / "points.txt");
+  std::vector<unsigned> trianglePointIndices = fileToVector<unsigned>(rootPath / "trianglePointIndices.txt");
+  std::vector<float>  triangleSurfaces       = fileToVector<float>(rootPath / "triangleSurfaces.txt");
+  unsigned numberOfPoints                    = fileToValue<unsigned>(rootPath / "numberOfPoints.txt");
+  unsigned numberOfTriangles                 = fileToValue<unsigned>(rootPath / "numberOfTriangles.txt");
+  unsigned numberOfLevels                    = fileToValue<unsigned>(rootPath / "numberOfLevels.txt");
+  float thickness                            = fileToValue<float>(rootPath / "thickness.txt");
+  float nTot                                 = fileToValue<float>(rootPath / "nTot.txt");
+  float crystalTFluo                         = fileToValue<float>(rootPath / "crystalTFluo.txt");
+  unsigned claddingNumber                    = fileToValue<unsigned>(rootPath / "claddingNumber.txt");
+  double claddingAbsorption                  = fileToValue<double>(rootPath / "claddingAbsorption.txt");
+  std::vector<double>  betaCells             = fileToVector<double>(rootPath / "betaCells.txt");
+  std::vector<unsigned>  claddingCellTypes   = fileToVector<unsigned>(rootPath / "claddingCellTypes.txt");
+  std::vector<float>  refractiveIndices      = fileToVector<float>(rootPath / "refractiveIndices.txt");
+  std::vector<float>  reflectivities         = fileToVector<float>(rootPath / "reflectivities.txt");
 
   // assert input sizes
   assert(numberOfPoints == (points.size() / 2));
@@ -657,7 +570,7 @@ std::vector<Mesh> parseMesh(const fs::path rootPath,
   assertRange(refractiveIndices,0,5,false);
   assertRange(reflectivities,0,1,false);
 
-  for( unsigned i=0; i < maxGpus; i++){
+  for( unsigned i=0; i < devices.size(); i++){
     CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
     meshs.push_back(
 		    createMesh(trianglePointIndices,

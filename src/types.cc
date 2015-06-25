@@ -20,34 +20,29 @@
 
 
 #include "types.hpp"
-#include <iostream>
 #include <string>
 
-// Idea from http://stackoverflow.com/questions/3342726/c-print-out-enum-value-as-text
-// Answer by user SigTerm
-// Switched char* to std::string
-//
-std::ostream& operator<<(std::ostream& out, const DeviceMode value){
-    std::string s;
-#define PROCESS_VAL(p) case(p): s = #p; break;
-    switch(value){
-        PROCESS_VAL(NO_DEVICE_MODE);
-        PROCESS_VAL(GPU_DEVICE_MODE);
-        PROCESS_VAL(CPU_DEVICE_MODE);
-    }
-#undef PROCESS_VAL
-    return out << s;
-}
+const std::string DeviceMode::NONE  = "no_device_mode";
+const std::string DeviceMode::GPU   = "gpu";
+const std::string DeviceMode::CPU   = "cpu";
 
-std::ostream& operator<<(std::ostream& out, const ParallelMode value){
-    std::string s;
-#define PROCESS_VAL(p) case(p): s = #p; break;
-    switch(value){
-        PROCESS_VAL(NO_PARALLEL_MODE);
-        PROCESS_VAL(THREADED_PARALLEL_MODE);
-        PROCESS_VAL(MPI_PARALLEL_MODE);
-        PROCESS_VAL(GRAYBAT_PARALLEL_MODE);
-    }
-#undef PROCESS_VAL
-    return out << s;
-}
+const std::string ParallelMode::NONE        = "no_parallel_mode";
+const std::string ParallelMode::THREADED    = "threaded";
+const std::string ParallelMode::MPI         = "mpi";
+const std::string ParallelMode::GRAYBAT     = "graybat";
+
+const std::string CompSwitch::parallel_mode     = "parallel-mode";
+const std::string CompSwitch::device_mode       = "device-mode";
+const std::string CompSwitch::ngpus             = "ngpus";
+const std::string CompSwitch::repetitions       = "repetitions";
+const std::string CompSwitch::adaptive_steps    = "adaptive-steps";
+const std::string CompSwitch::min_sample_i      = "min-sample-i";
+const std::string CompSwitch::max_sample_i      = "max-sample-i";
+
+const std::string ExpSwitch::input_path     = "input-path";
+const std::string ExpSwitch::output_path    = "output-path";
+const std::string ExpSwitch::min_rays       = "min-rays";
+const std::string ExpSwitch::max_rays       = "max-rays";
+const std::string ExpSwitch::mse            = "mse-threshold";
+const std::string ExpSwitch::reflection     = "reflection";
+const std::string ExpSwitch::spectral       = "spectral-resolution";
