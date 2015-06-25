@@ -162,6 +162,7 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
+    unsigned *adaptiveSteps,
     fs::path *outputPath,
     double *mseThreshold,
     unsigned *lambdaResolution
@@ -180,6 +181,7 @@ void printCommandLine(
     int minSample_i,
     int maxSample_i,
     unsigned maxRepetitions,
+    unsigned adaptiveSteps,
     fs::path outputPath,
     double mseThreshold
     );
@@ -196,6 +198,7 @@ int checkParameterValidity(
     const int minSample_i,
     const int maxSample_i,
     const unsigned maxRepetitions,
+    const unsigned adaptiveSteps,
     const fs::path outputPath,
     double *mseThreshold
     );
