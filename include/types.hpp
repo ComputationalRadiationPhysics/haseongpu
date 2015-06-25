@@ -7,6 +7,9 @@ namespace fs = boost::filesystem;
 enum DeviceMode { NO_DEVICE_MODE, GPU_DEVICE_MODE, CPU_DEVICE_MODE};
 enum ParallelMode { NO_PARALLEL_MODE, THREADED_PARALLEL_MODE, MPI_PARALLEL_MODE, GRAYBAT_PARALLEL_MODE};
 
+std::ostream& operator<<(std::ostream& out, const DeviceMode value);
+std::ostream& operator<<(std::ostream& out, const ParallelMode value);
+
 struct ComputeParameters {
 
     ComputeParameters() {}
