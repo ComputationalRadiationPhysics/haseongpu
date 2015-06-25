@@ -52,6 +52,7 @@ int parse( const int argc,
     unsigned minRaysPerSample = 0;
     unsigned maxRaysPerSample = 0;
     unsigned maxRepetitions = 4;
+    unsigned adaptiveSteps = 5;
     unsigned lambdaResolution = 0;
     std::string compareLocation("");
     bool writeVtk = false;
@@ -93,6 +94,7 @@ int parse( const int argc,
 		     &minSampleRange, // opt -
 		     &maxSampleRange, // opt -
 		     &maxRepetitions, // exp
+		     &adaptiveSteps, // exp
 		     &outputPath, // opt -
 		     &mseThreshold, // exp
 		     &lambdaResolution); // opt
@@ -109,6 +111,7 @@ int parse( const int argc,
 		     minSampleRange,
 		     maxSampleRange,
 		     maxRepetitions,
+             adaptiveSteps,
 		     outputPath,
 		     mseThreshold);
   
@@ -130,6 +133,7 @@ int parse( const int argc,
 			      minSampleRange,
 			      maxSampleRange,
 			      maxRepetitions,
+                  adaptiveSteps,
 			      outputPath,
 			      &mseThreshold)) return 1;
 
@@ -188,15 +192,16 @@ int parse( const int argc,
 					useReflections );
 
     compute = ComputeParameters ( maxRepetitions,
-				  devices.at(0),
-				  deviceMode,
-				  parallelMode,
-				  writeVtk,
-				  inputPath,
-				  outputPath,
-				  devices,
-				  minSampleRange,
-				  maxSampleRange);
+        adaptiveSteps,
+        devices.at(0),
+        deviceMode,
+        parallelMode,
+        writeVtk,
+        inputPath,
+        outputPath,
+        devices,
+        minSampleRange,
+        maxSampleRange);
 
     result = Result( phiAse, 
 		     mse, 
@@ -224,6 +229,7 @@ void parseCommandLine(
     int *minSample_i,
     int *maxSample_i,
     unsigned *maxRepetitions,
+    unsigned *adaptiveSteps,
     fs::path *outputPath,
     double *mseThreshold,
     unsigned *lambdaResolution
@@ -249,7 +255,7 @@ void parseCommandLine(
     ( "device-mode", po::value<std::string> (&dMode)->default_value("gpu"),
       "Set the device to run the calculation (cpu, gpu)")
     ( "parallel-mode", po::value<std::string> (&pMode)->default_value("threaded"),
-      "Set the preferred way of parellelization (mpi, threaded), only valid with device-mode=gpu")
+      "Set the preferred way of parellelization (mpi, graybat, threaded), only valid with device-mode=gpu")
     ( "reflection", po::value<bool> (useReflections)->default_value(true),
       "use reflections or not")
     ( "min-rays", po::value<unsigned> (raysPerSample)->default_value(100000),
@@ -271,7 +277,9 @@ void parseCommandLine(
     ( "spectral-resolution", po::value<unsigned> (lambdaResolution),
       "The number of samples used to interpolate spectral intensities")
     ( "repetitions,r", po::value<unsigned> (maxRepetitions)->default_value(4),
-      "The number of repetitions to try, before the number of rays is increased by adaptive sampling");
+      "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
+    ( "adaptive-steps,a", po::value<unsigned> (adaptiveSteps)->default_value(5),
+      "The number of adaptive sampling steps that are used to split the range between min-rays and max-rays");
 
   po::variables_map vm;
   po::store(po::parse_command_line( argc, argv, desc ), vm);
@@ -323,6 +331,7 @@ void printCommandLine(
     int minSample_i,
     int maxSample_i,
     unsigned maxRepetitions,
+    unsigned adaptiveSteps,
     const fs::path outputPath,
     double mseThreshold){
     
@@ -337,6 +346,7 @@ void printCommandLine(
   dout(V_INFO) << "minSample_i: " << minSample_i << std::endl;
   dout(V_INFO) << "maxSample_i:" << maxSample_i << std::endl;
   dout(V_INFO) << "maxRepetitions: " << maxRepetitions << std::endl;
+  dout(V_INFO) << "adaptiveSteps: " << adaptiveSteps << std::endl;
   dout(V_INFO) << "mseThreshold: " << mseThreshold << std::endl;
 }
 
@@ -352,6 +362,7 @@ int checkParameterValidity(
     const int minSampleRange,
     const int maxSampleRange,
     const unsigned maxRepetitions,
+    const unsigned adaptiveSteps,
     const fs::path outputPath,
     double *mseThreshold
     ) {
@@ -416,6 +427,10 @@ int checkParameterValidity(
   }
   if(maxRepetitions < 1){
     dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
+  }
+
+  if(adaptiveSteps < 1){
+    dout(V_ERROR) << "At least 1 adaptive step is necessary!" << std::endl;
   }
 
   if(*mseThreshold == 0){

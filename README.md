@@ -114,6 +114,7 @@ Usage
                                     maxRaysPerSample,  
                                     mseThreshold,  
                                     repetitions,  
+                                    adaptiveSteps,
                                     nTot,  
                                     thickness,  
                                     laserParameter,  
@@ -251,6 +252,11 @@ numbers the array belongs.
      Sets the number of maximal repetitions when the
      mseThreshold was not reached.
 
+   + __adaptiveSteps__ unsigned, size = 1  
+     Sets the number of adaptive steps. The range between min-rays and max-rays will be
+     split into that many parts. Setting it to 1 will result in no adaptive
+     steps and only minRaysPerSample is used.
+
    + __nTot__ float, size = 1  
      Doping of the active gain medium
 
@@ -367,6 +373,11 @@ Synopsis
       Number of repetitions, that will be done
       when mse-threshold was not met.
 
+    --adaptive-steps= 
+      Number of adaptive steps. The range between min-rays and max-rays will be
+      split into that many parts. Setting --adaptive=1 will result in no adaptive
+      steps and only min-rays is used.
+
     --spectral-resolution= 
       Resolution of absorption and emission spectrum to which the
       input spectrum will be interpolated linear.  Interpolation is
@@ -381,13 +392,14 @@ C-Application Templates
 + 4 GPUs, 10K to 100K Rays, 4 Repetitions   
 
         ./bin/calcPhiASE --input-path=/input/  
-	       	 --output-path=/tmp/ 
+	       	 --output-path=/tmp/  
     		 --parallel-mode=threaded  
-    		 --min-rays=10000 
-    		 --max-rays=100000 
+    		 --min-rays=10000  
+    		 --max-rays=100000  
     		 --reflection  
     		 --repetitions=4  
-    		 --ngpus=4 
+    		 --adaptive-steps=4  
+    		 --ngpus=4  
     		 --min-sample-i=0  
     		 --max-sample-i=1234  
     		 --mse-threshold=0.05  
@@ -399,10 +411,11 @@ C-Application Templates
     		 --parallel-mode=mpi  
     		 --min-rays=10000  
     		 --max-rays=100000  
-    		 --reflection 
+    		 --reflection  
     		 --repetitions=4  
+    		 --adaptive-steps=4  
     	   --ngpus=1  
-    		 --min-sample-i=0
+    		 --min-sample-i=0  
     		 --max-sample-i=1234  
     		 --mse-threshold=0.05  
 		 
