@@ -450,12 +450,14 @@ Synopsis
       Path to a writable location. Is used to write
       input and output for matlab script.
 
-    --parallel-mode=[|threaded|mpi]  
+    --parallel-mode=[graybat|threaded|mpi]
       Defines the method of parallelization to start the
       simulation with. Mode "threaded" uses pthreads on a single
-      node. Mode "mpi" is a parallel mpi
-      implementation for clusters. Note, that this parameter
-      is currently only available when using `--device-mode=gpu`
+      node. Mode "mpi" is a parallel mpi implementation for clusters. Mode
+      "graybat" is similar to "mpi", but uses the communication framework
+      [GrayBat](https://github.com/ComputationalRadiationPhysics/graybat)
+      instead of plain MPI. Note, that the last 2 parameters
+      are currently only available when using `--device-mode=gpu`
 
     --device-mode=[cpu|gpu]  
       Defines on which hardware the simulation will run.
@@ -532,8 +534,8 @@ C-Application Templates
         ./build/calcPhiASE --input-path=./example/c_example/input/  
 	       	 --output-path=/tmp/ 
     		 --parallel-mode=threaded  
-    		 --min-rays=10000 
-    		 --max-rays=100000 
+    		 --min-rays=10000  
+    		 --max-rays=100000  
     		 --reflection  
     		 --repetitions=4  
     		 --adaptive-steps=4  
@@ -549,11 +551,11 @@ C-Application Templates
     		 --parallel-mode=mpi  
     		 --min-rays=10000  
     		 --max-rays=100000  
-    		 --reflection 
+    		 --reflection  
     		 --repetitions=4  
     		 --adaptive-steps=4  
     	   --ngpus=1  
-    		 --min-sample-i=0
+    		 --min-sample-i=0  
     		 --max-sample-i=1234  
     		 --mse-threshold=0.05  
 		 
