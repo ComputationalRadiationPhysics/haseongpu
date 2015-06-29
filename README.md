@@ -70,16 +70,16 @@ Usage
   can be started by the following:
 
   1. follow the compile instructions above
-  2. change path "cd example/matlab_example/"
+  2. change path `cd example/matlab_example/`
   3. run : `matlab laserPumpCladdingExample`
   4. watch progress
-  5. take a look at the results (*.vtk) with paraview 
+  5. take a look at the results (`*.vtk`) with paraview
 
 
 ### Quick C-Application laser pump example 
 
   1. follow the compile instructions above
-  2. change path "cd example/c_example/"
+  2. change path `cd example/c_example/`
   3. run : `./bin/calcPhiASE --input-path=./input/cylindrical --min-rays=10000`
   4. watch progress
   5. take a look at the results in the output directory
@@ -312,12 +312,14 @@ Synopsis
       Path to a writable location. Is used to write
       input and output for matlab script.
 
-    --parallel-mode=[|threaded|mpi]  
+    --parallel-mode=[graybat|threaded|mpi]
       Defines the method of parallelization to start the
       simulation with. Mode "threaded" uses pthreads on a single
-      node. Mode "mpi" is a parallel mpi
-      implementation for clusters. Note, that this parameter
-      is currently only available when using `--device-mode=gpu`
+      node. Mode "mpi" is a parallel mpi implementation for clusters. Mode
+      "graybat" is similar to "mpi", but uses the communication framework
+      [GrayBat](https://github.com/ComputationalRadiationPhysics/graybat)
+      instead of plain MPI. Note, that the last 2 parameters
+      are currently only available when using `--device-mode=gpu`
 
     --device-mode=[cpu|gpu]  
       Defines on which hardware the simulation will run.
