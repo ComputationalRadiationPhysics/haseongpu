@@ -388,6 +388,14 @@ Synopsis
       resolutionwill set the lambda resolution to the maximum number
       of absorption or emission values.
 
+    --config=
+      Specify the location of an optional configuration file. This file holds
+      simple key=value pairs that have the same names as the command-line
+      parameters. If values are defined in the file and on the command line,
+      values from the file are overruled. It is not possible to specify
+      --help or --config= in the config file itself.
+      For an example configuration, see the C example (`calcPhiASE.cfg`).
+
 C-Application Templates
 -----------------------
 
