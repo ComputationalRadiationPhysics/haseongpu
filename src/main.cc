@@ -51,7 +51,6 @@ namespace fs = boost::filesystem;
 #include <for_loops_clad.hpp>
 #include <cudachecks.hpp>
 #include <mesh.hpp>
-#include <cuda_utils.hpp> /* getFreeDevices */
 #include <logging.hpp>
 #include <ray_histogram.hpp>
 #include <types.hpp>

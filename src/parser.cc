@@ -30,6 +30,7 @@
 #include <mesh.hpp>
 #include <parser.hpp>
 #include <interpolation.hpp> /* interpolateWavelength*/
+#include <cuda_utils.hpp> /* getFreeDevices */
 
 
 // includes for commandline parsing
@@ -223,28 +224,37 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
     po::options_description cmd_only_options;
     cmd_only_options.add_options()
         ( "config,c",
-          po::value<fs::path> ()->default_value(fs::path("calcPhiASE.cfg")),
+          po::value<fs::path> (),
           "location of an optional config file")
         ( "help,h",
           "print this help message and exit" )
         ;
 
+    po::variables_map vm;
+
     po::options_description cmdline_options;
     cmdline_options.add(experiment_options).add(compute_options).add(generic_options).add(cmd_only_options);
-
-    po::options_description configfile_options;
-    configfile_options.add(experiment_options).add(compute_options).add(generic_options);
-
-    po::variables_map vm;
     po::store(po::parse_command_line( argc, argv, cmdline_options ), vm);
-    std::ifstream configPathStream(vm["config"].as<fs::path>().string());
-    po::store(po::parse_config_file( configPathStream, configfile_options ), vm);
 
     if(vm.count("help")){
-        std::cout << "Usage: " << argv[0] << " [options] " << std::endl;
-        std::cout << std::endl;
-        std::cout << cmdline_options << std::endl;
+        dout(V_NOLABEL) << "Usage: " << argv[0] << " [options] " << std::endl;
+        dout(V_NOLABEL) << std::endl;
+        dout(V_NOLABEL) << cmdline_options << std::endl;
         exit(0);
+    }
+
+    if(vm.count("config")){
+        fs::path configPath(vm["config"].as<fs::path>());
+        if(fs::exists(configPath)){
+            po::options_description configfile_options;
+            configfile_options.add(experiment_options).add(compute_options).add(generic_options);
+            std::ifstream configPathStream(configPath.string());
+            po::store(po::parse_config_file( configPathStream, configfile_options ), vm);
+        }else{
+            dout(V_ERROR) << "Configuration file could not be read. Possible problems: path "
+                << configPath << "does not exist or insufficient permissions" << std::endl;
+            exit(1);
+        }
     }
 
     po::notify(vm);
