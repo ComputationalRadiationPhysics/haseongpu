@@ -322,13 +322,18 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         exit(1);
     }
 
-    if (!exists(inputPath) || !is_directory(inputPath) || is_empty(inputPath)) {
-        dout(V_ERROR) << "Please specify the experiment's location with --" << ExpSwitch::input_path << "=PATH_TO_EXPERIMENT" << std::endl;
+    if (!exists(inputPath) || !is_directory(inputPath)){
+        dout(V_ERROR) << "The specified input path does not exist, is no directory, or has insufficient permissions. Please specify a correct path by --" << ExpSwitch::output_path << "=[path]" << std::endl;
         exit(1);
+    }else{
+        if(is_empty(inputPath)) {
+            dout(V_ERROR) << "The specified input folder " << ExpSwitch::input_path << " is empty!" << std::endl;
+            exit(1);
+        }
     }
 
     if (!exists(outputPath) || !is_directory(outputPath)) {
-        dout(V_ERROR) << "Please specify the output location with --" << ExpSwitch::output_path << "=PATH_TO_EXPERIMENT" << std::endl;
+        dout(V_ERROR) << "The specified output path does not exist (or permission denied). Please specify a correct folder by --" << ExpSwitch::output_path << "=[path]" << std::endl;
         exit(1);
     }
 
