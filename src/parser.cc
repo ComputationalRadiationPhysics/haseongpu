@@ -134,8 +134,8 @@ int parse( const int argc,
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
             devices,
-            vm[CompSwitch::min_sample_i].as<int>(),
-            vm[CompSwitch::max_sample_i].as<int>());
+            vm[CompSwitch::min_sample_i].as<unsigned>(),
+            vm[CompSwitch::max_sample_i].as<unsigned>());
 
 
     std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
@@ -200,10 +200,10 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           std::string("The number of adaptive sampling steps that are used to split the range between "
               + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
         ( CompSwitch::min_sample_i.c_str(),
-          po::value<int> ()->default_value(-1),
+          po::value<int> (),
           "The the minimal index of sample points to simulate")
         ( CompSwitch::max_sample_i.c_str(),
-          po::value<int> ()->default_value(-1),
+          po::value<int> (),
           "The the maximal index of sample points to simulate")
         ;
 
@@ -237,8 +237,8 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
     po::store(po::parse_command_line( argc, argv, cmdline_options ), vm);
 
     if(vm.count("help")){
+        verbosity |= V_NOLABEL;
         dout(V_NOLABEL) << "Usage: " << argv[0] << " [options] " << std::endl;
-        dout(V_NOLABEL) << std::endl;
         dout(V_NOLABEL) << cmdline_options << std::endl;
         exit(0);
     }
@@ -293,8 +293,6 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     const fs::path outputPath = vm[ExpSwitch::output_path].as<fs::path>();
     const std::string deviceMode = vm[CompSwitch::device_mode].as<std::string>();
     const std::string parallelMode = vm[CompSwitch::parallel_mode].as<std::string>();
-    const int minSampleRange = vm [CompSwitch::min_sample_i].as<int>();
-    const int maxSampleRange = vm [CompSwitch::max_sample_i].as<int>();
     const unsigned maxRepetitions = vm[CompSwitch::repetitions].as<unsigned>();
     const unsigned adaptiveSteps = vm[CompSwitch::adaptive_steps].as<unsigned>();
 
@@ -323,7 +321,8 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     if (!exists(inputPath) || !is_directory(inputPath)){
-        dout(V_ERROR) << "The specified input path does not exist, is no directory, or has insufficient permissions. Please specify a correct path by --" << ExpSwitch::output_path << "=[path]" << std::endl;
+        dout(V_ERROR) << "The specified input path does not exist, is no directory, or has insufficient permissions." <<
+            " Please specify a correct path by --" << ExpSwitch::output_path << "=[path]" << std::endl;
         exit(1);
     }else{
         if(is_empty(inputPath)) {
@@ -333,7 +332,8 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     if (!exists(outputPath) || !is_directory(outputPath)) {
-        dout(V_ERROR) << "The specified output path does not exist (or permission denied). Please specify a correct folder by --" << ExpSwitch::output_path << "=[path]" << std::endl;
+        dout(V_ERROR) << "The specified output path does not exist (or permission denied)."
+            << " Please specify a correct folder by --" << ExpSwitch::output_path << "=[path]" << std::endl;
         exit(1);
     }
 
@@ -343,7 +343,8 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         maxRaysPerSample = minRaysPerSample;
     }
 
-    if(maxgpus > deviceCount){ dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ngpus << "=" << deviceCount << std::endl;
+    if(maxgpus > deviceCount){
+        dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ngpus << "=" << deviceCount << std::endl;
         exit(1);
     }
 
@@ -351,15 +352,20 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         maxgpus = deviceCount;
     }
 
-    if(maxSampleRange < minSampleRange){
-        dout(V_ERROR) << CompSwitch::max_sample_i << " < " << CompSwitch::min_sample_i << "!" << std::endl;
-        exit(1);
-    }
+    if( vm.count(CompSwitch::min_sample_i) + vm.count(CompSwitch::max_sample_i) == 2){
+        const unsigned minSampleRange = vm [CompSwitch::min_sample_i].as<unsigned>();
+        const unsigned maxSampleRange = vm [CompSwitch::max_sample_i].as<unsigned>();
 
-    int samplesForNode = maxSampleRange-minSampleRange+1;
-    if(samplesForNode < int(maxgpus) && (minSampleRange != -1 || maxSampleRange != -1)){
-        dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
-        maxgpus = unsigned(samplesForNode);
+        if(maxSampleRange < minSampleRange){
+            dout(V_ERROR) << CompSwitch::max_sample_i << " < " << CompSwitch::min_sample_i << "!" << std::endl;
+            exit(1);
+        }
+
+        unsigned samplesForNode = maxSampleRange-minSampleRange+1;
+        if(maxgpus > samplesForNode){
+            dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
+            maxgpus = samplesForNode;
+        }
     }
 
     if(verbosity >= 64){
@@ -387,34 +393,34 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
 
 
 Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const unsigned numberOfSamples){
-    int minSampleRange = vm[CompSwitch::min_sample_i].as<int>();
-    int maxSampleRange = vm[CompSwitch::max_sample_i].as<int>();
+    unsigned minCount = vm.count(CompSwitch::min_sample_i);
+    unsigned maxCount = vm.count(CompSwitch::max_sample_i);
 
-    if(minSampleRange == -1 && maxSampleRange== -1){
+    if(minCount+maxCount < 1){
         dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
             << " not set! Assuming a sampling point range of " << "0 to " << numberOfSamples-1 << std::endl;
-        minSampleRange = 0;
-        maxSampleRange = numberOfSamples-1;
-        vm[CompSwitch::min_sample_i].value() = boost::any(minSampleRange);
-        vm[CompSwitch::max_sample_i].value() = boost::any(maxSampleRange);
+        vm[CompSwitch::min_sample_i].value() = boost::any(0);
+        vm[CompSwitch::max_sample_i].value() = boost::any(numberOfSamples-1);
         return vm;
     }
 
-    if((minSampleRange == -1 && maxSampleRange != -1) || (minSampleRange != -1 && maxSampleRange == -1)){
-        dout(V_ERROR) << "check " << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
-            << "! (Allowed Range from 0 to " << numberOfSamples << ")";
+    if(minCount+maxCount < 2){
+        dout(V_ERROR) << "Options " << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
+            << " must be used together! (Allowed Range from 0 to " << numberOfSamples-1 << ")";
         exit(1);
     }
 
-    if((maxSampleRange >= int(numberOfSamples) || maxSampleRange < (int)0)){
+    // if the code did not terminate, both min and max are defined inside the map
+    if(vm[CompSwitch::min_sample_i].as<unsigned>() > numberOfSamples){
+        dout(V_ERROR) << CompSwitch::min_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
+        exit(1);
+    }
+
+    if(vm[CompSwitch::max_sample_i].as<unsigned>() > numberOfSamples){
         dout(V_ERROR) << CompSwitch::max_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
         exit(1);
     }
 
-    if((minSampleRange < -1 || minSampleRange >= (int)numberOfSamples)){
-        dout(V_ERROR) << CompSwitch::min_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
-        exit(1);
-    }
     return vm;
 }
 
