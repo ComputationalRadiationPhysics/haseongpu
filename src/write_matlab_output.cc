@@ -77,18 +77,15 @@ void writeMatlabOutput(
   fs::ofstream expectedValuesFile;
   const unsigned samplesPerLevel = numberOfSamples/numberOfLevels;
 
-  fs::path asePath(experimentPath);
-  aseFile.open(asePath /= "phi_ASE.txt");
+  aseFile.open(experimentPath / "phi_ASE.txt");
   write3dMatrix(ase, aseFile, samplesPerLevel, numberOfLevels, 1);
   aseFile.close();
 
-  fs::path raysPath(experimentPath);
-  raysFile.open(raysPath /= "N_rays.txt");
+  raysFile.open(experimentPath / "N_rays.txt");
   write3dMatrix(N_rays, raysFile, samplesPerLevel, numberOfLevels, 1);
   raysFile.close();
 
-  fs::path msePath(experimentPath);
-  expectedValuesFile.open(msePath /= "mse_values.txt");
+  expectedValuesFile.open(experimentPath / "mse_values.txt");
   write3dMatrix(expectedValues, expectedValuesFile, samplesPerLevel, numberOfLevels, 1);
   expectedValuesFile.close();
 }

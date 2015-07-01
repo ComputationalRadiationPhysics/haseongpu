@@ -70,16 +70,16 @@ Usage
   can be started by the following:
 
   1. follow the compile instructions above
-  2. change path "cd example/matlab_example/"
+  2. change path `cd example/matlab_example/`
   3. run : `matlab laserPumpCladdingExample`
   4. watch progress
-  5. take a look at the results (*.vtk) with paraview 
+  5. take a look at the results (`*.vtk`) with paraview
 
 
 ### Quick C-Application laser pump example 
 
   1. follow the compile instructions above
-  2. change path "cd example/c_example/"
+  2. change path `cd example/c_example/`
   3. run : `./bin/calcPhiASE --input-path=./input/cylindrical --min-rays=10000`
   4. watch progress
   5. take a look at the results in the output directory
@@ -312,12 +312,14 @@ Synopsis
       Path to a writable location. Is used to write
       input and output for matlab script.
 
-    --parallel-mode=[|threaded|mpi]  
+    --parallel-mode=[graybat|threaded|mpi]
       Defines the method of parallelization to start the
       simulation with. Mode "threaded" uses pthreads on a single
-      node. Mode "mpi" is a parallel mpi
-      implementation for clusters. Note, that this parameter
-      is currently only available when using `--device-mode=gpu`
+      node. Mode "mpi" is a parallel mpi implementation for clusters. Mode
+      "graybat" is similar to "mpi", but uses the communication framework
+      [GrayBat](https://github.com/ComputationalRadiationPhysics/graybat)
+      instead of plain MPI. Note, that the last 2 parameters
+      are currently only available when using `--device-mode=gpu`
 
     --device-mode=[cpu|gpu]  
       Defines on which hardware the simulation will run.
@@ -385,6 +387,14 @@ Synopsis
       wavelength.  Omitting this option or setting a to small
       resolutionwill set the lambda resolution to the maximum number
       of absorption or emission values.
+
+    --config=
+      Specify the location of an optional configuration file. This file holds
+      simple key=value pairs that have the same names as the command-line
+      parameters. If values are defined in the file and on the command line,
+      values from the file are overruled. It is not possible to specify
+      --help or --config= in the config file itself.
+      For an example configuration, see the C example (`calcPhiASE.cfg`).
 
 C-Application Templates
 -----------------------
