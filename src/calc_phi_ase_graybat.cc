@@ -157,7 +157,7 @@ void processSamples(const Vertex slave,
 
 float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 			  const ComputeParameters &compute,
-			  const Mesh& mesh,
+			  Mesh& mesh,
 			  Result &result ){
 
     /***************************************************************************
@@ -202,6 +202,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 	if(vertex != master){
 	  processSamples(vertex, master, cage, experiment, compute, mesh, result);
 	  cage.~Cage();
+          mesh.free();
 	  exit(0);
 
 	}	

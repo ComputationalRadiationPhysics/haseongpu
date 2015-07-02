@@ -44,6 +44,6 @@
  */
 float calcPhiAseMPI (const ExperimentParameters &experiment,
 		     const ComputeParameters &compute,
-		     const Mesh& mesh,
+		     Mesh& mesh,
 		     Result &result);
 

@@ -289,7 +289,13 @@ int main(int argc, char **argv){
         dout(V_STAT) << std::endl;
 
     }
-  
+
+    // Cleanup device memory
+    // TODO: replace by smart pointer for device memory
+    for(Mesh &mesh : meshs){
+        mesh.free();
+    }
+    
     return 0;
 
 }
