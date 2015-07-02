@@ -399,8 +399,8 @@ Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const uns
     if(minCount+maxCount < 1){
         dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
             << " not set! Assuming a sampling point range of " << "0 to " << numberOfSamples-1 << std::endl;
-        vm[CompSwitch::min_sample_i].value() = boost::any(0);
-        vm[CompSwitch::max_sample_i].value() = boost::any(numberOfSamples-1);
+        vm[CompSwitch::min_sample_i].value() = boost::any(unsigned(0));
+        vm[CompSwitch::max_sample_i].value() = boost::any(unsigned(numberOfSamples-1));
         return vm;
     }
 
