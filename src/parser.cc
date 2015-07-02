@@ -169,10 +169,10 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
     po::options_description experiment_options( "Experiment Options" );
     experiment_options.add_options()
         ( std::string(ExpSwitch::input_path + ",i").c_str(),
-          po::value<fs::path> ()->default_value(fs::path("input")),
+          po::value<fs::path> ()->required(),
           "The path to a folder that contains the input files")
         ( std::string(ExpSwitch::output_path + ",o").c_str(),
-          po::value<fs::path> ()->default_value(fs::path("output")),
+          po::value<fs::path> ()->required(),
           "The path to a folder that contains the output files")
         ( ExpSwitch::min_rays.c_str(),
           po::value<int> ()
@@ -264,7 +264,7 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
 
     if(vm.count("help")){
         verbosity |= V_NOLABEL;
-        dout(V_NOLABEL) << "Usage: " << argv[0] << " [options] " << std::endl;
+        dout(V_NOLABEL) << "Usage: " << argv[0] << " -i <input folder> -o <output folder> [options] " << std::endl;
         dout(V_NOLABEL) << cmdline_options << std::endl;
         exit(0);
     }
