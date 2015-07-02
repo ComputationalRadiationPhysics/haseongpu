@@ -80,7 +80,7 @@ Usage
 
   1. follow the compile instructions above
   2. change path `cd example/c_example/`
-  3. run : `./bin/calcPhiASE --input-path=./input/cylindrical --min-rays=10000`
+  3. run : `./bin/calcPhiASE --config=calcPhiASE.cfg`
   4. watch progress
   5. take a look at the results in the output directory
 
