@@ -73,8 +73,8 @@ struct ComputeParameters {
             fs::path inputPath,
             fs::path outputPath,
             std::vector<unsigned> devices,
-            int minSampleRange,
-            int maxSampleRange) :
+            unsigned minSampleRange,
+            unsigned maxSampleRange) :
         maxRepetitions(maxRepetitions),
         adaptiveSteps(adaptiveSteps),
         gpu_i(gpu_i),
@@ -96,8 +96,8 @@ struct ComputeParameters {
     fs::path inputPath;
     fs::path outputPath;
     std::vector<unsigned> devices;
-    int minSampleRange;
-    int maxSampleRange;
+    unsigned minSampleRange;
+    unsigned maxSampleRange;
 
 
 };
