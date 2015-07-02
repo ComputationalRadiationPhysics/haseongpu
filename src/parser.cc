@@ -200,10 +200,10 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           std::string("The number of adaptive sampling steps that are used to split the range between "
               + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
         ( CompSwitch::min_sample_i.c_str(),
-          po::value<int> (),
+          po::value<unsigned> (),
           "The the minimal index of sample points to simulate")
         ( CompSwitch::max_sample_i.c_str(),
-          po::value<int> (),
+          po::value<unsigned> (),
           "The the maximal index of sample points to simulate")
         ;
 
