@@ -107,7 +107,27 @@ Mesh::Mesh(// Constants
   triangleNormalPoint(triangleNormalPoint){
 
 }
+
 Mesh::~Mesh() {
+    
+}
+
+__host__ void Mesh::free(){
+    points.free();
+    betaVolume.free();
+    normalVec.free();
+    centers.free();
+    triangleSurfaces.free();
+    forbiddenEdge.free();
+    betaCells.free();
+    claddingCellTypes.free();
+    refractiveIndices.free(); 
+    reflectivities.free();   
+    totalReflectionAngles.free();
+    trianglePointIndices.free();
+    triangleNeighbors.free();
+    triangleNormalPoint.free();
+    
 }
 
 /**
