@@ -174,7 +174,7 @@ void mpiCompute( const ExperimentParameters &experiment,
 
 float calcPhiAseMPI ( const ExperimentParameters &experiment,
 		      const ComputeParameters &compute,
-		      const Mesh& mesh,
+		      Mesh& mesh,
 		      Result &result ){
 
   // Init MPI
@@ -205,6 +205,7 @@ float calcPhiAseMPI ( const ExperimentParameters &experiment,
 
     cudaDeviceReset();   
     MPI_Finalize();
+    mesh.free();
     break;
 
 
