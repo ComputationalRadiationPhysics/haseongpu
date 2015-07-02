@@ -32,8 +32,8 @@
 #include <string>
 #include <curand_kernel.h> /* curand_uniform */
 
-#include <cuda_utils.hpp>
 #include <geometry.hpp>
+#include <ConstHybridVector.hpp>
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
@@ -109,9 +109,6 @@
 class Mesh {
  public:
 
-    Mesh(){}
-    
-  //Mesh();
   Mesh(// Constants
        double claddingAbsorption,
        float surfaceTotal,
@@ -141,23 +138,23 @@ class Mesh {
        std::vector<unsigned> triangleNormalPoint);
 
 
-  constHybridVector<double>   points;
-  constHybridVector<double>   betaVolume;
-  constHybridVector<double>   normalVec;
-  constHybridVector<double>   centers;
-  constHybridVector<float>    triangleSurfaces;
-  constHybridVector<int>      forbiddenEdge;
-  constHybridVector<double>   betaCells;
-  constHybridVector<unsigned> claddingCellTypes;
+  ConstHybridVector<double>   points;
+  ConstHybridVector<double>   betaVolume;
+  ConstHybridVector<double>   normalVec;
+  ConstHybridVector<double>   centers;
+  ConstHybridVector<float>    triangleSurfaces;
+  ConstHybridVector<int>      forbiddenEdge;
+  ConstHybridVector<double>   betaCells;
+  ConstHybridVector<unsigned> claddingCellTypes;
 
-  constHybridVector<float>    refractiveIndices; 
-  constHybridVector<float>    reflectivities;   //based on triangleIndex, with offset from bottom/top
-  constHybridVector<float>    totalReflectionAngles;
+  ConstHybridVector<float>    refractiveIndices; 
+  ConstHybridVector<float>    reflectivities;   //based on triangleIndex, with offset from bottom/top
+  ConstHybridVector<float>    totalReflectionAngles;
 
   // Indexstructs
-  constHybridVector<unsigned> trianglePointIndices;
-  constHybridVector<int>      triangleNeighbors;
-  constHybridVector<unsigned> triangleNormalPoint;
+  ConstHybridVector<unsigned> trianglePointIndices;
+  ConstHybridVector<int>      triangleNeighbors;
+  ConstHybridVector<unsigned> triangleNormalPoint;
 
   // Constants
   double claddingAbsorption;
@@ -173,6 +170,8 @@ class Mesh {
   unsigned claddingNumber;
 
   ~Mesh();
+
+  void free();
 
   __device__ int getNeighbor(unsigned triangle, int edge) const;
   __device__ Point genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState) const;
