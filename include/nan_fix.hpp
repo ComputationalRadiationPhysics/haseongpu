@@ -31,11 +31,11 @@
  * @brief this allows the use of isnan() for int and unsigned
  * in the template function fileToVector()
  */
-inline bool isNaN(const int i){
+inline bool isNaN(const int){
   return false;
 }
 
-inline bool isNaN(const unsigned int i){
+inline bool isNaN(const unsigned int){
   return false;
 }
 

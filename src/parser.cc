@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <stdlib.h> /* exit() */
 #include <sstream> /* stringstream */
+#include <functional> /* bind, placeholders */
 
 #include <logging.hpp> 
 #include <mesh.hpp>
@@ -86,6 +87,15 @@ WavelengthData calculateSigmas(
 }
 
 
+void checkPositive(int i, std::string name){
+    if(i < 0){
+        verbosity |= V_ERROR;
+        dout(V_ERROR) << name << " must have a positive argument!" << std::endl;
+        throw po::invalid_option_value(std::to_string(i));
+    }
+}
+
+
 int parse( const int argc,
         char** argv,
         ExperimentParameters& experiment,
@@ -102,7 +112,7 @@ int parse( const int argc,
     // Set/Test device to run experiment with
     //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
     //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
-    std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<unsigned>());
+    std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
 
     vm = checkParameterValidity(vm, devices.size());
 
@@ -112,11 +122,12 @@ int parse( const int argc,
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
-            vm.count(ExpSwitch::spectral) ? vm[ExpSwitch::spectral].as<unsigned>() : 0
+            vm.count(ExpSwitch::spectral) ? vm[ExpSwitch::spectral].as<int>() : 0
             );
 
-    experiment = ExperimentParameters ( vm[ExpSwitch::min_rays].as<unsigned>(),
-            vm[ExpSwitch::max_rays].as<unsigned>(),
+    experiment = ExperimentParameters (
+            vm[ExpSwitch::min_rays].as<int>(),
+            vm[ExpSwitch::max_rays].as<int>(),
             waveD.sigmaAInterpolated,
             waveD.sigmaEInterpolated,
             waveD.maxSigmaA,
@@ -125,8 +136,9 @@ int parse( const int argc,
             vm[ExpSwitch::reflection].as<bool>() );
 
 
-    compute = ComputeParameters ( vm[CompSwitch::repetitions].as<unsigned>(),
-            vm[CompSwitch::adaptive_steps].as<unsigned>(),
+    compute = ComputeParameters (
+            vm[CompSwitch::repetitions].as<int>(),
+            vm[CompSwitch::adaptive_steps].as<int>(),
             devices.at(0),
             vm[CompSwitch::device_mode].as<std::string>(),
             vm[CompSwitch::parallel_mode].as<std::string>(),
@@ -134,8 +146,8 @@ int parse( const int argc,
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
             devices,
-            vm[CompSwitch::min_sample_i].as<unsigned>(),
-            vm[CompSwitch::max_sample_i].as<unsigned>());
+            vm[CompSwitch::min_sample_i].as<int>(),
+            vm[CompSwitch::max_sample_i].as<int>());
 
 
     std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
@@ -163,10 +175,14 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           po::value<fs::path> ()->default_value(fs::path("output")),
           "The path to a folder that contains the output files")
         ( ExpSwitch::min_rays.c_str(),
-          po::value<unsigned> ()->default_value(100000),
+          po::value<int> ()
+          ->default_value(100000)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The minimal number of rays to use for each sample point")
         ( ExpSwitch::max_rays.c_str(),
-          po::value<unsigned> ()->default_value(100000),
+          po::value<int> ()
+          ->default_value(100000)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The maximal number of rays to use for each sample point")
         ( std::string(ExpSwitch::mse + ",m").c_str(),
           po::value<double> ()->default_value(0.1,"0.1"),
@@ -175,7 +191,7 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           po::value<bool> ()->default_value(true),
           "use reflections or not")
         ( ExpSwitch::spectral.c_str(),
-          po::value<unsigned> (),
+          po::value<int> (),
           "The number of samples used to interpolate spectral intensities")
         ;
 
@@ -189,28 +205,38 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           po::value<std::string> ()->default_value("gpu"),
           "Set the device to run the calculation (cpu, gpu)")
         ( std::string(CompSwitch::ngpus + ",g").c_str(),
-          po::value<unsigned> ()->default_value(1),
+          po::value<int> ()
+          ->default_value(1)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           std::string("The maximum number of GPUs to b used on a single node. Should be left unchanged for --"
               + CompSwitch::parallel_mode + "=mpi").c_str())
         ( std::string(CompSwitch::repetitions + ",r").c_str(),
-          po::value<unsigned> ()->default_value(4),
+          po::value<int> ()
+          ->default_value(4)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
         ( std::string(CompSwitch::adaptive_steps + ",a").c_str(),
-          po::value<unsigned> ()->default_value(5),
+          po::value<int> ()
+          ->default_value(5)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           std::string("The number of adaptive sampling steps that are used to split the range between "
               + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
         ( CompSwitch::min_sample_i.c_str(),
-          po::value<unsigned> (),
+          po::value<int> ()
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The the minimal index of sample points to simulate")
         ( CompSwitch::max_sample_i.c_str(),
-          po::value<unsigned> (),
+          po::value<int> ()
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The the maximal index of sample points to simulate")
         ;
 
     po::options_description generic_options( "Generic Options" );
     generic_options.add_options()
         ( "verbosity,v",
-          po::value<unsigned> ( &verbosity )->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT),
+          po::value<int> ()
+          ->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT)
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "Set the verbosity levels:\n\
           \t 0 (quiet)\n\
           \t 1 (error)\n\
@@ -242,6 +268,8 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
         dout(V_NOLABEL) << cmdline_options << std::endl;
         exit(0);
     }
+
+    verbosity = vm["verbosity"].as<int>();
 
     if(vm.count("config")){
         fs::path configPath(vm["config"].as<fs::path>());
@@ -285,16 +313,16 @@ void printCommandLine(const Modifiable_variables_map vm){
 Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, const unsigned deviceCount){
         
     double mseThreshold = vm[ExpSwitch::mse].as<double>();
-    unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<unsigned>();
-    unsigned maxgpus = vm[CompSwitch::ngpus].as<unsigned>();
+    unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<int>();
+    unsigned maxgpus = vm[CompSwitch::ngpus].as<int>();
 
-    const unsigned minRaysPerSample = vm[ExpSwitch::min_rays].as<unsigned>();
+    const unsigned minRaysPerSample = vm[ExpSwitch::min_rays].as<int>();
     const fs::path inputPath = vm[ExpSwitch::input_path].as<fs::path>();
     const fs::path outputPath = vm[ExpSwitch::output_path].as<fs::path>();
     const std::string deviceMode = vm[CompSwitch::device_mode].as<std::string>();
     const std::string parallelMode = vm[CompSwitch::parallel_mode].as<std::string>();
-    const unsigned maxRepetitions = vm[CompSwitch::repetitions].as<unsigned>();
-    const unsigned adaptiveSteps = vm[CompSwitch::adaptive_steps].as<unsigned>();
+    const unsigned maxRepetitions = vm[CompSwitch::repetitions].as<int>();
+    const unsigned adaptiveSteps = vm[CompSwitch::adaptive_steps].as<int>();
 
     if(deviceMode != DeviceMode::CPU && deviceMode != DeviceMode::GPU){
         dout(V_ERROR) << CompSwitch::device_mode << " must be either \""
@@ -339,7 +367,7 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
 
     if(maxRaysPerSample < minRaysPerSample){
         dout(V_WARNING) << ExpSwitch::max_rays << " < " << ExpSwitch::min_rays << ". Auto-increasing "
-            << ExpSwitch::min_rays << " (will be non-adaptive!)" << std::endl;
+            << ExpSwitch::max_rays << " (will be non-adaptive!)" << std::endl;
         maxRaysPerSample = minRaysPerSample;
     }
 
@@ -353,8 +381,8 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     if( vm.count(CompSwitch::min_sample_i) + vm.count(CompSwitch::max_sample_i) == 2){
-        const unsigned minSampleRange = vm [CompSwitch::min_sample_i].as<unsigned>();
-        const unsigned maxSampleRange = vm [CompSwitch::max_sample_i].as<unsigned>();
+        const unsigned minSampleRange = vm[CompSwitch::min_sample_i].as<int>();
+        const unsigned maxSampleRange = vm[CompSwitch::max_sample_i].as<int>();
 
         if(maxSampleRange < minSampleRange){
             dout(V_ERROR) << CompSwitch::max_sample_i << " < " << CompSwitch::min_sample_i << "!" << std::endl;
@@ -399,8 +427,8 @@ Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const uns
     if(minCount+maxCount < 1){
         dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
             << " not set! Assuming a sampling point range of " << "0 to " << numberOfSamples-1 << std::endl;
-        vm[CompSwitch::min_sample_i].value() = boost::any(unsigned(0));
-        vm[CompSwitch::max_sample_i].value() = boost::any(unsigned(numberOfSamples-1));
+        vm[CompSwitch::min_sample_i].value() = boost::any(0);
+        vm[CompSwitch::max_sample_i].value() = boost::any(numberOfSamples-1);
         return vm;
     }
 
@@ -411,12 +439,12 @@ Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const uns
     }
 
     // if the code did not terminate, both min and max are defined inside the map
-    if(vm[CompSwitch::min_sample_i].as<unsigned>() > numberOfSamples){
+    if(static_cast<unsigned>(vm[CompSwitch::min_sample_i].as<int>()) > numberOfSamples){
         dout(V_ERROR) << CompSwitch::min_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
         exit(1);
     }
 
-    if(vm[CompSwitch::max_sample_i].as<unsigned>() > numberOfSamples){
+    if(static_cast<unsigned>(vm[CompSwitch::max_sample_i].as<int>()) > numberOfSamples){
         dout(V_ERROR) << CompSwitch::max_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
         exit(1);
     }
