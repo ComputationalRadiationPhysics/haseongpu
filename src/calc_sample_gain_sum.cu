@@ -91,7 +91,7 @@ __device__ __inline__ unsigned genRndSigmas(unsigned length, curandStateMtgp32* 
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 						const Mesh mesh, 
 						const unsigned* indicesOfPrisms, 
-						const unsigned* numberOfReflectionSlices,
+						const unsigned reflection_i,
 						const double* importance,
 						const unsigned raysPerSample,
 						float *gainSum, 
@@ -117,7 +117,6 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
 
     // Get triangle/prism to start ray from
     unsigned startPrism             = indicesOfPrisms[rayNumber];
-    unsigned reflection_i           = numberOfReflectionSlices[rayNumber];
     unsigned reflections            = (reflection_i + 1) / 2;
     ReflectionPlane reflectionPlane = (reflection_i % 2 == 0) ? BOTTOM_REFLECTION : TOP_REFLECTION;
     unsigned startLevel             = startPrism / mesh.numberOfTriangles;

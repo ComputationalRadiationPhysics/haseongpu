@@ -111,14 +111,11 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // }
 
   // Memory allocation/init and copy for device memory
-  device_vector<unsigned> dNumberOfReflectionSlices(experiment.maxRaysPerSample, 0);
   device_vector<float>    dGainSum            (1, 0);
   device_vector<float>    dGainSumSquare      (1, 0);
   device_vector<unsigned> dRaysPerPrism       (mesh.numberOfPrisms * reflectionSlices, 1);
-  device_vector<unsigned> dPrefixSum          (mesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dImportance         (mesh.numberOfPrisms * reflectionSlices, 0);
   device_vector<double>   dPreImportance      (mesh.numberOfPrisms * reflectionSlices, 0);
-  device_vector<unsigned> dIndicesOfPrisms    (experiment.maxRaysPerSample,  0);
   device_vector<double>   dSigmaA             (experiment.sigmaA.begin(), experiment.sigmaA.end());
   device_vector<double>   dSigmaE             (experiment.sigmaE.begin(),experiment.sigmaE.end());
 
@@ -164,42 +161,53 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 							    blockDim,
 							    gridDim);
           
-	// Prism scheduling for gpu threads
-	mapRaysToPrisms(dIndicesOfPrisms, dNumberOfReflectionSlices, dRaysPerPrism, dPrefixSum, reflectionSlices, hRaysPerSampleDump, mesh.numberOfPrisms);
-
-	// Start Kernel
 	dGainSum[0]       = 0;
 	dGainSumSquare[0] = 0;
 
-	if(experiment.useReflections){
-	  calcSampleGainSumWithReflection<<< gridDim, blockDim >>>(devMTGPStates,
-								   mesh, 
-								   raw_pointer_cast(&dIndicesOfPrisms[0]), 
-								   raw_pointer_cast(&dNumberOfReflectionSlices[0]), 
-								   raw_pointer_cast(&dImportance[0]),
-								   hRaysPerSampleDump, 
-								   raw_pointer_cast(&dGainSum[0]), 
-								   raw_pointer_cast(&dGainSumSquare[0]),
-								   sample_i, 
-								   raw_pointer_cast(&dSigmaA[0]),
-								   raw_pointer_cast(&dSigmaE[0]),
-								   experiment.sigmaA.size(),
-								   raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
-	}
-	else{
-	  calcSampleGainSum<<< gridDim, blockDim >>>(devMTGPStates,
-						     mesh, 
-						     raw_pointer_cast(&dIndicesOfPrisms[0]), 
-						     raw_pointer_cast(&dImportance[0]),
-						     hRaysPerSampleDump, 
-						     raw_pointer_cast(&dGainSum[0]), 
-						     raw_pointer_cast(&dGainSumSquare[0]),
-						     sample_i, 
-						     raw_pointer_cast(&dSigmaA[0]),
-						     raw_pointer_cast(&dSigmaE[0]),
-						     experiment.sigmaA.size(),
-						     raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
-	}
+    for(unsigned reflection_i=0; reflection_i < reflectionSlices; ++reflection_i){
+        const unsigned reflectionOffset = mesh.numberOfPrisms * reflection_i;
+        device_vector<double>::iterator   reflImportanceBegin   = dImportance.begin()   + reflectionOffset;
+        device_vector<unsigned>::iterator reflRaysPerPrismBegin = dRaysPerPrism.begin() + reflectionOffset;
+        device_vector<unsigned>::iterator reflRaysPerPrismEnd   = reflRaysPerPrismBegin + mesh.numberOfPrisms;
+
+        unsigned hRaysPerSampleIteration =  thrust::reduce(reflRaysPerPrismBegin, reflRaysPerPrismEnd, 0u);
+        device_vector<unsigned> dIndicesOfPrisms(hRaysPerSampleIteration,  0);
+        mapRaysToPrisms(dIndicesOfPrisms, reflRaysPerPrismBegin, reflRaysPerPrismEnd);
+
+        // Start Kernel
+        if(experiment.useReflections){
+            calcSampleGainSumWithReflection<<< gridDim, blockDim >>>(
+                    devMTGPStates,
+                    mesh,
+                    raw_pointer_cast(&dIndicesOfPrisms[0]),
+                    reflection_i,
+                    raw_pointer_cast( &(*reflImportanceBegin) ),
+                    hRaysPerSampleIteration,
+                    raw_pointer_cast(&dGainSum[0]),
+                    raw_pointer_cast(&dGainSumSquare[0]),
+                    sample_i,
+                    raw_pointer_cast(&dSigmaA[0]),
+                    raw_pointer_cast(&dSigmaE[0]),
+                    experiment.sigmaA.size(),
+                    raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
+        }
+        else{
+            calcSampleGainSum<<< gridDim, blockDim >>>(
+                    devMTGPStates,
+                    mesh,
+                    raw_pointer_cast(&dIndicesOfPrisms[0]),
+                    raw_pointer_cast( &(*reflImportanceBegin) ),
+                    hRaysPerSampleIteration,
+                    raw_pointer_cast(&dGainSum[0]),
+                    raw_pointer_cast(&dGainSumSquare[0]),
+                    sample_i,
+                    raw_pointer_cast(&dSigmaA[0]),
+                    raw_pointer_cast(&dSigmaE[0]),
+                    experiment.sigmaA.size(),
+                    raw_pointer_cast(&(device_vector<unsigned> (1,0))[0]));
+        }
+    }
+
 
 	float mseTmp = calcMSE(dGainSum[0], dGainSumSquare[0], hRaysPerSampleDump);
 
