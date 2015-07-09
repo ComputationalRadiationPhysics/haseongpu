@@ -58,6 +58,7 @@ __global__ void mapPrefixSumToPrisms(
         const unsigned numberOfPrisms,
         const unsigned* raysPerPrism,
         const unsigned* prefixSum,
+        const unsigned offset,
         unsigned *indicesOfPrisms
         ){
 
@@ -66,7 +67,7 @@ __global__ void mapPrefixSumToPrisms(
     if(id >= numberOfPrisms) return;
 
     const unsigned count            = raysPerPrism[id];
-    const unsigned startingPosition = prefixSum[id];
+    const unsigned startingPosition = prefixSum[id]-offset;
     const unsigned prism_i          = id;
 
     for(unsigned i=0; i < count ; ++i){
@@ -78,19 +79,23 @@ __global__ void mapPrefixSumToPrisms(
 void mapRaysToPrisms(
         device_vector<unsigned> &indicesOfPrisms,
         const device_vector<unsigned>::iterator raysPerPrismBegin,
-        const device_vector<unsigned>::iterator raysPerPrismEnd
+        const device_vector<unsigned>::iterator raysPerPrismEnd,
+        const device_vector<unsigned>::iterator prefixSumBegin,
+        const device_vector<unsigned>::iterator prefixSumEnd,
+        const unsigned offset
         ){
     // blocksize chosen by occupancyCalculator
     const unsigned blocksize = 256;
     const unsigned gridsize  = (raysPerPrismEnd-raysPerPrismBegin +blocksize-1)/blocksize;
-    device_vector<unsigned> prefixSum(raysPerPrismEnd-raysPerPrismBegin);
+    //device_vector<unsigned> prefixSum(raysPerPrismEnd-raysPerPrismBegin);
 
-    thrust::exclusive_scan(raysPerPrismBegin, raysPerPrismEnd, prefixSum.begin());
+    //thrust::exclusive_scan(raysPerPrismBegin, raysPerPrismEnd, prefixSum.begin());
 
     mapPrefixSumToPrisms<<<gridsize,blocksize>>> (
-            prefixSum.size(),
+            prefixSumEnd - prefixSumBegin,
             raw_pointer_cast( &(*raysPerPrismBegin) ),
-            raw_pointer_cast( &prefixSum[0] ),
+            raw_pointer_cast( &(*prefixSumBegin) ),
+            offset,
             raw_pointer_cast( &indicesOfPrisms[0] )
             );
 }

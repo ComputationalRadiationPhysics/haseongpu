@@ -121,7 +121,6 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
     ReflectionPlane reflectionPlane = (reflection_i % 2 == 0) ? BOTTOM_REFLECTION : TOP_REFLECTION;
     unsigned startLevel             = startPrism / mesh.numberOfTriangles;
     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-    unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
     Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
 	
 	//get a random index in the wavelength array
@@ -131,10 +130,10 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
     double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
 
 	// include the stimulus from the starting prism and the importance of that ray
-    gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism + reflectionOffset];
+    gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
     
     assert(!isnan(mesh.getBetaVolume(startPrism)));
-    assert(!isnan(importance[startPrism + reflectionOffset]));
+    assert(!isnan(importance[startPrism]));
     assert(!isnan(gain));
 
     gainSumTemp       += gain;

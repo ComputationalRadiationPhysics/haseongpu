@@ -51,6 +51,9 @@
  */
 void mapRaysToPrisms(
         thrust::device_vector<unsigned> &indicesOfPrisms,
-        const thrust::device_vector<unsigned>::iterator raysPerPrismStart,
-        const thrust::device_vector<unsigned>::iterator raysPerPrismEnd
+        const thrust::device_vector<unsigned>::iterator raysPerPrismBegin,
+        const thrust::device_vector<unsigned>::iterator raysPerPrismEnd,
+        const thrust::device_vector<unsigned>::iterator prefixSumBegin,
+        const thrust::device_vector<unsigned>::iterator prefixSumEnd,
+        const unsigned offset
         );

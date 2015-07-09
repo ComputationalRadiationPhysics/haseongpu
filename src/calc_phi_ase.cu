@@ -161,18 +161,38 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 							    blockDim,
 							    gridDim);
           
-	dGainSum[0]       = 0;
-	dGainSumSquare[0] = 0;
+    // prepare the Prefix Sum and determine how many rays will be started in each slice
+    device_vector<unsigned> dPrefixSumComplete(dRaysPerPrism.size());
+    thrust::exclusive_scan(dRaysPerPrism.begin(),dRaysPerPrism.end(),dPrefixSumComplete.begin());
+    std::vector<unsigned> hRaysPerIterationV(reflectionSlices);
+    std::vector<unsigned> hRaysPerIterationOffsetV(reflectionSlices);
+
+    for(unsigned i = reflectionSlices, sum = hRaysPerSampleDump; i > 0; ){
+        --i;
+        const unsigned offset = i * mesh.numberOfPrisms;
+        hRaysPerIterationOffsetV[i] = dPrefixSumComplete[offset];
+        hRaysPerIterationV[i] = sum-dPrefixSumComplete[offset];
+        sum -= hRaysPerIterationV[i];
+    }
+    //device_vector<unsigned> dIndicesOfPrisms( *(std::max_element(hRaysPerIterationV.begin(), hRaysPerIterationV.end())) );
+
+    dGainSum[0]       = 0;
+    dGainSumSquare[0] = 0;
 
     for(unsigned reflection_i=0; reflection_i < reflectionSlices; ++reflection_i){
+        unsigned hRaysPerSampleIteration = hRaysPerIterationV[reflection_i];
+        if(hRaysPerSampleIteration == 0) continue;
+
         const unsigned reflectionOffset = mesh.numberOfPrisms * reflection_i;
         device_vector<double>::iterator   reflImportanceBegin   = dImportance.begin()   + reflectionOffset;
         device_vector<unsigned>::iterator reflRaysPerPrismBegin = dRaysPerPrism.begin() + reflectionOffset;
         device_vector<unsigned>::iterator reflRaysPerPrismEnd   = reflRaysPerPrismBegin + mesh.numberOfPrisms;
+        device_vector<unsigned>::iterator reflPrefixSumBegin    = dPrefixSumComplete.begin() + reflectionOffset;
+        device_vector<unsigned>::iterator reflPrefixSumEnd      = reflPrefixSumBegin + mesh.numberOfPrisms;
 
-        unsigned hRaysPerSampleIteration =  thrust::reduce(reflRaysPerPrismBegin, reflRaysPerPrismEnd, 0u);
-        device_vector<unsigned> dIndicesOfPrisms(hRaysPerSampleIteration,  0);
-        mapRaysToPrisms(dIndicesOfPrisms, reflRaysPerPrismBegin, reflRaysPerPrismEnd);
+        device_vector<unsigned> dIndicesOfPrisms(hRaysPerSampleIteration);
+
+        mapRaysToPrisms(dIndicesOfPrisms, reflRaysPerPrismBegin, reflRaysPerPrismEnd, reflPrefixSumBegin, reflPrefixSumEnd, hRaysPerIterationOffsetV[reflection_i]);
 
         // Start Kernel
         if(experiment.useReflections){
