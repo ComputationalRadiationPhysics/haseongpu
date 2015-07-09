@@ -409,12 +409,12 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     if(mseThreshold == 0){
-        mseThreshold = 1000;
+        mseThreshold = 1000.;
     }
 
-    vm[ExpSwitch::max_rays].value() = boost::any(maxRaysPerSample);
-    vm[CompSwitch::ngpus].value() = boost::any(maxgpus);
-    vm[ExpSwitch::mse].value() = boost::any(mseThreshold);
+    vm[ExpSwitch::max_rays].value() = boost::any(static_cast<int>(maxRaysPerSample));
+    vm[CompSwitch::ngpus].value() = boost::any(static_cast<int>(maxgpus));
+    vm[ExpSwitch::mse].value() = boost::any(static_cast<double>(mseThreshold));
 
     return vm;
 }
