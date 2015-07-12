@@ -45,53 +45,53 @@ const std::array<int, 1> abortMsg{{abortTag}};
 
 template <class Vertex, class Cage>
 void distributeSamples(Vertex master,
-		    const std::vector<unsigned> samples,
-		    Cage &cage,
-		    const Mesh& mesh,
-		    Result& result ){
+                       const std::vector<unsigned> samples,
+                       Cage &cage,
+                       const Mesh& mesh,
+                       Result& result ){
 
     typedef typename Cage::Edge Edge;
     
     // Messages
     std::array<float, 4> resultMsg;
     std::array<int, 1>   sampleMsg; 
+    unsigned nReceivedResults = 0;
     
-    for(auto sample = samples.begin(); sample != samples.end();){
-
-
+    auto sample = samples.begin();
+    while(nReceivedResults != samples.size()){
         // Receive request or results
         Edge inEdge = cage.recv(resultMsg);
 		
         if(resultMsg[0] == requestTag){
-            sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
-		
-            // Send next sample
-            cage.send(inEdge.inverse(), sampleMsg);
+            
+            if(sample != samples.end()){
+                // Send next sample
+                sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
+                cage.send(inEdge.inverse(), sampleMsg);
+                
+            }
 
-            // TODO: should be removed
-            if(sample == samples.end())
-                break;
-		
-	
         }
         else {
             // Process result
-            unsigned sample_i      = (unsigned) (resultMsg[0]);
-            result.phiAse.at(sample_i)   = resultMsg[1];
+            unsigned sample_i             = (unsigned) (resultMsg[0]);
+            result.phiAse.at(sample_i)    = resultMsg[1];
             result.mse.at(sample_i)       = resultMsg[2];
             result.totalRays.at(sample_i) = (unsigned) resultMsg[3];
 
+            // Update receive counter
+            nReceivedResults++;
+            
             // Update progress bar
             fancyProgressBar(mesh.numberOfSamples);
 
         }
-		
 
     }
-       
-    // Send abort message to all slaves
+
+    // Send abort message to all vertices
     master.spread(abortMsg);
-	    
+       
 }
 
 template <class Vertex, class Cage>
