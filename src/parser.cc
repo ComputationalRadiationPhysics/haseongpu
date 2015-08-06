@@ -26,6 +26,8 @@
 #include <stdlib.h> /* exit() */
 #include <sstream> /* stringstream */
 #include <functional> /* bind, placeholders */
+#define _USE_MATH_DEFINES /* make M_PI known for windows */
+#include <cmath> /* M_PI */
 
 #include <logging.hpp> 
 #include <mesh.hpp>
