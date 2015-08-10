@@ -21,7 +21,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
+#define _USE_MATH_DEFINES /* make M_PI known for windows */
+#include <cmath>
 #include <assert.h>
 #include <vector>
 #include <curand_kernel.h>
