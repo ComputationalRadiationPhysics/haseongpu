@@ -37,8 +37,11 @@
  */
 
 #pragma once
+
 #include <mesh.hpp>
-#include <reflection.hpp> /* ReflectionPlane */
+#include <geometry.hpp> /* ReflectionPlane */
+
+#include <host_defines.h> /* __host__ __device__ */
 
 /**
  * @brief Direct ray propagation without reflection

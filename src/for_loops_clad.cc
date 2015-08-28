@@ -18,8 +18,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include <vector>
 #include <stdio.h>
 

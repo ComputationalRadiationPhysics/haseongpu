@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <host_defines.h> /* __host__ __device__ */
+
 struct TwoDimPoint {
   double x;
   double y;

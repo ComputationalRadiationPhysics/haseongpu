@@ -23,10 +23,11 @@
 #include <vector> /* vector */
 #include <iomanip> /* std::fixed, std::setprecision() */
 #include <string> /* std::to_string() */
-#include <time.h> /* time, time_t */
+#include <ctime> /* time, time_t */
 
-#include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::ofstream, fs::ifstream */
+#include <boost/filesystem/path.hpp> /* fs::path */
+
 namespace fs = boost::filesystem;
 
 #include <write_to_vtk.hpp>

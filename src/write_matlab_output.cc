@@ -24,8 +24,9 @@
 
 #include <write_matlab_output.hpp>
 
-#include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
+#include <boost/filesystem/path.hpp> /* fs::path */
+
 namespace fs = boost::filesystem;
 
 /**

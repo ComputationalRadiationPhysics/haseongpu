@@ -29,7 +29,9 @@
 #include <mesh.hpp>
 #include <logging.hpp>
 #include <progressbar.hpp>
+#include <types.hpp>
 
+#include <cuda_runtime_api.h> /* cudaDeviceReset */
 
 // Nodes
 #define HEAD_NODE 0
@@ -191,7 +193,7 @@ float calcPhiAseMPI ( const ExperimentParameters &experiment,
   float runtime;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  std::vector<float> runtimes(size,0);
+  std::vector<float> runtimes(size, 0);
 
   // Rank 0 will be head node
   // all other ranks will be compute nodes
@@ -202,7 +204,7 @@ float calcPhiAseMPI ( const ExperimentParameters &experiment,
 	     mesh,
 	     size-1,
 	     1);
-
+    
     cudaDeviceReset();   
     MPI_Finalize();
     mesh.free();
