@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <stdio.h> /* fprintf, printf, stderr */
+#include <cstdio> /* fprintf, printf, stderr */
 #include <cuda_runtime_api.h> /* cuda constants etc. */
 #include <cstdlib> /* exit */
 
