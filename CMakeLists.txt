@@ -20,7 +20,6 @@ set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
 set(CUDA_SEPARABLE_COMPILATION ON)
 # Do not propagate CXX flags to the nvcc host compiler (especially -std=c++11)
 set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-set(CUDA_HOST_COMPILER g++)
 
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_10" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_11" IS_CUDA_ARCH_UNSUPPORTED)
@@ -55,23 +54,11 @@ if(CUDA_KEEP_FILES)
 endif(CUDA_KEEP_FILES)
 
 
-###############################################################################
-# Boost
-###############################################################################
-find_package(Boost 1.50.0 COMPONENTS mpi system program_options filesystem REQUIRED)
-
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
-
-if(Boost_VERSION EQUAL 105500)
-  message(FATAL_ERROR "Boost 1.55 is not supported. Use a lower or a higher version instead!")
-endif(Boost_VERSION EQUAL 105500)
-
 
 ################################################################################
 # Find MPI
 ################################################################################
-find_package(MPI REQUIRED)
+find_package(MPI)
 include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
 set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
 
@@ -79,6 +66,35 @@ set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
 if(MPI_CXX_FOUND)
   set(LIBS ${LIBS} ${MPI_CXX_LIBRARIES})
 endif(MPI_CXX_FOUND)
+
+
+###############################################################################
+# Boost
+###############################################################################
+set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME ON)
+## The two paths might need to be set on windows
+## the following example paths are for a default installation of the pre-compiled
+## libraries from http://boost.teeks99.com/ (does NOT include Boost.MPI)
+# set(BOOST_LIBRARYDIR "C:/local/boost_1_58_0/lib64-msvc-12.0")
+# set(BOOST_ROOT "C:/local/boost_1_58_0")
+find_package(Boost 1.50.0 REQUIRED COMPONENTS program_options system filesystem)
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${Boost_LIBRARIES})
+
+find_package(Boost 1.50.0 OPTIONAL_COMPONENTS mpi)
+if(Boost_MPI_FOUND)
+    # The define can be used in the code to disable MPI features
+    add_definitions(-DBOOST_MPI_FOUND)
+    include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+    set(LIBS ${LIBS} ${Boost_LIBRARIES})
+endif()
+
+if(Boost_VERSION EQUAL 105500)
+  message(FATAL_ERROR "Boost 1.55 is not supported. Use a lower or a higher version instead!")
+endif(Boost_VERSION EQUAL 105500)
+
 
 
 ################################################################################
@@ -93,7 +109,7 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 ################################################################################
 # GNU
 if(CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")  
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
@@ -130,25 +146,18 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # PGI
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "PGI")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Minform=inform")
+  
+  # Visual Studio (Microsoft)
+ elseif(MSVC)
+    # This loop sets all linking to static (MT)
+    foreach(flag_var
+    CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif(${flag_var} MATCHES "/MD")
+    endforeach(flag_var)
 endif()
-
-
-################################################################################
-# Build type (debug, release)
-################################################################################
-option(HASE_RELEASE "Build release version, disables all runtime asserts" OFF)
-if(HASE_RELEASE)
-  message(STATUS "Release version")
-
-  set(CMAKE_BUILD_TYPE Release)
-  add_definitions(-DNDEBUG)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" "-Xcompiler=-pthread")
-else(HASE_RELEASE)
-  message(STATUS "Debug version")
-
-  set(CMAKE_BUILD_TYPE Debug)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -g "-Xcompiler=-g,-pthread")
-endif(HASE_RELEASE)
 
 
 ###############################################################################
@@ -158,7 +167,7 @@ function(warn_path_cuda PATH_VARIABLE)
   string(TOLOWER "$ENV{${PATH_VARIABLE}}" CPLUS_TOLOWER)
   string(FIND "${CPLUS_TOLOWER}" "cuda" CPLUS_TOLOWER_FOUND)
   if(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
-    message(WARNING 
+    message(WARNING
       "Your ${PATH_VARIABLE} seems to contain CUDA includes."
       "This might result in the following error:\n"
       "'error: kernel launches from templates are not allowed in system files'\n"
@@ -180,7 +189,7 @@ warn_path_cuda("C_INCLUDE_PATH")
 set(HASEonGPU_NAME "calcPhiASE")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
-		    ${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
+            ${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
 
 
 cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -195,6 +204,7 @@ target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
 ###############################################################################
 # more targets (make examples, make new, make doc)
 ###############################################################################
+if(CMAKE_COMPILER_IS_GNUCXX) # Only useful on Linux
 add_custom_target(
   examples
   ALL
@@ -225,3 +235,4 @@ add_custom_target(
 #    COMMENT "Generating API documentation with Doxygen" VERBATIM
 #    )
 #endif(DOXYGEN_FOUND)
+endif(CMAKE_COMPILER_IS_GNUCXX)
