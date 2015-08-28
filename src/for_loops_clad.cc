@@ -21,7 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <vector>
-#include <stdio.h>
+#include <cstdio>
 
 #include <for_loops_clad.hpp>
 #include <mt19937ar.hpp>
