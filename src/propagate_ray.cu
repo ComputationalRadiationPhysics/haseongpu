@@ -20,7 +20,7 @@
 
 
 #include <cuda_runtime_api.h>
-#include <assert.h> /* assert */
+#include <cassert> /* assert */
 
 #include <propagate_ray.hpp>
 #include <mesh.hpp>

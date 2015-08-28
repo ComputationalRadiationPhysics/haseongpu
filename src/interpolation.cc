@@ -20,10 +20,11 @@
 
 
 #include <vector>
-#include <assert.h>
+#include <cassert>
 
 #include <interpolation.hpp>
 #include <logging.hpp>
+
 
 /**
  * @brief Returns the index of an value in vector v,

@@ -21,11 +21,9 @@
 
 #pragma once
 #include <vector>
-#include <iostream>
 
 #include <cudachecks.hpp>
-#include <logging.hpp>
-
+#include <cuda_runtime_api.h>
 
 static const unsigned MIN_COMPUTE_CAPABILITY_MAJOR = 2;
 static const unsigned MIN_COMPUTE_CAPABILITY_MINOR = 0;

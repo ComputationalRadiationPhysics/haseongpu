@@ -19,14 +19,14 @@
  */
 
 
-//#include "calc_sample_phi_ase.h"
-#include <stdio.h> /* printf */
-#include <assert.h> /* assert */
+#include <cassert> /* assert */
 
 #include <mesh.hpp>
 #include <geometry.hpp> /* generateRay */
 #include <propagate_ray.hpp> /* propagateRay */
 #include <reflection.hpp> /* ReflectionPlane */
+
+#include <curand_kernel.h> /*curand_uniform*/
 
 /**
  * @brief get the offset for accessing indicesOfPrisms and numberOfReflectionSlices (slow!).

@@ -27,11 +27,9 @@
 
 #pragma once
 #include <vector>
-#include <string>
-
-#include <boost/filesystem.hpp> /* boost::filesystem::path */
 
 #include <mesh.hpp>
+#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
 
 /**
  * @brief creates a VTK file based on the mesh structure and 

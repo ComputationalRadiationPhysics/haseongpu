@@ -18,31 +18,36 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-
-#include <string> /* string */
-#include <vector> /* vector */
-#include <assert.h>
-#include <stdlib.h> /* exit() */
-#include <sstream> /* stringstream */
-#include <functional> /* bind, placeholders */
 #define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath> /* M_PI */
+#include <string> /* string */
+#include <vector> /* vector */
+#include <cassert>
+#include <algorithm>
+#include <cstdlib> /* exit() */
+#include <sstream> /* stringstream */
+#include <functional> /* bind, placeholders */
 
+#include <cuda_runtime_api.h> /* cudaSetDevice */
+
+#include <cudachecks.hpp> /* CUDA_CHECK_RETURN */
+#include <cuda_utils.hpp> /* getFreeDevices */
+#include <types.hpp>
 #include <logging.hpp> 
 #include <mesh.hpp>
 #include <parser.hpp>
 #include <interpolation.hpp> /* interpolateWavelength*/
-#include <cuda_utils.hpp> /* getFreeDevices */
-
 
 // includes for commandline parsing
 #include <boost/program_options.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/any.hpp> /* boost::any_cast */
 
-#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/path.hpp> /* fs::path */
+#include <boost/filesystem/operations.hpp>
+
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 

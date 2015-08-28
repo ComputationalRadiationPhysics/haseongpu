@@ -20,10 +20,10 @@
 
 
 #pragma once
-#include <vector>
-#include <string>
 
-#include <boost/filesystem.hpp> /* boost::filesystem::path */
+#include <vector>
+
+#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
 
 /**
  * @brief creates textfiles containing all the results as a 2D matrix

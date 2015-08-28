@@ -27,7 +27,6 @@
  */
 
 #pragma once
-#include <vector> /* std::vector */
 
 #include <mesh.hpp>
 #include <types.hpp>

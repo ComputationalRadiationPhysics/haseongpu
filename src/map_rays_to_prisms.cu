@@ -20,9 +20,8 @@
 
 
 #include <thrust/scan.h>
+#include <thrust/device_vector.h>
 
-#include <thrust_device_vector_nowarn.hpp>
-#include <thrust_host_vector_nowarn.hpp>
 #include <map_rays_to_prisms.hpp>
 
 

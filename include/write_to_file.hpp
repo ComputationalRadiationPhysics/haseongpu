@@ -26,10 +26,11 @@
  */
 
 #pragma once
+
 #include <string>
 #include <vector>
 
-#include <boost/filesystem.hpp> /* boost::filesystem::path */
+#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
 
 /** 
  * @brief writes a value to a file, where the filename is appended with 2 longish indices
