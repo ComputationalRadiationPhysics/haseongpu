@@ -20,8 +20,9 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/path.hpp> /* fs::path */
 #include <string>
+#include <vector>
 
 namespace fs = boost::filesystem;
 

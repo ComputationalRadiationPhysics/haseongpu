@@ -28,17 +28,17 @@
  */
 
 // STL
-#include <assert.h> /* assert */
 #include <string> /* string */
 #include <vector> /* vector */
-#include <stdlib.h> /* atoi */
-#include <pthread.h> /* pthread_t, pthread_join */
 #include <algorithm> /* std::max */
 #include <numeric> /* accumulate*/
 #include <stdexcept>
+#include <ctime> /* time */
+#include <locale> /* std::locale */
 
 // BOOST
-#include <boost/filesystem.hpp> /* fs::path */
+#include <boost/filesystem/path.hpp> /* fs::path */
+
 namespace fs = boost::filesystem;
 
 // User header files
@@ -49,11 +49,13 @@ namespace fs = boost::filesystem;
 #include <write_to_vtk.hpp>
 #include <write_matlab_output.hpp>
 #include <for_loops_clad.hpp>
-#include <cudachecks.hpp>
 #include <mesh.hpp>
 #include <logging.hpp>
 #include <ray_histogram.hpp>
 #include <types.hpp>
+
+#include <cuda_runtime_api.h> /* cudaDeviceReset */
+
 
 // default without V_DEBUG
 unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp

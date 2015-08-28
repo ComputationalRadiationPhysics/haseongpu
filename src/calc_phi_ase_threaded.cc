@@ -19,11 +19,11 @@
  */
 
 #include <vector>
-#include <iostream>
 #include <thread>
 
 #include <mesh.hpp>
 #include <calc_phi_ase.hpp>
+#include <types.hpp>
 
 
 static std::vector<std::thread> threadIds;

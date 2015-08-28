@@ -36,9 +36,10 @@
 #include <nan_fix.hpp>
 #include <types.hpp>
 
-#include <boost/program_options.hpp> /* fs::path */
-#include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
+#include <boost/filesystem/path.hpp> /* fs::path */
+#include <boost/program_options/variables_map.hpp>
+
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 

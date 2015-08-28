@@ -19,7 +19,7 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
+#include <cassert>
 #include <curand_kernel.h>
 
 #include <importance_sampling.hpp>

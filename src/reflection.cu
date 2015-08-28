@@ -19,7 +19,7 @@
  */
 
 
-#include <assert.h>
+#include <cassert>
 #define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath> /* M_PI */
 #include <reflection.hpp>

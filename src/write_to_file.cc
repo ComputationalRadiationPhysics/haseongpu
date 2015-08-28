@@ -23,8 +23,11 @@
 #include <string> /* std::to_string */
 #include <iomanip> /* setw(), setfill */
 
-#include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
+#include <boost/filesystem/path.hpp> /* fs::path */
+#include <ctime> /* time */
+#include <vector>
+
 namespace fs = boost::filesystem;
 
 #include <write_to_file.hpp>

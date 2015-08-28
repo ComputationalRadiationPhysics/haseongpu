@@ -17,6 +17,8 @@
  * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+
+
 #include <mpi.h>
 #include <vector>
 #include <iostream>
@@ -27,7 +29,9 @@
 #include <mesh.hpp>
 #include <logging.hpp>
 #include <progressbar.hpp>
+#include <types.hpp>
 
+#include <cuda_runtime_api.h> /* cudaDeviceReset */
 
 // Nodes
 #define HEAD_NODE 0

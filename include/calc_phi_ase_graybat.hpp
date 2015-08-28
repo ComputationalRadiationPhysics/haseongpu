@@ -27,10 +27,10 @@
  */
 
 #pragma once
-#include <vector>
 
 #include <mesh.hpp>
 #include <types.hpp>
+
 /**
  * @brief A wrapper for calcPhiAse, that distributes sample points
  *        to the available peers. The peers will split
