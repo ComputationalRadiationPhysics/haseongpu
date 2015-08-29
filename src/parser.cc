@@ -342,11 +342,23 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
             << CompSwitch::parallel_mode << " \"threaded\"! (will be ignored)" << std::endl;
     }
 
-    if (parallelMode != ParallelMode::GRAYBAT
+    if (parallelMode != ParallelMode::THREADED
+#if defined(MPI_FOUND)
             && parallelMode != ParallelMode::MPI
-            && parallelMode != ParallelMode::THREADED) {
-        dout(V_ERROR) << CompSwitch::parallel_mode << " must be either \"" << ParallelMode::MPI << "\", \""
-            << ParallelMode::GRAYBAT << "\", or \"" << ParallelMode::THREADED << "\"" << std::endl;
+#endif
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+            && parallelMode != ParallelMode::GRAYBAT
+#endif
+            ) {
+        dout(V_ERROR) << CompSwitch::parallel_mode << " must be one of \""
+            << ParallelMode::THREADED << "\""
+#if defined(MPI_FOUND)
+            << ", \"" << ParallelMode::MPI << "\""
+#endif
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+            << ", \"" << ParallelMode::GRAYBAT << "\""
+#endif
+            << std::endl;
         exit(1);
     }
 
