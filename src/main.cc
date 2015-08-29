@@ -42,9 +42,6 @@
 namespace fs = boost::filesystem;
 
 // User header files
-#include <calc_phi_ase_threaded.hpp>
-#include <calc_phi_ase_mpi.hpp>
-#include <calc_phi_ase_graybat.hpp>
 #include <parser.hpp> /* DeviceMode, ParallelMode */
 #include <write_to_vtk.hpp>
 #include <write_matlab_output.hpp>
@@ -53,6 +50,15 @@ namespace fs = boost::filesystem;
 #include <logging.hpp>
 #include <ray_histogram.hpp>
 #include <types.hpp>
+#include <calc_phi_ase_threaded.hpp>
+
+#if defined(MPI_FOUND)
+#include <calc_phi_ase_mpi.hpp>
+#endif
+
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+#include <calc_phi_ase_graybat.hpp>
+#endif
 
 #include <cuda_runtime_api.h> /* cudaDeviceReset */
 
@@ -150,21 +156,27 @@ int main(int argc, char **argv){
             usedGPUs = maxGpus;
             runtime = *(std::max_element(runtimes.begin(),runtimes.end()));
             cudaDeviceReset();      
-        }else if(compute.parallelMode == ParallelMode::MPI){
+        }
+#if defined(MPI_FOUND)
+        else if(compute.parallelMode == ParallelMode::MPI){
                 
             usedGPUs = calcPhiAseMPI( experiment,
                                       compute,
                                       mesh,
                                       result );
 
-        }else if(compute.parallelMode == ParallelMode::GRAYBAT){
-                
+        }
+#endif
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+        else if(compute.parallelMode == ParallelMode::GRAYBAT){
             usedGPUs = calcPhiAseGrayBat( experiment,
                                           compute,
                                           mesh,
                                           result );
 
-        }else{
+        }
+#endif
+        else{
             dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
             exit(1);
         }
