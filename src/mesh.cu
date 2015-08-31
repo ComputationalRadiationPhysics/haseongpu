@@ -24,7 +24,6 @@
 #include <string>
 #include <cassert>
 #include <cfloat>
-#define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath>
 #include <algorithm>
 

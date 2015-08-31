@@ -18,7 +18,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath> /* M_PI */
 #include <string> /* string */
 #include <vector> /* vector */

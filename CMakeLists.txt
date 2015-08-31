@@ -73,6 +73,16 @@ target_link_libraries(Forward ${LIBS})
 target_link_libraries(Ring ${LIBS})
 
 
+################################################################################
+# Cross Platform Definitions
+################################################################################
+
+if(MSVC)
+    # Make M_PI (found in <cmath>) available on Windows
+    add_definitions(/D_USE_MATH_DEFINES)
+endif(MSVC)
+
+
 ###############################################################################
 # Custom targets
 ###############################################################################
