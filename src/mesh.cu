@@ -19,14 +19,16 @@
  */
 
 
-#include <stdio.h>
+#include <cstdio>
 #include <vector>
 #include <string>
-#include <assert.h>
+#include <cassert>
 #include <cfloat>
 #define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath>
 #include <algorithm>
+
+#include <curand_kernel.h> /* curand_uniform */
 
 #include <cudachecks.hpp>
 #include <mesh.hpp>

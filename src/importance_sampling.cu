@@ -18,8 +18,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <assert.h>
+#include <cstdio>
+#include <cassert>
 #include <curand_kernel.h>
 
 #include <importance_sampling.hpp>

@@ -29,6 +29,7 @@
 
 #pragma once
 #include <mesh.hpp>
+#include <vector_types.h> /* dim3 */
 
 /**
  * @brief Calculates preImportance which needs only to be done once.

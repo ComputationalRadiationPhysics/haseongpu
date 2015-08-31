@@ -19,7 +19,9 @@
  */
 
 #pragma once
+
 #include <mesh.hpp>
+#include <vector>
 
 float forLoopsClad(
 	std::vector<double> *dndtAse,

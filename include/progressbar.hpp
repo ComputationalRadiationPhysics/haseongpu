@@ -30,9 +30,8 @@
  **/
 
 #pragma once
-#include <string>
 
-#include <boost/filesystem.hpp> /* boost::filesystem::path */
+#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
 
 /**
  * @brief writes the progress of an operation to dout(V_PROGRESS) (see logging.h),

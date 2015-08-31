@@ -18,10 +18,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
 #include <vector>
-#include <stdio.h>
+#include <cstdio>
 
 #include <for_loops_clad.hpp>
 #include <mt19937ar.hpp>

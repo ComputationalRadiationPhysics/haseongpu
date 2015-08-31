@@ -4,6 +4,8 @@
 #include <vector> /* std::vector */
 
 #include <cuda_utils.hpp> /* copyToDevice */
+#include <cuda_runtime_api.h>
+#include <host_defines.h> /* __host__ __device__ */
 
 
 /**

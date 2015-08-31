@@ -19,15 +19,16 @@
  */
 
 
-#include <stdio.h>
-#include <stdlib.h>
 #define _USE_MATH_DEFINES /* make M_PI known for windows */
 #include <cmath>
-#include <assert.h>
+#include <cassert>
+#include <cstdlib>
 #include <vector>
-#include <curand_kernel.h>
+#include <curand_kernel.h> /*curand_uniform*/
 #include <curand_mtgp32_host.h>
 #include <cuda_runtime_api.h>
+#include <thrust/device_vector.h>
+#include <vector_types.h> /* dim3 */
 
 #include <write_to_vtk.hpp>
 #include <calc_phi_ase.hpp>
@@ -38,7 +39,6 @@
 #include <mesh.hpp>
 #include <progressbar.hpp> /*progressBar */
 #include <logging.hpp>
-#include <thrust_device_vector_nowarn.hpp>
 #include <types.hpp> /* ExperimentParameter, ComputeParameter, Result */
 
 #define SEED 4321

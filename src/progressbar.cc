@@ -18,15 +18,15 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cmath> /* log10 */
+#include <iomanip> /* std::setfill, std::setw */
+#include <fstream> /* std::ofstream */
+#include <algorithm> /* std::max */
+#include <ctime> /* getTimeOfDay */
+#include <sys/time.h> /* timeval */
 
-#include <unistd.h>
-#include <cmath>
-#include <iomanip>
-#include <fstream>
-#include <sys/time.h>
-
-#include <boost/filesystem.hpp> /* fs::path */
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
+#include <boost/filesystem/path.hpp> /* fs::path */
 
 #include <progressbar.hpp>
 #include <logging.hpp>

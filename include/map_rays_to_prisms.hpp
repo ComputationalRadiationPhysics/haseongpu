@@ -24,7 +24,7 @@
  * @license GPLv3
  */
 #pragma once
-#include <thrust_device_vector_nowarn.hpp>
+#include <thrust/device_vector.h>
 
 /**
  * @brief takes an array of values and writes it into a unary representation. The value
