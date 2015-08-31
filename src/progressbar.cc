@@ -22,8 +22,8 @@
 #include <iomanip> /* std::setfill, std::setw */
 #include <fstream> /* std::ofstream */
 #include <algorithm> /* std::max */
-#include <ctime> /* getTimeOfDay */
-#include <sys/time.h> /* timeval */
+#include <chrono> /* steady_clock, time_point */
+#include <sstream> /* stringstream */
 
 #include <boost/filesystem/fstream.hpp> /* fs::fstream */
 #include <boost/filesystem/path.hpp> /* fs::path */
@@ -32,6 +32,7 @@
 #include <logging.hpp>
 
 namespace fs = boost::filesystem;
+namespace chr = std::chrono;
 
 /**
  * @brief prints a line of ascii-art in the style of a sine-wave
@@ -66,34 +67,36 @@ void printWave(std::ostream &stream, unsigned tic, int progress, int length){
   }
 }
 
-void simpleProgressBar(unsigned part, unsigned full){
-  unsigned length = 80;
 
-  float percentage = (float(part)+1) / float(full);
-
-  dout(V_PROGRESS | V_NOLABEL) << "\r";
-  dout(V_PROGRESS) << "Progress: [";
-  for(int i=0 ; i < (percentage*length) ; i++){
-    dout(V_PROGRESS | V_NOLABEL) << "#";
-  }
-  for(int i=0;i< length-(percentage*length) ;i++){
-    dout(V_PROGRESS | V_NOLABEL) << " ";
-  }
-  dout(V_PROGRESS | V_NOLABEL) << "] " << int(percentage*100) << "% (" << part+1 << "/" << full << std::flush;
-}
-
-
-/**
- * @brief give the difference of two time values in milliseconds
+/** 
+ * Writes the time in a human-friendly way
  *
- * @param start the starting time of the process to time
- * @param end the time when the process did finish
- * @return the difference (end-start) in milliseconds
+ * The returned string will be formatted to display the time in terms of hours,
+ * minutes and seconds. If the duration is small enough, some of those will be
+ * omitted. A template argument allows to include also milliseconds
+ * Example: 5000s -> 1h 23m 20s
+ *          1000s -> 16m 40s
  *
+ * @param time the duration to write
  */
-unsigned long long timevalDiffInMillis(timeval start, timeval end){
-  unsigned long long t = 1000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000;
-  return t;
+std::string humanRepresentation(chr::duration<float> const time){
+
+  typedef chr::duration<int, std::ratio<1,1>> seconds;
+  typedef chr::duration<int, std::ratio<60,1>> minutes;
+  typedef chr::duration<int, std::ratio<3600,1>> hours;
+
+  auto const tSec  = chr::duration_cast<seconds>(time).count() % 60; 
+  auto const tMin  = chr::duration_cast<minutes>(time).count() % 60; 
+  auto const tHour = chr::duration_cast<hours>(time).count();
+
+  std::stringstream ss; 
+
+  if(tHour) ss << tHour << "h ";
+  if(tMin)  ss << tMin  << "m "; 
+  if(tSec)  ss << tSec  << "s";
+
+  return ss.str();
+
 }
 
 
@@ -103,27 +106,25 @@ void fancyProgressBar(const unsigned nTotal){
 
   //use maxNTotal to find the global maximum between multiple calling threads
   static unsigned maxNTotal = 0;
-  static timeval startTime;
+  static chr::time_point<chr::steady_clock> startTime;
   static unsigned part = 0;
   
   //find the starting time of the whole progress
-  if(part==0){ gettimeofday(&startTime,NULL); }
+  if(part==0){ startTime=chr::steady_clock::now(); }
   maxNTotal = std::max(maxNTotal, nTotal);
   static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
   static unsigned tic  = 0;
-  timeval now;
-  gettimeofday(&now,NULL);
+  auto now = chr::steady_clock::now();
   ++part;
 
   //limit the update intervall (not faster than every 35ms, since that would be madness)
-  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
-  if(millisSpent > 35*tic || part==maxNTotal){
+  chr::duration<float> const timeSpent = now - startTime; 
+  if(timeSpent.count() > 0.035*tic || part==maxNTotal){
     ++tic;
 
     const float percentage = float(part) / float(maxNTotal);
-    const float timeSpent = float(millisSpent) / 1000;
-    const float timeTotal = timeSpent/percentage;
-    const int timeRemaining = timeTotal-timeSpent;
+    const auto timeTotal = timeSpent/percentage;
+    const auto timeRemaining = timeTotal-timeSpent;
 
     dout(V_PROGRESS | V_NOLABEL) << "\r";
     dout(V_PROGRESS) << "Progress: [";
@@ -132,96 +133,8 @@ void fancyProgressBar(const unsigned nTotal){
 
     dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
     dout(V_PROGRESS | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
-    dout(V_PROGRESS | V_NOLABEL) << " after " << int(timeSpent) << "s";
-    dout(V_PROGRESS | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
+    dout(V_PROGRESS | V_NOLABEL) << " after " << humanRepresentation(timeSpent) ;
+    dout(V_PROGRESS | V_NOLABEL) << " (" << humanRepresentation(timeTotal) << " total, " << humanRepresentation(timeRemaining) << " remaining)";
     dout(V_PROGRESS | V_NOLABEL) << std::flush;
   }
 }
-
-void fancyProgressBar(const unsigned current, const unsigned nTotal){
-
-  const int length = 50;
-  static unsigned maxNTotal = 0;
-  static timeval startTime;
-  static unsigned part = 0;
-
-  // get the starting time on the very first call
-  if(part==0){ gettimeofday(&startTime,NULL); }
-  maxNTotal = std::max(maxNTotal, nTotal);
-  static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
-  static unsigned tic  = 0;
-  timeval now;
-  gettimeofday(&now,NULL);
-  part=current;
-
-  //limit the update intervall (not faster than every 35ms, since this would be madness)
-  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
-  if(millisSpent > 35*tic || part==maxNTotal){
-    ++tic;
-
-    const float percentage = float(part) / float(maxNTotal);
-    const float timeSpent = float(millisSpent) / 1000;
-    const float timeTotal = timeSpent/percentage;
-    const int timeRemaining = timeTotal-timeSpent;
-
-    dout(V_PROGRESS | V_NOLABEL) << "\r";
-    dout(V_PROGRESS) << "Progress: [";
-    printWave(dout(V_PROGRESS | V_NOLABEL), tic, int(percentage*length), length);
-    dout(V_PROGRESS | V_NOLABEL) << "] ";
-
-    dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
-    dout(V_PROGRESS | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
-    dout(V_PROGRESS | V_NOLABEL) << " after " << int(timeSpent) << "s";
-    dout(V_PROGRESS | V_NOLABEL) << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)";
-    dout(V_PROGRESS | V_NOLABEL) << std::flush;
-  }
-}
-
-
-void fileProgressBar(unsigned nTotal, const fs::path path){
-
-  const int length = 50;
-  fs::ofstream filestream;
-  static timeval startTime;
-  static unsigned part = 0;
-  //if this is the first call, set the start time 
-  if(part==0){ gettimeofday(&startTime,NULL); }
-  static const unsigned fillwidthPart = unsigned(1+log10(nTotal));
-  static unsigned tic  = 0;
-  timeval now;
-  gettimeofday(&now,NULL);
-  ++part;
-
-  //limit the update intervall (not faster than every 35ms, since that would be madness)
-  unsigned long long millisSpent = timevalDiffInMillis(startTime,now); 
-  if(millisSpent > 35*tic || part==nTotal){
-    ++tic;
-
-    if(!filestream.is_open()){
-      filestream.open(path,std::ofstream::trunc);
-    }
-
-    const float percentage = float(part) / float(nTotal);
-    const float timeSpent = float(millisSpent) / 1000;
-    const float timeTotal = timeSpent/percentage;
-    const int timeRemaining = timeTotal-timeSpent;
-    const time_t finish = now.tv_sec + timeRemaining;
-
-    // write progressbar
-    filestream << "Progress: [";
-    printWave(filestream,tic,int(percentage*length),length);
-    filestream << "] ";
-
-    // write progress in numbers
-    filestream << std::setfill(' ') << std::setw(3) << unsigned(percentage*100) << "%";
-    filestream << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << nTotal << ")" << std::endl;
-    filestream << "running " << int(timeSpent) << "s";
-
-    // write remaining time estimates
-    filestream << " (" << int(timeTotal) << "s total, " << timeRemaining << "s remaining)" << std::endl;
-    filestream << "estimated completion: " << ctime(&finish);
-
-    filestream.close();
-  }
-}
-
