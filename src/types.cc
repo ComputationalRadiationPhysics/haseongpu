@@ -28,8 +28,14 @@ const std::string DeviceMode::CPU   = "cpu";
 
 const std::string ParallelMode::NONE        = "no_parallel_mode";
 const std::string ParallelMode::THREADED    = "threaded";
+
+#if defined(MPI_FOUND)
 const std::string ParallelMode::MPI         = "mpi";
+#endif
+
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
 const std::string ParallelMode::GRAYBAT     = "graybat";
+#endif
 
 const std::string CompSwitch::parallel_mode     = "parallel-mode";
 const std::string CompSwitch::device_mode       = "device-mode";
