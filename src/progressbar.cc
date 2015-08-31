@@ -106,7 +106,7 @@ void fancyProgressBar(const unsigned nTotal){
 
   //use maxNTotal to find the global maximum between multiple calling threads
   static unsigned maxNTotal = 0;
-  static chr::time_point<chr::steady_clock> startTime;
+  static chr::time_point < chr::steady_clock::time_point::clock > startTime;
   static unsigned part = 0;
   
   //find the starting time of the whole progress
