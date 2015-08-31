@@ -162,6 +162,16 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "PGI")
 endif()
 
 
+################################################################################
+# Cross Platform Definitions
+################################################################################
+
+if(MSVC)
+    # Make M_PI (found in <cmath>) available on Windows
+    add_definitions(/D_USE_MATH_DEFINES)
+endif(MSVC)
+
+
 ###############################################################################
 # Warning for Thrust-related Bug
 ###############################################################################
