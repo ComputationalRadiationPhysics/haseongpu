@@ -68,6 +68,26 @@ void printWave(std::ostream &stream, unsigned tic, int progress, int length){
 }
 
 
+/**
+* @brief prints a simplistic line of ascii-art
+*
+* @param stream the stream to which to write the output
+* @param progress the progress of the whole process (i.e. 90, if the process ranges
+*        from 0-100 and the progress is at 90%
+*        progress must be <= length! (normalize progress in order to acheive this)
+* @param length the length of the finished bar.
+*        length must be at least as long as the progress!
+*/
+void printBar(std::ostream &stream, int progress, int length){
+    for (int i = 0; i<progress; ++i){
+        stream << "#";
+    }
+    for (int i = 0; i < length - progress; ++i){
+        stream << " ";
+    }
+}
+
+
 /** 
  * Writes the time in a human-friendly way
  *
@@ -102,7 +122,11 @@ std::string humanRepresentation(chr::duration<float> const time){
 
 void fancyProgressBar(const unsigned nTotal){
 
+#ifdef _WIN32
+  const int length = 16;
+#else
   const int length = 50;
+#endif
 
   //use maxNTotal to find the global maximum between multiple calling threads
   static unsigned maxNTotal = 0;
@@ -127,8 +151,12 @@ void fancyProgressBar(const unsigned nTotal){
     const auto timeRemaining = timeTotal-timeSpent;
 
     dout(V_PROGRESS | V_NOLABEL) << "\r";
-    dout(V_PROGRESS) << "Progress: [";
+    dout(V_PROGRESS) << "[";
+#ifdef _WIN32
+    printBar(dout(V_PROGRESS | V_NOLABEL), int(percentage*length), length);
+#else
     printWave(dout(V_PROGRESS | V_NOLABEL), tic, int(percentage*length), length);
+#endif
     dout(V_PROGRESS | V_NOLABEL) << "] ";
 
     dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";

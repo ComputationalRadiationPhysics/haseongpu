@@ -25,6 +25,10 @@
 #include <map>
 #include <cmath>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <logging.hpp>
 
 void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const double mseThreshold, const std::vector<double> mseValues){
@@ -56,6 +60,7 @@ void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, co
 
   std::map<unsigned,unsigned>::iterator itG;
   std::map<unsigned,unsigned>::iterator itR;
+#ifndef _WIN32
   for(itG=histGreen.begin(), itR=histRed.begin(); itG!=histGreen.end(); ++itG, ++itR){
     dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') <<  itG->first << " (";
     dout(V_STAT | V_NOLABEL) << "\033[0;32m" << std::setw(log10(totalRays.size())+3) << itG->second << "x";
@@ -66,7 +71,7 @@ void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, co
     // set color = green
     dout(V_STAT | V_NOLABEL) << "\033[0;32m";
     for(unsigned j=0;j< ceil(maxLength*(float(itG->second)/totalRays.size())) ; ++j){
-      dout(V_STAT | V_NOLABEL) << "#"; 
+      dout(V_STAT | V_NOLABEL) << "#";
     }
 
     // set color = red
@@ -76,4 +81,33 @@ void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, co
     }
     dout(V_STAT | V_NOLABEL) << std::endl;
   }
+
+#else
+  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+  for(itG=histGreen.begin(), itR=histRed.begin(); itG!=histGreen.end(); ++itG, ++itR){
+    dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') <<  itG->first << " (";
+    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+    dout(V_STAT | V_NOLABEL) << std::setw(log10(totalRays.size())+3) << itG->second << "x";
+    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+    dout(V_STAT | V_NOLABEL) << " / ";
+    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+    dout(V_STAT | V_NOLABEL) << std::setw(log10(totalRays.size())+3) << itR->second << "x";
+    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+    dout(V_STAT | V_NOLABEL) << "):";
+
+    // set color = green
+    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+    for(unsigned j=0;j< ceil(maxLength*(float(itG->second)/totalRays.size())) ; ++j){
+      dout(V_STAT | V_NOLABEL) << "#";
+    }
+
+    // set color = red
+    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+    for(unsigned j=0;j< ceil(maxLength*(float(itR->second)/totalRays.size())) ; ++j){
+      dout(V_STAT | V_NOLABEL) << "#"; 
+    }
+    dout(V_STAT | V_NOLABEL) << std::endl;
+  }
+#endif
+
 }
