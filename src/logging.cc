@@ -20,6 +20,10 @@
 
 #include <iostream>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <logging.hpp>
 
 
@@ -35,29 +39,65 @@ std::ostream& dout(unsigned activation_level) {
   }
 
   if(activation_level & V_ERROR){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+    return std::cerr << "[ERROR] ";
+#else
     return std::cerr << "\033[0;" << COLOR_ERROR << "m[ERROR] ";
+#endif
   }
 
   if(activation_level & V_WARNING){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+    return std::cerr << "[WARNING] ";
+#else
     return std::cerr << "\033[0;" << COLOR_WARN << "m[WARNING] ";
+#endif
   }
 
   if(activation_level & V_INFO){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+    return std::cerr << "[INFO] ";
+#else
     //return std::cout << "\033[0;" << COLOR_INFO << "m[INFO] ";
     return std::cout << "\033[0" << "m[INFO] ";
+#endif
   }
 
   if(activation_level & V_STAT){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+    return std::cerr << "[STATISTIC] ";
+#else
     //return std::cout << "\033[0;" << COLOR_STATISTIC << "m[STATISTIC] ";
     return std::cout << "\033[0" << "m[STATISTIC] ";
+#endif
   }
 
   if(activation_level & V_PROGRESS){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+    return std::cerr << "[PROGRESS] ";
+#else
     return std::cout << "\033[0" << "m[PROGRESS] ";
+#endif
   }
 
   if(activation_level & V_DEBUG){
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+    return std::cerr << "[DEBUG] ";
+#else
     return std::cerr << "\033[0;" << COLOR_DEBUG << "m[DEBUG] ";
+#endif
   }
 
 
