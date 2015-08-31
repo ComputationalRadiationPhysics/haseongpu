@@ -37,8 +37,12 @@ struct DeviceMode {
 struct ParallelMode {
     static const std::string NONE;
     static const std::string THREADED;
+#if defined(MPI_FOUND)
     static const std::string MPI;
+#endif
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
     static const std::string GRAYBAT;
+#endif
 };
 
 struct CompSwitch{
