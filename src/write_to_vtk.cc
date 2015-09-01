@@ -191,7 +191,7 @@ std::vector<double> compareVtk(std::vector<double> compare, const fs::path filen
   double smallDiff = 10;
 
   // No compare vtk was given
-  if(!filename.compare("")){
+  if(!filename.compare(fs::path(""))){
     return std::vector<double>();
   }
   dout(V_INFO) << "Compare solution with " << filename << std::endl;

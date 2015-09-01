@@ -162,6 +162,16 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "PGI")
 endif()
 
 
+################################################################################
+# Cross Platform Definitions
+################################################################################
+
+if(MSVC)
+    # Make M_PI (found in <cmath>) available on Windows
+    add_definitions(/D_USE_MATH_DEFINES)
+endif(MSVC)
+
+
 ###############################################################################
 # Warning for Thrust-related Bug
 ###############################################################################
@@ -189,23 +199,21 @@ warn_path_cuda("C_INCLUDE_PATH")
 # Executables
 ###############################################################################
 set(HASEonGPU_NAME "calcPhiASE")
-
 file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if(NOT MPI_FOUND)
-    LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/include/calc_phi_ase_mpi.cc)
+    LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_mpi.cc)
 endif()
 
 if(Boost_MPI_FOUND)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
-else ()
-    LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/include/calc_phi_ase_graybat.cc)
+     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
+else()
+	LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_graybat.cc)
 endif()
 
-cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-
 cuda_add_executable(${HASEonGPU_NAME} ${SRCFILES})
-
 target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
 
 
