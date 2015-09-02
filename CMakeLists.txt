@@ -213,6 +213,10 @@ else()
 	LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_graybat.cc)
 endif()
 
+
+# Alpaka include
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/alpaka/include/)
+
 cuda_add_executable(${HASEonGPU_NAME} ${SRCFILES})
 target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
 
