@@ -10,10 +10,19 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
 endif(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
 
 
+################################################################################
+# Find alpaka
+################################################################################
+SET(ALPAKA_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/include/alpaka/" CACHE STRING  "The location of the alpaka library")
+
+LIST(APPEND CMAKE_MODULE_PATH "${ALPAKA_ROOT}")
+FIND_PACKAGE("alpaka" REQUIRED)
+
+
 ###############################################################################
 # CUDA
 ###############################################################################
-set(CUDA_TOOLKIT_ROOT_DIR "/opt/cuda")
+#set(CUDA_TOOLKIT_ROOT_DIR "/opt/cuda")
 
 find_package(CUDA 5.5 REQUIRED)
 
@@ -84,6 +93,7 @@ set(Boost_USE_STATIC_RUNTIME ON)
 # set(BOOST_LIBRARYDIR "C:/local/boost_1_58_0/lib64-msvc-12.0")
 # set(BOOST_ROOT "C:/local/boost_1_58_0")
 find_package(Boost 1.50.0 REQUIRED COMPONENTS program_options system filesystem)
+
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
@@ -106,6 +116,8 @@ endif(Boost_VERSION EQUAL 105500)
 ################################################################################
 find_package(Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+
+
 
 
 ################################################################################
