@@ -42,19 +42,39 @@ Dependencies
 Compiling
 ---------
 
+| *branch* | *state* | *description* |
+| -------- | --------| ------------- |
+| **master** | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=master)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our stable new releases |
+| **dev**  | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=dev)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our development branch |
+
+
+### Linux
+
    + clone the repository: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
    + create the build directory: `mkdir haseongpu/build`
    + go to build directory: `cd haseongpu/build`
    + create Makefile `cmake ..`
    + build project : `make`
 
-### Current Compilation Status:
 
-| *branch* | *state* | *description* |
-| -------- | --------| ------------- |
-| **master** | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=master)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our stable new releases |
-| **dev**  | [![Build Status](http://haseongpu.mooo.com/api/badge/github.com/ComputationalRadiationPhysics/haseongpu/status.svg?branch=dev)](http://haseongpu.mooo.com/github.com/ComputationalRadiationPhysics/haseongpu) | our development branch |
- 
+### Windows (**experimental**, using Visual Studio 2013)
+
+   + Install the necessary dependencies, some notes:
+     - Boost can be either [compiled from source](http://www.boost.org/doc/libs/1_58_0/more/getting_started/windows.html) or downloaded as a [pre-compiled package](http://boost.teeks99.com/) (will not include Boost.MPI).
+     - gcc is not necessary, the MSVC compiler in Visual Studio works as well
+     - Optionally install an MPI implementatin (tested with [Microsoft MPI](https://msdn.microsoft.com/en-us/library/bb524831(v=vs.85).aspx))
+   + [download](https://github.com/ComputationalRadiationPhysics/haseongpu/archive/dev.zip) the repository or clone it with git: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
+   + Edit the `CMakeLists.txt` to define the variables `BOOST_LIBRARYDIR` and `BOOST_ROOT` to the correct location
+     - Have a look at the already commented out lines in `CMakeLists.txt` where Boost is included
+   + Use the CMake (either the GUI or command line) to create a VisualStudio Project fitting your Visual Studio and Windows version in a directory of your choice:
+     - `cd build_directory`
+     - `cmake -G "Visual Studio 12 2013 Win64" <PATH_TO_HASEONGPU_SOURCE>`
+   + Start Visual Studio and run `import existing solution` to import the newly generated project
+   + Compile the project `calcPhiASE`
+     - If there are linker errors, you might have to set your build to "Release" instead of "Debug" and re-run the whole compilation
+   + Copy the resulting binary `calcPhiASE.exe` to the folder `haseongpu/example/c_example/bin` to start using the first example
+   + Hint: use Microsoft PowerShell when executing experiments, instead of the regular command line shell, since the allowed output lines appear to be longer
+
 
 Usage
 -----
