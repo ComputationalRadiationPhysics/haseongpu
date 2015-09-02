@@ -13,6 +13,8 @@ endif(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
 ###############################################################################
 # CUDA
 ###############################################################################
+set(CUDA_TOOLKIT_ROOT_DIR "/opt/cuda")
+
 find_package(CUDA 5.5 REQUIRED)
 
 set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
