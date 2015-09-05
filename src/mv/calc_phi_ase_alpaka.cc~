@@ -22,6 +22,14 @@
 #include <vector>
 #include <algorithm> /* std::iota */
 
+
+// HASEonGPU
+#include <calc_phi_ase.hpp>
+#include <mesh.hpp>
+#include <logging.hpp>
+#include <progressbar.hpp>
+#include <types.hpp>
+
 // GrayBat
 #include <graybat/Cage.hpp>
 #include <graybat/communicationPolicy/BMPI.hpp>
@@ -29,15 +37,8 @@
 #include <graybat/pattern/BidirectionalStar.hpp>
 #include <graybat/mapping/Roundrobin.hpp>
 
-// HASEonGPU
-#include <calc_phi_ase.hpp>
-#include <logging.hpp>
-#include <progressbar.hpp>
-#include <types.hpp>
-
-
 // Const messages
-const int abortTag     = -1;
+const int abortTag   = -1;
 const float requestTag = -1.0;
 const std::array<float, 4> requestMsg{{requestTag, 0, 0, 0}};
 const std::array<int, 1> abortMsg{{abortTag}};
@@ -46,6 +47,7 @@ template <class Vertex, class Cage>
 void distributeSamples(Vertex master,
                        const std::vector<unsigned> samples,
                        Cage &cage,
+                       const Mesh& mesh,
                        Result& result ){
 
     typedef typename Cage::Edge Edge;
@@ -72,7 +74,6 @@ void distributeSamples(Vertex master,
         }
         else {
             // Process result
-	    
             unsigned sample_i             = (unsigned) (resultMsg[0]);
             result.phiAse.at(sample_i)    = resultMsg[1];
             result.mse.at(sample_i)       = resultMsg[2];
@@ -82,7 +83,7 @@ void distributeSamples(Vertex master,
             nReceivedResults++;
             
             // Update progress bar
-            fancyProgressBar(samples.size());
+            fancyProgressBar(mesh.numberOfSamples);
 
         }
 
@@ -95,11 +96,12 @@ void distributeSamples(Vertex master,
 
 template <class Vertex, class Cage>
 void processSamples(const Vertex slave,
-		    const Vertex master,
-		    Cage &cage,
-		    const ExperimentParameters& experiment,
-		    const ComputeParameters& compute,
-		    Result& result ){
+		   const Vertex master,
+		   Cage &cage,
+		   const ExperimentParameters& experiment,
+		   const ComputeParameters& compute,
+		   const Mesh& mesh,
+		   Result& result ){
 
     typedef typename Cage::Edge Edge;
     
@@ -130,6 +132,7 @@ void processSamples(const Vertex slave,
 	else {
 	    calcPhiAse ( experiment,
 			 compute,
+			 mesh,
 			 result,
 			 sampleMsg.at(0),
 			 sampleMsg.at(0) + 1,
@@ -154,6 +157,7 @@ void processSamples(const Vertex slave,
 
 float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 			  const ComputeParameters &compute,
+			  Mesh& mesh,
 			  Result &result ){
 
     /***************************************************************************
@@ -178,7 +182,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
      * ASE SIMULATION
      **************************************************************************/
     // Create sample indices
-    std::vector<unsigned> samples(experiment.numberOfSamples);
+    std::vector<unsigned> samples(mesh.numberOfSamples);
     std::iota(samples.begin(), samples.end(), 0);
 
     // Determine phi ase for each sample
@@ -188,7 +192,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 	 * MASTER
 	 *******************************************************************/
 	if(vertex == master){
-	    distributeSamples(vertex, samples, cage, result);
+	    distributeSamples(vertex, samples, cage, mesh, result);
 
 	}
 
@@ -196,8 +200,9 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 	 * SLAVES
 	 *******************************************************************/
 	if(vertex != master){
-	    processSamples(vertex, master, cage, experiment, compute, result);
+	  processSamples(vertex, master, cage, experiment, compute, mesh, result);
 	  cage.~Cage();
+          mesh.free();
 	  exit(0);
 
 	}	

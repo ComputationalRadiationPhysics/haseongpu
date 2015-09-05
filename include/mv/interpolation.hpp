@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -19,30 +19,13 @@
  */
 
 
-/**
- * @author Erik Zenker
- * @author Carlchristian Eckert
- * @licence GPLv3
- *
- */
-
 #pragma once
+#include <vector>
 
-#include <mesh.hpp>
-#include <types.hpp>
+#define MAX_INTERPOLATION 1000
+#define LAMBDA_START 905
+#define LAMBDA_STOP 1095
 
-/**
- * @brief A wrapper for calcPhiAse, that distributes sample points
- *        to the available peers. The peers will split
- *        up in one head peer and the others as compute peers. 
- *        The slaves request sample points and the head  
- *        distributes the available sample points by demand.
- *
- * @return number of used compute nodes
- */
+std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop);
+std::vector<double> interpolateLinear(const std::vector<double> y, const std::vector<double> x, const unsigned nInterpolations);
 
-
-
-float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
-			  const ComputeParameters &compute,
-			  Result &result );

@@ -3,9 +3,13 @@
 // STL
 #include <vector> /* std::vector */
 
-#include <cuda_utils.hpp> /* copyToDevice */
-#include <cuda_runtime_api.h>
-#include <host_defines.h> /* __host__ __device__ */
+// ALPAKA
+#include <alpaka/alpaka.hpp> /* ALPAKA_FN_HOST_ACC */
+
+
+//#include <cuda_utils.hpp> /* copyToDevice */
+//#include <cuda_runtime_api.h>
+//#include <host_defines.h> /* __host__ __device__ */
 
 
 /**
@@ -14,51 +18,57 @@
  *        triggered based on a compiler macro.
  *
  **/
-template<class T>
+template<typename  T_Data, typename T_Dev>
 class ConstHybridVector {
 public:
 
-  ConstHybridVector(std::vector<T> &srcV) :
-    hostV(srcV),
-    deviceV(copyToDevice(srcV)){
+    ConstHybridVector(std::vector<T_Data> &srcV, T_Dev &dev) :
+	hostV(srcV),
+	deviceV(alpaka::mem::buf::alloc<T_Data>( dev, srcV.size())) {
       
-  }
-
-  __forceinline__ __host__ __device__ T at(int i) const{
+    }
+    
+  ALPAKA_FN_HOST_ACC T_Data at(int i) const{
+      /*
 #ifdef __CUDA_ARCH__
     return deviceV[i];
 #else
     return hostV.at(i);
 #endif
+      */
   }
 
-  __forceinline__ __host__ __device__ const T operator[] (int i) const {
+    ALPAKA_FN_HOST_ACC const T_Data operator[] (int i) const {
+      /*
 #ifdef __CUDA_ARCH__
     return deviceV[i];
 #else
     return hostV[i];
 #endif
+      */
   }
 
-  __host__  operator T*(){
+  ALPAKA_FN_HOST  operator T_Data*(){
     return &(hostV.at(0));
   }
 
-  __host__ T* toArray() const{
-    std::vector<T> copyV = hostV;
+  ALPAKA_FN_HOST T_Data* toArray() const{
+    std::vector<T_Data> copyV = hostV;
     return &(copyV.at(0));
   }
 
-  __host__ std::vector<T> toVector() const{
+  ALPAKA_FN_HOST std::vector<T_Data> toVector() const{
     return hostV;
   }
 
-    __host__ void free() {
+    ALPAKA_FN_HOST void free() {
+	/*
         cudaFree(deviceV);
+	*/
     }
   
 private:
-  T *deviceV;
-  std::vector<T> hostV;
+    alpaka::mem::buf::Buf<T_Dev, T_Data, std::size_t, std::size_t> deviceV;
+    std::vector<T_Data> hostV;
 
 };

@@ -70,37 +70,33 @@ struct ComputeParameters {
     ComputeParameters() {}
 
     ComputeParameters(  unsigned maxRepetitions,
-            unsigned adaptiveSteps,
-            unsigned gpu_i,
-            std::string deviceMode,
-            std::string parallelMode,
-            bool writeVtk,
-            fs::path inputPath,
-            fs::path outputPath,
-            std::vector<unsigned> devices,
-            unsigned minSampleRange,
-            unsigned maxSampleRange) :
+			unsigned adaptiveSteps,
+			std::string deviceMode,
+			std::string parallelMode,
+			bool writeVtk,
+			fs::path inputPath,
+			fs::path outputPath,
+			unsigned minSampleRange,
+			unsigned maxSampleRange) :
         maxRepetitions(maxRepetitions),
         adaptiveSteps(adaptiveSteps),
-        gpu_i(gpu_i),
         deviceMode(deviceMode),
         parallelMode(parallelMode),
         writeVtk(writeVtk),
         inputPath(inputPath),
         outputPath(outputPath),
-        devices(devices),
         minSampleRange(minSampleRange),
         maxSampleRange(maxSampleRange){ }
 
     unsigned maxRepetitions;
     unsigned adaptiveSteps;
-    unsigned gpu_i;
+    //unsigned gpu_i;
     std::string deviceMode;
     std::string parallelMode;
     bool writeVtk;
     fs::path inputPath;
     fs::path outputPath;
-    std::vector<unsigned> devices;
+    //std::vector<unsigned> devices;
     unsigned minSampleRange;
     unsigned maxSampleRange;
 
@@ -132,13 +128,14 @@ struct ExperimentParameters {
     ExperimentParameters() {}
 
     ExperimentParameters(  unsigned minRaysPerSample,
-            unsigned maxRaysPerSample,
-            std::vector<double> sigmaA,
-            std::vector<double> sigmaE,
-            double maxSigmaA,
-            double maxSigmaE,
-            double mseThreshold,
-            bool useReflections) :
+			   unsigned maxRaysPerSample,
+			   std::vector<double> sigmaA,
+			   std::vector<double> sigmaE,
+			   double maxSigmaA,
+			   double maxSigmaE,
+			   double mseThreshold,
+			   bool useReflections,
+			   unsigned numberOfSamples) :
         minRaysPerSample(minRaysPerSample),
         maxRaysPerSample(maxRaysPerSample),
         sigmaA(sigmaA),
@@ -146,7 +143,8 @@ struct ExperimentParameters {
         maxSigmaA(maxSigmaA),
         maxSigmaE(maxSigmaE),
         mseThreshold(mseThreshold),
-        useReflections(useReflections) { }
+        useReflections(useReflections),
+	numberOfSamples(numberOfSamples){ }
 
     unsigned minRaysPerSample;
     unsigned maxRaysPerSample;
@@ -156,5 +154,6 @@ struct ExperimentParameters {
     double maxSigmaE;
     double mseThreshold;
     bool useReflections;
+    unsigned numberOfSamples;
 
 };

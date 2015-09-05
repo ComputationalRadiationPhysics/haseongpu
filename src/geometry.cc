@@ -19,14 +19,19 @@
  */
 
 
-#include "geometry.hpp"
 
-__host__ __device__ Vector direction(Point startPoint, Point endPoint){
+// ALPAKA
+#include <alpaka/alpaka.hpp> /* ALPAKA_FN_HOST_ACC */
+
+// HASEonGPU
+#include <geometry.hpp> /* Vector, Point, Ray */
+
+ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint){
   Vector v = {endPoint.x - startPoint.x, endPoint.y - startPoint.y, endPoint.z - startPoint.z};
   return v;
 }
 
-__host__ __device__ float distance(Point startPoint, Point endPoint){
+ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint){
   float x, y, z;
   x = endPoint.x - startPoint.x;
   y = endPoint.y - startPoint.y;
@@ -36,7 +41,7 @@ __host__ __device__ float distance(Point startPoint, Point endPoint){
 
 }
 
-__host__ __device__ Ray generateRay(Point startPoint, Point endPoint){
+ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint){
   Ray ray;
   ray.p = startPoint;
   ray.dir = direction(startPoint, endPoint);
@@ -46,7 +51,7 @@ __host__ __device__ Ray generateRay(Point startPoint, Point endPoint){
 
 }
 
-__host__ __device__ Ray normalizeRay(Ray ray){
+ALPAKA_FN_HOST_ACC Ray normalizeRay(Ray ray){
   ray.dir.x = ray.dir.x / ray.length;
   ray.dir.y = ray.dir.y / ray.length;
   ray.dir.z = ray.dir.z / ray.length;

@@ -19,14 +19,19 @@
  */
 
 
+// CLIB
 #include <cassert>
 #include <cmath> /* M_PI */
 
-#include <reflection.hpp>
+// ALPAKA
+#include <alpaka/alpaka.hpp> /* ALPAKA_FN_ACC */
+
+// HASEonGPU
+//#include <reflection.hpp>
 #include <mesh.hpp>
 #include <geometry.hpp>
 
-__device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
+ALPAKA_FN_ACC double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   // Calc intesection angle with z-plane
   double nominator = abs(ray.dir.z);
   double denominator = sqrt((ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y) + (ray.dir.z * ray.dir.z));
@@ -38,7 +43,8 @@ __device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   return 1;
 }
 
-__device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const ReflectionPlane reflectionPlane, const Mesh &mesh, Point *intersectionPoint){
+template <typename T_Mesh>
+ALPAKA_FN_ACC int calcPlaneIntersectionPoint(const Ray reflectionRay, const ReflectionPlane reflectionPlane, const T_Mesh &mesh, Point *intersectionPoint){
   // Assume that mesh is on x/y axis and parallel to x/y axis
   double planeZ = 0.0;
   if(reflectionPlane == TOP_REFLECTION){
@@ -65,7 +71,8 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
  * BOTTOM_REFLECTION = -1
  * defined in reflection.hpp
  */
-__device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  const int reflectionsLeft, const ReflectionPlane reflectionPlane, const Mesh &mesh){
+template <typename T_Mesh>
+ALPAKA_FN_ACC Ray generateReflectionRay(const Point startPoint, Point endPoint,  const int reflectionsLeft, const ReflectionPlane reflectionPlane, const T_Mesh &mesh){
   float mirrorPlaneZ = 0;
   if(reflectionsLeft % 2 == 0){
     // Even reflectionCount is postponement
@@ -87,7 +94,8 @@ __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  co
   return generateRay(startPoint, endPoint);
 }
 
-__device__ int calcNextReflection(const Point startPoint, const Point endPoint, const unsigned reflectionsLeft, const ReflectionPlane reflectionPlane, Point *reflectionPoint, double *reflectionAngle, const Mesh &mesh){
+template <typename T_Mesh>
+ALPAKA_FN_ACC int calcNextReflection(const Point startPoint, const Point endPoint, const unsigned reflectionsLeft, const ReflectionPlane reflectionPlane, Point *reflectionPoint, double *reflectionAngle, const T_Mesh &mesh){
   Ray reflectionRay = generateReflectionRay(startPoint, endPoint, reflectionsLeft, reflectionPlane, mesh);
   if(calcPlaneIntersectionPoint(reflectionRay, reflectionPlane, mesh, reflectionPoint)) return 1;
   if(calcIntersectionAngle(reflectionRay, reflectionAngle)) return 1;

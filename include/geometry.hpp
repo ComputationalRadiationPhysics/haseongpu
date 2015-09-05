@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include <host_defines.h> /* __host__ __device__ */
+// ALPAKA
+#include <alpaka/alpaka.hpp> /* ALPAKA_FN_HOST_ACC */
+
 
 struct TwoDimPoint {
   double x;
@@ -62,9 +64,9 @@ struct NormalRay {
 
 enum ReflectionPlane {TOP_REFLECTION = 1, BOTTOM_REFLECTION = -1};
 
-__host__ __device__ Vector direction(Point startPoint, Point endPoint);
-__host__ __device__ float distance(Point startPoint, Point endPoint);
-__host__ __device__ Ray generateRay(Point startPoint, Point endPoint);
-__host__ __device__ Ray normalizeRay(Ray ray);
+ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC Ray normalizeRay(Ray ray);
 
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2014 Erik Zenker, Carlchristian Eckert, Marius Melzer
  *
  * This file is part of HASEonGPU
  *
@@ -20,7 +20,6 @@
 
 
 /**
- * @author Erik Zenker
  * @author Carlchristian Eckert
  * @licence GPLv3
  *
@@ -28,21 +27,27 @@
 
 #pragma once
 
-#include <mesh.hpp>
-#include <types.hpp>
-
 /**
- * @brief A wrapper for calcPhiAse, that distributes sample points
- *        to the available peers. The peers will split
- *        up in one head peer and the others as compute peers. 
- *        The slaves request sample points and the head  
- *        distributes the available sample points by demand.
- *
- * @return number of used compute nodes
+ * @brief this allows the use of isnan() for int and unsigned
+ * in the template function fileToVector()
  */
+inline bool isNaN(const int){
+  return false;
+}
 
+inline bool isNaN(const unsigned int){
+  return false;
+}
 
+inline bool isNaN(const float i){
+  return isnan(i);
+}
 
-float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
-			  const ComputeParameters &compute,
-			  Result &result );
+inline bool isNaN(const double i){
+  return isnan(i);
+}
+
+inline bool isNaN(const long double i){
+  return isnan(i);
+}
+

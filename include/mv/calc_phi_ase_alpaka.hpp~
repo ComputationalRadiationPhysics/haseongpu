@@ -45,4 +45,5 @@
 
 float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
 			  const ComputeParameters &compute,
+			  Mesh& mesh,
 			  Result &result );

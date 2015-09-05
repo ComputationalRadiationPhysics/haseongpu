@@ -43,7 +43,6 @@
  **/
 float calcPhiAse ( const ExperimentParameters& experiment,
 		   const ComputeParameters& compute,
-		   const Mesh& mesh,
 		   Result &result,
 		   const unsigned minSample_i,
 		   const unsigned maxSample_i,

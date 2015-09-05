@@ -28,12 +28,12 @@
 
 #pragma once
 
-// Alpaka
-#include <alpaka/alpaka.hpp> /* ALPAKA_FN_ACC */
-
 // HASEonGPU
 #include <mesh.hpp>
 #include <geometry.hpp>
+
+// Alpaka
+#include <alpaka/alpaka.hpp>
 
 
 /**
@@ -53,13 +53,12 @@
  *         1 otherwise
  *
  */
-template <typename T_Mesh>
-ALPAKA_FN_ACC int calcNextReflection(const Point startPoint, 
-				     const Point endPoint, 
-				     const unsigned reflectionsLeft, 
-				     const ReflectionPlane reflectionPlane, 
-				     Point *reflectionPoint, 
-				     double *reflectionAngle, 
-				     const T_Mesh &mesh);
+__device__ int calcNextReflection(const Point startPoint, 
+				  const Point endPoint, 
+				  const unsigned reflectionsLeft, 
+				  const ReflectionPlane reflectionPlane, 
+				  Point *reflectionPoint, 
+				  double *reflectionAngle, 
+				  const Mesh &mesh);
 
 

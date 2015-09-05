@@ -43,6 +43,7 @@
 
 
 
-float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
-			  const ComputeParameters &compute,
-			  Result &result );
+float calcPhiAseAlpaka ( const ExperimentParameters &experiment,
+			 const ComputeParameters &compute,
+			 Mesh& mesh,
+			 Result &result );

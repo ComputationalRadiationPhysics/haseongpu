@@ -40,6 +40,7 @@
 
 // HASEonGPU
 #include <logging.hpp>
+#include <mesh.hpp>
 #include <nan_fix.hpp>
 #include <types.hpp>
 
@@ -137,4 +138,5 @@ int parse( const int argc,
 	   char** argv,
 	   ExperimentParameters& experiment,
 	   ComputeParameters& compute,
+	   std::vector<Mesh>& mesh,
 	   Result& result);

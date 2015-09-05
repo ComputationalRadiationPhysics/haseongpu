@@ -27,16 +27,16 @@
 #include <sstream> /* stringstream */
 #include <functional> /* bind, placeholders */
 
-#include <cuda_runtime_api.h> /* cudaSetDevice */
+//#include <cuda_runtime_api.h> /* cudaSetDevice */
 
-#include <cudachecks.hpp> /* CUDA_CHECK_RETURN */
-#include <cuda_utils.hpp> /* getFreeDevices */
+//#include <cudachecks.hpp> /* CUDA_CHECK_RETURN */
+//#include <cuda_utils.hpp> /* getFreeDevices */
 #include <types.hpp>
 #include <logging.hpp> 
-#include <mesh.hpp>
 #include <parser.hpp>
 #include <interpolation.hpp> /* interpolateWavelength*/
 
+// Boost
 // includes for commandline parsing
 #include <boost/program_options.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -106,7 +106,6 @@ int parse( const int argc,
         char** argv,
         ExperimentParameters& experiment,
         ComputeParameters& compute,
-        std::vector<Mesh>& meshs,
         Result& result) {
 
     bool writeVtk = false;
@@ -118,13 +117,25 @@ int parse( const int argc,
     // Set/Test device to run experiment with
     //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
     //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
-    std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
 
-    vm = checkParameterValidity(vm, devices.size());
+    /*
+    
+      FIXIT: This should be done before kernel execution
+      std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
+      vm = checkParameterValidity(vm, devices.size());
 
-    meshs = parseMesh(vm[ExpSwitch::input_path].as<fs::path>(), devices);
+    */
 
-    vm = checkSampleRange(vm, meshs[0].numberOfSamples);
+
+
+    /*
+    
+      FIXIT: This should also be done before kernel execution
+      meshs = parseMesh(vm[ExpSwitch::input_path].as<fs::path>(), devices);
+      vm = checkSampleRange(vm, meshs[0].numberOfSamples);
+
+    */
+
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
@@ -139,32 +150,33 @@ int parse( const int argc,
             waveD.maxSigmaA,
             waveD.maxSigmaE,
             vm[ExpSwitch::mse].as<double>(),
-            vm[ExpSwitch::reflection].as<bool>() );
+            vm[ExpSwitch::reflection].as<bool>(),
+	    vm[CompSwitch::max_sample_i].as<int>());
 
 
     compute = ComputeParameters (
             vm[CompSwitch::repetitions].as<int>(),
             vm[CompSwitch::adaptive_steps].as<int>(),
-            devices.at(0),
             vm[CompSwitch::device_mode].as<std::string>(),
             vm[CompSwitch::parallel_mode].as<std::string>(),
             writeVtk,
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
-            devices,
             vm[CompSwitch::min_sample_i].as<int>(),
             vm[CompSwitch::max_sample_i].as<int>());
 
 
-    std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
-    std::vector<double>   mse(meshs[0].numberOfSamples, 100000);
-    std::vector<unsigned> totalRays(meshs[0].numberOfSamples, 0);
-    std::vector<double>   dndtAse(meshs[0].numberOfSamples, 0);
+    std::vector<float>    phiAse(experiment.numberOfSamples, 0);
+    std::vector<double>   mse(experiment.numberOfSamples, 100000);
+    std::vector<unsigned> totalRays(experiment.numberOfSamples, 0);
+    std::vector<double>   dndtAse(experiment.numberOfSamples, 0);
 
     result = Result( phiAse,
-            mse,
-            totalRays,
-            dndtAse );
+		     mse,
+		     totalRays,
+		     dndtAse );
+
+    
 
     return 0;
 }
@@ -498,6 +510,7 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
  *
  * See parseMultiGPU for details on the parameters
  */
+/*
 Mesh createMesh(const std::vector<unsigned> &triangleIndices, 
 		const unsigned numberOfTriangles, 
 		const unsigned numberOfLevels,
@@ -568,11 +581,13 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
   return mesh;
 
 }
+*/
 
 
 /**
  *
  */
+/*
 std::vector<Mesh> parseMesh(const fs::path rootPath,
 			    std::vector<unsigned> devices) {
 
@@ -671,3 +686,4 @@ std::vector<Mesh> parseMesh(const fs::path rootPath,
   return meshs;
 
 }
+*/
