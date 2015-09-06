@@ -26,6 +26,7 @@
 // STL
 #include <vector>
 #include <utility> /* std::forward */
+#include <type_traits>
 
 // CUDA
 // #include <curand_kernel.h> /*curand_uniform*/
@@ -79,7 +80,7 @@
 
 
 
-struct AccInfo {
+struct EmptyKernel {
     template <typename T_Acc>
     ALPAKA_FN_ACC void operator()(T_Acc const & acc) const {
 
@@ -89,7 +90,36 @@ struct AccInfo {
 };
 
 
+template< typename T>
+struct has_destructor
+{   
+    /* Has destructor :) */
+    template <typename A> 
+    static std::true_type test(decltype(std::declval<A>().~A()) *) {
+        return std::true_type();
+    }
 
+    /* Has no destructor :( */
+    template<typename A>
+    static std::false_type test(...) {
+        return std::false_type(); 
+    }
+
+    /* This will be either `std::true_type` or `std::false_type` */
+    typedef decltype(test<T>(0)) type;
+
+    static const bool value = type::value; /* Which is it? */
+};
+
+namespace alpaka {
+    namespace acc {
+        template <typename T1, typename T2>
+        class AccGpuCudaRt;
+
+        template <typename T1, typename T2>
+        class AccCpuSerial;
+    }
+}
 
 float calcPhiAse ( const ExperimentParameters& experiment,
 		   const ComputeParameters& compute,
@@ -101,8 +131,36 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      // Set types 
      using Dim  = alpaka::dim::DimInt<1u>;
      using Size = std::size_t;
+
+     // Cpu Serial
      using Acc  = alpaka::acc::AccCpuSerial<Dim, Size>;
      using Stream = alpaka::stream::StreamCpuSync;
+
+     // Cpu Threads
+     // using Acc  = alpaka::acc::AccCpuThreads<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuSync;
+
+
+     // Cpu OpenMP2 Blocks
+     // using Acc    = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuAsync;
+
+     // Cpu OpenMP2 Threads
+     // using Acc    = alpaka::acc::AccCpuOmp2Threads<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuAsync;
+
+     // Cpu OpenMP4
+     // using Acc    = alpaka::acc::AccCpuOmp4<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuAsync;
+     
+     // CUDA
+     // Is not working. I think there need to be special options set
+     // in the cmake file. See alpaka examples.
+     // using Acc    = alpaka::acc::AccGpuCudaRt<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuAsync;
+
+     std::cout << has_destructor<alpaka::acc::AccCpuSerial<Dim, Size> >::value << std::endl;
+     //std::cout << has_destructor<alpaka::acc::AccGpuCudaRt<Dim, Size> >::value << std::endl;
 
      // Get host and device
      auto host = alpaka::dev::cpu::getDev();
@@ -116,7 +174,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
        std::cout << "              " << alpaka::dev::getFreeMemBytes(dev) << " bytes free" << std::endl;
 
        Stream stream(dev);
-       AccInfo kernel;
+       EmptyKernel kernel;
 
        auto const workDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>(1ul,1ul);
        auto const exec    = alpaka::exec::create<Acc>(workDiv, kernel);
@@ -128,8 +186,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
       
      }
 
-     return 0.;
-     
      //alpaka::core::forEachType<alpaka::examples::accs::EnabledAccs<Dim, Size> >(AccInfo());
 
     

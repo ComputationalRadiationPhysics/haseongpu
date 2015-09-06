@@ -169,8 +169,8 @@ endif(MSVC)
 ###############################################################################
 set(HASEonGPU_NAME "calcPhiASE")
 file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-#cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if(NOT MPI_FOUND)
     LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_mpi.cc)
