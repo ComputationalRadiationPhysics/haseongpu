@@ -49,7 +49,7 @@
 
 // Alpaka
 #include <alpaka/alpaka.hpp>
-//#include <alpaka/accs/EnabledAccs.hpp> 
+#include <alpaka/core/EnabledAccs.hpp> 
 
 #define SEED 4321
 
@@ -90,36 +90,70 @@ struct EmptyKernel {
 };
 
 
-template< typename T>
-struct has_destructor
-{   
-    /* Has destructor :) */
-    template <typename A> 
-    static std::true_type test(decltype(std::declval<A>().~A()) *) {
-        return std::true_type();
+// template< typename T>
+// struct has_destructor
+// {   
+//     /* Has destructor :) */
+//     template <typename A> 
+//     static std::true_type test(decltype(std::declval<A>().~A()) *) {
+//         return std::true_type();
+//     }
+
+//     /* Has no destructor :( */
+//     template<typename A>
+//     static std::false_type test(...) {
+//         return std::false_type(); 
+//     }
+
+//     /* This will be either `std::true_type` or `std::false_type` */
+//     typedef decltype(test<T>(0)) type;
+
+//     static const bool value = type::value; /* Which is it? */
+// };
+
+// namespace alpaka {
+//     namespace acc {
+//         template <typename T1, typename T2>
+//         class AccGpuCudaRt;
+
+//         template <typename T1, typename T2>
+//         class AccCpuSerial;
+//     }
+// }
+
+struct AccInfo{
+    template <typename T_Acc, typename T_Size>
+    void operator()(T_Size const n){
+
+        using Acc    = T_Acc;
+        using Size   = T_Size;
+        using Dim    = alpaka::dim::DimInt<1u>;
+        using Stream = alpaka::stream::StreamCpuAsync;
+        
+        auto nDevs  = alpaka::dev::DevMan<Acc>::getDevCount();
+
+        // Print device Information
+        for(unsigned dev_i = 0; dev_i < nDevs; ++dev_i){
+            auto dev = alpaka::dev::DevMan<Acc>::getDevByIdx(dev_i);
+            std::cout << "Found device: " << alpaka::dev::getName(dev) << std::endl;
+            std::cout << "              " << alpaka::dev::getMemBytes(dev) << " bytes total" << std::endl;
+            std::cout << "              " << alpaka::dev::getFreeMemBytes(dev) << " bytes free" << std::endl;
+
+            Stream stream(dev);
+            EmptyKernel kernel;
+
+            auto const workDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>(1ul,1ul);
+            auto const exec    = alpaka::exec::create<Acc>(workDiv, kernel);
+
+
+            alpaka::stream::enqueue(stream, exec);
+      
+        }
+
+        
     }
-
-    /* Has no destructor :( */
-    template<typename A>
-    static std::false_type test(...) {
-        return std::false_type(); 
-    }
-
-    /* This will be either `std::true_type` or `std::false_type` */
-    typedef decltype(test<T>(0)) type;
-
-    static const bool value = type::value; /* Which is it? */
+    
 };
-
-namespace alpaka {
-    namespace acc {
-        template <typename T1, typename T2>
-        class AccGpuCudaRt;
-
-        template <typename T1, typename T2>
-        class AccCpuSerial;
-    }
-}
 
 float calcPhiAse ( const ExperimentParameters& experiment,
 		   const ComputeParameters& compute,
@@ -128,13 +162,14 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 		   const unsigned maxSample_i,
 		   float &runtime ){
 
-     // Set types 
-     using Dim  = alpaka::dim::DimInt<1u>;
-     using Size = std::size_t;
 
-     // Cpu Serial
-     using Acc  = alpaka::acc::AccCpuSerial<Dim, Size>;
-     using Stream = alpaka::stream::StreamCpuSync;
+     // // Set types 
+    using Dim  = alpaka::dim::DimInt<1u>;
+    using Size = std::size_t;
+
+     // // Cpu Serial
+     // using Acc  = alpaka::acc::AccCpuSerial<Dim, Size>;
+     // using Stream = alpaka::stream::StreamCpuSync;
 
      // Cpu Threads
      // using Acc  = alpaka::acc::AccCpuThreads<Dim, Size>;
@@ -159,36 +194,9 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      // using Acc    = alpaka::acc::AccGpuCudaRt<Dim, Size>;
      // using Stream = alpaka::stream::StreamCpuAsync;
 
-     std::cout << has_destructor<alpaka::acc::AccCpuSerial<Dim, Size> >::value << std::endl;
-     //std::cout << has_destructor<alpaka::acc::AccGpuCudaRt<Dim, Size> >::value << std::endl;
-
-     // Get host and device
-     auto host = alpaka::dev::cpu::getDev();
-     auto nDevs  = alpaka::dev::DevMan<Acc>::getDevCount();
-
-     // Print some device Information
-     for(unsigned dev_i = 0; dev_i < nDevs; ++dev_i){
-       auto dev = alpaka::dev::DevMan<Acc>::getDevByIdx(dev_i);
-       std::cout << "Found device: " << alpaka::dev::getName(dev) << std::endl;
-       std::cout << "              " << alpaka::dev::getMemBytes(dev) << " bytes total" << std::endl;
-       std::cout << "              " << alpaka::dev::getFreeMemBytes(dev) << " bytes free" << std::endl;
-
-       Stream stream(dev);
-       EmptyKernel kernel;
-
-       auto const workDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>(1ul,1ul);
-       auto const exec    = alpaka::exec::create<Acc>(workDiv, kernel);
-
-
-       // TODO get type of Exec
-
-       alpaka::stream::enqueue(stream, exec);
-      
-     }
-
-     //alpaka::core::forEachType<alpaka::examples::accs::EnabledAccs<Dim, Size> >(AccInfo());
-
+    AccInfo accInfo;
     
+    alpaka::core::forEachType<alpaka::core::accs::EnabledAccs<Dim, Size> >(accInfo, 5ul);
 
     
   // // Optimization to use more L1 cache
