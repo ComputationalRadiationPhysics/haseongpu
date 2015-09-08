@@ -39,15 +39,14 @@
 //#include <write_to_vtk.hpp>
 //#include <calc_phi_ase.hpp>
 //#include <map_rays_to_prisms.hpp>
-//#include <cudachecks.hpp>
-//#include <importance_sampling.hpp>
 //#include <calc_sample_gain_sum.hpp>
 //#include <mesh.hpp>
 //#include <progressbar.hpp> /*progressBar */
 //#include <logging.hpp>
-#include <types.hpp> /* ExperimentParameter, ComputeParameter, Result */
+#include <importance_sampling.hpp> /* importanceSamplingPropagation */
+#include <types.hpp>               /* ExperimentParameter, ComputeParameter, Result */
 #include <mesh.hpp>
-#include <parser.hpp> /* parseMesh */
+#include <parser.hpp>              /* parseMesh */
 
 // Alpaka
 #include <alpaka/alpaka.hpp>
@@ -83,15 +82,6 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
 
 
 
-
-struct EmptyKernel {
-    template <typename T_Acc>
-    ALPAKA_FN_ACC void operator()(T_Acc const & acc) const {
-
-	    
-    }
-
-};
 
 
 // template< typename T>
@@ -163,7 +153,7 @@ struct EmptyKernel {
 template <typename T_Buf, typename T_Extents, typename T_Value>
 void initHostBuffer(T_Buf &buf, T_Extents const extents, T_Value const value){
     
-    for(unsigned i = 0; i < extents; ++i){
+    for(T_Extents i = 0; i < extents; ++i){
 	alpaka::mem::view::getPtrNative(buf)[static_cast<T_Extents>(i)] = value;
     }
 
@@ -174,7 +164,7 @@ void initHostBuffer(T_Buf &buf, T_Extents const extents, T_It const &begin, T_It
 
 
     T_It it = begin;
-    for(unsigned i = 0; i < extents, begin != end; ++i, ++it){
+    for(unsigned i = 0; i < extents or begin != end; ++i, ++it){
 	alpaka::mem::view::getPtrNative(buf)[static_cast<T_Extents>(i)] = *it;
 
     }
@@ -194,11 +184,11 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      * Choose device
      ****************************************************************************/
     // Set types 
-    using Dim     = alpaka::dim::DimInt<1u>;  
+    using Dim     = alpaka::dim::DimInt<3>;  
     using Size    = std::size_t;
     using Extents = Size;
     using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using Acc     = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using Acc     = alpaka::acc::AccCpuOmp2Threads<Dim, Size>;
     using Stream  = alpaka::stream::StreamCpuSync;
     using DevAcc  = alpaka::dev::Dev<Acc>;
     using DevHost = alpaka::dev::DevCpu;
@@ -227,6 +217,15 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     time_t starttime                = time(0);
     unsigned maxReflections         = experiment.useReflections ? hMesh.getMaxReflections() : 0;
     unsigned reflectionSlices       = 1 + (2 * maxReflections);
+
+
+    alpaka::Vec<Dim, Size> importanceGrid  (static_cast<Size>(200),
+					    static_cast<Size>(1),
+					    static_cast<Size>(reflectionSlices));
+    alpaka::Vec<Dim, Size> importanceBlocks(static_cast<Size>(128),
+					    static_cast<Size>(1),
+					    static_cast<Size>(1));
+    auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, importanceBlocks));
 
     // // In some cases distributeRandomly has to be true !
     // // Otherwise bad or no ray distribution possible.
@@ -286,6 +285,8 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   auto dSigmaA                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaA.size())));
   auto dSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaE.size())));
 
+
+  
   // Init memory buffer
   initHostBuffer(hNumberOfReflectionSlices, experiment.maxRaysPerSample, 0);
   initHostBuffer(hGainSum,                  1, 0);
@@ -295,8 +296,10 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   initHostBuffer(hImportance,               hMesh.numberOfPrisms * reflectionSlices, 0);
   initHostBuffer(hPreImportance,            hMesh.numberOfPrisms * reflectionSlices, 0);
   initHostBuffer(hIndicesOfPrisms,          experiment.maxRaysPerSample, 0);
-  initHostBuffer(hSigmaA,                   experiment.sigmaA.size(), experiment.sigmaA.begin(), experiment.sigmaA.end());
-  initHostBuffer(hSigmaE,                   experiment.sigmaA.size(), experiment.sigmaE.begin(), experiment.sigmaA.end());
+  //initHostBuffer(hSigmaA,                   experiment.sigmaA.size(), experiment.sigmaA.begin(), experiment.sigmaA.end());
+  //initHostBuffer(hSigmaE,                   experiment.sigmaA.size(), experiment.sigmaE.begin(), experiment.sigmaA.end());
+
+
 
   // Copy host to device buffer
   alpaka::mem::view::copy(stream, hNumberOfReflectionSlices, dNumberOfReflectionSlices, static_cast<Extents>(experiment.maxRaysPerSample));
@@ -340,14 +343,15 @@ float calcPhiAse ( const ExperimentParameters& experiment,
       raysPerSampleIter           = raysPerSampleList.begin();
       bool mseTooHigh             = true;
 
-  //   importanceSamplingPropagation(sample_i,
-  // 				  reflectionSlices,  
-  // 				  mesh,
-  // 				  experiment.maxSigmaA,
-  // 				  experiment.maxSigmaE,
-  // 				  raw_pointer_cast(&dPreImportance[0]), 
-  // 				  blockDim,
-  // 				  gridDim);
+      importanceSamplingPropagation<Acc>(stream,
+					 importanceWorkdiv,
+					 sample_i,
+					 dMesh,
+					 experiment.maxSigmaA,
+					 experiment.maxSigmaE,
+					 alpaka::mem::view::getPtrNative(dPreImportance));
+								    
+
 
   //   float hSumPhi = thrust::reduce(dPreImportance.begin(), dPreImportance.end(),0.);
 
@@ -437,6 +441,33 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // // Free Memory
   // cudaFree(devMTGPStates);
   // cudaFree(devKernelParams);
+  //alpaka::mem::free(hNumberOfReflectionSlices ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.maxRaysPerSample)));
+  
+  // auto hGainSum                  ( alpaka::mem::buf::alloc<float,    Size, Extents, DevHost>(devHost, static_cast<Extents>(1)));
+  // auto hGainSumSquare            ( alpaka::mem::buf::alloc<float,    Size, Extents, DevHost>(devHost, static_cast<Extents>(1)));
+  // auto hRaysPerPrism             ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto hPrefixSum                ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto hImportance               ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto hPreImportance            ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto hIndicesOfPrisms          ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.maxRaysPerSample)));
+  // auto hSigmaA                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.sigmaA.size())));
+  // auto hSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost,static_cast<Extents>(experiment.sigmaE.size())));
+  
+  // auto dNumberOfReflectionSlices ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.maxRaysPerSample)));
+  // auto dGainSum                  ( alpaka::mem::buf::alloc<float,    Size, Extents, DevAcc>(devAcc, static_cast<Extents>(1)));
+  // auto dGainSumSquare            ( alpaka::mem::buf::alloc<float,    Size, Extents, DevAcc>(devAcc, static_cast<Extents>(1)));
+  // auto dRaysPerPrism             ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms  * reflectionSlices)));
+  // auto dPrefixSum                ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto dImportance               ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto dPreImportance            ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  // auto dIndicesOfPrisms          ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.maxRaysPerSample)));
+  // auto dSigmaA                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaA.size())));
+  // auto dSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaE.size())));
+
+  
+
+
+  
 
   // runtime = difftime(time(0),starttime);
   // return runtime;
