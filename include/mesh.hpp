@@ -35,12 +35,13 @@
 // STL
 #include <vector>
 
+// Alpaka
+#include <alpaka/alpaka.hpp>
+
 // HASEonGPU
 #include <geometry.hpp>
 #include <ConstHybridVector.hpp>
 
-//#include <curand_mtgp32.h> /* curandStateMtgp32 */
-//#include <host_defines.h> /* __host__ __device__ */
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
@@ -113,27 +114,36 @@
  * 
  * totalReflectionAngles [0]-> bottomTotalReflectionAngle, [1]-> topTotalReflectionAngle
  */
-template <typename T_Dev>
+template <typename T_Acc, typename T_Dev>
 class Mesh {
  public:
 
-    ConstHybridVector<double, T_Dev>   points;
-    ConstHybridVector<double, T_Dev>   betaVolume;
-    ConstHybridVector<double, T_Dev>   normalVec;
-    ConstHybridVector<double, T_Dev>   centers;
-    ConstHybridVector<float, T_Dev>    triangleSurfaces;
-    ConstHybridVector<int, T_Dev>      forbiddenEdge;
-    ConstHybridVector<double, T_Dev>   betaCells;
-    ConstHybridVector<unsigned, T_Dev> claddingCellTypes;
+    using Dim =  alpaka::dim::DimInt<1u>;
+    using Size = std::size_t;
 
-    ConstHybridVector<float, T_Dev>    refractiveIndices; 
-    ConstHybridVector<float, T_Dev>    reflectivities;   //based on triangleIndex, with offset from bottom/top
-    ConstHybridVector<float, T_Dev>    totalReflectionAngles;
+    using Gen =
+        decltype(alpaka::rand::generator::createDefault(std::declval<T_Acc const &>(),
+							std::declval<uint32_t &>(),
+							std::declval<uint32_t &>()));
+    using Dist =
+        decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
+    
+    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> points;
+    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> betaVolume;
+    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> normalVec;
+    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> centers;
+    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> triangleSurfaces;
+    alpaka::mem::buf::Buf<T_Dev, int,      Dim, Size> forbiddenEdge;
+    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> betaCells;    
+    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> claddingCellTypes;            
 
-    // Indexstructs
-    ConstHybridVector<unsigned, T_Dev> trianglePointIndices;
-    ConstHybridVector<int, T_Dev>      triangleNeighbors;
-    ConstHybridVector<unsigned, T_Dev> triangleNormalPoint;
+    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> refractiveIndices;
+    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> reflectivities;  //based on triangleIndex, with offset from bottom/top
+    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> totalReflectionAngles;
+
+    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> trianglePointIndices;
+    alpaka::mem::buf::Buf<T_Dev, int,      Dim, Size> triangleNeighbors;
+    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> triangleNormalPoint;
 
     // Constants
     double claddingAbsorption;
@@ -148,8 +158,12 @@ class Mesh {
     unsigned numberOfSamples;
     unsigned claddingNumber;
 
+    // Random number generator
+    Gen gen;
+    Dist dist;
+    
     Mesh(// Device
-	 T_Dev &dev,
+	 T_Dev const &dev,
 	 // Constants
 	 double claddingAbsorption,
 	 float surfaceTotal,
@@ -177,6 +191,7 @@ class Mesh {
 	 std::vector<unsigned> trianglePointIndices,
 	 std::vector<int> triangleNeighbors,
 	 std::vector<unsigned> triangleNormalPoint) :
+	// Constants
 	claddingAbsorption(claddingAbsorption),
 	surfaceTotal(surfaceTotal),
 	thickness(thickness),
@@ -188,45 +203,53 @@ class Mesh {
 	numberOfPoints(numberOfPoints),
 	numberOfSamples(numberOfSamples),
 	claddingNumber(claddingNumber),
-	points(points, dev),
-	normalVec(normalVec, dev),
-	betaVolume(betaVolume, dev),
-	centers(centers, dev),
-	triangleSurfaces(triangleSurfaces, dev),
-	forbiddenEdge(forbiddenEdge, dev),
-	betaCells(betaCells, dev),
-	claddingCellTypes(claddingCellTypes, dev),
-	refractiveIndices(refractiveIndices, dev),
-	reflectivities(reflectivities, dev),
-	totalReflectionAngles(totalReflectionAngles, dev),
-	trianglePointIndices(trianglePointIndices, dev),
-	triangleNeighbors(triangleNeighbors, dev),
-	triangleNormalPoint(triangleNormalPoint, dev){
+	// Vectors
+	points(alpaka::mem::buf::alloc                <double,   Size, Size, T_Dev>(dev, points.size())),
+	normalVec(alpaka::mem::buf::alloc             <double,   Size, Size, T_Dev>(dev, normalVec.size())),
+	betaVolume(alpaka::mem::buf::alloc            <double,   Size, Size, T_Dev>(dev, betaVolume.size())),
+	centers(alpaka::mem::buf::alloc               <double,   Size, Size, T_Dev>(dev, centers.size())),
+	triangleSurfaces(alpaka::mem::buf::alloc      <float,    Size, Size, T_Dev>(dev, triangleSurfaces.size())),
+	forbiddenEdge(alpaka::mem::buf::alloc         <int,      Size, Size, T_Dev>(dev, forbiddenEdge.size())),
+	betaCells(alpaka::mem::buf::alloc             <double,   Size, Size, T_Dev>(dev, betaCells.size())),
+	claddingCellTypes(alpaka::mem::buf::alloc     <unsigned, Size, Size, T_Dev>(dev, claddingCellTypes.size())),
+	refractiveIndices(alpaka::mem::buf::alloc     <float,    Size, Size, T_Dev>(dev, refractiveIndices.size())),
+	reflectivities(alpaka::mem::buf::alloc        <float,    Size, Size, T_Dev>(dev, reflectivities.size())),
+	totalReflectionAngles(alpaka::mem::buf::alloc <float,    Size, Size, T_Dev>(dev, totalReflectionAngles.size())),
+	trianglePointIndices(alpaka::mem::buf::alloc  <unsigned, Size, Size, T_Dev>(dev, trianglePointIndices.size())),
+	triangleNeighbors(alpaka::mem::buf::alloc     <int,      Size, Size, T_Dev>(dev, triangleNeighbors.size())),
+	triangleNormalPoint(alpaka::mem::buf::alloc   <unsigned, Size, Size, T_Dev>(dev, triangleNormalPoint.size())),
+	// Random number generator
+	gen(alpaka::rand::generator::createDefault(dev, 1234, 0)),
+	dist(alpaka::rand::distribution::createUniformReal<float>(dev))
+    {
 
     }
 
 
+
+
+    /*
+      FIXIT: free device memory correctly
+
+     */
     ALPAKA_FN_HOST void free(){
-	points.free();
-	betaVolume.free();
-	normalVec.free();
-	centers.free();
-	triangleSurfaces.free();
-	forbiddenEdge.free();
-	betaCells.free();
-	claddingCellTypes.free();
-	refractiveIndices.free(); 
-	reflectivities.free();   
-	totalReflectionAngles.free();
-	trianglePointIndices.free();
-	triangleNeighbors.free();
-	triangleNormalPoint.free();
+	// points.free();
+	// betaVolume.free();
+	// normalVec.free();
+	// centers.free();
+	// triangleSurfaces.free();
+	// forbiddenEdge.free();
+	// betaCells.free();
+	// claddingCellTypes.free();
+	// refractiveIndices.free(); 
+	// reflectivities.free();   
+	// totalReflectionAngles.free();
+	// trianglePointIndices.free();
+	// triangleNeighbors.free();
+	// triangleNormalPoint.free();
     
     }
 
-    ~Mesh();
-
-    
     template <class T, class B, class E>
     void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
 	if(equals){
@@ -273,34 +296,40 @@ class Mesh {
      * random position inside a given triangle in a specific depth
      */
     
-    /*
 
-      FIXIT: use random number generator of alpaka (picongpu: src/libPMACC/startposition/RandImpl)
 
-      ALPAKA_FN_ACC Point Mesh::genRndPoint(unsigned triangle, unsigned level, curandStateMtgp32 *globalState) const{
-      Point startPoint = {0,0,0};
-      double u = curand_uniform_double(&globalState[blockIdx.x]);
-      double v = curand_uniform_double(&globalState[blockIdx.x]);
+    //FIXIT: use random number generator of alpaka (picongpu: src/libPMACC/startposition/RandImpl)
 
-      if((u+v)>1)
-      {
-      u = 1-u;
-      v = 1-v;
-      }
-      double w = 1-u-v;
-      int t1 = trianglePointIndices[triangle];
-      int t2 = trianglePointIndices[triangle + numberOfTriangles];
-      int t3 = trianglePointIndices[triangle + 2 * numberOfTriangles];
+    
+    ALPAKA_FN_ACC Point genRndPoint(unsigned triangle, unsigned level) const{
+	Point startPoint = {0,0,0};
+	double u = dist(gen); // curand_uniform_double(&globalState[blockIdx.x]);
+	double v = dist(gen); // curand_uniform_double(&globalState[blockIdx.x]);
 
-      // convert the random startpoint into coordinates
-      startPoint.z = (level + curand_uniform_double(&globalState[blockIdx.x])) * thickness;
-      startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
-      startPoint.y = (points[t1+numberOfPoints] * u) + (points[t2+numberOfPoints] * v) + (points[t3+numberOfPoints] * w);
+	if((u+v)>1) {
+		u = 1-u;
+		v = 1-v;
+	}
+	
+	double w = 1-u-v;
+	int t1 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle];
+	int t2 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle + numberOfTriangles];
+	int t3 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle + 2 * numberOfTriangles];
 
-      return startPoint;
-      }
+	// convert the random startpoint into coordinates
+	startPoint.z = (level + dist(gen)) * thickness;
+	startPoint.x =
+	    (alpaka::mem::view::getPtrNative(points)[t1] * u) +
+	    (alpaka::mem::view::getPtrNative(points)[t2] * v) +
+	    (alpaka::mem::view::getPtrNative(points)[t3] * w);
+	startPoint.y =
+	    (alpaka::mem::view::getPtrNative(points)[t1+numberOfPoints] * u) +
+	    (alpaka::mem::view::getPtrNative(points)[t2+numberOfPoints] * v) +
+	    (alpaka::mem::view::getPtrNative(points)[t3+numberOfPoints] * w);
 
-    */
+	return startPoint;
+    }
+
 
 
     /**
@@ -399,11 +428,11 @@ class Mesh {
     }
 
 
-    ALPAKA_FN_HOST double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) {
+    ALPAKA_FN_HOST double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) const{
 	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
     }
 
-    ALPAKA_FN_HOST double getMaxDistance(std::vector<TwoDimPoint> points) {
+    ALPAKA_FN_HOST double getMaxDistance(std::vector<TwoDimPoint> points) const{
 	double maxDistance = -1;
 
 	for(unsigned p1=0 ; p1 < points.size() ; ++p1)
@@ -413,7 +442,7 @@ class Mesh {
 	return maxDistance;
     }
 
-    ALPAKA_FN_HOST double calculateMaxDiameter(const double* points, const unsigned offset) {
+    ALPAKA_FN_HOST double calculateMaxDiameter(const double* points, const unsigned offset) const{
 	TwoDimPoint minX = {DBL_MAX,0};
 	TwoDimPoint minY = {0,DBL_MAX};
 	TwoDimPoint maxX = {DBL_MIN,0};
@@ -441,7 +470,7 @@ class Mesh {
     }
 
     ALPAKA_FN_HOST unsigned getMaxReflections (ReflectionPlane reflectionPlane) const{
-	double d = calculateMaxDiameter(points.toArray(),numberOfPoints);
+	double d = calculateMaxDiameter(alpaka::mem::view::getPtrNative(points), numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h = numberOfLevels * thickness; 
 	double z = d/tan(alpha);
@@ -467,10 +496,10 @@ class Mesh {
     ALPAKA_FN_HOST_ACC float getReflectionAngle(ReflectionPlane reflectionPlane) const{
 	switch(reflectionPlane){
 	case BOTTOM_REFLECTION:
-	    return totalReflectionAngles[0];
+	    return alpaka::mem::view::getPtrNative(totalReflectionAngles)[0];
 	    //return asin(refractiveIndices[1]/refractiveIndices[0]);
 	case TOP_REFLECTION:
-	    return totalReflectionAngles[1];
+	    return alpaka::mem::view::getPtrNative(totalReflectionAngles)[1];
 	    //return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
 	return  0;

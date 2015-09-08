@@ -46,6 +46,8 @@
 //#include <progressbar.hpp> /*progressBar */
 //#include <logging.hpp>
 #include <types.hpp> /* ExperimentParameter, ComputeParameter, Result */
+#include <mesh.hpp>
+#include <parser.hpp> /* parseMesh */
 
 // Alpaka
 #include <alpaka/alpaka.hpp>
@@ -53,30 +55,32 @@
 
 #define SEED 4321
 
-// double calcMSE(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
-//   double a = phiAseSquare / raysPerSample;
-//   double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
+double calcMSE(const double phiAse, const double phiAseSquare, const unsigned raysPerSample){
+  double a = phiAseSquare / raysPerSample;
+  double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
 
-//   return sqrt(abs((a - b) / raysPerSample));
-// }
+  return sqrt(abs((a - b) / raysPerSample));
+}
 
-// std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
-//   std::vector<int> raysPerSample;
+std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps){
+    std::vector<int> raysPerSample;
 
-//   if((minRaysPerSample == maxRaysPerSample) || steps < 2){
-//     raysPerSample.push_back(minRaysPerSample);
-//     return raysPerSample;
-//   }
+    if((minRaysPerSample == maxRaysPerSample) || steps < 2){
+	raysPerSample.push_back(minRaysPerSample);
+	return raysPerSample;
+    }
 
-//   for(int i = 0; i < steps; ++i){
-//     int step_val = minRaysPerSample * pow((maxRaysPerSample / minRaysPerSample), (i / (float)(steps - 1)));
-//     raysPerSample.push_back(step_val);
+    for(int i = 0; i < steps; ++i){
+	int step_val = minRaysPerSample * pow((maxRaysPerSample / minRaysPerSample), (i / (float)(steps - 1)));
+	raysPerSample.push_back(step_val);
 
-//   }
+    }
   
-//   return raysPerSample;
+    return raysPerSample;
 
-// }
+}
+
+
 
 
 
@@ -121,39 +125,63 @@ struct EmptyKernel {
 //     }
 // }
 
-struct AccInfo{
-    template <typename T_Acc, typename T_Size>
-    void operator()(T_Size const n){
+// struct AccInfo{
+//     template <typename T_Acc, typename T_Size>
+//     void operator()(T_Size const n){
 
-        using Acc    = T_Acc;
-        using Size   = T_Size;
-        using Dim    = alpaka::dim::DimInt<1u>;
-        using Stream = alpaka::stream::StreamCpuAsync;
+//         using Acc    = T_Acc;
+//         using Size   = T_Size;
+//         using Dim    = alpaka::dim::DimInt<1u>;
+//         using Stream = alpaka::stream::StreamCpuAsync;
         
-        auto nDevs  = alpaka::dev::DevMan<Acc>::getDevCount();
+//         auto nDevs  = alpaka::dev::DevMan<Acc>::getDevCount();
 
-        // Print device Information
-        for(unsigned dev_i = 0; dev_i < nDevs; ++dev_i){
-            auto dev = alpaka::dev::DevMan<Acc>::getDevByIdx(dev_i);
-            std::cout << "Found device: " << alpaka::dev::getName(dev) << std::endl;
-            std::cout << "              " << alpaka::dev::getMemBytes(dev) << " bytes total" << std::endl;
-            std::cout << "              " << alpaka::dev::getFreeMemBytes(dev) << " bytes free" << std::endl;
+//         // Print device Information
+//         for(unsigned dev_i = 0; dev_i < nDevs; ++dev_i){
+//             auto dev = alpaka::dev::DevMan<Acc>::getDevByIdx(dev_i);
+//             std::cout << "Found device: " << alpaka::dev::getName(dev) << std::endl;
+//             std::cout << "              " << alpaka::dev::getMemBytes(dev) << " bytes total" << std::endl;
+//             std::cout << "              " << alpaka::dev::getFreeMemBytes(dev) << " bytes free" << std::endl;
 
-            Stream stream(dev);
-            EmptyKernel kernel;
+//             Stream stream(dev);
+//             EmptyKernel kernel;
 
-            auto const workDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>(1ul,1ul);
-            auto const exec    = alpaka::exec::create<Acc>(workDiv, kernel);
+//             auto const workDiv = alpaka::workdiv::WorkDivMembers<Dim, Size>(1ul,1ul);
+//             auto const exec    = alpaka::exec::create<Acc>(workDiv, kernel);
 
 
-            alpaka::stream::enqueue(stream, exec);
+//             alpaka::stream::enqueue(stream, exec);
       
-        }
+//         }
 
         
-    }
+//     }
     
-};
+    
+// };
+
+template <typename T_Buf, typename T_Extents, typename T_Value>
+void initHostBuffer(T_Buf &buf, T_Extents const extents, T_Value const value){
+    
+    for(unsigned i = 0; i < extents; ++i){
+	alpaka::mem::view::getPtrNative(buf)[static_cast<T_Extents>(i)] = value;
+    }
+
+}
+
+template <typename T_Buf, typename T_Extents, typename T_It>
+void initHostBuffer(T_Buf &buf, T_Extents const extents, T_It const &begin, T_It const& end){
+
+
+    T_It it = begin;
+    for(unsigned i = 0; i < extents, begin != end; ++i, ++it){
+	alpaka::mem::view::getPtrNative(buf)[static_cast<T_Extents>(i)] = *it;
+
+    }
+
+}
+
+
 
 float calcPhiAse ( const ExperimentParameters& experiment,
 		   const ComputeParameters& compute,
@@ -162,67 +190,60 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 		   const unsigned maxSample_i,
 		   float &runtime ){
 
+    /*****************************************************************************
+     * Choose device
+     ****************************************************************************/
+    // Set types 
+    using Dim     = alpaka::dim::DimInt<1u>;  
+    using Size    = std::size_t;
+    using Extents = Size;
+    using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using Acc     = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using Stream  = alpaka::stream::StreamCpuSync;
+    using DevAcc  = alpaka::dev::Dev<Acc>;
+    using DevHost = alpaka::dev::DevCpu;
 
-     // // Set types 
-    using Dim  = alpaka::dim::DimInt<1u>;
-    using Size = std::size_t;
 
-     // // Cpu Serial
-     // using Acc  = alpaka::acc::AccCpuSerial<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuSync;
+    // Get the first device
+    DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
+    DevHost devHost (alpaka::dev::cpu::getDev());
+    Stream  stream  (devAcc);
 
-     // Cpu Threads
-     // using Acc  = alpaka::acc::AccCpuThreads<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuSync;
-
-
-     // Cpu OpenMP2 Blocks
-     // using Acc    = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuAsync;
-
-     // Cpu OpenMP2 Threads
-     // using Acc    = alpaka::acc::AccCpuOmp2Threads<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuAsync;
-
-     // Cpu OpenMP4
-     // using Acc    = alpaka::acc::AccCpuOmp4<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuAsync;
-     
-     // CUDA
-     // Is not working. I think there need to be special options set
-     // in the cmake file. See alpaka examples.
-     // using Acc    = alpaka::acc::AccGpuCudaRt<Dim, Size>;
-     // using Stream = alpaka::stream::StreamCpuAsync;
-
-    AccInfo accInfo;
-    
-    alpaka::core::forEachType<alpaka::core::accs::EnabledAccs<Dim, Size> >(accInfo, 5ul);
+    /*****************************************************************************
+     * Parse mesh
+     ****************************************************************************/
+    Mesh<Acc,  DevAcc>  dMesh = parseMesh<Acc,  DevAcc> (compute.inputPath, devAcc);
+    Mesh<Host, DevHost> hMesh = parseMesh<Host, DevHost>(compute.inputPath, devHost);
 
     
-  // // Optimization to use more L1 cache
-  // cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  // cudaSetDevice(compute.gpu_i);
+    //alpAka::core::forEachType<alpaka::core::accs::EnabledAccs<Dim, Size> >(AccInfo(), 5ul);
 
-  // using thrust::device_vector;
-  // using thrust::raw_pointer_cast;
+    
+    // // Optimization to use more L1 cache
+    // cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    // cudaSetDevice(compute.gpu_i);
 
-  // // variable Definitions CPU
-  // time_t starttime                = time(0);
-  // unsigned maxReflections         = experiment.useReflections ? mesh.getMaxReflections() : 0;
-  // unsigned reflectionSlices       = 1 + (2 * maxReflections);
-  // // In some cases distributeRandomly has to be true !
-  // // Otherwise bad or no ray distribution possible.
-  // bool distributeRandomly         = true;
-  // dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
-  //                                 // MUST be 128, since in the kernel we use a bitshift << 7
-  // dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
+    // variable Definitions CPU
+    time_t starttime                = time(0);
+    unsigned maxReflections         = experiment.useReflections ? hMesh.getMaxReflections() : 0;
+    unsigned reflectionSlices       = 1 + (2 * maxReflections);
 
-  // // Divide RaysPerSample range into steps
-  // std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
-  // 								     experiment.maxRaysPerSample,
-  // 								     compute.adaptiveSteps);
+    // // In some cases distributeRandomly has to be true !
+    // // Otherwise bad or no ray distribution possible.
+    // bool distributeRandomly         = true;
+    // dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
+    //                                 // MUST be 128, since in the kernel we use a bitshift << 7
+    // dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
+
+
+
+    
+  // Divide RaysPerSample range into steps
+  std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
+  								     experiment.maxRaysPerSample,
+  								     compute.adaptiveSteps);
   
-  // std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
+  std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
   // // // Calc max sigmaA / sigmaE
   // // double maxSigmaE = 0;
@@ -234,13 +255,69 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // //   }
   // // }
 
-  // // Memory allocation/init and copy for device memory
+
+  
+
+  /*****************************************************************************
+   * Memory allocation/init and copy for device memory
+   ****************************************************************************/
+
+
+  // Define memory buffers
+  auto hNumberOfReflectionSlices ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.maxRaysPerSample)));
+  auto hGainSum                  ( alpaka::mem::buf::alloc<float,    Size, Extents, DevHost>(devHost, static_cast<Extents>(1)));
+  auto hGainSumSquare            ( alpaka::mem::buf::alloc<float,    Size, Extents, DevHost>(devHost, static_cast<Extents>(1)));
+  auto hRaysPerPrism             ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto hPrefixSum                ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto hImportance               ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto hPreImportance            ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto hIndicesOfPrisms          ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.maxRaysPerSample)));
+  auto hSigmaA                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost, static_cast<Extents>(experiment.sigmaA.size())));
+  auto hSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevHost>(devHost,static_cast<Extents>(experiment.sigmaE.size())));
+  
+  auto dNumberOfReflectionSlices ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.maxRaysPerSample)));
+  auto dGainSum                  ( alpaka::mem::buf::alloc<float,    Size, Extents, DevAcc>(devAcc, static_cast<Extents>(1)));
+  auto dGainSumSquare            ( alpaka::mem::buf::alloc<float,    Size, Extents, DevAcc>(devAcc, static_cast<Extents>(1)));
+  auto dRaysPerPrism             ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms  * reflectionSlices)));
+  auto dPrefixSum                ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto dImportance               ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto dPreImportance            ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices)));
+  auto dIndicesOfPrisms          ( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.maxRaysPerSample)));
+  auto dSigmaA                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaA.size())));
+  auto dSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaE.size())));
+
+  // Init memory buffer
+  initHostBuffer(hNumberOfReflectionSlices, experiment.maxRaysPerSample, 0);
+  initHostBuffer(hGainSum,                  1, 0);
+  initHostBuffer(hGainSumSquare,            1, 0);
+  initHostBuffer(hRaysPerPrism,             hMesh.numberOfPrisms * reflectionSlices, 1);
+  initHostBuffer(hPrefixSum,                hMesh.numberOfPrisms * reflectionSlices, 0);
+  initHostBuffer(hImportance,               hMesh.numberOfPrisms * reflectionSlices, 0);
+  initHostBuffer(hPreImportance,            hMesh.numberOfPrisms * reflectionSlices, 0);
+  initHostBuffer(hIndicesOfPrisms,          experiment.maxRaysPerSample, 0);
+  initHostBuffer(hSigmaA,                   experiment.sigmaA.size(), experiment.sigmaA.begin(), experiment.sigmaA.end());
+  initHostBuffer(hSigmaE,                   experiment.sigmaA.size(), experiment.sigmaE.begin(), experiment.sigmaA.end());
+
+  // Copy host to device buffer
+  alpaka::mem::view::copy(stream, hNumberOfReflectionSlices, dNumberOfReflectionSlices, static_cast<Extents>(experiment.maxRaysPerSample));
+  alpaka::mem::view::copy(stream, hGainSum, dGainSum, static_cast<Extents>(1));
+  alpaka::mem::view::copy(stream, hGainSumSquare, dGainSumSquare, static_cast<Extents>(1));
+  alpaka::mem::view::copy(stream, hRaysPerPrism, dRaysPerPrism, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
+  alpaka::mem::view::copy(stream, hPrefixSum, dPrefixSum, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
+  alpaka::mem::view::copy(stream, hImportance, dImportance, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
+  alpaka::mem::view::copy(stream, hPreImportance, dPreImportance, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
+  alpaka::mem::view::copy(stream, hIndicesOfPrisms, dIndicesOfPrisms, static_cast<Extents>(experiment.maxRaysPerSample));
+  alpaka::mem::view::copy(stream, hSigmaA, dSigmaA, static_cast<Extents>(experiment.sigmaA.size()));
+  alpaka::mem::view::copy(stream, hSigmaE, dSigmaE, static_cast<Extents>(experiment.sigmaE.size()));  
+
+  
   // device_vector<unsigned> dNumberOfReflectionSlices(experiment.maxRaysPerSample, 0);
   // device_vector<float>    dGainSum            (1, 0);
   // device_vector<float>    dGainSumSquare      (1, 0);
   // device_vector<unsigned> dRaysPerPrism       (mesh.numberOfPrisms * reflectionSlices, 1);
   // device_vector<unsigned> dPrefixSum          (mesh.numberOfPrisms * reflectionSlices, 0);
   // device_vector<double>   dImportance         (mesh.numberOfPrisms * reflectionSlices, 0);
+		 
   // device_vector<double>   dPreImportance      (mesh.numberOfPrisms * reflectionSlices, 0);
   // device_vector<unsigned> dIndicesOfPrisms    (experiment.maxRaysPerSample,  0);
   // device_vector<double>   dSigmaA             (experiment.sigmaA.begin(), experiment.sigmaA.end());
@@ -254,14 +331,17 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   // CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
 
-  // // Calculation for each sample point
-  // for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
-  //   unsigned hRaysPerSampleDump = 0; 
-  //   raysPerSampleIter = raysPerSampleList.begin();
-  //   bool mseTooHigh=true;
+
+  /*****************************************************************************
+   * Calculation for each sample point
+   ****************************************************************************/
+  for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
+      unsigned hRaysPerSampleDump = 0; 
+      raysPerSampleIter           = raysPerSampleList.begin();
+      bool mseTooHigh             = true;
 
   //   importanceSamplingPropagation(sample_i,
-  // 				  reflectionSlices,
+  // 				  reflectionSlices,  
   // 				  mesh,
   // 				  experiment.maxSigmaA,
   // 				  experiment.maxSigmaE,
@@ -352,7 +432,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   //      fancyProgressBar(mesh.numberOfSamples);
   //    }
 
-  // }
+  }
     
   // // Free Memory
   // cudaFree(devMTGPStates);
