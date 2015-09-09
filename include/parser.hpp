@@ -165,8 +165,7 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
  *
  */
 template <typename T_Acc, typename T_Dev>
-Mesh<T_Acc, T_Dev> createMesh(T_Dev const &dev,
-			      const std::vector<unsigned> &triangleIndices, 
+Mesh<T_Acc, T_Dev> createMesh(const std::vector<unsigned> &triangleIndices, 
 			      const unsigned numberOfTriangles, 
 			      const unsigned numberOfLevels,
 			      const unsigned numberOfPoints, 
@@ -188,7 +187,8 @@ Mesh<T_Acc, T_Dev> createMesh(T_Dev const &dev,
 			      const float nTot,
 			      const float crystalFluorescence,
 			      const unsigned cladNumber,
-			      const double cladAbsorption) {
+			      const double cladAbsorption,
+			      T_Dev &dev) {
 
     // GPU variables
     double totalSurface = 0.;
@@ -207,8 +207,7 @@ Mesh<T_Acc, T_Dev> createMesh(T_Dev const &dev,
 	totalReflectionAngles.at(i/2) = (180. / M_PI *  asin(refractiveIndices.at(i+1) / refractiveIndices.at(i)));
     }
 
-    return Mesh<T_Acc, T_Dev> ( dev,
-				cladAbsorption,
+    return Mesh<T_Acc, T_Dev> ( cladAbsorption,
 				totalSurface,
 				thicknessOfPrism,
 				nTot,
@@ -232,14 +231,15 @@ Mesh<T_Acc, T_Dev> createMesh(T_Dev const &dev,
 				totalReflectionAngles,
 				triangleIndices,
 				neighborsVector,
-				positionsOfNormalVectors);
+				positionsOfNormalVectors,
+				dev);
 
 }
 
 
 template <typename T_Acc, typename T_Dev>
 Mesh<T_Acc, T_Dev> parseMesh( fs::path const rootPath,
-			      T_Dev const &dev) {
+			      T_Dev &dev) {
 
     // Parse experimentdata from files
     std::vector<unsigned> triangleNormalPoint  = fileToVector<unsigned>(rootPath / "triangleNormalPoint.txt");
@@ -300,8 +300,7 @@ Mesh<T_Acc, T_Dev> parseMesh( fs::path const rootPath,
     assertRange(refractiveIndices,0,5,false);
     assertRange(reflectivities,0,1,false);
 
-    return createMesh<T_Acc, T_Dev>(dev,
-				    trianglePointIndices,
+    return createMesh<T_Acc, T_Dev>(trianglePointIndices,
 				    numberOfTriangles,
 				    numberOfLevels,
 				    numberOfPoints,
@@ -323,6 +322,7 @@ Mesh<T_Acc, T_Dev> parseMesh( fs::path const rootPath,
 				    nTot,
 				    crystalTFluo,
 				    claddingNumber,
-				    claddingAbsorption);
+				    claddingAbsorption,
+				    dev);
 }
 
