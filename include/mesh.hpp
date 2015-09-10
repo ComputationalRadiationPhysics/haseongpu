@@ -160,10 +160,6 @@ class Mesh {
     alpaka::mem::buf::Buf<T_Dev, int,      Dim, Size> triangleNeighbors;
     alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> triangleNormalPoint;
     
-    // Random number generator
-    Gen gen;
-    Dist dist;
-    
     Mesh(// Constants
 	 double claddingAbsorption,
 	 float surfaceTotal,
@@ -219,10 +215,7 @@ class Mesh {
 	totalReflectionAngles(alpaka::mem::buf::alloc <float,    Size, Size, T_Dev>(dev, totalReflectionAngles.size())),
 	trianglePointIndices(alpaka::mem::buf::alloc  <unsigned, Size, Size, T_Dev>(dev, trianglePointIndices.size())),
 	triangleNeighbors(alpaka::mem::buf::alloc     <int,      Size, Size, T_Dev>(dev, triangleNeighbors.size())),
-	triangleNormalPoint(alpaka::mem::buf::alloc   <unsigned, Size, Size, T_Dev>(dev, triangleNormalPoint.size())),
-	// Random number generator
-	gen(alpaka::rand::generator::createDefault(dev, 1234, 0)),
-	dist(alpaka::rand::distribution::createUniformReal<float>(dev))
+	triangleNormalPoint(alpaka::mem::buf::alloc   <unsigned, Size, Size, T_Dev>(dev, triangleNormalPoint.size()))
     {
 
 	// FIXIT: Is this the most general
@@ -337,7 +330,12 @@ class Mesh {
     //FIXIT: use random number generator of alpaka (picongpu: src/libPMACC/startposition/RandImpl)
 
     
-    ALPAKA_FN_ACC Point genRndPoint(unsigned triangle, unsigned level) const{
+    ALPAKA_FN_ACC Point genRndPoint(T_Acc const &acc, unsigned triangle, unsigned level) const{
+	// Random number generator
+	// FIXIT: No need to initialize this again and again ?
+	Gen gen(alpaka::rand::generator::createDefault(acc, 1234, 0));
+	Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
+	
 	Point startPoint = {0,0,0};
 	double u = dist(gen); // curand_uniform_double(&globalState[blockIdx.x]);
 	double v = dist(gen); // curand_uniform_double(&globalState[blockIdx.x]);
@@ -539,6 +537,11 @@ class Mesh {
 	    //return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
 	return  0;
+    }
+
+    ALPAKA_FN_HOST_ACC float getTriangleSurface(const unsigned triangle) const{
+	return alpaka::mem::view::getPtrNative(triangleSurfaces)[triangle];
+	    
     }
 
     ALPAKA_FN_HOST_ACC  void test() const{

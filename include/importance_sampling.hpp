@@ -58,43 +58,104 @@ struct DistributeRaysByImportance {
 				   const unsigned raysPerSample,
 				   unsigned *raysDump) const {
 
-	// unsigned reflection_i = blockIdx.z;
-	// unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
+	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-	// int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-	// if(startPrism >= mesh.numberOfPrisms) return;
+	
 
-	// raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-	// if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
-	//     printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
-	// }
-	// assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
-	// atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
+	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	if(startPrism >= mesh.numberOfPrisms) return;
+
+	raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
+	if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
+	     printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
+	}
+	assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, raysDump, raysPerPrism[startPrism + reflectionOffset]);
+	
     }
 
 };
 
-// __global__ void distributeRaysByImportance(Mesh mesh,
-// 					   unsigned *raysPerPrism,
-// 					   double *importance,
-// 					   float *sumPhi,
-// 					   unsigned raysPerSample,
-// 					   unsigned *raysDump){
+/**
+ * @brief takes a number of rays and distributes them randomly over the available prisms
+ *        Warning: Does not distribute to reflection slices !!!
+ *
+ * @param *raysPerPrism the number of rays for each prism (will be changed)
+ * @param *raysDump the number of rays which were already distributed
+ *
+ * for other parameters, see documentation of importanceSampling()
+ *
+ */
+struct DistributeRemainingRaysRandomly {
+    template <typename T_Acc,
+	      typename T_Mesh>
+    ALPAKA_FN_ACC void operator()(T_Acc const &acc,
+				  T_Mesh const &mesh,
+				  unsigned *raysPerPrism,
+				  unsigned raysPerSample,
+				  unsigned *raysDump) const {
+	using Gen =   decltype(alpaka::rand::generator::createDefault(std::declval<T_Acc const &>(),
+								      std::declval<uint32_t &>(),
+								      std::declval<uint32_t &>()));
+	using Dist =  decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
+    
+	int id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	int raysLeft = raysPerSample - (*raysDump);
 
-//   unsigned reflection_i = blockIdx.z;
-//   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
+	if(id < raysLeft){
+	    Gen gen(alpaka::rand::generator::createDefault(acc, id, 0));
+	    Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
+	    
+	    int rand_t = (int ) ceil(dist(gen) * mesh.numberOfTriangles) - 1;
+	    int rand_z = (int ) ceil(dist(gen) * (mesh.numberOfLevels-1)) - 1;
+	    unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
+	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, &(raysPerPrism[randomPrism]), 1u);	    
+	} 
 
-//   int startPrism = threadIdx.x + blockIdx.x * blockDim.x;
-//   if(startPrism >= mesh.numberOfPrisms) return;
+    }
 
-//   raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-//   if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
-// 	  printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
-//   }
-//   assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
-//   atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
+};
 
-// }
+/**
+ * @brief corrects the importance to match with the randomly distributed rays
+ *
+ * @param *raysPerPrism the number of rays to be launced for each prism
+ *
+ * @param *importance the importance for each prism (will be changed)
+ *
+ * for other parameters, see documentation of importanceSampling()
+ */
+struct RecalculateImportance {
+    template <typename T_Acc,
+	      typename T_Mesh>
+    ALPAKA_FN_ACC void operator()(T_Acc const &acc,
+				  T_Mesh const &mesh,
+				  unsigned *raysPerPrism,
+				  unsigned raysPerSample,
+				  double *importance) const{
+
+
+	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
+	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
+
+	if(startPrism >= mesh.numberOfPrisms) return;
+
+	int startLevel = startPrism/(mesh.numberOfTriangles);
+	int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
+
+	if(raysPerPrism[startPrism + reflectionOffset] > 0){
+	    importance[startPrism + reflectionOffset] = raysPerSample * mesh.getTriangleSurface(startTriangle) / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
+	}
+	else{
+	    importance[startPrism + reflectionOffset] = 0;
+	}
+
+    }
+    
+};
+
 
 
 /**
@@ -116,16 +177,13 @@ struct PropagateFromTriangleCenter {
 				   const double sigmaA,
 				   const double sigmaE) const {
 	double gain = 0;
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
 	unsigned reflections  = (reflection_i + 1) / 2;
 	ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
 
-	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; 
 	
-	if(startPrism >= mesh.numberOfPrisms){
-	    return;
-	    
-	}
+	if(startPrism >= mesh.numberOfPrisms) return;
 	
 	unsigned startLevel       = startPrism/(mesh.numberOfTriangles);
 	unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
@@ -197,8 +255,8 @@ ALPAKA_FN_HOST void importanceSamplingPropagation( T_Stream &stream,
  */
 template <typename T_Acc, typename T_Workdiv, typename T_Stream, typename T_Mesh>
 unsigned importanceSamplingDistribution(T_Stream &stream,
-					T_Workdiv &workdiv,
-					const unsigned reflectionSlices,
+					T_Workdiv const &importanceWorkdiv,
+					T_Workdiv const &workdiv,
 					const T_Mesh &dMesh,
 					const unsigned raysPerSample,
 					double *dPreImportance,
@@ -224,33 +282,44 @@ unsigned importanceSamplingDistribution(T_Stream &stream,
     alpaka::mem::view::copy(stream, dSumPhi, hSumPhi, static_cast<std::size_t>(1));
     alpaka::mem::view::copy(stream, dRaysDump, hRaysDump, static_cast<std::size_t>(1));    
 
-
+    // Kernel functors
     DistributeRaysByImportance distributeRaysByImportance;
+    DistributeRemainingRaysRandomly distributeRemainingRaysRandomly;
+    RecalculateImportance recalculateImportance;
+
+    auto const exec0 (alpaka::exec::create<T_Acc>(importanceWorkdiv,
+						 distributeRaysByImportance,
+						 dMesh,
+						 dRaysPerPrism,
+						 dPreImportance,
+						 alpaka::mem::view::getPtrNative(dSumPhi),
+						 raysPerSample,
+						 alpaka::mem::view::getPtrNative(dRaysDump)));
+    alpaka::stream::enqueue(stream, exec0);
 
 
+    // Distribute remaining rays randomly if wanted
+    if(distributeRandomly){
+	auto const exec1 (alpaka::exec::create<T_Acc>(workdiv,
+						     distributeRemainingRaysRandomly,
+						     dMesh,
+						     dRaysPerPrism,
+						     raysPerSample,
+						     alpaka::mem::view::getPtrNative(dRaysDump)));
+	alpaka::stream::enqueue(stream, exec1);
+	alpaka::mem::view::getPtrNative(hRaysDump)[0] = raysPerSample;
+    }
+    else {
+	alpaka::mem::view::copy(stream, hRaysDump, dRaysDump, static_cast<std::size_t>(1));    	
+    }
+
+    auto const exec2 (alpaka::exec::create<T_Acc>(importanceWorkdiv,
+						 recalculateImportance,
+						 dMesh,
+						 dRaysPerPrism,
+						 alpaka::mem::view::getPtrNative(hRaysDump)[0],
+						 dImportance));
+    alpaka::stream::enqueue(stream, exec2);
     
-    // dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
-
-    // CUDA_CHECK_KERNEL_SYNC(distributeRaysByImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, preImportance, dSumPhi, raysPerSample, dRaysDump));
-
-    //auto const exec (alpaka::exec::create<T_Acc>(workdiv, distributeRaysByImportance, dMesh, dRaysPerPrism, dPreImportance, dSumPhi, raysPerSample, dRaysDump));
-    auto const exec (alpaka::exec::create<T_Acc>(workdiv, distributeRaysByImportance, dMesh, dRaysPerPrism, dPreImportance, alpaka::mem::view::getPtrNative(dSumPhi), raysPerSample, alpaka::mem::view::getPtrNative(dRaysDump)));
-    alpaka::stream::enqueue(stream, exec);
-
-
-    // // Distribute remaining rays randomly if wanted
-    // if(distributeRandomly){
-    //   CUDA_CHECK_KERNEL_SYNC(distributeRemainingRaysRandomly<<< 200,blockDim >>>(deviceMesh ,raysPerPrism, raysPerSample, dRaysDump));
-    //   hRaysDump = raysPerSample;
-    // }
-    // else {
-    //   hRaysDump = copyFromDevice(dRaysDump);
-    // }
-
-    // CUDA_CHECK_KERNEL_SYNC(recalculateImportance<<< gridDimReflection, blockDim >>>(deviceMesh, raysPerPrism, hRaysDump, importance));
-
-    // cudaFree(dSumPhi);
-    // cudaFree(dRaysDump);
-
     return alpaka::mem::view::getPtrNative(hRaysDump)[0];
 }
