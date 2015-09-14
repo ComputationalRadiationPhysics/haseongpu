@@ -53,6 +53,7 @@ struct CompSwitch{
     static const std::string adaptive_steps;
     static const std::string min_sample_i;
     static const std::string max_sample_i;
+    static const std::string write_vtk;
 };
 
 struct ExpSwitch{

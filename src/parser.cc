@@ -109,8 +109,6 @@ int parse( const int argc,
         std::vector<Mesh>& meshs,
         Result& result) {
 
-    bool writeVtk = false;
-
     Modifiable_variables_map vm = parseCommandLine(argc, argv);
 
     printCommandLine(vm);
@@ -148,7 +146,7 @@ int parse( const int argc,
             devices.at(0),
             vm[CompSwitch::device_mode].as<std::string>(),
             vm[CompSwitch::parallel_mode].as<std::string>(),
-            writeVtk,
+            vm[CompSwitch::write_vtk].as<bool>(),
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
             devices,
@@ -235,6 +233,10 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
           po::value<int> ()
           ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
           "The the maximal index of sample points to simulate")
+        ( CompSwitch::write_vtk.c_str(),
+          po::value<bool> ()
+          ->default_value(false),
+          "Write VTK files of the computed ASE values")
         ;
 
     po::options_description generic_options( "Generic Options" );
