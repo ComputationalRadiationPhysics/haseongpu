@@ -58,12 +58,10 @@ struct DistributeRaysByImportance {
 				   const unsigned raysPerSample,
 				   unsigned *raysDump) const {
 
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];	
 	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-	
-
-	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 	if(startPrism >= mesh.numberOfPrisms) return;
 
 	raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
@@ -136,8 +134,8 @@ struct RecalculateImportance {
 				  double *importance) const{
 
 
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
 	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
 	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
 	if(startPrism >= mesh.numberOfPrisms) return;
@@ -177,11 +175,10 @@ struct PropagateFromTriangleCenter {
 				   const double sigmaA,
 				   const double sigmaE) const {
 	double gain = 0;
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0]; // block.z
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned startPrism   = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; 	
 	unsigned reflections  = (reflection_i + 1) / 2;
 	ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
-
-	unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; 
 	
 	if(startPrism >= mesh.numberOfPrisms) return;
 	

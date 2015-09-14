@@ -37,49 +37,157 @@
 // Alpaka
 #include <alpaka/alpaka.hpp>
 
-// /**
-//  * @brief: calculate the sum of all gains for a single sample point s_i, accounting
-//  *		   for reflections on the top and bottom surface. Different cladding, 
-//  *		   coating and refractive indices are stored in the mesh.
-//  *
-//  * @param globalState State for random number generation (mersenne twister).
-//  *                    The state need to be initialized before. See
-//  *                    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MTGP/
-//  *                    for more information.
-//  * @param mesh the gain medium mesh 
-//  * @param indicesOfPrisms a mapping from rays to prisms. The value x on the
-//  *	      n-th position denotes that ray n is supposed to start propagating 
-//  *	      from the x-th prism
-//  * @param numberOfReflectionSlices similar to indicesOfPrisms, but denotes the
-//  *        reflection slice from which each ray starts (see importance sampling)
-//  * @param importance the importance for each prism, obtained through the
-//  *        importance sampling kernel
-//  * @param raysPerSample the number of rays to use for the sample point s_i
-//  * @param gainSum the sum of all gain values for sample point s_i
-//  * @param gainSumSquare the sum of all (gain^2) values for sample point s_i
-//  *        useful for finding the mean square error
-//  * @param sample_i the index of the sample point to sample (s_i)
-//  * @param sigmaA the values for absorption cross section in the selected wavelength interval
-//  * @param sigmaE the values for emission cross section in the selected wavelength interval
-//  * @param maxInterpolation the number of elements contained in sigmaA or sigmaE
-//  * @param globalOffsetMultiplicator holds the number of work-requests done by the blocks
-//  *        (see getRayNumberBlockbased())
-//  *
-//  */
-// __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState, 
-// 						const Mesh mesh,
-// 						const unsigned* indicesOfPrisms, 
-// 						const unsigned* numberOfReflections,
-// 						const double* importance,
-// 						const unsigned raysPerSample,
-// 						float *gainSum,
-// 						float *gainSumSquare,
-// 						const unsigned sample_i,
-// 						const double *sigmaA,
-// 						const double *sigmaE,
-// 						const unsigned maxInterpolation,
-// 						unsigned *globalOffsetMultiplicator
-// 						);
+// HASEonGPU
+#include <geometry.hpp>      /* generateRay */
+#include <propagate_ray.hpp> /* propagateRay */
+
+// FIXIT: We should have some random number generator object and not initilize it again and again !
+template <typename T_Acc>
+ALPAKA_FN_ACC unsigned genRndSigmas(T_Acc const &acc, unsigned length) {
+    using Gen =   decltype(alpaka::rand::generator::createDefault(std::declval<T_Acc const &>(),
+								  std::declval<uint32_t &>(),
+								  std::declval<uint32_t &>()));
+    using Dist =  decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
+    
+    // FIXIT: the orginal used blockid.x to 
+    Gen gen(alpaka::rand::generator::createDefault(acc, 0/*alpaka::idx::getIdx<alpaka::Grid, alpaka::Block>(acc)[0]*/, 0));
+    Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
+    
+    return static_cast<unsigned>(dist(gen) * (length-1));
+}
+
+
+/**
+ * @brief get the offset for accessing indicesOfPrisms and numberOfReflectionSlices.
+ *        Warning: works only for a blocksize of 128 threads!
+ *
+ * @param blockOffset shared memory location that holds the offset for the whole block
+ * @param raysPerSample number of raysPerSample (can be any number higher than raysPerSample/blocksize)
+ * @param globalOffsetMultiplicator is incremented by 1 each time a block asks for a new workload
+ * @return an unused offset in the global arrays indicesOfPrisms/numberOfReflectionSlices
+ *
+ */
+template <typename T_Acc>
+ALPAKA_FN_ACC unsigned getRayNumberBlockbased(T_Acc const & acc, unsigned* const blockOffset, unsigned const &raysPerSample, unsigned * const globalOffsetMultiplicator){
+
+    // FIXIT: Extra sync since alpaka
+    alpaka::block::sync::syncBlockThreads(acc);
+
+    // The first thread in the threadblock increases the globalOffsetMultiplicator (without real limit)
+    if(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] == 0){
+	// blockOffset is the new value of the globalOffsetMultiplicator
+	blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Inc>(acc, &globalOffsetMultiplicator[0], raysPerSample);
+    }
+
+    // FIXIT: This barrier locks computation
+    alpaka::block::sync::syncBlockThreads(acc);
+
+    // FIXIT: this 128 is fixed !!!
+    // multiply blockOffset by 128 (size of the threadblock)
+    return alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] << 7) ;
+}
+
+
+/**
+ * @brief: calculate the sum of all gains for a single sample point s_i, accounting
+ *		   for reflections on the top and bottom surface. Different cladding, 
+ *		   coating and refractive indices are stored in the mesh.
+ *
+ * @param globalState State for random number generation (mersenne twister).
+ *                    The state need to be initialized before. See
+ *                    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MTGP/
+ *                    for more information.
+ * @param mesh the gain medium mesh 
+ * @param indicesOfPrisms a mapping from rays to prisms. The value x on the
+ *	      n-th position denotes that ray n is supposed to start propagating 
+ *	      from the x-th prism
+ * @param numberOfReflectionSlices similar to indicesOfPrisms, but denotes the
+ *        reflection slice from which each ray starts (see importance sampling)
+ * @param importance the importance for each prism, obtained through the
+ *        importance sampling kernel
+ * @param raysPerSample the number of rays to use for the sample point s_i
+ * @param gainSum the sum of all gain values for sample point s_i
+ * @param gainSumSquare the sum of all (gain^2) values for sample point s_i
+ *        useful for finding the mean square error
+ * @param sample_i the index of the sample point to sample (s_i)
+ * @param sigmaA the values for absorption cross section in the selected wavelength interval
+ * @param sigmaE the values for emission cross section in the selected wavelength interval
+ * @param maxInterpolation the number of elements contained in sigmaA or sigmaE
+ * @param globalOffsetMultiplicator holds the number of work-requests done by the blocks
+ *        (see getRayNumberBlockbased())
+ *
+ */
+struct CalcSampleGainSumWithReflection {
+    template <typename T_Acc,
+	      typename T_Mesh>
+    ALPAKA_FN_ACC void operator()(const T_Acc &acc,
+				  const T_Mesh &mesh, 
+				  const unsigned* indicesOfPrisms, 
+				  const unsigned* numberOfReflectionSlices,
+				  const double* importance,
+				  const unsigned raysPerSample,
+				  float *gainSum, 
+				  float *gainSumSquare,
+				  const unsigned sample_i,
+				  const double *sigmaA, 
+				  const double *sigmaE,
+				  const unsigned maxInterpolation,
+				  unsigned * const globalOffsetMultiplicator) const {
+
+	unsigned rayNumber = 0;
+	double gainSumTemp = 0;
+	double gainSumSquareTemp = 0;
+	Point samplePoint = mesh.getSamplePoint(sample_i);
+
+	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
+	blockOffset[0] = 0;
+
+	// One thread can compute multiple rays
+	while(blockOffset[0] * 128 < raysPerSample){
+
+	    // the whole block gets a new offset (==workload)
+	    rayNumber = getRayNumberBlockbased(acc, blockOffset,raysPerSample,globalOffsetMultiplicator);
+	    if(rayNumber < raysPerSample) {
+
+		// Get triangle/prism to start ray from
+		unsigned startPrism             = indicesOfPrisms[rayNumber];
+		unsigned reflection_i           = numberOfReflectionSlices[rayNumber];
+		unsigned reflections            = (reflection_i + 1) / 2;
+		ReflectionPlane reflectionPlane = (reflection_i % 2 == 0) ? BOTTOM_REFLECTION : TOP_REFLECTION;
+		unsigned startLevel             = startPrism / mesh.numberOfTriangles;
+		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
+		unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
+		Point startPoint                = mesh.genRndPoint(acc, startTriangle, startLevel);
+	
+		//get a random index in the wavelength array
+		unsigned sigma_i                = genRndSigmas(acc, maxInterpolation);
+
+		// Calculate reflections as different ray propagations
+		double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
+		//std::cout << gain << std::endl;
+
+		// include the stimulus from the starting prism and the importance of that ray
+		gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism + reflectionOffset];
+    
+		assert(!isnan(mesh.getBetaVolume(startPrism)));
+		assert(!isnan(importance[startPrism + reflectionOffset]));
+		assert(!isnan(gain));
+
+		gainSumTemp       += gain;
+		gainSumSquareTemp += gain * gain;
+ 
+	    }
+
+
+	}
+
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSum,       static_cast<float>(gainSumTemp));
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSumSquare, static_cast<float>(gainSumSquareTemp));
+
+    }
+
+};
+
 
 /**
  * @brief: calculate the sum of all gains for a single sample point s_i, ignoring
@@ -110,56 +218,67 @@
 struct CalcSampleGainSum {
     template <typename T_Acc,
 	      typename T_Mesh>
-    ALPAKA_FN_ACC void operator()(const T_Mesh mesh,
+    ALPAKA_FN_ACC void operator()(const T_Acc &acc,
+				  const T_Mesh &mesh,
 				  const unsigned* indicesOfPrisms, 
 				  const double* importance,
 				  const unsigned raysPerSample,
-				  float *gainSum,
-				  float *gainSumSquare,
+				  float * const gainSum,
+				  float * const gainSumSquare,
 				  const unsigned sample_i,
 				  const double *sigmaA,
 				  const double *sigmaE,
 				  const unsigned maxInterpolation,
-				  unsigned *globalOffsetMultiplicator) const {
+				  unsigned * const globalOffsetMultiplicator) const {
 
-	int rayNumber = 0; 
-	double gainSumTemp = 0;
+	unsigned rayNumber       = 0; 
+	double gainSumTemp       = 0;
 	double gainSumSquareTemp = 0;
-	Point samplePoint = mesh.getSamplePoint(sample_i);
-	// __shared__ unsigned blockOffset[4]; // 4 in case of warp-based raynumber
-  
-	// // One thread can compute multiple rays
-	// while(true){
-	//     // the whole block gets a new offset (==workload)
-	//     rayNumber = getRayNumberBlockbased(blockOffset,raysPerSample,globalOffsetMultiplicator);
-	//     if(rayNumber>=raysPerSample) break;
+	Point samplePoint        = mesh.getSamplePoint(sample_i);
+	
+	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
+	blockOffset[0] = 0;
+	
+	// One thread can compute multiple rays
+	// Need to replace this while true
+	while(blockOffset[0] * 128 < raysPerSample){
+	    // the whole block gets a new offset (==workload)
+	    rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+	    if(rayNumber < raysPerSample) {
 
-	//     // Get triangle/prism to start ray from
-	//     unsigned startPrism             = indicesOfPrisms[rayNumber];
-	//     unsigned startLevel             = startPrism/mesh.numberOfTriangles;
-	//     unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-	//     Point startPoint                = mesh.genRndPoint(startTriangle, startLevel, globalState);
-	//     Ray ray                         = generateRay(startPoint, samplePoint);
+		// Get triangle/prism to start ray from
+		unsigned startPrism             = indicesOfPrisms[rayNumber]; // <--- only zeros ???
+		unsigned startLevel             = startPrism/mesh.numberOfTriangles;
+		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
+		Point startPoint                = mesh.genRndPoint(acc, startTriangle, startLevel);
+		Ray ray                         = generateRay(startPoint, samplePoint);
 
-	//     // get a random index in the wavelength array
-	//     unsigned sigma_i                = genRndSigmas(lambdaResolution, globalState);
-	//     assert(sigma_i < lambdaResolution);
+		// get a random index in the wavelength array
+		unsigned sigma_i                = genRndSigmas(acc, maxInterpolation);
+		assert(sigma_i < maxInterpolation);
 
-	//     // calculate the gain for the whole ray at once
-	//     double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
-	//     gain          /= ray.length * ray.length; // important, since usually done in the reflection device function
+		// calculate the gain for the whole ray at once
+		double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
 
-	//     // include the stimulus from the starting prism and the importance of that ray
-	//     gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
+		//std::cout << rayNumber << " " << startPrism << std::endl;
+		
+		gain          /= ray.length * ray.length; // important, since usually done in the reflection device function
 
-	//     gainSumTemp       += gain;
-	//     gainSumSquareTemp += gain * gain;
-
-	// }
-	// atomicAdd(&(gainSum[0]), float(gainSumTemp));
-	// atomicAdd(&(gainSumSquare[0]), float(gainSumSquareTemp));
+		// include the stimulus from the starting prism and the importance of that ray
+		gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
 
 
+		
+		gainSumTemp       += gain;
+		gainSumSquareTemp += gain * gain;
+	    
+	    }
+	    
+
+	}
+
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSum,       static_cast<float>(gainSumTemp));
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSumSquare, static_cast<float>(gainSumSquareTemp));
 	
     }
 

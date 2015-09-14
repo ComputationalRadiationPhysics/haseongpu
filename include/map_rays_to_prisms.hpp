@@ -128,6 +128,8 @@ struct MapPrefixSumToPrisms {
 				  unsigned *numberOfReflections) const {
 
 	unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+
+	
 	// break if we have too many threads (this is likely)
 	if(id >= numberOfPrisms*reflectionSlices) return;
 
@@ -136,8 +138,10 @@ struct MapPrefixSumToPrisms {
 	const unsigned reflection_i     = id / numberOfPrisms;
 	const unsigned prism_i          = id % numberOfPrisms;
 
+	//std::cout << id << " " << count << std::endl;
+	
 	for(unsigned i=0; i < count ; ++i){
-	    indicesOfPrisms[startingPosition + i] = prism_i;     
+	    indicesOfPrisms[startingPosition + i] = prism_i;
 	    numberOfReflections[startingPosition + i] = reflection_i; 
 	}
 	

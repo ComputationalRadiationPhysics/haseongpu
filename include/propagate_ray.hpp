@@ -360,7 +360,7 @@ ALPAKA_FN_ACC double propagateRayWithReflection(Point startPoint,
     }
 
     Ray ray = generateRay(startPoint, endPoint);
-    gain  *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+    gain   *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
 
     distanceTotal += ray.length;  
   

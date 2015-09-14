@@ -329,7 +329,6 @@ class Mesh {
 
     //FIXIT: use random number generator of alpaka (picongpu: src/libPMACC/startposition/RandImpl)
 
-    
     ALPAKA_FN_ACC Point genRndPoint(T_Acc const &acc, unsigned triangle, unsigned level) const{
 	// Random number generator
 	// FIXIT: No need to initialize this again and again ?
