@@ -165,12 +165,12 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
      **************************************************************************/
     // Configuration
 
-    typedef typename graybat::communicationPolicy::BMPI CP;
-    typedef typename graybat::graphPolicy::BGL<>        GP;
-    typedef typename graybat::Cage<CP, GP>              Cage;
-    typedef typename Cage::Vertex                       Vertex;
-    typedef typename Cage::Edge                         Edge;
-    
+    typedef graybat::communicationPolicy::BMPI CP;
+    typedef graybat::graphPolicy::BGL<>        GP;
+    typedef graybat::Cage<CP, GP>              Cage;
+    typedef Cage::Vertex                       Vertex;
+    typedef Cage::Edge                         Edge;
+
     // Init
     Cage cage;
     const unsigned nPeers = cage.getPeers().size();
