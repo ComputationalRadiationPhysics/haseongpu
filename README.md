@@ -489,7 +489,7 @@ File Descriptions
   - `src/ray_histogram.cu` print a histogram of the adaptive ray count to command line
   - `src/calc_phi_ase_threaded.cu` pthreads workload distribution
   - `src/mt19937ar.cu` CPU code for Mersenne Twister PRNG used by for_loops_clad.cu
-  - `src/write_to_vtk.cu` generate VTK-files from simulation results (deprecated)
+  - `src/write_to_vtk.cu` generate VTK-files from simulation results
   - `src/propagate_ray.cu` CUDA code to propagate a single ray through the prism mesh structure
   - `src/mesh.cu` class that holds the information and all parameters about the gain medium mesh
   - `src/cuda_utils.cu` utility functions (getFreeDevice)

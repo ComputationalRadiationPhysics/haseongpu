@@ -35,9 +35,10 @@
 #include <stdexcept>
 #include <ctime> /* time */
 #include <locale> /* std::locale */
+#include <chrono> /* std::chrono::system_clock */
 
 // BOOST
-#include <boost/filesystem/path.hpp> /* fs::path */
+#include <boost/filesystem.hpp> /* fs::path, fs::exists, fs::create_directory */
 
 namespace fs = boost::filesystem;
 
@@ -225,9 +226,16 @@ int main(int argc, char **argv){
         std::vector<double> tmpPhiAse(result.phiAse.begin(), result.phiAse.end());
         std::vector<double> tmpTotalRays(result.totalRays.begin(), result.totalRays.end());
 
+        fs::path vtkPath = compute.outputPath / fs::path("vtk");
+        if(fs::exists(compute.outputPath)){
+            fs::create_directory(vtkPath);
+        }
+
+        std::string currentTime = std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+
         writePointsToVtk( mesh,
                           result.dndtAse,
-                          compute.outputPath / "vtk/dndt",
+                          vtkPath / fs::path("dndt_" + currentTime + ".vtk"),
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -236,7 +244,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           tmpPhiAse,
-                          compute.outputPath / "vtk/phiase",
+                          vtkPath / fs::path("phiase_" + currentTime + ".vtk"),
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -245,7 +253,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           result.mse,
-                          compute.outputPath / "vtk/mse",
+                          vtkPath / fs::path("mse_" + currentTime + ".vtk"),
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,
@@ -254,7 +262,7 @@ int main(int argc, char **argv){
       
         writePointsToVtk( mesh,
                           tmpTotalRays,
-                          compute.outputPath / "vtk/total_rays",
+                          vtkPath / fs::path("total_rays_" + currentTime + ".vtk"),
                           experiment.minRaysPerSample,
                           experiment.maxRaysPerSample,
                           experiment.mseThreshold,

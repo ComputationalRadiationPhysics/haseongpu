@@ -23,7 +23,6 @@
 #include <vector> /* vector */
 #include <iomanip> /* std::fixed, std::setprecision() */
 #include <string> /* std::to_string() */
-#include <ctime> /* time, time_t */
 
 #include <boost/filesystem/fstream.hpp> /* fs::ofstream, fs::ifstream */
 #include <boost/filesystem/path.hpp> /* fs::path */
@@ -50,8 +49,8 @@ int writeToVtk(const Mesh& mesh,
 	       const float runtime,
 	       const std::string vtkType){
 
-  const double* vertexCoordinates = mesh.points.toArray();
-  const unsigned* triangles       = mesh.trianglePointIndices.toArray();
+  const std::vector<double> vertexCoordinates = mesh.points.toVector();
+  const std::vector<unsigned> triangles       = mesh.trianglePointIndices.toVector();
   const float    thicknessOfLevel = mesh.thickness;
   const unsigned verticesPerLevel = mesh.numberOfPoints;
   const unsigned trianglesPerLevel= mesh.numberOfTriangles;
@@ -61,15 +60,8 @@ int writeToVtk(const Mesh& mesh,
 
   // Construct experiment information
   unsigned r = useReflections ? mesh.getMaxReflections() : 0;
-  
 
   // Add time to filename
-  time_t currentTime;
-  time(&currentTime);
-  filename += ("_");
-  filename += std::to_string((int) currentTime);
-  filename += (".vtk");
-
   dout(V_INFO) << "Write experiment data to vtk-file " << filename << std::endl;
 
   fs::ofstream vtkFile;
