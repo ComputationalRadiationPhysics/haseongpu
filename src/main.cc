@@ -41,14 +41,14 @@
 
 namespace fs = boost::filesystem;
 
-// User header files
+// HASEonGPU
 #include <parser.hpp> /* parse, DeviceMode, ParallelMode */
 //#include <write_to_vtk.hpp>
-//#include <write_matlab_output.hpp>
+#include <write_matlab_output.hpp>
 //#include <for_loops_clad.hpp>
 #include <mesh.hpp>
 #include <logging.hpp>
-//#include <ray_histogram.hpp>
+#include <ray_histogram.hpp>
 #include <types.hpp> /* ComputeParamets, ExperimentParameters, Result */
 //#include <calc_phi_ase_threaded.hpp>
 
@@ -77,10 +77,11 @@ unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // exte
  * @return dndtAse
  *
  */
-// double calcDndtAse(const Mesh& mesh, const double sigmaA, const double sigmaE, const float phiAse, const unsigned sample_i){
-//     double gain_local = mesh.nTot * mesh.betaCells[sample_i] * (sigmaE + sigmaA) - double(mesh.nTot * sigmaA);
-//     return gain_local * phiAse / mesh.crystalTFluo;
-// }
+template <typename T_Mesh>
+double calcDndtAse(const T_Mesh& mesh, const double sigmaA, const double sigmaE, const float phiAse, const unsigned sample_i){
+    double gain_local = mesh.nTot * mesh.betaCells[sample_i] * (sigmaE + sigmaA) - double(mesh.nTot * sigmaA);
+    return gain_local * phiAse / mesh.crystalTFluo;
+}
 
 int main(int argc, char **argv){
 
@@ -188,35 +189,36 @@ int main(int argc, char **argv){
 
 
 
-//     /***************************************************************************
-//      * PRINT SOLUTION
-//      **************************************************************************/
-//     if(verbosity & V_DEBUG){
-//         for(unsigned sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
-//             result.dndtAse.at(sample_i) = calcDndtAse(mesh,
-//                                                       experiment.maxSigmaA,
-//                                                       experiment.maxSigmaE,
-//                                                       result.phiAse.at(sample_i), sample_i);
-//             if(sample_i <=10)
-//                 dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << result.dndtAse.at(sample_i) << " " << result.mse.at(sample_i) << std::endl;
-//         }
-//         for(unsigned sample_i = 0; sample_i < mesh.numberOfSamples; ++sample_i){
-//             dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " " << result.mse.at(sample_i) <<std::endl;
-//             if(sample_i >= 10) break;
-//         }
-//     }
+     // FIXIT: Mesh information not available here !
+    // /***************************************************************************
+    //  * PRINT SOLUTION
+    //  **************************************************************************/
+    // if(verbosity & V_DEBUG){
+    //     for(unsigned sample_i = 0; sample_i < experiment.numberOfSamples; ++sample_i){
+    //         result.dndtAse.at(sample_i) = calcDndtAse(mesh,
+    //                                                   experiment.maxSigmaA,
+    //                                                   experiment.maxSigmaE,
+    //                                                   result.phiAse.at(sample_i), sample_i);
+    //         if(sample_i <=10)
+    //             dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << result.dndtAse.at(sample_i) << " " << result.mse.at(sample_i) << std::endl;
+    //     }
+    //     for(unsigned sample_i = 0; sample_i < experiment.numberOfSamples; ++sample_i){
+    //         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " " << result.mse.at(sample_i) <<std::endl;
+    //         if(sample_i >= 10) break;
+    //     }
+    // }
 
 
-//     /***************************************************************************
-//      * WRITE MATLAB OUTPUT
-//      **************************************************************************/
-//     // output folder has to be the same as TMP_FOLDER in the calling MatLab script
-//     writeMatlabOutput(compute.outputPath,
-//                       result.phiAse,
-//                       result.totalRays,
-//                       result.mse,
-//                       mesh.numberOfSamples,
-//                       mesh.numberOfLevels);
+    /***************************************************************************
+     * WRITE MATLAB OUTPUT
+     **************************************************************************/
+    // output folder has to be the same as TMP_FOLDER in the calling MatLab script
+    writeMatlabOutput(compute.outputPath,
+                      result.phiAse,
+                      result.totalRays,
+                      result.mse,
+                      experiment.numberOfSamples,
+                      10/*mesh.numberOfLevels*/); // FIXIT
 
 //     /***************************************************************************
 //      * WRITE VTK FILES
@@ -262,54 +264,48 @@ int main(int argc, char **argv){
 //                           runtime );
 //     }
 
-//     /***************************************************************************
-//      * PRINT STATISTICS
-//      **************************************************************************/
-//     if(verbosity & V_STAT){
-//         for(std::vector<double>::iterator it = result.mse.begin(); it != result.mse.end(); ++it){
-//             maxMSE = std::max(maxMSE, *it);
-//             avgMSE += *it;
-//             if(*it >= experiment.mseThreshold)
-//                 highMSE++;
-//         }
-//         avgMSE /= result.mse.size();
+    /***************************************************************************
+     * PRINT STATISTICS
+     **************************************************************************/
+    if(verbosity & V_STAT){
+        for(std::vector<double>::iterator it = result.mse.begin(); it != result.mse.end(); ++it){
+            maxMSE = std::max(maxMSE, *it);
+            avgMSE += *it;
+            if(*it >= experiment.mseThreshold)
+                highMSE++;
+        }
+        avgMSE /= result.mse.size();
 
-//         try{ std::cout.imbue(std::locale("")); }
-//         catch(std::runtime_error e){}
+        try{ std::cout.imbue(std::locale("")); }
+        catch(std::runtime_error e){}
 
-//         dout(V_STAT | V_NOLABEL) << std::endl;
-//         dout(V_STAT) << "=== Statistics ===" << std::endl;
-//         dout(V_STAT) << "DeviceMode        : " << compute.deviceMode << std::endl;
-//         dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
-//         dout(V_STAT) << "Prisms            : " << (int) mesh.numberOfPrisms << std::endl;
-//         dout(V_STAT) << "Samples           : " << (int) result.dndtAse.size() << std::endl;
-//         dout(V_STAT) << "RaysPerSample     : " << experiment.minRaysPerSample;
-//         if(experiment.maxRaysPerSample > experiment.minRaysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << experiment.maxRaysPerSample << " (adaptive)"; }
-//         dout(V_STAT | V_NOLABEL) << std::endl;
-//         dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
-//         dout(V_STAT) << "MSE threshold     : " << experiment.mseThreshold << std::endl;
-//         //dout(V_STAT) << "Wavelength        : " << experiment.sigmaA.size() << std::endl;
-//         dout(V_STAT) << "int. Wavelength   : " << experiment.sigmaA.size() << std::endl;
-//         dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
-//         dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
-//         dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
-//         dout(V_STAT) << "Nr of GPUs        : " << usedGPUs << std::endl;
-//         dout(V_STAT) << "Runtime           : " << difftime(time(0), starttime) << "s" << std::endl;
-//         dout(V_STAT) << std::endl;
-//         if(experiment.maxRaysPerSample > experiment.minRaysPerSample){
-//             dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-//             ray_histogram(result.totalRays, experiment.maxRaysPerSample, experiment.mseThreshold, result.mse);
-//         }
-//         dout(V_STAT) << std::endl;
+        dout(V_STAT | V_NOLABEL) << std::endl;
+        dout(V_STAT) << "=== Statistics ===" << std::endl;
+        dout(V_STAT) << "DeviceMode        : " << compute.deviceMode << std::endl;
+        dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
+        dout(V_STAT) << "Prisms            : " << "FIXME" /*mesh.numberOfPrisms*/ << std::endl;
+        dout(V_STAT) << "Samples           : " << (int) result.dndtAse.size() << std::endl;
+        dout(V_STAT) << "RaysPerSample     : " << experiment.minRaysPerSample;
+        if(experiment.maxRaysPerSample > experiment.minRaysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << experiment.maxRaysPerSample << " (adaptive)"; }
+        dout(V_STAT | V_NOLABEL) << std::endl;
+        dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
+        dout(V_STAT) << "MSE threshold     : " << experiment.mseThreshold << std::endl;
+        //dout(V_STAT) << "Wavelength        : " << experiment.sigmaA.size() << std::endl;
+        dout(V_STAT) << "int. Wavelength   : " << experiment.sigmaA.size() << std::endl;
+        dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
+        dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
+        dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
+        dout(V_STAT) << "Nr of GPUs        : " << usedDevices << std::endl;
+        dout(V_STAT) << "Runtime           : " << difftime(time(0), starttime) << "s" << std::endl;
+        dout(V_STAT) << std::endl;
+        if(experiment.maxRaysPerSample > experiment.minRaysPerSample){
+            dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
+            ray_histogram(result.totalRays, experiment.maxRaysPerSample, experiment.mseThreshold, result.mse);
+        }
+        dout(V_STAT) << std::endl;
 
-//     }
+    }
 
-//     // Cleanup device memory
-//     // TODO: replace by smart pointer for device memory
-//     for(Mesh &mesh : meshs){
-//         mesh.free();
-//     }
-    
     return 0;
 
 }
