@@ -44,6 +44,7 @@ const std::string CompSwitch::repetitions       = "repetitions";
 const std::string CompSwitch::adaptive_steps    = "adaptive-steps";
 const std::string CompSwitch::min_sample_i      = "min-sample-i";
 const std::string CompSwitch::max_sample_i      = "max-sample-i";
+const std::string CompSwitch::write_vtk         = "write-vtk";
 
 const std::string ExpSwitch::input_path     = "input-path";
 const std::string ExpSwitch::output_path    = "output-path";
