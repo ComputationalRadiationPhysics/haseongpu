@@ -137,7 +137,7 @@ double calcMSE(const double phiAse, const double phiAseSquare, const unsigned ra
   double a = phiAseSquare / raysPerSample;
   double b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
 
-  return sqrt(abs((a - b) / raysPerSample));
+  return sqrt(fabs((a - b) / raysPerSample));
 }
 
 float calcPhiAse ( const ExperimentParameters& experiment,
@@ -410,12 +410,14 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 		alpaka::mem::view::copy(stream, hGainSum, dGainSum, static_cast<Extents>(1));
 		alpaka::mem::view::copy(stream, hGainSumSquare, dGainSumSquare, static_cast<Extents>(1));
 
-		//std::cout << alpaka::mem::view::getPtrNative(hGainSum)[0] << std::endl;
+
 		
-		float mseTmp = calcMSE(alpaka::mem::view::getPtrNative(hGainSum)[0],
+		double mseTmp = calcMSE(alpaka::mem::view::getPtrNative(hGainSum)[0],
 				       alpaka::mem::view::getPtrNative(hGainSumSquare)[0],
 				       raysPerSampleDump);
 
+		//std::cout << mseTmp << " " << raysPerSampleDump << " " << alpaka::mem::view::getPtrNative(hGainSum)[0] << " " << alpaka::mem::view::getPtrNative(hGainSumSquare)[0] << std::endl;
+		
 		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSum)[0]));
 		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSumSquare)[0]));
 		assert(!isnan(mseTmp));
