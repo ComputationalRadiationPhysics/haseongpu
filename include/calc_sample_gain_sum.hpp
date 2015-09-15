@@ -140,7 +140,7 @@ struct CalcSampleGainSumWithReflection {
 	blockOffset[0] = 0;
 
 	// One thread can compute multiple rays
-	while(blockOffset[0] * 128 < raysPerSample){
+	while(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] < raysPerSample){
 
 	    // the whole block gets a new offset (==workload)
 	    rayNumber = getRayNumberBlockbased(acc, blockOffset,raysPerSample,globalOffsetMultiplicator);
