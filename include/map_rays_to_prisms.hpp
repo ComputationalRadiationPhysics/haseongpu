@@ -127,15 +127,17 @@ struct MapPrefixSumToPrisms {
 				  unsigned *indicesOfPrisms,
 				  unsigned *numberOfReflections) const {
 
-	std::cout << alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0u] << std::endl;
-	std::cout << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0u] << std::endl;	
+	//alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Threads>(acc);
+	
+	// std::cout << alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0u] << std::endl;
+	// std::cout << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0u] << std::endl;	
     
 
 	
 	unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 	
 	// break if we have too many threads (this is likely)
-	if(id >= numberOfPrisms*reflectionSlices) return;
+	if(id >= numberOfPrisms * reflectionSlices) return;
 
 	const unsigned count            = raysPerPrism[id];
 	const unsigned startingPosition = prefixSum[id];
