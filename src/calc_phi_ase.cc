@@ -59,7 +59,9 @@ void initHostBuffer(T_Buf &buf, T_Extents const extents, T_Value const value){
 template <typename T_Buf, typename T_Extents, typename T_It>
 void initHostBuffer(T_Buf &buf, T_Extents const extents, T_It const &begin, T_It const& end){
 
+    
     T_It it = begin;
+    (void) end;
     for(unsigned i = 0; i < extents; ++i){
 	alpaka::mem::view::getPtrNative(buf)[static_cast<T_Extents>(i)] = *it;
 	it++;
