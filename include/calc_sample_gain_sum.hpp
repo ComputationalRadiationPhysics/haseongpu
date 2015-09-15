@@ -79,12 +79,9 @@ ALPAKA_FN_ACC unsigned getRayNumberBlockbased(T_Acc const & acc, unsigned* const
 	blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Inc>(acc, &globalOffsetMultiplicator[0], raysPerSample);
     }
 
-    // FIXIT: This barrier locks computation
     alpaka::block::sync::syncBlockThreads(acc);
 
-    // FIXIT: this 128 is fixed !!!
-    // multiply blockOffset by 128 (size of the threadblock)
-    return alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] << 7) ;
+    return alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]) ;
 }
 
 
