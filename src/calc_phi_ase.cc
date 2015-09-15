@@ -201,6 +201,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks));
     auto const workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks));
 
+
     // In some cases distributeRandomly has to be true !
     // Good comment, but next time describe why !
     // Otherwise bad or no ray distribution possible.
