@@ -84,7 +84,7 @@ double calcDndtAse(const T_Mesh& mesh, const double sigmaA, const double sigmaE,
 int main(int argc, char **argv){
 
     // Statistics data
-    float runtime       = 0.0;
+    //float runtime       = 0.0;
     double maxMSE       = 0;
     float  avgMSE       = 0;
     unsigned highMSE    = 0;
