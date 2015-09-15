@@ -202,7 +202,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     // In some cases distributeRandomly has to be true !
     // Good comment, but next time describe why !
     // Otherwise bad or no ray distribution possible.
-    bool distributeRandomly         = false;
+    bool distributeRandomly         = true;
     
     // Divide RaysPerSample range into steps
     std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
