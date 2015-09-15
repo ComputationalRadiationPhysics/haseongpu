@@ -135,7 +135,9 @@ struct ExperimentParameters {
 			   double maxSigmaE,
 			   double mseThreshold,
 			   bool useReflections,
-			   unsigned numberOfSamples) :
+			   unsigned numberOfSamples,
+			   unsigned numberOfLevels,
+			   unsigned numberOfPrisms) :
         minRaysPerSample(minRaysPerSample),
         maxRaysPerSample(maxRaysPerSample),
         sigmaA(sigmaA),
@@ -144,7 +146,9 @@ struct ExperimentParameters {
         maxSigmaE(maxSigmaE),
         mseThreshold(mseThreshold),
         useReflections(useReflections),
-	numberOfSamples(numberOfSamples){ }
+	numberOfSamples(numberOfSamples),
+	numberOfLevels(numberOfLevels),
+	numberOfPrisms(numberOfPrisms){ }
 
     unsigned minRaysPerSample;
     unsigned maxRaysPerSample;
@@ -155,5 +159,7 @@ struct ExperimentParameters {
     double mseThreshold;
     bool useReflections;
     unsigned numberOfSamples;
+    unsigned numberOfLevels;
+    unsigned numberOfPrisms;
 
 };
