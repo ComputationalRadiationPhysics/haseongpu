@@ -126,7 +126,7 @@ int parse( const int argc,
     unsigned numberOfSamples   = numberOfLevels * numberOfPoints;
     unsigned numberOfPrisms    = numberOfTriangles * (numberOfLevels-1);
 
-     vm = checkSampleRange(vm, experiment.numberOfSamples);
+    vm = checkSampleRange(vm, numberOfSamples);
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
