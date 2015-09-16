@@ -43,13 +43,13 @@ namespace fs = boost::filesystem;
 
 // HASEonGPU
 #include <parser.hpp> /* parse, DeviceMode, ParallelMode */
-//#include <write_to_vtk.hpp>
 #include <write_matlab_output.hpp>
-//#include <for_loops_clad.hpp>
 #include <mesh.hpp>
 #include <logging.hpp>
 #include <ray_histogram.hpp>
 #include <types.hpp> /* ComputeParamets, ExperimentParameters, Result */
+//#include <write_to_vtk.hpp>
+//#include <for_loops_clad.hpp>
 //#include <calc_phi_ase_threaded.hpp>
 
 #if defined(MPI_FOUND)
@@ -59,8 +59,6 @@ namespace fs = boost::filesystem;
 #if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
 #include <calc_phi_ase_graybat.hpp>
 #endif
-
-//#include <cuda_runtime_api.h> /* cudaDeviceReset */
 
 
 // default without V_DEBUG
@@ -86,7 +84,7 @@ double calcDndtAse(const T_Mesh& mesh, const double sigmaA, const double sigmaE,
 int main(int argc, char **argv){
 
     // Statistics data
-    float runtime       = 0.0;
+    //float runtime       = 0.0;
     double maxMSE       = 0;
     float  avgMSE       = 0;
     unsigned highMSE    = 0;
@@ -218,7 +216,7 @@ int main(int argc, char **argv){
                       result.totalRays,
                       result.mse,
                       experiment.numberOfSamples,
-                      10/*mesh.numberOfLevels*/); // FIXIT
+                      experiment.numberOfLevels);
 
 //     /***************************************************************************
 //      * WRITE VTK FILES
@@ -283,7 +281,7 @@ int main(int argc, char **argv){
         dout(V_STAT) << "=== Statistics ===" << std::endl;
         dout(V_STAT) << "DeviceMode        : " << compute.deviceMode << std::endl;
         dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
-        dout(V_STAT) << "Prisms            : " << "FIXME" /*mesh.numberOfPrisms*/ << std::endl;
+        dout(V_STAT) << "Prisms            : " << experiment.numberOfPrisms << std::endl;
         dout(V_STAT) << "Samples           : " << (int) result.dndtAse.size() << std::endl;
         dout(V_STAT) << "RaysPerSample     : " << experiment.minRaysPerSample;
         if(experiment.maxRaysPerSample > experiment.minRaysPerSample) { dout(V_STAT | V_NOLABEL) << " - " << experiment.maxRaysPerSample << " (adaptive)"; }

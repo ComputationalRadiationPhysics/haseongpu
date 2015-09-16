@@ -256,29 +256,6 @@ class Mesh {
 	alpaka::mem::view::copy(stream, this->triangleNormalPoint, hTriangleNormalPoint, triangleNormalPoint.size());	
     }
 
-
-    /*
-      FIXIT: free device memory correctly
-
-     */
-    ALPAKA_FN_HOST void free(){
-	// points.free();
-	// betaVolume.free();
-	// normalVec.free();
-	// centers.free();
-	// triangleSurfaces.free();
-	// forbiddenEdge.free();
-	// betaCells.free();
-	// claddingCellTypes.free();
-	// refractiveIndices.free(); 
-	// reflectivities.free();   
-	// totalReflectionAngles.free();
-	// trianglePointIndices.free();
-	// triangleNeighbors.free();
-	// triangleNormalPoint.free();
-    
-    }
-
     template <class T, class B, class E>
     void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
 	if(equals){

@@ -117,28 +117,16 @@ int parse( const int argc,
 
     printCommandLine(vm);
 
-    // Set/Test device to run experiment with
-    //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
-    //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
+    // vm = checkParameterValidity(vm, devices.size());
 
-    /*
-    
-      FIXIT: This should be done before kernel execution
-      std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
-      vm = checkParameterValidity(vm, devices.size());
+    // Parse some mesh data independant from mesh
+    unsigned numberOfLevels    = fileToValue<unsigned>(vm[ExpSwitch::input_path].as<fs::path>() / "numberOfLevels.txt");
+    unsigned numberOfPoints    = fileToValue<unsigned>(vm[ExpSwitch::input_path].as<fs::path>() / "numberOfPoints.txt");
+    unsigned numberOfTriangles = fileToValue<unsigned>(vm[ExpSwitch::input_path].as<fs::path>() / "numberOfTriangles.txt");
+    unsigned numberOfSamples   = numberOfLevels * numberOfPoints;
+    unsigned numberOfPrisms    = numberOfTriangles * (numberOfLevels-1);
 
-    */
-
-
-
-    /*
-    
-      FIXIT: This should also be done before kernel execution
-      meshs = parseMesh(vm[ExpSwitch::input_path].as<fs::path>(), devices);
-      vm = checkSampleRange(vm, meshs[0].numberOfSamples);
-
-    */
-
+    vm = checkSampleRange(vm, numberOfSamples);
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
@@ -154,7 +142,9 @@ int parse( const int argc,
             waveD.maxSigmaE,
             vm[ExpSwitch::mse].as<double>(),
             vm[ExpSwitch::reflection].as<bool>(),
-	    vm[CompSwitch::max_sample_i].as<int>());
+	    numberOfSamples,
+	    numberOfLevels,
+	    numberOfPrisms);
 
 
     compute = ComputeParameters (
