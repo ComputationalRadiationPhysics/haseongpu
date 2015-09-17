@@ -149,16 +149,17 @@ struct CalcSampleGainSumWithReflection {
 
 	    // the whole block gets a new offset (==workload)
 	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+
 	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
 	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
 
 	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
 
-	    auto threadNumberOffset =
+	    auto threadOffset =
 		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
 		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
 	    
-	    for(unsigned rayNumber = threadNumberOffset; rayNumber < (threadNumberOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
+	    for(unsigned rayNumber = threadOffset; rayNumber < (threadOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
 
 		// rayNumber =
 		//     (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
