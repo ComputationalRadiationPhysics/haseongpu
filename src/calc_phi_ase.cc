@@ -432,7 +432,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     		    result.phiAse.at(sample_i)    = alpaka::mem::view::getPtrNative(hGainSum)[0]; 
     		    result.phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
     		    result.totalRays.at(sample_i) = *raysPerSampleIter;
-    		    //std::cout << result.phiAse.at(sample_i) << std::endl;
+    		    std::cout << result.phiAse.at(sample_i) << std::endl;
     		}
 
 

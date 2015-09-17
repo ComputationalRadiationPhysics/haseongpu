@@ -140,12 +140,34 @@ struct CalcSampleGainSumWithReflection {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
+	const unsigned nElementsPerThread = 1;
+
+	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
+	
 	// One thread can compute multiple rays
-	while(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] < raysPerSample){
+	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
 
 	    // the whole block gets a new offset (==workload)
-	    rayNumber = getRayNumberBlockbased(acc, blockOffset,raysPerSample,globalOffsetMultiplicator);
-	    if(rayNumber < raysPerSample) {
+	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
+	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+
+	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
+
+	    auto threadNumberOffset =
+		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
+	    
+	    for(unsigned rayNumber = threadNumberOffset; rayNumber < (threadNumberOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
+
+		// rayNumber =
+		//     (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		//     (alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		//     nthRay;
+		
+		//rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0])
+		
+		//if(rayNumber < raysPerSample) {
 
 		// Get triangle/prism to start ray from
 		unsigned startPrism             = indicesOfPrisms[rayNumber];
@@ -174,6 +196,7 @@ struct CalcSampleGainSumWithReflection {
 		gainSumTemp       += gain;
 		gainSumSquareTemp += gain * gain;
  
+		//}
 	    }
 
 
