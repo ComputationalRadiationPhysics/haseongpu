@@ -132,7 +132,7 @@ struct CalcSampleGainSumWithReflection {
 				  const unsigned maxInterpolation,
 				  unsigned * const globalOffsetMultiplicator) const {
 
-	unsigned rayNumber = 0;
+	//unsigned rayNumber = 0;
 	double gainSumTemp = 0;
 	double gainSumSquareTemp = 0;
 	Point samplePoint = mesh.getSamplePoint(sample_i);
@@ -253,22 +253,39 @@ struct CalcSampleGainSum {
 				  const unsigned maxInterpolation,
 				  unsigned * globalOffsetMultiplicator) const {
 
-	unsigned rayNumber       = 0; 
+	//unsigned rayNumber       = 0; 
 	double gainSumTemp       = 0;
 	double gainSumSquareTemp = 0;
 	Point samplePoint        = mesh.getSamplePoint(sample_i);
 	
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
-	// sync threads here
+
+	const unsigned nElementsPerThread = 512;
+
+	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
 	
 	// One thread can compute multiple rays
-	// Need to replace this while true
-	size_t textent = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
-	while((blockOffset[0] * textent) < raysPerSample){
+	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
+
 	    // the whole block gets a new offset (==workload)
-	    rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
-	    if(rayNumber < raysPerSample) {
+	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+
+	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
+	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+
+	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
+
+	    auto threadOffset =
+		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
+
+	    for(unsigned rayNumber = threadOffset; rayNumber < (threadOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
+		// sync threads here
+	
+		// One thread can compute multiple rays
+		// Need to replace this while true
+
 
 		// Get triangle/prism to start ray from
 		unsigned startPrism             = indicesOfPrisms[rayNumber]; 

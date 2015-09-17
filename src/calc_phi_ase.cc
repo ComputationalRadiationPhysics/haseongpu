@@ -158,6 +158,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     using Extents = Size;
     using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Acc     = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
+    //using Acc     = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Stream  = alpaka::stream::StreamCpuSync;
     using DevAcc  = alpaka::dev::Dev<Acc>;
     using DevHost = alpaka::dev::DevCpu;
