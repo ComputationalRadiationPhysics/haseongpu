@@ -9,4 +9,5 @@ script:
   - cd ../example/c_example
 
 build:
-  - echo "##### BUILD ######"
+  commands:
+    - echo "##### BUILD ######"
