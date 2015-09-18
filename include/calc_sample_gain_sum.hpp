@@ -261,7 +261,7 @@ struct CalcSampleGainSum {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
-	const unsigned nElementsPerThread = 512;
+	const unsigned nElementsPerThread = 128;
 
 	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
 	
