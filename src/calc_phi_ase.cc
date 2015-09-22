@@ -305,152 +305,150 @@ float calcPhiAse ( const ExperimentParameters& experiment,
       
      	float hSumPhi = reduce(stream, dPreImportance, hMesh.numberOfPrisms * reflectionSlices, 0.);
 
-    	//std::cout << hSumPhi << std::endl;
+    	std::cout << hSumPhi << std::endl;
 
-    	while(mseTooHigh){
+    // 	while(mseTooHigh){
 
-    	//     // FIXIT: Reset random seed ?
-    	//     // CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
+    // 	//     // FIXIT: Reset random seed ?
+    // 	//     // CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
 	  
-     	    unsigned run = 0;
-     	    while(run < compute.maxRepetitions && mseTooHigh){
-     	 	run++;
+    //  	    unsigned run = 0;
+    //  	    while(run < compute.maxRepetitions && mseTooHigh){
+    //  	 	// run++;
 
-    		raysPerSampleDump = importanceSamplingDistribution<Acc>(stream,
-    									importanceWorkdiv,
-    									workdiv,
-    									dMesh,
-    									*raysPerSampleIter,
-    									alpaka::mem::view::getPtrNative(dPreImportance), 
-    									alpaka::mem::view::getPtrNative(dImportance), 
-    									alpaka::mem::view::getPtrNative(dRaysPerPrism),
-    									hSumPhi,
-    									distributeRandomly);
-    	 	//std::cout << run << std::endl;
+    // 		// raysPerSampleDump = importanceSamplingDistribution<Acc>(stream,
+    // 		// 							importanceWorkdiv,
+    // 		// 							workdiv,
+    // 		// 							dMesh,
+    // 		// 							*raysPerSampleIter,
+    // 		// 							alpaka::mem::view::getPtrNative(dPreImportance), 
+    // 		// 							alpaka::mem::view::getPtrNative(dImportance), 
+    // 		// 							alpaka::mem::view::getPtrNative(dRaysPerPrism),
+    // 		// 							hSumPhi,
+    // 		// 							distributeRandomly);
+    // 	 	// //std::cout << run << std::endl;
 
-		//std::cout << raysPerSampleDump << std::endl;
+    // 		// //std::cout << raysPerSampleDump << std::endl;
 		
-    		// alpaka::mem::view::copy(stream, hRaysPerPrism, dRaysPerPrism, static_cast<Extents>(hMesh.numberOfPrisms  * reflectionSlices));
-    		// for(unsigned i = 0; i < (hMesh.numberOfPrisms  * reflectionSlices); ++i){
-    		//     std::cout << alpaka::mem::view::getPtrNative(hRaysPerPrism)[i] << " ";
-    		// }
-
-		
-		 exclusivePrefixSum<unsigned>(stream, dRaysPerPrism, dPrefixSum, hMesh.numberOfPrisms * reflectionSlices);
-
-
-    		// alpaka::mem::view::copy(stream, hPrefixSum, dPrefixSum, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
-    		// for(unsigned i = 0; i < (hMesh.numberOfPrisms  * reflectionSlices); ++i){
-    		//     std::cout << alpaka::mem::view::getPtrNative(hPrefixSum)[i] << " ";
-    		// }
-
-    		// Prism scheduling for gpu threads
-    		mapPrefixSumToPrisms<Acc>(stream,
-    					  workdiv,
-    					  hMesh.numberOfPrisms,
-    					  reflectionSlices,
-    					  alpaka::mem::view::getPtrNative(dRaysPerPrism),
-    					  alpaka::mem::view::getPtrNative(dPrefixSum),
-    					  alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
-    					  alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices));
-
-
-    		// alpaka::mem::view::copy(stream, hIndicesOfPrisms, dIndicesOfPrisms, static_cast<Extents>(experiment.maxRaysPerSample));
-    		// for(unsigned i = 0; i < (experiment.maxRaysPerSample); ++i){
-    		//     std::cout << alpaka::mem::view::getPtrNative(hIndicesOfPrisms)[i] << " ";
-    		// }
-		
-    		alpaka::mem::view::getPtrNative(hGainSum)[0]                   = 0;
-    		alpaka::mem::view::getPtrNative(hGainSumSquare)[0]             = 0;
-    		//alpaka::mem::view::getPtrNative(hGlobalOffsetMultiplicator)[0] = 0;
-
-    		alpaka::mem::view::copy(stream, dGainSum, hGainSum, static_cast<Extents>(1));
-    		alpaka::mem::view::copy(stream, dGainSumSquare, hGainSumSquare, static_cast<Extents>(1));
-    		//alpaka::mem::view::copy(stream, dGlobalOffsetMultiplicator, hGlobalOffsetMultiplicator, static_cast<Extents>(1));    		
-
-    		// FIXIT: following 4 lines just to have some temporary global variable in the kernel
-
+    // 		// // alpaka::mem::view::copy(stream, hRaysPerPrism, dRaysPerPrism, static_cast<Extents>(hMesh.numberOfPrisms  * reflectionSlices));
+    // 		// // for(unsigned i = 0; i < (hMesh.numberOfPrisms  * reflectionSlices); ++i){
+    // 		// //     std::cout << alpaka::mem::view::getPtrNative(hRaysPerPrism)[i] << " ";
+    // 		// // }
 
 		
-    		// Start Kernel
-    		if(experiment.useReflections){
-    		    CalcSampleGainSumWithReflection calcSampleGainSumWithReflection;
+    // 		//  exclusivePrefixSum<unsigned>(stream, dRaysPerPrism, dPrefixSum, hMesh.numberOfPrisms * reflectionSlices);
 
-    		    auto const exec (alpaka::exec::create<Acc>(workdiv,
-    		    					       calcSampleGainSumWithReflection,
-    		    					       dMesh, 
-    		    					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
-    		    					       alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices),
-    		    					       alpaka::mem::view::getPtrNative(dImportance),
-    		    					       raysPerSampleDump, 
-    		    					       alpaka::mem::view::getPtrNative(dGainSum), 
-    		    					       alpaka::mem::view::getPtrNative(dGainSumSquare),
-    		    					       sample_i, 
-    		    					       alpaka::mem::view::getPtrNative(dSigmaA),
-    		    					       alpaka::mem::view::getPtrNative(dSigmaE),
-    		    					       experiment.sigmaA.size(),
-    		    					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
-    		    alpaka::stream::enqueue(stream, exec);
+
+    // 		// // alpaka::mem::view::copy(stream, hPrefixSum, dPrefixSum, static_cast<Extents>(hMesh.numberOfPrisms * reflectionSlices));
+    // 		// // for(unsigned i = 0; i < (hMesh.numberOfPrisms  * reflectionSlices); ++i){
+    // 		// //     std::cout << alpaka::mem::view::getPtrNative(hPrefixSum)[i] << " ";
+    // 		// // }
+
+    // 		// // Prism scheduling for gpu threads
+    // 		// mapPrefixSumToPrisms<Acc>(stream,
+    // 		// 			  workdiv,
+    // 		// 			  hMesh.numberOfPrisms,
+    // 		// 			  reflectionSlices,
+    // 		// 			  alpaka::mem::view::getPtrNative(dRaysPerPrism),
+    // 		// 			  alpaka::mem::view::getPtrNative(dPrefixSum),
+    // 		// 			  alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
+    // 		// 			  alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices));
+
+
+    // 		// // alpaka::mem::view::copy(stream, hIndicesOfPrisms, dIndicesOfPrisms, static_cast<Extents>(experiment.maxRaysPerSample));
+    // 		// // for(unsigned i = 0; i < (experiment.maxRaysPerSample); ++i){
+    // 		// //     std::cout << alpaka::mem::view::getPtrNative(hIndicesOfPrisms)[i] << " ";
+    // 		// // }
+		
+    // 		// alpaka::mem::view::getPtrNative(hGainSum)[0]                   = 0;
+    // 		// alpaka::mem::view::getPtrNative(hGainSumSquare)[0]             = 0;
+    // 		// alpaka::mem::view::getPtrNative(hGlobalOffsetMultiplicator)[0] = 0;
+
+    // 		// alpaka::mem::view::copy(stream, dGainSum, hGainSum, static_cast<Extents>(1));
+    // 		// alpaka::mem::view::copy(stream, dGainSumSquare, hGainSumSquare, static_cast<Extents>(1));
+    // 		// alpaka::mem::view::copy(stream, dGlobalOffsetMultiplicator, hGlobalOffsetMultiplicator, static_cast<Extents>(1)); 
+		
+
+		
+    // 		// // Start Kernel
+    // 		// if(experiment.useReflections){
+    // 		//     CalcSampleGainSumWithReflection calcSampleGainSumWithReflection;
+
+    // 		//     auto const exec (alpaka::exec::create<Acc>(workdiv,
+    // 		//     					       calcSampleGainSumWithReflection,
+    // 		//     					       dMesh, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
+    // 		//     					       alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices),
+    // 		//     					       alpaka::mem::view::getPtrNative(dImportance),
+    // 		//     					       raysPerSampleDump, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dGainSum), 
+    // 		//     					       alpaka::mem::view::getPtrNative(dGainSumSquare),
+    // 		//     					       sample_i, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dSigmaA),
+    // 		//     					       alpaka::mem::view::getPtrNative(dSigmaE),
+    // 		//     					       experiment.sigmaA.size(),
+    // 		//     					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
+    // 		//     alpaka::stream::enqueue(stream, exec);
 		    
-    		}
-    		else{
-    		    CalcSampleGainSum calcSampleGainSum;
+    // 		// }
+    // 		// else{
+    // 		//     CalcSampleGainSum calcSampleGainSum;
 
-    		    auto const exec (alpaka::exec::create<Acc>(workdiv,
-    		    					       calcSampleGainSum,
-    		    					       dMesh, 
-    		    					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms), 
-    		    					       alpaka::mem::view::getPtrNative(dImportance),
-    		    					       raysPerSampleDump, 
-    		    					       alpaka::mem::view::getPtrNative(dGainSum), 
-    		    					       alpaka::mem::view::getPtrNative(dGainSumSquare),
-    		    					       sample_i, 
-    		    					       alpaka::mem::view::getPtrNative(dSigmaA),
-    		    					       alpaka::mem::view::getPtrNative(dSigmaE),
-    		    					       experiment.sigmaA.size(),
-    		    					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
-    		    alpaka::stream::enqueue(stream, exec);
-    		}
+    // 		//     auto const exec (alpaka::exec::create<Acc>(workdiv,
+    // 		//     					       calcSampleGainSum,
+    // 		//     					       dMesh, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms), 
+    // 		//     					       alpaka::mem::view::getPtrNative(dImportance),
+    // 		//     					       raysPerSampleDump, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dGainSum), 
+    // 		//     					       alpaka::mem::view::getPtrNative(dGainSumSquare),
+    // 		//     					       sample_i, 
+    // 		//     					       alpaka::mem::view::getPtrNative(dSigmaA),
+    // 		//     					       alpaka::mem::view::getPtrNative(dSigmaE),
+    // 		//     					       experiment.sigmaA.size(),
+    // 		//     					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
+    // 		//     alpaka::stream::enqueue(stream, exec);
+    // 		// }
 
 
-		alpaka::mem::view::copy(stream, hGlobalOffsetMultiplicator, dGlobalOffsetMultiplicator, static_cast<Extents>(1));
-    		alpaka::mem::view::copy(stream, hGainSum, dGainSum, static_cast<Extents>(1));
-    		alpaka::mem::view::copy(stream, hGainSumSquare, dGainSumSquare, static_cast<Extents>(1));
+    // 		alpaka::mem::view::copy(stream, hGlobalOffsetMultiplicator, dGlobalOffsetMultiplicator, static_cast<Extents>(1));
+    // 		alpaka::mem::view::copy(stream, hGainSum, dGainSum, static_cast<Extents>(1));
+    // 		alpaka::mem::view::copy(stream, hGainSumSquare, dGainSumSquare, static_cast<Extents>(1));
 		
-    		double mseTmp = calcMSE(alpaka::mem::view::getPtrNative(hGainSum)[0],
-    				       alpaka::mem::view::getPtrNative(hGainSumSquare)[0],
-    				       raysPerSampleDump);
+    // 		double mseTmp = calcMSE(alpaka::mem::view::getPtrNative(hGainSum)[0],
+    // 				       alpaka::mem::view::getPtrNative(hGainSumSquare)[0],
+    // 				       raysPerSampleDump);
 
-    		//std::cout << mseTmp << " " << raysPerSampleDump << " " << alpaka::mem::view::getPtrNative(hGlobalOffsetMultiplicator)[0] << " " << alpaka::mem::view::getPtrNative(hGainSum)[0] << " " << alpaka::mem::view::getPtrNative(hGainSumSquare)[0] << std::endl;
+    // 		//std::cout << mseTmp << " " << raysPerSampleDump << " " << alpaka::mem::view::getPtrNative(hGlobalOffsetMultiplicator)[0] << " " << alpaka::mem::view::getPtrNative(hGainSum)[0] << " " << alpaka::mem::view::getPtrNative(hGainSumSquare)[0] << std::endl;
 		
-    		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSum)[0]));
-    		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSumSquare)[0]));
-    		assert(!isnan(mseTmp));
+    // 		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSum)[0]));
+    // 		assert(!isnan(alpaka::mem::view::getPtrNative(hGainSumSquare)[0]));
+    // 		assert(!isnan(mseTmp));
 
-    		if(result.mse.at(sample_i) > mseTmp){
-    		    //std::cout << alpaka::mem::view::getPtrNative(hGainSum)[0] << std::endl;		    
-    		    result.mse.at(sample_i)       = mseTmp;
-    		    result.phiAse.at(sample_i)    = alpaka::mem::view::getPtrNative(hGainSum)[0]; 
-    		    result.phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
-    		    result.totalRays.at(sample_i) = *raysPerSampleIter;
-    		    std::cout << result.phiAse.at(sample_i) << std::endl;
-    		}
+    // 		if(result.mse.at(sample_i) > mseTmp){
+    // 		    //std::cout << alpaka::mem::view::getPtrNative(hGainSum)[0] << std::endl;		    
+    // 		    result.mse.at(sample_i)       = mseTmp;
+    // 		    result.phiAse.at(sample_i)    = alpaka::mem::view::getPtrNative(hGainSum)[0]; 
+    // 		    result.phiAse.at(sample_i)   /= *raysPerSampleIter * 4.0f * M_PI;
+    // 		    result.totalRays.at(sample_i) = *raysPerSampleIter;
+    // 		    std::cout << result.phiAse.at(sample_i) << std::endl;
+    // 		}
 
 
 		
-    	 	if(result.mse.at(sample_i) < experiment.mseThreshold) mseTooHigh = false;
+    // 	 	if(result.mse.at(sample_i) < experiment.mseThreshold) mseTooHigh = false;
 		
-     	    }
-    	    // Increase rays per sample or break, when mseThreshold was not met
-    	    raysPerSampleIter++;
-    	    if(raysPerSampleIter == raysPerSampleList.end()) break;
+    //  	    }
+    // 	    // Increase rays per sample or break, when mseThreshold was not met
+    // 	    raysPerSampleIter++;
+    // 	    if(raysPerSampleIter == raysPerSampleList.end()) break;
       
 	  
-     	}
+    //  	}
 
-    	// if(verbosity & V_PROGRESS){
-    	//     fancyProgressBar(mesh.numberOfSamples);
-    	// }
+    // 	// if(verbosity & V_PROGRESS){
+    // 	//     fancyProgressBar(mesh.numberOfSamples);
+    // 	// }
 
     }
 

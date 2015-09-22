@@ -210,25 +210,26 @@ struct PropagateFromTriangleCenter {
 				   const double sigmaE) const {
 
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
-	auto nThreads = threadsVec[0] * threadsVec[1];
+	auto nThreads = threadsVec[0];
 
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned reflections  = (reflection_i + 1) / 2;
+	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
+	ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
+	
 	for(unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; startPrism < mesh.numberOfPrisms; startPrism += nThreads){
 	
 	    double gain = 0;
-	    unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
-	    unsigned reflections  = (reflection_i + 1) / 2;
-	    ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
 	
 	    unsigned startLevel       = startPrism/(mesh.numberOfTriangles);
 	    unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
 	    Point startPoint          = mesh.getCenterPoint(startTriangle, startLevel);
 	    Point samplePoint         = mesh.getSamplePoint(sample_i);
-	    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
 	    gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
 	    importance[startPrism + reflectionOffset] = mesh.getBetaVolume(startPrism) * gain;
 	    if(mesh.getBetaVolume(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
-		printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(startPrism), importance[startPrism + reflectionOffset], gain);
+	    	printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(startPrism), importance[startPrism + reflectionOffset], gain);
 	    }
 	}
 
