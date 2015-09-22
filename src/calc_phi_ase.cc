@@ -374,23 +374,23 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 		
     		// Start Kernel
     		if(experiment.useReflections){
-    		    // CalcSampleGainSumWithReflection calcSampleGainSumWithReflection;
+    		    CalcSampleGainSumWithReflection calcSampleGainSumWithReflection;
 
-    		    // auto const exec (alpaka::exec::create<Acc>(workdiv,
-    		    // 					       calcSampleGainSumWithReflection,
-    		    // 					       dMesh, 
-    		    // 					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
-    		    // 					       alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices),
-    		    // 					       alpaka::mem::view::getPtrNative(dImportance),
-    		    // 					       raysPerSampleDump, 
-    		    // 					       alpaka::mem::view::getPtrNative(dGainSum), 
-    		    // 					       alpaka::mem::view::getPtrNative(dGainSumSquare),
-    		    // 					       sample_i, 
-    		    // 					       alpaka::mem::view::getPtrNative(dSigmaA),
-    		    // 					       alpaka::mem::view::getPtrNative(dSigmaE),
-    		    // 					       experiment.sigmaA.size(),
-    		    // 					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
-    		    // alpaka::stream::enqueue(stream, exec);
+    		    auto const exec (alpaka::exec::create<Acc>(workdiv,
+    		    					       calcSampleGainSumWithReflection,
+    		    					       dMesh, 
+    		    					       alpaka::mem::view::getPtrNative(dIndicesOfPrisms),
+    		    					       alpaka::mem::view::getPtrNative(dNumberOfReflectionSlices),
+    		    					       alpaka::mem::view::getPtrNative(dImportance),
+    		    					       raysPerSampleDump, 
+    		    					       alpaka::mem::view::getPtrNative(dGainSum), 
+    		    					       alpaka::mem::view::getPtrNative(dGainSumSquare),
+    		    					       sample_i, 
+    		    					       alpaka::mem::view::getPtrNative(dSigmaA),
+    		    					       alpaka::mem::view::getPtrNative(dSigmaE),
+    		    					       experiment.sigmaA.size(),
+    		    					       alpaka::mem::view::getPtrNative(dGlobalOffsetMultiplicator)));
+    		    alpaka::stream::enqueue(stream, exec);
 		    
     		}
     		else{
