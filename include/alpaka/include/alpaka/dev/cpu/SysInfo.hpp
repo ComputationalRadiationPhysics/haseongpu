@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <boost/predef.h>   // BOOST_XXX
+
 #if BOOST_OS_WINDOWS || BOOST_OS_CYGWIN
     #ifndef NOMINMAX
         #define NOMINMAX
@@ -40,7 +42,9 @@
     #endif
 #endif
 
-#include <boost/predef.h>   // BOOST_XXX
+#if BOOST_OS_LINUX
+    #include <fstream>
+#endif
 
 #include <cstring>          // std::memcpy
 #include <string>           // std::string
@@ -54,7 +58,7 @@ namespace alpaka
 #if BOOST_ARCH_X86
             namespace detail
             {
-    #if BOOST_COMP_GNUC || BOOST_COMP_CLANG
+    #if BOOST_COMP_GNUC || BOOST_COMP_CLANG || __INTEL_COMPILER
         #include <cpuid.h>
                 //-----------------------------------------------------------------------------
                 //!
@@ -65,7 +69,7 @@ namespace alpaka
                     __cpuid_count(level, subfunction, ex[0], ex[1], ex[2], ex[3]);
                 }
 
-    #elif BOOST_COMP_MSVC || BOOST_COMP_INTEL
+    #elif BOOST_COMP_MSVC
         #include <intrin.h>
                 //-----------------------------------------------------------------------------
                 //!
@@ -90,7 +94,7 @@ namespace alpaka
                     std::uint32_t const nExIds(ex[0]);
 
                     // Get the information associated with each extended ID.
-                    char pCpuBrandString[0x40] = {0};
+                    char cpuBrandString[0x40] = {0};
                     for(std::uint32_t i(0x80000000); i<=nExIds; ++i)
                     {
                         cpuid(i, 0, ex);
@@ -98,18 +102,18 @@ namespace alpaka
                         // Interpret CPU brand string and cache information.
                         if(i == 0x80000002)
                         {
-                            std::memcpy(pCpuBrandString, ex, sizeof(ex));
+                            std::memcpy(cpuBrandString, ex, sizeof(ex));
                         }
                         else if(i == 0x80000003)
                         {
-                            std::memcpy(pCpuBrandString + 16, ex, sizeof(ex));
+                            std::memcpy(cpuBrandString + 16, ex, sizeof(ex));
                         }
                         else if(i == 0x80000004)
                         {
-                            std::memcpy(pCpuBrandString + 32, ex, sizeof(ex));
+                            std::memcpy(cpuBrandString + 32, ex, sizeof(ex));
                         }
                     }
-                    return std::string(pCpuBrandString);
+                    return std::string(cpuBrandString);
 #else
                     return "<unknown>";
 #endif
@@ -124,10 +128,10 @@ namespace alpaka
                     return 0;
                 }*/
                 //-----------------------------------------------------------------------------
-                //! \return The number of bytes of global memory.
+                //! \return The total number of bytes of global memory.
                 //! Adapted from David Robert Nadeau: http://nadeausoftware.com/articles/2012/09/c_c_tip_how_get_physical_memory_size_system
                 //-----------------------------------------------------------------------------
-                inline auto getGlobalMemSizeBytes()
+                inline auto getTotalGlobalMemSizeBytes()
                 -> std::size_t
                 {
 #if BOOST_OS_WINDOWS
@@ -157,7 +161,7 @@ namespace alpaka
                     std::size_t const sizeLen{sizeof(size)};
                     if(sysctl(mib, 2, &size, &sizeLen, nullptr, 0) < 0)
                     {
-                        throw std::logic_error("getGlobalMemSizeBytes failed calling sysctl!");
+                        throw std::logic_error("getTotalGlobalMemSizeBytes failed calling sysctl!");
                     }
                     return static_cast<std::size_t>(size);
 
@@ -182,13 +186,58 @@ namespace alpaka
                     std::size_t const sizeLen{sizeof(size)};
                     if(sysctl(mib, 2, &size, &sizeLen, nullptr, 0) < 0)
                     {
-                        throw std::logic_error("getGlobalMemSizeBytes failed calling sysctl!");
+                        throw std::logic_error("getTotalGlobalMemSizeBytes failed calling sysctl!");
                     }
                     return static_cast<std::size_t>(size);
     #endif
 
 #else
-                    throw std::logic_error("getGlobalMemSizeBytes not implemented for this system!");
+    #error "getTotalGlobalMemSizeBytes not implemented for this system!"
+#endif
+                }
+                //-----------------------------------------------------------------------------
+                //! \return The free number of bytes of global memory.
+                //! \throws std::logic_error if not implemented on the system and std::runtime_error on other errors.
+                //-----------------------------------------------------------------------------
+                inline auto getFreeGlobalMemSizeBytes()
+                -> std::size_t
+                {
+#if BOOST_OS_WINDOWS
+                    MEMORYSTATUSEX status;
+                    status.dwLength = sizeof(status);
+                    GlobalMemoryStatusEx(&status);
+                    return static_cast<std::size_t>(status.ullAvailPhys);
+
+#elif BOOST_OS_LINUX
+                    std::string token;
+                    std::ifstream file("/proc/meminfo");
+                    if(file)
+                    {
+                        while(file >> token)
+                        {
+                            if(token == "MemFree:")
+                            {
+                                std::size_t freeGlobalMemSizeBytes(0);
+                                if(file >> freeGlobalMemSizeBytes)
+                                {
+                                    return freeGlobalMemSizeBytes;
+                                }
+                                else
+                                {
+                                    throw std::runtime_error("Unable to read MemFree value!");
+                                }
+                            }
+                        }
+                        throw std::runtime_error("Unable to find MemFree in '/proc/meminfo'!");
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Unable to open '/proc/meminfo'!");
+                    }
+#elif BOOST_OS_MACOS
+    #error "getFreeGlobalMemSizeBytes not implemented for __APPLE__!"
+#else
+    #error "getFreeGlobalMemSizeBytes not implemented for this system!"
 #endif
                 }
             }

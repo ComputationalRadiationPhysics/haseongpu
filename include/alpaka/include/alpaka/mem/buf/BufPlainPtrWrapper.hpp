@@ -176,6 +176,25 @@ namespace alpaka
             };
         }
     }
+    namespace elem
+    {
+        namespace traits
+        {
+            //#############################################################################
+            //! The BufPlainPtrWrapper memory element type get trait specialization.
+            //#############################################################################
+            template<
+                typename TDev,
+                typename TElem,
+                typename TDim,
+                typename TSize>
+            struct ElemType<
+                mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
+            {
+                using type = TElem;
+            };
+        }
+    }
     namespace extent
     {
         namespace traits
@@ -211,20 +230,6 @@ namespace alpaka
             namespace traits
             {
                 //#############################################################################
-                //! The BufPlainPtrWrapper memory element type get trait specialization.
-                //#############################################################################
-                template<
-                    typename TDev,
-                    typename TElem,
-                    typename TDim,
-                    typename TSize>
-                struct ElemType<
-                    buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
-                {
-                    using type = TElem;
-                };
-
-                //#############################################################################
                 //! The BufPlainPtrWrapper buf trait specialization.
                 //#############################################################################
                 template<
@@ -233,15 +238,15 @@ namespace alpaka
                     typename TDim,
                     typename TSize>
                 struct GetBuf<
-                    buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
+                    mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
                 {
                     //-----------------------------------------------------------------------------
                     //!
                     //-----------------------------------------------------------------------------
                     ALPAKA_NO_HOST_ACC_WARNING
                     ALPAKA_FN_HOST_ACC static auto getBuf(
-                        buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
-                    -> buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const &
+                        mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
+                    -> mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const &
                     {
                         return buf;
                     }
@@ -250,8 +255,8 @@ namespace alpaka
                     //-----------------------------------------------------------------------------
                     ALPAKA_NO_HOST_ACC_WARNING
                     ALPAKA_FN_HOST_ACC static auto getBuf(
-                        buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> & buf)
-                    -> buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> &
+                        mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> & buf)
+                    -> mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> &
                     {
                         return buf;
                     }
@@ -266,18 +271,18 @@ namespace alpaka
                     typename TDim,
                     typename TSize>
                 struct GetPtrNative<
-                    buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
+                    mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
                 {
                     ALPAKA_NO_HOST_ACC_WARNING
                     ALPAKA_FN_HOST_ACC static auto getPtrNative(
-                        buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
+                        mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
                     -> TElem const *
                     {
                         return buf.m_pMem;
                     }
                     ALPAKA_NO_HOST_ACC_WARNING
                     ALPAKA_FN_HOST_ACC static auto getPtrNative(
-                        buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> & buf)
+                        mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> & buf)
                     -> TElem *
                     {
                         return buf.m_pMem;
@@ -293,12 +298,12 @@ namespace alpaka
                     typename TDim,
                     typename TSize>
                 struct GetPitchBytes<
-                    std::integral_constant<std::size_t, 0u>,
-                    buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
+                    dim::DimInt<TDim::value - 1u>,
+                    mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize>>
                 {
                     ALPAKA_NO_HOST_ACC_WARNING
                     ALPAKA_FN_HOST_ACC static auto getPitchBytes(
-                        buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
+                        mem::buf::BufPlainPtrWrapper<TDev, TElem, TDim, TSize> const & buf)
                     -> TSize
                     {
                         return buf.m_pitchBytes;

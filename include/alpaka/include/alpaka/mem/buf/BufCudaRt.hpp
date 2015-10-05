@@ -23,9 +23,9 @@
 
 #include <alpaka/dev/Traits.hpp>            // dev::traits::DevType
 #include <alpaka/dim/DimIntegralConst.hpp>  // dim::DimInt<N>
-#include <alpaka/mem/buf/Traits.hpp>        // view::Copy, ...
+#include <alpaka/mem/buf/Traits.hpp>        // mem::view::Copy, ...
 
-#include <alpaka/vec/Vec.hpp>               // Vec<TDim, TSize>
+#include <alpaka/vec/Vec.hpp>               // Vec
 #include <alpaka/core/Cuda.hpp>             // cudaMalloc, ...
 
 #include <cassert>                          // assert
@@ -80,7 +80,9 @@ namespace alpaka
                         m_extentsElements(extent::getExtentsVecEnd<TDim>(extents)),
                         m_spMem(
                             pMem,
-                            std::bind(&BufCudaRt::freeBuffer, std::placeholders::_1, std::ref(m_dev))),
+                            // NOTE: Because the BufCudaRt object can be copied and the original object could have been destroyed,
+                            // a std::ref(m_dev) or a this pointer can not be bound to the callback because they are not always valid at time of destruction.
+                            std::bind(&BufCudaRt::freeBuffer, std::placeholders::_1, m_dev)),
                         m_pitchBytes(pitchBytes)
                 {
                     ALPAKA_DEBUG_MINIMAL_LOG_SCOPE;
@@ -115,7 +117,7 @@ namespace alpaka
                 }
 
             public:
-                dev::DevCudaRt m_dev;
+                dev::DevCudaRt m_dev;               // NOTE: The device has to be destructed after the memory pointer because it is required for destruction.
                 Vec<TDim, TSize> m_extentsElements;
                 std::shared_ptr<TElem> m_spMem;
                 TSize m_pitchBytes;
@@ -179,6 +181,24 @@ namespace alpaka
             };
         }
     }
+    namespace elem
+    {
+        namespace traits
+        {
+            //#############################################################################
+            //! The BufCudaRt memory element type get trait specialization.
+            //#############################################################################
+            template<
+                typename TElem,
+                typename TDim,
+                typename TSize>
+            struct ElemType<
+                mem::buf::BufCudaRt<TElem, TDim, TSize>>
+            {
+                using type = TElem;
+            };
+        }
+    }
     namespace extent
     {
         namespace traits
@@ -214,18 +234,6 @@ namespace alpaka
         {
             namespace traits
             {
-                //#############################################################################
-                //! The BufCudaRt memory element type get trait specialization.
-                //#############################################################################
-                template<
-                    typename TElem,
-                    typename TDim,
-                    typename TSize>
-                struct ElemType<
-                    mem::buf::BufCudaRt<TElem, TDim, TSize>>
-                {
-                    using type = TElem;
-                };
                 //#############################################################################
                 //! The BufCudaRt buf trait specialization.
                 //#############################################################################
@@ -338,7 +346,7 @@ namespace alpaka
                     typename TDim,
                     typename TSize>
                 struct GetPitchBytes<
-                    std::integral_constant<std::size_t, TDim::value - 1u>,
+                    dim::DimInt<TDim::value - 1u>,
                     mem::buf::BufCudaRt<TElem, TDim, TSize>>
                 {
                     //-----------------------------------------------------------------------------
@@ -753,7 +761,7 @@ namespace alpaka
                             ALPAKA_CUDA_RT_CHECK(
                                 cudaHostRegister(
                                     const_cast<void *>(reinterpret_cast<void const *>(mem::view::getPtrNative(buf))),
-                                    extent::getProductOfExtents(buf) * sizeof(mem::view::Elem<BufCpu<TElem, TDim, TSize>>),
+                                    extent::getProductOfExtents(buf) * sizeof(elem::Elem<BufCpu<TElem, TDim, TSize>>),
                                     cudaHostRegisterMapped));
                         }
                         // If it is already the same device, nothing has to be mapped.
