@@ -59,22 +59,19 @@ struct DistributeRaysByImportance {
 				   unsigned *raysDump) const {
 
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
-	auto nThreads = threadsVec[0] * threadsVec[1];
+	auto nThreads = threadsVec[0];
 
-	for(unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; startPrism < mesh.numberOfPrisms; startPrism += nThreads){	
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-	    unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
-	    //unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];	
-	    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-
-	    //if(startPrism >= mesh.numberOfPrisms) return;
-
-	    raysPerPrism[startPrism + reflectionOffset] = (unsigned) floor(importance[startPrism + reflectionOffset] / (*sumPhi) * raysPerSample);
-	    if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
-		printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
+	unsigned prism_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	for(; prism_i < mesh.numberOfPrisms; prism_i += nThreads){	
+	    raysPerPrism[prism_i + reflectionOffset] = (unsigned) floor(importance[prism_i + reflectionOffset] / (*sumPhi) * raysPerSample);
+	    if(raysPerPrism[prism_i + reflectionOffset] > raysPerSample){
+		printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[prism_i+reflectionOffset],*sumPhi,prism_i+reflectionOffset,raysPerPrism[prism_i+reflectionOffset],raysPerSample);
 	    }
-	    assert(raysPerPrism[startPrism + reflectionOffset] <= raysPerSample);
-	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, raysDump, raysPerPrism[startPrism + reflectionOffset]);
+	    assert(raysPerPrism[prism_i + reflectionOffset] <= raysPerSample);
+	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, raysDump, raysPerPrism[prism_i + reflectionOffset]);
 	
 	}
     }
@@ -116,8 +113,8 @@ struct DistributeRemainingRaysRandomly {
 	//std::cout << *raysDump << std::endl;
 
 	//std::cout << alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0] << std::endl;
-	
-	for(unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; id < raysLeft; id += nThreads){
+	unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	for(; id < raysLeft; id += nThreads){
     
 	    //int id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 	    //std::cout <<  id << " ";
@@ -161,25 +158,23 @@ struct RecalculateImportance {
 				  double *importance) const{
 
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
-	auto nThreads = threadsVec[0] * threadsVec[1];
+	auto nThreads = threadsVec[0] ;
 
-	for(unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; startPrism < mesh.numberOfPrisms; startPrism += nThreads){
+	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
+	unsigned prism_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 	
-	    unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
-	    //unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
-	    unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
+	for(; prism_i < mesh.numberOfPrisms; prism_i += nThreads){
+	
+	    int startLevel = prism_i/(mesh.numberOfTriangles);
+	    int startTriangle = prism_i - (mesh.numberOfTriangles * startLevel);
 
-	    //if(startPrism >= mesh.numberOfPrisms) return;
-
-	    int startLevel = startPrism/(mesh.numberOfTriangles);
-	    int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-
-	    if(raysPerPrism[startPrism + reflectionOffset] > 0){
-		importance[startPrism + reflectionOffset] = raysPerSample * mesh.getTriangleSurface(startTriangle) / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
+	    if(raysPerPrism[prism_i + reflectionOffset] > 0){
+		importance[prism_i + reflectionOffset] = raysPerSample * mesh.getTriangleSurface(startTriangle) / (mesh.surfaceTotal * raysPerPrism[prism_i + reflectionOffset]);
 	    }
 	    else{
-		importance[startPrism + reflectionOffset] = 0;
+		importance[prism_i + reflectionOffset] = 0;
 	    }
 
 	}
@@ -209,8 +204,6 @@ struct PropagateFromTriangleCenter {
 				   const double sigmaA,
 				   const double sigmaE) const {
 
-	//std::cout << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0] << " " << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[1] << std::endl;
-	
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
 	auto nThreads = threadsVec[0];
 
@@ -220,7 +213,6 @@ struct PropagateFromTriangleCenter {
 	ReflectionPlane reflectionPlane = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
 
 	unsigned prism_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
-
 	for(; prism_i < mesh.numberOfPrisms; prism_i += nThreads){
 
 
@@ -234,10 +226,10 @@ struct PropagateFromTriangleCenter {
 
 
 	    //if(prism_i == 0 && reflections == 6 && reflectionPlane == BOTTOM_REFLECTION)
-		gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
+	    gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
 		
-	    if(prism_i == 0)
-	    	printf("reflections: %u  prism_i: %u gain: %f\n", reflections, prism_i, gain);
+	    // if(prism_i == 0)
+	    // 	printf("reflections: %u  prism_i: %u gain: %f\n", reflections, prism_i, gain);
 
 	    
 	    importance[prism_i + reflectionOffset] = mesh.getBetaVolume(prism_i) * gain;

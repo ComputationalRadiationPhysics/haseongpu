@@ -129,8 +129,10 @@ struct MapPrefixSumToPrisms {
 
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
 	auto nThreads = threadsVec[0] * threadsVec[1];
+
 	
-	for(unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; id < numberOfPrisms * reflectionSlices; id += nThreads){
+	unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	for(; id < numberOfPrisms * reflectionSlices; id += nThreads){
 	
 	    const unsigned count            = raysPerPrism[id];
 	    const unsigned startingPosition = prefixSum[id];
