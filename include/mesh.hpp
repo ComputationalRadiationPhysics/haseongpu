@@ -439,7 +439,7 @@ class Mesh {
 
 
     ALPAKA_FN_HOST double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) const{
-	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
+	return fabs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
     }
 
     ALPAKA_FN_HOST double getMaxDistance(std::vector<TwoDimPoint> points) const{

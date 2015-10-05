@@ -37,7 +37,7 @@
 
 ALPAKA_FN_ACC double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
   // Calc intesection angle with z-plane
-  double nominator = abs(ray.dir.z);
+  double nominator = fabs(ray.dir.z);
   double denominator = sqrt((ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y) + (ray.dir.z * ray.dir.z));
   if(denominator != 0.0){
     double radian = acos(nominator / denominator);
@@ -77,7 +77,7 @@ ALPAKA_FN_ACC int calcPlaneIntersectionPoint(const Ray reflectionRay, const Refl
  */
 template <typename T_Mesh>
 ALPAKA_FN_ACC Ray generateReflectionRay(const Point startPoint, Point endPoint,  const int reflectionsLeft, const ReflectionPlane reflectionPlane, const T_Mesh &mesh){
-  float mirrorPlaneZ = 0;
+  double mirrorPlaneZ = 0;
   if(reflectionsLeft % 2 == 0){
     // Even reflectionCount is postponement
     endPoint.z = endPoint.z + reflectionPlane * (reflectionsLeft * mesh.thickness * mesh.numberOfLevels); 
@@ -92,7 +92,7 @@ ALPAKA_FN_ACC Ray generateReflectionRay(const Point startPoint, Point endPoint, 
       mirrorPlaneZ = floor(reflectionsLeft/(double)2) * mesh.thickness * mesh.numberOfLevels * reflectionPlane;
     }
 
-    endPoint.z = reflectionPlane * abs(( mirrorPlaneZ + mirrorPlaneZ - endPoint.z));
+    endPoint.z = reflectionPlane * fabs(( mirrorPlaneZ + mirrorPlaneZ - endPoint.z));
     
   }
   return generateRay(startPoint, endPoint);

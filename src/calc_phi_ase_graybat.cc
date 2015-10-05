@@ -178,8 +178,8 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
      * ASE SIMULATION
      **************************************************************************/
     // Create sample indices
-    std::vector<unsigned> samples(experiment.numberOfSamples);
-    std::iota(samples.begin(), samples.end(), 0);
+    std::vector<unsigned> samples(1 + compute.maxSampleRange - compute.minSampleRange);
+    std::iota(samples.begin(), samples.end(), compute.minSampleRange);
 
     // Determine phi ase for each sample
     for(Vertex vertex : cage.hostedVertices) {

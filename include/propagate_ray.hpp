@@ -213,6 +213,7 @@ ALPAKA_FN_ACC int calcTriangleRayIntersection(double *length,
 	for(int edge_i = 0; edge_i < 3; ++edge_i){
 	    if(edge_i != forbiddenEdge){
 		double lengthTmp = checkEdge(triangle, edge_i, ray, mesh, *length);
+		//printf("edge_i: %i, lengthTmp: %.30f\n", edge_i, lengthTmp);		
 		if(lengthTmp){
 		    *length = lengthTmp;
 		    edge = edge_i;
@@ -223,6 +224,7 @@ ALPAKA_FN_ACC int calcTriangleRayIntersection(double *length,
 	// check the upper surface
 	if (forbiddenEdge != 3){
 	    double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, *length, mesh.thickness);
+	    //printf("edge_i: 3, lengthTmp: %.30f\n", lengthTmp);    	    
 	    if(lengthTmp){
 		*length = lengthTmp;
 		edge = 3;
@@ -232,6 +234,7 @@ ALPAKA_FN_ACC int calcTriangleRayIntersection(double *length,
 	// check the lower surface
 	if (forbiddenEdge != 4){
 	    double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, *length, mesh.thickness);
+	    //printf("edge_i: 4, lengthTmp: %.30f\n", lengthTmp);    	    	    
 	    if (lengthTmp){
 		*length = lengthTmp;
 		edge = 4;
@@ -267,14 +270,17 @@ ALPAKA_FN_ACC double propagateRay(Ray nextRay,
     double distanceRemaining = nextRay.length;
     double length            = 0;
     double gain              = 1;
-    int nextForbiddenEdge    = -1;
     int nextEdge             = -1;
-
+    int nextForbiddenEdge    = -1;
+    
     // Length to small, could be same points
     if(distanceTotal < SMALL)
 	return 1;
 
     nextRay = normalizeRay(nextRay);
+
+    //printf("point: %f,%f,%f dir: %f,%f,%f, length: %f\n",nextRay.p.x, nextRay.p.y, nextRay.p.z, nextRay.dir.x, nextRay.dir.y, nextRay.dir.z, nextRay.length);
+    
     while(fabs(distanceRemaining) > SMALL){
 	assert(*nextLevel <= mesh.numberOfLevels);
      	// Calc gain for triangle intersection
@@ -283,6 +289,7 @@ ALPAKA_FN_ACC double propagateRay(Ray nextRay,
 	nextRay            = calcNextRay(nextRay, length);
      	double gainTmp     = calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
      	gain              *= gainTmp;
+	//printf("triangle: %u, level: %u, nextEdge: %i, gainTmp: %f, gainSum: %f\n", *nextTriangle, *nextLevel, nextEdge, gainTmp, gain);	
      	assert(length >= 0);
 
      	distanceRemaining -= length;
@@ -342,20 +349,28 @@ ALPAKA_FN_ACC double propagateRayWithReflection(Point startPoint,
 	calcNextReflection(startPoint, endPoint, (reflections - reflection), reflectionPlane, &reflectionPoint, &reflectionAngle, mesh);
 	Ray reflectionRay   = generateRay(startPoint, reflectionPoint);
 	distanceTotal += reflectionRay.length;
-	   gain  *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
 
-	   assert(reflectionAngle <= 90);
-	   assert(reflectionAngle >= 0 );
 
-	  if(reflectionAngle <= totalReflectionAngle){
+	//printf("reflection: %u\n", reflection);
+	double gainPart = propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
+	gain  *= gainPart;
+	
+	// if(reflection == 2){
+	//     printf("Reflections: %u, Reflection: %u, GainPart: %f, GainSum: %f, ReflectionPoint[%f,%f,%f]\n", reflections, reflection, gainPart, gain, reflectionPoint.x, reflectionPoint.y, reflectionPoint.z );
+	// }
+
+	assert(reflectionAngle <= 90);
+	assert(reflectionAngle >= 0 );
+
+	if(reflectionAngle <= totalReflectionAngle){
 	    gain             *= reflectivity;
 	    if(gain == 0){
 		return 0;
 	    }
-	  }
+	}
 
-	  startPoint          = reflectionPoint;
-	  reflectionPlane     = reflectionPlane == TOP_REFLECTION ? BOTTOM_REFLECTION : TOP_REFLECTION;
+	startPoint          = reflectionPoint;
+	reflectionPlane     = reflectionPlane == TOP_REFLECTION ? BOTTOM_REFLECTION : TOP_REFLECTION;
     
     }
 

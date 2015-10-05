@@ -215,10 +215,10 @@ std::vector<double> compareVtk(std::vector<double> compare, const fs::path filen
           break;
         value = (double) atof(line.c_str());
 
-        if(abs(value) > abs(compare.at(ase_i)))
-          diff = (abs(value / compare.at(ase_i)) - 1) * 100;
+        if(fabs(value) > abs(compare.at(ase_i)))
+          diff = (fabs(value / compare.at(ase_i)) - 1) * 100;
         else
-          diff = (abs(compare.at(ase_i) / value) - 1) * 100;
+          diff = (fabs(compare.at(ase_i) / value) - 1) * 100;
 
         totalDiff += diff;
 

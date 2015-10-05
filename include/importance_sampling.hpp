@@ -209,27 +209,40 @@ struct PropagateFromTriangleCenter {
 				   const double sigmaA,
 				   const double sigmaE) const {
 
+	//std::cout << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[0] << " " << alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc)[1] << std::endl;
+	
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
 	auto nThreads = threadsVec[0];
 
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
-	unsigned reflections  = (reflection_i + 1) / 2;
-	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-	ReflectionPlane reflectionPlane  = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
-	
-	for(unsigned startPrism = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0]; startPrism < mesh.numberOfPrisms; startPrism += nThreads){
-	
+	unsigned reflection_i           = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	unsigned reflections            = (reflection_i + 1) / 2;
+	unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
+	ReflectionPlane reflectionPlane = (reflection_i % 2 == 0)? BOTTOM_REFLECTION : TOP_REFLECTION;
+
+	unsigned prism_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+
+	for(; prism_i < mesh.numberOfPrisms; prism_i += nThreads){
+
+
+	    
 	    double gain = 0;
 	
-	    unsigned startLevel       = startPrism/(mesh.numberOfTriangles);
-	    unsigned startTriangle    = startPrism - (mesh.numberOfTriangles * startLevel);
-	    Point startPoint          = mesh.getCenterPoint(startTriangle, startLevel);
-	    Point samplePoint         = mesh.getSamplePoint(sample_i);
+	    unsigned startLevel    = prism_i / (mesh.numberOfTriangles);
+	    unsigned startTriangle = prism_i - (mesh.numberOfTriangles * startLevel);
+	    Point startPoint       = mesh.getCenterPoint(startTriangle, startLevel);
+	    Point samplePoint      = mesh.getSamplePoint(sample_i);
 
-	    gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
-	    importance[startPrism + reflectionOffset] = mesh.getBetaVolume(startPrism) * gain;
-	    if(mesh.getBetaVolume(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
-	    	printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(startPrism), importance[startPrism + reflectionOffset], gain);
+
+	    //if(prism_i == 0 && reflections == 6 && reflectionPlane == BOTTOM_REFLECTION)
+		gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
+		
+	    if(prism_i == 0)
+	    	printf("reflections: %u  prism_i: %u gain: %f\n", reflections, prism_i, gain);
+
+	    
+	    importance[prism_i + reflectionOffset] = mesh.getBetaVolume(prism_i) * gain;
+	    if(mesh.getBetaVolume(prism_i) < 0 || gain < 0 || importance[prism_i+reflectionOffset] < 0){
+	    	printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(prism_i), importance[prism_i + reflectionOffset], gain);
 	    }
 	}
 
