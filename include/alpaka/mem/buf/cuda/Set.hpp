@@ -1,6 +1,6 @@
 /**
 * \file
-* Copyright 2014-2015 Benjamin Worpitz
+* Copyright 2014-2015 Benjamin Worpitz, Rene Widera
 *
 * This file is part of alpaka.
 *
@@ -23,8 +23,8 @@
 
 #include <alpaka/dev/Traits.hpp>            // dev::getDev
 #include <alpaka/dim/DimIntegralConst.hpp>  // dim::DimInt<N>
-#include <alpaka/extent/Traits.hpp>         // view::getXXX
-#include <alpaka/mem/view/Traits.hpp>       // view::Set
+#include <alpaka/extent/Traits.hpp>         // mem::view::getXXX
+#include <alpaka/mem/view/Traits.hpp>       // mem::view::Set
 #include <alpaka/stream/Traits.hpp>         // stream::Enqueue
 
 #include <alpaka/core/Cuda.hpp>             // cudaMemset, ...
@@ -161,7 +161,7 @@ namespace alpaka
                     auto const & iDevice(task.m_iDevice);
 
                     auto const extentWidth(extent::getWidth(extents));
-                    auto const extentWidthBytes(extentWidth * sizeof(mem::view::Elem<TBuf>));
+                    auto const extentWidthBytes(extentWidth * sizeof(elem::Elem<TBuf>));
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
@@ -212,7 +212,7 @@ namespace alpaka
                     auto const & iDevice(task.m_iDevice);
 
                     auto const extentWidth(extent::getWidth(extents));
-                    auto const extentWidthBytes(extentWidth * sizeof(mem::view::Elem<TBuf>));
+                    auto const extentWidthBytes(extentWidth * sizeof(elem::Elem<TBuf>));
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
@@ -262,11 +262,11 @@ namespace alpaka
                     auto const & iDevice(task.m_iDevice);
 
                     auto const extentWidth(extent::getWidth(extents));
-                    auto const extentWidthBytes(extentWidth * sizeof(mem::view::Elem<TBuf>));
+                    auto const extentWidthBytes(extentWidth * sizeof(elem::Elem<TBuf>));
                     auto const extentHeight(extent::getHeight(extents));
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstHeight(extent::getHeight(buf));
-                    auto const dstPitchBytes(mem::view::getPitchBytes<std::integral_constant<std::size_t, dim::Dim<TBuf>::value - 1u>>(buf));
+                    auto const dstPitchBytes(mem::view::getPitchBytes<dim::Dim<TBuf>::value - 1u>(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
                     assert(extentHeight <= dstHeight);
@@ -319,11 +319,11 @@ namespace alpaka
                     auto const & iDevice(task.m_iDevice);
 
                     auto const extentWidth(extent::getWidth(extents));
-                    auto const extentWidthBytes(extentWidth * sizeof(mem::view::Elem<TBuf>));
+                    auto const extentWidthBytes(extentWidth * sizeof(elem::Elem<TBuf>));
                     auto const extentHeight(extent::getHeight(extents));
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstHeight(extent::getHeight(buf));
-                    auto const dstPitchBytes(mem::view::getPitchBytes<std::integral_constant<std::size_t, dim::Dim<TBuf>::value - 1u>>(buf));
+                    auto const dstPitchBytes(mem::view::getPitchBytes<dim::Dim<TBuf>::value - 1u>(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
                     assert(extentHeight <= dstHeight);
@@ -380,7 +380,7 @@ namespace alpaka
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstHeight(extent::getHeight(buf));
                     auto const dstDepth(extent::getDepth(buf));
-                    auto const dstPitchBytes(mem::view::getPitchBytes<std::integral_constant<std::size_t, dim::Dim<TBuf>::value - 1u>>(buf));
+                    auto const dstPitchBytes(mem::view::getPitchBytes<dim::Dim<TBuf>::value - 1u>(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
                     assert(extentHeight <= dstHeight);
@@ -451,7 +451,7 @@ namespace alpaka
                     auto const dstWidth(extent::getWidth(buf));
                     auto const dstHeight(extent::getHeight(buf));
                     auto const dstDepth(extent::getDepth(buf));
-                    auto const dstPitchBytes(mem::view::getPitchBytes<std::integral_constant<std::size_t, dim::Dim<TBuf>::value - 1u>>(buf));
+                    auto const dstPitchBytes(mem::view::getPitchBytes<dim::Dim<TBuf>::value - 1u>(buf));
                     auto const dstNativePtr(reinterpret_cast<void *>(mem::view::getPtrNative(buf)));
                     assert(extentWidth <= dstWidth);
                     assert(extentHeight <= dstHeight);

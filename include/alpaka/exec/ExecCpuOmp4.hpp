@@ -182,7 +182,7 @@ namespace alpaka
                         #pragma omp distribute
                         for(TSize b = 0u; b<numBlocksInGrid; ++b)
                         {
-                            Vec1<TSize> const gridBlockIdx(b);
+                            Vec<dim::DimInt<1u>, TSize> const gridBlockIdx(b);
                             // When this is not repeated here:
                             // error: ‘gridBlockExtents’ referenced in target region does not have a mappable type
                             auto const gridBlockExtents2(
@@ -210,7 +210,7 @@ namespace alpaka
                                     int const numThreads(::omp_get_num_threads());
                                     // NOTE: No std::cout in omp target!
                                     printf("%s omp_get_num_threads: %d\n", BOOST_CURRENT_FUNCTION, numThreads);
-                                    if(numThreads != numThreadsInBlock)
+                                    if(numThreads != static_cast<int>(numThreadsInBlock))
                                     {
                                         throw std::runtime_error("The CPU OpenMP4 runtime did not use the number of threads that had been required!");
                                     }

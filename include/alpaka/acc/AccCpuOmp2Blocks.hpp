@@ -25,10 +25,11 @@
 #include <alpaka/workdiv/WorkDivMembers.hpp>    // workdiv::WorkDivMembers
 #include <alpaka/idx/gb/IdxGbRef.hpp>           // IdxGbRef
 #include <alpaka/idx/bt/IdxBtZero.hpp>          // IdxBtZero
-#include <alpaka/atomic/AtomicNoOp.hpp>         // AtomicNoOp
+#include <alpaka/atomic/AtomicOmpCritSec.hpp>   // AtomicOmpCritSec
 #include <alpaka/math/MathStl.hpp>              // MathStl
 #include <alpaka/block/shared/BlockSharedAllocNoSync.hpp>  // BlockSharedAllocNoSync
 #include <alpaka/block/sync/BlockSyncNoOp.hpp>  // BlockSyncNoOp
+#include <alpaka/rand/RandStl.hpp>              // RandStl
 
 // Specialized traits.
 #include <alpaka/acc/Traits.hpp>                // acc::traits::AccType
@@ -73,10 +74,11 @@ namespace alpaka
             public workdiv::WorkDivMembers<TDim, TSize>,
             public idx::gb::IdxGbRef<TDim, TSize>,
             public idx::bt::IdxBtZero<TDim, TSize>,
-            public atomic::AtomicNoOp,
+            public atomic::AtomicOmpCritSec,
             public math::MathStl,
             public block::shared::BlockSharedAllocNoSync,
-            public block::sync::BlockSyncNoOp
+            public block::sync::BlockSyncNoOp,
+            public rand::RandStl
         {
         public:
             // Partial specialization with the correct TDim and TSize is not allowed.
@@ -98,10 +100,11 @@ namespace alpaka
                     workdiv::WorkDivMembers<TDim, TSize>(workDiv),
                     idx::gb::IdxGbRef<TDim, TSize>(m_gridBlockIdx),
                     idx::bt::IdxBtZero<TDim, TSize>(),
-                    atomic::AtomicNoOp(),
+                    atomic::AtomicOmpCritSec(),
                     math::MathStl(),
                     block::shared::BlockSharedAllocNoSync(),
                     block::sync::BlockSyncNoOp(),
+                    rand::RandStl(),
                     m_gridBlockIdx(Vec<TDim, TSize>::zeros())
             {}
 

@@ -21,70 +21,52 @@
 
 #pragma once
 
-#include <alpaka/core/Common.hpp>   // ALPAKA_FN_HOST
+#include <type_traits>  // std::enable_if, std::is_fundamental
 
 namespace alpaka
 {
     //-----------------------------------------------------------------------------
-    //! The event management specifics.
+    //! The element specifics.
     //-----------------------------------------------------------------------------
-    namespace event
+    namespace elem
     {
         //-----------------------------------------------------------------------------
-        //! The event management traits.
+        //! The element traits.
         //-----------------------------------------------------------------------------
         namespace traits
         {
             //#############################################################################
-            //! The event type trait.
+            //! The element type trait.
             //#############################################################################
             template<
-                typename TAcc,
+                typename TView,
                 typename TSfinae = void>
-            struct EventType;
-
-            //#############################################################################
-            //! The event tester trait.
-            //#############################################################################
-            template<
-                typename TEvent,
-                typename TSfinae = void>
-            struct EventTest;
+            struct ElemType;
         }
 
         //#############################################################################
-        //! The event type trait alias template to remove the ::type.
+        //! The element type trait alias template to remove the ::type.
         //#############################################################################
         template<
-            typename TAcc>
-        using Event = typename traits::EventType<TAcc>::type;
+            typename TView>
+        using Elem = typename std::remove_volatile<typename traits::ElemType<TView>::type>::type;
 
         //-----------------------------------------------------------------------------
-        //! Creates an event on a device.
+        // Trait specializations for unsigned integral types.
         //-----------------------------------------------------------------------------
-        template<
-            typename TDev>
-        ALPAKA_FN_HOST auto create(
-            TDev const & dev)
-        -> Event<TDev>
+        namespace traits
         {
-            return Event<TDev>(dev);
-        }
-
-        //-----------------------------------------------------------------------------
-        //! Tests if the given event has already be completed.
-        //-----------------------------------------------------------------------------
-        template<
-            typename TEvent>
-        ALPAKA_FN_HOST auto test(
-            TEvent const & event)
-        -> bool
-        {
-            return
-                traits::EventTest<
-                    TEvent>
-                ::eventTest(
-                    event);
+            //#############################################################################
+            //! The fundamental type elem type trait specialization.
+            //#############################################################################
+            template<
+                typename T>
+            struct ElemType<
+                T,
+                typename std::enable_if<std::is_fundamental<T>::value>::type>
+            {
+                using type = T;
+            };
         }
     }
 }

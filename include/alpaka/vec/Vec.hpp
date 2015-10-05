@@ -42,6 +42,12 @@
 #include <type_traits>                      // std::enable_if
 #include <algorithm>                        // std::min, std::max, std::min_element, std::max_element
 
+#define ALPAKA_CREATE_VEC_IN_CLASS
+// The nvcc compiler does not support the out of class version.
+#ifdef __CUDACC__
+    #define ALPAKA_CREATE_VEC_IN_CLASS
+#endif
+
 namespace alpaka
 {
     template<
@@ -49,7 +55,7 @@ namespace alpaka
         typename TSize>
     class Vec;
 
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
     //-----------------------------------------------------------------------------
     //! Single value constructor helper.
     //-----------------------------------------------------------------------------
@@ -171,10 +177,10 @@ namespace alpaka
         ALPAKA_FN_HOST_ACC Vec(
             TArg0 && arg0,
             TArgs && ... args) :
-                m_auiData{std::forward<TArg0>(arg0), std::forward<TArgs>(args)...}
+                m_data{std::forward<TArg0>(arg0), std::forward<TArgs>(args)...}
         {}
 
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
         //-----------------------------------------------------------------------------
         //! Creator using func<idx>(args...) to initialize all values of the vector.
         //-----------------------------------------------------------------------------
@@ -294,7 +300,7 @@ namespace alpaka
         {
             return
                 createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     TDim,
 #endif
                     CreateSingleVal>(
@@ -335,7 +341,7 @@ namespace alpaka
             core::assertValueUnsigned(iIdx);
             auto const idx(static_cast<typename TDim::value_type>(iIdx));
             assert(idx<TDim::value);
-            return m_auiData[idx];
+            return m_data[idx];
         }
 
         //-----------------------------------------------------------------------------
@@ -354,7 +360,7 @@ namespace alpaka
             core::assertValueUnsigned(iIdx);
             auto const idx(static_cast<typename TDim::value_type>(iIdx));
             assert(idx<TDim::value);
-            return m_auiData[idx];
+            return m_data[idx];
         }
 
         //-----------------------------------------------------------------------------
@@ -416,7 +422,7 @@ namespace alpaka
         ALPAKA_FN_HOST_ACC auto foldrAll(
             TFnObj const & f) const
         -> decltype(
-#if (BOOST_COMP_GNUC) && (BOOST_COMP_GNUC < BOOST_VERSION_NUMBER(5, 0, 0))
+#if (BOOST_COMP_GNUC && (BOOST_COMP_GNUC < BOOST_VERSION_NUMBER(5, 0, 0))) || __INTEL_COMPILER
             this->foldrByIndices(
 #else
             foldrByIndices(
@@ -483,10 +489,10 @@ namespace alpaka
             return
                 static_cast<typename TDim::value_type>(
                     std::distance(
-                        std::begin(m_auiData),
+                        std::begin(m_data),
                         std::min_element(
-                            std::begin(m_auiData),
-                            std::end(m_auiData))));
+                            std::begin(m_data),
+                            std::end(m_data))));
         }
         //-----------------------------------------------------------------------------
         //! \return The index of the maximal element.
@@ -498,32 +504,17 @@ namespace alpaka
             return
                 static_cast<typename TDim::value_type>(
                     std::distance(
-                        std::begin(m_auiData),
+                        std::begin(m_data),
                         std::max_element(
-                            std::begin(m_auiData),
-                            std::end(m_auiData))));
+                            std::begin(m_data),
+                            std::end(m_data))));
         }
 
     private:
         // 16 Byte alignment for usage inside of CUDA kernels.
-        alignas(16u) TSize m_auiData[TDim::value];
+        alignas(16u) TSize m_data[TDim::value];
     };
 
-    template<
-        typename TSize>
-    using Vec1 = Vec<dim::DimInt<1u>, TSize>;
-
-    template<
-        typename TSize>
-    using Vec2 = Vec<dim::DimInt<2u>, TSize>;
-
-    template<
-        typename TSize>
-    using Vec3 = Vec<dim::DimInt<3u>, TSize>;
-
-    template<
-        typename TSize>
-    using Vec4 = Vec<dim::DimInt<4u>, TSize>;
 
     namespace detail
     {
@@ -563,11 +554,11 @@ namespace alpaka
     -> Vec<TDim, TSize>
     {
         return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<TDim, TSize>::template
 #endif
             createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                 TDim,
 #endif
                 detail::CreateAdd>(
@@ -613,11 +604,11 @@ namespace alpaka
     -> Vec<TDim, TSize>
     {
         return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<TDim, TSize>::template
 #endif
             createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                 TDim,
 #endif
                 detail::CreateMul>(
@@ -771,15 +762,15 @@ namespace alpaka
                 //-----------------------------------------------------------------------------
                 ALPAKA_NO_HOST_ACC_WARNING
                 template<
-                    typename TValNew,
+                    typename TSizeNew,
                     typename TDim,
                     typename TSize>
                 ALPAKA_FN_HOST_ACC static auto create(
-                    TValNew const &/* valNew*/,
+                    TSizeNew const &/* valNew*/,
                     Vec<TDim, TSize> const & vec)
-                -> TValNew
+                -> TSizeNew
                 {
-                    return static_cast<TValNew>(vec[Tidx]);
+                    return static_cast<TSizeNew>(vec[Tidx]);
                 }
             };
 
@@ -789,22 +780,22 @@ namespace alpaka
         //-----------------------------------------------------------------------------
         ALPAKA_NO_HOST_ACC_WARNING
         template<
-            typename TValNew,
+            typename TSizeNew,
             typename TDim,
             typename TSize>
         ALPAKA_FN_HOST_ACC static auto cast(Vec<TDim, TSize> const & other)
-        -> Vec<TDim, TValNew>
+        -> Vec<TDim, TSizeNew>
         {
             return
-#ifdef __CUDACC__
-            Vec<TDim, TValNew>::template
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
+            Vec<TDim, TSizeNew>::template
 #endif
                 createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     TDim,
 #endif
                     detail::CreateCast>(
-                        TValNew(),
+                        TSizeNew(),
                         other);
         }
     }
@@ -844,11 +835,11 @@ namespace alpaka
     -> Vec<TDim, TSize>
     {
         return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<TDim, TSize>::template
 #endif
             createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                 TDim,
 #endif
                 detail::CreateReverse>(
@@ -891,11 +882,11 @@ namespace alpaka
         -> Vec<dim::Dim<TExtents>, size::Size<TExtents>>
         {
             return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<dim::Dim<TExtents>, size::Size<TExtents>>::template
 #endif
                 createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     dim::Dim<TExtents>,
 #endif
                     detail::CreateExtent>(
@@ -914,11 +905,11 @@ namespace alpaka
         {
             using IdxOffset = std::integral_constant<std::intmax_t, ((std::intmax_t)dim::Dim<TExtents>::value)-((std::intmax_t)TDim::value)>;
             return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<TDim, size::Size<TExtents>>::template
 #endif
                 createVecFromIndexedFnOffset<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     TDim,
 #endif
                     detail::CreateExtent,
@@ -963,11 +954,11 @@ namespace alpaka
         -> Vec<dim::Dim<TOffsets>, size::Size<TOffsets>>
         {
             return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<dim::Dim<TOffsets>, size::Size<TOffsets>>::template
 #endif
                 createVecFromIndexedFn<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     dim::Dim<TOffsets>,
 #endif
                     detail::CreateOffset>(
@@ -986,11 +977,11 @@ namespace alpaka
         {
             using IdxOffset = std::integral_constant<std::size_t, (std::size_t)(((std::intmax_t)dim::Dim<TOffsets>::value)-((std::intmax_t)TDim::value))>;
             return
-#ifdef __CUDACC__
+#ifdef ALPAKA_CREATE_VEC_IN_CLASS
             Vec<TDim, size::Size<TOffsets>>::template
 #endif
                 createVecFromIndexedFnOffset<
-#ifndef __CUDACC__
+#ifndef ALPAKA_CREATE_VEC_IN_CLASS
                     TDim,
 #endif
                     detail::CreateOffset,
