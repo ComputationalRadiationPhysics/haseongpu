@@ -18,10 +18,29 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// HASE_ON_GPU_VERSION % 100 is sub-minor version 
-// HASE_ON_GPU_VERSION / 100 % 100 is minor version
-// HASE_ON_GPU_VERSION / 10000 is major version
+
+/**
+ * @author Erik Zenker
+ * @author Carlchristian Eckert
+ * @licence GPLv3
+ *
+ */
 
 #pragma once
-#define HASE_ON_GPU_VERSION 010100
+
+#include <types.hpp>
+
+/**
+ * @brief A wrapper for calcPhiAse, that distributes sample points
+ *        to the available MPI nodes.The Nodes will split 
+ *        up in one head node and the others as compute nodes. 
+ *        The head node distributes the available sample
+ *        points by demand.
+ *
+ *
+ * @return number of used compute nodes
+ */
+float calcPhiAseMPI (const ExperimentParameters &experiment,
+		     const ComputeParameters &compute,
+		     Result &result);
 

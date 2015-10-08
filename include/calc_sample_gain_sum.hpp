@@ -50,7 +50,7 @@ ALPAKA_FN_ACC unsigned genRndSigmas(T_Acc const &acc, unsigned length) {
     using Dist =  decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
     
     // FIXIT: the orginal used blockid.x to 
-    Gen gen(alpaka::rand::generator::createDefault(acc, 0/*alpaka::idx::getIdx<alpaka::Grid, alpaka::Block>(acc)[0]*/, 0));
+    Gen gen(alpaka::rand::generator::createDefault(acc, alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0], 0));
     Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
     
     return static_cast<unsigned>(dist(gen) * (length-1));
@@ -68,7 +68,7 @@ ALPAKA_FN_ACC unsigned genRndSigmas(T_Acc const &acc, unsigned length) {
  *
  */
 template <typename T_Acc>
-ALPAKA_FN_ACC unsigned getRayNumberBlockbased(T_Acc const & acc, unsigned* const blockOffset, unsigned const &raysPerSample, unsigned * const globalOffsetMultiplicator){
+ALPAKA_FN_ACC unsigned getRayNumberBlockbased(T_Acc const & acc, unsigned* const blockOffset, unsigned const &raysPerSample, unsigned * globalOffsetMultiplicator){
 
     // FIXIT: Extra sync since alpaka
     alpaka::block::sync::syncBlockThreads(acc);
@@ -76,15 +76,13 @@ ALPAKA_FN_ACC unsigned getRayNumberBlockbased(T_Acc const & acc, unsigned* const
     // The first thread in the threadblock increases the globalOffsetMultiplicator (without real limit)
     if(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] == 0){
 	// blockOffset is the new value of the globalOffsetMultiplicator
-	blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Inc>(acc, &globalOffsetMultiplicator[0], raysPerSample);
+	blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+	//std::cout << globalOffsetMultiplicator[0] << std::endl;
     }
 
-    // FIXIT: This barrier locks computation
     alpaka::block::sync::syncBlockThreads(acc);
 
-    // FIXIT: this 128 is fixed !!!
-    // multiply blockOffset by 128 (size of the threadblock)
-    return alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] << 7) ;
+    return alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]) ;
 }
 
 
@@ -134,7 +132,7 @@ struct CalcSampleGainSumWithReflection {
 				  const unsigned maxInterpolation,
 				  unsigned * const globalOffsetMultiplicator) const {
 
-	unsigned rayNumber = 0;
+	//unsigned rayNumber = 0;
 	double gainSumTemp = 0;
 	double gainSumSquareTemp = 0;
 	Point samplePoint = mesh.getSamplePoint(sample_i);
@@ -142,12 +140,35 @@ struct CalcSampleGainSumWithReflection {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
+	const unsigned nElementsPerThread = 1;
+
+	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
+	
 	// One thread can compute multiple rays
-	while(blockOffset[0] * 128 < raysPerSample){
+	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
 
 	    // the whole block gets a new offset (==workload)
-	    rayNumber = getRayNumberBlockbased(acc, blockOffset,raysPerSample,globalOffsetMultiplicator);
-	    if(rayNumber < raysPerSample) {
+	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+
+	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
+	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+
+	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
+
+	    auto threadOffset =
+		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
+	    
+	    for(unsigned rayNumber = threadOffset; rayNumber < (threadOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
+
+		// rayNumber =
+		//     (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		//     (alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		//     nthRay;
+		
+		//rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0])
+		
+		//if(rayNumber < raysPerSample) {
 
 		// Get triangle/prism to start ray from
 		unsigned startPrism             = indicesOfPrisms[rayNumber];
@@ -176,6 +197,7 @@ struct CalcSampleGainSumWithReflection {
 		gainSumTemp       += gain;
 		gainSumSquareTemp += gain * gain;
  
+		//}
 	    }
 
 
@@ -229,25 +251,44 @@ struct CalcSampleGainSum {
 				  const double *sigmaA,
 				  const double *sigmaE,
 				  const unsigned maxInterpolation,
-				  unsigned * const globalOffsetMultiplicator) const {
+				  unsigned * globalOffsetMultiplicator) const {
 
-	unsigned rayNumber       = 0; 
+	//unsigned rayNumber       = 0; 
 	double gainSumTemp       = 0;
 	double gainSumSquareTemp = 0;
 	Point samplePoint        = mesh.getSamplePoint(sample_i);
 	
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
+
+	const unsigned nElementsPerThread = 128;
+
+	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
 	
 	// One thread can compute multiple rays
-	// Need to replace this while true
-	while(blockOffset[0] * 128 < raysPerSample){
+	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
+
 	    // the whole block gets a new offset (==workload)
-	    rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
-	    if(rayNumber < raysPerSample) {
+	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
+
+	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
+	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+
+	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
+
+	    auto threadOffset =
+		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
+		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
+
+	    for(unsigned rayNumber = threadOffset; rayNumber < (threadOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
+		// sync threads here
+	
+		// One thread can compute multiple rays
+		// Need to replace this while true
+
 
 		// Get triangle/prism to start ray from
-		unsigned startPrism             = indicesOfPrisms[rayNumber]; // <--- only zeros ???
+		unsigned startPrism             = indicesOfPrisms[rayNumber]; 
 		unsigned startLevel             = startPrism/mesh.numberOfTriangles;
 		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
 		Point startPoint                = mesh.genRndPoint(acc, startTriangle, startLevel);
@@ -259,6 +300,7 @@ struct CalcSampleGainSum {
 
 		// calculate the gain for the whole ray at once
 		double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
+		//std::cout << gain << std::endl;
 
 		//std::cout << rayNumber << " " << startPrism << std::endl;
 		
@@ -267,16 +309,19 @@ struct CalcSampleGainSum {
 		// include the stimulus from the starting prism and the importance of that ray
 		gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
 
-
+		//std::cout << gain << " " << importance[startPrism] << std::endl;
 		
 		gainSumTemp       += gain;
 		gainSumSquareTemp += gain * gain;
-	    
+		//std::cout << rayNumber << " " << globalOffsetMultiplicator[0] << " "<< omp_get_thread_num()<<std::endl;	
 	    }
 	    
 
 	}
 
+	
+
+	
 	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSum,       static_cast<float>(gainSumTemp));
 	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSumSquare, static_cast<float>(gainSumSquareTemp));
 	

@@ -97,7 +97,7 @@ time_t = timetotal/timeslice;
 
 % ASE application
 maxGPUs           = 2;
-nPerNode          = 4;
+nPerNode          = 64;
 deviceMode             = 'gpu';
 %parallelMode           = 'mpi';
 %parallelMode          = 'threaded';

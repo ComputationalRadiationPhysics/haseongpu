@@ -39,6 +39,7 @@ Dependencies
      + Nvidia device >= Compute capability 2.0 (at least fermi generation)
 
 
+
 Compiling
 ---------
 

@@ -309,7 +309,7 @@ class Mesh {
     ALPAKA_FN_ACC Point genRndPoint(T_Acc const &acc, unsigned triangle, unsigned level) const{
 	// Random number generator
 	// FIXIT: No need to initialize this again and again ?
-	Gen gen(alpaka::rand::generator::createDefault(acc, 1234, 0));
+	Gen gen(alpaka::rand::generator::createDefault(acc, alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0], 0));
 	Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
 	
 	Point startPoint = {0,0,0};
@@ -439,7 +439,7 @@ class Mesh {
 
 
     ALPAKA_FN_HOST double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) const{
-	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
+	return fabs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
     }
 
     ALPAKA_FN_HOST double getMaxDistance(std::vector<TwoDimPoint> points) const{

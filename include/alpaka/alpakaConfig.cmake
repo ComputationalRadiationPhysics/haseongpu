@@ -44,6 +44,7 @@ UNSET(_ALPAKA_INCLUDE_DIRECTORIES_PUBLIC)
 UNSET(_ALPAKA_LINK_LIBRARIES_PUBLIC)
 UNSET(_ALPAKA_LINK_FLAGS_PUBLIC)
 UNSET(_ALPAKA_COMMON_FILE)
+UNSET(_ALPAKA_ADD_EXECUTABLE_FILE)
 UNSET(_ALPAKA_FILES_HEADER)
 UNSET(_ALPAKA_FILES_SOURCE)
 UNSET(_ALPAKA_FILES_OTHER)
@@ -75,6 +76,10 @@ LIST(APPEND CMAKE_MODULE_PATH "${_ALPAKA_ROOT_DIR}/cmake/modules")
 SET(_ALPAKA_COMMON_FILE "${_ALPAKA_ROOT_DIR}/cmake/common.cmake")
 INCLUDE("${_ALPAKA_COMMON_FILE}")
 
+# Add ALPAKA_ADD_EXECUTABLE function.
+SET(_ALPAKA_ADD_EXECUTABLE_FILE "${_ALPAKA_ROOT_DIR}/cmake/addExecutable.cmake")
+INCLUDE("${_ALPAKA_ADD_EXECUTABLE_FILE}")
+
 #-------------------------------------------------------------------------------
 # Options.
 #-------------------------------------------------------------------------------
@@ -83,7 +88,7 @@ OPTION(ALPAKA_ACC_CPU_B_SEQ_T_THREADS_ENABLE "Enable the threads CPU block threa
 OPTION(ALPAKA_ACC_CPU_B_SEQ_T_FIBERS_ENABLE "Enable the fibers CPU block thread accelerator" ON)
 OPTION(ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLE "Enable the OpenMP 2.0 CPU grid block accelerator" ON)
 OPTION(ALPAKA_ACC_CPU_B_SEQ_T_OMP2_ENABLE "Enable the OpenMP 2.0 CPU block thread accelerator" ON)
-OPTION(ALPAKA_ACC_CPU_BT_OMP4_ENABLE "Enable the OpenMP 4.0 CPU block and block thread accelerator" ON)
+OPTION(ALPAKA_ACC_CPU_BT_OMP4_ENABLE "Enable the OpenMP 4.0 CPU block and block thread accelerator" OFF)
 OPTION(ALPAKA_ACC_GPU_CUDA_ENABLE "Enable the CUDA GPU accelerator" ON)
 
 # Drop-down combo box in cmake-gui.
@@ -185,13 +190,12 @@ IF(ALPAKA_ACC_CPU_B_OMP2_T_SEQ_ENABLE OR ALPAKA_ACC_CPU_B_SEQ_T_OMP2_ENABLE OR A
 
     ELSE()
         SET(_ALPAKA_COMPILE_OPTIONS_PUBLIC ${OpenMP_CXX_FLAGS})
+        IF(NOT MSVC)
+            SET(_ALPAKA_LINK_FLAGS_PUBLIC ${OpenMP_CXX_FLAGS})
+        ENDIF()
         # CUDA requires some special handling
         IF(ALPAKA_ACC_GPU_CUDA_ENABLE)
             SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        ELSE()
-            IF(NOT MSVC)
-                SET(_ALPAKA_LINK_FLAGS_PUBLIC ${OpenMP_CXX_FLAGS})
-            ENDIF()
         ENDIF()
     ENDIF()
 ENDIF()
@@ -356,7 +360,7 @@ SET(_ALPAKA_SUFFIXED_INCLUDE_DIR "${_ALPAKA_INCLUDE_DIRECTORY}/alpaka")
 SET(_ALPAKA_LINK_LIBRARY)
 LIST(APPEND _ALPAKA_LINK_LIBRARIES_PUBLIC "${_ALPAKA_LINK_LIBRARY}")
 
-SET(_ALPAKA_FILES_OTHER "${_ALPAKA_ROOT_DIR}/alpakaConfig.cmake" "${_ALPAKA_COMMON_FILE}" "${_ALPAKA_ROOT_DIR}/.travis.yml" "${_ALPAKA_ROOT_DIR}/README.md")
+SET(_ALPAKA_FILES_OTHER "${_ALPAKA_ROOT_DIR}/alpakaConfig.cmake" "${_ALPAKA_ADD_EXECUTABLE_FILE}" "${_ALPAKA_COMMON_FILE}" "${_ALPAKA_ROOT_DIR}/.travis.yml" "${_ALPAKA_ROOT_DIR}/README.md")
 
 # Add all the source and include files in all recursive subdirectories and group them accordingly.
 append_recursive_files_add_to_src_group("${_ALPAKA_SUFFIXED_INCLUDE_DIR}" "${_ALPAKA_SUFFIXED_INCLUDE_DIR}" "hpp" "_ALPAKA_FILES_HEADER")
@@ -453,7 +457,8 @@ LIST(APPEND alpaka_DEFINITIONS ${_ALPAKA_COMPILE_OPTIONS_PUBLIC})
 SET(alpaka_INCLUDE_DIR ${_ALPAKA_INCLUDE_DIRECTORY})
 SET(alpaka_INCLUDE_DIRS ${_ALPAKA_INCLUDE_DIRECTORIES_PUBLIC})
 SET(alpaka_LIBRARY ${_ALPAKA_LINK_LIBRARY})
-SET(alpaka_LIBRARIES ${_ALPAKA_LINK_LIBRARIES_PUBLIC})
+SET(alpaka_LIBRARIES ${_ALPAKA_LINK_FLAGS_PUBLIC})
+LIST(APPEND alpaka_LIBRARIES ${_ALPAKA_LINK_LIBRARIES_PUBLIC})
 
 #-------------------------------------------------------------------------------
 # Print the return values.
@@ -491,6 +496,7 @@ IF(NOT _ALPAKA_FOUND)
     UNSET(_ALPAKA_LINK_LIBRARIES_PUBLIC)
     UNSET(_ALPAKA_LINK_FLAGS_PUBLIC)
     UNSET(_ALPAKA_COMMON_FILE)
+    UNSET(_ALPAKA_ADD_EXECUTABLE_FILE)
     UNSET(_ALPAKA_FILES_HEADER)
     UNSET(_ALPAKA_FILES_SOURCE)
     UNSET(_ALPAKA_FILES_OTHER)
@@ -512,6 +518,7 @@ ELSE()
         _ALPAKA_LINK_LIBRARIES_PUBLIC
         _ALPAKA_LINK_FLAGS_PUBLIC
         _ALPAKA_COMMON_FILE
+        _ALPAKA_ADD_EXECUTABLE_FILE
         _ALPAKA_FILES_HEADER
         _ALPAKA_FILES_SOURCE
         _ALPAKA_FILES_OTHER

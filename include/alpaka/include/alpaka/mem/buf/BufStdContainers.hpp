@@ -97,6 +97,24 @@ namespace alpaka
             };
         }
     }
+    namespace elem
+    {
+        namespace traits
+        {
+            //#############################################################################
+            //! The fixed size array memory element type get trait specialization.
+            //#############################################################################
+            template<
+                typename TFixedSizeArray>
+            struct ElemType<
+                TFixedSizeArray,
+                typename std::enable_if<
+                    std::is_array<TFixedSizeArray>::value>::type>
+            {
+                using type = typename std::remove_all_extents<TFixedSizeArray>::type;
+            };
+        }
+    }
     namespace extent
     {
         namespace traits
@@ -136,19 +154,6 @@ namespace alpaka
         {
             namespace traits
             {
-                //#############################################################################
-                //! The fixed size array memory element type get trait specialization.
-                //#############################################################################
-                template<
-                    typename TFixedSizeArray>
-                struct ElemType<
-                    TFixedSizeArray,
-                    typename std::enable_if<
-                        std::is_array<TFixedSizeArray>::value>::type>
-                {
-                    using type = typename std::remove_all_extents<TFixedSizeArray>::type;
-                };
-
                 //#############################################################################
                 //! The fixed size array buf trait specialization.
                 //#############################################################################
@@ -219,7 +224,7 @@ namespace alpaka
                 template<
                     typename TFixedSizeArray>
                 struct GetPitchBytes<
-                    std::integral_constant<std::size_t, std::rank<TFixedSizeArray>::value - 1u>,
+                    dim::DimInt<std::rank<TFixedSizeArray>::value - 1u>,
                     TFixedSizeArray,
                     typename std::enable_if<
                         std::is_array<TFixedSizeArray>::value
@@ -344,6 +349,23 @@ namespace alpaka
             };
         }
     }
+    namespace elem
+    {
+        namespace traits
+        {
+            //#############################################################################
+            //! The std::array memory element type get trait specialization.
+            //#############################################################################
+            template<
+                typename TElem,
+                std::size_t Tsize>
+            struct ElemType<
+                std::array<TElem, Tsize>>
+            {
+                using type = TElem;
+            };
+        }
+    }
     namespace extent
     {
         namespace traits
@@ -355,7 +377,7 @@ namespace alpaka
                 typename TElem,
                 std::size_t Tsize>
             struct GetExtent<
-                std::integral_constant<std::size_t, 0u>,
+                dim::DimInt<0u>,
                 std::array<TElem, Tsize>>
             {
                 //-----------------------------------------------------------------------------
@@ -378,18 +400,6 @@ namespace alpaka
         {
             namespace traits
             {
-                //#############################################################################
-                //! The std::array memory element type get trait specialization.
-                //#############################################################################
-                template<
-                    typename TElem,
-                    std::size_t Tsize>
-                struct ElemType<
-                    std::array<TElem, Tsize>>
-                {
-                    using type = TElem;
-                };
-
                 //#############################################################################
                 //! The std::array buf trait specialization.
                 //#############################################################################
@@ -455,7 +465,7 @@ namespace alpaka
                     typename TElem,
                     std::size_t Tsize>
                 struct GetPitchBytes<
-                    std::integral_constant<std::size_t, 0u>,
+                    dim::DimInt<0u>,
                     std::array<TElem, Tsize>>
                 {
                     //-----------------------------------------------------------------------------
@@ -573,6 +583,23 @@ namespace alpaka
             };
         }
     }
+    namespace elem
+    {
+        namespace traits
+        {
+            //#############################################################################
+            //! The std::vector memory element type get trait specialization.
+            //#############################################################################
+            template<
+                typename TElem,
+                typename TAllocator>
+            struct ElemType<
+                std::vector<TElem, TAllocator>>
+            {
+                using type = TElem;
+            };
+        }
+    }
     namespace extent
     {
         namespace traits
@@ -584,7 +611,7 @@ namespace alpaka
                 typename TElem,
                 typename TAllocator>
             struct GetExtent<
-                std::integral_constant<std::size_t, 0u>,
+                dim::DimInt<0u>,
                 std::vector<TElem, TAllocator>>
             {
                 //-----------------------------------------------------------------------------
@@ -605,18 +632,6 @@ namespace alpaka
         {
             namespace traits
             {
-                //#############################################################################
-                //! The std::vector memory element type get trait specialization.
-                //#############################################################################
-                template<
-                    typename TElem,
-                    typename TAllocator>
-                struct ElemType<
-                    std::vector<TElem, TAllocator>>
-                {
-                    using type = TElem;
-                };
-
                 //#############################################################################
                 //! The std::vector buf trait specialization.
                 //#############################################################################
@@ -682,7 +697,7 @@ namespace alpaka
                     typename TElem,
                     typename TAllocator>
                 struct GetPitchBytes<
-                    std::integral_constant<std::size_t, 0u>,
+                    dim::DimInt<0u>,
                     std::vector<TElem, TAllocator>>
                 {
                     //-----------------------------------------------------------------------------

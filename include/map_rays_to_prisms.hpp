@@ -127,22 +127,23 @@ struct MapPrefixSumToPrisms {
 				  unsigned *indicesOfPrisms,
 				  unsigned *numberOfReflections) const {
 
+	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
+	auto nThreads = threadsVec[0] * threadsVec[1];
+
+	
 	unsigned id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
-
+	for(; id < numberOfPrisms * reflectionSlices; id += nThreads){
 	
-	// break if we have too many threads (this is likely)
-	if(id >= numberOfPrisms*reflectionSlices) return;
+	    const unsigned count            = raysPerPrism[id];
+	    const unsigned startingPosition = prefixSum[id];
+	    const unsigned reflection_i     = id / numberOfPrisms;
+	    const unsigned prism_i          = id % numberOfPrisms;
 
-	const unsigned count            = raysPerPrism[id];
-	const unsigned startingPosition = prefixSum[id];
-	const unsigned reflection_i     = id / numberOfPrisms;
-	const unsigned prism_i          = id % numberOfPrisms;
-
-	//std::cout << id << " " << count << std::endl;
+	    for(unsigned i=0; i < count ; ++i){
+		indicesOfPrisms[startingPosition + i] = prism_i;
+		numberOfReflections[startingPosition + i] = reflection_i; 
+	    }
 	
-	for(unsigned i=0; i < count ; ++i){
-	    indicesOfPrisms[startingPosition + i] = prism_i;
-	    numberOfReflections[startingPosition + i] = reflection_i; 
 	}
 	
     }

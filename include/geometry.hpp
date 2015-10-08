@@ -54,7 +54,7 @@ typedef Point Vector;
 struct Ray {
     Point p;
     Vector dir;
-    float length;
+    double length;
 };
 
 struct NormalRay {
@@ -69,12 +69,12 @@ ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint){
     return v;
 }
 
-ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint){
-    float x, y, z;
+ALPAKA_FN_HOST_ACC double distance(Point startPoint, Point endPoint){
+    double x, y, z;
     x = endPoint.x - startPoint.x;
     y = endPoint.y - startPoint.y;
     z = endPoint.z - startPoint.z;
-    float d = sqrt(x*x + y*y + z*z);
+    double d = sqrt(x*x + y*y + z*z);
     return fabs(d);
 
 }

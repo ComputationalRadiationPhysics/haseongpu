@@ -48,7 +48,7 @@ struct ParallelMode {
 struct CompSwitch{
     static const std::string parallel_mode;
     static const std::string device_mode;
-    static const std::string ngpus;
+    static const std::string ndevices;
     static const std::string repetitions;
     static const std::string adaptive_steps;
     static const std::string min_sample_i;
@@ -77,7 +77,8 @@ struct ComputeParameters {
 			fs::path inputPath,
 			fs::path outputPath,
 			unsigned minSampleRange,
-			unsigned maxSampleRange) :
+			unsigned maxSampleRange,
+			unsigned nDevices) :
         maxRepetitions(maxRepetitions),
         adaptiveSteps(adaptiveSteps),
         deviceMode(deviceMode),
@@ -86,19 +87,22 @@ struct ComputeParameters {
         inputPath(inputPath),
         outputPath(outputPath),
         minSampleRange(minSampleRange),
-        maxSampleRange(maxSampleRange){ }
+        maxSampleRange(maxSampleRange),
+	nDevices(nDevices)
+    { }
 
     unsigned maxRepetitions;
     unsigned adaptiveSteps;
-    //unsigned gpu_i;
     std::string deviceMode;
     std::string parallelMode;
     bool writeVtk;
     fs::path inputPath;
     fs::path outputPath;
-    //std::vector<unsigned> devices;
     unsigned minSampleRange;
     unsigned maxSampleRange;
+    unsigned nSamples;
+    unsigned nDevices;
+
 
 
 };

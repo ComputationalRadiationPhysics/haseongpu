@@ -28,21 +28,14 @@
 
 #pragma once
 
-#include <mesh.hpp>
-#include <types.hpp>
+#include <types.hpp> /* ExperimentParameters, ComputeParameters */ 
 
 /**
- * @brief A wrapper for calcPhiAse, that distributes sample points
- *        to the available MPI nodes.The Nodes will split 
- *        up in one head node and the others as compute nodes. 
- *        The head node distributes the available sample
- *        points by demand.
+ * @brief Wrapper for calcPhiAse on pthread base.
+ *        This function will spawn a thread for
+ *        each function call and start calcPhiAse.
  *
- *
- * @return number of used compute nodes
  */
-float calcPhiAseMPI (const ExperimentParameters &experiment,
-		     const ComputeParameters &compute,
-		     Mesh& mesh,
-		     Result &result);
-
+unsigned calcPhiAseThreaded( const ExperimentParameters &experiment,
+			 const ComputeParameters &compute,
+			 Result &result);
