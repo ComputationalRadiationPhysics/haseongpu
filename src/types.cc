@@ -39,7 +39,7 @@ const std::string ParallelMode::GRAYBAT     = "graybat";
 
 const std::string CompSwitch::parallel_mode     = "parallel-mode";
 const std::string CompSwitch::device_mode       = "device-mode";
-const std::string CompSwitch::ngpus             = "ngpus";
+const std::string CompSwitch::ndevices          = "ndevices";
 const std::string CompSwitch::repetitions       = "repetitions";
 const std::string CompSwitch::adaptive_steps    = "adaptive-steps";
 const std::string CompSwitch::min_sample_i      = "min-sample-i";

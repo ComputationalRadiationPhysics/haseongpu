@@ -30,17 +30,13 @@
 #include <alpaka/alpaka.hpp>
 
 // HASEonGPU
-//#include <write_to_vtk.hpp>
-//#include <progressbar.hpp>         /*progressBar */
-//#include <logging.hpp>
+#include <progressbar.hpp>          /* progressBar */
 #include <importance_sampling.hpp>  /* importanceSamplingPropagation, importanceSamplingDistribution */
 #include <types.hpp>                /* ExperimentParameter, ComputeParameter, Result */
-#include <mesh.hpp>
+#include <mesh.hpp>                 /* Mesh */
 #include <parser.hpp>               /* parseMesh */
 #include <map_rays_to_prisms.hpp>   /* mapRaysToPrisms */
 #include <calc_sample_gain_sum.hpp> /* CalcSampleGainSum*/
-
-
 
 #define SEED 4321
 
@@ -169,25 +165,32 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     DevHost devHost (alpaka::dev::cpu::getDev());
     Stream  stream  (devAcc);
 
+    
     /*****************************************************************************
      * Parse mesh
      ****************************************************************************/
     const Mesh<Acc,  DevAcc>  dMesh(parseMesh<Acc,  DevAcc> (compute.inputPath, devAcc));
     const Mesh<Host, DevHost> hMesh(parseMesh<Host, DevHost>(compute.inputPath, devHost));
-
-    
-    //alpAka::core::forEachType<alpaka::core::accs::EnabledAccs<Dim, Size> >(AccInfo(), 5ul);
-
-    
-    // // Optimization to use more L1 cache
-    // cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-    // cudaSetDevice(compute.gpu_i);
-
-    // variable Definitions CPU
     const time_t starttime                = time(0);
     const unsigned maxReflections         = experiment.useReflections ? hMesh.getMaxReflections() : 0;
     const unsigned reflectionSlices       = 1 + (2 * maxReflections);
 
+    // In some cases distributeRandomly has to be true !
+    // Good comment, but next time describe why !
+    // Otherwise bad or no ray distribution possible.
+    bool distributeRandomly         = true;
+    
+    // Divide RaysPerSample range into steps
+    std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
+								       experiment.maxRaysPerSample,
+								       compute.adaptiveSteps);
+  
+    std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
+    
+    
+    /*****************************************************************************
+     * Setup wordivition
+     ****************************************************************************/
     const alpaka::Vec<Dim, Size> importanceGrid (static_cast<Size>(200), //can't be more than 200 due to restrictions from the Mersenne Twister 
 						 static_cast<Size>(reflectionSlices));
     const alpaka::Vec<Dim, Size> grid (static_cast<Size>(200), //can't be more than 200 due to restrictions from the Mersenne Twister, MapPrefixSumToPrism needs number of prisms threads
@@ -198,19 +201,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 
     auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks));
     auto const workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks));
-
-
-    // In some cases distributeRandomly has to be true !
-    // Good comment, but next time describe why !
-    // Otherwise bad or no ray distribution possible.
-    bool distributeRandomly         = true;
-    
-    // Divide RaysPerSample range into steps
-    std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
-									     experiment.maxRaysPerSample,
-									     compute.adaptiveSteps);
-  
-    std::vector<int>::iterator raysPerSampleIter = raysPerSampleList.begin();
 
     /*****************************************************************************
      * Memory allocation/init and copy for device memory
@@ -243,11 +233,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     auto dSigmaE                   ( alpaka::mem::buf::alloc<double  , Size, Extents, DevAcc>(devAcc, static_cast<Extents>(experiment.sigmaE.size())));
     auto dGlobalOffsetMultiplicator( alpaka::mem::buf::alloc<unsigned, Size, Extents, DevAcc>(devAcc, static_cast<Extents>(1)));
 
-    // std::cout << "numberOfPrisms: " << hMesh.numberOfPrisms << std::endl;
-    // std::cout << "reflectionSlices: " << reflectionSlices << std::endl;
-    // std::cout << "maxRaysPerSample: " << experiment.maxRaysPerSample << std::endl;
-    // std::cout << "Memory was allocated: " << hMesh.numberOfPrisms * reflectionSlices << std::endl;
-
     // Init memory buffer
     initHostBuffer(hNumberOfReflectionSlices, experiment.maxRaysPerSample, 0);
     initHostBuffer(hGainSum,                  1, 0);
@@ -274,19 +259,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     alpaka::mem::view::copy(stream, dSigmaE, hSigmaE, static_cast<Extents>(experiment.sigmaE.size()));
     alpaka::mem::view::copy(stream, dGlobalOffsetMultiplicator, hGlobalOffsetMultiplicator, static_cast<Extents>(1));    		    
 
-    // Kept this lines to have the correct dimension of the vectors for safety
-    // device_vector<unsigned> dNumberOfReflectionSlices(experiment.maxRaysPerSample, 0);
-    // device_vector<float>    dGainSum            (1, 0);
-    // device_vector<float>    dGainSumSquare      (1, 0);
-    // device_vector<unsigned> dRaysPerPrism       (mesh.numberOfPrisms * reflectionSlices, 1);
-    // device_vector<unsigned> dPrefixSum          (mesh.numberOfPrisms * reflectionSlices, 0);
-    // device_vector<double>   dImportance         (mesh.numberOfPrisms * reflectionSlices, 0);
-		 
-    // device_vector<double>   dPreImportance      (mesh.numberOfPrisms * reflectionSlices, 0);
-    // device_vector<unsigned> dIndicesOfPrisms    (experiment.maxRaysPerSample,  0);
-    // device_vector<double>   dSigmaA             (experiment.sigmaA.begin(), experiment.sigmaA.end());
-    // device_vector<double>   dSigmaE             (experiment.sigmaE.begin(),experiment.sigmaE.end());
-
     /*****************************************************************************
      * Calculation for each sample point
      ****************************************************************************/
@@ -304,8 +276,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     					   alpaka::mem::view::getPtrNative(dPreImportance));
       
      	float hSumPhi = reduce(stream, dPreImportance, hMesh.numberOfPrisms * reflectionSlices, 0.);
-
-    	//std::cout << hSumPhi << std::endl;
 
     	while(mseTooHigh){
 
@@ -442,9 +412,9 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 	  
      	}
 
-    	// if(verbosity & V_PROGRESS){
-    	//     fancyProgressBar(mesh.numberOfSamples);
-    	// }
+    	if(verbosity & V_PROGRESS){
+    	    fancyProgressBar(experiment.numberOfSamples);
+    	}
 
     }
 

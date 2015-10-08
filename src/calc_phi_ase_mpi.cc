@@ -18,20 +18,19 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <mpi.h>
+// STL
 #include <vector>
 #include <iostream>
 #include <algorithm>
 
-#include <calc_phi_ase_mpi.hpp>
+// MPI
+#include <mpi.h>
+
+// HASEonGPU
 #include <calc_phi_ase.hpp>
-#include <mesh.hpp>
 #include <logging.hpp>
 #include <progressbar.hpp>
 #include <types.hpp>
-
-#include <cuda_runtime_api.h> /* cudaDeviceReset */
 
 // Nodes
 #define HEAD_NODE 0
@@ -58,9 +57,9 @@
  * @param mse       return for Mean squared error
  * @param totalRays return for raysPerSample
  */
-void mpiHead(Result &result,
+void mpiHead(const ExperimentParameters& experiment,
+	     Result &result,
 	     std::vector<float> &runtimes,
-	     const Mesh& mesh,
 	     const unsigned numberOfComputeNodes,
 	     const int sampleRange){
   MPI_Status status;
@@ -88,16 +87,16 @@ void mpiHead(Result &result,
        * res[2] : mse
        * res[3] : totalRays 
        **/
-      sampleOffset = (unsigned)(res[0]);
+      sampleOffset                      = (unsigned)(res[0]);
       result.phiAse.at(sampleOffset)    = res[1];
       result.mse.at(sampleOffset)       = res[2];
       result.totalRays.at(sampleOffset) = (unsigned)res[3];
-      fancyProgressBar(mesh.numberOfSamples);
+      fancyProgressBar(experiment.numberOfSamples);
       break;
 
       // Compute node requests new sample point for computation
     case SAMPLE_REQUEST_TAG:
-      if(sample_i[0] == (int)mesh.numberOfSamples){
+      if(sample_i[0] == (int)experiment.numberOfSamples){
 	// No sample points left, abort computation
 	int abortMPI[2] = {-1,-1};
 	MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
@@ -105,8 +104,8 @@ void mpiHead(Result &result,
       else{
 	// Send next sample range
 	MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)mesh.numberOfSamples); // min_sample_i
-	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)mesh.numberOfSamples); // max_sample_i
+	sample_i[0] = std::min(sample_i[0] + sampleRange, (int)experiment.numberOfSamples); // min_sample_i
+	sample_i[1] = std::min(sample_i[1] + sampleRange, (int)experiment.numberOfSamples); // max_sample_i
 	
       }
       break;
@@ -129,7 +128,6 @@ void mpiHead(Result &result,
  **/
 void mpiCompute( const ExperimentParameters &experiment,
 		 const ComputeParameters &compute,
-		 const Mesh& mesh,
 		 Result &result,
 		 float &runtime ){
   while(true){
@@ -151,7 +149,6 @@ void mpiCompute( const ExperimentParameters &experiment,
       // Sample range received => calculate
 	calcPhiAse ( experiment,
 		     compute,
-		     mesh,
 		     result,
 		     sample_i[0],
 		     sample_i[1],
@@ -176,7 +173,6 @@ void mpiCompute( const ExperimentParameters &experiment,
 
 float calcPhiAseMPI ( const ExperimentParameters &experiment,
 		      const ComputeParameters &compute,
-		      Mesh& mesh,
 		      Result &result ){
 
   // Init MPI
@@ -199,16 +195,14 @@ float calcPhiAseMPI ( const ExperimentParameters &experiment,
   // all other ranks will be compute nodes
   switch(rank){
   case HEAD_NODE:
-    mpiHead( result,
-	     runtimes,
-	     mesh,
-	     size-1,
-	     1);
+      mpiHead( experiment,
+	       result,
+	       runtimes,
+	       size-1,
+	       1);
     
-    cudaDeviceReset();   
-    MPI_Finalize();
-    mesh.free();
-    break;
+      MPI_Finalize();
+      break;
 
 
   default:
@@ -218,11 +212,9 @@ float calcPhiAseMPI ( const ExperimentParameters &experiment,
 
     mpiCompute( experiment,
 		compute,
-		mesh,
 		result,
 		runtime );
     
-    cudaDeviceReset();      
     MPI_Finalize();
     exit(0);
     break;

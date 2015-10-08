@@ -156,7 +156,8 @@ int parse( const int argc,
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
             vm[CompSwitch::min_sample_i].as<int>(),
-            vm[CompSwitch::max_sample_i].as<int>());
+            vm[CompSwitch::max_sample_i].as<int>(),
+	    vm[CompSwitch::ndevices].as<int>());
 
 
     std::vector<float>    phiAse(experiment.numberOfSamples, 0);
@@ -215,7 +216,7 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
         ( CompSwitch::device_mode.c_str(),
           po::value<std::string> ()->default_value("gpu"),
           "Set the device to run the calculation (cpu, gpu)")
-        ( std::string(CompSwitch::ngpus + ",g").c_str(),
+        ( std::string(CompSwitch::ndevices + ",d").c_str(),
           po::value<int> ()
           ->default_value(1)
           ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
@@ -325,7 +326,7 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         
     double mseThreshold = vm[ExpSwitch::mse].as<double>();
     unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<int>();
-    unsigned maxgpus = vm[CompSwitch::ngpus].as<int>();
+    unsigned maxDevices = vm[CompSwitch::ndevices].as<int>();
 
     const unsigned minRaysPerSample = vm[ExpSwitch::min_rays].as<int>();
     const fs::path inputPath = vm[ExpSwitch::input_path].as<fs::path>();
@@ -394,13 +395,13 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         maxRaysPerSample = minRaysPerSample;
     }
 
-    if(maxgpus > deviceCount){
-        dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ngpus << "=" << deviceCount << std::endl;
+    if(maxDevices > deviceCount){
+        dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ndevices << "=" << deviceCount << std::endl;
         exit(1);
     }
 
-    if(maxgpus == 0){
-        maxgpus = deviceCount;
+    if(maxDevices == 0){
+        maxDevices = deviceCount;
     }
 
     if( vm.count(CompSwitch::min_sample_i) + vm.count(CompSwitch::max_sample_i) == 2){
@@ -413,9 +414,9 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
         }
 
         unsigned samplesForNode = maxSampleRange-minSampleRange+1;
-        if(maxgpus > samplesForNode){
+        if(maxDevices > samplesForNode){
             dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
-            maxgpus = samplesForNode;
+            maxDevices = samplesForNode;
         }
     }
 
@@ -436,7 +437,7 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     vm[ExpSwitch::max_rays].value() = boost::any(static_cast<int>(maxRaysPerSample));
-    vm[CompSwitch::ngpus].value() = boost::any(static_cast<int>(maxgpus));
+    vm[CompSwitch::ndevices].value() = boost::any(static_cast<int>(maxDevices));
     vm[ExpSwitch::mse].value() = boost::any(static_cast<double>(mseThreshold));
 
     return vm;

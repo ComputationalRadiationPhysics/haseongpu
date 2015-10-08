@@ -28,32 +28,24 @@
  */
 
 // STL
-#include <string> /* string */
-#include <vector> /* vector */
+#include <string>    /* string */
+#include <vector>    /* vector */
 #include <algorithm> /* std::max */
-#include <numeric> /* accumulate*/
+#include <numeric>   /* accumulate*/
 #include <stdexcept>
-#include <ctime> /* time */
-#include <locale> /* std::locale */
-
-// BOOST
-#include <boost/filesystem/path.hpp> /* fs::path */
-
-namespace fs = boost::filesystem;
+#include <ctime>     /* time */
+#include <locale>    /* std::locale */
 
 // HASEonGPU
 #include <parser.hpp> /* parse, DeviceMode, ParallelMode */
 #include <write_matlab_output.hpp>
-#include <mesh.hpp>
 #include <logging.hpp>
 #include <ray_histogram.hpp>
 #include <types.hpp> /* ComputeParamets, ExperimentParameters, Result */
-//#include <write_to_vtk.hpp>
-//#include <for_loops_clad.hpp>
-//#include <calc_phi_ase_threaded.hpp>
+#include <calc_phi_ase_threaded.hpp>
 
 #if defined(MPI_FOUND)
-//#include <calc_phi_ase_mpi.hpp>
+#include <calc_phi_ase_mpi.hpp>
 #endif
 
 #if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
@@ -64,148 +56,54 @@ namespace fs = boost::filesystem;
 // default without V_DEBUG
 unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
 
-/** 
- * @brief Calculates dndt ASE from phi ASE values
- * 
- * @param mesh needed for some constants
- * @param sigmaA absorption
- * @param sigmaE emission
- * @param phiAse results from calcPhiAse
- * @param sample_i index of sample point
- * @return dndtAse
- *
- */
-template <typename T_Mesh>
-double calcDndtAse(const T_Mesh& mesh, const double sigmaA, const double sigmaE, const float phiAse, const unsigned sample_i){
-    double gain_local = mesh.nTot * mesh.betaCells[sample_i] * (sigmaE + sigmaA) - double(mesh.nTot * sigmaA);
-    return gain_local * phiAse / mesh.crystalTFluo;
-}
-
 int main(int argc, char **argv){
 
     // Statistics data
-    //float runtime       = 0.0;
-    double maxMSE       = 0;
-    float  avgMSE       = 0;
-    unsigned highMSE    = 0;
-    time_t starttime    = time(0);
+    double maxMSE    = 0;
+    float  avgMSE    = 0;
+    unsigned highMSE = 0;
+    time_t starttime = time(0);
 
     // Simulation data
     ExperimentParameters experiment;
     ComputeParameters    compute;
     Result               result;
 
-    // Parse commandline and prepate all data structures
+    // Parse commandline
     parse(argc, argv, experiment, compute, result);
 
-    // This declaration will hopefully deleted in future
-    // Mesh mesh = meshs.at(0);
-    // unsigned maxGpus = compute.devices.size();
-    // std::vector<float> runtimes(maxGpus, 0);
     unsigned usedDevices = 0;
-    // std::vector<ComputeParameters> computes(maxGpus, compute);
-
     
-//     /***************************************************************************
-//      * COMPUTATIONS
-//      **************************************************************************/    
-    
-     if (compute.deviceMode == DeviceMode::CPU){
-            
-//         // Possibly deprecated! (Definitely deprecated!)
-//         runtime = forLoopsClad( &(result.dndtAse),
-//                                 experiment.minRaysPerSample,
-//                                 &mesh,
-//                                 mesh.betaCells,
-//                                 mesh.nTot,
-//                                 experiment.sigmaA.at(0),
-//                                 experiment.sigmaE.at(0),
-//                                 mesh.numberOfPoints,
-//                                 mesh.numberOfTriangles,
-//                                 mesh.numberOfLevels,
-//                                 mesh.thickness,
-//                                 mesh.crystalTFluo);
+    /***************************************************************************
+     * COMPUTATIONS
+     **************************************************************************/    
+    if(compute.parallelMode == ParallelMode::THREADED){
 
-     }
-     else if(compute.deviceMode == DeviceMode::GPU){
-            
-         if(compute.parallelMode == ParallelMode::THREADED){
-
-//             for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
-//                 const unsigned samplesPerNode = compute.maxSampleRange - compute.minSampleRange+1;
-//                 const float samplePerGpu = samplesPerNode / (float) maxGpus;
-//                 unsigned minSample_i = gpu_i * samplePerGpu;
-//                 unsigned maxSample_i = std::min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
-
-//                 minSample_i += compute.minSampleRange;
-//                 maxSample_i += compute.minSampleRange; 
-
-//                 computes[gpu_i].gpu_i = gpu_i;
-
-//                 calcPhiAseThreaded( experiment,
-//                         computes[gpu_i],
-//                         meshs[gpu_i],
-//                         result,
-//                         minSample_i,
-//                         maxSample_i,
-//                         runtimes.at(gpu_i));
-//             }
-
-//             joinAll();
-//             usedGPUs = maxGpus;
-//             runtime = *(std::max_element(runtimes.begin(),runtimes.end()));
-//             cudaDeviceReset();      
-         }
- #if defined(MPI_FOUND)
-         else if(compute.parallelMode == ParallelMode::MPI){
+	usedDevices = calcPhiAseThreaded( experiment,
+					  compute,
+					  result );
+    }
+#if defined(MPI_FOUND)
+    else if(compute.parallelMode == ParallelMode::MPI){
                 
-//             usedGPUs = calcPhiAseMPI( experiment,
-//                                       compute,
-//                                       mesh,
-//                                       result );
+	usedDevices = calcPhiAseMPI( experiment,
+				     compute,
+				     result );
 
-         }
+    }
 #endif
- #if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
-         else if(compute.parallelMode == ParallelMode::GRAYBAT){
-	     usedDevices = calcPhiAseGrayBat( experiment,
-					      compute,
-					      result );
+#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+    else if(compute.parallelMode == ParallelMode::GRAYBAT){
+	usedDevices = calcPhiAseGrayBat( experiment,
+					 compute,
+					 result );
 
-         }
+    }
 #endif
-	 else{
-	     dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
-	     exit(1);
-	 }
-
-     }
-     else {
-	 dout(V_ERROR) << "No valid device-mode!" << std::endl;
-	 exit(1);
-     }
-
-
-
-     // FIXIT: Mesh information not available here !
-    // /***************************************************************************
-    //  * PRINT SOLUTION
-    //  **************************************************************************/
-    // if(verbosity & V_DEBUG){
-    //     for(unsigned sample_i = 0; sample_i < experiment.numberOfSamples; ++sample_i){
-    //         result.dndtAse.at(sample_i) = calcDndtAse(mesh,
-    //                                                   experiment.maxSigmaA,
-    //                                                   experiment.maxSigmaE,
-    //                                                   result.phiAse.at(sample_i), sample_i);
-    //         if(sample_i <=10)
-    //             dout(V_DEBUG) << "Dndt ASE[" << sample_i << "]: " << result.dndtAse.at(sample_i) << " " << result.mse.at(sample_i) << std::endl;
-    //     }
-    //     for(unsigned sample_i = 0; sample_i < experiment.numberOfSamples; ++sample_i){
-    //         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " " << result.mse.at(sample_i) <<std::endl;
-    //         if(sample_i >= 10) break;
-    //     }
-    // }
-
+    else{
+	dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
+	exit(1);
+    }
 
     /***************************************************************************
      * WRITE MATLAB OUTPUT
@@ -217,50 +115,6 @@ int main(int argc, char **argv){
                       result.mse,
                       experiment.numberOfSamples,
                       experiment.numberOfLevels);
-
-//     /***************************************************************************
-//      * WRITE VTK FILES
-//      **************************************************************************/
-//     if(compute.writeVtk){
-//         std::vector<double> tmpPhiAse(result.phiAse.begin(), result.phiAse.end());
-//         std::vector<double> tmpTotalRays(result.totalRays.begin(), result.totalRays.end());
-
-//         writePointsToVtk( mesh,
-//                           result.dndtAse,
-//                           compute.outputPath / "vtk/dndt",
-//                           experiment.minRaysPerSample,
-//                           experiment.maxRaysPerSample,
-//                           experiment.mseThreshold,
-//                           experiment.useReflections,
-//                           runtime );
-      
-//         writePointsToVtk( mesh,
-//                           tmpPhiAse,
-//                           compute.outputPath / "vtk/phiase",
-//                           experiment.minRaysPerSample,
-//                           experiment.maxRaysPerSample,
-//                           experiment.mseThreshold,
-//                           experiment.useReflections,
-//                           runtime );
-      
-//         writePointsToVtk( mesh,
-//                           result.mse,
-//                           compute.outputPath / "vtk/mse",
-//                           experiment.minRaysPerSample,
-//                           experiment.maxRaysPerSample,
-//                           experiment.mseThreshold,
-//                           experiment.useReflections,
-//                           runtime );
-      
-//         writePointsToVtk( mesh,
-//                           tmpTotalRays,
-//                           compute.outputPath / "vtk/total_rays",
-//                           experiment.minRaysPerSample,
-//                           experiment.maxRaysPerSample,
-//                           experiment.mseThreshold,
-//                           experiment.useReflections,
-//                           runtime );
-//     }
 
     /***************************************************************************
      * PRINT STATISTICS
@@ -288,12 +142,11 @@ int main(int argc, char **argv){
         dout(V_STAT | V_NOLABEL) << std::endl;
         dout(V_STAT) << "sum(totalRays)    : " << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
         dout(V_STAT) << "MSE threshold     : " << experiment.mseThreshold << std::endl;
-        //dout(V_STAT) << "Wavelength        : " << experiment.sigmaA.size() << std::endl;
         dout(V_STAT) << "int. Wavelength   : " << experiment.sigmaA.size() << std::endl;
         dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
         dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
         dout(V_STAT) << "too high MSE      : " << highMSE << std::endl;
-        dout(V_STAT) << "Nr of GPUs        : " << usedDevices << std::endl;
+        dout(V_STAT) << "Nr of Devices     : " << usedDevices << std::endl;
         dout(V_STAT) << "Runtime           : " << difftime(time(0), starttime) << "s" << std::endl;
         dout(V_STAT) << std::endl;
         if(experiment.maxRaysPerSample > experiment.minRaysPerSample){
