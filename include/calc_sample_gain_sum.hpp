@@ -178,10 +178,10 @@ struct CalcSampleGainSumWithReflection {
 		unsigned startLevel             = startPrism / mesh.numberOfTriangles;
 		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
 		unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
-		Point startPoint                = mesh.genRndPoint(acc, startTriangle, startLevel);
+		Point startPoint                = mesh.getCenterPoint(startTriangle, startLevel);//mesh.genRndPoint(acc, startTriangle, startLevel);
 	
 		//get a random index in the wavelength array
-		unsigned sigma_i                = genRndSigmas(acc, maxInterpolation);
+		unsigned sigma_i                = 0;//genRndSigmas(acc, maxInterpolation);
 
 		// Calculate reflections as different ray propagations
 		double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
