@@ -38,6 +38,8 @@
 // HASEonGPU
 #include <mesh.hpp>
 #include <propagate_ray.hpp>
+#include <types.hpp>           /* SEED */
+#include <RandomGenerator.hpp> /* RandomGenerator */
 
 
 /**
@@ -98,13 +100,11 @@ struct DistributeRemainingRaysRandomly {
 				  unsigned const *raysDump,
 				  unsigned *count) const {
 	
-	using Gen =   decltype(alpaka::rand::generator::createDefault(std::declval<T_Acc const &>(),
-								      std::declval<uint32_t &>(),
-								      std::declval<uint32_t &>()));
-	using Dist =  decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
-
 	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
 	auto nThreads = threadsVec[0] * threadsVec[1];
+	auto blockIndex   = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
+	RandomGenerator<T_Acc> rand(acc, SEED, blockIndex);
+	
 	//std::cout << nThreads << std::endl;
 
 	assert(raysPerSample >= raysDump[0]);
@@ -119,11 +119,8 @@ struct DistributeRemainingRaysRandomly {
 	    //int id = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 	    //std::cout <<  id << " ";
 
-	    Gen gen(alpaka::rand::generator::createDefault(acc, id, 0));
-	    Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
-	    
-	    int rand_t = (int ) ceil(dist(gen) * mesh.numberOfTriangles) - 1;
-	    int rand_z = (int ) ceil(dist(gen) * (mesh.numberOfLevels-1)) - 1;
+	    int rand_t = static_cast<int>(rand() * mesh.numberOfTriangles);
+	    int rand_z = static_cast<int>(rand() * (mesh.numberOfLevels-1));
 	    unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
 	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, &(raysPerPrism[randomPrism]), 1u);
 	    //FIXIT: count is just for debugging

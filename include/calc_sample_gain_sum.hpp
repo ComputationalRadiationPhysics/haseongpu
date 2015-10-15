@@ -38,22 +38,15 @@
 #include <alpaka/alpaka.hpp>
 
 // HASEonGPU
-#include <geometry.hpp>      /* generateRay */
-#include <propagate_ray.hpp> /* propagateRay */
+#include <geometry.hpp>        /* generateRay */
+#include <propagate_ray.hpp>   /* propagateRay */
+#include <RandomGenerator.hpp> /* RandomGenerator*/
+#include <types.hpp>           /* SEED */
 
-// FIXIT: We should have some random number generator object and not initilize it again and again !
-template <typename T_Acc>
-ALPAKA_FN_ACC unsigned genRndSigmas(T_Acc const &acc, unsigned length) {
-    using Gen =   decltype(alpaka::rand::generator::createDefault(std::declval<T_Acc const &>(),
-								  std::declval<uint32_t &>(),
-								  std::declval<uint32_t &>()));
-    using Dist =  decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
-    
-    // FIXIT: the orginal used blockid.x to 
-    Gen gen(alpaka::rand::generator::createDefault(acc, alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0], 0));
-    Dist dist(alpaka::rand::distribution::createUniformReal<float>(acc));
-    
-    return static_cast<unsigned>(dist(gen) * (length-1));
+
+template <typename T_Rand>
+ALPAKA_FN_ACC unsigned genRndSigmas(T_Rand &rand, unsigned length) {
+    return static_cast<unsigned>(rand() * length);
 }
 
 
@@ -140,12 +133,15 @@ struct CalcSampleGainSumWithReflection {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
-	const unsigned nElementsPerThread = 1;
+	const unsigned nElementsPerThread = 8;
 
-	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
+	auto blockSize  = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
+	auto blockIndex = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
+
+	RandomGenerator<T_Acc> rand(acc, SEED, blockIndex);
 	
 	// One thread can compute multiple rays
-	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
+	while(blockOffset[0] * blockSize * nElementsPerThread < raysPerSample){
 
 	    // the whole block gets a new offset (==workload)
 	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
@@ -178,10 +174,10 @@ struct CalcSampleGainSumWithReflection {
 		unsigned startLevel             = startPrism / mesh.numberOfTriangles;
 		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
 		unsigned reflectionOffset       = reflection_i * mesh.numberOfPrisms;
-		Point startPoint                = mesh.getCenterPoint(startTriangle, startLevel);//mesh.genRndPoint(acc, startTriangle, startLevel);
+		Point startPoint                = mesh.genRndPoint(rand, startTriangle, startLevel);
 	
 		//get a random index in the wavelength array
-		unsigned sigma_i                = 0;//genRndSigmas(acc, maxInterpolation);
+		unsigned sigma_i                = genRndSigmas(rand, maxInterpolation);
 
 		// Calculate reflections as different ray propagations
 		double gain    = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
@@ -237,6 +233,7 @@ struct CalcSampleGainSumWithReflection {
  *        (see getRayNumberBlockbased())
  *
  */
+
 struct CalcSampleGainSum {
     template <typename T_Acc,
 	      typename T_Mesh>
@@ -261,12 +258,15 @@ struct CalcSampleGainSum {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
-	const unsigned nElementsPerThread = 128;
+	const unsigned nElementsPerThread = 8;
 
-	auto localTId = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
-	
+	auto blockSize  = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
+	auto blockIndex = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
+
+	RandomGenerator<T_Acc> rand(acc, SEED, blockIndex);
+
 	// One thread can compute multiple rays
-	while(blockOffset[0] * localTId * nElementsPerThread < raysPerSample){
+	while(blockOffset[0] * blockSize * nElementsPerThread < raysPerSample){
 
 	    // the whole block gets a new offset (==workload)
 	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
@@ -291,11 +291,11 @@ struct CalcSampleGainSum {
 		unsigned startPrism             = indicesOfPrisms[rayNumber]; 
 		unsigned startLevel             = startPrism/mesh.numberOfTriangles;
 		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-		Point startPoint                = mesh.genRndPoint(acc, startTriangle, startLevel);
+		Point startPoint                = mesh.genRndPoint(rand, startTriangle, startLevel);
 		Ray ray                         = generateRay(startPoint, samplePoint);
 
 		// get a random index in the wavelength array
-		unsigned sigma_i                = genRndSigmas(acc, maxInterpolation);
+		unsigned sigma_i                = genRndSigmas(rand, maxInterpolation);
 		assert(sigma_i < maxInterpolation);
 
 		// calculate the gain for the whole ray at once
