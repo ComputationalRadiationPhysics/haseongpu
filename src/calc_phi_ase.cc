@@ -38,8 +38,6 @@
 #include <map_rays_to_prisms.hpp>   /* mapRaysToPrisms */
 #include <calc_sample_gain_sum.hpp> /* CalcSampleGainSum*/
 
-#define SEED 4321
-
 /******************************************************************************
  * Alpaka utilities
  ******************************************************************************/
@@ -278,9 +276,6 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      	float hSumPhi = reduce(stream, dPreImportance, hMesh.numberOfPrisms * reflectionSlices, 0.);
 
     	while(mseTooHigh){
-
-    	//     // FIXIT: Reset random seed ?
-    	//     // CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));
 	  
      	    unsigned run = 0;
      	    while(run < compute.maxRepetitions && mseTooHigh){

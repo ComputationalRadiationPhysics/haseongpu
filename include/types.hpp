@@ -24,8 +24,9 @@
 #include <string>
 #include <vector>
 
-namespace fs = boost::filesystem;
+#define SEED 4321
 
+namespace fs = boost::filesystem;
 
 struct DeviceMode {
     static const std::string NONE;
