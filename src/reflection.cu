@@ -52,7 +52,7 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
     if(length > 0){
       intersectionPoint->x = reflectionRay.p.x + length * reflectionRay.dir.x;
       intersectionPoint->y = reflectionRay.p.y + length * reflectionRay.dir.y;
-      intersectionPoint->z = reflectionRay.p.z + length * reflectionRay.dir.z;
+      intersectionPoint->z = planeZ;
       return 0;
     }
 
