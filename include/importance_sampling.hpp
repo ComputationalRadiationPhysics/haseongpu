@@ -60,22 +60,35 @@ struct DistributeRaysByImportance {
 				   const unsigned raysPerSample,
 				   unsigned *raysDump) const {
 
-	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
-	auto nThreads = threadsVec[0];
+	auto threadsVec = 
+	  alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) 
+	  *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
 
-	unsigned reflection_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
+	auto nThreads             = threadsVec[0];
+	unsigned tid              = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
+	unsigned reflection_i     = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[1];
 	unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-
-	unsigned prism_i = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
-	for(; prism_i < mesh.numberOfPrisms; prism_i += nThreads){	
-	    raysPerPrism[prism_i + reflectionOffset] = (unsigned) floor(importance[prism_i + reflectionOffset] / (*sumPhi) * raysPerSample);
+	unsigned raysDumpPart = 0;
+	
+	for(unsigned prism_i = tid; prism_i < mesh.numberOfPrisms; prism_i += nThreads){	
+	    unsigned i = prism_i + reflectionOffset;
+	    raysPerPrism[i] = (unsigned) floor(importance[i] / (*sumPhi) * raysPerSample);
+	    raysDumpPart += raysPerPrism[i];
 	    if(raysPerPrism[prism_i + reflectionOffset] > raysPerSample){
-		printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[prism_i+reflectionOffset],*sumPhi,prism_i+reflectionOffset,raysPerPrism[prism_i+reflectionOffset],raysPerSample);
+		printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",
+		       importance[i],
+		       *sumPhi, i,
+		       raysPerPrism[prism_i+reflectionOffset],
+		       raysPerSample);
+
 	    }
-	    assert(raysPerPrism[prism_i + reflectionOffset] <= raysPerSample);
-	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, raysDump, raysPerPrism[prism_i + reflectionOffset]);
+
+	    assert(raysPerPrism[i] <= raysPerSample);
 	
 	}
+	
+	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, raysDump, raysDumpPart);
+
     }
 
 };
@@ -97,11 +110,10 @@ struct DistributeRemainingRaysRandomly {
 				  T_Mesh const &mesh,
 				  unsigned *raysPerPrism,
 				  unsigned const raysPerSample,
-				  unsigned const *raysDump,
-				  unsigned *count) const {
+				  unsigned const *raysDump) const {
 	
-	auto threadsVec = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
-	auto nThreads = threadsVec[0] * threadsVec[1];
+	auto threadsVec   = alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc) *  alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc);
+	auto nThreads     = threadsVec[0] * threadsVec[1];
 	auto blockIndex   = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
 	RandomGenerator<T_Acc> rand(acc, SEED, blockIndex);
 	
@@ -123,8 +135,6 @@ struct DistributeRemainingRaysRandomly {
 	    int rand_z = static_cast<int>(rand() * (mesh.numberOfLevels-1));
 	    unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
 	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, &(raysPerPrism[randomPrism]), 1u);
-	    //FIXIT: count is just for debugging
-	    alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, count, 1u);
 
 	    //if(alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0] == 0)
 		//std::cout << raysDump[0] << std::endl;
@@ -311,18 +321,14 @@ unsigned importanceSamplingDistribution(T_Stream &stream,
 
     auto hSumPhi   ( alpaka::mem::buf::alloc<float,    std::size_t, std::size_t, DevHost>(devHost, static_cast<std::size_t>(1)));
     auto hRaysDump ( alpaka::mem::buf::alloc<unsigned, std::size_t, std::size_t, DevHost>(devHost, static_cast<std::size_t>(1)));
-    auto hCount    ( alpaka::mem::buf::alloc<unsigned, std::size_t, std::size_t, DevHost>(devHost, static_cast<std::size_t>(1)));      
     auto dSumPhi   ( alpaka::mem::buf::alloc<float,    std::size_t, std::size_t, DevAcc> (devAcc, static_cast<std::size_t>(1)));
     auto dRaysDump ( alpaka::mem::buf::alloc<unsigned, std::size_t, std::size_t, DevAcc> (devAcc, static_cast<std::size_t>(1)));
-    auto dCount    ( alpaka::mem::buf::alloc<unsigned, std::size_t, std::size_t, DevAcc> (devAcc, static_cast<std::size_t>(1)));      
 
     alpaka::mem::view::getPtrNative(hSumPhi)[0]   = sumPhi;
     alpaka::mem::view::getPtrNative(hRaysDump)[0] = 0;
-    alpaka::mem::view::getPtrNative(hCount)[0]    = 0;
 
     alpaka::mem::view::copy(stream, dSumPhi, hSumPhi, static_cast<std::size_t>(1));
     alpaka::mem::view::copy(stream, dRaysDump, hRaysDump, static_cast<std::size_t>(1));
-    alpaka::mem::view::copy(stream, dCount, hCount, static_cast<std::size_t>(1));        
 
     // Kernel functors
     DistributeRaysByImportance distributeRaysByImportance;
@@ -346,37 +352,33 @@ unsigned importanceSamplingDistribution(T_Stream &stream,
 
     // Distribute remaining rays randomly if wanted
     if(distributeRandomly){
-	auto const exec1 (alpaka::exec::create<T_Acc>(workdiv,
-						      distributeRemainingRaysRandomly,
-						      dMesh,
-						      dRaysPerPrism,
-						      raysPerSample,
-						      alpaka::mem::view::getPtrNative(dRaysDump),
-						      alpaka::mem::view::getPtrNative(dCount)));
-	alpaka::stream::enqueue(stream, exec1);
+    	auto const exec1 (alpaka::exec::create<T_Acc>(workdiv,
+    						      distributeRemainingRaysRandomly,
+    						      dMesh,
+    						      dRaysPerPrism,
+    						      raysPerSample,
+    						      alpaka::mem::view::getPtrNative(dRaysDump)));
+    	alpaka::stream::enqueue(stream, exec1);
 
-	// alpaka::mem::view::copy(stream, hRaysDump, dRaysDump, static_cast<std::size_t>(1));
-	// alpaka::mem::view::copy(stream, hCount, dCount, static_cast<std::size_t>(1));
-	// std::cout << "RaysLeft:" << raysPerSample - alpaka::mem::view::getPtrNative(hRaysDump)[0] << std::endl;
-	// std::cout << "Count:   " << alpaka::mem::view::getPtrNative(hCount)[0] << std::endl;
-
+    	// alpaka::mem::view::copy(stream, hRaysDump, dRaysDump, static_cast<std::size_t>(1));
+    	// std::cout << "RaysLeft:" << raysPerSample - alpaka::mem::view::getPtrNative(hRaysDump)[0] << std::endl;
 	
-	alpaka::mem::view::getPtrNative(hRaysDump)[0] = raysPerSample;
+    	alpaka::mem::view::getPtrNative(hRaysDump)[0] = raysPerSample;
 
 	
 	
 	
     }
     else {
-	alpaka::mem::view::copy(stream, hRaysDump, dRaysDump, static_cast<std::size_t>(1));    	
+    	alpaka::mem::view::copy(stream, hRaysDump, dRaysDump, static_cast<std::size_t>(1));    	
     }
 
     auto const exec2 (alpaka::exec::create<T_Acc>(importanceWorkdiv,
-						 recalculateImportance,
-						 dMesh,
-						 dRaysPerPrism,
-						 alpaka::mem::view::getPtrNative(hRaysDump)[0],
-						 dImportance));
+    						 recalculateImportance,
+    						 dMesh,
+    						 dRaysPerPrism,
+    						 alpaka::mem::view::getPtrNative(hRaysDump)[0],
+    						 dImportance));
     alpaka::stream::enqueue(stream, exec2);
     
     return alpaka::mem::view::getPtrNative(hRaysDump)[0];

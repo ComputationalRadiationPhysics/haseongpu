@@ -133,7 +133,7 @@ struct CalcSampleGainSumWithReflection {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
-	const unsigned nElementsPerThread = 8;
+	const unsigned nElementsPerThread = 128;
 
 	auto blockSize  = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
 	auto blockIndex = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
@@ -146,8 +146,13 @@ struct CalcSampleGainSumWithReflection {
 	    // the whole block gets a new offset (==workload)
 	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
 
-	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
-	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+	    alpaka::block::sync::syncBlockThreads(acc);
+	    // The first thread in the threadblock increases the globalOffsetMultiplicator (without real limit)
+	    if(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] == 0){
+		// blockOffset is the new value of the globalOffsetMultiplicator
+		blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+	    }
+	    alpaka::block::sync::syncBlockThreads(acc);
 
 	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
 
@@ -258,7 +263,7 @@ struct CalcSampleGainSum {
 	auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
 	blockOffset[0] = 0;
 
-	const unsigned nElementsPerThread = 8;
+	const unsigned nElementsPerThread = 128;
 
 	auto blockSize  = alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0];
 	auto blockIndex = alpaka::idx::getIdx<alpaka::Grid, alpaka::Blocks>(acc)[0];
@@ -268,59 +273,51 @@ struct CalcSampleGainSum {
 	// One thread can compute multiple rays
 	while(blockOffset[0] * blockSize * nElementsPerThread < raysPerSample){
 
-	    // the whole block gets a new offset (==workload)
-	    //rayNumber = getRayNumberBlockbased(acc, blockOffset, raysPerSample, globalOffsetMultiplicator);
-
-	    // HACK: ONLY WITH BLOCKSIZE 1, 1, 1
-	    blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
-
-	    // rayNumber = alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] + (blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0]);
+	    alpaka::block::sync::syncBlockThreads(acc);
+	    // The first thread in the threadblock increases the globalOffsetMultiplicator (without real limit)
+	    if(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] == 0){
+		// blockOffset is the new value of the globalOffsetMultiplicator
+		blockOffset[0] = alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, globalOffsetMultiplicator, 1u);
+	    }
+	    alpaka::block::sync::syncBlockThreads(acc);
 
 	    auto threadOffset =
 		(blockOffset[0] * alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread) +
 		(alpaka::idx::getIdx<alpaka::Block, alpaka::Threads>(acc)[0] * nElementsPerThread);
 
 	    for(unsigned rayNumber = threadOffset; rayNumber < (threadOffset + nElementsPerThread) && rayNumber < raysPerSample; ++rayNumber){
-		// sync threads here
-	
-		// One thread can compute multiple rays
-		// Need to replace this while true
-
-
+		
 		// Get triangle/prism to start ray from
-		unsigned startPrism             = indicesOfPrisms[rayNumber]; 
-		unsigned startLevel             = startPrism/mesh.numberOfTriangles;
-		unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
-		Point startPoint                = mesh.genRndPoint(rand, startTriangle, startLevel);
-		Ray ray                         = generateRay(startPoint, samplePoint);
+	    	unsigned startPrism             = indicesOfPrisms[rayNumber]; 
+	    	unsigned startLevel             = startPrism/mesh.numberOfTriangles;
+	    	unsigned startTriangle          = startPrism - (mesh.numberOfTriangles * startLevel);
+	    	Point startPoint                = mesh.genRndPoint(rand, startTriangle, startLevel);
+	    	Ray ray                         = generateRay(startPoint, samplePoint);
 
-		// get a random index in the wavelength array
-		unsigned sigma_i                = genRndSigmas(rand, maxInterpolation);
-		assert(sigma_i < maxInterpolation);
+	    	// get a random index in the wavelength array
+	    	unsigned sigma_i                = genRndSigmas(rand, maxInterpolation);
+	    	assert(sigma_i < maxInterpolation);
 
-		// calculate the gain for the whole ray at once
-		double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
-		//std::cout << gain << std::endl;
+	    	// calculate the gain for the whole ray at once
+	    	double gain    = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
+	    	//std::cout << gain << std::endl;
 
-		//std::cout << rayNumber << " " << startPrism << std::endl;
+	    	//std::cout << rayNumber << " " << startPrism << std::endl;
 		
-		gain          /= ray.length * ray.length; // important, since usually done in the reflection device function
+	    	gain          /= ray.length * ray.length; // important, since usually done in the reflection device function
 
-		// include the stimulus from the starting prism and the importance of that ray
-		gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
+	    	// include the stimulus from the starting prism and the importance of that ray
+	    	gain          *= mesh.getBetaVolume(startPrism) * importance[startPrism];
 
-		//std::cout << gain << " " << importance[startPrism] << std::endl;
+	    	//std::cout << gain << " " << importance[startPrism] << std::endl;
 		
-		gainSumTemp       += gain;
-		gainSumSquareTemp += gain * gain;
-		//std::cout << rayNumber << " " << globalOffsetMultiplicator[0] << " "<< omp_get_thread_num()<<std::endl;	
+	    	gainSumTemp       += gain;
+	    	gainSumSquareTemp += gain * gain;
+	    	//std::cout << rayNumber << " " << globalOffsetMultiplicator[0] << " "<< omp_get_thread_num()<<std::endl;	
 	    }
 	    
 
 	}
-
-	
-
 	
 	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSum,       static_cast<float>(gainSumTemp));
 	alpaka::atomic::atomicOp<alpaka::atomic::op::Add>(acc, gainSumSquare, static_cast<float>(gainSumSquareTemp));
