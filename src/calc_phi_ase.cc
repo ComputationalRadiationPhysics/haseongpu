@@ -275,7 +275,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
       
      	float hSumPhi = reduce(stream, dPreImportance, hMesh.numberOfPrisms * reflectionSlices, 0.);
 
-    	while(mseTooHigh){
+	while(mseTooHigh){
 	  
      	    unsigned run = 0;
      	    while(run < compute.maxRepetitions && mseTooHigh){
@@ -405,7 +405,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     	    if(raysPerSampleIter == raysPerSampleList.end()) break;
       
 	  
-     	}
+	}
 
     	if(verbosity & V_PROGRESS){
     	    fancyProgressBar(experiment.numberOfSamples);
