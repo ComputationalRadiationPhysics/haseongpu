@@ -213,26 +213,26 @@ class Mesh {
     {
 
 	// FIXIT: Is this the most general
-	using DevHost = alpaka::dev::DevCpu;
+        using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
+        using DevHost = alpaka::dev::Dev<Host>;
 	using Stream  = alpaka::stream::StreamCpuSync;
-	DevHost devHost (alpaka::dev::cpu::getDev());
+        DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));
 	Stream  stream  (dev);
 	
-	using Dim = alpaka::dim::DimInt<1u>;
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, double,   Dim, Size> hPoints(points.data(), devHost, points.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, double,   Dim, Size> hNormalVec(normalVec.data(), devHost, normalVec.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, double,   Dim, Size> hBetaVolume(betaVolume.data(), devHost, betaVolume.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, double,   Dim, Size> hCenters(centers.data(), devHost, centers.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, float,    Dim, Size> hTriangleSurfaces(triangleSurfaces.data(), devHost, triangleSurfaces.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, int,      Dim, Size> hForbiddenEdge(forbiddenEdge.data(), devHost, forbiddenEdge.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, double,   Dim, Size> hBetaCells(betaCells.data(), devHost, betaCells.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, unsigned, Dim, Size> hCladdingCellTypes(claddingCellTypes.data(), devHost, claddingCellTypes.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, float,    Dim, Size> hRefractiveIndices(refractiveIndices.data(), devHost, refractiveIndices.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, float,    Dim, Size> hReflectivities(reflectivities.data(), devHost, reflectivities.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, float,    Dim, Size> hTotalReflectionsAngles(totalReflectionAngles.data(), devHost, totalReflectionAngles.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, unsigned, Dim, Size> hTrianglePointIndices(trianglePointIndices.data(), devHost, trianglePointIndices.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, int     , Dim, Size> hTriangleNeighbors(triangleNeighbors.data(), devHost, triangleNeighbors.size());
-	alpaka::mem::buf::BufPlainPtrWrapper<T_Dev, unsigned, Dim, Size> hTriangleNormalPoint(triangleNormalPoint.data(), devHost, triangleNormalPoint.size());		
+	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hPoints(points.data(), devHost,  alpaka::Vec<Dim, Size>(points.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hNormalVec(normalVec.data(), devHost, alpaka::Vec<Dim, Size>(normalVec.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hBetaVolume(betaVolume.data(), devHost, alpaka::Vec<Dim, Size>(betaVolume.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hCenters(centers.data(), devHost, alpaka::Vec<Dim, Size>(centers.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hTriangleSurfaces(triangleSurfaces.data(), devHost, alpaka::Vec<Dim, Size>(triangleSurfaces.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, int,      Dim, Size> hForbiddenEdge(forbiddenEdge.data(), devHost, alpaka::Vec<Dim, Size>(forbiddenEdge.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hBetaCells(betaCells.data(), devHost, alpaka::Vec<Dim, Size>(betaCells.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hCladdingCellTypes(claddingCellTypes.data(), devHost, alpaka::Vec<Dim, Size>(claddingCellTypes.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hRefractiveIndices(refractiveIndices.data(), devHost, alpaka::Vec<Dim, Size>(refractiveIndices.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hReflectivities(reflectivities.data(), devHost, alpaka::Vec<Dim, Size>(reflectivities.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hTotalReflectionsAngles(totalReflectionAngles.data(), devHost, alpaka::Vec<Dim, Size>(totalReflectionAngles.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hTrianglePointIndices(trianglePointIndices.data(), devHost, alpaka::Vec<Dim, Size>(trianglePointIndices.size()));
+	alpaka::mem::view::ViewPlainPtr<T_Dev, int     , Dim, Size> hTriangleNeighbors(triangleNeighbors.data(), devHost, alpaka::Vec<Dim, Size>(triangleNeighbors.size()));
+        alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hTriangleNormalPoint(triangleNormalPoint.data(), devHost, alpaka::Vec<Dim, Size>(triangleNormalPoint.size()));		
 
 	alpaka::mem::view::copy(stream, this->points, hPoints, points.size());
 	alpaka::mem::view::copy(stream, this->normalVec, hNormalVec, normalVec.size());

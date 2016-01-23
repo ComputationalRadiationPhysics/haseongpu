@@ -299,11 +299,14 @@ unsigned importanceSamplingDistribution(T_Stream &stream,
                                         const float sumPhi,
                                         const bool distributeRandomly){
 
+    using Size    = std::size_t;
+    using Dim     = alpaka::dim::DimInt<1>;      
+    using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
     using DevAcc  = alpaka::dev::Dev<T_Stream>;
-    using DevHost = alpaka::dev::DevCpu;
+    using DevHost = alpaka::dev::Dev<Host>;        
 
     DevAcc  devAcc  (alpaka::dev::getDev(stream));
-    DevHost devHost (alpaka::dev::cpu::getDev());
+    DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));    
 
     auto hSumPhi   ( alpaka::mem::buf::alloc<float,    std::size_t, std::size_t, DevHost>(devHost, static_cast<std::size_t>(1)));
     auto hRaysDump ( alpaka::mem::buf::alloc<unsigned, std::size_t, std::size_t, DevHost>(devHost, static_cast<std::size_t>(1)));

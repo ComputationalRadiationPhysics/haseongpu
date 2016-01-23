@@ -84,9 +84,12 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
 
 template <typename T_Value, typename T_Stream, typename T_Buf, typename T_Extents>
 void exclusivePrefixSum(T_Stream &stream, T_Buf const &inBuf, T_Buf &outBuf, const T_Extents extents){
-
-    using DevHost = alpaka::dev::DevCpu;
-    DevHost devHost (alpaka::dev::cpu::getDev());
+    using Dim     = alpaka::dim::DimInt<2>;  
+    using Size    = std::size_t;
+    using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;    
+    using DevHost = alpaka::dev::Dev<Host>;            
+    DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));        
+    
 
     auto hostBuf( alpaka::mem::buf::alloc<T_Value, T_Extents, T_Extents, DevHost>(devHost, extents));
     initHostBuffer(hostBuf, extents, 0);
@@ -109,8 +112,11 @@ void exclusivePrefixSum(T_Stream &stream, T_Buf const &inBuf, T_Buf &outBuf, con
 
 template <typename T_Stream, typename T_Buf, typename T_Value, typename T_Extents>
 T_Value reduce(T_Stream &stream, T_Buf const &buf, T_Extents const extents, T_Value const init){
-    using DevHost = alpaka::dev::DevCpu;
-    DevHost devHost (alpaka::dev::cpu::getDev());
+    using Dim     = alpaka::dim::DimInt<2>;  
+    using Size    = std::size_t;
+    using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;    
+    using DevHost = alpaka::dev::Dev<Host>;            
+    DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));        
 
     // Create host buffer and copy buffer to host buffer
     auto hostBuf( alpaka::mem::buf::alloc<T_Value, T_Extents, T_Extents, DevHost>(devHost, extents));    
@@ -155,12 +161,11 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     //using Acc     = alpaka::acc::AccCpuSerial<Dim, Size>;
     using Stream  = alpaka::stream::StreamCpuSync;
     using DevAcc  = alpaka::dev::Dev<Acc>;
-    using DevHost = alpaka::dev::DevCpu;
-
+    using DevHost = alpaka::dev::Dev<Host>;        
 
     // Get the first device
     DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
-    DevHost devHost (alpaka::dev::cpu::getDev());
+    DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));        
     Stream  stream  (devAcc);
 
     
@@ -196,9 +201,12 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     const alpaka::Vec<Dim, Size> blocks (static_cast<Size>(1),
 					 static_cast<Size>(1)); // can't be more than 256 due to restrictions from the Mersenne Twister
                                                                 // MUST be 128, since in the kernel we use a bitshift << 7
+    const alpaka::Vec<Dim, Size> elements(static_cast<Size>(1),
+                                          static_cast<Size>(1));
+    
 
-    auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks));
-    auto const workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks));
+    auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks, elements));
+    auto const workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks, elements));
 
     /*****************************************************************************
      * Memory allocation/init and copy for device memory

@@ -130,7 +130,7 @@ struct CalcSampleGainSumWithReflection {
         double gainSumSquareTemp = 0;
         Point samplePoint = mesh.getSamplePoint(sample_i);
 
-        auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
+        auto * blockOffset(alpaka::block::shared::st::allocArr<unsigned, 4, 0>(acc)); // 4 in case of warp-based raynumber
         blockOffset[0] = 0;
 
         const unsigned nElementsPerThread = 128;
@@ -260,7 +260,7 @@ struct CalcSampleGainSum {
         double gainSumSquareTemp = 0;
         Point samplePoint        = mesh.getSamplePoint(sample_i);
 
-        auto * blockOffset(alpaka::block::shared::allocArr<unsigned, 4>(acc)); // 4 in case of warp-based raynumber
+        auto * blockOffset(alpaka::block::shared::st::allocArr<unsigned, 4, 0>(acc)); // 4 in case of warp-based raynumber
         blockOffset[0] = 0;
 
         const unsigned nElementsPerThread = 128;
