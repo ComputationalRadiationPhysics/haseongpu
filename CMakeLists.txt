@@ -170,7 +170,7 @@ endif(MSVC)
 # Executables
 ###############################################################################
 set(HASEonGPU_NAME "calcPhiASE")
-file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
+file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
