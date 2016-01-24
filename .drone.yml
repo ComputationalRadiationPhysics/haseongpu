@@ -2,8 +2,9 @@ image: coin/archlinux
 
 script:
   - date
+  - export ROOT_PATH=$(pwd)
   - git clone https://github.com/ComputationalRadiationPhysics/alpaka.git --depth=1 --branch develop --single-branch alpaka
   - mkdir build_tmp && cd build_tmp
-  - cmake -Dalpaka_DIR=../../alpaka -DCUDA_TOOLKIT_ROOT_DIR=/opt/cuda -DCMAKE_CXX_FLAGS="-Werror" ..
+  - cmake -Dalpaka_DIR=$ROOT_PATH/alpaka -DCUDA_TOOLKIT_ROOT_DIR=/opt/cuda -DCMAKE_CXX_FLAGS="-Werror" ..
   - make
   - ls -l
