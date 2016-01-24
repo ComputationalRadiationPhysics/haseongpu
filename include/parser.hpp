@@ -164,32 +164,32 @@ void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
  * @brief fills a device mesh with the correct datastructures
  *
  */
-template <typename T_Acc, typename T_Dev>
-Mesh<T_Acc, T_Dev> createMesh(const std::vector<unsigned> &triangleIndices, 
-			      const unsigned numberOfTriangles, 
-			      const unsigned numberOfLevels,
-			      const unsigned numberOfPoints, 
-			      const float thicknessOfPrism,
-			      std::vector<double> &pointsVector, 
-			      std::vector<double> &xOfTriangleCenter, 
-			      std::vector<double> &yOfTriangleCenter, 
-			      std::vector<unsigned> &positionsOfNormalVectors,
-			      std::vector<double> &xOfNormals, 
-			      std::vector<double> &yOfNormals,
-			      std::vector<int> &forbiddenVector, 
-			      std::vector<int> &neighborsVector, 
-			      std::vector<float> &surfacesVector,
-			      std::vector<double> &betaValuesVector,
-			      std::vector<double> &betaCells,
-			      std::vector<unsigned> &cellTypes,
-			      std::vector<float> & refractiveIndices,
-			      std::vector<float> & reflectivities,
-			      const float nTot,
-			      const float crystalFluorescence,
-			      const unsigned cladNumber,
-			      const double cladAbsorption,
-			      T_Dev &dev) {
-
+template <typename T_Acc, typename T_Host, typename T_Stream>
+Mesh<T_Acc, T_Host, T_Stream> createMesh(const std::vector<unsigned> &triangleIndices, 
+                                         const unsigned numberOfTriangles, 
+                                         const unsigned numberOfLevels,
+                                         const unsigned numberOfPoints, 
+                                         const float thicknessOfPrism,
+                                         std::vector<double> &pointsVector, 
+                                         std::vector<double> &xOfTriangleCenter, 
+                                         std::vector<double> &yOfTriangleCenter, 
+                                         std::vector<unsigned> &positionsOfNormalVectors,
+                                         std::vector<double> &xOfNormals, 
+                                         std::vector<double> &yOfNormals,
+                                         std::vector<int> &forbiddenVector, 
+                                         std::vector<int> &neighborsVector, 
+                                         std::vector<float> &surfacesVector,
+                                         std::vector<double> &betaValuesVector,
+                                         std::vector<double> &betaCells,
+                                         std::vector<unsigned> &cellTypes,
+                                         std::vector<float> & refractiveIndices,
+                                         std::vector<float> & reflectivities,
+                                         const float nTot,
+                                         const float crystalFluorescence,
+                                         const unsigned cladNumber,
+                                         const double cladAbsorption,
+                                         alpaka::dev::Dev<T_Acc> &dev) {
+    
     // GPU variables
     double totalSurface = 0.;
 
@@ -207,39 +207,39 @@ Mesh<T_Acc, T_Dev> createMesh(const std::vector<unsigned> &triangleIndices,
 	totalReflectionAngles.at(i/2) = (180. / M_PI *  asin(refractiveIndices.at(i+1) / refractiveIndices.at(i)));
     }
 
-    return Mesh<T_Acc, T_Dev> ( cladAbsorption,
-				totalSurface,
-				thicknessOfPrism,
-				nTot,
-				crystalFluorescence,
-				numberOfTriangles,
-				numberOfLevels,
-				numberOfTriangles * (numberOfLevels-1),
-				numberOfPoints,
-				numberOfPoints * numberOfLevels,
-				cladNumber,
-				pointsVector,
-				hostNormalVec,
-				betaValuesVector,
-				hostCenters,
-				surfacesVector,
-				forbiddenVector,
-				betaCells,
-				cellTypes,
-				refractiveIndices,
-				reflectivities,
-				totalReflectionAngles,
-				triangleIndices,
-				neighborsVector,
-				positionsOfNormalVectors,
-				dev);
+    return Mesh<T_Acc, T_Host, T_Stream> ( cladAbsorption,
+                                           totalSurface,
+                                           thicknessOfPrism,
+                                           nTot,
+                                           crystalFluorescence,
+                                           numberOfTriangles,
+                                           numberOfLevels,
+                                           numberOfTriangles * (numberOfLevels-1),
+                                           numberOfPoints,
+                                           numberOfPoints * numberOfLevels,
+                                           cladNumber,
+                                           pointsVector,
+                                           hostNormalVec,
+                                           betaValuesVector,
+                                           hostCenters,
+                                           surfacesVector,
+                                           forbiddenVector,
+                                           betaCells,
+                                           cellTypes,
+                                           refractiveIndices,
+                                           reflectivities,
+                                           totalReflectionAngles,
+                                           triangleIndices,
+                                           neighborsVector,
+                                           positionsOfNormalVectors,
+                                           dev);
 
 }
 
 
-template <typename T_Acc, typename T_Dev>
-Mesh<T_Acc, T_Dev> parseMesh( fs::path const rootPath,
-			      T_Dev &dev) {
+template <typename T_Acc, typename T_Host, typename T_Stream>
+Mesh<T_Acc, T_Host, T_Stream> parseMesh( fs::path const rootPath,
+                                         alpaka::dev::Dev<T_Acc> &dev) {
 
     // Parse experimentdata from files
     std::vector<unsigned> triangleNormalPoint  = fileToVector<unsigned>(rootPath / "triangleNormalPoint.txt");
@@ -300,29 +300,29 @@ Mesh<T_Acc, T_Dev> parseMesh( fs::path const rootPath,
     assertRange(refractiveIndices,0,5,false);
     assertRange(reflectivities,0,1,false);
 
-    return createMesh<T_Acc, T_Dev>(trianglePointIndices,
-				    numberOfTriangles,
-				    numberOfLevels,
-				    numberOfPoints,
-				    thickness,
-				    points,
-				    triangleCenterX,
-				    triangleCenterY,
-				    triangleNormalPoint,
-				    triangleNormalsX,
-				    triangleNormalsY,
-				    forbiddenEdge,
-				    triangleNeighbors,
-				    triangleSurfaces,
-				    betaVolume,
-				    betaCells,
-				    claddingCellTypes,
-				    refractiveIndices,
-				    reflectivities,
-				    nTot,
-				    crystalTFluo,
-				    claddingNumber,
-				    claddingAbsorption,
-				    dev);
+    return createMesh<T_Acc, T_Host, T_Stream>(trianglePointIndices,
+                                               numberOfTriangles,
+                                               numberOfLevels,
+                                               numberOfPoints,
+                                               thickness,
+                                               points,
+                                               triangleCenterX,
+                                               triangleCenterY,
+                                               triangleNormalPoint,
+                                               triangleNormalsX,
+                                               triangleNormalsY,
+                                               forbiddenEdge,
+                                               triangleNeighbors,
+                                               triangleSurfaces,
+                                               betaVolume,
+                                               betaCells,
+                                               claddingCellTypes,
+                                               refractiveIndices,
+                                               reflectivities,
+                                               nTot,
+                                               crystalTFluo,
+                                               claddingNumber,
+                                               claddingAbsorption,
+                                               dev);
 }
 

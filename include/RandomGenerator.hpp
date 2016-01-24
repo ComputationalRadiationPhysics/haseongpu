@@ -11,12 +11,12 @@ struct RandomGenerator {
 								std::declval<uint32_t &>()));
     using Dist = decltype(alpaka::rand::distribution::createUniformReal<float>(std::declval<T_Acc const &>()));
     
-    RandomGenerator(T_Acc const &acc, unsigned const seed, unsigned const subsequence) : gen(alpaka::rand::generator::createDefault(acc, seed, subsequence)),
-											 dist(alpaka::rand::distribution::createUniformReal<float>(acc)) {
+    ALPAKA_FN_HOST_ACC RandomGenerator(T_Acc const &acc, unsigned const seed, unsigned const subsequence) : gen(alpaka::rand::generator::createDefault(acc, seed, subsequence)),
+                                                                                                            dist(alpaka::rand::distribution::createUniformReal<float>(acc)) {
 
     }
     
-    double operator()(){
+    ALPAKA_FN_HOST_ACC double operator()(){
 	return dist(gen);
     }
 
