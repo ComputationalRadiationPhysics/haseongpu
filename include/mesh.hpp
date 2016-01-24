@@ -115,10 +115,15 @@
  * totalReflectionAngles [0]-> bottomTotalReflectionAngle, [1]-> topTotalReflectionAngle
  */
 
-template <typename T_Acc, typename T_Dev>
+template <typename T_Acc, typename T_Host, typename T_Stream>
 class Mesh {
  public:
 
+    using Host    = T_Host;
+    using Acc     = T_Acc;     
+    using Stream  = T_Stream;
+    using DevAcc  = alpaka::dev::Dev<Acc>;
+    using DevHost = alpaka::dev::Dev<Host>;        
     using Dim =  alpaka::dim::DimInt<1u>;
     using Size = std::size_t;
 
@@ -137,22 +142,41 @@ class Mesh {
     unsigned claddingNumber;
 
     // Buffers
-    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> points;
-    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> normalVec;    
-    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> betaVolume;
-    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> centers;
-    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> triangleSurfaces;
-    alpaka::mem::buf::Buf<T_Dev, int,      Dim, Size> forbiddenEdge;
-    alpaka::mem::buf::Buf<T_Dev, double,   Dim, Size> betaCells;    
-    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> claddingCellTypes;            
+    alpaka::mem::buf::Buf<DevAcc, double,   Dim, Size> pointsBuf;
+    alpaka::mem::buf::Buf<DevAcc, double,   Dim, Size> normalVecBuf;    
+    alpaka::mem::buf::Buf<DevAcc, double,   Dim, Size> betaVolumeBuf;
+    alpaka::mem::buf::Buf<DevAcc, double,   Dim, Size> centersBuf;
+    alpaka::mem::buf::Buf<DevAcc, float,    Dim, Size> triangleSurfacesBuf;
+    alpaka::mem::buf::Buf<DevAcc, int,      Dim, Size> forbiddenEdgeBuf;
+    alpaka::mem::buf::Buf<DevAcc, double,   Dim, Size> betaCellsBuf;    
+    alpaka::mem::buf::Buf<DevAcc, unsigned, Dim, Size> claddingCellTypesBuf;            
 
-    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> refractiveIndices;
-    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> reflectivities;  //based on triangleIndex, with offset from bottom/top
-    alpaka::mem::buf::Buf<T_Dev, float,    Dim, Size> totalReflectionAngles;
+    alpaka::mem::buf::Buf<DevAcc, float,    Dim, Size> refractiveIndicesBuf;
+    alpaka::mem::buf::Buf<DevAcc, float,    Dim, Size> reflectivitiesBuf;  //based on triangleIndex, with offset from bottom/top
+    alpaka::mem::buf::Buf<DevAcc, float,    Dim, Size> totalReflectionAnglesBuf;
 
-    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> trianglePointIndices;
-    alpaka::mem::buf::Buf<T_Dev, int,      Dim, Size> triangleNeighbors;
-    alpaka::mem::buf::Buf<T_Dev, unsigned, Dim, Size> triangleNormalPoint;
+    alpaka::mem::buf::Buf<DevAcc, unsigned, Dim, Size> trianglePointIndicesBuf;
+    alpaka::mem::buf::Buf<DevAcc, int,      Dim, Size> triangleNeighborsBuf;
+    alpaka::mem::buf::Buf<DevAcc, unsigned, Dim, Size> triangleNormalPointBuf;
+
+    // Ptr
+    double* points;
+    double* normalVec;    
+    double* betaVolume;
+    double* centers;
+    float*  triangleSurfaces;
+    int*    forbiddenEdge;
+    double* betaCells;    
+    unsigned* claddingCellTypes;            
+
+    float*    refractiveIndices;
+    float*    reflectivities;  //based on triangleIndex* with offset from bottom/top
+    float*    totalReflectionAngles;
+
+    unsigned* trianglePointIndices;
+    int*      triangleNeighbors;
+    unsigned* triangleNormalPoint;
+    
     
     Mesh(// Constants
 	 double claddingAbsorption,
@@ -182,7 +206,7 @@ class Mesh {
 	 std::vector<int> triangleNeighbors,
 	 std::vector<unsigned> triangleNormalPoint,
 	 // Device
-	 T_Dev &dev) :
+	 DevAcc &dev) :
 	// Constants
 	claddingAbsorption(claddingAbsorption),
 	surfaceTotal(surfaceTotal),
@@ -196,58 +220,72 @@ class Mesh {
 	numberOfSamples(numberOfSamples),
 	claddingNumber(claddingNumber),
 	// Vectors
-	points(alpaka::mem::buf::alloc                <double,   Size, Size, T_Dev>(dev, points.size())),
-	normalVec(alpaka::mem::buf::alloc             <double,   Size, Size, T_Dev>(dev, normalVec.size())),
-	betaVolume(alpaka::mem::buf::alloc            <double,   Size, Size, T_Dev>(dev, betaVolume.size())),
-	centers(alpaka::mem::buf::alloc               <double,   Size, Size, T_Dev>(dev, centers.size())),
-	triangleSurfaces(alpaka::mem::buf::alloc      <float,    Size, Size, T_Dev>(dev, triangleSurfaces.size())),
-	forbiddenEdge(alpaka::mem::buf::alloc         <int,      Size, Size, T_Dev>(dev, forbiddenEdge.size())),
-	betaCells(alpaka::mem::buf::alloc             <double,   Size, Size, T_Dev>(dev, betaCells.size())),
-	claddingCellTypes(alpaka::mem::buf::alloc     <unsigned, Size, Size, T_Dev>(dev, claddingCellTypes.size())),
-	refractiveIndices(alpaka::mem::buf::alloc     <float,    Size, Size, T_Dev>(dev, refractiveIndices.size())),
-	reflectivities(alpaka::mem::buf::alloc        <float,    Size, Size, T_Dev>(dev, reflectivities.size())),
-	totalReflectionAngles(alpaka::mem::buf::alloc <float,    Size, Size, T_Dev>(dev, totalReflectionAngles.size())),
-	trianglePointIndices(alpaka::mem::buf::alloc  <unsigned, Size, Size, T_Dev>(dev, trianglePointIndices.size())),
-	triangleNeighbors(alpaka::mem::buf::alloc     <int,      Size, Size, T_Dev>(dev, triangleNeighbors.size())),
-	triangleNormalPoint(alpaka::mem::buf::alloc   <unsigned, Size, Size, T_Dev>(dev, triangleNormalPoint.size()))
+	pointsBuf(alpaka::mem::buf::alloc                <double,   Size, Size, DevAcc>(dev, points.size())),
+	normalVecBuf(alpaka::mem::buf::alloc             <double,   Size, Size, DevAcc>(dev, normalVec.size())),
+	betaVolumeBuf(alpaka::mem::buf::alloc            <double,   Size, Size, DevAcc>(dev, betaVolume.size())),
+	centersBuf(alpaka::mem::buf::alloc               <double,   Size, Size, DevAcc>(dev, centers.size())),
+	triangleSurfacesBuf(alpaka::mem::buf::alloc      <float,    Size, Size, DevAcc>(dev, triangleSurfaces.size())),
+	forbiddenEdgeBuf(alpaka::mem::buf::alloc         <int,      Size, Size, DevAcc>(dev, forbiddenEdge.size())),
+	betaCellsBuf(alpaka::mem::buf::alloc             <double,   Size, Size, DevAcc>(dev, betaCells.size())),
+	claddingCellTypesBuf(alpaka::mem::buf::alloc     <unsigned, Size, Size, DevAcc>(dev, claddingCellTypes.size())),
+	refractiveIndicesBuf(alpaka::mem::buf::alloc     <float,    Size, Size, DevAcc>(dev, refractiveIndices.size())),
+	reflectivitiesBuf(alpaka::mem::buf::alloc        <float,    Size, Size, DevAcc>(dev, reflectivities.size())),
+	totalReflectionAnglesBuf(alpaka::mem::buf::alloc <float,    Size, Size, DevAcc>(dev, totalReflectionAngles.size())),
+	trianglePointIndicesBuf(alpaka::mem::buf::alloc  <unsigned, Size, Size, DevAcc>(dev, trianglePointIndices.size())),
+	triangleNeighborsBuf(alpaka::mem::buf::alloc     <int,      Size, Size, DevAcc>(dev, triangleNeighbors.size())),
+	triangleNormalPointBuf(alpaka::mem::buf::alloc   <unsigned, Size, Size, DevAcc>(dev, triangleNormalPoint.size()))
     {
 
 	// FIXIT: Is this the most general
-        using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
-        using DevHost = alpaka::dev::Dev<Host>;
-	using Stream  = alpaka::stream::StreamCpuSync;
         DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));
 	Stream  stream  (dev);
 	
-	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hPoints(points.data(), devHost,  alpaka::Vec<Dim, Size>(points.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hNormalVec(normalVec.data(), devHost, alpaka::Vec<Dim, Size>(normalVec.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hBetaVolume(betaVolume.data(), devHost, alpaka::Vec<Dim, Size>(betaVolume.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hCenters(centers.data(), devHost, alpaka::Vec<Dim, Size>(centers.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hTriangleSurfaces(triangleSurfaces.data(), devHost, alpaka::Vec<Dim, Size>(triangleSurfaces.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, int,      Dim, Size> hForbiddenEdge(forbiddenEdge.data(), devHost, alpaka::Vec<Dim, Size>(forbiddenEdge.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, double,   Dim, Size> hBetaCells(betaCells.data(), devHost, alpaka::Vec<Dim, Size>(betaCells.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hCladdingCellTypes(claddingCellTypes.data(), devHost, alpaka::Vec<Dim, Size>(claddingCellTypes.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hRefractiveIndices(refractiveIndices.data(), devHost, alpaka::Vec<Dim, Size>(refractiveIndices.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hReflectivities(reflectivities.data(), devHost, alpaka::Vec<Dim, Size>(reflectivities.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, float,    Dim, Size> hTotalReflectionsAngles(totalReflectionAngles.data(), devHost, alpaka::Vec<Dim, Size>(totalReflectionAngles.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hTrianglePointIndices(trianglePointIndices.data(), devHost, alpaka::Vec<Dim, Size>(trianglePointIndices.size()));
-	alpaka::mem::view::ViewPlainPtr<T_Dev, int     , Dim, Size> hTriangleNeighbors(triangleNeighbors.data(), devHost, alpaka::Vec<Dim, Size>(triangleNeighbors.size()));
-        alpaka::mem::view::ViewPlainPtr<T_Dev, unsigned, Dim, Size> hTriangleNormalPoint(triangleNormalPoint.data(), devHost, alpaka::Vec<Dim, Size>(triangleNormalPoint.size()));		
+	alpaka::mem::view::ViewPlainPtr<DevHost, double,   Dim, Size> hPoints(points.data(), devHost,  alpaka::Vec<Dim, Size>(points.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, double,   Dim, Size> hNormalVec(normalVec.data(), devHost, alpaka::Vec<Dim, Size>(normalVec.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, double,   Dim, Size> hBetaVolume(betaVolume.data(), devHost, alpaka::Vec<Dim, Size>(betaVolume.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, double,   Dim, Size> hCenters(centers.data(), devHost, alpaka::Vec<Dim, Size>(centers.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, float,    Dim, Size> hTriangleSurfaces(triangleSurfaces.data(), devHost, alpaka::Vec<Dim, Size>(triangleSurfaces.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, int,      Dim, Size> hForbiddenEdge(forbiddenEdge.data(), devHost, alpaka::Vec<Dim, Size>(forbiddenEdge.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, double,   Dim, Size> hBetaCells(betaCells.data(), devHost, alpaka::Vec<Dim, Size>(betaCells.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, unsigned, Dim, Size> hCladdingCellTypes(claddingCellTypes.data(), devHost, alpaka::Vec<Dim, Size>(claddingCellTypes.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, float,    Dim, Size> hRefractiveIndices(refractiveIndices.data(), devHost, alpaka::Vec<Dim, Size>(refractiveIndices.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, float,    Dim, Size> hReflectivities(reflectivities.data(), devHost, alpaka::Vec<Dim, Size>(reflectivities.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, float,    Dim, Size> hTotalReflectionsAngles(totalReflectionAngles.data(), devHost, alpaka::Vec<Dim, Size>(totalReflectionAngles.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, unsigned, Dim, Size> hTrianglePointIndices(trianglePointIndices.data(), devHost, alpaka::Vec<Dim, Size>(trianglePointIndices.size()));
+	alpaka::mem::view::ViewPlainPtr<DevHost, int     , Dim, Size> hTriangleNeighbors(triangleNeighbors.data(), devHost, alpaka::Vec<Dim, Size>(triangleNeighbors.size()));
+        alpaka::mem::view::ViewPlainPtr<DevHost, unsigned, Dim, Size> hTriangleNormalPoint(triangleNormalPoint.data(), devHost, alpaka::Vec<Dim, Size>(triangleNormalPoint.size()));		
 
-	alpaka::mem::view::copy(stream, this->points, hPoints, points.size());
-	alpaka::mem::view::copy(stream, this->normalVec, hNormalVec, normalVec.size());
-	alpaka::mem::view::copy(stream, this->betaVolume, hBetaVolume, betaVolume.size());
-	alpaka::mem::view::copy(stream, this->centers, hCenters, centers.size());
-	alpaka::mem::view::copy(stream, this->triangleSurfaces, hTriangleSurfaces, triangleSurfaces.size());
-	alpaka::mem::view::copy(stream, this->forbiddenEdge, hForbiddenEdge, forbiddenEdge.size());
-	alpaka::mem::view::copy(stream, this->betaCells, hBetaCells, betaCells.size());
-	alpaka::mem::view::copy(stream, this->claddingCellTypes, hCladdingCellTypes, claddingCellTypes.size());
-	alpaka::mem::view::copy(stream, this->refractiveIndices, hRefractiveIndices, refractiveIndices.size());
-	alpaka::mem::view::copy(stream, this->reflectivities, hReflectivities, reflectivities.size());
-	alpaka::mem::view::copy(stream, this->totalReflectionAngles, hTotalReflectionsAngles, totalReflectionAngles.size());
-	alpaka::mem::view::copy(stream, this->trianglePointIndices, hTrianglePointIndices, trianglePointIndices.size());
-	alpaka::mem::view::copy(stream, this->triangleNeighbors, hTriangleNeighbors, triangleNeighbors.size());
-	alpaka::mem::view::copy(stream, this->triangleNormalPoint, hTriangleNormalPoint, triangleNormalPoint.size());	
+	alpaka::mem::view::copy(stream, this->pointsBuf, hPoints, points.size());
+	alpaka::mem::view::copy(stream, this->normalVecBuf, hNormalVec, normalVec.size());
+	alpaka::mem::view::copy(stream, this->betaVolumeBuf, hBetaVolume, betaVolume.size());
+	alpaka::mem::view::copy(stream, this->centersBuf, hCenters, centers.size());
+	alpaka::mem::view::copy(stream, this->triangleSurfacesBuf, hTriangleSurfaces, triangleSurfaces.size());
+	alpaka::mem::view::copy(stream, this->forbiddenEdgeBuf, hForbiddenEdge, forbiddenEdge.size());
+	alpaka::mem::view::copy(stream, this->betaCellsBuf, hBetaCells, betaCells.size());
+	alpaka::mem::view::copy(stream, this->claddingCellTypesBuf, hCladdingCellTypes, claddingCellTypes.size());
+	alpaka::mem::view::copy(stream, this->refractiveIndicesBuf, hRefractiveIndices, refractiveIndices.size());
+	alpaka::mem::view::copy(stream, this->reflectivitiesBuf, hReflectivities, reflectivities.size());
+
+        alpaka::mem::view::copy(stream, this->totalReflectionAnglesBuf, hTotalReflectionsAngles, totalReflectionAngles.size());
+	alpaka::mem::view::copy(stream, this->trianglePointIndicesBuf, hTrianglePointIndices, trianglePointIndices.size());
+	alpaka::mem::view::copy(stream, this->triangleNeighborsBuf, hTriangleNeighbors, triangleNeighbors.size());
+	alpaka::mem::view::copy(stream, this->triangleNormalPointBuf, hTriangleNormalPoint, triangleNormalPoint.size());
+
+        this->points = alpaka::mem::view::getPtrNative(pointsBuf);
+        this->normalVec = alpaka::mem::view::getPtrNative(normalVecBuf);    
+        this->betaVolume = alpaka::mem::view::getPtrNative(betaVolumeBuf);
+        this->centers = alpaka::mem::view::getPtrNative(centersBuf);
+        this->triangleSurfaces = alpaka::mem::view::getPtrNative(triangleSurfacesBuf);
+        this->forbiddenEdge = alpaka::mem::view::getPtrNative(forbiddenEdgeBuf);
+        this->betaCells = alpaka::mem::view::getPtrNative(betaCellsBuf);    
+        this->claddingCellTypes = alpaka::mem::view::getPtrNative(claddingCellTypesBuf);            
+        this->refractiveIndices = alpaka::mem::view::getPtrNative(refractiveIndicesBuf);
+        this->reflectivities = alpaka::mem::view::getPtrNative(reflectivitiesBuf);
+        this->totalReflectionAngles = alpaka::mem::view::getPtrNative(totalReflectionAnglesBuf);
+        this->trianglePointIndices = alpaka::mem::view::getPtrNative(trianglePointIndicesBuf);
+        this->triangleNeighbors = alpaka::mem::view::getPtrNative(triangleNeighborsBuf);
+        this->triangleNormalPoint = alpaka::mem::view::getPtrNative(triangleNormalPointBuf);
+        
     }
 
     template <class T, class B, class E>
@@ -280,7 +318,7 @@ class Mesh {
      * @return the index of the neighbor triangle
      */
     ALPAKA_FN_ACC int getNeighbor(unsigned triangle, int edge) const{
-	return alpaka::mem::view::getPtrNative(triangleNeighbors)[triangle + edge*numberOfTriangles];
+	return triangleNeighbors[triangle + edge*numberOfTriangles];
     }
 
     /**
@@ -315,20 +353,20 @@ class Mesh {
 	}
 	
 	double w = 1-u-v;
-	int t1 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle];
-	int t2 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle + numberOfTriangles];
-	int t3 = alpaka::mem::view::getPtrNative(trianglePointIndices)[triangle + 2 * numberOfTriangles];
+	int t1 = trianglePointIndices[triangle];
+	int t2 = trianglePointIndices[triangle + numberOfTriangles];
+	int t3 = trianglePointIndices[triangle + 2 * numberOfTriangles];
 
 	// convert the random startpoint into coordinates
 	startPoint.z = (level + rand()) * thickness;
 	startPoint.x =
-	    (alpaka::mem::view::getPtrNative(points)[t1] * u) +
-	    (alpaka::mem::view::getPtrNative(points)[t2] * v) +
-	    (alpaka::mem::view::getPtrNative(points)[t3] * w);
+	    (points[t1] * u) +
+	    (points[t2] * v) +
+	    (points[t3] * w);
 	startPoint.y =
-	    (alpaka::mem::view::getPtrNative(points)[t1+numberOfPoints] * u) +
-	    (alpaka::mem::view::getPtrNative(points)[t2+numberOfPoints] * v) +
-	    (alpaka::mem::view::getPtrNative(points)[t3+numberOfPoints] * w);
+	    (points[t1+numberOfPoints] * u) +
+	    (points[t2+numberOfPoints] * v) +
+	    (points[t3+numberOfPoints] * w);
 
 	return startPoint;
     }
@@ -344,7 +382,7 @@ class Mesh {
      * @return a beta value
      */
     ALPAKA_FN_ACC double getBetaVolume(unsigned triangle, unsigned level) const{
-	return alpaka::mem::view::getPtrNative(betaVolume)[triangle + level * numberOfTriangles];
+	return betaVolume[triangle + level * numberOfTriangles];
     }
 
     /**
@@ -355,7 +393,7 @@ class Mesh {
      * @return a beta value
      */
     ALPAKA_FN_ACC double getBetaVolume(unsigned prism) const{
-	return alpaka::mem::view::getPtrNative(betaVolume)[prism];
+	return betaVolume[prism];
     }
 
     /**
@@ -369,11 +407,11 @@ class Mesh {
     ALPAKA_FN_ACC NormalRay getNormal(unsigned triangle, int edge) const{
 	NormalRay ray = { {0,0},{0,0}};
 	int offset =  edge*numberOfTriangles + triangle;
-	ray.p.x = alpaka::mem::view::getPtrNative(points)[ alpaka::mem::view::getPtrNative(triangleNormalPoint) [offset] ];
-	ray.p.y = alpaka::mem::view::getPtrNative(points)[ alpaka::mem::view::getPtrNative(triangleNormalPoint) [offset] + numberOfPoints ];
+	ray.p.x = points[triangleNormalPoint[offset] ];
+	ray.p.y = points[triangleNormalPoint[offset] + numberOfPoints ];
 
-	ray.dir.x = alpaka::mem::view::getPtrNative(normalVec)[offset];
-	ray.dir.y = alpaka::mem::view::getPtrNative(normalVec)[offset + 3*numberOfTriangles];
+	ray.dir.x = normalVec[offset];
+	ray.dir.y = normalVec[offset + 3*numberOfTriangles];
 
 	return ray;
     }	
@@ -390,8 +428,8 @@ class Mesh {
 	unsigned level = sample_i/numberOfPoints;
 	p.z = level*thickness;
 	unsigned pos = sample_i - (numberOfPoints * level);
-	p.x = alpaka::mem::view::getPtrNative(points)[pos];
-	p.y = alpaka::mem::view::getPtrNative(points)[pos + numberOfPoints];
+	p.x = points[pos];
+	p.y = points[pos + numberOfPoints];
 	return p;
     }
 
@@ -405,8 +443,8 @@ class Mesh {
      */
     ALPAKA_FN_ACC Point getCenterPoint(unsigned triangle,unsigned level) const{
 	Point p = {0,0,(level+0.5)*thickness};
-	p.x = alpaka::mem::view::getPtrNative(centers)[triangle];
-	p.y = alpaka::mem::view::getPtrNative(centers)[triangle + numberOfTriangles];
+	p.x = centers[triangle];
+	p.y = centers[triangle + numberOfTriangles];
 	return p;
     }
 
@@ -422,12 +460,12 @@ class Mesh {
      * previous triangle (has a different index in the new triangle)
      */
     ALPAKA_FN_ACC int getForbiddenEdge(unsigned triangle,int edge) const{
-	return alpaka::mem::view::getPtrNative(forbiddenEdge)[edge * numberOfTriangles + triangle];
+	return forbiddenEdge[edge * numberOfTriangles + triangle];
     }
 
 
     ALPAKA_FN_ACC unsigned getCellType(unsigned triangle) const{
-	return alpaka::mem::view::getPtrNative(claddingCellTypes)[triangle];
+	return claddingCellTypes[triangle];
     }
 
 
@@ -473,7 +511,7 @@ class Mesh {
     }
 
     ALPAKA_FN_HOST unsigned getMaxReflections (ReflectionPlane reflectionPlane) const{
-	double d    = calculateMaxDiameter(alpaka::mem::view::getPtrNative(points), numberOfPoints);
+	double d    = calculateMaxDiameter(points, numberOfPoints);
 	float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
 	double h    = numberOfLevels * thickness; 
 	double z    = d/tan(alpha);
@@ -489,9 +527,9 @@ class Mesh {
     ALPAKA_FN_HOST_ACC float getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const{
 	switch(reflectionPlane){
 	case BOTTOM_REFLECTION:
-	    return alpaka::mem::view::getPtrNative(reflectivities)[triangle];
+	    return reflectivities[triangle];
 	case TOP_REFLECTION:
-	    return alpaka::mem::view::getPtrNative(reflectivities)[triangle + numberOfTriangles];
+	    return reflectivities[triangle + numberOfTriangles];
 	}
 	return 0;
     }
@@ -499,17 +537,17 @@ class Mesh {
     ALPAKA_FN_HOST_ACC float getReflectionAngle(ReflectionPlane reflectionPlane) const{
 	switch(reflectionPlane){
 	case BOTTOM_REFLECTION:
-	    return alpaka::mem::view::getPtrNative(totalReflectionAngles)[0];
+	    return totalReflectionAngles[0];
 	    //return asin(refractiveIndices[1]/refractiveIndices[0]);
 	case TOP_REFLECTION:
-	    return alpaka::mem::view::getPtrNative(totalReflectionAngles)[1];
+	    return totalReflectionAngles[1];
 	    //return asin(refractiveIndices[3]/refractiveIndices[2]);
 	}
 	return  0;
     }
 
     ALPAKA_FN_HOST_ACC float getTriangleSurface(const unsigned triangle) const{
-	return alpaka::mem::view::getPtrNative(triangleSurfaces)[triangle];
+	return triangleSurfaces[triangle];
 	    
     }
 

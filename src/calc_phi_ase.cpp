@@ -153,27 +153,34 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      * Choose device
      ****************************************************************************/
     // Set types 
-    using Dim     = alpaka::dim::DimInt<2>;  
-    using Size    = std::size_t;
-    using Extents = Size;
-    using Host    = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using Acc     = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
-    //using Acc     = alpaka::acc::AccCpuSerial<Dim, Size>;
-    using Stream  = alpaka::stream::StreamCpuSync;
-    using DevAcc  = alpaka::dev::Dev<Acc>;
-    using DevHost = alpaka::dev::Dev<Host>;        
+    using Dim         = alpaka::dim::DimInt<2>;  
+    using Size        = std::size_t;
+    using Extents     = Size;
+    using Host        = alpaka::acc::AccCpuSerial<Dim, Size>;
+    using HostStream  = alpaka::stream::StreamCpuSync;
+    using WorkDiv     = alpaka::workdiv::WorkDivMembers<Dim, Size>;
+#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED) && defined(__CUDACC__)
+    using Acc         = alpaka::acc::AccGpuCudaRt<Dim, Size>;
+    using AccStream   = alpaka::stream::StreamCudaRtSync;        
+#else
+    //using Acc         = alpaka::acc::AccCpuSerial<Dim, Size>;    
+    using Acc         = alpaka::acc::AccCpuOmp2Blocks<Dim, Size>;
+    using AccStream   = alpaka::stream::StreamCpuSync;    
+#endif
+    using DevAcc      = alpaka::dev::Dev<Acc>;
+    using DevHost     = alpaka::dev::Dev<Host>;        
 
     // Get the first device
     DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
     DevHost devHost (alpaka::dev::DevMan<Host>::getDevByIdx(0));        
-    Stream  stream  (devAcc);
+    AccStream  stream  (devAcc);
 
     
     /*****************************************************************************
      * Parse mesh
      ****************************************************************************/
-    const Mesh<Acc,  DevAcc>  dMesh(parseMesh<Acc,  DevAcc> (compute.inputPath, devAcc));
-    const Mesh<Host, DevHost> hMesh(parseMesh<Host, DevHost>(compute.inputPath, devHost));
+    const Mesh<Acc, Host,  AccStream>  dMesh(parseMesh<Acc,  Host, AccStream>  (compute.inputPath, devAcc));
+    const Mesh<Host, Host, HostStream> hMesh(parseMesh<Host, Host, HostStream>(compute.inputPath, devHost));
     const time_t starttime                = time(0);
     const unsigned maxReflections         = experiment.useReflections ? hMesh.getMaxReflections() : 0;
     const unsigned reflectionSlices       = 1 + (2 * maxReflections);
@@ -196,8 +203,10 @@ float calcPhiAse ( const ExperimentParameters& experiment,
      ****************************************************************************/
     const alpaka::Vec<Dim, Size> importanceGrid (static_cast<Size>(200), //can't be more than 200 due to restrictions from the Mersenne Twister 
 						 static_cast<Size>(reflectionSlices));
+
     const alpaka::Vec<Dim, Size> grid (static_cast<Size>(200), //can't be more than 200 due to restrictions from the Mersenne Twister, MapPrefixSumToPrism needs number of prisms threads
 				       static_cast<Size>(1));
+
     const alpaka::Vec<Dim, Size> blocks (static_cast<Size>(1),
 					 static_cast<Size>(1)); // can't be more than 256 due to restrictions from the Mersenne Twister
                                                                 // MUST be 128, since in the kernel we use a bitshift << 7
@@ -205,8 +214,8 @@ float calcPhiAse ( const ExperimentParameters& experiment,
                                           static_cast<Size>(1));
     
 
-    auto const importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks, elements));
-    auto const workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks, elements));
+    const WorkDiv importanceWorkdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(importanceGrid, blocks, elements));
+    const WorkDiv workdiv(alpaka::workdiv::WorkDivMembers<Dim, Size>(grid, blocks, elements));
 
     /*****************************************************************************
      * Memory allocation/init and copy for device memory
