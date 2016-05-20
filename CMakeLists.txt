@@ -5,10 +5,13 @@ cmake_minimum_required(VERSION 3.0.1)
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
   "$ENV{MPI_ROOT}" "$ENV{CUDA_ROOT}" "$ENV{BOOST_ROOT}")
 
-if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
-  message(FATAL_ERROR "GCC version must be at least 4.8.2")
-endif(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.2)
+if(CMAKE_CXX_COMPILER_VERSION STREQUAL "")
+    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
+endif()
 
+if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS "4.8.2")
+    message(FATAL_ERROR "GCC version must be at least 4.8.2 (found version: ${CMAKE_CXX_COMPILER_VERSION})")
+endif(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS "4.8.2")
 
 ###############################################################################
 # CUDA
@@ -59,8 +62,11 @@ endif(CUDA_KEEP_FILES)
 # Find MPI
 ################################################################################
 find_package(MPI)
-include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
-set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
+if(MPI_C_FOUND)
+  include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
+  set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
+  add_definitions(-DMPI_FOUND)
+endif(MPI_C_FOUND)
 
 # bullxmpi fails if it can not find its c++ counter part
 if(MPI_CXX_FOUND)
@@ -109,47 +115,15 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 ################################################################################
 # Compiler Flags
 ################################################################################
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
+
 # GNU
 if(CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wnarrowing")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Waddress")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Warray-bounds")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wchar-subscripts")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wcomment")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wmain")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wmissing-braces")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wparentheses")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wreturn-type")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsequence-point")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-compare")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wstrict-aliasing")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wstrict-overflow=1")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wswitch")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wtrigraphs")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wuninitialized")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-function")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-label")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-value")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-variable")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wvolatile-register-var")
-  # new warning in gcc 4.8 (flag ignored in previous version)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
-  # ICC
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBOOST_NO_VARIADIC_TEMPLATES")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBOOST_NO_CXX11_VARIADIC_TEMPLATES")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBOOST_NO_FENV_H")
-  # PGI
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "PGI")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Minform=inform")
-  
-  # Visual Studio (Microsoft)
+# Visual Studio (Microsoft)
  elseif(MSVC)
     # This loop sets all linking to static (MT)
     foreach(flag_var
