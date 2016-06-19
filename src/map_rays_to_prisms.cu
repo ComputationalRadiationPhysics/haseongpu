@@ -26,7 +26,6 @@
 
 
 using thrust::device_vector;
-using thrust::host_vector;
 using thrust::raw_pointer_cast;
 
 /**
@@ -48,67 +47,55 @@ using thrust::raw_pointer_cast;
  *        resulting output arrays:
  *        [0 0 0 2 2 3] (indicesOfPrisms)
  *
- *        output numberOfReflections is handled in a similar way
  *
- *
- * @param numberOfPrisms the number of prisms. numberOfPrisms * reflectionSlices
+ * @param numberOfPrisms the number of prisms.
  *                       must be equal to the the length of the prefixSum.
- * @param raysPerSample the size of indicesOfPrisms/numberOfReflections. Actually 
- *                      identical to the sum of all values in raysPerPrism
- * @param reflectionSlices the number of reflectionSlices. see numberOfPrisms
  * @param raysPerPrism the input array from which prefixSum was generated
  * @param prefixSum the prefixSum generated from raysPerPrism
  * @param indicesOfPrisms a pointer to the OUTPUT generated like described in the example
- * @param numberOfReflections a pointer to the OUTPUT similar to indicesOfPrisms
  */
 __global__ void mapPrefixSumToPrisms(
-    const unsigned numberOfPrisms,
-    const unsigned raysPerSample,
-    const unsigned reflectionSlices,
-    const unsigned* raysPerPrism,
-    const unsigned* prefixSum,
-    unsigned *indicesOfPrisms,
-    unsigned *numberOfReflections
-    ){
+        const unsigned numberOfPrisms,
+        const unsigned* raysPerPrism,
+        const unsigned* prefixSum,
+        const unsigned offset,
+        unsigned *indicesOfPrisms
+        ){
 
-  int id = threadIdx.x + (blockIdx.x * blockDim.x);
-  // break if we have too many threads (this is likely)
-  if(id >= numberOfPrisms*reflectionSlices) return;
+    int id = threadIdx.x + (blockIdx.x * blockDim.x);
+    // break if we have too many threads (this is likely)
+    if(id >= numberOfPrisms) return;
 
-  const unsigned count            = raysPerPrism[id];
-  const unsigned startingPosition = prefixSum[id];
-  const unsigned reflection_i     = id / numberOfPrisms;
-  const unsigned prism_i          = id % numberOfPrisms;
+    const unsigned count            = raysPerPrism[id];
+    const unsigned startingPosition = prefixSum[id]-offset;
+    const unsigned prism_i          = id;
 
-  for(unsigned i=0; i < count ; ++i){
-    indicesOfPrisms[startingPosition + i] = prism_i;     
-    numberOfReflections[startingPosition + i] = reflection_i; 
-  }
+    for(unsigned i=0; i < count ; ++i){
+        indicesOfPrisms[startingPosition + i] = prism_i;
+    }
 }
 
+
 void mapRaysToPrisms(
-    device_vector<unsigned> &indicesOfPrisms, 
-    device_vector<unsigned> &numberOfReflections,
-    const device_vector<unsigned> &raysPerPrism, 
-    device_vector<unsigned> &prefixSum, 
-    const unsigned reflectionSlices,
-    const unsigned raysPerSample,
-    const unsigned numberOfPrisms
-    ){
+        device_vector<unsigned> &indicesOfPrisms,
+        const device_vector<unsigned>::iterator raysPerPrismBegin,
+        const device_vector<unsigned>::iterator raysPerPrismEnd,
+        const device_vector<unsigned>::iterator prefixSumBegin,
+        const device_vector<unsigned>::iterator prefixSumEnd,
+        const unsigned offset
+        ){
+    // blocksize chosen by occupancyCalculator
+    const unsigned blocksize = 256;
+    const unsigned gridsize  = (raysPerPrismEnd-raysPerPrismBegin +blocksize-1)/blocksize;
+    //device_vector<unsigned> prefixSum(raysPerPrismEnd-raysPerPrismBegin);
 
-  // blocksize chosen by occupancyCalculator
-  const unsigned blocksize = 256;
-  const unsigned gridsize  = (raysPerPrism.size()+blocksize-1)/blocksize;
+    //thrust::exclusive_scan(raysPerPrismBegin, raysPerPrismEnd, prefixSum.begin());
 
-  thrust::exclusive_scan(raysPerPrism.begin(), raysPerPrism.end(),prefixSum.begin());
-
-  mapPrefixSumToPrisms <<<gridsize,blocksize>>> (
-      numberOfPrisms, 
-      raysPerSample, 
-      reflectionSlices,
-      raw_pointer_cast( &raysPerPrism[0] ),
-      raw_pointer_cast( &prefixSum[0] ), 
-      raw_pointer_cast( &indicesOfPrisms[0] ),
-      raw_pointer_cast( &numberOfReflections[0] )
-      );
+    mapPrefixSumToPrisms<<<gridsize,blocksize>>> (
+            prefixSumEnd - prefixSumBegin,
+            raw_pointer_cast( &(*raysPerPrismBegin) ),
+            raw_pointer_cast( &(*prefixSumBegin) ),
+            offset,
+            raw_pointer_cast( &indicesOfPrisms[0] )
+            );
 }

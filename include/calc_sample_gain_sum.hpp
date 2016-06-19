@@ -52,8 +52,8 @@
  * @param indicesOfPrisms a mapping from rays to prisms. The value x on the
  *	      n-th position denotes that ray n is supposed to start propagating 
  *	      from the x-th prism
- * @param numberOfReflectionSlices similar to indicesOfPrisms, but denotes the
- *        reflection slice from which each ray starts (see importance sampling)
+ * @param reflection_i denotes the reflection slice from which each ray starts
+ *        (see importance sampling)
  * @param importance the importance for each prism, obtained through the
  *        importance sampling kernel
  * @param raysPerSample the number of rays to use for the sample point s_i
@@ -71,7 +71,7 @@
 __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState, 
 				 const Mesh mesh,
 				 const unsigned* indicesOfPrisms, 
-				 const unsigned* numberOfReflections,
+				 unsigned reflection_i,
 				 const double* importance,
 				 const unsigned raysPerSample,
 				 float *gainSum,

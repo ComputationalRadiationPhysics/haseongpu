@@ -45,21 +45,15 @@
  *        output numberOfReflections is handled in a similar way
  *
  *
- * @param indicesOfPrisms a pointer to the OUTPUT generated like described in the example
- * @param numberOfReflections a pointer to the OUTPUT similar to indicesOfPrisms
- * @param raysPerPrism the input array
- *                       must be equal to the the length of the prefixSum.
- * @param reflectionSlices the number of reflectionSlices. see numberOfPrisms
- * @param raysPerSample the size of indicesOfPrisms/numberOfReflections. Actually 
- *                      identical to the sum of all values in raysPerPrism
- * @param numberOfPrisms the number of prisms. numberOfPrisms * reflectionSlices
+ * @param indicesOfPrisms a reference to the OUTPUT generated like described in the example
+ * @param raysPerPrismStart iterator to the input array
+ * @param raysPerPrismEnd iterator to the input array
  */
 void mapRaysToPrisms(
-    thrust::device_vector<unsigned> &indicesOfPrisms,
-    thrust::device_vector<unsigned> &numberOfReflections,
-    const thrust::device_vector<unsigned> &raysPerPrism,
-    thrust::device_vector<unsigned> &prefixSum,
-    const unsigned reflectionSlices,
-    const unsigned raysPerSample,
-    const unsigned numberOfPrisms
-    );
+        thrust::device_vector<unsigned> &indicesOfPrisms,
+        const thrust::device_vector<unsigned>::iterator raysPerPrismBegin,
+        const thrust::device_vector<unsigned>::iterator raysPerPrismEnd,
+        const thrust::device_vector<unsigned>::iterator prefixSumBegin,
+        const thrust::device_vector<unsigned>::iterator prefixSumEnd,
+        const unsigned offset
+        );
