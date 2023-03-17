@@ -9,7 +9,7 @@ NVCC = nvcc
 
 # build flags
 LIBS =  -lpthread -lcudart -lm
-ARCH = -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_35,code=sm_35
+ARCH = -gencode=arch=compute_60,code=sm_60
  #NVCC_FLAGS = --use_fast_math -Xptxas="-v"
  #DEBUG_FLAGS = -g -G -lineinfo -D THRUST_DEBUG
 NVCC_FLAGS = --use_fast_math "-DBOOST_NOINLINE=__attribute__((noinline))"
