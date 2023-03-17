@@ -286,7 +286,7 @@ void assertRange(const std::vector<T> &v, const B minElement,const E maxElement,
 }
 
 template <class T, class B>
-void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
+void assertMin(const std::vector<T> &v,const  B minElement,const bool equals){
   if(equals){
     assert(*std::min_element(v.begin(),v.end()) == minElement);
   }else{

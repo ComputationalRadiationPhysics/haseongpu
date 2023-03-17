@@ -1,5 +1,5 @@
 project(HASEonGPU)
-cmake_minimum_required(VERSION 2.8.10.1)
+cmake_minimum_required(VERSION 3.20.0)
 
 # helper for libs and packages
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
@@ -10,14 +10,18 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/utils/cmake/modules/" ${CMAKE
 ###############################################################################
 # CUDA
 ###############################################################################
-find_package(CUDA 5.0 REQUIRED)
+find_package(CUDA 10.0 REQUIRED)
 
 if(CUDA_VERSION VERSION_LESS 5.5)
   message(STATUS "CUDA Toolkit < 5.5 detected. We strongly recommend to still "
     "use CUDA 5.5+ drivers (319.82 or higher)!")
 endif(CUDA_VERSION VERSION_LESS 5.5)
 
-set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
+set(CUDA_ARCH sm_60 CACHE STRING "Set GPU architecture")
+string(COMPARE EQUAL ${CUDA_ARCH} "sm_37" IS_CUDA_ARCH_UNSUPPORTED)
+string(COMPARE EQUAL ${CUDA_ARCH} "sm_35" IS_CUDA_ARCH_UNSUPPORTED)
+string(COMPARE EQUAL ${CUDA_ARCH} "sm_30" IS_CUDA_ARCH_UNSUPPORTED)
+string(COMPARE EQUAL ${CUDA_ARCH} "sm_20" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_10" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_11" IS_CUDA_ARCH_UNSUPPORTED)
 string(COMPARE EQUAL ${CUDA_ARCH} "sm_12" IS_CUDA_ARCH_UNSUPPORTED)
@@ -25,7 +29,7 @@ string(COMPARE EQUAL ${CUDA_ARCH} "sm_13" IS_CUDA_ARCH_UNSUPPORTED)
 
 if(IS_CUDA_ARCH_UNSUPPORTED)
   message(FATAL_ERROR "Unsupported CUDA architecture ${CUDA_ARCH} specified. "
-    "SM 2.0 or higher is required.")
+    "SM 6.0 or higher is required.")
 endif(IS_CUDA_ARCH_UNSUPPORTED)
 
 set(CUDA_FTZ "--ftz=false" CACHE STRING "Set flush to zero for GPU")
