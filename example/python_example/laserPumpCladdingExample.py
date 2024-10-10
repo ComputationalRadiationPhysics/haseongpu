@@ -39,6 +39,7 @@ import os
 from  vtk_wedge import vtk_wedge
 from set_variables import set_variables
 from calcPhiASE import calcPhiASE
+from beta_int import beta_int
 
 
 # Constants
@@ -64,7 +65,7 @@ def calc_phi_ASE(p, t_int, beta_cell, beta_vol, clad_int, clad_number, clad_abs,
     pass
 
 # Function to perform beta integration
-def beta_int3(beta_crystal, pulse, const, crystal, steps, pump, mode, n_tot_gradient):
+def beta_int(beta_crystal, pulse, const, crystal, steps, pump, mode, n_tot_gradient):
     # Implement beta_int3 functionality based on the original MATLAB code
     return beta_crystal, pulse, n_tot_gradient
 
