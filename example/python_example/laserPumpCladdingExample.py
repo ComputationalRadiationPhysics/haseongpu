@@ -40,6 +40,7 @@ from  vtk_wedge import vtk_wedge
 from set_variables import set_variables
 from calcPhiASE import calcPhiASE
 from beta_int import beta_int 
+from beta_int3 import beta_int3
 
 
 # Constants
