@@ -4,7 +4,9 @@ project(HASEonGPU LANGUAGES CUDA CXX C)
 include(CMakePrintHelpers)
 
 # dependencies
-cmake_policy(SET CMP0167 NEW)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
+  cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost 1.70.0 REQUIRED COMPONENTS program_options)
 find_package(MPI REQUIRED COMPONENTS C)
 find_package(Threads REQUIRED)
