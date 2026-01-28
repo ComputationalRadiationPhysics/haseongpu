@@ -81,3 +81,5 @@ talk/*.~lock.*
 build/
 cmake-build-debug/
 *.__pycache__
+example/example_c/bin/
+*.__pycache__

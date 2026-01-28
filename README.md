@@ -125,6 +125,88 @@ Usage
     	  
 	  value = values(i,j);
 
+### Python Interface
+
+0.  **Compile the CUDA binary first**\
+    (see *Quick C-Application ASE Flux Example*) in your `./build`
+    directory.
+
+1.  **Install the Python dependencies** required by the example scripts:
+
+``` bash
+pip install -r example/python_example/requirements.txt
+```
+
+2.  **Make `calcPhiASE(...)` importable (optional)**
+
+If you want to use `calcPhiASE(...)` in your own scripts outside of
+`example/python_example`, add that directory to your `PYTHONPATH`:
+
+``` bash
+export PYTHONPATH=$HOME/.../haseongpu/example/python_example:$PYTHONPATH
+```
+
+This step is **not required** when running the provided example scripts
+directly inside `example/python_example`.
+
+3.  **Import and call `calcPhiASE` from your own Python script:**
+
+``` python
+from calcPhiASE import calcPhiASE
+
+phi_ASE, mse_values, n_rays = calcPhiASE(
+    p,
+    t_int,
+    beta_cell,
+    beta_vol,
+    clad_int,
+    clad_number,
+    clad_abs,
+    useReflections,
+    refractiveIndices,
+    reflectivities,
+    normals_x,
+    normals_y,
+    ordered_int,
+    surface,
+    x_center,
+    y_center,
+    normals_p,
+    forbidden,
+    minRaysPerSample,
+    maxRaysPerSample,
+    mseThreshold,
+    repetitions,
+    N_tot,
+    z_mesh,
+    laser,
+    crystal,
+    mesh_z,
+    deviceMode,
+    parallelMode,
+    maxGPUs,
+    nPerNode,
+)
+```
+
+**Reference Example**
+
+A complete, working reference implementation is provided in:
+
+`example/python_example/laserPumpCladdingExample.py`
+
+This script demonstrates the full workflow:
+
+-   Performing the laser pumping step to compute the population
+    inversion / gain distribution.
+-   Preparing mesh-based inputs (points, triangles, normals, neighbors,
+    etc.).
+-   Calling the external C interface via `calcPhiASE` to compute the ASE
+    flux.
+-   Handling GPU and parallel configuration parameters.
+
+Use this example as a template when integrating pumping and ASE
+computation into your own simulation workflow.
 
 ### Input argument description
 
