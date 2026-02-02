@@ -7,22 +7,27 @@ include(CMakePrintHelpers)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
   cmake_policy(SET CMP0167 NEW)
 endif()
+
 find_package(Boost 1.70.0 REQUIRED COMPONENTS program_options)
-find_package(MPI REQUIRED COMPONENTS C)
 find_package(Threads REQUIRED)
 find_package(CUDAToolkit REQUIRED COMPONENTS cudart)
 
-
 # build options
-set(HASE_CUDA_FLUSHTOZERO OFF CACHE BOOL "Set flush to zero for GPU")
-set(HASE_CUDA_FASTMATH ON CACHE BOOL "Enable fast-math" )
-set(HASE_CUDA_SHOW_REGISTER OFF CACHE BOOL "Show kernel registers and create PTX")
-set(HASE_CUDA_KEEP_FILES OFF CACHE BOOL "Keep all intermediate files that are generated during internal compilation steps (folder: nvcc_tmp)")
-set(HASE_CUDA_SHOW_CODELINES OFF CACHE BOOL "Show kernel lines in cuda-gdb and cuda-memcheck")
+option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
+option(HASE_CUDA_FASTMATH "Enable fast-math" ON)
+option(HASE_CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
+option(HASE_CUDA_KEEP_FILES
+        "Keep all intermediate files that are generated during internal compilation steps (folder: nvcc_tmp)"
+        OFF
+)
+option(HASE_CUDA_SHOW_CODELINES "Show kernel lines in cuda-gdb and cuda-memcheck" OFF)
+option(DISABLE_MPI "toggle that allows compilation of haseongpu without requiring the MPI dependency" OFF)
+
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 
 # CUDA compiler Flags
 set(HASE_NVCC_FLAGS "")
+
 if(HASE_CUDA_SHOW_CODELINES)
   set(HASE_CUDA_KEEP_FILES ON)
   list(APPEND HASE_NVCC_FLAGS --source-in-ptx -Xcompiler -rdynamic -lineinfo)
@@ -40,8 +45,8 @@ endif()
 
 if(HASE_CUDA_KEEP_FILES)
   set(NVCC_TMP_DIR "${PROJECT_BINARY_DIR}/nvcc_tmp")
-  make_directory("${NVCC_TMP_DIR}")
-  list(APPEND HASE_NVCC_FLAGS --keep-dir "${NVCC_TMP_DIR}")
+  file(MAKE_DIRECTORY "${NVCC_TMP_DIR}")
+  list(APPEND HASE_NVCC_FLAGS --keep --keep-dir "${NVCC_TMP_DIR}")
 endif()
 
 cmake_print_variables(HASE_NVCC_FLAGS)
@@ -55,7 +60,7 @@ function(warn_path_cuda PATH_VARIABLE)
   string(TOLOWER "$ENV{${PATH_VARIABLE}}" CPLUS_TOLOWER)
   string(FIND "${CPLUS_TOLOWER}" "cuda" CPLUS_TOLOWER_FOUND)
   if(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
-    message(WARNING 
+    message(WARNING
       "Your ${PATH_VARIABLE} seems to contain CUDA includes."
       "This might result in the following error:\n"
       "'error: kernel launches from templates are not allowed in system files'\n"
@@ -81,33 +86,19 @@ else()
 endif()
 
 # calcPhiASE executable target
-add_executable(calcPhiASE
-  src/calc_phi_ase.cu
-  src/calc_phi_ase_mpi.cc
-  src/calc_phi_ase_threaded.cu
-  src/calc_sample_gain_sum.cu
-  src/cuda_utils.cu
-  src/for_loops_clad.cu
-  src/geometry.cu
-  src/importance_sampling.cu
-  src/interpolation.cu
-  src/logging.cu
-  src/main.cu
-  src/map_rays_to_prisms.cu
-  src/mesh.cu
-  src/mt19937ar.cu
-  src/parser.cu
-  src/progressbar.cu
-  src/propagate_ray.cu
-  src/ray_histogram.cu
-  src/reflection.cu
-  src/write_matlab_output.cu
-  src/write_to_file.cu
-  src/write_to_vtk.cu
+add_executable(calcPhiASE)
+
+file(GLOB_RECURSE calcPhiASE_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
 )
 
+target_sources(calcPhiASE PRIVATE ${calcPhiASE_SOURCES})
 target_include_directories(calcPhiASE PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-  
+
 set_target_properties(calcPhiASE PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
@@ -121,22 +112,21 @@ target_compile_options(calcPhiASE PRIVATE
 
 target_link_libraries(calcPhiASE PRIVATE
   Boost::program_options
-  MPI::MPI_C
   Threads::Threads
   CUDA::cudart
 )
+#enable/disable mpi dependency based on cmake option
+if(NOT DISABLE_MPI)
+    find_package(MPI REQUIRED COMPONENTS C)
+    target_link_libraries(calcPhiASE PRIVATE MPI::MPI_C)
+    target_compile_definitions(calcPhiASE PRIVATE OMPI_SKIP_MPICXX)
+else()
+    target_compile_definitions(calcPhiASE PRIVATE DISABLE_MPI)
+endif()
 
-
-# examples target
-add_custom_target(
-  examples
-  ALL
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example/bin
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/bin
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/output
-  COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/calcPhiASE ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example/bin
-  COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/calcPhiASE ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/bin
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/calcPhiASE.m ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/calcPhiASE.m ${CMAKE_CURRENT_SOURCE_DIR}/.
-  DEPENDS calcPhiASE
+# add target
+add_custom_target(examples ALL
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:calcPhiASE>
+        ${CMAKE_CURRENT_BINARY_DIR}/calcPhiASE
+        DEPENDS calcPhiASE
 )

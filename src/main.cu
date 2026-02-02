@@ -223,6 +223,7 @@ int main(int argc, char **argv){
           break;
 
         case MPI_PARALLEL_MODE:
+        #ifndef DISABLE_MPI
           usedGpus = calcPhiAseMPI( minRaysPerSample,
               maxRaysPerSample,
               maxRepetitions,
@@ -237,6 +238,11 @@ int main(int argc, char **argv){
               devices.at(0)
               );
           runmode = "GPU mode MPI";
+            #else
+            dout(V_ERROR)<<" TURN 'DISABLE_MPI' to 'OFF' in order to run in MPI mode"<<std::endl;
+            exit(1);
+            #endif
+
           break;
 
         default:
