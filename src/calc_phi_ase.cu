@@ -151,7 +151,7 @@ float calcPhiAse (const unsigned hMinRaysPerSample,
 				  blockDim,
 				  gridDim);
 
-    float hSumPhi = thrust::reduce(dPreImportance.begin(), dPreImportance.end(),0.);
+    double hSumPhi = thrust::reduce(dPreImportance.begin(), dPreImportance.end(),0.);
 
     while(mseTooHigh){
       CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + sample_i));

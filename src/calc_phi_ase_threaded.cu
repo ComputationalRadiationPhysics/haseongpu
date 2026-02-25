@@ -25,6 +25,7 @@
 #include <calc_phi_ase_threaded.hpp>
 #include <mesh.hpp>
 #include <calc_phi_ase.hpp>
+#include <memory>
 
 struct calcDndtAseArgs 
 {
@@ -77,7 +78,8 @@ struct calcDndtAseArgs
 };
 
 void *entryPoint(void* arg){
-  calcDndtAseArgs *a = (calcDndtAseArgs*) arg;
+    //thread takes over memory ownership
+    const std::unique_ptr<calcDndtAseArgs> a(static_cast<calcDndtAseArgs*>(arg));
   calcPhiAse( a->minRaysPerSample,
    	      a->maxRaysPerSample,
 	      a->maxRepetitions,
@@ -94,7 +96,7 @@ void *entryPoint(void* arg){
    	      a->maxSample_i,
 	      a->runtime);
 
-  return arg;
+  return nullptr;
 }
 
 pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
@@ -129,7 +131,12 @@ pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
 					      runtime);
 
   pthread_t threadId;
-  pthread_create( &threadId, NULL, entryPoint, (void*) args);
+  pthread_create( &threadId, nullptr, entryPoint, (void*) args);
+  int rc = pthread_create(&threadId, nullptr, entryPoint, args);
+  if (rc != 0) {
+    delete args;               // important if thread creation fails
+    throw std::runtime_error("pthread_create failed");
+  }
   return threadId;
 
 }
