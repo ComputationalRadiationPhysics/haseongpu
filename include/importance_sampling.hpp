@@ -79,7 +79,7 @@ unsigned importanceSamplingDistribution(const unsigned reflectionSlices,
 					double *preImportance,
 					double *importance,
 					unsigned *raysPerPrism,
-					float hSumPhi,
+					double hSumPhi,
 					const bool distributeRandomly,
 					dim3 blockDim,
 					dim3 gridDim);

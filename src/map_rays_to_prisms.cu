@@ -72,7 +72,7 @@ __global__ void mapPrefixSumToPrisms(
     unsigned *numberOfReflections
     ){
 
-  int id = threadIdx.x + (blockIdx.x * blockDim.x);
+  unsigned id = threadIdx.x + (blockIdx.x * blockDim.x);
   // break if we have too many threads (this is likely)
   if(id >= numberOfPrisms*reflectionSlices) return;
 
