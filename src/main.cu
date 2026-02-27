@@ -50,10 +50,7 @@
 #include <cuda_utils.hpp> /* getFreeDevices */
 #include <logging.hpp>
 #include <ray_histogram.hpp>
-#include <interpolation.hpp> /* interpolateWavelength*/
-
-// default without V_DEBUG
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
+#include <interpolation.hpp> /* interpolateLinear*/
 
 /** 
  * @brief Calculates dndt ASE from phi ASE values
@@ -125,8 +122,8 @@ int main(int argc, char **argv){
   if(fileToVector(inputPath + "sigmaE.txt",  &sigmaE))   return 1;
   if(fileToVector(inputPath + "lambdaA.txt", &lambdaA)) return 1;
   if(fileToVector(inputPath + "lambdaE.txt", &lambdaE)) return 1;
-  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
-  lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
+  lambdaResolution = std::max(lambdaResolution, static_cast<unsigned>(lambdaA.size()));
+  lambdaResolution = std::max(lambdaResolution, static_cast<unsigned>(lambdaE.size()));
   
   assert(sigmaA.size() == lambdaA.size());
   assert(sigmaE.size() == lambdaE.size());
