@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2013-2026 Erik Zenker, Carlchristian Eckert, Marius Melzer, Tim Hanel
  *
  * This file is part of HASEonGPU
  *
@@ -83,26 +83,32 @@ bool isStrictlySorted(const std::vector<T> &v){
  *        The value of y[i] corresponds to the value of x[i].
  *        For Example could you interpolate 100 y values to 1000 y values,
  *        to reach a better resolution.
+ *        The resulting x coordinates correspond to a equidistant spacing
  *
  * @param y                   y values
  * @param x                   x values of y (monoton increasing)
  * @param nInterpolations     number of interpolated values
  *
- * @return vector of linear interpolated y values with size of nInterpolations
+* @return A vector containing the linearly interpolated y values with size
+ *         nInterpolations. The associated x-coordinates are distributed
+ *         equidistantly over the interval (x[0],x[x.size()-1]).
  */
-std::vector<double> interpolateLinear(const std::vector<double> y, const std::vector<double> x, const unsigned nInterpolations){
+std::vector<double> interpolateLinear(const std::vector<double>& y, const std::vector<double>& x, const unsigned nInterpolations){
+    assert(!x.empty());
+    assert(x.size() == y.size());
     assert(nInterpolations >= y.size());
-    assert(y.size() == x.size());
+    assert(isStrictlySorted(x));
+    if (nInterpolations == 0) return {};
+    if (y.size() == 1) return std::vector<double>(nInterpolations, y.front());
 
     // Determine range of x values
     const double x_min = x.at(0);
     const double x_max = x.at(x.size() - 1);
     const double x_range = x_max - x_min;
-    assert(y.size() >= x_range);
 
     // Monochromatic case
     if(y.size() == 1){
-	return std::vector<double>(nInterpolations, y.at(0));
+	    return std::vector<double>(nInterpolations, y.front());
     }
 
     // Check x data if monoton increasing
@@ -110,125 +116,26 @@ std::vector<double> interpolateLinear(const std::vector<double> y, const std::ve
 
     // Create equidistant interpolation on x axis
     std::vector<double> interpolated_x(nInterpolations, 0);
-    for(unsigned i = 0; i < nInterpolations; ++i){
-	interpolated_x.at(i) = x_min + (i * (x_range / nInterpolations));
+    for (unsigned i = 0; i < nInterpolations; ++i) {
+      interpolated_x[i] = x_min + (static_cast<double>(i) * x_range) /
+                                 static_cast<double>(nInterpolations - 1);
     }
 
-    // Start to interpolate y values for every x value
+    // Start to interpolate y values for every "new" x value
     std::vector<double> interpolated_y(nInterpolations, 0);
-    for(unsigned i = 0; i < interpolated_x.size(); ++i){
-	// Get index of points before and after x
-	double y1_i = getNextSmallerIndex(x, interpolated_x.at(i));
-	double y2_i = getNextBiggerIndex(x, interpolated_x.at(i));
-	int y_diff = y2_i - y1_i;
-
-	if(y_diff == 1){
-	    // First point p1=(x1/y1) before x
-	    double x1 = x_min + y1_i;
-	    double y1 = y.at(y1_i);
-
-	    // Second point p2=(x2/y2) after x
-	    double x2 = x_min + y2_i;
-	    double y2 = y.at(y2_i);
-	    assert(y.size() >= y1_i);
-
-	    // linear function between p1 and p2 (y=mx+b)
-	    double m = (y2 - y1) / (x2 / x1);
-	    double b = y1 - (m * x1);
-
-	    // Interpolate y from linear function
-	    interpolated_y.at(i) = m * interpolated_x.at(i) + b;
-
-	}
-	else if(y_diff == 2){
-	    // No interpolation needed
-	    interpolated_y.at(i) = y.at(y1_i + 1);
-	}
-	else {
-	    dout(V_ERROR) << "Index of smaller and bigger sigma too seperated" << std::endl;
-	    exit(0);
-	}
-    
+    unsigned j=0;
+    for(unsigned i = 0; i < x.size()-1; ++i){
+    	double x_orig=x[i];
+    	double x_next=x[i+1];
+    	double y_orig=y[i];
+    	double y_next=y[i+1];
+    	double m = (y_next - y_orig) / (x_next - x_orig);
+    	double b = y_orig - (m * x_orig);
+    	while (j<interpolated_y.size()&&interpolated_x[j]<x_next) {
+    		interpolated_y[j]=b+m*interpolated_x[j];
+    		++j;
+    	}
     }
-  
+    interpolated_y.back() = y.back();
     return interpolated_y;
-}
-
-
-
-/************************************************************************************/
-/************************************************************************************/
-
-/**
- * @brief Interpolates the values of sigma_y to n values(interpolation range) linear. 
- *        With the assumption, they are distributed between lambda_start
- *        and lambda_stop equidistant. For Example could you interpolate
- *        100 sigma values to 1000 sigma values, to reach a better resolution.
- *
- * @deprecated use interpolateLinear instead !
- *
- * @param sigma_y             y values
- * @param interpolation_range number of interpolated values
- * @param lambda_start        start of x range
- * @param lambda_stop         stop of x range
- *
- * @return vector of linear interpolated values
- */
-std::vector<double> interpolateWavelength(const std::vector<double> sigma_y, const unsigned interpolation_range, const double lambda_start, const double lambda_stop){
-  assert(interpolation_range >= sigma_y.size());
-  assert(lambda_stop >= lambda_start);
-
-  // Monochromatic case
-  if(sigma_y.size() == 1){
-    return std::vector<double>(1, sigma_y.at(0));
-  }
-
-  std::vector<double> y(interpolation_range, 0);
-  const double lambda_range = lambda_stop - lambda_start;
-  assert(sigma_y.size() >= lambda_range);
-
-  // Generate sigma_x
-  std::vector<double> sigma_x;
-  for(unsigned i = lambda_start; i <= lambda_stop; ++i){
-    sigma_x.push_back(i);
-  }
-  
-  for(unsigned i = 0; i < interpolation_range; ++i){
-    double x = lambda_start + (i * (lambda_range / interpolation_range));
-
-    // Get index of points before and after x
-    double y1_i = getNextSmallerIndex(sigma_x, x);
-    double y2_i = getNextBiggerIndex(sigma_x, x);
-    int sigma_diff = y2_i - y1_i;
-
-    if(sigma_diff == 1){
-      // First point p1=(x1/y1) before x
-      double x1 = lambda_start + y1_i;
-      double y1 = sigma_y.at(y1_i);
-
-      // Second point p2=(x2/y2) after x
-      double x2 = lambda_start + y2_i;
-      double y2 = sigma_y.at(y2_i);
-      assert(sigma_y.size() >= y1_i);
-
-      // linear function between p1 and p2 (y=mx+b)
-      double m = (y2 - y1) / (x2 / x1);
-      double b = y1 - (m * x1);
-
-      // Interpolate y from linear function
-      y.at(i) = m * x + b;
-
-    }
-    else if(sigma_diff == 2){
-      // No interpolation needed
-      y.at(i) = sigma_y.at(y1_i + 1);
-    }
-    else {
-      dout(V_ERROR) << "Index of smaller and bigger sigma too seperated" << std::endl;
-      exit(0);
-    }
-    
-  }
-  
-  return y;
 }
