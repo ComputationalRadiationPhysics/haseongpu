@@ -17,7 +17,9 @@
  * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include <mpi.h>
+#ifndef DISABLE_MPI
+	#include <mpi.h>
+
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -187,7 +189,6 @@ void mpiCompute(const unsigned minRaysPerSample,
   }
 
 }
-
 float calcPhiAseMPI ( const unsigned minRaysPerSample,
 		      const unsigned maxRaysPerSample,
 		      const unsigned maxRepetitions,
@@ -254,5 +255,6 @@ float calcPhiAseMPI ( const unsigned minRaysPerSample,
 
   return size - 1;
 }
+#endif
 
 
