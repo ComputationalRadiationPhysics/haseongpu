@@ -22,6 +22,7 @@ option(HASE_CUDA_KEEP_FILES
 )
 option(HASE_CUDA_SHOW_CODELINES "Show kernel lines in cuda-gdb and cuda-memcheck" OFF)
 option(DISABLE_MPI "toggle that allows compilation of haseongpu without requiring the MPI dependency" OFF)
+option(HASE_TESTING "Build unit tests" OFF)
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 
@@ -85,48 +86,60 @@ else()
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-# calcPhiASE executable target
-add_executable(calcPhiASE)
 
-file(GLOB_RECURSE calcPhiASE_SOURCES CONFIGURE_DEPENDS
+# core library with all sources
+add_library(hase_core STATIC)
+
+file(GLOB_RECURSE HASE_CORE_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
 )
+list(REMOVE_ITEM HASE_CORE_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cu"
+)
+target_sources(hase_core PRIVATE ${HASE_CORE_SOURCES})
 
-target_sources(calcPhiASE PRIVATE ${calcPhiASE_SOURCES})
-target_include_directories(calcPhiASE PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-
-set_target_properties(calcPhiASE PROPERTIES
-  CUDA_SEPARABLE_COMPILATION ON
-  CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
+target_include_directories(hase_core PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-target_compile_options(calcPhiASE PRIVATE
-  "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${HASE_NVCC_FLAGS}>"
-  "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:${HASE_GCC_FLAGS}>"
-  "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:${HASE_CLANG_FLAGS}>"
+set_target_properties(hase_core PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
 
-target_link_libraries(calcPhiASE PRIVATE
-  Boost::program_options
-  Threads::Threads
-  CUDA::cudart
+target_compile_options(hase_core PRIVATE
+        "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${HASE_NVCC_FLAGS}>"
+        "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:${HASE_GCC_FLAGS}>"
+        "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:${HASE_CLANG_FLAGS}>"
 )
-#enable/disable mpi dependency based on cmake option
+
+target_link_libraries(hase_core PUBLIC
+        Boost::program_options
+        Threads::Threads
+        CUDA::cudart
+)
+
+# enable/disable mpi dependency based on cmake option
 if(NOT DISABLE_MPI)
-    find_package(MPI REQUIRED COMPONENTS C)
-    target_link_libraries(calcPhiASE PRIVATE MPI::MPI_C)
-    target_compile_definitions(calcPhiASE PRIVATE OMPI_SKIP_MPICXX)
+  find_package(MPI REQUIRED COMPONENTS C)
+  target_link_libraries(hase_core PUBLIC MPI::MPI_C)
+  target_compile_definitions(hase_core PUBLIC OMPI_SKIP_MPICXX)
 else()
-    target_compile_definitions(calcPhiASE PRIVATE DISABLE_MPI)
+  target_compile_definitions(hase_core PUBLIC DISABLE_MPI)
 endif()
+# enable Testing
+if(HASE_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
+# (keep your CUDA props / flags / link libs on hase_core as discussed)
 
-# add target
-add_custom_target(examples ALL
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:calcPhiASE>
-        ${CMAKE_CURRENT_BINARY_DIR}/calcPhiASE
-        DEPENDS calcPhiASE
-)
+
+# --- main executable: main.cu + core lib ---
+add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cu")
+
+target_link_libraries(calcPhiASE PRIVATE hase_core)
