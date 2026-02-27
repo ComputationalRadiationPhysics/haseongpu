@@ -71,8 +71,8 @@ Usage
 ### Quick C-Application ASE flux example 
 
   1. follow the compile instructions above
-  2. change path "cd example/c_example/"
-  3. run : `./bin/calcPhiASE --input-path=./input/cylindrical --min-rays=10000`
+  2. change path to repository root directory: `cd haseongpu`
+  3. run : `./build/calcPhiASE ./example/c_example/input/cylindrical --min-rays=10000`
   4. watch progress
   5. take a look at the results in the output directory
 
@@ -282,7 +282,7 @@ Synopsis
 
    + Command:
    
-        ./bin/calcPhiASE [OPTIONS] 
+        ./build/calcPhiASE [OPTIONS] 
 
    + Options:
    
@@ -371,7 +371,7 @@ C-Application Templates
 
 + 4 GPUs, 10K to 100K Rays, 4 Repetitions   
 
-        ./bin/calcPhiASE --input-path=/input/  
+        ./build/calcPhiASE --input-path=./example/c_example/input/  
 	       	 --output-path=/tmp/ 
     		 --parallel-mode=threaded  
     		 --min-rays=10000 
@@ -385,7 +385,7 @@ C-Application Templates
 
 + MPI with 4 GPUs per node   
 
-        mpiexec -npernode 4 ./bin/calcPhiASE  --input-path=/input/  
+        mpiexec -npernode 4 ./build/calcPhiASE  --input-path=./example/c_example/input/  
 		     --output-path=/tmp/  
     		 --parallel-mode=mpi  
     		 --min-rays=10000  
