@@ -27,7 +27,7 @@
 #include <calc_phi_ase.hpp>
 #include <memory>
 
-struct calcDndtAseArgs 
+struct calcDndtAseArgs
 {
   calcDndtAseArgs(const unsigned pminRaysPerSample,
 		  const unsigned pmaxRaysPerSample,
@@ -131,7 +131,6 @@ pthread_t calcPhiAseThreaded( const unsigned minRaysPerSample,
 					      runtime);
 
   pthread_t threadId;
-  pthread_create( &threadId, nullptr, entryPoint, (void*) args);
   int rc = pthread_create(&threadId, nullptr, entryPoint, args);
   if (rc != 0) {
     delete args;               // important if thread creation fails
