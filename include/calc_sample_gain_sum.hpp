@@ -35,7 +35,6 @@
 #pragma once
 
 #include <curand_mtgp32.h> /* curandStateMtgp32 */
-#include <host_defines.h> /* __host__ __device__ */
 
 #include <mesh.hpp>
 

@@ -28,9 +28,7 @@
  **/
 
 #pragma once
-
-#include <host_defines.h> /* __host__ __device__ */
-
+#include <cuda_runtime_api.h>
 struct TwoDimPoint {
   double x;
   double y;

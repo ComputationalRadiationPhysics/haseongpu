@@ -1,154 +1,68 @@
-project(HASEonGPU)
-cmake_minimum_required(VERSION 3.0.1)
+cmake_minimum_required(VERSION 3.24)
+project(HASEonGPU LANGUAGES CUDA CXX C)
+set(CMAKE_CXX_STANDARD 20)
+include(CMakePrintHelpers)
 
-# helper for libs and packages
-set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/"
-  "$ENV{MPI_ROOT}" "$ENV{CUDA_ROOT}" "$ENV{BOOST_ROOT}")
-
-if(CMAKE_CXX_COMPILER_VERSION STREQUAL "")
-    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
+# dependencies
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
+  cmake_policy(SET CMP0167 NEW)
 endif()
 
-if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS "4.8.2")
-    message(FATAL_ERROR "GCC version must be at least 4.8.2 (found version: ${CMAKE_CXX_COMPILER_VERSION})")
-endif(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS "4.8.2")
+set(HASE_BOOST_COMPONENTS program_options system filesystem)
 
-###############################################################################
-# CUDA
-###############################################################################
-find_package(CUDA 5.5 REQUIRED)
-
-set(CUDA_ARCH sm_20 CACHE STRING "Set GPU architecture")
-# Separate C++ from CUDA file compilation (So we can use our own compiler)
-set(CUDA_SEPARABLE_COMPILATION ON)
-# Do not propagate CXX flags to the nvcc host compiler (especially -std=c++11)
-set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-
-string(COMPARE EQUAL ${CUDA_ARCH} "sm_10" IS_CUDA_ARCH_UNSUPPORTED)
-string(COMPARE EQUAL ${CUDA_ARCH} "sm_11" IS_CUDA_ARCH_UNSUPPORTED)
-string(COMPARE EQUAL ${CUDA_ARCH} "sm_12" IS_CUDA_ARCH_UNSUPPORTED)
-string(COMPARE EQUAL ${CUDA_ARCH} "sm_13" IS_CUDA_ARCH_UNSUPPORTED)
-
-if(IS_CUDA_ARCH_UNSUPPORTED)
-  message(FATAL_ERROR "Unsupported CUDA architecture ${CUDA_ARCH} specified. "
-    "SM 2.0 or higher is required.")
-endif(IS_CUDA_ARCH_UNSUPPORTED)
-
-set(CUDA_FTZ "--ftz=false" CACHE STRING "Set flush to zero for GPU")
-
-set(CUDA_MATH --use_fast_math CACHE STRING "Enable fast-math" )
-option(CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
-option(CUDA_KEEP_FILES "Keep all intermediate files that are generated during internal compilation steps (folder: nvcc_tmp)" OFF)
-option(CUDA_SHOW_CODELINES "Show kernel lines in cuda-gdb and cuda-memcheck" OFF)
-
-if(CUDA_SHOW_CODELINES)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" --source-in-ptx -Xcompiler -rdynamic -lineinfo)
-  set(CUDA_KEEP_FILES ON CACHE BOOL "activate keep files" FORCE)
-endif(CUDA_SHOW_CODELINES)
-
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${nvcc_flags} -arch=${CUDA_ARCH} ${CUDA_MATH} ${CUDA_FTZ})
-if(CUDA_SHOW_REGISTER)
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -Xptxas=-v)
-endif(CUDA_SHOW_REGISTER)
-
-if(CUDA_KEEP_FILES)
-  make_directory("${PROJECT_BINARY_DIR}/nvcc_tmp")
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" --keep --keep-dir "${PROJECT_BINARY_DIR}/nvcc_tmp")
-endif(CUDA_KEEP_FILES)
-
-
-
-################################################################################
-# Find MPI
-################################################################################
-find_package(MPI)
-if(MPI_C_FOUND)
-  include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
-  set(LIBS ${LIBS} ${MPI_C_LIBRARIES})
-  add_definitions(-DMPI_FOUND)
-endif(MPI_C_FOUND)
-
-# bullxmpi fails if it can not find its c++ counter part
-if(MPI_CXX_FOUND)
-  set(LIBS ${LIBS} ${MPI_CXX_LIBRARIES})
-  # The define can be used in the code to disable MPI features
-  add_definitions(-DMPI_FOUND)
-endif(MPI_CXX_FOUND)
-
-
-###############################################################################
-# Boost
-###############################################################################
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-## The two paths might need to be set on windows
-## the following example paths are for a default installation of the pre-compiled
-## libraries from http://boost.teeks99.com/ (does NOT include Boost.MPI)
-# set(BOOST_LIBRARYDIR "C:/local/boost_1_58_0/lib64-msvc-12.0")
-# set(BOOST_ROOT "C:/local/boost_1_58_0")
-find_package(Boost 1.50.0 REQUIRED COMPONENTS program_options system filesystem)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
-
-find_package(Boost 1.50.0 OPTIONAL_COMPONENTS mpi)
-if(Boost_MPI_FOUND)
-    # The define can be used in the code to disable Boost.MPI features like GrayBat
-    add_definitions(-DBOOST_MPI_FOUND)
-    include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-    set(LIBS ${LIBS} ${Boost_LIBRARIES})
+if(NOT DISABLE_MPI)
+    list(APPEND HASE_BOOST_COMPONENTS mpi)
 endif()
 
-if(Boost_VERSION EQUAL 105500)
-  message(FATAL_ERROR "Boost 1.55 is not supported. Use a lower or a higher version instead!")
-endif(Boost_VERSION EQUAL 105500)
-
-
-
-################################################################################
-# Find PThreads
-################################################################################
+find_package(Boost 1.70.0 REQUIRED COMPONENTS ${HASE_BOOST_COMPONENTS})
 find_package(Threads REQUIRED)
-set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+find_package(CUDAToolkit REQUIRED COMPONENTS cudart)
 
+# build options
+option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
+option(HASE_CUDA_FASTMATH "Enable fast-math" ON)
+option(HASE_CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
+option(HASE_CUDA_KEEP_FILES
+        "Keep all intermediate files that are generated during internal compilation steps (folder: nvcc_tmp)"
+        OFF
+)
+option(HASE_CUDA_SHOW_CODELINES "Show kernel lines in cuda-gdb and cuda-memcheck" OFF)
+option(DISABLE_MPI "toggle that allows compilation of haseongpu without requiring the MPI dependency" OFF)
+option(HASE_TESTING "Build unit tests" OFF)
 
-################################################################################
-# Compiler Flags
-################################################################################
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
+set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 
-# GNU
-if(CMAKE_COMPILER_IS_GNUCXX)
-# Visual Studio (Microsoft)
- elseif(MSVC)
-    # This loop sets all linking to static (MT)
-    foreach(flag_var
-    CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-    CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        if(${flag_var} MATCHES "/MD")
-            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        endif(${flag_var} MATCHES "/MD")
-    endforeach(flag_var)
+# CUDA compiler Flags
+set(HASE_NVCC_FLAGS "")
+
+if(HASE_CUDA_SHOW_CODELINES)
+  set(HASE_CUDA_KEEP_FILES ON)
+  list(APPEND HASE_NVCC_FLAGS --source-in-ptx -Xcompiler -rdynamic -lineinfo)
 endif()
 
+if(HASE_CUDA_FLUSHTOZERO)
+  list(APPEND HASE_NVCC_FLAGS --ftz=true)
+else()
+  list(APPEND HASE_NVCC_FLAGS --ftz=false)
+endif()
 
-################################################################################
-# Cross Platform Definitions
-################################################################################
+if(HASE_CUDA_FASTMATH)
+  list(APPEND HASE_NVCC_FLAGS --use_fast_math)
+endif()
 
-if(MSVC)
-    # Make M_PI (found in <cmath>) available on Windows
-    add_definitions(/D_USE_MATH_DEFINES)
-endif(MSVC)
+if(HASE_CUDA_KEEP_FILES)
+  set(NVCC_TMP_DIR "${PROJECT_BINARY_DIR}/nvcc_tmp")
+  file(MAKE_DIRECTORY "${NVCC_TMP_DIR}")
+  list(APPEND HASE_NVCC_FLAGS --keep --keep-dir "${NVCC_TMP_DIR}")
+endif()
 
+cmake_print_variables(HASE_NVCC_FLAGS)
 
-###############################################################################
-# Warning for Thrust-related Bug
-###############################################################################
+# C++ compiler Flags
+set(HASE_GCC_FLAGS -Wall -Wextra)
+set(HASE_CLANG_FLAGS -Wall -Wextra)
+
+# warning for Thrust-related Bug
 function(warn_path_cuda PATH_VARIABLE)
   string(TOLOWER "$ENV{${PATH_VARIABLE}}" CPLUS_TOLOWER)
   string(FIND "${CPLUS_TOLOWER}" "cuda" CPLUS_TOLOWER_FOUND)
@@ -162,67 +76,119 @@ function(warn_path_cuda PATH_VARIABLE)
       "source: https://code.google.com/p/thrust/issues/detail?id=359#c5 \n"
       "issue:  https://github.com/ComputationalRadiationPhysics/haseongpu/issues/26"
       "CPATH:  https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html \n")
-  endif(NOT "${CPLUS_TOLOWER_FOUND}" MATCHES "-1")
-endfunction(warn_path_cuda)
+  endif()
+endfunction()
 
 warn_path_cuda("CPLUS_INCLUDE_PATH")
 warn_path_cuda("C_INCLUDE_PATH")
 
-
-###############################################################################
-# Executables
-###############################################################################
-set(HASEonGPU_NAME "calcPhiASE")
-file(GLOB SRCFILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c*")
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-if(NOT MPI_FOUND)
-    LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_mpi.cc)
-endif()
-
-if(Boost_MPI_FOUND)
-     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/graybat)
+# build type (debug, release)
+option(HASE_RELEASE "Build release version, disables all runtime asserts" OFF)
+if(HASE_RELEASE)
+  message(STATUS "Release version")
+  set(CMAKE_BUILD_TYPE Release)
 else()
-	LIST(REMOVE_ITEM SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/calc_phi_ase_graybat.cc)
+  message(STATUS "Debug version")
+  set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-cuda_add_executable(${HASEonGPU_NAME} ${SRCFILES})
-target_link_libraries(${HASEonGPU_NAME} ${LIBS} ${CUDA_CUDART_LIBRARY})
+
+# core library with all sources
+add_library(hase_core STATIC)
+
+file(GLOB_RECURSE HASE_CORE_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
+)
+list(REMOVE_ITEM HASE_CORE_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc"
+)
+target_sources(hase_core PRIVATE ${HASE_CORE_SOURCES})
+
+target_include_directories(hase_core PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+set_target_properties(hase_core PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
+)
+
+target_compile_options(hase_core PRIVATE
+        "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${HASE_NVCC_FLAGS}>"
+        "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:${HASE_GCC_FLAGS}>"
+        "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:${HASE_CLANG_FLAGS}>"
+)
+
+target_link_libraries(hase_core PUBLIC
+        Boost::program_options
+        Boost::filesystem
+        Boost::system
+        Threads::Threads
+        CUDA::cudart
+)
+
+# enable/disable mpi dependency based on cmake option
+if(NOT DISABLE_MPI)
+    option(USE_GRAYBAT "Use Graph Approach for Highly Generic Communication Schemes Based on Adaptive Topologies (Graybat)" OFF)
+    if(USE_GRAYBAT)
+        include(FetchContent)
+
+        FetchContent_Declare(graybat
+                GIT_REPOSITORY https://github.com/ComputationalRadiationPhysics/graybat.git
+                GIT_TAG dev-c++11
+                GIT_SHALLOW TRUE
+        )
+
+        # Fetch sources, but do NOT add_subdirectory() / MakeAvailable()
+        FetchContent_GetProperties(graybat)
+        if(NOT graybat_POPULATED)
+            FetchContent_Populate(graybat)
+        endif()
+
+        # Graybat ships graybatConfig.cmake in its repo root, so we can use it directly
+        find_package(graybat 1.0.0 REQUIRED CONFIG
+                PATHS "${graybat_SOURCE_DIR}"
+        )
+
+        # Example integration with your target
+        target_include_directories(hase_core SYSTEM PRIVATE
+                ${graybat_INCLUDE_DIRS}
+        )
+
+        # Graybat says these "generated files" must be compiled with your target
+        target_sources(hase_core PRIVATE
+                ${graybat_GENERATED_FILES}
+        )
+
+        target_compile_definitions(hase_core PRIVATE
+                ${graybat_DEFINITIONS}
+        )
+
+        target_link_libraries(hase_core PRIVATE
+                ${graybat_LIBRARIES}
+        )
+        target_compile_definitions(hase_core PUBLIC USE_GRAYBAT)
+        target_link_libraries(hase_core PUBLIC Boost::mpi)
+    endif()
+    find_package(MPI REQUIRED)
+    target_link_libraries(hase_core PUBLIC MPI::MPI_CXX)
+else()
+    target_compile_definitions(hase_core PUBLIC DISABLE_MPI)
+endif ()
+
+# enable Testing
+if(HASE_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
+# (keep your CUDA props / flags / link libs on hase_core as discussed)
 
 
-###############################################################################
-# more targets (make examples, make new, make doc)
-###############################################################################
-if(CMAKE_COMPILER_IS_GNUCXX) # Only useful on Linux
-add_custom_target(
-  examples
-  ALL
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example/bin
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/bin
-  COMMAND mkdir -p ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/output
-  COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/${HASEonGPU_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example/bin
-  COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/${HASEonGPU_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/example/c_example/bin
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/${HASEonGPU_NAME}.m ${CMAKE_CURRENT_SOURCE_DIR}/example/matlab_example
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/src/${HASEonGPU_NAME}.m ${CMAKE_CURRENT_SOURCE_DIR}/.
-  DEPENDS ${HASEonGPU_NAME}
-  )
+# --- main executable: main.cu + core lib ---
+add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
 
-add_custom_target(
-  new
-  COMMAND make clean
-  COMMAND make
-  )
-
-# for later...
-#
-#find_package(Doxygen)
-#if(DOXYGEN_FOUND)
-#  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxygen.conf ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
-#  add_custom_target(doc
-#    ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-#    COMMENT "Generating API documentation with Doxygen" VERBATIM
-#    )
-#endif(DOXYGEN_FOUND)
-endif(CMAKE_COMPILER_IS_GNUCXX)
+target_link_libraries(calcPhiASE PRIVATE hase_core)

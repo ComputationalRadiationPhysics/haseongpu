@@ -41,8 +41,6 @@
 #include <mesh.hpp>
 #include <geometry.hpp> /* ReflectionPlane */
 
-#include <host_defines.h> /* __host__ __device__ */
-
 /**
  * @brief Direct ray propagation without reflection
  *

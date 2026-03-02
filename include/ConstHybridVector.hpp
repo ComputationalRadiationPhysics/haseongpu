@@ -5,8 +5,7 @@
 
 #include <cuda_utils.hpp> /* copyToDevice */
 #include <cuda_runtime_api.h>
-#include <host_defines.h> /* __host__ __device__ */
-
+#include <span>
 
 /**
  * @brief Vector on host and array on device
@@ -44,9 +43,8 @@ public:
     return &(hostV.at(0));
   }
 
-  __host__ T* toArray() const{
-    std::vector<T> copyV = hostV;
-    return &(copyV.at(0));
+  __host__ auto toArray() const{
+    return std::span<const T>(hostV.data(), hostV.size());
   }
 
   __host__ std::vector<T> toVector() const{

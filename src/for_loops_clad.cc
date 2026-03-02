@@ -29,7 +29,7 @@
 
 #define ALIVE 1
 #define DEAD 0
-#define SMALL_FOR_LOOPS 1E-06 // 1µm is considered to be small
+#define SMALL_FOR_LOOPS 1E-06 // 1ï¿½m is considered to be small
 #define MAXREFL 5 // number of max amount of reflections <= this has to be done in a better way later (distance defines the max number)
 
 // change 2011/02/23
@@ -42,7 +42,8 @@
 // compiler note: mex for_loops_clad.cpp mt19937ar.cpp
 
 //global variables
-double *p_in, *beta_v, *n_x, *n_y, *center_x, *center_y;
+double *p_in, *beta_v;
+double const *n_y,*n_x,*center_y,*center_x;
 int *neighbors, *forbidden;
 unsigned *n_p;
 int size_p, N_cells, mesh_z, rays;
@@ -108,7 +109,10 @@ float forLoopsClad(
   t_in = mesh->trianglePointIndices;
   beta_v = mesh->betaVolume;
   n_x = mesh->normalVec;
-  n_y = &(mesh->normalVec.toArray()[3 * mesh->numberOfTriangles]);
+  auto normalVecArr = mesh->normalVec.toArray();  // owns data for the whole function
+
+  n_y = normalVecArr.data() + 3 * mesh->numberOfTriangles;
+
   neighbors = mesh->triangleNeighbors;
   surface_new = mesh->triangleSurfaces;
   center_x = mesh->centers;
@@ -239,13 +243,15 @@ return 0;
 // as well as the beta informations
 // give back to integrated gain
 
-double propagation(double x_pos, double y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start, int N_refl){
+double propagation(double const start_x_pos, double const start_y_pos, double z_pos, double x_dest, double y_dest, double z_dest, int t_start, int mesh_start, int N_refl){
 //    in first try no reflections
 //    calculate the vector and make the the calculation, which surface would be the shortest to reach
 //    then get the length, make the integration, get the information about the next cell out of the array
 //    set the point to the surface (this surface is "forbidden" in the calculations)
 //    proceed until you hit a the point or the surface
 //    if you are closer then "small" stop and return the value
+    double x_pos=start_x_pos;
+    double y_pos=start_y_pos;
     double vec_x, vec_y,vec_z, norm;
     double distance, length, length_help, distance_total;
     double gain=1;

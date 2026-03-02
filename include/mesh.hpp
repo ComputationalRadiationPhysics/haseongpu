@@ -34,7 +34,6 @@
 #include <ConstHybridVector.hpp>
 
 #include <curand_mtgp32.h> /* curandStateMtgp32 */
-#include <host_defines.h> /* __host__ __device__ */
 
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5

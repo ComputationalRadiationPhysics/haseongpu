@@ -17,7 +17,7 @@
  * along with HASEonGPU.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-
+#if defined(USE_GRAYBAT)
 // STL
 #include <vector>
 #include <algorithm> /* std::iota */
@@ -34,7 +34,7 @@
 #include <graybat/Cage.hpp>
 #include <graybat/communicationPolicy/BMPI.hpp>
 #include <graybat/graphPolicy/BGL.hpp>
-#include <graybat/pattern/BidirectionalStar.hpp>
+#include <graybat/pattern/BiStar.hpp>
 #include <graybat/mapping/Roundrobin.hpp>
 
 // Const messages
@@ -174,7 +174,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
     // Init
     Cage cage;
     const unsigned nPeers = cage.getPeers().size();
-    cage.setGraph(graybat::pattern::BidirectionalStar(nPeers));
+    cage.setGraph(graybat::pattern::BiStar<GP>(nPeers));
     cage.distribute(graybat::mapping::Roundrobin());
     const Vertex master = cage.getVertex(0);
     
@@ -186,7 +186,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
     std::iota(samples.begin(), samples.end(), compute.minSampleRange);
 
     // Determine phi ase for each sample
-    for(Vertex vertex : cage.hostedVertices) {
+    for(Vertex vertex : cage.getHostedVertices()) {
 
 	/*******************************************************************
 	 * MASTER
@@ -212,3 +212,4 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
     return cage.getVertices().size() - 1;
     
 }
+#endif

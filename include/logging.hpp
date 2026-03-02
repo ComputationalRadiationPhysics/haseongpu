@@ -43,8 +43,8 @@
 #define COLOR_STATISTIC 32 //green
 #define COLOR_DEBUG 36  //cyan
 
-
-extern unsigned verbosity;
+// default without V_DEBUG
+inline unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
 
 struct nullstream : std::ostream {
   nullstream() : std::ostream(0) { }

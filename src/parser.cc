@@ -344,19 +344,19 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, con
     }
 
     if (parallelMode != ParallelMode::THREADED
-#if defined(MPI_FOUND)
+#if !defined(DISABLE_MPI)
             && parallelMode != ParallelMode::MPI
 #endif
-#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+#if defined(USE_GRAYBAT)
             && parallelMode != ParallelMode::GRAYBAT
 #endif
             ) {
         dout(V_ERROR) << CompSwitch::parallel_mode << " must be one of \""
             << ParallelMode::THREADED << "\""
-#if defined(MPI_FOUND)
+#if !defined(DISABLE_MPI)
             << ", \"" << ParallelMode::MPI << "\""
 #endif
-#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+#if defined(USE_GRAYBAT)
             << ", \"" << ParallelMode::GRAYBAT << "\""
 #endif
             << std::endl;
@@ -474,7 +474,7 @@ Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const uns
 
 
 template <class T, class B, class E>
-void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
+void assertRange([[maybe_unused]]const std::vector<T> &v,[[maybe_unused]] const B minElement,[[maybe_unused]]const E maxElement,[[maybe_unused]] const bool equals){
   if(equals){
     assert(*std::min_element(v.begin(),v.end()) == minElement);
     assert(*std::max_element(v.begin(),v.end()) == maxElement);
@@ -486,7 +486,7 @@ void assertRange(const std::vector<T> &v, const B minElement,const E maxElement,
 
 
 template <class T, class B>
-void assertMin(const std::vector<T> &v,const  B minElement,const bool equals){
+void assertMin([[maybe_unused]]const std::vector<T>& v,[[maybe_unused]]const  B minElement,const bool equals){
   if(equals){
     assert(*std::min_element(v.begin(),v.end()) == minElement);
   }else{
