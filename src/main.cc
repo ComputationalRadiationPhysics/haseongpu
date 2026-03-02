@@ -52,20 +52,17 @@ namespace fs = boost::filesystem;
 #include <ray_histogram.hpp>
 #include <types.hpp>
 #include <calc_phi_ase_threaded.hpp>
-
-#if defined(MPI_FOUND)
+#if !defined(DISABLE_MPI)&&defined(MPI_FOUND)
 #include <calc_phi_ase_mpi.hpp>
 #endif
 
-#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+
+#if defined(USE_GRAYBAT)
 #include <calc_phi_ase_graybat.hpp>
 #endif
 
 #include <cuda_runtime_api.h> /* cudaDeviceReset */
 
-
-// default without V_DEBUG
-unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
 
 /** 
  * @brief Calculates dndt ASE from phi ASE values
@@ -158,25 +155,29 @@ int main(int argc, char **argv){
             runtime = *(std::max_element(runtimes.begin(),runtimes.end()));
             cudaDeviceReset();      
         }
-#if defined(MPI_FOUND)
+
         else if(compute.parallelMode == ParallelMode::MPI){
-                
+#if defined(MPI_FOUND) &&!defined(DISABLE_MPI)
             usedGPUs = calcPhiAseMPI( experiment,
                                       compute,
                                       mesh,
                                       result );
-
-        }
+#else
+            dout(V_ERROR) << "TURN 'DISABLE_MPI' to 'OFF' in order to run PhiASE on multiple nodes!";
+  exit(1);
 #endif
-#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
+        }
+
+
         else if(compute.parallelMode == ParallelMode::GRAYBAT){
+#if defined(USE_GRAYBAT)
             usedGPUs = calcPhiAseGrayBat( experiment,
                                           compute,
                                           mesh,
                                           result );
-
-        }
 #endif
+        }
+
         else{
             dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
             exit(1);

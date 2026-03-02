@@ -31,8 +31,6 @@
 #include <mesh.hpp>
 #include <geometry.hpp>
 
-#include <host_defines.h> /* __host__ __device__ */
-
 /**
  * @brief Calculates the reflectionPoint and reflectionAngle with upper or lower surface
  *        of gain medium. Depending on the number of reflection the

@@ -26,7 +26,7 @@
  */
 
 #pragma once
-
+#include <cmath>
 /**
  * @brief this allows the use of isnan() for int and unsigned
  * in the template function fileToVector()
@@ -40,14 +40,14 @@ inline bool isNaN(const unsigned int){
 }
 
 inline bool isNaN(const float i){
-  return isnan(i);
+  return std::isnan(i);
 }
 
 inline bool isNaN(const double i){
-  return isnan(i);
+  return std::isnan(i);
 }
 
 inline bool isNaN(const long double i){
-  return isnan(i);
+  return std::isnan(i);
 }
 

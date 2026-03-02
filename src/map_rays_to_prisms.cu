@@ -20,8 +20,9 @@
 
 
 #include <thrust/scan.h>
-#include <thrust/device_vector.h>
 
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 #include <map_rays_to_prisms.hpp>
 
 
@@ -71,7 +72,7 @@ __global__ void mapPrefixSumToPrisms(
     unsigned *numberOfReflections
     ){
 
-  unsigned id = threadIdx.x + (blockIdx.x * blockDim.x);
+  int id = threadIdx.x + (blockIdx.x * blockDim.x);
   // break if we have too many threads (this is likely)
   if(id >= numberOfPrisms*reflectionSlices) return;
 

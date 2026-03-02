@@ -40,7 +40,7 @@ from calcPhiASE import calcPhiASE
 import csv
 from pathlib import Path
 
-def main(material_path: str = "pt.mat"):
+def main(material_path: str = "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
     #precheck the file path and throw in case this is not present
     # Crystal parameter
     crystal = {
@@ -113,11 +113,12 @@ def main(material_path: str = "pt.mat"):
     time_t = timetotal / timeslice
 
     # ASE application
-    maxGPUs = 4
+    maxGPUs = gpus
     nPerNode = 4
     deviceMode = 'gpu'
     # parallelMode = 'mpi'
-    parallelMode = 'threaded'
+    # parallelMode = 'threaded'
+    parallelMode = parallel_mode
     useReflections = True
     refractiveIndices = [1.83, 1, 1.83, 1]
     repetitions = 4
@@ -461,6 +462,18 @@ if __name__ == "__main__":
         default="pt.mat",
         help="Path to material/mesh MAT file (default: pt.mat)",
     )
+    parser.add_argument(
+        "--number_of_gpus",
+        "-nr_gpus",
+        default=1,
+        help="The number of gpus used for phiASE calculation (default: 1)",
+    )
+    parser.add_argument(
+        "--parallel_mode",
+        "-par",
+        default="threaded",
+        help="The Parallel Mode used for phiASE [threaded|mpi|graybat] (default: threaded)",
+    )
     args = parser.parse_args()
     material_path = Path(args.material)
 
@@ -474,6 +487,6 @@ if __name__ == "__main__":
         raise ValueError(
             f"Material path '{material_path}' is not a file."
         )
-    main(material_path=args.material)
+    main(material_path=args.material,gpus=args.number_of_gpus,parallel_mode=args.parallel_mode)
 
 

@@ -28,42 +28,39 @@ namespace fs = boost::filesystem;
 
 
 struct DeviceMode {
-    static const std::string NONE;
-    static const std::string GPU;
-    static const std::string CPU;
+    static const inline std::string NONE  = "no_device_mode";
+    static const inline std::string GPU   = "gpu";
+    static const inline std::string CPU   = "cpu";
 };
 
 
 struct ParallelMode {
-    static const std::string NONE;
-    static const std::string THREADED;
-#if defined(MPI_FOUND)
-    static const std::string MPI;
-#endif
-#if defined(BOOST_MPI_FOUND) || defined(ZMQ_FOUND)
-    static const std::string GRAYBAT;
-#endif
+    static const inline std::string NONE        = "no_parallel_mode";
+    static const inline std::string THREADED    = "threaded";
+    static const inline std::string MPI         = "mpi";
+    static const inline std::string GRAYBAT     = "graybat";
+
 };
 
 struct CompSwitch{
-    static const std::string parallel_mode;
-    static const std::string device_mode;
-    static const std::string ngpus;
-    static const std::string repetitions;
-    static const std::string adaptive_steps;
-    static const std::string min_sample_i;
-    static const std::string max_sample_i;
-    static const std::string write_vtk;
+    static const inline std::string parallel_mode     = "parallel-mode";
+    static const inline std::string device_mode       = "device-mode";
+    static const inline std::string ngpus             = "ngpus";
+    static const inline std::string repetitions       = "repetitions";
+    static const inline std::string adaptive_steps    = "adaptive-steps";
+    static const inline std::string min_sample_i      = "min-sample-i";
+    static const inline std::string max_sample_i      = "max-sample-i";
+    static const inline std::string write_vtk         = "write-vtk";
 };
 
 struct ExpSwitch{
-    static const std::string input_path;
-    static const std::string output_path;
-    static const std::string min_rays;
-    static const std::string max_rays;
-    static const std::string mse;
-    static const std::string reflection;
-    static const std::string spectral;
+    static const inline std::string input_path     = "input-path";
+    static const inline std::string output_path    = "output-path";
+    static const inline std::string min_rays       = "min-rays";
+    static const inline std::string max_rays       = "max-rays";
+    static const inline std::string mse            = "mse-threshold";
+    static const inline std::string reflection     = "reflection";
+    static const inline std::string spectral       = "spectral-resolution";
 };
 
 struct ComputeParameters {

@@ -36,7 +36,7 @@
 
 
 template <class T, class B, class E>
-void assertRange(const std::vector<T> &v, const B minElement,const E maxElement, const bool equals){
+void assertRange([[maybe_unused]] const std::vector<T> &v, [[maybe_unused]] const B minElement,[[maybe_unused]] const E maxElement,[[maybe_unused]] const bool equals){
   if(equals){
     assert(*std::min_element(v.begin(),v.end()) == minElement);
     assert(*std::max_element(v.begin(),v.end()) == maxElement);
@@ -47,7 +47,7 @@ void assertRange(const std::vector<T> &v, const B minElement,const E maxElement,
 }
 
 template <class T, class B>
-void assertMin(const std::vector<T>& v,const  B minElement,const bool equals){
+void assertMin([[maybe_unused]] const std::vector<T>& v,[[maybe_unused]] const  B minElement,[[maybe_unused]] const bool equals){
   if(equals){
     assert(*std::min_element(v.begin(),v.end()) == minElement);
   }else{
@@ -110,9 +110,7 @@ Mesh::Mesh(// Constants
 
 }
 
-Mesh::~Mesh() {
-    
-}
+Mesh::~Mesh() = default;
 
 __host__ void Mesh::free(){
     points.free();
@@ -318,7 +316,7 @@ double calculateMaxDiameter(const double* points, const unsigned offset) {
 }
 
 unsigned Mesh::getMaxReflections (ReflectionPlane reflectionPlane) const{
-  double d = calculateMaxDiameter(points.toArray(),numberOfPoints);
+  double d = calculateMaxDiameter(points.toArray().data(),numberOfPoints);
   float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
   double h = numberOfLevels * thickness; 
   double z = d/tan(alpha);
