@@ -95,7 +95,7 @@ warn_path_cuda("CPLUS_INCLUDE_PATH")
 warn_path_cuda("C_INCLUDE_PATH")
 
 # build type (debug, release)
-option(HASE_RELEASE "Build release version, disables all runtime asserts" OFF)
+option(HASE_RELEASE "Build release version, disables all runtime asserts" ON)
 if(HASE_RELEASE)
     message(STATUS "Release version")
     set(CMAKE_BUILD_TYPE Release)
