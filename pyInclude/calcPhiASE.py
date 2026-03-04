@@ -214,56 +214,56 @@ def calcPhiASE_mpi(
 
 
 def calcPhiASE(
-        p,
-        t_int,
-        beta_cell,
-        beta_vol,
-        clad_int,
-        clad_number,
-        clad_abs,
+        points,
+        trianglePointIndices,
+        betaCells,
+        betaVolume,
+        claddingCellTypes,
+        claddingNumber,
+        claddingAbsorption,
         useReflections,
         refractiveIndices,
         reflectivities,
-        normals_x,
-        normals_y,
-        ordered_int,
-        surface,
-        x_center,
-        y_center,
-        normals_p,
-        forbidden,
+        triangleNormalsX,
+        triangleNormalsY,
+        triangleNeighbors,
+        triangleSurfaces,
+        triangleCenterX,
+        triangleCenterY,
+        triangleNormalPoint,
+        forbiddenEdge,
         minRaysPerSample,
         maxRaysPerSample,
         mseThreshold,
         repetitions,
-        N_tot,
-        z_mesh,
-        laser,
+        nTot,
+        thickness,
+        laserParameter,
         crystal,
-        mesh_z,
+        numberOfLevels,
         deviceMode,
         parallelMode,
         maxGPUs,
         nPerNode
 ):
     def transform_inputs(
-            p,
-            t_int,
-            beta_cell,
-            beta_vol,
-            clad_int,
+            points,
+            trianglePointIndices,
+            betaCells,
+            betaVolume,
+            claddingCellTypes,
             refractiveIndices,
             reflectivities,
-            normals_x,
-            normals_y,
-            ordered_int,
-            surface,
-            x_center,
-            y_center,
-            normals_p,
-            forbidden,
-            laser,
-            mesh_z,
+            triangleNormalsX,
+            triangleNormalsY,
+            triangleNeighbors,
+            triangleSurfaces,
+            triangleCenterX,
+            triangleCenterY,
+            triangleNormalPoint,
+            forbiddenEdge,
+            laserParameter,
+            numberOfLevels,
     ):
         def is_numpy(x):
             return isinstance(x, np.ndarray)
@@ -307,104 +307,108 @@ def calcPhiASE(
 
             return flat
 
-        p_arr = as_array(p, "p")
-        if p_arr.ndim == 2:
-            if p_arr.shape[1] != 2:
-                raise ValueError(f"p must have shape (numberOfPoints, 2), got {p_arr.shape}")
+        points_arr = as_array(points, "points")
+        if points_arr.ndim == 2:
+            if points_arr.shape[1] != 2:
+                raise ValueError(
+                    f"points must have shape (numberOfPoints, 2), got {points_arr.shape}"
+                )
             layout = "matrix"
-            numberOfPoints = int(p_arr.shape[0])
-        elif p_arr.ndim == 1:
-            if p_arr.size % 2 != 0:
-                raise ValueError(f"flat p must have even length, got {p_arr.size}")
+            numberOfPoints = int(points_arr.shape[0])
+        elif points_arr.ndim == 1:
+            if points_arr.size % 2 != 0:
+                raise ValueError(f"flat points must have even length, got {points_arr.size}")
             layout = "flattened"
-            numberOfPoints = int(p_arr.size // 2)
+            numberOfPoints = int(points_arr.size // 2)
         else:
-            raise ValueError(f"Unsupported p shape {p_arr.shape}")
+            raise ValueError(f"Unsupported points shape {points_arr.shape}")
 
-        t_int_arr = as_array(t_int, "t_int")
-        if t_int_arr.ndim == 2:
-            if t_int_arr.shape[1] != 3:
+        trianglePointIndices_arr = as_array(trianglePointIndices, "trianglePointIndices")
+        if trianglePointIndices_arr.ndim == 2:
+            if trianglePointIndices_arr.shape[1] != 3:
                 raise ValueError(
-                    f"t_int must have shape (numberOfTriangles, 3), got {t_int_arr.shape}"
+                    f"trianglePointIndices must have shape (numberOfTriangles, 3), got {trianglePointIndices_arr.shape}"
                 )
-            numberOfTriangles = int(t_int_arr.shape[0])
-        elif t_int_arr.ndim == 1:
-            if t_int_arr.size % 3 != 0:
+            numberOfTriangles = int(trianglePointIndices_arr.shape[0])
+        elif trianglePointIndices_arr.ndim == 1:
+            if trianglePointIndices_arr.size % 3 != 0:
                 raise ValueError(
-                    f"flat t_int length must be divisible by 3, got {t_int_arr.size}"
+                    f"flat trianglePointIndices length must be divisible by 3, got {trianglePointIndices_arr.size}"
                 )
-            numberOfTriangles = int(t_int_arr.size // 3)
+            numberOfTriangles = int(trianglePointIndices_arr.size // 3)
         else:
-            raise ValueError(f"Unsupported t_int shape {t_int_arr.shape}")
+            raise ValueError(f"Unsupported trianglePointIndices shape {trianglePointIndices_arr.shape}")
 
-        container = "ndarray" if is_numpy(p) else "list"
+        container = "ndarray" if is_numpy(points) else "list"
 
         return {
             "layout": layout,
             "container": container,
             "numberOfPoints": numberOfPoints,
             "numberOfTriangles": numberOfTriangles,
-            "numberOfLevels": int(mesh_z),
+            "numberOfLevels": int(numberOfLevels),
 
-            "p_flat": pack(p, "p", width=2, dtype=np.float64),
-            "t_int_flat": pack(t_int, "t_int", width=3, dtype=np.uint32),
-            "beta_cell_flat": pack(beta_cell, "beta_cell", dtype=np.float64),
-            "beta_vol_flat": pack(beta_vol, "beta_vol", width=int(mesh_z) - 1, dtype=np.float64),
-            "clad_int_flat": pack(clad_int, "clad_int", dtype=np.uint32),
+            "points_flat": pack(points, "points", width=2, dtype=np.float64),
+            "trianglePointIndices_flat": pack(trianglePointIndices, "trianglePointIndices", width=3, dtype=np.uint32),
+            "betaCells_flat": pack(betaCells, "betaCells", dtype=np.float64),
+            "betaVolume_flat": pack(betaVolume, "betaVolume", width=int(numberOfLevels) - 1, dtype=np.float64),
+            "claddingCellTypes_flat": pack(claddingCellTypes, "claddingCellTypes", dtype=np.uint32),
             "refractiveIndices_flat": pack(refractiveIndices, "refractiveIndices", dtype=np.float32),
             "reflectivities_flat": pack(reflectivities, "reflectivities", dtype=np.float32),
-            "normals_x_flat": pack(normals_x, "normals_x", width=3, dtype=np.float64),
-            "normals_y_flat": pack(normals_y, "normals_y", width=3, dtype=np.float64),
-            "ordered_int_flat": pack(ordered_int, "ordered_int", width=3, dtype=np.int32),
-            "surface_flat": pack(surface, "surface", dtype=np.float32),
-            "x_center_flat": pack(x_center, "x_center", dtype=np.float64),
-            "y_center_flat": pack(y_center, "y_center", dtype=np.float64),
-            "normals_p_flat": pack(normals_p, "normals_p", width=3, dtype=np.uint32),
-            "forbidden_flat": pack(forbidden, "forbidden", width=3, dtype=np.int32),
+            "triangleNormalsX_flat": pack(triangleNormalsX, "triangleNormalsX", width=3, dtype=np.float64),
+            "triangleNormalsY_flat": pack(triangleNormalsY, "triangleNormalsY", width=3, dtype=np.float64),
+            "triangleNeighbors_flat": pack(triangleNeighbors, "triangleNeighbors", width=3, dtype=np.int32),
+            "triangleSurfaces_flat": pack(triangleSurfaces, "triangleSurfaces", dtype=np.float32),
+            "triangleCenterX_flat": pack(triangleCenterX, "triangleCenterX", dtype=np.float64),
+            "triangleCenterY_flat": pack(triangleCenterY, "triangleCenterY", dtype=np.float64),
+            "triangleNormalPoint_flat": pack(triangleNormalPoint, "triangleNormalPoint", width=3, dtype=np.uint32),
+            "forbiddenEdge_flat": pack(forbiddenEdge, "forbiddenEdge", width=3, dtype=np.int32),
 
-            "laser": {
-                "l_abs": pack(laser["l_abs"], 'laser["l_abs"]', dtype=np.float64),
-                "l_ems": pack(laser["l_ems"], 'laser["l_ems"]', dtype=np.float64),
-                "s_abs": pack(laser["s_abs"], 'laser["s_abs"]', dtype=np.float64),
-                "s_ems": pack(laser["s_ems"], 'laser["s_ems"]', dtype=np.float64),
-                "l_res": laser["l_res"],
+            "laserParameter": {
+                "l_abs": pack(laserParameter["l_abs"], 'laserParameter["l_abs"]', dtype=np.float64),
+                "l_ems": pack(laserParameter["l_ems"], 'laserParameter["l_ems"]', dtype=np.float64),
+                "s_abs": pack(laserParameter["s_abs"], 'laserParameter["s_abs"]', dtype=np.float64),
+                "s_ems": pack(laserParameter["s_ems"], 'laserParameter["s_ems"]', dtype=np.float64),
+                "l_res": laserParameter["l_res"],
             }
         }
+
     packed = transform_inputs(
-        p,
-        t_int,
-        beta_cell,
-        beta_vol,
-        clad_int,
+        points,
+        trianglePointIndices,
+        betaCells,
+        betaVolume,
+        claddingCellTypes,
         refractiveIndices,
         reflectivities,
-        normals_x,
-        normals_y,
-        ordered_int,
-        surface,
-        x_center,
-        y_center,
-        normals_p,
-        forbidden,
-        laser,
-        mesh_z,
+        triangleNormalsX,
+        triangleNormalsY,
+        triangleNeighbors,
+        triangleSurfaces,
+        triangleCenterX,
+        triangleCenterY,
+        triangleNormalPoint,
+        forbiddenEdge,
+        laserParameter,
+        numberOfLevels,
     )
-    if parallelMode=="mpi" or parallelMode=="graybat" or parallelMode=="debugFileIOPath":
-        if parallelMode=="debugFileIOPath":
-            parallelMode="threaded"
+
+    if parallelMode == "mpi" or parallelMode == "graybat" or parallelMode == "debugFileIOPath":
+        if parallelMode == "debugFileIOPath":
+            parallelMode = "threaded"
         return calcPhiASE_mpi(
             packed,
-            clad_number,
-            clad_abs,
+            claddingNumber,
+            claddingAbsorption,
             useReflections,
             minRaysPerSample,
             maxRaysPerSample,
             mseThreshold,
             repetitions,
-            N_tot,
-            z_mesh,
+            nTot,
+            thickness,
             crystal,
-            mesh_z,
+            numberOfLevels,
             deviceMode,
             parallelMode,
             maxGPUs,
@@ -414,20 +418,20 @@ def calcPhiASE(
     numberOfPoints = int(packed["numberOfPoints"])
     numberOfTriangles = int(packed["numberOfTriangles"])
     numberOfLevels = int(packed["numberOfLevels"])
-    thicknessOfPrism = float(z_mesh)
+    thicknessOfPrism = float(thickness)
 
     experiment = HASEonGPU_Bindings.ExperimentParameters(
         minRaysPerSample=int(minRaysPerSample),
         maxRaysPerSample=int(maxRaysPerSample),
-        lambdaA=packed["laser"]["l_abs"],
-        lambdaE=packed["laser"]["l_ems"],
-        sigmaA=packed["laser"]["s_abs"],
-        sigmaE=packed["laser"]["s_ems"],
-        maxSigmaA=float(np.max(packed["laser"]["s_abs"])),
-        maxSigmaE=float(np.max(packed["laser"]["s_ems"])),
+        lambdaA=packed["laserParameter"]["l_abs"],
+        lambdaE=packed["laserParameter"]["l_ems"],
+        sigmaA=packed["laserParameter"]["s_abs"],
+        sigmaE=packed["laserParameter"]["s_ems"],
+        maxSigmaA=float(np.max(packed["laserParameter"]["s_abs"])),
+        maxSigmaE=float(np.max(packed["laserParameter"]["s_ems"])),
         mseThreshold=float(mseThreshold),
         useReflections=bool(useReflections),
-        spectral=int(packed["laser"]["l_res"]),
+        spectral=int(packed["laserParameter"]["l_res"]),
     )
 
     compute = HASEonGPU_Bindings.ComputeParameters(
@@ -444,29 +448,29 @@ def calcPhiASE(
     )
 
     host_mesh = Mesh(
-        triangleIndices=packed["t_int_flat"],
+        triangleIndices=packed["trianglePointIndices_flat"],
         numberOfTriangles=numberOfTriangles,
         numberOfLevels=numberOfLevels,
         numberOfPoints=numberOfPoints,
         thicknessOfPrism=thicknessOfPrism,
-        pointsVector=packed["p_flat"],
-        xOfTriangleCenter=packed["x_center_flat"],
-        yOfTriangleCenter=packed["y_center_flat"],
-        positionsOfNormalVectors=packed["normals_p_flat"],
-        xOfNormals=packed["normals_x_flat"],
-        yOfNormals=packed["normals_y_flat"],
-        forbiddenVector=packed["forbidden_flat"],
-        neighborsVector=packed["ordered_int_flat"],
-        surfacesVector=packed["surface_flat"],
-        betaValuesVector=packed["beta_vol_flat"],
-        betaCells=packed["beta_cell_flat"],
-        cellTypes=packed["clad_int_flat"],
+        pointsVector=packed["points_flat"],
+        xOfTriangleCenter=packed["triangleCenterX_flat"],
+        yOfTriangleCenter=packed["triangleCenterY_flat"],
+        positionsOfNormalVectors=packed["triangleNormalPoint_flat"],
+        xOfNormals=packed["triangleNormalsX_flat"],
+        yOfNormals=packed["triangleNormalsY_flat"],
+        forbiddenVector=packed["forbiddenEdge_flat"],
+        neighborsVector=packed["triangleNeighbors_flat"],
+        surfacesVector=packed["triangleSurfaces_flat"],
+        betaValuesVector=packed["betaVolume_flat"],
+        betaCells=packed["betaCells_flat"],
+        cellTypes=packed["claddingCellTypes_flat"],
         refractiveIndices=packed["refractiveIndices_flat"],
         reflectivities=packed["reflectivities_flat"],
-        nTot=float(N_tot),
+        nTot=float(nTot),
         crystalTFluo=float(crystal["tfluo"]),
-        claddingNumber=int(clad_number),
-        claddingAbsorption=float(clad_abs),
+        claddingNumber=int(claddingNumber),
+        claddingAbsorption=float(claddingAbsorption),
     )
 
     result = HASEonGPU_Bindings.calcPhiASE(experiment, compute, host_mesh)
@@ -476,14 +480,14 @@ def calcPhiASE(
 
     phi_ASE = np.asarray(result.phiAse, dtype=np.float32)
     mse_values = np.asarray(result.mse, dtype=np.float64)
-    N_rays = np.asarray(result.totalRays, dtype=np.uint32)
+    n_rays = np.asarray(result.totalRays, dtype=np.uint32)
 
     if packed["layout"] == "matrix":
         phi_ASE = phi_ASE.reshape((numberOfPoints, numberOfLevels), order="F")
         mse_values = mse_values.reshape((numberOfPoints, numberOfLevels), order="F")
-        N_rays = N_rays.reshape((numberOfPoints, numberOfLevels), order="F")
+        n_rays = n_rays.reshape((numberOfPoints, numberOfLevels), order="F")
 
     if packed["container"] == "list":
-        return phi_ASE.tolist(), mse_values.tolist(), N_rays.tolist()
+        return phi_ASE.tolist(), mse_values.tolist(), n_rays.tolist()
 
-    return phi_ASE, mse_values, N_rays
+    return phi_ASE, mse_values, n_rays
