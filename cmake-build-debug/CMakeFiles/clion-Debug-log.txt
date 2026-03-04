@@ -1,6 +1,0 @@
-/home/tim/clion/clion-2024.3/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/tim/clion/clion-2024.3/bin/ninja/linux/x64/ninja -G Ninja -DPython_EXECUTABLE=/home/tim/hzdr/workspace/myHaseOnGpu/.venv/bin/python -DPython3_EXECUTABLE=/home/tim/hzdr/workspace/myHaseOnGpu/.venv/bin/python -S /home/tim/hzdr/workspace/myHaseOnGpu -B /home/tim/hzdr/workspace/myHaseOnGpu/cmake-build-debug
--- HASE_NVCC_FLAGS="--ftz=false;--use_fast_math"
--- Debug version
--- Configuring done (2.0s)
--- Generating done (0.0s)
--- Build files have been written to: /home/tim/hzdr/workspace/myHaseOnGpu/cmake-build-debug
