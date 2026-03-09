@@ -57,19 +57,290 @@ struct WavelengthData{
     double maxSigmaA = 0;
     double maxSigmaE = 0;
 };
+/**
+ *
+ */
+HostMesh createHostMeshFromFile(const fs::path rootPath)
+{
+    // Parse experimentdata from files
+    std::vector<unsigned> triangleNormalPoint  = fileToVector<unsigned>(rootPath / "triangleNormalPoint.txt");
+    std::vector<double> betaVolume             = fileToVector<double>(rootPath / "betaVolume.txt");
+    std::vector<int> forbiddenEdge             = fileToVector<int>(rootPath / "forbiddenEdge.txt");
+    std::vector<int> triangleNeighbors         = fileToVector<int>(rootPath / "triangleNeighbors.txt");
+    std::vector<double> triangleNormalsX       = fileToVector<double>(rootPath / "triangleNormalsX.txt");
+    std::vector<double> triangleNormalsY       = fileToVector<double>(rootPath / "triangleNormalsY.txt");
+    std::vector<double> triangleCenterX        = fileToVector<double>(rootPath / "triangleCenterX.txt");
+    std::vector<double> triangleCenterY        = fileToVector<double>(rootPath / "triangleCenterY.txt");
+    std::vector<double> points                 = fileToVector<double>(rootPath / "points.txt");
+    std::vector<unsigned> trianglePointIndices = fileToVector<unsigned>(rootPath / "trianglePointIndices.txt");
+    std::vector<float>  triangleSurfaces       = fileToVector<float>(rootPath / "triangleSurfaces.txt");
+    unsigned numberOfPoints                    = fileToValue<unsigned>(rootPath / "numberOfPoints.txt");
+    unsigned numberOfTriangles                 = fileToValue<unsigned>(rootPath / "numberOfTriangles.txt");
+    unsigned numberOfLevels                    = fileToValue<unsigned>(rootPath / "numberOfLevels.txt");
+    float thickness                            = fileToValue<float>(rootPath / "thickness.txt");
+    float nTot                                 = fileToValue<float>(rootPath / "nTot.txt");
+    float crystalTFluo                         = fileToValue<float>(rootPath / "crystalTFluo.txt");
+    unsigned claddingNumber                    = fileToValue<unsigned>(rootPath / "claddingNumber.txt");
+    double claddingAbsorption                  = fileToValue<double>(rootPath / "claddingAbsorption.txt");
+    std::vector<double>  betaCells             = fileToVector<double>(rootPath / "betaCells.txt");
+    std::vector<unsigned>  claddingCellTypes   = fileToVector<unsigned>(rootPath / "claddingCellTypes.txt");
+    std::vector<float>  refractiveIndices      = fileToVector<float>(rootPath / "refractiveIndices.txt");
+    std::vector<float>  reflectivities         = fileToVector<float>(rootPath / "reflectivities.txt");
+    return HostMesh(
+      trianglePointIndices,
+      numberOfTriangles,
+      numberOfLevels,
+      numberOfPoints,
+      thickness,
+      points,
+      triangleCenterX,
+      triangleCenterY,
+      triangleNormalPoint,
+      triangleNormalsX,
+      triangleNormalsY,
+      forbiddenEdge,
+      triangleNeighbors,
+      triangleSurfaces,
+      betaVolume,
+      betaCells,
+      claddingCellTypes,
+      refractiveIndices,
+      reflectivities,
+      nTot,
+      crystalTFluo,
+      claddingNumber,
+      claddingAbsorption
+  );
+}
+
+template <class T, class B, class E>
+void assertRange([[maybe_unused]]const std::vector<T> &v,[[maybe_unused]] const B minElement,[[maybe_unused]]const E maxElement,[[maybe_unused]] const bool equals){
+    if(equals){
+        assert(*std::min_element(v.begin(),v.end()) == minElement);
+        assert(*std::max_element(v.begin(),v.end()) == maxElement);
+    }else{
+        assert(*std::min_element(v.begin(),v.end()) >= minElement);
+        assert(*std::max_element(v.begin(),v.end()) <= maxElement);
+    }
+}
 
 
-WavelengthData calculateSigmas(
-        fs::path inputPath,
-        unsigned lambdaResolution
-        ){
+template <class T, class B>
+void assertMin([[maybe_unused]]const std::vector<T>& v,[[maybe_unused]]const  B minElement,const bool equals){
+    if(equals){
+        assert(*std::min_element(v.begin(),v.end()) == minElement);
+    }else{
+        assert(*std::min_element(v.begin(),v.end()) >= minElement);
+    }
+}
 
-    // Parse wavelengths from files
-    std::vector<double> sigmaA  = fileToVector<double>(inputPath / "sigmaA.txt");
-    std::vector<double> sigmaE  = fileToVector<double>(inputPath / "sigmaE.txt");
-    std::vector<double> lambdaA = fileToVector<double>(inputPath / "lambdaA.txt");
-    std::vector<double> lambdaE = fileToVector<double>(inputPath / "lambdaE.txt");
+bool validateHostMesh(const HostMesh& mesh)
+{
+    // assert input sizes
+    assert(mesh.numberOfPoints == (mesh.pointsVector.size() / 2));
+    assert(mesh.numberOfTriangles == mesh.triangleIndices.size() / 3);
+    assert(mesh.positionsOfNormalVectors.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.yOfTriangleCenter.size() == mesh.numberOfTriangles);
+    assert(mesh.xOfTriangleCenter.size() == mesh.numberOfTriangles);
+    assert(mesh.surfacesVector.size() == mesh.numberOfTriangles);
+    assert(mesh.betaValuesVector.size() == mesh.numberOfTriangles * (mesh.numberOfLevels - 1));
+    assert(mesh.xOfNormals.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.yOfNormals.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.triangleIndices.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.forbiddenVector.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.neighborsVector.size() == mesh.numberOfTriangles * 3);
+    assert(mesh.betaCells.size() == mesh.numberOfPoints * mesh.numberOfLevels);
+    assert(mesh.cellTypes.size() == mesh.numberOfTriangles);
+    assert(mesh.refractiveIndices.size() == 4);
+    assert(mesh.reflectivities.size() == (mesh.refractiveIndices.size() / 2) * mesh.numberOfTriangles);
+    assert(mesh.cellTypes.size() == mesh.numberOfTriangles);
 
+    // assert input data validity
+    assertRange(mesh.positionsOfNormalVectors, 0u, unsigned(mesh.numberOfPoints - 1), true);
+    assertMin(mesh.betaValuesVector, 0, false);
+    assertRange(mesh.forbiddenVector, -1, 2, true);
+    assertRange(mesh.neighborsVector, -1, int(mesh.numberOfTriangles - 1), true);
+    assertRange(mesh.xOfNormals, -1, 1, false);
+    assertRange(mesh.yOfNormals, -1, 1, false);
+
+    assertRange(
+        mesh.xOfTriangleCenter,
+        *std::min_element(mesh.pointsVector.begin(), mesh.pointsVector.end()),
+        *std::max_element(mesh.pointsVector.begin(), mesh.pointsVector.end()),
+        false);
+
+    assertRange(
+        mesh.yOfTriangleCenter,
+        *std::min_element(mesh.pointsVector.begin(), mesh.pointsVector.end()),
+        *std::max_element(mesh.pointsVector.begin(), mesh.pointsVector.end()),
+        false);
+
+    assertRange(mesh.triangleIndices, 0u, unsigned(mesh.numberOfPoints - 1), true);
+    assertMin(mesh.surfacesVector, 0, false);
+    assertMin(mesh.betaCells, 0, false);
+    assertRange(mesh.refractiveIndices, 0, 5, false);
+    assertRange(mesh.reflectivities, 0, 1, false);
+
+    return true;
+}
+void validateSampleRange(
+    ComputeParameters& compute,
+    const unsigned numberOfSamples)
+{
+    const bool minSet = compute.minSampleRange != std::numeric_limits<unsigned>::max();
+    const bool maxSet = compute.maxSampleRange != std::numeric_limits<unsigned>::max();
+
+    if(!minSet && !maxSet)
+    {
+        dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
+                        << " not set! Assuming a sampling point range of 0 to "
+                        << (numberOfSamples - 1) << std::endl;
+        compute.minSampleRange = 0;
+        compute.maxSampleRange = numberOfSamples - 1;
+        return;
+    }
+
+    if(minSet != maxSet)
+    {
+        throw std::runtime_error(
+            "Options " + std::string(CompSwitch::min_sample_i) + "/" +
+            std::string(CompSwitch::max_sample_i) +
+            " must be used together!");
+    }
+
+    if(compute.maxSampleRange < compute.minSampleRange)
+    {
+        throw std::runtime_error(
+            std::string(CompSwitch::max_sample_i) + " < " +
+            std::string(CompSwitch::min_sample_i) + "!");
+    }
+
+    if(compute.minSampleRange >= numberOfSamples)
+    {
+        throw std::runtime_error(
+            std::string(CompSwitch::min_sample_i) +
+            " is out of range! (There are only " +
+            std::to_string(numberOfSamples) + " sampling points)");
+    }
+
+    if(compute.maxSampleRange >= numberOfSamples)
+    {
+        throw std::runtime_error(
+            std::string(CompSwitch::max_sample_i) +
+            " is out of range! (There are only " +
+            std::to_string(numberOfSamples) + " sampling points)");
+    }
+
+    const unsigned samplesForNode = compute.maxSampleRange - compute.minSampleRange + 1;
+    if(compute.maxGpus > samplesForNode)
+    {
+        dout(V_WARNING) << "More GPUs requested than there are sample points. "
+                        << "Number of used GPUs reduced to " << samplesForNode << std::endl;
+        compute.maxGpus = samplesForNode;
+    }
+}
+inline void ensureOrThrow(bool cond, const std::string& msg)
+{
+    if(!cond)
+        throw std::runtime_error(msg);
+}
+void validateInput(
+    ExperimentParameters& experiment,
+    ComputeParameters& compute,
+    const unsigned deviceCount)
+{
+    if(compute.deviceMode != DeviceMode::CPU && compute.deviceMode != DeviceMode::GPU)
+    {
+        throw std::runtime_error(
+            CompSwitch::device_mode + " must be either \"" +
+            std::string(DeviceMode::CPU) + "\" or \"" +
+            std::string(DeviceMode::GPU) + "\"");
+    }
+
+    if(compute.deviceMode == DeviceMode::CPU &&
+       compute.parallelMode != ParallelMode::THREADED)
+    {
+        dout(V_WARNING) << CompSwitch::device_mode << " \"" << DeviceMode::CPU
+                        << "\" does only support " << CompSwitch::parallel_mode
+                        << " \"threaded\"! (will be ignored)" << std::endl;
+    }
+
+    if(compute.parallelMode != ParallelMode::THREADED
+#if !defined(DISABLE_MPI)
+       && compute.parallelMode != ParallelMode::MPI
+#endif
+#if defined(USE_GRAYBAT)
+       && compute.parallelMode != ParallelMode::GRAYBAT
+#endif
+    )
+    {
+        std::stringstream ss;
+        ss << CompSwitch::parallel_mode << " must be one of \""
+           << ParallelMode::THREADED << "\"";
+#if !defined(DISABLE_MPI)
+        ss << ", \"" << ParallelMode::MPI << "\"";
+#endif
+#if defined(USE_GRAYBAT)
+        ss << ", \"" << ParallelMode::GRAYBAT << "\"";
+#endif
+        throw std::runtime_error(ss.str());
+    }
+
+    ensureOrThrow(experiment.minRaysPerSample > 0,
+        "Please specify a positive value for --" + ExpSwitch::min_rays);
+
+    if(experiment.maxRaysPerSample < experiment.minRaysPerSample)
+    {
+        dout(V_WARNING) << ExpSwitch::max_rays << " < " << ExpSwitch::min_rays
+                        << ". Auto-increasing " << ExpSwitch::max_rays
+                        << " (will be non-adaptive!)" << std::endl;
+        experiment.maxRaysPerSample = experiment.minRaysPerSample;
+    }
+
+    if(compute.maxGpus > deviceCount)
+    {
+        throw std::runtime_error(
+            "You don't have so many devices, use --" +
+            std::string(CompSwitch::ngpus) + "=" + std::to_string(deviceCount)+ " "+ std::to_string(compute.maxGpus));
+    }
+
+    if(compute.maxGpus == 0)
+    {
+        compute.maxGpus = deviceCount;
+    }
+
+    if(verbosity >= 64)
+    {
+        verbosity = 63;
+        dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 63 (all). "
+                        << "Levels can be bitmasked together." << std::endl;
+    }
+
+    ensureOrThrow(compute.maxRepetitions >= 1, "At least 1 repetition is necessary!");
+    ensureOrThrow(compute.adaptiveSteps >= 1, "At least 1 adaptive step is necessary!");
+
+    if(experiment.mseThreshold == 0.0)
+    {
+        experiment.mseThreshold = 1000.0;
+    }
+
+    if(!compute.inputPath.empty())
+    {
+        ensureOrThrow(fs::exists(compute.inputPath) && fs::is_directory(compute.inputPath),
+            "The specified input path does not exist, is no directory, or has insufficient permissions.");
+
+        ensureOrThrow(!fs::is_empty(compute.inputPath),
+            "The specified input folder is empty.");
+    }
+
+    if(!compute.outputPath.empty())
+    {
+        ensureOrThrow(fs::exists(compute.outputPath) && fs::is_directory(compute.outputPath),
+            "The specified output path does not exist (or permission denied).");
+    }
+}
+WavelengthData calculateSigmas(std::vector<double> &sigmaA,std::vector<double> &sigmaE,std::vector<double> &lambdaA,std::vector<double> &lambdaE,unsigned lambdaResolution)
+{
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
 
@@ -92,8 +363,22 @@ WavelengthData calculateSigmas(
     return waveD;
 }
 
+WavelengthData calculateSigmas(
+        fs::path inputPath,
+        unsigned lambdaResolution
+        ){
 
-void checkPositive(int i, std::string name){
+    // Parse wavelengths from files
+    std::vector<double> sigmaA  = fileToVector<double>(inputPath / "sigmaA.txt");
+    std::vector<double> sigmaE  = fileToVector<double>(inputPath / "sigmaE.txt");
+    std::vector<double> lambdaA = fileToVector<double>(inputPath / "lambdaA.txt");
+    std::vector<double> lambdaE = fileToVector<double>(inputPath / "lambdaE.txt");
+    return calculateSigmas(sigmaA, sigmaE, lambdaA, lambdaE, lambdaResolution);
+
+}
+
+
+void checkPositive(int i, const std::string& name){
     if(i < 0){
         verbosity |= V_ERROR;
         dout(V_ERROR) << name << " must have a positive argument!" << std::endl;
@@ -101,6 +386,51 @@ void checkPositive(int i, std::string name){
     }
 }
 
+
+void initializeResult(Result& result, const unsigned numberOfSamples)
+{
+    result = Result(
+        std::vector<float>(numberOfSamples, 0.0f),
+        std::vector<double>(numberOfSamples, 100000.0),
+        std::vector<unsigned>(numberOfSamples, 0u),
+        std::vector<double>(numberOfSamples, 0.0));
+}
+std::vector<Mesh> createMeshes(HostMesh& host_mesh,std::vector<unsigned> &devices)
+{
+    std::vector<Mesh> meshes;
+    for(auto i:devices)
+    {
+        CUDA_CHECK_RETURN(cudaSetDevice(i) );
+        meshes.emplace_back(host_mesh.toMesh());
+        cudaDeviceSynchronize();
+
+    }
+    return meshes;
+}
+int pythonParse(ExperimentParameters& experiment,
+    ComputeParameters& compute,
+    HostMesh & host_mesh,
+    std::vector<Mesh>& mesh,
+    Result& result)
+{
+    std::vector<unsigned>devices = getFreeDevices(compute.maxGpus);
+    ensureOrThrow(!devices.empty()," No cuda capable device found!");
+    validateHostMesh(host_mesh);
+    validateInput(experiment, compute, devices.size());
+    validateSampleRange(compute,host_mesh.numberOfPoints * host_mesh.numberOfLevels);
+    auto wave=calculateSigmas(experiment.sigmaA,experiment.sigmaE,experiment.lambdaA,experiment.lambdaE,experiment.spectral);
+    experiment.sigmaA=wave.sigmaAInterpolated;
+    experiment.sigmaE=wave.sigmaEInterpolated;
+    experiment.maxSigmaA=wave.maxSigmaA;
+    experiment.maxSigmaE=wave.maxSigmaE;
+    compute.devices = devices;
+    compute.gpu_i=devices.front();
+
+    mesh=std::move(createMeshes(host_mesh,devices));
+
+    initializeResult(result, host_mesh.numberOfPoints);
+    return 0;
+}
 
 int parse( const int argc,
         char** argv,
@@ -110,19 +440,16 @@ int parse( const int argc,
         Result& result) {
 
     Modifiable_variables_map vm = parseCommandLine(argc, argv);
-
     printCommandLine(vm);
 
     // Set/Test device to run experiment with
     //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
     //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
     std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
-
-    vm = checkParameterValidity(vm, devices.size());
-
-    meshs = parseMesh(vm[ExpSwitch::input_path].as<fs::path>(), devices);
-
-    vm = checkSampleRange(vm, meshs[0].numberOfSamples);
+    ensureOrThrow(!devices.empty()," No cuda capable device found!");
+    HostMesh host_mesh = createHostMeshFromFile(vm[ExpSwitch::input_path].as<fs::path>());
+    validateHostMesh(host_mesh);
+    meshs=std::move(createMeshes(host_mesh,devices));
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
@@ -130,8 +457,8 @@ int parse( const int argc,
             );
 
     experiment = ExperimentParameters (
-            vm[ExpSwitch::min_rays].as<int>(),
-            vm[ExpSwitch::max_rays].as<int>(),
+            static_cast<unsigned>(vm[ExpSwitch::min_rays].as<int>()),
+            static_cast<unsigned>(vm[ExpSwitch::max_rays].as<int>()),
             waveD.sigmaAInterpolated,
             waveD.sigmaEInterpolated,
             waveD.maxSigmaA,
@@ -141,8 +468,8 @@ int parse( const int argc,
 
 
     compute = ComputeParameters (
-            vm[CompSwitch::repetitions].as<int>(),
-            vm[CompSwitch::adaptive_steps].as<int>(),
+    static_cast<unsigned>(vm[CompSwitch::repetitions].as<int>()),
+    static_cast<unsigned>(vm[CompSwitch::adaptive_steps].as<int>()),
             devices.at(0),
             vm[CompSwitch::device_mode].as<std::string>(),
             vm[CompSwitch::parallel_mode].as<std::string>(),
@@ -150,20 +477,12 @@ int parse( const int argc,
             vm[ExpSwitch::input_path].as<fs::path>(),
             vm[ExpSwitch::output_path].as<fs::path>(),
             devices,
-            vm[CompSwitch::min_sample_i].as<int>(),
-            vm[CompSwitch::max_sample_i].as<int>());
-
-
-    std::vector<float>    phiAse(meshs[0].numberOfSamples, 0);
-    std::vector<double>   mse(meshs[0].numberOfSamples, 100000);
-    std::vector<unsigned> totalRays(meshs[0].numberOfSamples, 0);
-    std::vector<double>   dndtAse(meshs[0].numberOfSamples, 0);
-
-    result = Result( phiAse,
-            mse,
-            totalRays,
-            dndtAse );
-
+            vm[CompSwitch::min_sample_i].as<unsigned>(),
+            vm[CompSwitch::max_sample_i].as<unsigned>(),
+            vm[CompSwitch::ngpus].as<int>());
+    validateInput(experiment,compute,devices.size());
+    validateSampleRange(compute,meshs[0].numberOfSamples);
+    initializeResult(result, meshs[0].numberOfSamples);
     return 0;
 }
 
@@ -186,7 +505,7 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
         ( ExpSwitch::max_rays.c_str(),
           po::value<int> ()
           ->default_value(100000)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::max_rays)),
           "The maximal number of rays to use for each sample point")
         ( std::string(ExpSwitch::mse + ",m").c_str(),
           po::value<double> ()->default_value(0.1,"0.1"),
@@ -211,27 +530,27 @@ po::variables_map parseCommandLine(const int argc, char** argv) {
         ( std::string(CompSwitch::ngpus + ",g").c_str(),
           po::value<int> ()
           ->default_value(1)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::ngpus)),
           std::string("The maximum number of GPUs to b used on a single node. Should be left unchanged for --"
               + CompSwitch::parallel_mode + "=mpi").c_str())
         ( std::string(CompSwitch::repetitions + ",r").c_str(),
           po::value<int> ()
           ->default_value(4)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::repetitions)),
           "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
         ( std::string(CompSwitch::adaptive_steps + ",a").c_str(),
           po::value<int> ()
           ->default_value(5)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
+          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::adaptive_steps)),
           std::string("The number of adaptive sampling steps that are used to split the range between "
               + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
         ( CompSwitch::min_sample_i.c_str(),
-          po::value<int> ()
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
-          "The the minimal index of sample points to simulate")
+          po::value<unsigned> ()
+          ->default_value(-1),
+          "The the minimum index of sample points to simulate")
         ( CompSwitch::max_sample_i.c_str(),
-          po::value<int> ()
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
+          po::value<unsigned> ()
+          ->default_value(-1),
           "The the maximal index of sample points to simulate")
         ( CompSwitch::write_vtk.c_str(),
           po::value<bool> ()
@@ -303,6 +622,9 @@ void printCommandLine(const Modifiable_variables_map vm){
     for (const auto& it : vm) {
         std::stringstream ss;
         auto& value = it.second.value();
+        dout(V_INFO) << "[DEBUG] option '" << it.first
+                     << "' stored type: " << value.type().name() << std::endl;
+
         if      (auto v = boost::any_cast<uint32_t>   (&value)) ss << *v;
         else if (auto v = boost::any_cast<std::string>(&value)) ss << *v;
         else if (auto v = boost::any_cast<int>        (&value)) ss << *v;
@@ -315,183 +637,6 @@ void printCommandLine(const Modifiable_variables_map vm){
         }
         dout(V_INFO) << it.first << ": " << ss.str() << std::endl;
     }
-}
-
-
-Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, const unsigned deviceCount){
-
-    double mseThreshold = vm[ExpSwitch::mse].as<double>();
-    unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<int>();
-    unsigned maxgpus = vm[CompSwitch::ngpus].as<int>();
-
-    const unsigned minRaysPerSample = vm[ExpSwitch::min_rays].as<int>();
-    const fs::path inputPath = vm[ExpSwitch::input_path].as<fs::path>();
-    const fs::path outputPath = vm[ExpSwitch::output_path].as<fs::path>();
-    const std::string deviceMode = vm[CompSwitch::device_mode].as<std::string>();
-    const std::string parallelMode = vm[CompSwitch::parallel_mode].as<std::string>();
-    const unsigned maxRepetitions = vm[CompSwitch::repetitions].as<int>();
-    const unsigned adaptiveSteps = vm[CompSwitch::adaptive_steps].as<int>();
-
-    if(deviceMode != DeviceMode::CPU && deviceMode != DeviceMode::GPU){
-        dout(V_ERROR) << CompSwitch::device_mode << " must be either \""
-            << DeviceMode::CPU << "\" or \"" << DeviceMode::GPU << "\"" << std::endl;
-        exit(1);
-    }
-
-    if (deviceMode == DeviceMode::CPU && parallelMode != ParallelMode::THREADED){
-        dout(V_WARNING) << CompSwitch::device_mode << " \"" << DeviceMode::CPU << "\" does only support "
-            << CompSwitch::parallel_mode << " \"threaded\"! (will be ignored)" << std::endl;
-    }
-
-    if (parallelMode != ParallelMode::THREADED
-#if !defined(DISABLE_MPI)
-            && parallelMode != ParallelMode::MPI
-#endif
-#if defined(USE_GRAYBAT)
-            && parallelMode != ParallelMode::GRAYBAT
-#endif
-            ) {
-        dout(V_ERROR) << CompSwitch::parallel_mode << " must be one of \""
-            << ParallelMode::THREADED << "\""
-#if !defined(DISABLE_MPI)
-            << ", \"" << ParallelMode::MPI << "\""
-#endif
-#if defined(USE_GRAYBAT)
-            << ", \"" << ParallelMode::GRAYBAT << "\""
-#endif
-            << std::endl;
-        exit(1);
-    }
-
-    if (minRaysPerSample == 0) {
-        dout(V_ERROR) << "Please specify the number of rays per sample Point with --" << ExpSwitch::min_rays << "=RAYS" << std::endl;
-        exit(1);
-    }
-
-    if (!exists(inputPath) || !is_directory(inputPath)){
-        dout(V_ERROR) << "The specified input path does not exist, is no directory, or has insufficient permissions." <<
-            " Please specify a correct path by --" << ExpSwitch::output_path << "=[path]" << std::endl;
-        exit(1);
-    }else{
-        if(is_empty(inputPath)) {
-            dout(V_ERROR) << "The specified input folder " << ExpSwitch::input_path << " is empty!" << std::endl;
-            exit(1);
-        }
-    }
-
-    if (!exists(outputPath) || !is_directory(outputPath)) {
-        dout(V_ERROR) << "The specified output path does not exist (or permission denied)."
-            << " Please specify a correct folder by --" << ExpSwitch::output_path << "=[path]" << std::endl;
-        exit(1);
-    }
-
-    if(maxRaysPerSample < minRaysPerSample){
-        dout(V_WARNING) << ExpSwitch::max_rays << " < " << ExpSwitch::min_rays << ". Auto-increasing "
-            << ExpSwitch::max_rays << " (will be non-adaptive!)" << std::endl;
-        maxRaysPerSample = minRaysPerSample;
-    }
-
-    if(maxgpus > deviceCount){
-        dout(V_ERROR) << "You don't have so many devices, use --" << CompSwitch::ngpus << "=" << deviceCount << std::endl;
-        exit(1);
-    }
-
-    if(maxgpus == 0){
-        maxgpus = deviceCount;
-    }
-
-    if( vm.count(CompSwitch::min_sample_i) + vm.count(CompSwitch::max_sample_i) == 2){
-        const unsigned minSampleRange = vm[CompSwitch::min_sample_i].as<int>();
-        const unsigned maxSampleRange = vm[CompSwitch::max_sample_i].as<int>();
-
-        if(maxSampleRange < minSampleRange){
-            dout(V_ERROR) << CompSwitch::max_sample_i << " < " << CompSwitch::min_sample_i << "!" << std::endl;
-            exit(1);
-        }
-
-        unsigned samplesForNode = maxSampleRange-minSampleRange+1;
-        if(maxgpus > samplesForNode){
-            dout(V_WARNING) << "More GPUs requested than there are sample points. Number of used GPUs reduced to " << samplesForNode << std::endl;
-            maxgpus = samplesForNode;
-        }
-    }
-
-    if(verbosity >= 64){
-        verbosity = 63;
-        dout(V_WARNING) << "Verbosity level should be between 0 (quiet) and 63 (all). Levels can be bitmasked together." << std::endl;
-    }
-    if(maxRepetitions < 1){
-        dout(V_ERROR) << "At least 1 repetition is necessary!" << std::endl;
-    }
-
-    if(adaptiveSteps < 1){
-        dout(V_ERROR) << "At least 1 adaptive step is necessary!" << std::endl;
-    }
-
-    if(mseThreshold == 0){
-        mseThreshold = 1000.;
-    }
-
-    vm[ExpSwitch::max_rays].value() = boost::any(static_cast<int>(maxRaysPerSample));
-    vm[CompSwitch::ngpus].value() = boost::any(static_cast<int>(maxgpus));
-    vm[ExpSwitch::mse].value() = boost::any(static_cast<double>(mseThreshold));
-
-    return vm;
-}
-
-
-Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, const unsigned numberOfSamples){
-    unsigned minCount = vm.count(CompSwitch::min_sample_i);
-    unsigned maxCount = vm.count(CompSwitch::max_sample_i);
-
-    if(minCount+maxCount < 1){
-        dout(V_WARNING) << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
-            << " not set! Assuming a sampling point range of " << "0 to " << numberOfSamples-1 << std::endl;
-        vm[CompSwitch::min_sample_i].value() = boost::any(0);
-        vm[CompSwitch::max_sample_i].value() = boost::any(numberOfSamples-1);
-        return vm;
-    }
-
-    if(minCount+maxCount < 2){
-        dout(V_ERROR) << "Options " << CompSwitch::min_sample_i << "/" << CompSwitch::max_sample_i
-            << " must be used together! (Allowed Range from 0 to " << numberOfSamples-1 << ")";
-        exit(1);
-    }
-
-    // if the code did not terminate, both min and max are defined inside the map
-    if(static_cast<unsigned>(vm[CompSwitch::min_sample_i].as<int>()) > numberOfSamples){
-        dout(V_ERROR) << CompSwitch::min_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
-        exit(1);
-    }
-
-    if(static_cast<unsigned>(vm[CompSwitch::max_sample_i].as<int>()) > numberOfSamples){
-        dout(V_ERROR) << CompSwitch::max_sample_i << " is out of range! (There are only " << numberOfSamples << " sampling points)";
-        exit(1);
-    }
-
-    return vm;
-}
-
-
-template <class T, class B, class E>
-void assertRange([[maybe_unused]]const std::vector<T> &v,[[maybe_unused]] const B minElement,[[maybe_unused]]const E maxElement,[[maybe_unused]] const bool equals){
-  if(equals){
-    assert(*std::min_element(v.begin(),v.end()) == minElement);
-    assert(*std::max_element(v.begin(),v.end()) == maxElement);
-  }else{
-    assert(*std::min_element(v.begin(),v.end()) >= minElement);
-    assert(*std::max_element(v.begin(),v.end()) <= maxElement);
-  }
-}
-
-
-template <class T, class B>
-void assertMin([[maybe_unused]]const std::vector<T>& v,[[maybe_unused]]const  B minElement,const bool equals){
-  if(equals){
-    assert(*std::min_element(v.begin(),v.end()) == minElement);
-  }else{
-    assert(*std::min_element(v.begin(),v.end()) >= minElement);
-  }
 }
 
 
@@ -568,108 +713,5 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
          neighborsVector,
          positionsOfNormalVectors);
   return mesh;
-
-}
-
-
-/**
- *
- */
-std::vector<Mesh> parseMesh(const fs::path rootPath,
-                std::vector<unsigned> devices) {
-
-  std::vector<Mesh> meshs;
-
-  // Parse experimentdata from files
-  std::vector<unsigned> triangleNormalPoint  = fileToVector<unsigned>(rootPath / "triangleNormalPoint.txt");
-  std::vector<double> betaVolume             = fileToVector<double>(rootPath / "betaVolume.txt");
-  std::vector<int> forbiddenEdge             = fileToVector<int>(rootPath / "forbiddenEdge.txt");
-  std::vector<int> triangleNeighbors         = fileToVector<int>(rootPath / "triangleNeighbors.txt");
-  std::vector<double> triangleNormalsX       = fileToVector<double>(rootPath / "triangleNormalsX.txt");
-  std::vector<double> triangleNormalsY       = fileToVector<double>(rootPath / "triangleNormalsY.txt");
-  std::vector<double> triangleCenterX        = fileToVector<double>(rootPath / "triangleCenterX.txt");
-  std::vector<double> triangleCenterY        = fileToVector<double>(rootPath / "triangleCenterY.txt");
-  std::vector<double> points                 = fileToVector<double>(rootPath / "points.txt");
-  std::vector<unsigned> trianglePointIndices = fileToVector<unsigned>(rootPath / "trianglePointIndices.txt");
-  std::vector<float>  triangleSurfaces       = fileToVector<float>(rootPath / "triangleSurfaces.txt");
-  unsigned numberOfPoints                    = fileToValue<unsigned>(rootPath / "numberOfPoints.txt");
-  unsigned numberOfTriangles                 = fileToValue<unsigned>(rootPath / "numberOfTriangles.txt");
-  unsigned numberOfLevels                    = fileToValue<unsigned>(rootPath / "numberOfLevels.txt");
-  float thickness                            = fileToValue<float>(rootPath / "thickness.txt");
-  float nTot                                 = fileToValue<float>(rootPath / "nTot.txt");
-  float crystalTFluo                         = fileToValue<float>(rootPath / "crystalTFluo.txt");
-  unsigned claddingNumber                    = fileToValue<unsigned>(rootPath / "claddingNumber.txt");
-  double claddingAbsorption                  = fileToValue<double>(rootPath / "claddingAbsorption.txt");
-  std::vector<double>  betaCells             = fileToVector<double>(rootPath / "betaCells.txt");
-  std::vector<unsigned>  claddingCellTypes   = fileToVector<unsigned>(rootPath / "claddingCellTypes.txt");
-  std::vector<float>  refractiveIndices      = fileToVector<float>(rootPath / "refractiveIndices.txt");
-  std::vector<float>  reflectivities         = fileToVector<float>(rootPath / "reflectivities.txt");
-
-  // assert input sizes
-  assert(numberOfPoints == (points.size() / 2));
-  assert(numberOfTriangles == trianglePointIndices.size() / 3);
-  assert(triangleNormalPoint.size() == numberOfTriangles * 3);
-  assert(triangleCenterY.size() == numberOfTriangles);
-  assert(triangleCenterX.size() == numberOfTriangles);
-  assert(triangleSurfaces.size() == numberOfTriangles);
-  assert(betaVolume.size() == numberOfTriangles * (numberOfLevels-1));
-  assert(triangleNormalsX.size() == numberOfTriangles * 3);
-  assert(triangleNormalsY.size() == numberOfTriangles * 3);
-  assert(trianglePointIndices.size() == numberOfTriangles * 3);
-  assert(forbiddenEdge.size() == numberOfTriangles * 3);
-  assert(triangleNeighbors.size() == numberOfTriangles * 3);
-  assert(betaCells.size() == numberOfPoints * numberOfLevels);
-  assert(claddingCellTypes.size()== numberOfTriangles);
-  assert(refractiveIndices.size() == 4);
-  assert(reflectivities.size() == (refractiveIndices.size()/2) * numberOfTriangles);
-  assert(claddingCellTypes.size() == numberOfTriangles);
-
-  // assert input data validity
-  assertRange(triangleNormalPoint,0u,unsigned(numberOfPoints-1),true);
-  assertMin(betaVolume,0,false);
-  assertRange(forbiddenEdge,-1,2,true);
-  assertRange(triangleNeighbors,-1,int(numberOfTriangles-1),true);
-  assertRange(triangleNormalsX,-1,1,false);
-  assertRange(triangleNormalsY,-1,1,false);
-  assertRange(triangleCenterX,*std::min_element(points.begin(),points.end()),*std::max_element(points.begin(),points.end()),false);
-  assertRange(triangleCenterY,*std::min_element(points.begin(),points.end()),*std::max_element(points.begin(),points.end()),false);
-  assertRange(trianglePointIndices,0u,unsigned(numberOfPoints-1),true);
-  assertMin(triangleSurfaces,0,false);
-  assertMin(betaCells,0,false);
-  assertRange(refractiveIndices,0,5,false);
-  assertRange(reflectivities,0,1,false);
-
-  for( unsigned i=0; i < devices.size(); i++){
-    CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
-    meshs.push_back(
-            createMesh(trianglePointIndices,
-                   numberOfTriangles,
-                   numberOfLevels,
-                   numberOfPoints,
-                   thickness,
-                   points,
-                   triangleCenterX,
-                   triangleCenterY,
-                   triangleNormalPoint,
-                   triangleNormalsX,
-                   triangleNormalsY,
-                   forbiddenEdge,
-                   triangleNeighbors,
-                   triangleSurfaces,
-                   betaVolume,
-                   betaCells,
-                   claddingCellTypes,
-                   refractiveIndices,
-                   reflectivities,
-                   nTot,
-                   crystalTFluo,
-                   claddingNumber,
-                   claddingAbsorption
-                   )
-            );
-    cudaDeviceSynchronize();
-  }
-
-  return meshs;
 
 }

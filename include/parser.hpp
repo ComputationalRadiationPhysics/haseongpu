@@ -124,9 +124,40 @@ Modifiable_variables_map checkParameterValidity(Modifiable_variables_map, unsign
 
 Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, unsigned const numberOfSamples);
 
+Mesh createMesh(
+    std::vector<unsigned> const& triangleIndices,
+    unsigned numberOfTriangles,
+    unsigned numberOfLevels,
+    unsigned numberOfPoints,
+    float thicknessOfPrism,
+    std::vector<double>& pointsVector,
+    std::vector<double>& xOfTriangleCenter,
+    std::vector<double>& yOfTriangleCenter,
+    std::vector<unsigned>& positionsOfNormalVectors,
+    std::vector<double>& xOfNormals,
+    std::vector<double>& yOfNormals,
+    std::vector<int>& forbiddenVector,
+    std::vector<int>& neighborsVector,
+    std::vector<float>& surfacesVector,
+    std::vector<double>& betaValuesVector,
+    std::vector<double>& betaCells,
+    std::vector<unsigned>& cellTypes,
+    std::vector<float>& refractiveIndices,
+    std::vector<float>& reflectivities,
+    float nTot,
+    float crystalFluorescence,
+    unsigned cladNumber,
+    double cladAbsorption);
+
 
 std::vector<Mesh> parseMesh(fs::path const rootPath, std::vector<unsigned> devices);
 
+int pythonParse(
+    ExperimentParameters& experiment,
+    ComputeParameters& compute,
+    HostMesh& host_mesh,
+    std::vector<Mesh>& mesh,
+    Result& result);
 
 int parse(
     int const argc,

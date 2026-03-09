@@ -18,18 +18,56 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cstdio>
-#include <cassert>
+#include <assert.h>
+#include <cuda_utils.hpp>
+#include <cudachecks.hpp>
 #include <curand_kernel.h>
-
+#include <geometry.hpp>
 #include <importance_sampling.hpp>
+#include <math.h>
 #include <mesh.hpp>
 #include <propagate_ray.hpp>
-#include <geometry.hpp>
-#include <cudachecks.hpp>
-#include <cuda_utils.hpp>
 #include <reflection.hpp> /* ReflectionPlane */
 
+#include <cassert>
+#include <cstdio>
+#include <iostream>
+#include <ostream>
+
+inline __device__ bool deviceIsFinite(double x)
+{
+    return isfinite(x);
+}
+
+__device__ inline bool deviceIsFinite(float x)
+{
+    return isfinite(x);
+}
+__device__ void assertMeshPropagationInputs(
+    const Mesh& mesh,
+    unsigned prism,
+    unsigned sample_i)
+{
+    assert(prism < mesh.numberOfPrisms);
+    assert(sample_i < mesh.numberOfSamples);
+    const unsigned level = prism / mesh.numberOfTriangles;
+    const unsigned triangle = prism - mesh.numberOfTriangles * level;
+
+    assert(level < mesh.numberOfLevels);
+    assert(triangle < mesh.numberOfTriangles);
+
+    const double beta = mesh.getBetaVolume(prism);
+    assert(isfinite(beta));
+}
+__global__ void validateMeshKernel(const Mesh mesh, unsigned sample_i)
+{
+    unsigned prism = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if(prism >= mesh.numberOfPrisms)
+        return;
+
+    assertMeshPropagationInputs(mesh, prism, sample_i);
+}
 /**
  * @brief calculates a first estimate on the importance of each prism, based on a single ray started in the center of each prism
  *
@@ -173,7 +211,11 @@ void importanceSamplingPropagation(unsigned sample_i,
 
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
+  CUDA_CHECK_KERNEL_SYNC(validateMeshKernel<<<gridDim, blockDim>>>(deviceMesh, sample_i));
+
   CUDA_CHECK_KERNEL_SYNC(propagateFromTriangleCenter<<< gridDimReflection, blockDim >>>(deviceMesh, preImportance, sample_i, sigmaA, sigmaE));
+    std::cout<<" finished successfully! "<<std::endl;
+    std::terminate();
 
 }
 

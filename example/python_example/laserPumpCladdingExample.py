@@ -36,11 +36,11 @@ from scipy.interpolate import griddata
 from beta_int3 import beta_int3Main
 from set_variables import set_variables
 from vtk_wedge import vtk_wedge
-from calcPhiASE import calcPhiASE
+from HASEonGPU import calcPhiASE_legacy
 import csv
 from pathlib import Path
 
-def main(material_path: str = Path(__file__).parent / "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
+def main(material_path: Path = Path(__file__).parent / "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
     #precheck the file path and throw in case this is not present
     # Crystal parameter
     crystal = {
@@ -75,10 +75,10 @@ def main(material_path: str = Path(__file__).parent / "pt.mat",gpus: int=1,paral
     }
     # Laser parameter
     laser = {
-        's_abs' : np.loadtxt('sigma_a.txt'),  # Absorption spectrum cm2(1.16e-21 pour DA)
-        's_ems' : np.loadtxt('sigma_e.txt'), # Emission spectrum in cm2(2.48e-20)
-        'l_abs' : np.loadtxt('lambda_a.txt'), # Wavelengths absoroption spectrum in nm (x values for absorption)
-        'l_ems' : np.loadtxt('lambda_e.txt'), # Wavelengths emission spectrum in nm (y values for emission)
+        's_abs' : np.loadtxt(material_path.parent/'sigma_a.txt'),  # Absorption spectrum cm2(1.16e-21 pour DA)
+        's_ems' : np.loadtxt(material_path.parent/'sigma_e.txt'), # Emission spectrum in cm2(2.48e-20)
+        'l_abs' : np.loadtxt(material_path.parent/'lambda_a.txt'), # Wavelengths absoroption spectrum in nm (x values for absorption)
+        'l_ems' : np.loadtxt(material_path.parent/'lambda_e.txt'), # Wavelengths emission spectrum in nm (y values for emission)
         'l_res' : 1000,                      # Resolution of linear interpolated spectrum
         'I' : 1e6,                           # Laser intensity
         'T' : 1e-8,                          # Laser duration
@@ -139,7 +139,7 @@ def main(material_path: str = Path(__file__).parent / "pt.mat",gpus: int=1,paral
     # use e.g. cr_60mm_30mm.m in meshing folder
     print("loading points data")
     # load data from .mat files
-    pt_data = loadmat(material_path)
+    pt_data = loadmat(str(material_path))
     print("finished loading points data")
     # extract necessary variables
     p = np.array(pt_data['p'])
@@ -315,7 +315,7 @@ def main(material_path: str = Path(__file__).parent / "pt.mat",gpus: int=1,paral
             zi = zi + z_mesh
         phi_ASECall_in_t=time.perf_counter()
         ############################ Call external ASE application ####################
-        phi_ASE, mse_values, N_rays = calcPhiASE(
+        phi_ASE, mse_values, N_rays = calcPhiASE_legacy(
             p,
             t_int,
             beta_cell,
@@ -487,4 +487,4 @@ if __name__ == "__main__":
         raise ValueError(
             f"Material path '{material_path}' is not a file."
         )
-    main(material_path=args.material,gpus=args.number_of_gpus,parallel_mode=args.parallel_mode)
+    main(material_path=material_path,gpus=args.number_of_gpus,parallel_mode=args.parallel_mode)

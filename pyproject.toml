@@ -1,0 +1,38 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.10",
+    "pybind11>=2.10",
+    "packaging>=23"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "HASEonGPU"
+version = "0.1.0"
+description = "Python bindings for HASEonGPU"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Carlchristian Eckert"}, {name="Tobias Hänel"}, {name= "Dr. Daniel Albach"}, {name="Tim Hanel" }
+]
+dependencies=[
+    "numpy",
+    "scipy",
+    "numba",
+    "vtk",
+    "matplotlib",
+
+]
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["HASEonGPU_Bindings"]
+
+[tool.scikit-build.cmake]
+build-type = "Release"
+
+[tool.scikit-build.cmake.define]
+HASE_ENABLE_PYTHON = "ON"
+HASE_RELEASE = "ON"
+HASE_CUDA_FASTMATH = "ON"
+USE_GRAYBAT = "OFF"
+CMAKE_INTERPROCEDURAL_OPTIMIZATION = "OFF"
