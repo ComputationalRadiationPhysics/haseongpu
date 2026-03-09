@@ -31,12 +31,25 @@
 
 #pragma once
 
-/**
- * @brief writes the progress of an operation to dout(V_PROGRESS) (see logging.h),
- *        updating the progress every time the function is called.
- *        Works withh a threaded approach or if called directly from a single managing thread
- *
- * @param nTotal the maximum of the progress (i.e. 100, if you have 100 steps)
- *
- */
-void fancyProgressBar(unsigned const nTotal);
+#pragma once
+
+#include <atomic>
+#include <chrono>
+#include <iosfwd>
+#include <string>
+namespace chr = std::chrono;
+
+struct ProgressBar
+{
+    unsigned maxNTotal = 0;
+
+    chr::time_point<chr::steady_clock> startTime{};
+    std::atomic<unsigned> part{0};
+    unsigned tic = 0;
+    bool initialized = false;
+
+    ProgressBar();
+
+    void reset();
+    void printFancyProgressBar(unsigned nTotal);
+};

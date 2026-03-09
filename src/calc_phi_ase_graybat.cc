@@ -56,8 +56,9 @@ void distributeSamples(Vertex master,
     std::array<float, 4> resultMsg;
     std::array<int, 1>   sampleMsg;
     unsigned nReceivedResults = 0;
-
+    ProgressBar bar;
     auto sample = samples.begin();
+
     while(nReceivedResults != samples.size()){
         // Receive request or results
         Edge inEdge = cage.recv(resultMsg);
@@ -83,7 +84,7 @@ void distributeSamples(Vertex master,
             nReceivedResults++;
 
             // Update progress bar
-            fancyProgressBar(mesh.numberOfSamples);
+            bar.printFancyProgressBar(mesh.numberOfSamples);
 
         }
 

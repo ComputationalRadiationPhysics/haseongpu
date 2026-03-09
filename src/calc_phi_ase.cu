@@ -28,7 +28,6 @@
 #include <cuda_runtime_api.h>
 #include <thrust/device_vector.h>
 #include <vector_types.h> /* dim3 */
-
 #include <write_to_vtk.hpp>
 #include <calc_phi_ase.hpp>
 #include <map_rays_to_prisms.hpp>
@@ -67,14 +66,16 @@ std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysP
 
 }
 
-float calcPhiAse ( const ExperimentParameters& experiment,
+
+template<typename ... Args>
+constexpr float calcPhiAse ( const ExperimentParameters& experiment,
            const ComputeParameters& compute,
            const Mesh& mesh,
            Result& result,
            const unsigned minSample_i,
            const unsigned maxSample_i,
-           float &runtime ){
-
+           float &runtime,
+           Args&&... args){
   // Optimization to use more L1 cache
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   cudaSetDevice(compute.gpu_i);
@@ -89,9 +90,9 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   // In some cases distributeRandomly has to be true !
   // Otherwise bad or no ray distribution possible.
   bool distributeRandomly         = true;
-  dim3 blockDim(128);             //can't be more than 256 due to restrictions from the Mersenne Twister
+  dim3 blockDim(128);          // can't be more than 256 due to restrictions from the Mersenne Twister
                                   // MUST be 128, since in the kernel we use a bitshift << 7
-  dim3 gridDim(200);              //can't be more than 200 due to restrictions from the Mersenne Twister
+  dim3 gridDim(200);
 
   // Divide RaysPerSample range into steps
   std::vector<int>  raysPerSampleList = generateRaysPerSampleExpList(experiment.minRaysPerSample,
@@ -129,13 +130,12 @@ float calcPhiAse ( const ExperimentParameters& experiment,
   CUDA_CALL(cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params)));
   CURAND_CALL(curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams));
   CURAND_CALL(curandMakeMTGP32KernelState(devMTGPStates, mtgp32dc_params_fast_11213, devKernelParams, gridDim.x, SEED + minSample_i));
-
   // Calculation for each sample point
   for(unsigned sample_i = minSample_i; sample_i < maxSample_i; ++sample_i){
     unsigned hRaysPerSampleDump = 0;
     raysPerSampleIter = raysPerSampleList.begin();
     bool mseTooHigh=true;
-
+    CUDA_CHECK_KERNEL_SYNC();
     importanceSamplingPropagation(sample_i,
                   reflectionSlices,
                   mesh,
@@ -223,17 +223,40 @@ float calcPhiAse ( const ExperimentParameters& experiment,
 
 
     }
+    if constexpr(sizeof...(Args) > 0)
+    {
+      auto& progressBar = std::get<0>(std::forward_as_tuple(args...));
+      if(verbosity & V_PROGRESS)
+      {
+          progressBar.printFancyProgressBar(mesh.numberOfSamples);
+      }
+    }
 
-     if(verbosity & V_PROGRESS){
-       fancyProgressBar(mesh.numberOfSamples);
-     }
 
   }
 
   // Free Memory
-  cudaFree(devMTGPStates);
-  cudaFree(devKernelParams);
+  CUDA_CHECK_RETURN(cudaFree(devMTGPStates));
+  CUDA_CHECK_RETURN(cudaFree(devKernelParams));
 
   runtime = difftime(time(0),starttime);
   return runtime;
 }
+template float calcPhiAse<>(
+    ExperimentParameters const&,
+    ComputeParameters const&,
+    Mesh const&,
+    Result&,
+    unsigned const,
+    unsigned const,
+    float&);
+
+template float calcPhiAse<ProgressBar&>(
+    ExperimentParameters const&,
+    ComputeParameters const&,
+    Mesh const&,
+    Result&,
+    unsigned const,
+    unsigned const,
+    float&,
+    ProgressBar&);

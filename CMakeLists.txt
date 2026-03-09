@@ -38,6 +38,7 @@ option(
     OFF
 )
 option(HASE_TESTING "Build unit tests" OFF)
+option(HASE_ENABLE_PYTHON "Build Python bindings" OFF)
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 
@@ -98,13 +99,21 @@ option(HASE_RELEASE "Build release version, disables all runtime asserts" OFF)
 if(HASE_RELEASE)
     message(STATUS "Release version")
     set(CMAKE_BUILD_TYPE Release)
-else()
-    message(STATUS "Debug version")
-    set(CMAKE_BUILD_TYPE Debug)
 endif()
 
 # core library with all sources
 add_library(hase_core STATIC)
+
+file(
+    GLOB_RECURSE HASE_CORE_SOURCES
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
+)
+set_target_properties(hase_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 file(
     GLOB_RECURSE HASE_CORE_SOURCES
@@ -187,8 +196,6 @@ if(NOT DISABLE_MPI)
             SYSTEM
             PRIVATE ${graybat_INCLUDE_DIRS}
         )
-
-        # Graybat says these "generated files" must be compiled with your target
         target_sources(hase_core PRIVATE ${graybat_GENERATED_FILES})
 
         target_compile_definitions(hase_core PRIVATE ${graybat_DEFINITIONS})
@@ -214,3 +221,24 @@ endif()
 add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
 
 target_link_libraries(calcPhiASE PRIVATE hase_core)
+
+if(HASE_ENABLE_PYTHON)
+    set_target_properties(hase_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    find_package(pybind11 REQUIRED)
+    pybind11_add_module(HASEonGPU HASEonGPU_Bindings/module.cpp)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+    set_target_properties(
+        HASEonGPU
+        PROPERTIES BUILD_RPATH_USE_ORIGIN ON INSTALL_RPATH_USE_LINK_PATH ON
+    )
+    target_link_libraries(HASEonGPU PRIVATE hase_core)
+    install(FILES HASEonGPU.py DESTINATION .)
+    install(
+        DIRECTORY HASEonGPU_Bindings
+        DESTINATION .
+        FILES_MATCHING
+        PATTERN "__init__.py"
+    )
+
+    install(TARGETS HASEonGPU DESTINATION HASEonGPU_Bindings)
+endif()

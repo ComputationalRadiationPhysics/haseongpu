@@ -28,32 +28,141 @@ Dependencies
      + cmake >= 3.0.1
      + gcc >= 4.9.2
      + cuda >= 11.0
-     + boost >= 3.0
+     + boost >= 1.7 +program-options +system +filesystem
 
    + Optional:
+     + python >= python3.10
+     + boost >=1.7 +boost_mpi
      + octave / matlab
      + paraview
-     + OpenMPI 1.8 or compatible
+     + OpenMPI
    
    + Hardware:
      + Nvidia device >= Compute capability 2.0 (at least fermi generation)
 
 
+### Python Interface
+
+#### Installation
+
+This software provides Python bindings to access the C++ backend directly from Python.  
+Make sure Boost is built with MPI support (`+boost_mpi`) - which is only listed as an optional dependency above.
+
+Afterwards the Python interface can be installed by running:
+```bash
+pip install -e .
+```
+from the repository root.
+
+---
+
+#### Usage
+
+The main entry point is:
+
+`calcPhiASE(...)`
+
+#### Minimal Example
+
+```python
+from HASEonGPU import calcPhiASE
+
+phi_ASE, mse_values, n_rays = calcPhiASE(
+    p,
+    t_int,
+    beta_cell,
+    beta_vol,
+    clad_int,
+    clad_number,
+    clad_abs,
+    useReflections,
+    refractiveIndices,
+    reflectivities,
+    normals_x,
+    normals_y,
+    ordered_int,
+    surface,
+    x_center,
+    y_center,
+    normals_p,
+    forbidden,
+    minRaysPerSample,
+    maxRaysPerSample,
+    mseThreshold,
+    repetitions,
+    N_tot,
+    z_mesh,
+    laser,
+    crystal,
+    mesh_z,
+    deviceMode,
+    parallelMode,
+    maxGPUs,
+    nPerNode,
+)
+```
+
+---
+
+#### Input Requirements (Important)
+
+- All array inputs must be **NumPy arrays (`np.ndarray`)**
+- Arrays must follow shape convention: **(N, components)**
+
+Example:
+```text
+Correct:   (N_points, 2) → [[x0, y0], [x1, y1], ...]
+Incorrect: (2, N_points)
+```
+
+Incorrect shapes may not raise immediate errors but will lead to invalid results.
+
+---
+
+#### MPI Execution
+
+If `parallelMode` is set to `"mpi"` or `"graybat"`:
+
+- Input is written to a temporary folder 
+- The external `calcPhiASE` executable is launched via `mpiexec`
+- Results are read back into Python
+- This mirrors the workflow used for the matlab interface
+
+For single-node runs, the Python binding is used directly without disk I/O.
+
+---
+
+#### Reference Example
+
+A complete working example is provided in:
+
+`example/python_example/laserPumpCladdingExample.py`
+
+It demonstrates:
+
+- Pumping step (gain computation)
+- Mesh preparation
+- ASE computation via `calcPhiASE`
+- GPU / parallel configuration
+
+Use this script as a template for your own workflow.
+
+
 Compiling
 ---------
+Note: these steps can be ignored when using `python install -e .`
 
-   + clone the repository: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
-   + create the build directory: `mkdir haseongpu/build`
-   + go to build directory: `cd haseongpu/build`
-   + create Makefile `cmake ..`
-   + build project : `make`
-GrayBat
-=======
++ clone the repository: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
++ create the build directory: `mkdir haseongpu/build`
++ go to build directory: `cd haseongpu/build`
++ create Makefile `cmake ..`
++ build project : `make`
+### GrayBat **(experimentell)** ###
 
 <b>Gr</b>aph <b>A</b>pproach  for Highl<b>y</b>  Generic Communication
 Schemes <b>B</b>ased on <b>A</b>daptive <b>T</b>opologies
 
-##Description##
+#### Description ####
 
 **GrayBat** is a C++ library that presents a graph-based communication
 approach, which enables a mapping of algorithms to communication
@@ -62,99 +171,65 @@ varying hardware architectures. Therefore, a flexible and configurable
 communication approach for parallel and distributed
 applications. These mappings are established as an intermediate layer
 between an application and communication libraries and are dynamically
-adptable during run-time.
+adptable during run-time. More information is available under: https://github.com/computationalradiationphysics/graybat.git`
 
-##Documentation##
+#### Documentation ####
 
-Have a look at the documentation that is available [here](https://ComputationalRadiationPhysics.github.io/graybat)
-
-##Referencing##
-
-GrayBat is a scientific project. If you **present and/or publish** scientific
-results that used GrayBat, you should set this as a **reference**.
-
-##Software License##
-
-
-GrayBat  is licensed under the <b>GPLv3+</b>. Please refer to our [LICENSE.md](LICENSE.md)
-
-
-##Dependencies##
-
- * cmake 3.0.2
- * Boost 1.57.0
- * OpenMPI 1.8.0 (mpi communication policy)
- * g++ 4.9.2
- * metis 5.1 (graph partitioning)
-
-##Compiling##
-
- * Clone the repository: `git clone https://github.com/computationalradiationphysics/graybat.git`
- * Change directory: `cd graybat`
- * Init git submodules: `git submodule init && git submodule update`
- * Create the build directory: `mkdir -p build`
- * Change to build directory: `cd build`
- * Set compiler: `export CXX=[g++,clang++]`
- * Create Makefile `cmake ..`
- * Build project : `make [target]`
-
-##Tested Compilers##
-
- * clang 3.5
- * g++ 4.9.2
+Graybat documentation that is available [here](https://ComputationalRadiationPhysics.github.io/graybat)
 
 ### Current Compilation Status:
 ### Windows (**experimental**, using Visual Studio 2013)
 
-   + Install the necessary dependencies, some notes:
-     - Boost can be either [compiled from source](http://www.boost.org/doc/libs/1_58_0/more/getting_started/windows.html) or downloaded as a [pre-compiled package](http://boost.teeks99.com/) (will not include Boost.MPI).
-     - gcc is not necessary, the MSVC compiler in Visual Studio works as well
-     - Optionally install an MPI implementatin (tested with [Microsoft MPI](https://msdn.microsoft.com/en-us/library/bb524831(v=vs.85).aspx))
-   + [download](https://github.com/ComputationalRadiationPhysics/haseongpu/archive/dev.zip) the repository or clone it with git: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
-   + Edit the `CMakeLists.txt` to define the variables `BOOST_LIBRARYDIR` and `BOOST_ROOT` to the correct location
-     - Have a look at the already commented out lines in `CMakeLists.txt` where Boost is included
-   + Use the CMake (either the GUI or command line) to create a VisualStudio Project fitting your Visual Studio and Windows version in a directory of your choice:
-     - `cd build_directory`
-     - `cmake -G "Visual Studio 12 2013 Win64" <PATH_TO_HASEONGPU_SOURCE>`
-   + Start Visual Studio and run `import existing solution` to import the newly generated project
-   + Compile the project `calcPhiASE`
-     - If there are linker errors, you might have to set your build to "Release" instead of "Debug" and re-run the whole compilation
-   + Copy the resulting binary `calcPhiASE.exe` to the folder `haseongpu/example/c_example/bin` to start using the first example
-   + Hint: use Microsoft PowerShell when executing experiments, instead of the regular command line shell, since the allowed output lines appear to be longer
++ Install the necessary dependencies, some notes:
+    - Boost can be either [compiled from source](http://www.boost.org/doc/libs/1_58_0/more/getting_started/windows.html) or downloaded as a [pre-compiled package](http://boost.teeks99.com/) (will not include Boost.MPI).
+    - gcc is not necessary, the MSVC compiler in Visual Studio works as well
+    - Optionally install an MPI implementatin (tested with [Microsoft MPI](https://msdn.microsoft.com/en-us/library/bb524831(v=vs.85).aspx))
++ [download](https://github.com/ComputationalRadiationPhysics/haseongpu/archive/dev.zip) the repository or clone it with git: `git clone https://github.com/computationalradiationphysics/haseongpu.git`
++ Edit the `CMakeLists.txt` to define the variables `BOOST_LIBRARYDIR` and `BOOST_ROOT` to the correct location
+    - Have a look at the already commented out lines in `CMakeLists.txt` where Boost is included
++ Use the CMake (either the GUI or command line) to create a VisualStudio Project fitting your Visual Studio and Windows version in a directory of your choice:
+    - `cd build_directory`
+    - `cmake -G "Visual Studio 12 2013 Win64" <PATH_TO_HASEONGPU_SOURCE>`
++ Start Visual Studio and run `import existing solution` to import the newly generated project
++ Compile the project `calcPhiASE`
+    - If there are linker errors, you might have to set your build to "Release" instead of "Debug" and re-run the whole compilation
++ Copy the resulting binary `calcPhiASE.exe` to the folder `haseongpu/example/c_example/bin` to start using the first example
++ Hint: use Microsoft PowerShell when executing experiments, instead of the regular command line shell, since the allowed output lines appear to be longer
 
 Usage
 -----
++ Python interface
++ Directly working on the generated binary (see compiling) use --help for parameter selection
++ MATLAB compatible interface [Deprecated]
 
-   + MATLAB compatible interface
-   + C-Application interface
 
 
 ### Quick MATLAB laser pump example
 
-  A small example for Phi ASE calculation
-  with a pumped crystal. The simulation
-  can be started by the following:
+A small example for Phi ASE calculation
+with a pumped crystal. The simulation
+can be started by the following:
 
-  1. follow the compile instructions above
-  2. change path "cd example/matlab_example/"
-  3. run : `matlab laserPumpCladdingExample`
-  4. watch progress
-  5. take a look at the results (*.vtk) with paraview 
+1. follow the compile instructions above
+2. change path "cd example/matlab_example/"
+3. run : `matlab laserPumpCladdingExample`
+4. watch progress
+5. take a look at the results (*.vtk) with paraview
 
 
-### Quick C-Application laser pump example 
+### Quick C-Application laser pump example
 
-  1. follow the compile instructions above
-  2. change path to repository root directory: `cd haseongpu`
-  3. run : `./build/calcPhiASE ./example/c_example/input/cylindrical --min-rays=10000`
-  4. watch progress
-  5. take a look at the results in the output directory
+1. follow the compile instructions above
+2. change path to repository root directory: `cd haseongpu`
+3. run : `./build/calcPhiASE ./example/c_example/input/cylindrical --min-rays=10000`
+4. watch progress
+5. take a look at the results in the output directory
 
 ### MATLAB compatible interface
 
-   + Add calcPhiASE.m to your matlab path
-   + Call calcPhiASE from your matlab script 
-     like following:
++ Add calcPhiASE.m to your matlab path
++ Call calcPhiASE from your matlab script
+  like following:
 
 ```matlab
 [phiASE, MSE, nRays] = calcPhiASE(
@@ -192,96 +267,13 @@ Usage
                                     nPerNode
                                 );  
 ```
-  + The returned values are represented as
-    two-dimensional matrices in which columns are
-    slice indices(levels) and rows are point
-    indices. The value for the ith point and jth 
-    slice can then be optained by MATLAB with:
-          
-      value = values(i,j);
++ The returned values are represented as
+  two-dimensional matrices in which columns are
+  slice indices(levels) and rows are point
+  indices. The value for the ith point and jth
+  slice can then be optained by MATLAB with:
 
-### Python Interface
-
-0.  **Compile the CUDA binary first**\
-    (see *Quick C-Application ASE Flux Example*) in your `./build`
-    directory.
-
-1.  **Install the Python dependencies** required by the example scripts:
-
-``` bash
-pip install -r example/python_example/requirements.txt
-```
-
-2.  **Make `calcPhiASE(...)` importable (optional)**
-
-If you want to use `calcPhiASE(...)` in your own scripts outside of
-`example/python_example`, add that directory to your `PYTHONPATH`:
-
-``` bash
-export PYTHONPATH=$HOME/.../haseongpu/example/python_example:$PYTHONPATH
-```
-
-This step is **not required** when running the provided example scripts
-directly inside `example/python_example`.
-
-3.  **Import and call `calcPhiASE` from your own Python script:**
-
-``` python
-from calcPhiASE import calcPhiASE
-
-phi_ASE, mse_values, n_rays = calcPhiASE(
-    p,
-    t_int,
-    beta_cell,
-    beta_vol,
-    clad_int,
-    clad_number,
-    clad_abs,
-    useReflections,
-    refractiveIndices,
-    reflectivities,
-    normals_x,
-    normals_y,
-    ordered_int,
-    surface,
-    x_center,
-    y_center,
-    normals_p,
-    forbidden,
-    minRaysPerSample,
-    maxRaysPerSample,
-    mseThreshold,
-    repetitions,
-    N_tot,
-    z_mesh,
-    laser,
-    crystal,
-    mesh_z,
-    deviceMode,
-    parallelMode,
-    maxGPUs,
-    nPerNode,
-)
-```
-
-**Reference Example**
-
-A complete, working reference implementation is provided in:
-
-`example/python_example/laserPumpCladdingExample.py`
-
-This script demonstrates the full workflow:
-
--   Performing the laser pumping step to compute the population
-    inversion / gain distribution.
--   Preparing mesh-based inputs (points, triangles, normals, neighbors,
-    etc.).
--   Calling the external C interface via `calcPhiASE` to compute the ASE
-    flux.
--   Handling GPU and parallel configuration parameters.
-
-Use this example as a template when integrating pumping and ASE
-computation into your own simulation workflow.
+  value = values(i,j);
 
 ### Input argument description
 
@@ -615,7 +607,7 @@ File Descriptions
   - `src/calc_phi_ase_mpi.cc` MPI workload distribution. Code for Master and Slaves
   - `src/write_to_file.cu` writing formatted data to a file
   - `src/ray_histogram.cu` print a histogram of the adaptive ray count to command line
-  - `src/calc_phi_ase_threaded.cu` pthreads workload distribution
+  - `src/calc_phi_ase_threaded.cc` pthreads workload distribution
   - `src/mt19937ar.cu` CPU code for Mersenne Twister PRNG used by for_loops_clad.cu
   - `src/write_to_vtk.cu` generate VTK-files from simulation results
   - `src/propagate_ray.cu` CUDA code to propagate a single ray through the prism mesh structure
@@ -660,7 +652,7 @@ File Descriptions
   - `include/reflection.hpp` header for reflection.cu
   - `include/parser.hpp` header for parser.cu
   - `include/map_rays_to_prisms.hpp` header for map_rays_to_prisms.cu
-  - `include/calc_phi_ase_threaded.hpp` header for calc_phi_ase_threaded.cu
+  - `include/calc_phi_ase_threaded.hpp` header for calc_phi_ase_threaded.cc
   - `include/thrust_device_vector_nowarn.hpp` wrapper to switch off compiler warning that is produced by 3rd party library (CUDA Thrust)
   - `include/propagate_ray.hpp` header for propagate_ray.cu
   - `include/thrust_host_vector_nowarn.hpp` wrapper to switch off compiler warning that is produced by 3rd party library (CUDA Thrust)

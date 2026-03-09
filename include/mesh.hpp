@@ -37,6 +37,33 @@
 #define REFLECTION_SMALL 1E-3
 #define SMALL 1E-5
 #define VERY_SMALL 0.0
+// forward declaration
+class Mesh;
+// forward declaration
+Mesh createMesh(
+    std::vector<unsigned> const& triangleIndices,
+    unsigned numberOfTriangles,
+    unsigned numberOfLevels,
+    unsigned numberOfPoints,
+    float thicknessOfPrism,
+    std::vector<double>& pointsVector,
+    std::vector<double>& xOfTriangleCenter,
+    std::vector<double>& yOfTriangleCenter,
+    std::vector<unsigned>& positionsOfNormalVectors,
+    std::vector<double>& xOfNormals,
+    std::vector<double>& yOfNormals,
+    std::vector<int>& forbiddenVector,
+    std::vector<int>& neighborsVector,
+    std::vector<float>& surfacesVector,
+    std::vector<double>& betaValuesVector,
+    std::vector<double>& betaCells,
+    std::vector<unsigned>& cellTypes,
+    std::vector<float>& refractiveIndices,
+    std::vector<float>& reflectivities,
+    float nTot,
+    float crystalFluorescence,
+    unsigned cladNumber,
+    double cladAbsorption);
 
 /**
  * @brief Contains the structure of the crystal
@@ -136,7 +163,6 @@ public:
        std::vector<int> triangleNeighbors,
        std::vector<unsigned> triangleNormalPoint);
 
-
     ConstHybridVector<double> points;
     ConstHybridVector<double> betaVolume;
     ConstHybridVector<double> normalVec;
@@ -190,4 +216,60 @@ public:
     __device__ __host__ float getReflectionAngle(ReflectionPlane reflectionPlane) const;
 
     __device__ __host__ void test() const;
+};
+
+class HostMesh
+{
+public:
+    std::vector<unsigned> const triangleIndices;
+    unsigned const numberOfTriangles;
+    unsigned const numberOfLevels;
+    unsigned const numberOfPoints;
+    float const thicknessOfPrism;
+    std::vector<double> pointsVector;
+    std::vector<double> xOfTriangleCenter;
+    std::vector<double> yOfTriangleCenter;
+    std::vector<unsigned> positionsOfNormalVectors;
+    std::vector<double> xOfNormals;
+    std::vector<double> yOfNormals;
+    std::vector<int> forbiddenVector;
+    std::vector<int> neighborsVector;
+    std::vector<float> surfacesVector;
+    std::vector<double> betaValuesVector;
+    std::vector<double> betaCells;
+    std::vector<unsigned> cellTypes;
+    std::vector<float> refractiveIndices;
+    std::vector<float> reflectivities;
+    float nTot;
+    float crystalTFluo;
+    unsigned claddingNumber;
+    double claddingAbsorption;
+
+    [[nodiscard]] Mesh toMesh()
+    {
+        return createMesh(
+            triangleIndices,
+            numberOfTriangles,
+            numberOfLevels,
+            numberOfPoints,
+            thicknessOfPrism,
+            pointsVector,
+            xOfTriangleCenter,
+            yOfTriangleCenter,
+            positionsOfNormalVectors,
+            xOfNormals,
+            yOfNormals,
+            forbiddenVector,
+            neighborsVector,
+            surfacesVector,
+            betaValuesVector,
+            betaCells,
+            cellTypes,
+            refractiveIndices,
+            reflectivities,
+            nTot,
+            crystalTFluo,
+            claddingNumber,
+            claddingAbsorption);
+    }
 };

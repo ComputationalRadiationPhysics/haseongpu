@@ -82,9 +82,11 @@ struct ComputeParameters
         fs::path outputPath,
         std::vector<unsigned> devices,
         unsigned minSampleRange,
-        unsigned maxSampleRange)
+        unsigned maxSampleRange,
+        unsigned maxGpus)
         : maxRepetitions(maxRepetitions)
         , adaptiveSteps(adaptiveSteps)
+        , maxGpus(maxGpus)
         , gpu_i(gpu_i)
         , deviceMode(deviceMode)
         , parallelMode(parallelMode)
@@ -99,12 +101,15 @@ struct ComputeParameters
 
     unsigned maxRepetitions;
     unsigned adaptiveSteps;
+    // user defined nr of gpus
+    unsigned maxGpus;
     unsigned gpu_i;
     std::string deviceMode;
     std::string parallelMode;
     bool writeVtk;
     fs::path inputPath;
     fs::path outputPath;
+    // gpu ids from cuda api
     std::vector<unsigned> devices;
     unsigned minSampleRange;
     unsigned maxSampleRange;
@@ -162,10 +167,13 @@ struct ExperimentParameters
 
     unsigned minRaysPerSample;
     unsigned maxRaysPerSample;
+    std::vector<double> lambdaA;
+    std::vector<double> lambdaE;
     std::vector<double> sigmaA;
     std::vector<double> sigmaE;
     double maxSigmaA;
     double maxSigmaE;
     double mseThreshold;
     bool useReflections;
+    unsigned spectral;
 };
