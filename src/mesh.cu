@@ -108,6 +108,7 @@ Mesh::Mesh(// Constants
   triangleNeighbors(triangleNeighbors),
   triangleNormalPoint(triangleNormalPoint){
 
+
 }
 
 Mesh::~Mesh() = default;

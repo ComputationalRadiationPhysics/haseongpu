@@ -69,7 +69,7 @@ void mpiHead(Result &result,
   unsigned finishedComputeNodes = 0;
   unsigned sampleOffset = 0;
   sample_i[1] = sampleRange;
-
+  ProgressBar bar;
   while(finishedComputeNodes < numberOfComputeNodes){
     MPI_Recv(res, RESULT_MSG_LENGTH, MPI_FLOAT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
@@ -92,7 +92,8 @@ void mpiHead(Result &result,
       result.phiAse.at(sampleOffset)    = res[1];
       result.mse.at(sampleOffset)       = res[2];
       result.totalRays.at(sampleOffset) = (unsigned)res[3];
-      fancyProgressBar(mesh.numberOfSamples);
+
+      bar.printFancyProgressBar(mesh.numberOfSamples);
       break;
 
       // Compute node requests new sample point for computation

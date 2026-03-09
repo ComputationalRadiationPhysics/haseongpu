@@ -24,7 +24,7 @@
 #include <mesh.hpp>
 #include <calc_phi_ase.hpp>
 #include <types.hpp>
-
+#include <progressbar.hpp>
 
 static std::vector<std::thread> threadIds;
 
@@ -35,20 +35,30 @@ void calcPhiAseThreaded( const ExperimentParameters &experiment,
                          Result &result,
                          const unsigned minSample_i,
                          const unsigned maxSample_i,
-                         float &runtime){
+                         float &runtime,
+                         ProgressBar &bar){
 
-    threadIds.push_back(std::thread(calcPhiAse,
-                                    std::ref(experiment),
-                                    std::ref(compute),
-                                    std::ref(mesh),
-                                    std::ref(result),
-                                    minSample_i,
-                                    maxSample_i,
-                                    std::ref(runtime)));
+    bar.reset();
+    threadIds.emplace_back(std::thread(
+    [&experiment, &compute, &mesh, &result, minSample_i, maxSample_i, &runtime, &bar]()
+    {
+        calcPhiAse(
+            experiment,
+            compute,
+            mesh,
+            result,
+            minSample_i,
+            maxSample_i,
+            runtime,
+            bar);
+    }));
 }
 
 void joinAll(){
-    for(unsigned i=0; i < threadIds.size(); ++i){
-        threadIds[i].join();
+    for(auto& t : threadIds){
+        if(t.joinable()){
+            t.join();
+        }
     }
+    threadIds.clear();
 }

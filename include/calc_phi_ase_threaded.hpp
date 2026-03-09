@@ -29,6 +29,7 @@
 #pragma once
 
 #include <mesh.hpp>
+#include <progressbar.hpp>
 #include <types.hpp>
 
 /**
@@ -62,6 +63,7 @@
  *             or should be replaced by c++11 threads
  * @return     threadId
  */
+
 void calcPhiAseThreaded(
     ExperimentParameters const& experiment,
     ComputeParameters const& compute,
@@ -69,7 +71,8 @@ void calcPhiAseThreaded(
     Result& result,
     unsigned const minSample_i,
     unsigned const maxSample_i,
-    float& runtime);
+    float& runtime,
+    ProgressBar& bar);
 
 /**
  * @brief Wait for all threads to finish

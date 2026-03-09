@@ -33,136 +33,150 @@
 
 namespace fs = boost::filesystem;
 namespace chr = std::chrono;
-
-/**
- * @brief prints a line of ascii-art in the style of a sine-wave
- *
- * @param stream the stream to which to write the output
- * @param tic continuously increasing value related to the real outside time
- * @param progress the progress of the whole process (i.e. 90, if the process ranges
- *        from 0-100 and the progress is at 90%
- *        progress must be <= length! (normalize progress in order to acheive this)
- * @param length the length of the finished wave.
- *        length must be at least as long as the progress!
- */
-void printWave(std::ostream &stream, unsigned tic, int progress, int length){
-  for(int i=0;i<progress ;++i){
-    switch((tic+i) % 12){
-      case 0: stream << "ø"; break;
-      case 1: stream << "¤"; break;
-      case 2: stream << "º"; break;
-      case 3: stream << "°"; break;
-      case 4: stream << "`"; break;
-      case 5: stream << "°"; break;
-      case 6: stream << "º"; break;
-      case 7: stream << "¤"; break;
-      case 8: stream << "ø"; break;
-      case 9: stream << ","; break;
-      case 10: stream << "¸"; break;
-      case 11: stream << ","; break;
+void printWave(std::ostream& stream, unsigned tic, int progress, int length)
+{
+    for(int i = 0; i < progress; ++i)
+    {
+        switch((tic + i) % 12)
+        {
+            case 0:  stream << "ø"; break;
+            case 1:  stream << "¤"; break;
+            case 2:  stream << "º"; break;
+            case 3:  stream << "°"; break;
+            case 4:  stream << "`"; break;
+            case 5:  stream << "°"; break;
+            case 6:  stream << "º"; break;
+            case 7:  stream << "¤"; break;
+            case 8:  stream << "ø"; break;
+            case 9:  stream << ","; break;
+            case 10: stream << "¸"; break;
+            case 11: stream << ","; break;
+        }
     }
-  }
-  for(int i=0; i < length-progress ; ++i){
-    stream << " ";
-  }
-}
 
-
-/**
-* @brief prints a simplistic line of ascii-art
-*
-* @param stream the stream to which to write the output
-* @param progress the progress of the whole process (i.e. 90, if the process ranges
-*        from 0-100 and the progress is at 90%
-*        progress must be <= length! (normalize progress in order to acheive this)
-* @param length the length of the finished bar.
-*        length must be at least as long as the progress!
-*/
-void printBar(std::ostream &stream, int progress, int length){
-    for (int i = 0; i<progress; ++i){
-        stream << "#";
-    }
-    for (int i = 0; i < length - progress; ++i){
+    for(int i = 0; i < length - progress; ++i)
+    {
         stream << " ";
     }
 }
 
+void printBar(std::ostream& stream, int progress, int length)
+{
+    for(int i = 0; i < progress; ++i)
+    {
+        stream << "#";
+    }
+    for(int i = 0; i < length - progress; ++i)
+    {
+        stream << " ";
+    }
+}
 
-/**
- * Writes the time in a human-friendly way
- *
- * The returned string will be formatted to display the time in terms of hours,
- * minutes and seconds. If the duration is small enough, some of those will be
- * omitted. A template argument allows to include also milliseconds
- * Example: 5000s -> 1h 23m 20s
- *          1000s -> 16m 40s
- *
- * @param time the duration to write
- */
-std::string humanRepresentation(chr::duration<float> const time){
+std::string humanRepresentation(chr::duration<float> time)
+{
+    using seconds = chr::duration<int, std::ratio<1, 1>>;
+    using minutes = chr::duration<int, std::ratio<60, 1>>;
+    using hours   = chr::duration<int, std::ratio<3600, 1>>;
 
-  typedef chr::duration<int, std::ratio<1,1>> seconds;
-  typedef chr::duration<int, std::ratio<60,1>> minutes;
-  typedef chr::duration<int, std::ratio<3600,1>> hours;
+    auto const tSec  = chr::duration_cast<seconds>(time).count() % 60;
+    auto const tMin  = chr::duration_cast<minutes>(time).count() % 60;
+    auto const tHour = chr::duration_cast<hours>(time).count();
 
-  auto const tSec  = chr::duration_cast<seconds>(time).count() % 60;
-  auto const tMin  = chr::duration_cast<minutes>(time).count() % 60;
-  auto const tHour = chr::duration_cast<hours>(time).count();
+    std::stringstream ss;
 
-  std::stringstream ss;
+    if(tHour) ss << tHour << "h ";
+    if(tMin)  ss << tMin  << "m ";
+    if(tSec)  ss << tSec  << "s";
 
-  if(tHour) ss << tHour << "h ";
-  if(tMin)  ss << tMin  << "m ";
-  if(tSec)  ss << tSec  << "s";
+    return ss.str();
+}
 
-  return ss.str();
+ProgressBar::ProgressBar(){
 
 }
 
+void ProgressBar::reset()
+{
+    maxNTotal = 0;
+    startTime = chr::steady_clock::now();
+    part.store(0, std::memory_order_relaxed);   // atomic reset
+    tic = 0;
+    initialized = false;
+}
 
-void fancyProgressBar(const unsigned nTotal){
-
+void ProgressBar::printFancyProgressBar(unsigned nTotal)
+{
 #ifdef _WIN32
-  const int length = 16;
+    const int length = 16;
 #else
-  const int length = 50;
+    const int length = 50;
 #endif
 
-  //use maxNTotal to find the global maximum between multiple calling threads
-  static unsigned maxNTotal = 0;
-  static chr::time_point < chr::steady_clock::time_point::clock > startTime;
-  static unsigned part = 0;
+    if(!initialized)
+    {
+        startTime = chr::steady_clock::now();
+        initialized = true;
+    }
 
-  //find the starting time of the whole progress
-  if(part==0){ startTime=chr::steady_clock::now(); }
-  maxNTotal = std::max(maxNTotal, nTotal);
-  static const unsigned fillwidthPart = unsigned(1+log10(maxNTotal));
-  static unsigned tic  = 0;
-  auto now = chr::steady_clock::now();
-  ++part;
+    maxNTotal = std::max(maxNTotal, nTotal);
 
-  //limit the update intervall (not faster than every 35ms, since that would be madness)
-  chr::duration<float> const timeSpent = now - startTime;
-  if(timeSpent.count() > 0.035*tic || part==maxNTotal){
-    ++tic;
+    unsigned const currentPart =
+        part.fetch_add(1, std::memory_order_relaxed) + 1;
 
-    const float percentage = float(part) / float(maxNTotal);
-    const auto timeTotal = timeSpent/percentage;
-    const auto timeRemaining = timeTotal-timeSpent;
+    if(maxNTotal == 0)
+        return;
 
-    dout(V_PROGRESS | V_NOLABEL) << "\r";
-    dout(V_PROGRESS) << "[";
+    auto const now = chr::steady_clock::now();
+    chr::duration<float> const timeSpent = now - startTime;
+
+    if(timeSpent.count() > 0.035f * tic || currentPart == maxNTotal)
+    {
+        ++tic;
+
+        float const percentage =
+            static_cast<float>(currentPart) / static_cast<float>(maxNTotal);
+
+        auto const timeTotal =
+            percentage > 0.0f
+                ? timeSpent / percentage
+                : chr::duration<float>::zero();
+
+        auto const timeRemaining = timeTotal - timeSpent;
+
+        unsigned const fillwidthPart =
+            maxNTotal > 0
+                ? static_cast<unsigned>(1 + std::log10(static_cast<double>(maxNTotal)))
+                : 1;
+
+        dout(V_PROGRESS | V_NOLABEL) << "\r";
+        dout(V_PROGRESS) << "[";
+
 #ifdef _WIN32
-    printBar(dout(V_PROGRESS | V_NOLABEL), int(percentage*length), length);
+        printBar(
+            dout(V_PROGRESS | V_NOLABEL),
+            static_cast<int>(percentage * length),
+            length);
 #else
-    printWave(dout(V_PROGRESS | V_NOLABEL), tic, int(percentage*length), length);
+        printWave(
+            dout(V_PROGRESS | V_NOLABEL),
+            tic,
+            static_cast<int>(percentage * length),
+            length);
 #endif
-    dout(V_PROGRESS | V_NOLABEL) << "] ";
 
-    dout(V_PROGRESS | V_NOLABEL) << std::setfill(' ') << std::setw(3) << int(percentage*100) << "%";
-    dout(V_PROGRESS | V_NOLABEL) << " (" << std::setfill(' ') << std::setw(fillwidthPart) << part << "/" << maxNTotal << ")";
-    dout(V_PROGRESS | V_NOLABEL) << " after " << humanRepresentation(timeSpent) ;
-    dout(V_PROGRESS | V_NOLABEL) << " (" << humanRepresentation(timeTotal) << " total, " << humanRepresentation(timeRemaining) << " remaining)";
-    dout(V_PROGRESS | V_NOLABEL) << std::flush;
-  }
+        dout(V_PROGRESS | V_NOLABEL) << "] ";
+        dout(V_PROGRESS | V_NOLABEL)
+            << std::setfill(' ') << std::setw(3)
+            << static_cast<int>(percentage * 100) << "%";
+        dout(V_PROGRESS | V_NOLABEL)
+            << " (" << std::setfill(' ') << std::setw(fillwidthPart)
+            << currentPart << "/" << maxNTotal << ")";
+        dout(V_PROGRESS | V_NOLABEL)
+            << " after " << humanRepresentation(timeSpent);
+        dout(V_PROGRESS | V_NOLABEL)
+            << " (" << humanRepresentation(timeTotal)
+            << " total, " << humanRepresentation(timeRemaining)
+            << " remaining)";
+        dout(V_PROGRESS | V_NOLABEL) << std::flush;
+    }
 }

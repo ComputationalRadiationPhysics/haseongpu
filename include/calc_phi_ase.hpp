@@ -41,11 +41,14 @@
  * @param runtime          Reference to the needed runtime.
  *
  **/
-float calcPhiAse(
+
+template<typename... Args>
+constexpr float calcPhiAse(
     ExperimentParameters const& experiment,
     ComputeParameters const& compute,
     Mesh const& mesh,
     Result& result,
     unsigned const minSample_i,
     unsigned const maxSample_i,
-    float& runtime);
+    float& runtime,
+    Args&&... args);

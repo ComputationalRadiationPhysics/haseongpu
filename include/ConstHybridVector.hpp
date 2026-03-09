@@ -17,7 +17,7 @@ template<class T>
 class ConstHybridVector
 {
 public:
-    ConstHybridVector(std::vector<T>& srcV) : hostV(srcV), deviceV(copyToDevice(srcV))
+    explicit ConstHybridVector(std::vector<T>& srcV) : hostV(srcV), deviceV(copyToDevice(srcV))
     {
     }
 
@@ -30,7 +30,7 @@ public:
 #endif
     }
 
-    __forceinline__ __host__ __device__ const T operator[](int i) const
+    __forceinline__ __host__ __device__ T operator[](int i) const
     {
 #ifdef __CUDA_ARCH__
         return deviceV[i];
@@ -56,7 +56,7 @@ public:
 
     __host__ void free()
     {
-        cudaFree(deviceV);
+        CUDA_CHECK_RETURN(cudaFree(deviceV));
     }
 
 private:
