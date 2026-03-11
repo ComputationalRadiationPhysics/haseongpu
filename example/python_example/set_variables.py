@@ -187,7 +187,7 @@ import numpy as np
 from scipy.io import savemat
 
 def set_variables(p, t):
-    
+
     length_t = t.shape[0]
 
     # Step 1: Calculate neighbor indices

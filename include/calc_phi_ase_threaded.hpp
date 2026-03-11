@@ -42,7 +42,7 @@
  *                         in case of adaptive sampling.
  * @param maxRepetitions   Number of Repetitions will
  *                         be done, when not reaching mse threshold
- * @param dMesh            All information about triangles, points, contants. 
+ * @param dMesh            All information about triangles, points, contants.
  *                         Is located in device memory. See mesh.h for details.
  * @param hMesh            Same as dMesh, but locatet in host memory.
  * @param sigmaA           Vector with Absorption values
@@ -62,18 +62,17 @@
  *             or should be replaced by c++11 threads
  * @return     threadId
  */
-void calcPhiAseThreaded( const ExperimentParameters &experiment,
-                         const ComputeParameters &compute,
-                         const Mesh& mesh,
-                         Result &result,
-                         const unsigned minSample_i,
-                         const unsigned maxSample_i,
-                         float &runtime );
-                              
+void calcPhiAseThreaded(
+    ExperimentParameters const& experiment,
+    ComputeParameters const& compute,
+    Mesh const& mesh,
+    Result& result,
+    unsigned const minSample_i,
+    unsigned const maxSample_i,
+    float& runtime);
+
 /**
  * @brief Wait for all threads to finish
  *
  */
 void joinAll();
-
-

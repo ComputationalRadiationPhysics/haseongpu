@@ -34,20 +34,20 @@ namespace fs = boost::filesystem;
 #include <mesh.hpp>
 
 
-/** 
+/**
  * @brief takes data and creates a nice VTK-file usable with paraview
  *
- * @param 
+ * @param
  */
 int writeToVtk(const Mesh& mesh,
-	       const std::vector<double> data,
-	       fs::path filename,
-	       const unsigned raysPerSample,
-	       const unsigned maxRaysPerSample,
-	       const float expectationThreshold,
-	       const bool useReflections,
-	       const float runtime,
-	       const std::string vtkType){
+           const std::vector<double> data,
+           fs::path filename,
+           const unsigned raysPerSample,
+           const unsigned maxRaysPerSample,
+           const float expectationThreshold,
+           const bool useReflections,
+           const float runtime,
+           const std::string vtkType){
 
   const std::vector<double> vertexCoordinates = mesh.points.toVector();
   const std::vector<unsigned> triangles       = mesh.trianglePointIndices.toVector();
@@ -87,7 +87,7 @@ int writeToVtk(const Mesh& mesh,
   vtkFile << "CELLS" << " " << numberOfCells << " " << numberOfCells * 7 << std::endl;
   for(unsigned level_i=0; level_i < (numberOfLevels - 1); ++level_i){
     for(unsigned triangle_i=0; triangle_i < trianglesPerLevel; ++triangle_i){
-      vtkFile << "6 " 
+      vtkFile << "6 "
         << level_i     * verticesPerLevel + triangles[triangle_i] << " "
         << level_i     * verticesPerLevel + triangles[trianglesPerLevel + triangle_i] << " "
         << level_i     * verticesPerLevel + triangles[2 * trianglesPerLevel + triangle_i] << " "

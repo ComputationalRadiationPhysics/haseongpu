@@ -26,5 +26,7 @@
 #define LAMBDA_START 905
 #define LAMBDA_STOP 1095
 
-std::vector<double> interpolateLinear(const std::vector<double> &y, const std::vector<double> &x, const unsigned nInterpolations);
-
+std::vector<double> interpolateLinear(
+    std::vector<double> const& y,
+    std::vector<double> const& x,
+    unsigned const nInterpolations);

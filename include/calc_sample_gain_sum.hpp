@@ -20,7 +20,7 @@
 
 
 /**
- * @brief Calculates the gain sum for the given 
+ * @brief Calculates the gain sum for the given
  *        sample point with or without reflections. This is done by a monte carlo
  *        simulation with randomly generated rays and
  *        wavelenghts.
@@ -35,22 +35,21 @@
 #pragma once
 
 #include <curand_mtgp32.h> /* curandStateMtgp32 */
-
 #include <mesh.hpp>
 
 /**
  * @brief: calculate the sum of all gains for a single sample point s_i, accounting
- *		   for reflections on the top and bottom surface. Different cladding, 
- *		   coating and refractive indices are stored in the mesh.
+ *         for reflections on the top and bottom surface. Different cladding,
+ *         coating and refractive indices are stored in the mesh.
  *
  * @param globalState State for random number generation (mersenne twister).
  *                    The state need to be initialized before. See
  *                    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MTGP/
  *                    for more information.
- * @param mesh the gain medium mesh 
+ * @param mesh the gain medium mesh
  * @param indicesOfPrisms a mapping from rays to prisms. The value x on the
- *	      n-th position denotes that ray n is supposed to start propagating 
- *	      from the x-th prism
+ *        n-th position denotes that ray n is supposed to start propagating
+ *        from the x-th prism
  * @param numberOfReflectionSlices similar to indicesOfPrisms, but denotes the
  *        reflection slice from which each ray starts (see importance sampling)
  * @param importance the importance for each prism, obtained through the
@@ -67,20 +66,20 @@
  *        (see getRayNumberBlockbased())
  *
  */
-__global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState, 
-				 const Mesh mesh,
-				 const unsigned* indicesOfPrisms, 
-				 const unsigned* numberOfReflections,
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum,
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double *sigmaA,
-				 const double *sigmaE,
-         const unsigned maxInterpolation,
-				 unsigned *globalOffsetMultiplicator
-				 );
+__global__ void calcSampleGainSumWithReflection(
+    curandStateMtgp32* globalState,
+    Mesh const mesh,
+    unsigned const* indicesOfPrisms,
+    unsigned const* numberOfReflections,
+    double const* importance,
+    unsigned const raysPerSample,
+    float* gainSum,
+    float* gainSumSquare,
+    unsigned const sample_i,
+    double const* sigmaA,
+    double const* sigmaE,
+    unsigned const maxInterpolation,
+    unsigned* globalOffsetMultiplicator);
 
 /**
  * @brief: calculate the sum of all gains for a single sample point s_i, ignoring
@@ -90,10 +89,10 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
  *                    The state need to be initialized before. See
  *                    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MTGP/
  *                    for more information.
- * @param mesh the gain medium mesh 
+ * @param mesh the gain medium mesh
  * @param indicesOfPrisms a mapping from rays to prisms. The value x on the
- *	      n-th position denotes that ray n is supposed to start propagating 
- *	      from the x-th prism
+ *        n-th position denotes that ray n is supposed to start propagating
+ *        from the x-th prism
  * @param importance the importance for each prism, obtained through the
  *        importance sampling kernel
  * @param raysPerSample the number of rays to use for the sample point s_i
@@ -108,16 +107,16 @@ __global__ void calcSampleGainSumWithReflection(curandStateMtgp32* globalState,
  *        (see getRayNumberBlockbased())
  *
  */
-__global__ void calcSampleGainSum(curandStateMtgp32* globalState, 
-				 const Mesh mesh,
-				 const unsigned* indicesOfPrisms, 
-				 const double* importance,
-				 const unsigned raysPerSample,
-				 float *gainSum,
-				 float *gainSumSquare,
-				 const unsigned sample_i,
-				 const double *sigmaA,
-				 const double *sigmaE,
-         const unsigned maxInterpolation,
-				 unsigned *globalOffsetMultiplicator
-				 );
+__global__ void calcSampleGainSum(
+    curandStateMtgp32* globalState,
+    Mesh const mesh,
+    unsigned const* indicesOfPrisms,
+    double const* importance,
+    unsigned const raysPerSample,
+    float* gainSum,
+    float* gainSumSquare,
+    unsigned const sample_i,
+    double const* sigmaA,
+    double const* sigmaE,
+    unsigned const maxInterpolation,
+    unsigned* globalOffsetMultiplicator);

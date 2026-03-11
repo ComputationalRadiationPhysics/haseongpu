@@ -25,12 +25,12 @@
 
 
 
-/** 
+/**
  * @brief Queries for devices on the running mashine and collects
- *        them on the devices array. Set the first device in this 
+ *        them on the devices array. Set the first device in this
  *        array as computation-device. On Errors the programm will
- *        be stoped by exit(). 
- * 
+ *        be stoped by exit().
+ *
  * @param maxGpus max. devices which should be allocated
  * @return vector of possible devices
  */

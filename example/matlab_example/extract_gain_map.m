@@ -24,7 +24,7 @@
 
 % at first try with one distribution
 
-clear all; 
+clear all;
 tic
 timeslices_tot = 150;
 
@@ -40,11 +40,11 @@ for i_s=1:timeslices_tot
     end
 
     i_ss = i_s-1;
-    
+
     filename=['save_' num2str(i_ss) '.mat'];
-    
+
     load(filename);
-    
+
     time_step = pump.T/(steps.time-1);
     crystal_step = crystal.length/(steps.crys-1);
 
@@ -61,7 +61,7 @@ for i_s=1:timeslices_tot
         grid_z = 0:crystal_step:crystal.length;
 
         time_step = pump.T/(steps.time-1);
-        crystal_step = crystal.length/(steps.crys-1); 
+        crystal_step = crystal.length/(steps.crys-1);
 
         gain_local = zeros(steps.crys,1);
 
@@ -74,7 +74,7 @@ for i_s=1:timeslices_tot
         mode.extr =1;
 
         % laser wavelength
-	[laser.max_ems, i] = max(laser.s_ems);
+    [laser.max_ems, i] = max(laser.s_ems);
         laser.max_abs = laser.s_abs(i);
 
         sigma_abs_L=laser.max_abs;
@@ -87,11 +87,11 @@ for i_s=1:timeslices_tot
         time_step_ex = laser.T/(steps.time-1);
         grid_t_ex = 0:time_step_ex:laser.T;
 
-	if (isOctave)
-	  energy_pulse = trapz(grid_t_ex, pulse');
-	else
+    if (isOctave)
+      energy_pulse = trapz(grid_t_ex, pulse');
+    else
           energy_pulse = trapz(grid_t_ex, pulse);
-	end
+    end
 
         % energy dump for the plot
         energy_pulse_round(1,1)=energy_pulse;
@@ -127,11 +127,11 @@ for i_s=1:timeslices_tot
 
         % bar (energy_pulse_round); figure(gcf)
     end
-    
+
 %     figure(2)
     [x_grid,y_grid]=meshgrid(-3:0.5:3);
     gainmap_Interp(:,:,i_s) = griddata(p(:,1),p(:,2),gainmap(:,1),x_grid,y_grid);
-    
+
 %     imagesc(gainmap_Interp);
 %     axis equal;
 %     colorbar;

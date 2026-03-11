@@ -51,24 +51,24 @@ void distributeSamples(Vertex master,
                        Result& result ){
 
     typedef typename Cage::Edge Edge;
-    
+
     // Messages
     std::array<float, 4> resultMsg;
-    std::array<int, 1>   sampleMsg; 
+    std::array<int, 1>   sampleMsg;
     unsigned nReceivedResults = 0;
-    
+
     auto sample = samples.begin();
     while(nReceivedResults != samples.size()){
         // Receive request or results
         Edge inEdge = cage.recv(resultMsg);
-		
+
         if(resultMsg[0] == requestTag){
-            
+
             if(sample != samples.end()){
                 // Send next sample
                 sampleMsg = std::array<int, 1>{{ (int) *sample++ }};
                 cage.send(inEdge.inverse(), sampleMsg);
-                
+
             }
 
         }
@@ -81,7 +81,7 @@ void distributeSamples(Vertex master,
 
             // Update receive counter
             nReceivedResults++;
-            
+
             // Update progress bar
             fancyProgressBar(mesh.numberOfSamples);
 
@@ -91,20 +91,20 @@ void distributeSamples(Vertex master,
 
     // Send abort message to all vertices
     master.spread(abortMsg);
-       
+
 }
 
 template <class Vertex, class Cage>
 void processSamples(const Vertex slave,
-		   const Vertex master,
-		   Cage &cage,
-		   const ExperimentParameters& experiment,
-		   const ComputeParameters& compute,
-		   const Mesh& mesh,
-		   Result& result ){
+           const Vertex master,
+           Cage &cage,
+           const ExperimentParameters& experiment,
+           const ComputeParameters& compute,
+           const Mesh& mesh,
+           Result& result ){
 
     typedef typename Cage::Edge Edge;
-    
+
     verbosity &= ~V_PROGRESS;
 
     // Messages
@@ -114,51 +114,51 @@ void processSamples(const Vertex slave,
     float runtime = 0.0;
 
     bool abort = false;
-    
+
     while(!abort){
 
-	// Get edge to master
-	Edge outEdge = cage.getEdge(slave, master);
+    // Get edge to master
+    Edge outEdge = cage.getEdge(slave, master);
 
-	// Request new sampling point
-	cage.send(outEdge, requestMsg);
+    // Request new sampling point
+    cage.send(outEdge, requestMsg);
 
-	// Receive new sampling point or abort
-	cage.recv(outEdge.inverse(), sampleMsg);
-		    
-	if(sampleMsg.at(0) == abortTag){
-	  abort = true;
-	}
-	else {
-	    calcPhiAse ( experiment,
-			 compute,
-			 mesh,
-			 result,
-			 sampleMsg.at(0),
-			 sampleMsg.at(0) + 1,
-			 runtime);
-			
-	    unsigned sample_i = sampleMsg[0];
-	    resultMsg = std::array<float, 4>{{ (float) sample_i,
-					       (float) result.phiAse.at(sample_i),
-					       (float) result.mse.at(sample_i),
-					       (float) result.totalRays.at(sample_i) }};
+    // Receive new sampling point or abort
+    cage.recv(outEdge.inverse(), sampleMsg);
 
-	    // Send simulation results
-	    cage.send(outEdge, resultMsg);
-						
-	}
+    if(sampleMsg.at(0) == abortTag){
+      abort = true;
+    }
+    else {
+        calcPhiAse ( experiment,
+             compute,
+             mesh,
+             result,
+             sampleMsg.at(0),
+             sampleMsg.at(0) + 1,
+             runtime);
+
+        unsigned sample_i = sampleMsg[0];
+        resultMsg = std::array<float, 4>{{ (float) sample_i,
+                           (float) result.phiAse.at(sample_i),
+                           (float) result.mse.at(sample_i),
+                           (float) result.totalRays.at(sample_i) }};
+
+        // Send simulation results
+        cage.send(outEdge, resultMsg);
 
     }
 
- 
+    }
+
+
 }
 
 
 float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
-			  const ComputeParameters &compute,
-			  Mesh& mesh,
-			  Result &result ){
+              const ComputeParameters &compute,
+              Mesh& mesh,
+              Result &result ){
 
     /***************************************************************************
      * CAGE
@@ -177,7 +177,7 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
     cage.setGraph(graybat::pattern::BiStar<GP>(nPeers));
     cage.distribute(graybat::mapping::Roundrobin());
     const Vertex master = cage.getVertex(0);
-    
+
     /***************************************************************************
      * ASE SIMULATION
      **************************************************************************/
@@ -188,28 +188,28 @@ float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
     // Determine phi ase for each sample
     for(Vertex vertex : cage.getHostedVertices()) {
 
-	/*******************************************************************
-	 * MASTER
-	 *******************************************************************/
-	if(vertex == master){
-	    distributeSamples(vertex, samples, cage, mesh, result);
-
-	}
-
-	/*******************************************************************
-	 * SLAVES
-	 *******************************************************************/
-	if(vertex != master){
-	  processSamples(vertex, master, cage, experiment, compute, mesh, result);
-	  cage.~Cage();
-          mesh.free();
-	  exit(0);
-
-	}	
+    /*******************************************************************
+     * MASTER
+     *******************************************************************/
+    if(vertex == master){
+        distributeSamples(vertex, samples, cage, mesh, result);
 
     }
-    
+
+    /*******************************************************************
+     * SLAVES
+     *******************************************************************/
+    if(vertex != master){
+      processSamples(vertex, master, cage, experiment, compute, mesh, result);
+      cage.~Cage();
+          mesh.free();
+      exit(0);
+
+    }
+
+    }
+
     return cage.getVertices().size() - 1;
-    
+
 }
 #endif

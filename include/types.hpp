@@ -21,74 +21,81 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp> /* fs::path */
+
 #include <string>
 #include <vector>
 
 namespace fs = boost::filesystem;
 
-
-struct DeviceMode {
-    static const inline std::string NONE  = "no_device_mode";
-    static const inline std::string GPU   = "gpu";
-    static const inline std::string CPU   = "cpu";
+struct DeviceMode
+{
+    static inline std::string const NONE = "no_device_mode";
+    static inline std::string const GPU = "gpu";
+    static inline std::string const CPU = "cpu";
 };
 
-
-struct ParallelMode {
-    static const inline std::string NONE        = "no_parallel_mode";
-    static const inline std::string THREADED    = "threaded";
-    static const inline std::string MPI         = "mpi";
-    static const inline std::string GRAYBAT     = "graybat";
-
+struct ParallelMode
+{
+    static inline std::string const NONE = "no_parallel_mode";
+    static inline std::string const THREADED = "threaded";
+    static inline std::string const MPI = "mpi";
+    static inline std::string const GRAYBAT = "graybat";
 };
 
-struct CompSwitch{
-    static const inline std::string parallel_mode     = "parallel-mode";
-    static const inline std::string device_mode       = "device-mode";
-    static const inline std::string ngpus             = "ngpus";
-    static const inline std::string repetitions       = "repetitions";
-    static const inline std::string adaptive_steps    = "adaptive-steps";
-    static const inline std::string min_sample_i      = "min-sample-i";
-    static const inline std::string max_sample_i      = "max-sample-i";
-    static const inline std::string write_vtk         = "write-vtk";
+struct CompSwitch
+{
+    static inline std::string const parallel_mode = "parallel-mode";
+    static inline std::string const device_mode = "device-mode";
+    static inline std::string const ngpus = "ngpus";
+    static inline std::string const repetitions = "repetitions";
+    static inline std::string const adaptive_steps = "adaptive-steps";
+    static inline std::string const min_sample_i = "min-sample-i";
+    static inline std::string const max_sample_i = "max-sample-i";
+    static inline std::string const write_vtk = "write-vtk";
 };
 
-struct ExpSwitch{
-    static const inline std::string input_path     = "input-path";
-    static const inline std::string output_path    = "output-path";
-    static const inline std::string min_rays       = "min-rays";
-    static const inline std::string max_rays       = "max-rays";
-    static const inline std::string mse            = "mse-threshold";
-    static const inline std::string reflection     = "reflection";
-    static const inline std::string spectral       = "spectral-resolution";
+struct ExpSwitch
+{
+    static inline std::string const input_path = "input-path";
+    static inline std::string const output_path = "output-path";
+    static inline std::string const min_rays = "min-rays";
+    static inline std::string const max_rays = "max-rays";
+    static inline std::string const mse = "mse-threshold";
+    static inline std::string const reflection = "reflection";
+    static inline std::string const spectral = "spectral-resolution";
 };
 
-struct ComputeParameters {
+struct ComputeParameters
+{
+    ComputeParameters()
+    {
+    }
 
-    ComputeParameters() {}
-
-    ComputeParameters(  unsigned maxRepetitions,
-            unsigned adaptiveSteps,
-            unsigned gpu_i,
-            std::string deviceMode,
-            std::string parallelMode,
-            bool writeVtk,
-            fs::path inputPath,
-            fs::path outputPath,
-            std::vector<unsigned> devices,
-            unsigned minSampleRange,
-            unsigned maxSampleRange) :
-        maxRepetitions(maxRepetitions),
-        adaptiveSteps(adaptiveSteps),
-        gpu_i(gpu_i),
-        deviceMode(deviceMode),
-        parallelMode(parallelMode),
-        writeVtk(writeVtk),
-        inputPath(inputPath),
-        outputPath(outputPath),
-        devices(devices),
-        minSampleRange(minSampleRange),
-        maxSampleRange(maxSampleRange){ }
+    ComputeParameters(
+        unsigned maxRepetitions,
+        unsigned adaptiveSteps,
+        unsigned gpu_i,
+        std::string deviceMode,
+        std::string parallelMode,
+        bool writeVtk,
+        fs::path inputPath,
+        fs::path outputPath,
+        std::vector<unsigned> devices,
+        unsigned minSampleRange,
+        unsigned maxSampleRange)
+        : maxRepetitions(maxRepetitions)
+        , adaptiveSteps(adaptiveSteps)
+        , gpu_i(gpu_i)
+        , deviceMode(deviceMode)
+        , parallelMode(parallelMode)
+        , writeVtk(writeVtk)
+        , inputPath(inputPath)
+        , outputPath(outputPath)
+        , devices(devices)
+        , minSampleRange(minSampleRange)
+        , maxSampleRange(maxSampleRange)
+    {
+    }
 
     unsigned maxRepetitions;
     unsigned adaptiveSteps;
@@ -101,50 +108,57 @@ struct ComputeParameters {
     std::vector<unsigned> devices;
     unsigned minSampleRange;
     unsigned maxSampleRange;
-
-
 };
 
-struct Result {
+struct Result
+{
+    Result()
+    {
+    }
 
-    Result(){}
-
-    Result( std::vector<float> phiAse,
-            std::vector<double> mse,
-            std::vector<unsigned> totalRays,
-            std::vector<double>   dndtAse) :
-        phiAse(phiAse),
-        mse(mse),
-        totalRays(totalRays),
-        dndtAse(dndtAse){}
+    Result(
+        std::vector<float> phiAse,
+        std::vector<double> mse,
+        std::vector<unsigned> totalRays,
+        std::vector<double> dndtAse)
+        : phiAse(phiAse)
+        , mse(mse)
+        , totalRays(totalRays)
+        , dndtAse(dndtAse)
+    {
+    }
 
     std::vector<float> phiAse;
     std::vector<double> mse;
     std::vector<unsigned> totalRays;
-    std::vector<double>   dndtAse;
-
+    std::vector<double> dndtAse;
 };
 
-struct ExperimentParameters {
+struct ExperimentParameters
+{
+    ExperimentParameters()
+    {
+    }
 
-    ExperimentParameters() {}
-
-    ExperimentParameters(  unsigned minRaysPerSample,
-            unsigned maxRaysPerSample,
-            std::vector<double> sigmaA,
-            std::vector<double> sigmaE,
-            double maxSigmaA,
-            double maxSigmaE,
-            double mseThreshold,
-            bool useReflections) :
-        minRaysPerSample(minRaysPerSample),
-        maxRaysPerSample(maxRaysPerSample),
-        sigmaA(sigmaA),
-        sigmaE(sigmaE),
-        maxSigmaA(maxSigmaA),
-        maxSigmaE(maxSigmaE),
-        mseThreshold(mseThreshold),
-        useReflections(useReflections) { }
+    ExperimentParameters(
+        unsigned minRaysPerSample,
+        unsigned maxRaysPerSample,
+        std::vector<double> sigmaA,
+        std::vector<double> sigmaE,
+        double maxSigmaA,
+        double maxSigmaE,
+        double mseThreshold,
+        bool useReflections)
+        : minRaysPerSample(minRaysPerSample)
+        , maxRaysPerSample(maxRaysPerSample)
+        , sigmaA(sigmaA)
+        , sigmaE(sigmaE)
+        , maxSigmaA(maxSigmaA)
+        , maxSigmaE(maxSigmaE)
+        , mseThreshold(mseThreshold)
+        , useReflections(useReflections)
+    {
+    }
 
     unsigned minRaysPerSample;
     unsigned maxRaysPerSample;
@@ -154,5 +168,4 @@ struct ExperimentParameters {
     double maxSigmaE;
     double mseThreshold;
     bool useReflections;
-
 };

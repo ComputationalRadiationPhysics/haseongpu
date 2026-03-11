@@ -52,7 +52,7 @@ curvename = strcat('gain_curve_', current_dir, '.txt');
 fid = fopen(curvename , 'w');
 fprintf(fid, '%s\n', '# time[us]        gain');
 fclose(fid);
-dlmwrite(curvename, curve, '-append', 'delimiter', ' '); 
+dlmwrite(curvename, curve, '-append', 'delimiter', ' ');
 
 cd(current_dir)
 toc

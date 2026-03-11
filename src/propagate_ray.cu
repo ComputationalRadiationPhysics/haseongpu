@@ -29,8 +29,8 @@
 
 /**
  * @brief Checks a level-plane(currentLevel * thickness) for intersection with an ray (zPos, zVec).
- *        If the intersection-length is greater then length. 
- *        Than the intersection-length will be returned. 
+ *        If the intersection-length is greater then length.
+ *        Than the intersection-length will be returned.
  *        Otherwise 0 will be returned.
  *
  * @return intersection-length if intersection-length <= length
@@ -65,19 +65,19 @@ __device__ double checkEdge(const unsigned triangle, const int edge, const Ray r
 
   if (denominator != 0.0)
     {
-      double nominator =	  
-	normal.dir.x * normal.p.x
-	+ normal.dir.y * normal.p.y
-	- normal.dir.x * ray.p.x 
-	- normal.dir.y * ray.p.y; 
+      double nominator =
+    normal.dir.x * normal.p.x
+    + normal.dir.y * normal.p.y
+    - normal.dir.x * ray.p.x
+    - normal.dir.y * ray.p.y;
 
       double lengthTmp = nominator/denominator;
       if(lengthTmp <= length && lengthTmp > 0.0){
-	return lengthTmp;
+    return lengthTmp;
       }
 
     }
-  
+
   return 0;
 }
 
@@ -96,12 +96,12 @@ __device__ int calcTriangleRayIntersection(double *length, const unsigned triang
     if(edge_i != forbiddenEdge){
       double lengthTmp = checkEdge(triangle, edge_i, ray, mesh, *length);
       if(lengthTmp){
-	*length = lengthTmp;
-	edge = edge_i;
+    *length = lengthTmp;
+    edge = edge_i;
       }
     }
   }
-  
+
   // check the upper surface
   if (forbiddenEdge != 3){
     double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, *length, mesh.thickness);
@@ -125,7 +125,7 @@ __device__ int calcTriangleRayIntersection(double *length, const unsigned triang
 /**
  * @brief This is simple vector calculation. The startpoint
  *        of ray will be moved by length.
- * 
+ *
  * @return ray is the ray with moved startpoint
  *
  **/
@@ -139,7 +139,7 @@ __device__ Ray calcNextRay(Ray ray, const double length){
 }
 
 /**
- * @brief Calculates the gain for the given prism(triangle and level) and 
+ * @brief Calculates the gain for the given prism(triangle and level) and
  *        the intersection-length of the ray.
  *
  * @return gain
@@ -152,12 +152,12 @@ __device__ double calcPrismGain(const unsigned triangle, const unsigned level, c
   else {
      return (double) exp(mesh.nTot * (mesh.getBetaVolume(triangle, level) * ( sigmaE + sigmaA ) - sigmaA ) * length);
    }
- 
+
 }
 
 /**
- * @brief Sets the next triangle, next forbiddenEdge 
- *        and next level depending on the cutted edge of 
+ * @brief Sets the next triangle, next forbiddenEdge
+ *        and next level depending on the cutted edge of
  *        the current triangle and the propagated ray.
  *
  **/
@@ -187,8 +187,8 @@ __device__ void updateFromEdge(unsigned *triangle, int *forbiddenEdge, unsigned 
 
 }
 
-__device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextTriangle, const Mesh &mesh, 
-			       const double sigmaA, const double sigmaE){
+__device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextTriangle, const Mesh &mesh,
+                   const double sigmaA, const double sigmaE){
   double distanceTotal     = nextRay.length;
   double distanceRemaining = nextRay.length;
   double length  = 0;
@@ -224,15 +224,15 @@ __device__ double propagateRay(Ray nextRay, unsigned *nextLevel, unsigned *nextT
 }
 
 
-__device__ double propagateRayWithReflection(Point startPoint, 
-					     const Point endPoint, 
-					     const unsigned reflections, 
-					     ReflectionPlane reflectionPlane, 
-					     unsigned startLevel, 
-					     unsigned startTriangle, 
-					     const Mesh &mesh, 
-					     const double sigmaA, 
-					     const double sigmaE){
+__device__ double propagateRayWithReflection(Point startPoint,
+                         const Point endPoint,
+                         const unsigned reflections,
+                         ReflectionPlane reflectionPlane,
+                         unsigned startLevel,
+                         unsigned startTriangle,
+                         const Mesh &mesh,
+                         const double sigmaA,
+                         const double sigmaE){
 
   double distanceTotal = 0;
   double gain = 1.0;
@@ -255,20 +255,20 @@ __device__ double propagateRayWithReflection(Point startPoint,
     if(reflectionAngle <= totalReflectionAngle){
       gain             *= reflectivity;
       if(gain == 0){
-	return 0;
+    return 0;
       }
     }
 
     startPoint          = reflectionPoint;
     reflectionPlane     = reflectionPlane == TOP_REFLECTION ? BOTTOM_REFLECTION : TOP_REFLECTION;
-    
+
     }
 
   Ray ray = generateRay(startPoint, endPoint);
   gain  *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
 
-  distanceTotal += ray.length;  
-  
+  distanceTotal += ray.length;
+
   return gain / (distanceTotal * distanceTotal);
 
 }

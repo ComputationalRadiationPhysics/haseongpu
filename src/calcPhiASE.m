@@ -24,7 +24,7 @@
 % most meshing paramers are given through the function parameters.
 % However, many parameters for optimization of the computation are
 % set in the beginning of the function (adjust as needed)
-% 
+%
 % for most mesh parameters see README file
 %
 % @return phiASE the ASE-Flux for all the given sample points
@@ -93,7 +93,7 @@ TMP_FOLDER=[ CALCPHIASE_DIR filesep 'input_tmp' ];
 
 
 %%%%%%%%%%%%%%%%%% doing the computation %%%%%%%%%%%%%%%%%%
-% make sure that the temporary folder is clean 
+% make sure that the temporary folder is clean
 clean_IO_files(TMP_FOLDER);
 
 % create new input in the temporary folder
@@ -123,7 +123,7 @@ end
 % takes all the variables and puts them into textfiles
 % so the CUDA code can parse them. Take care that the
 % names of the textfiles match those in the parsing function
-% 
+%
 % for most parameters, see calcPhiASE (above)
 % @param FOLDER the folder in which to create the input files (usually a
 %               temporary folder visible by all the participating nodes)
@@ -249,7 +249,7 @@ fprintf(x,'%.50f\n',reflectivities);
 fclose(x);
 
 cd(CURRENT_DIR);
-end 
+end
 
 
 
@@ -258,7 +258,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%% parse_calcPhiASE_output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % takes the output from the CUDA code and fills it into a variable
-% assumes that the matrix is saved as a 3D-matrix where the first line 
+% assumes that the matrix is saved as a 3D-matrix where the first line
 % denotes the dimensions and the second line is the whole data
 %
 % @param FOLDER the folder which contains the output files
@@ -296,7 +296,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% clean_IO_files %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % deletes the temporary folder and the dndt_ASE.txt
-% 
+%
 % @param TMP_FOLDER the folder to remove
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -56,32 +56,32 @@ void assertMin([[maybe_unused]] const std::vector<T>& v,[[maybe_unused]] const  
 }
 
 Mesh::Mesh(// Constants
-	   double claddingAbsorption,
-	   float surfaceTotal,
-	   float thickness,
-	   float nTot,
-	   float crystalTFluo,
-	   unsigned numberOfTriangles,
-	   unsigned numberOfLevels,
-	   unsigned numberOfPrisms,
-	   unsigned numberOfPoints,
-	   unsigned numberOfSamples,
-	   unsigned claddingNumber,
-	   // Vectors
-	   std::vector<double> points,
-	   std::vector<double> normalVec,
-	   std::vector<double> betaVolume,
-	   std::vector<double> centers,
-	   std::vector<float> triangleSurfaces,
-	   std::vector<int> forbiddenEdge,
-	   std::vector<double> betaCells,
-	   std::vector<unsigned> claddingCellTypes,
-	   std::vector<float> refractiveIndices,
-	   std::vector<float> reflectivities,
-	   std::vector<float> totalReflectionAngles,
-	   std::vector<unsigned> trianglePointIndices,
-	   std::vector<int> triangleNeighbors,
-	   std::vector<unsigned> triangleNormalPoint) :
+       double claddingAbsorption,
+       float surfaceTotal,
+       float thickness,
+       float nTot,
+       float crystalTFluo,
+       unsigned numberOfTriangles,
+       unsigned numberOfLevels,
+       unsigned numberOfPrisms,
+       unsigned numberOfPoints,
+       unsigned numberOfSamples,
+       unsigned claddingNumber,
+       // Vectors
+       std::vector<double> points,
+       std::vector<double> normalVec,
+       std::vector<double> betaVolume,
+       std::vector<double> centers,
+       std::vector<float> triangleSurfaces,
+       std::vector<int> forbiddenEdge,
+       std::vector<double> betaCells,
+       std::vector<unsigned> claddingCellTypes,
+       std::vector<float> refractiveIndices,
+       std::vector<float> reflectivities,
+       std::vector<float> totalReflectionAngles,
+       std::vector<unsigned> trianglePointIndices,
+       std::vector<int> triangleNeighbors,
+       std::vector<unsigned> triangleNormalPoint) :
   claddingAbsorption(claddingAbsorption),
   surfaceTotal(surfaceTotal),
   thickness(thickness),
@@ -121,13 +121,13 @@ __host__ void Mesh::free(){
     forbiddenEdge.free();
     betaCells.free();
     claddingCellTypes.free();
-    refractiveIndices.free(); 
-    reflectivities.free();   
+    refractiveIndices.free();
+    reflectivities.free();
     totalReflectionAngles.free();
     trianglePointIndices.free();
     triangleNeighbors.free();
     triangleNormalPoint.free();
-    
+
 }
 
 /**
@@ -219,7 +219,7 @@ __device__ NormalRay Mesh::getNormal(unsigned triangle, int edge) const{
   ray.dir.y = normalVec[offset + 3*numberOfTriangles];
 
   return ray;
-}	
+}
 
 /**
  * @brief genenerates a point with the coordinates of a given vertex
@@ -275,80 +275,80 @@ __device__ unsigned Mesh::getCellType(unsigned triangle) const{
 
 
 double distance2D(const TwoDimPoint p1, const TwoDimPoint p2) {
-	return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
+    return abs(sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y)));
 }
 
 double getMaxDistance(std::vector<TwoDimPoint> points) {
-	double maxDistance = -1;
+    double maxDistance = -1;
 
-	for(unsigned p1=0 ; p1 < points.size() ; ++p1)
-		for(unsigned p2 = p1; p2 < points.size() ; ++p2)
-			maxDistance = max(maxDistance,distance2D(points[p1],points[p2]));
+    for(unsigned p1=0 ; p1 < points.size() ; ++p1)
+        for(unsigned p2 = p1; p2 < points.size() ; ++p2)
+            maxDistance = max(maxDistance,distance2D(points[p1],points[p2]));
 
-	return maxDistance;
+    return maxDistance;
 }
 
 double calculateMaxDiameter(const double* points, const unsigned offset) {
-	TwoDimPoint minX = {DBL_MAX,0};
-	TwoDimPoint minY = {0,DBL_MAX};
-	TwoDimPoint maxX = {DBL_MIN,0};
-	TwoDimPoint maxY = {0,DBL_MIN};
+    TwoDimPoint minX = {DBL_MAX,0};
+    TwoDimPoint minY = {0,DBL_MAX};
+    TwoDimPoint maxX = {DBL_MIN,0};
+    TwoDimPoint maxY = {0,DBL_MIN};
 
-	for(unsigned p=0; p<offset; ++p){
-		TwoDimPoint np = {points[p],points[p+offset]};
-		minX = (points[p] < minX.x) ? np : minX;
-		maxX = (points[p] > maxX.x) ? np : maxX;
-	}
-	for(unsigned p=offset;p<2*offset;++p){
+    for(unsigned p=0; p<offset; ++p){
+        TwoDimPoint np = {points[p],points[p+offset]};
+        minX = (points[p] < minX.x) ? np : minX;
+        maxX = (points[p] > maxX.x) ? np : maxX;
+    }
+    for(unsigned p=offset;p<2*offset;++p){
         TwoDimPoint np = {points[p-offset],points[p]};
-		minY = points[p]<minY.y ? np : minY;
-		maxY = points[p]>maxY.y ? np : maxY;
-	}
+        minY = points[p]<minY.y ? np : minY;
+        maxY = points[p]>maxY.y ? np : maxY;
+    }
 
-	std::vector<TwoDimPoint> extrema;
-	extrema.push_back(minX);
-	extrema.push_back(minY);
-	extrema.push_back(maxX);
-	extrema.push_back(maxY);
-	
+    std::vector<TwoDimPoint> extrema;
+    extrema.push_back(minX);
+    extrema.push_back(minY);
+    extrema.push_back(maxX);
+    extrema.push_back(maxY);
 
-	return getMaxDistance(extrema);
+
+    return getMaxDistance(extrema);
 }
 
 unsigned Mesh::getMaxReflections (ReflectionPlane reflectionPlane) const{
   double d = calculateMaxDiameter(points.toArray().data(),numberOfPoints);
   float alpha = getReflectionAngle(reflectionPlane) * M_PI / 180.;
-  double h = numberOfLevels * thickness; 
+  double h = numberOfLevels * thickness;
   double z = d/tan(alpha);
   return ceil(z/h);
 }
 
 unsigned Mesh::getMaxReflections() const{
-	unsigned top = getMaxReflections(TOP_REFLECTION);
-	unsigned bottom = getMaxReflections(BOTTOM_REFLECTION);
-	return max(top,bottom);
+    unsigned top = getMaxReflections(TOP_REFLECTION);
+    unsigned bottom = getMaxReflections(BOTTOM_REFLECTION);
+    return max(top,bottom);
 }
 
 __device__ __host__ float Mesh::getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle) const{
-	switch(reflectionPlane){
-		case BOTTOM_REFLECTION:
-			return reflectivities[triangle];
-		case TOP_REFLECTION:
-			return reflectivities[triangle + numberOfTriangles];
-	}
-	return 0;
+    switch(reflectionPlane){
+        case BOTTOM_REFLECTION:
+            return reflectivities[triangle];
+        case TOP_REFLECTION:
+            return reflectivities[triangle + numberOfTriangles];
+    }
+    return 0;
 }
 
 __device__ __host__ float Mesh::getReflectionAngle(ReflectionPlane reflectionPlane) const{
-	switch(reflectionPlane){
-		case BOTTOM_REFLECTION:
+    switch(reflectionPlane){
+        case BOTTOM_REFLECTION:
       return totalReflectionAngles[0];
-			//return asin(refractiveIndices[1]/refractiveIndices[0]);
-		case TOP_REFLECTION:
+            //return asin(refractiveIndices[1]/refractiveIndices[0]);
+        case TOP_REFLECTION:
       return totalReflectionAngles[1];
-			//return asin(refractiveIndices[3]/refractiveIndices[2]);
-	}
-	return  0;
+            //return asin(refractiveIndices[3]/refractiveIndices[2]);
+    }
+    return  0;
 }
 
 __device__ __host__ void Mesh::test() const{
@@ -364,5 +364,5 @@ __device__ __host__ void Mesh::test() const{
   printf("numberOfPoints: %u\n", numberOfPoints);
   printf("numberOfSamples: %u\n", numberOfSamples);
   printf("claddingNumber: %u\n", claddingNumber);
-  
+
 }

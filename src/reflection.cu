@@ -45,7 +45,7 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
     // Reflection on TOP plane
     planeZ = mesh.thickness * mesh.numberOfLevels;
   }
-  double denominator = reflectionRay.dir.z;  
+  double denominator = reflectionRay.dir.z;
   if (denominator != 0.0){
     double nominator = planeZ - reflectionRay.p.z;
     double length = nominator / denominator;
@@ -61,7 +61,7 @@ __device__ int calcPlaneIntersectionPoint(const Ray reflectionRay, const Reflect
 }
 
 /*
- * TOP_REFLECTION = 1 
+ * TOP_REFLECTION = 1
  * BOTTOM_REFLECTION = -1
  * defined in reflection.hpp
  */
@@ -69,7 +69,7 @@ __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  co
   float mirrorPlaneZ = 0;
   if(reflectionsLeft % 2 == 0){
     // Even reflectionCount is postponement
-    endPoint.z = endPoint.z + reflectionPlane * (reflectionsLeft * mesh.thickness * mesh.numberOfLevels); 
+    endPoint.z = endPoint.z + reflectionPlane * (reflectionsLeft * mesh.thickness * mesh.numberOfLevels);
   }
   else {
     // Odd reflectionsCount is reflection
@@ -82,7 +82,7 @@ __device__ Ray generateReflectionRay(const Point startPoint, Point endPoint,  co
     }
 
     endPoint.z = reflectionPlane * abs(( mirrorPlaneZ + mirrorPlaneZ - endPoint.z));
-    
+
   }
   return generateRay(startPoint, endPoint);
 }

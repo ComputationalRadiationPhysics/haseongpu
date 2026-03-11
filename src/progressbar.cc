@@ -88,7 +88,7 @@ void printBar(std::ostream &stream, int progress, int length){
 }
 
 
-/** 
+/**
  * Writes the time in a human-friendly way
  *
  * The returned string will be formatted to display the time in terms of hours,
@@ -105,14 +105,14 @@ std::string humanRepresentation(chr::duration<float> const time){
   typedef chr::duration<int, std::ratio<60,1>> minutes;
   typedef chr::duration<int, std::ratio<3600,1>> hours;
 
-  auto const tSec  = chr::duration_cast<seconds>(time).count() % 60; 
-  auto const tMin  = chr::duration_cast<minutes>(time).count() % 60; 
+  auto const tSec  = chr::duration_cast<seconds>(time).count() % 60;
+  auto const tMin  = chr::duration_cast<minutes>(time).count() % 60;
   auto const tHour = chr::duration_cast<hours>(time).count();
 
-  std::stringstream ss; 
+  std::stringstream ss;
 
   if(tHour) ss << tHour << "h ";
-  if(tMin)  ss << tMin  << "m "; 
+  if(tMin)  ss << tMin  << "m ";
   if(tSec)  ss << tSec  << "s";
 
   return ss.str();
@@ -132,7 +132,7 @@ void fancyProgressBar(const unsigned nTotal){
   static unsigned maxNTotal = 0;
   static chr::time_point < chr::steady_clock::time_point::clock > startTime;
   static unsigned part = 0;
-  
+
   //find the starting time of the whole progress
   if(part==0){ startTime=chr::steady_clock::now(); }
   maxNTotal = std::max(maxNTotal, nTotal);
@@ -142,7 +142,7 @@ void fancyProgressBar(const unsigned nTotal){
   ++part;
 
   //limit the update intervall (not faster than every 35ms, since that would be madness)
-  chr::duration<float> const timeSpent = now - startTime; 
+  chr::duration<float> const timeSpent = now - startTime;
   if(timeSpent.count() > 0.035*tic || part==maxNTotal){
     ++tic;
 

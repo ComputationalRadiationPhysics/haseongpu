@@ -31,21 +31,21 @@ using thrust::host_vector;
 using thrust::raw_pointer_cast;
 
 /**
- * @brief takes a prefix sum (obtained by an exclusive scan over raysPerPrism) 
- *        and writes it into a unary representation. The value from the 
+ * @brief takes a prefix sum (obtained by an exclusive scan over raysPerPrism)
+ *        and writes it into a unary representation. The value from the
  *        prefixSum at index i describes the offset where to start writing,
  *        whereas i itself is the new value to be stored in the output array.
  *
  *        example:
- *        raysPerPrism [3,0,2,1] 
+ *        raysPerPrism [3,0,2,1]
  *
- *        -> exclusive prefixSum [0,3,3,5] 
+ *        -> exclusive prefixSum [0,3,3,5]
  *
  *        beginning from place 0 in the output should be 0 (length 3 according to raysPerPrism[0])
  *        beginning from place 3 in the output should be 1 (EMPTY range at raysPerPrism[1])
  *        beginning from place 3 in the output should be 2 (length 2 according to raysPerPrism[2])
  *        beginning from place 5 in the output should be 3 (length 1 according to raysPerPrism[3])
- *        
+ *
  *        resulting output arrays:
  *        [0 0 0 2 2 3] (indicesOfPrisms)
  *
@@ -54,7 +54,7 @@ using thrust::raw_pointer_cast;
  *
  * @param numberOfPrisms the number of prisms. numberOfPrisms * reflectionSlices
  *                       must be equal to the the length of the prefixSum.
- * @param raysPerSample the size of indicesOfPrisms/numberOfReflections. Actually 
+ * @param raysPerSample the size of indicesOfPrisms/numberOfReflections. Actually
  *                      identical to the sum of all values in raysPerPrism
  * @param reflectionSlices the number of reflectionSlices. see numberOfPrisms
  * @param raysPerPrism the input array from which prefixSum was generated
@@ -82,16 +82,16 @@ __global__ void mapPrefixSumToPrisms(
   const unsigned prism_i          = id % numberOfPrisms;
 
   for(unsigned i=0; i < count ; ++i){
-    indicesOfPrisms[startingPosition + i] = prism_i;     
-    numberOfReflections[startingPosition + i] = reflection_i; 
+    indicesOfPrisms[startingPosition + i] = prism_i;
+    numberOfReflections[startingPosition + i] = reflection_i;
   }
 }
 
 void mapRaysToPrisms(
-    device_vector<unsigned> &indicesOfPrisms, 
+    device_vector<unsigned> &indicesOfPrisms,
     device_vector<unsigned> &numberOfReflections,
-    const device_vector<unsigned> &raysPerPrism, 
-    device_vector<unsigned> &prefixSum, 
+    const device_vector<unsigned> &raysPerPrism,
+    device_vector<unsigned> &prefixSum,
     const unsigned reflectionSlices,
     const unsigned raysPerSample,
     const unsigned numberOfPrisms
@@ -104,11 +104,11 @@ void mapRaysToPrisms(
   thrust::exclusive_scan(raysPerPrism.begin(), raysPerPrism.end(),prefixSum.begin());
 
   mapPrefixSumToPrisms <<<gridsize,blocksize>>> (
-      numberOfPrisms, 
-      raysPerSample, 
+      numberOfPrisms,
+      raysPerSample,
       reflectionSlices,
       raw_pointer_cast( &raysPerPrism[0] ),
-      raw_pointer_cast( &prefixSum[0] ), 
+      raw_pointer_cast( &prefixSum[0] ),
       raw_pointer_cast( &indicesOfPrisms[0] ),
       raw_pointer_cast( &numberOfReflections[0] )
       );

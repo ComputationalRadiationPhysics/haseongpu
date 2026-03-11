@@ -18,10 +18,9 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// HASE_ON_GPU_VERSION % 100 is sub-minor version 
+// HASE_ON_GPU_VERSION % 100 is sub-minor version
 // HASE_ON_GPU_VERSION / 100 % 100 is minor version
 // HASE_ON_GPU_VERSION / 10000 is major version
 
 #pragma once
 #define HASE_ON_GPU_VERSION 010100
-

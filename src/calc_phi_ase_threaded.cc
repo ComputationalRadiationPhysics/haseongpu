@@ -52,5 +52,3 @@ void joinAll(){
         threadIds[i].join();
     }
 }
-
-

@@ -21,14 +21,14 @@
 
 /**
  * @brief Propagates an ray through the triangle/prism/crystal structure.
- *        On each step the next triangle on the ray path will be calculated 
+ *        On each step the next triangle on the ray path will be calculated
  *        from the current triangle (startTriangle in the beginning).
  *        length and startpoint of propagation is stored inside the
- *        ray struct. The propagation ends when the length of the ray 
+ *        ray struct. The propagation ends when the length of the ray
  *        is reduced to zero. It is possible to do propagation with
  *        or without reflection. In case of reflection, the rays will
  *        have a longer way.
- * 
+ *
  * @author Erik Zenker
  * @author Carlchristian Eckert
  * @author Marius Melzer
@@ -38,8 +38,8 @@
 
 #pragma once
 
-#include <mesh.hpp>
 #include <geometry.hpp> /* ReflectionPlane */
+#include <mesh.hpp>
 
 /**
  * @brief Direct ray propagation without reflection
@@ -47,7 +47,7 @@
  * @param ray           The ray which will propagate through the prisms.
  * @param startLevel    The level where the startpoint of the ray is located.
  * @param startTriangle The triangle where the startpoint of the ray is locaed
- * @param mesh          All information about triangles, points, contants. 
+ * @param mesh          All information about triangles, points, contants.
  *                      See mesh.h for details.
  * @param sigmaA        Absorption value of the ray.
  * @param sigmaE        Emission value of the ray.
@@ -56,13 +56,13 @@
  *                      See at the code or accompanying paper for more clarity.
  *
  */
-__device__ double propagateRay(Ray ray, 
-			       unsigned *startLevel, 
-			       unsigned  *startTriangle, 
-			       const Mesh &mesh,
-			       const double sigmaA, 
-			       const double sigmaE
-			       );
+__device__ double propagateRay(
+    Ray ray,
+    unsigned* startLevel,
+    unsigned* startTriangle,
+    Mesh const& mesh,
+    double const sigmaA,
+    double const sigmaE);
 /**
  * @brief Indirect ray propagation with reflections on upper and lower surface
  *
@@ -73,7 +73,7 @@ __device__ double propagateRay(Ray ray,
  * @param reflectionPlane Plane of first reflection (upper or lower surface of gain medium)
  * @param startLevel      The level where the startpoint of the ray is located.
  * @param startTriangle   The triangle where the startpoint of the ray is locaed
- * @param mesh            All information about triangles, points, contants. 
+ * @param mesh            All information about triangles, points, contants.
  *                        See mesh.h for details.
  * @param sigmaA          Absorption value of the ray.
  * @param sigmaE          Emission value of the ray.
@@ -82,15 +82,13 @@ __device__ double propagateRay(Ray ray,
  *                        See at the code or accompanying paper for more clarity.
  *
  */
-__device__ double propagateRayWithReflection(Point startPoint, 
-					     const Point endPoint, 
-					     const unsigned reflections,
-					     ReflectionPlane reflectionPlane,
-					     unsigned startLevel, 
-					     unsigned startTriangle, 
-					     const Mesh &mesh, 
-					     const double sigmaA, 
-					     const double sigmaE);
-
-
-
+__device__ double propagateRayWithReflection(
+    Point startPoint,
+    Point const endPoint,
+    unsigned const reflections,
+    ReflectionPlane reflectionPlane,
+    unsigned startLevel,
+    unsigned startTriangle,
+    Mesh const& mesh,
+    double const sigmaA,
+    double const sigmaE);
