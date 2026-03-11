@@ -68,16 +68,16 @@ t_1 = t_int;
 t_2 = int32(zeros(size(t_int,1),size(t_int,2)));
 
 for i_z=1:(mesh_z-1)
-    
+
     t_2 = t_1 + size(p,1);
-    
+
     tp = horzcat(t_0, t_1, t_2);
-    
+
     for i_v=1:size(t_int,1)
         fprintf(fid,'%i %i %i %i %i %i %i', tp(i_v,1), tp(i_v,2), tp(i_v,3), tp(i_v,4), tp(i_v,5), tp(i_v,6), tp(i_v,7));
         fwrite(fid, nl);
     end
-    
+
     t_1 = t_2;
 end
 

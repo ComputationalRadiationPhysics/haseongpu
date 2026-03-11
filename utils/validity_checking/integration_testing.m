@@ -33,7 +33,7 @@ for test_dir={'graybat','mpi','threaded'}
     pwd
     tic
     %laserPumpCladdingExample
-    toc 
+    toc
     %extract_gain_map
     cd ..
 end

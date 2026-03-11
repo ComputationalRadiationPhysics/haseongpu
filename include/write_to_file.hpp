@@ -21,18 +21,18 @@
 
 /**
  * @author Carlchristan Eckert
- * @author Erik Zenker 
+ * @author Erik Zenker
  * @license GPLv3
  */
 
 #pragma once
 
+#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
+
 #include <string>
 #include <vector>
 
-#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
-
-/** 
+/**
  * @brief writes a value to a file, where the filename is appended with 2 longish indices
  *
  * @param value the value to write to a file
@@ -43,13 +43,12 @@
  * @param index2 the value of the second index
  */
 int writeValueToFile(
-    const float value, 
-    const boost::filesystem::path path,
-    const std::string indexName1, 
-    const int index1, 
-    const std::string indexName2, 
-    const int index2
-    );
+    float const value,
+    boost::filesystem::path const path,
+    std::string const indexName1,
+    int const index1,
+    std::string const indexName2,
+    int const index2);
 
 
 /**

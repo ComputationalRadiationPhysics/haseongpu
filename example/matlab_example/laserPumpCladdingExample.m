@@ -40,7 +40,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Definitions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Crystal parameter 
+% Crystal parameter
 crystal.doping = 2;
 crystal.length = 0.7;    % [cm]
 crystal.tfluo = 9.5e-4;  % 1.0e-3 pour DA
@@ -214,7 +214,7 @@ clear clad_points_t;
 clad_points_t = unique(clad_points_t2);
 clear clad_points_t2;
 
-% Now get the lengths of the 
+% Now get the lengths of the
 length_clad = size(clad_points_t,1);
 length_Yb = size(Yb_points_t,1);
 
@@ -232,16 +232,16 @@ for i_slice=1:timeslice_tot-1
     % if we don't have any formula discribing the intensity distribution
     % as first test do a supergaussian distribution for 1µs and then estimate
     % the dndt|pump
-    
+
     % Write output for this timeslice to file
     file_b = ['beta_cell_' num2str(i_slice) '.vtk'];
     file_p = ['dndt_pump_' num2str(i_slice) '.vtk'];
     file_A = ['dndt_ASE_' num2str(i_slice) '.vtk'];
     file_C = ['flux_clad_' num2str(i_slice) '.vtk'];
-    
+
     vtk_wedge(file_b,beta_cell, p, t_int, mesh_z, z_mesh);
     vtk_wedge(file_p,dndt_pump, p, t_int, mesh_z, z_mesh);
-    
+
     % Interpolate beta_vol from beta_cell
     x_1 = p(:,1);
     y_1 = p(:,2);
@@ -319,14 +319,14 @@ for i_slice=1:timeslice_tot-1
     for i_p=1:length_Yb
         for i_z=1:mesh_z
             pos_Yb = Yb_points_t(i_p);
-	    % Calc local gain (g_l)
+        % Calc local gain (g_l)
             g_l = -(N_tot*laser.max_abs - N_tot*beta_cell(pos_Yb,i_z)*(laser.max_ems+laser.max_abs));
             dndt_ASE(pos_Yb,i_z) = g_l * phi_ASE(pos_Yb,i_z) / crystal.tfluo;
         end
     end
-    
 
-    
+
+
     % Now for the cladding points
     for i_p=1:length_clad
         for i_z=1:mesh_z
@@ -335,7 +335,7 @@ for i_slice=1:timeslice_tot-1
             flux_clad(pos_clad,i_z) = clad_abs*phi_ASE(pos_clad,i_z)/crystal.tfluo;
         end
     end
-    
+
     vtk_wedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh);
     vtk_wedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh);
     save(['save_' num2str(i_slice) '.mat']);
@@ -363,7 +363,7 @@ for i_slice=1:timeslice_tot-1
     else
         dndt_pump = zeros(size(p,1),mesh_z);
     end
-    
+
     pump.I = intensity;
     pump.T = temp;
     crystal.tfluo = temp_f;

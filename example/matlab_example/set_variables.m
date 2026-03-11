@@ -82,7 +82,7 @@ for i_point=1:length_t
         forbidden(i_point,1)=0;
         continue;
     end
-    
+
     if (sorted(face_1,1)==i_point)
         forbidden(i_point,1)=1;
     end
@@ -100,7 +100,7 @@ for i_point=1:length_t
         forbidden(i_point,2)=0;
         continue;
     end
-    
+
     if (sorted(face_2,1)==i_point)
         forbidden(i_point,2)=1;
     end
@@ -118,7 +118,7 @@ for i_point=1:length_t
         forbidden(i_point,3)=0;
         continue;
     end
-    
+
     if (sorted(face_3,1)==i_point)
         forbidden(i_point,3)=1;
     end
@@ -141,13 +141,13 @@ for i_points=1:length_t
     Px(1) = p(t(i_points,1),1);
     Px(2) = p(t(i_points,2),1);
     Px(3) = p(t(i_points,3),1);
-    
+
     Py(1) = p(t(i_points,1),2);
     Py(2) = p(t(i_points,2),2);
     Py(3) = p(t(i_points,3),2);
-    
+
     x_center(i_points,1)=Px*center_vec;
-    y_center(i_points,1)=Py*center_vec; 
+    y_center(i_points,1)=Py*center_vec;
 end
 % %% now plot it
 % hold on
@@ -172,9 +172,9 @@ for i_points=1:length_t
     normals_x(i_points,1) = vec_cross(1);
     normals_y(i_points,1) = vec_cross(2);
     normals_z(i_points,1) = vec_cross(3);
-    
+
     normals_p(i_points,1) = t(i_points,1);
-    
+
 %     normals to points 1-3
     vec_1 = [p(t(i_points,1),1) p(t(i_points,1),2) 0] - [p(t(i_points,3),1) p(t(i_points,3),2) 0];
     vec_2 = [p(t(i_points,1),1) p(t(i_points,1),2) 0] - [p(t(i_points,1),1) p(t(i_points,1),2) 0.1];
@@ -183,9 +183,9 @@ for i_points=1:length_t
     normals_x(i_points,2) = vec_cross(1);
     normals_y(i_points,2) = vec_cross(2);
     normals_z(i_points,2) = vec_cross(3);
-    
+
     normals_p(i_points,2) = t(i_points,1);
-    
+
 %     normals to points 2-3
     vec_1 = [p(t(i_points,2),1) p(t(i_points,2),2) 0] - [p(t(i_points,3),1) p(t(i_points,3),2) 0];
     vec_2 = [p(t(i_points,2),1) p(t(i_points,2),2) 0] - [p(t(i_points,2),1) p(t(i_points,2),2) 0.1];
@@ -194,7 +194,7 @@ for i_points=1:length_t
     normals_x(i_points,3) = vec_cross(1);
     normals_y(i_points,3) = vec_cross(2);
     normals_z(i_points,3) = vec_cross(3);
-    
+
     normals_p(i_points,3) = t(i_points,2);
 end
 
@@ -202,9 +202,9 @@ end
 % z = zeros(size(p,1),1);
 % % as an example make a linear function as the functional values
 % z(:) = 3*p(:,1);
-% 
+%
 % interpolated = griddata(p(:,1),p(:,2),z,x_center,y_center);
-% 
+%
 % % %% now show the interpolation error
 % % plot(interpolated-3*x_center(:,1));
 
@@ -216,7 +216,7 @@ for i_point = 1:size(t,1)
     a = ((p(t(i_point,1),1)-p(t(i_point,2),1))^2 + (p(t(i_point,1),2)-p(t(i_point,2),2))^2);
     b = ((p(t(i_point,3),1)-p(t(i_point,2),1))^2 + (p(t(i_point,3),2)-p(t(i_point,2),2))^2);
     c = ((p(t(i_point,1),1)-p(t(i_point,3),1))^2 + (p(t(i_point,1),2)-p(t(i_point,3),2))^2);
-    
+
     surface(i_point) = sqrt(1/16*(4*a*c-(a+c-b)^2));
 end
 

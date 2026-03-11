@@ -56,7 +56,7 @@ exp_factor = crystal.nlexp;
 Ntot = N_1percent * doping;
 
 time_step = tau_pump/(steps_time-1);
-crystal_step = crystal_length/(steps_crystal-1); 
+crystal_step = crystal_length/(steps_crystal-1);
 
 % prepare the vectors with zeros
 beta_store = zeros(steps_crystal,steps_time);
@@ -71,19 +71,19 @@ end
 
 for itime=1:steps_time
 %     now the first slice moves
-%     go with it into the slices of the crystal 
+%     go with it into the slices of the crystal
 %     for the first slice the it is always Ip, the second gets the
 %     estimation with an average beta from m->m+1 with an exponential
 %     function and so on - boundaries!
     pump(1) = I_pump;
-    
+
 %   this is the positive direction
     for icrys=1:steps_crystal-1
 %       step one is from point one to two for I_pump
         beta_average = (beta_crystal(icrys)+beta_crystal(icrys+1))/2;
-        pump(icrys+1) = pump(icrys) * exp(-(sigma_abs - beta_average*(sigma_abs+sigma_ems))*Ntot_gradient(icrys)*crystal_step);    
+        pump(icrys+1) = pump(icrys) * exp(-(sigma_abs - beta_average*(sigma_abs+sigma_ems))*Ntot_gradient(icrys)*crystal_step);
     end
-    
+
 %   now make the case of Backreflecetion - rough approximation, that the
 %   beta hasn't changed during the roundtrip - valid for the pump
 %   (integration step is ~5 orders of magnitude longer than the roundtrip),
@@ -91,39 +91,38 @@ for itime=1:steps_time
 %   during roundtrip or more slices to converge
     if mode.BRM == 1
         beta_crystal = flipud(beta_crystal);
-        
+
         pump_BRM(1) = pump(length(pump))*mode.R;
         Ntot_gradient = flipud(Ntot_gradient);
-    
+
 %   this is the negative direction
         for jcrys=1:steps_crystal-1
 %           step one is from point one to two for I_pump
             beta_average = (beta_crystal(jcrys)+beta_crystal(jcrys+1))/2;
-            pump_BRM(jcrys+1) = pump_BRM(jcrys) * exp(-(sigma_abs - beta_average*(sigma_abs+sigma_ems))*Ntot_gradient(jcrys)*crystal_step);    
+            pump_BRM(jcrys+1) = pump_BRM(jcrys) * exp(-(sigma_abs - beta_average*(sigma_abs+sigma_ems))*Ntot_gradient(jcrys)*crystal_step);
         end
 %         now turn the second pumppart and the beta again
         pump_BRM=rot90(pump_BRM,2);
         beta_crystal = flipud(beta_crystal);
-        
+
 %         full pump intensity is I+ + I-
         pump_l(:)=pump(:)+pump_BRM(:);
         Ntot_gradient = flipud(Ntot_gradient);
-        
+
     else
         pump_l = pump(:);
     end
-    
+
 %   now calculate the local beta
     for ibeta = 1:steps_crystal
         A1 = sigma_abs*pump_l(ibeta)/(h*c/wavelength);
         C1 = (sigma_abs+sigma_ems)*pump_l(ibeta)/(h*c/wavelength)+1/tau_fluo;
-    
-        beta_crystal(ibeta) = A1/C1*(1-exp(-C1*time_step))+ beta_crystal(ibeta)*exp(-C1*time_step);   
+
+        beta_crystal(ibeta) = A1/C1*(1-exp(-C1*time_step))+ beta_crystal(ibeta)*exp(-C1*time_step);
     end
-   
+
 %     if icrys or jcrys makes no difference
     pulse(itime) = pump(icrys+1);
     beta_store(:,itime)=beta_crystal(:);
-    
-end
 
+end

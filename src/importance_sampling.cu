@@ -41,11 +41,11 @@
  *
  */
 __global__ void propagateFromTriangleCenter(const Mesh mesh,
-					    double *importance,
-					    const unsigned sample_i,
-					    const double sigmaA,
-					    const double sigmaE
-					    ){
+                        double *importance,
+                        const unsigned sample_i,
+                        const double sigmaA,
+                        const double sigmaE
+                        ){
 
   double gain = 0;
   unsigned reflection_i = blockIdx.z;
@@ -62,7 +62,7 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
   Point samplePoint = mesh.getSamplePoint(sample_i);
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
 
-  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE); 
+  gain = propagateRayWithReflection(startPoint, samplePoint, reflections, reflectionPlane, startLevel, startTriangle, mesh, sigmaA, sigmaE);
   importance[startPrism + reflectionOffset] = mesh.getBetaVolume(startPrism) * gain;
   if(mesh.getBetaVolume(startPrism) < 0 || gain < 0 || importance[startPrism+reflectionOffset] < 0){
     printf("beta: %f importance: %f gain: %f\n", mesh.getBetaVolume(startPrism), importance[startPrism + reflectionOffset], gain);
@@ -74,15 +74,15 @@ __global__ void propagateFromTriangleCenter(const Mesh mesh,
  * @brief uses a given importance distribution to decide how many rays will be launched from each prism
  *
  * @param *raysDump will contain the number of rays which were mapped to a specific prism
- * 
+ *
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void distributeRaysByImportance(Mesh mesh,
-					   unsigned *raysPerPrism,
-					   double *importance,
-					   const double *sumPhi,
-					   unsigned raysPerSample,
-					   unsigned *raysDump){
+                       unsigned *raysPerPrism,
+                       double *importance,
+                       const double *sumPhi,
+                       unsigned raysPerSample,
+                       unsigned *raysDump){
 
   unsigned reflection_i = blockIdx.z;
   unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
@@ -93,7 +93,7 @@ __global__ void distributeRaysByImportance(Mesh mesh,
   const double raysForPrism = static_cast<double>(raysPerSample) * importance[startPrism + reflectionOffset] / *sumPhi;
   raysPerPrism[startPrism + reflectionOffset] = static_cast<unsigned>(floor(raysForPrism));
   if(raysPerPrism[startPrism + reflectionOffset] > raysPerSample){
-	  printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
+      printf("importance: %f sumPhi: %f raysPerPrism[%d]: %d (max %d)\n",importance[startPrism+reflectionOffset],*sumPhi,startPrism+reflectionOffset,raysPerPrism[startPrism+reflectionOffset],raysPerSample);
   }
   atomicAdd(raysDump, raysPerPrism[startPrism + reflectionOffset]);
 
@@ -110,10 +110,10 @@ __global__ void distributeRaysByImportance(Mesh mesh,
  *
  */
 __global__ void distributeRemainingRaysRandomly(Mesh mesh,
-						unsigned *raysPerPrism,
-						unsigned raysPerSample,
-						unsigned *raysDump){
-  
+                        unsigned *raysPerPrism,
+                        unsigned raysPerSample,
+                        unsigned *raysDump){
+
   int id = threadIdx.x + blockIdx.x * blockDim.x;
   int raysLeft = raysPerSample - (*raysDump);
 
@@ -124,7 +124,7 @@ __global__ void distributeRemainingRaysRandomly(Mesh mesh,
     int rand_z = (int ) ceil(curand_uniform(&randomState) * (mesh.numberOfLevels-1)) - 1;
     unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
     atomicAdd(&(raysPerPrism[randomPrism]),1);
-  } 
+  }
 
 }
 
@@ -139,9 +139,9 @@ __global__ void distributeRemainingRaysRandomly(Mesh mesh,
  * for other parameters, see documentation of importanceSampling()
  */
 __global__ void recalculateImportance(Mesh mesh,
-				      unsigned *raysPerPrism,
-				      unsigned raysPerSample,
-				      double *importance){
+                      unsigned *raysPerPrism,
+                      unsigned raysPerSample,
+                      double *importance){
 
 
   unsigned startPrism = threadIdx.x + blockIdx.x * blockDim.x;
@@ -163,13 +163,13 @@ __global__ void recalculateImportance(Mesh mesh,
 }
 
 void importanceSamplingPropagation(unsigned sample_i,
-			    const unsigned reflectionSlices,
-			    Mesh deviceMesh,
-			    const double sigmaA,
-			    const double sigmaE,
-			    double *preImportance,
-			    dim3 blockDim,
-			    dim3 gridDim){
+                const unsigned reflectionSlices,
+                Mesh deviceMesh,
+                const double sigmaA,
+                const double sigmaE,
+                double *preImportance,
+                dim3 blockDim,
+                dim3 gridDim){
 
 
   dim3 gridDimReflection(gridDim.x, 1, reflectionSlices);
@@ -178,16 +178,16 @@ void importanceSamplingPropagation(unsigned sample_i,
 }
 
 unsigned importanceSamplingDistribution(
-			    const unsigned reflectionSlices,
-			    Mesh deviceMesh,
-			    const unsigned raysPerSample,
-			    double *preImportance,
-			    double *importance,
-			    unsigned *raysPerPrism,
-			    double hSumPhi,
-			    const bool distributeRandomly,
-			    dim3 blockDim,
-			    dim3 gridDim){
+                const unsigned reflectionSlices,
+                Mesh deviceMesh,
+                const unsigned raysPerSample,
+                double *preImportance,
+                double *importance,
+                unsigned *raysPerPrism,
+                double hSumPhi,
+                const bool distributeRandomly,
+                dim3 blockDim,
+                dim3 gridDim){
 
 
   unsigned hRaysDump = 0;

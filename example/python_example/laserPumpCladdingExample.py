@@ -40,12 +40,12 @@ from calcPhiASE import calcPhiASE
 import csv
 from pathlib import Path
 
-def main(material_path: str = "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
+def main(material_path: str = Path(__file__).parent / "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
     #precheck the file path and throw in case this is not present
     # Crystal parameter
     crystal = {
         'doping': 2,
-        'length': 0.7,  # [cm]
+        'length': 0.7,    # [cm]
         'tfluo': 9.5e-4,  # 1.0e-3 pour DA
         'nlexp': 1,
         'levels': 10,
@@ -488,5 +488,3 @@ if __name__ == "__main__":
             f"Material path '{material_path}' is not a file."
         )
     main(material_path=args.material,gpus=args.number_of_gpus,parallel_mode=args.parallel_mode)
-
-

@@ -21,12 +21,12 @@
 import numpy as np
 import os
 import warnings
-import shutil 
+import shutil
 
 ############################## clean_IO_files #################################
 #
 # deletes the temporary folder and the dndt_ASE.txt
-# 
+#
 # @param TMP_FOLDER the folder to remove
 #
 #
@@ -44,7 +44,7 @@ def clean_IO_files (TMP_FOLDER):
 # takes all the variables and puts them into textfiles
 # so the CUDA code can parse them. Take care that the
 # names of the textfiles match those in the parsing function
-# 
+#
 # for most parameters, see calcPhiASE (above)
 # @param FOLDER the folder in which to create the input files (usually a
 #               temporary folder visible by all the participating nodes)
@@ -53,35 +53,35 @@ def clean_IO_files (TMP_FOLDER):
 ##########################################################################
 
 def create_calcPhiASE_input (points,
-                            triangleNormalsX,  
-                            triangleNormalsY,   
-                            forbiddenEdge,  
-                            triangleNormalPoint,    
-                            triangleNeighbors,  
-                            trianglePointIndices,   
-                            thickness,  
-                            numberOfLevels, 
+                            triangleNormalsX,
+                            triangleNormalsY,
+                            forbiddenEdge,
+                            triangleNormalPoint,
+                            triangleNeighbors,
+                            trianglePointIndices,
+                            thickness,
+                            numberOfLevels,
                             nTot,
-                            betaVolume, 
-                            laserParameter, 
-                            crystal,    
-                            betaCells,  
-                            triangleSurfaces,   
-                            triangleCenterX,    
-                            triangleCenterY,    
-                            claddingCellTypes,  
-                            claddingNumber, 
-                            claddingAbsorption, 
-                            refractiveIndices,  
-                            reflectivities, 
+                            betaVolume,
+                            laserParameter,
+                            crystal,
+                            betaCells,
+                            triangleSurfaces,
+                            triangleCenterX,
+                            triangleCenterY,
+                            claddingCellTypes,
+                            claddingNumber,
+                            claddingAbsorption,
+                            refractiveIndices,
+                            reflectivities,
                             FOLDER):
-    
+
     CURRENT_DIR = os.getcwd()
 
     os.mkdir(FOLDER)
-    os.chdir(FOLDER) 
+    os.chdir(FOLDER)
 
-    points=                   np.transpose(points) 
+    points=                   np.transpose(points)
     triangleNormalsX=         np.transpose(triangleNormalsX)
     triangleNormalsY=         np.transpose(triangleNormalsY)
     forbiddenEdge=            np.transpose(forbiddenEdge)
@@ -135,7 +135,7 @@ def create_calcPhiASE_input (points,
     # number of slices
     with open('numberOfLevels.txt','w') as f:
       f.write(str(numberOfLevels) + '\n')
- 
+
     with open('numberOfTriangles.txt','w') as f:
       a = len(trianglePointIndices[0])
       f.write(str(a) + '\n')
@@ -159,7 +159,7 @@ def create_calcPhiASE_input (points,
     #with open('sigmaE.txt','w') as f:
     #  f.write('\n'.join(map(str, laserParameter['s_ems'])))
     np.savetxt('sigmaE.txt', laserParameter['s_ems'], delimiter='\n', fmt='%.50f')
-    
+
     #with open('lambdaA.txt','w') as f:
     #  f.write('\n'.join(map(str, laserParameter['l_abs'])))
     np.savetxt('lambdaA.txt', laserParameter['l_abs'], delimiter='\n', fmt='%.50f')
@@ -170,14 +170,14 @@ def create_calcPhiASE_input (points,
 
     with open('crystalTFluo.txt','w') as f:
       f.write(str(crystal['tfluo']) + '\n')
-    
+
     #with open('betaCells.txt','w') as f:
     #  f.write('\n'.join(map(str, betaCells)))
     np.savetxt('betaCells.txt', betaCells, delimiter='\n', fmt='%.50f')
 
     #with open('triangleSurfaces.txt','w') as f:
     #  f.write('\n'.join(map(str, triangleSurfaces)))
-    np.savetxt('triangleSurfaces.txt', triangleSurfaces, delimiter='\n', fmt='%.50f')  
+    np.savetxt('triangleSurfaces.txt', triangleSurfaces, delimiter='\n', fmt='%.50f')
 
     #with open('triangleCenterX.txt','w') as f:
     #  f.write('\n'.join(map(str, triangleCenterX)))
@@ -204,7 +204,7 @@ def create_calcPhiASE_input (points,
     #with open('reflectivities.txt','w') as f:
     #  f.write('\n'.join(map(str, reflectivities)))
     np.savetxt('reflectivities.txt', reflectivities, delimiter='\n', fmt='%.50f')
-    
+
     os.chdir(CURRENT_DIR)
 
     triangleNormalsX=         np.transpose(triangleNormalsX)
@@ -229,7 +229,7 @@ def create_calcPhiASE_input (points,
 ######################### parse_calcPhiASE_output #############################
 #
 # takes the output from the CUDA code and fills it into a variable
-# assumes that the matrix is saved as a 3D-matrix where the first line 
+# assumes that the matrix is saved as a 3D-matrix where the first line
 # denotes the dimensions and the second line is the whole data
 #
 # @param FOLDER the folder which contains the output files
@@ -241,20 +241,20 @@ def parse_calcPhiASE_output (FOLDER):
   os.chdir(FOLDER)
   with open('phi_ASE.txt','r') as fid:
     arraySize = [int(x) for x in next(fid).split()]
-    phiASE = [float(x) for x in next(fid).split()] 
+    phiASE = [float(x) for x in next(fid).split()]
     phiASE = np.reshape(phiASE,arraySize, order= 'F') #order= 'F' beacause file was adapted from Matlab
 
-  with open('mse_values.txt', 'r') as fid: 
+  with open('mse_values.txt', 'r') as fid:
     arraySize= [int(x) for x in next(fid).split()]
     mseValues = [float(x) for x in next(fid).split()]
     mseValues = np.reshape(mseValues,arraySize, order= 'F')
 
 
-  with open('N_rays.txt', 'r') as fid: 
+  with open('N_rays.txt', 'r') as fid:
     arraySize = [int(x) for x in next(fid).split()]
     raysUsedPerSample = [float(x) for x in next(fid).split()]
     raysUsedPerSample = np.reshape(raysUsedPerSample,arraySize, order= 'F')
-  
+
   os.chdir(CURRENT_DIR)
   return([mseValues, raysUsedPerSample, phiASE])
 
@@ -263,7 +263,7 @@ def parse_calcPhiASE_output (FOLDER):
 # most meshing paramers are given through the function parameters.
 # However, many parameters for optimization of the computation are
 # set in the beginning of the function (adjust as needed)
-# 
+#
 # for most mesh parameters see README file
 #
 # @return phiASE the ASE-Flux for all the given sample points
@@ -324,11 +324,11 @@ def calcPhiASE(
 
   # create a tmp-folder in the same directory as this script
   # before filedirectory, name and extension, but only filddirectory is used
-  CALCPHIASE_DIR= os.getcwd() 
+  CALCPHIASE_DIR= os.getcwd()
   TMP_FOLDER= os.path.join(CALCPHIASE_DIR,'input_tmp')
 
   ################## doing the computation ##################
-  # make sure that the temporary folder is clean 
+  # make sure that the temporary folder is clean
   clean_IO_files(TMP_FOLDER)
 
   # create new input in the temporary folder

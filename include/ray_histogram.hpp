@@ -23,5 +23,8 @@
 
 #include <vector>
 
-void ray_histogram(const std::vector<unsigned> totalRays, const unsigned max, const double mseThreshold, const std::vector<double> mseValues);
-
+void ray_histogram(
+    std::vector<unsigned> const totalRays,
+    unsigned const max,
+    double const mseThreshold,
+    std::vector<double> const mseValues);

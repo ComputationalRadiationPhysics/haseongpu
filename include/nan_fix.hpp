@@ -27,27 +27,32 @@
 
 #pragma once
 #include <cmath>
+
 /**
  * @brief this allows the use of isnan() for int and unsigned
  * in the template function fileToVector()
  */
-inline bool isNaN(const int){
-  return false;
+inline bool isNaN(int const)
+{
+    return false;
 }
 
-inline bool isNaN(const unsigned int){
-  return false;
+inline bool isNaN(unsigned int const)
+{
+    return false;
 }
 
-inline bool isNaN(const float i){
-  return std::isnan(i);
+inline bool isNaN(float const i)
+{
+    return std::isnan(i);
 }
 
-inline bool isNaN(const double i){
-  return std::isnan(i);
+inline bool isNaN(double const i)
+{
+    return std::isnan(i);
 }
 
-inline bool isNaN(const long double i){
-  return std::isnan(i);
+inline bool isNaN(long double const i)
+{
+    return std::isnan(i);
 }
-

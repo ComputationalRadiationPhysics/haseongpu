@@ -43,13 +43,13 @@ namespace fs = boost::filesystem;
  */
 template <typename T>
 void write3dMatrix(
-    const std::vector<T>& data, 
+    const std::vector<T>& data,
     fs::ofstream &file,
     const unsigned rowCount,
     const unsigned columnCount,
     const unsigned pageCount
     ){
-  
+
   unsigned elementsPerPage = rowCount*columnCount;
   // write first line, containing geometry information parsable by matlab
   file << rowCount << " " << columnCount << " " << pageCount << std::endl;
@@ -68,7 +68,7 @@ void write3dMatrix(
 void writeMatlabOutput(
     const fs::path experimentPath,
     const std::vector<float> ase,
-    const std::vector<unsigned> N_rays, 
+    const std::vector<unsigned> N_rays,
     const std::vector<double> expectedValues,
     const unsigned numberOfSamples,
     const unsigned numberOfLevels){

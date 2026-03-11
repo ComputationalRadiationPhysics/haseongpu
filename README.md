@@ -197,8 +197,8 @@ Usage
     slice indices(levels) and rows are point
     indices. The value for the ith point and jth 
     slice can then be optained by MATLAB with:
-    	  
-	  value = values(i,j);
+          
+      value = values(i,j);
 
 ### Python Interface
 
@@ -550,33 +550,33 @@ C-Application Templates
 + 4 GPUs, 10K to 100K Rays, 4 Repetitions   
 
         ./build/calcPhiASE --input-path=./example/c_example/input/  
-	       	 --output-path=/tmp/ 
-    		 --parallel-mode=threaded  
-    		 --min-rays=10000  
-    		 --max-rays=100000  
-    		 --reflection  
-    		 --repetitions=4  
-    		 --adaptive-steps=4  
-    		 --ngpus=4  
-    		 --min-sample-i=0  
-    		 --max-sample-i=1234  
-    		 --mse-threshold=0.05  
+             --output-path=/tmp/ 
+             --parallel-mode=threaded  
+             --min-rays=10000  
+             --max-rays=100000  
+             --reflection  
+             --repetitions=4  
+             --adaptive-steps=4  
+             --ngpus=4  
+             --min-sample-i=0  
+             --max-sample-i=1234  
+             --mse-threshold=0.05  
 
 + MPI with 4 GPUs per node   
 
         mpiexec -npernode 4 ./build/calcPhiASE  --input-path=./example/c_example/input/  
-		     --output-path=/tmp/  
-    		 --parallel-mode=mpi  
-    		 --min-rays=10000  
-    		 --max-rays=100000  
-    		 --reflection  
-    		 --repetitions=4  
-    		 --adaptive-steps=4  
-    	   --ngpus=1  
-    		 --min-sample-i=0  
-    		 --max-sample-i=1234  
-    		 --mse-threshold=0.05  
-		 
+             --output-path=/tmp/  
+             --parallel-mode=mpi  
+             --min-rays=10000  
+             --max-rays=100000  
+             --reflection  
+             --repetitions=4  
+             --adaptive-steps=4  
+           --ngpus=1  
+             --min-sample-i=0  
+             --max-sample-i=1234  
+             --mse-threshold=0.05  
+         
 Active Team
 ----------
 
@@ -680,4 +680,3 @@ File Descriptions
  - `utils/` folder that contains utility files
   - `utils/cmake/`
    - `utils/cmake/modules/` 3rd Party CMAKE module that was modified to circumvent a bug where the NVCC linker would crash on unknown arguments
-

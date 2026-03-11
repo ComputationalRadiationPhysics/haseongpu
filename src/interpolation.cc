@@ -29,7 +29,7 @@
 /**
  * @brief Returns the index of an value in vector v,
  *        that is smaller than t.
- *        
+ *
  * @param v vector
  * @param t bigger value
  * @return index of smaller value
@@ -48,7 +48,7 @@ unsigned getNextSmallerIndex(std::vector<double> v, double t){
 /**
  * @brief Returns the index of an value in vector v,
  *        that is bigger than t.
- *        
+ *
  * @param v vector
  * @param t smaller value
  * @return index of smaller value
@@ -65,13 +65,13 @@ unsigned getNextBiggerIndex(std::vector<double> v, double t){
 
 template <class T>
 bool isStrictlySorted(const std::vector<T> &v){
-    if(v.size() == 1) 
-	return true;
-    
+    if(v.size() == 1)
+    return true;
+
     for(unsigned i = 0; i < v.size() - 1; ++i){
-	if(v[i] >= v[i + 1]) {
-	    return false;
-	}
+    if(v[i] >= v[i + 1]) {
+        return false;
+    }
 
     }
 
@@ -109,7 +109,7 @@ std::vector<double> interpolateLinear(const std::vector<double>& y, const std::v
 
     // Monochromatic case
     if(y.size() == 1){
-	    return std::vector<double>(nInterpolations, y.front());
+        return std::vector<double>(nInterpolations, y.front());
     }
 
     // Check x data if monoton increasing
@@ -126,16 +126,16 @@ std::vector<double> interpolateLinear(const std::vector<double>& y, const std::v
     std::vector<double> interpolated_y(nInterpolations, 0);
     unsigned j=0;
     for(unsigned i = 0; i < x.size()-1; ++i){
-    	double x_orig=x[i];
-    	double x_next=x[i+1];
-    	double y_orig=y[i];
-    	double y_next=y[i+1];
-    	double m = (y_next - y_orig) / (x_next - x_orig);
-    	double b = y_orig - (m * x_orig);
-    	while (j<interpolated_y.size()&&interpolated_x[j]<x_next) {
-    		interpolated_y[j]=b+m*interpolated_x[j];
-    		++j;
-    	}
+        double x_orig=x[i];
+        double x_next=x[i+1];
+        double y_orig=y[i];
+        double y_next=y[i+1];
+        double m = (y_next - y_orig) / (x_next - x_orig);
+        double b = y_orig - (m * x_orig);
+        while (j<interpolated_y.size()&&interpolated_x[j]<x_next) {
+            interpolated_y[j]=b+m*interpolated_x[j];
+            ++j;
+        }
     }
     interpolated_y.back() = y.back();
     return interpolated_y;

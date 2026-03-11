@@ -39,4 +39,4 @@
  * @param nTotal the maximum of the progress (i.e. 100, if you have 100 steps)
  *
  */
-void fancyProgressBar(const unsigned nTotal);
+void fancyProgressBar(unsigned const nTotal);

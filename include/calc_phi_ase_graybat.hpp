@@ -34,16 +34,16 @@
 /**
  * @brief A wrapper for calcPhiAse, that distributes sample points
  *        to the available peers. The peers will split
- *        up in one head peer and the others as compute peers. 
- *        The slaves request sample points and the head  
+ *        up in one head peer and the others as compute peers.
+ *        The slaves request sample points and the head
  *        distributes the available sample points by demand.
  *
  * @return number of used compute nodes
  */
 
 
-
-float calcPhiAseGrayBat ( const ExperimentParameters &experiment,
-			  const ComputeParameters &compute,
-			  Mesh& mesh,
-			  Result &result );
+float calcPhiAseGrayBat(
+    ExperimentParameters const& experiment,
+    ComputeParameters const& compute,
+    Mesh& mesh,
+    Result& result);

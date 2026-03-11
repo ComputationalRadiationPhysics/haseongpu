@@ -32,7 +32,7 @@
 #include <cudachecks.hpp> /* CUDA_CHECK_RETURN */
 #include <cuda_utils.hpp> /* getFreeDevices */
 #include <types.hpp>
-#include <logging.hpp> 
+#include <logging.hpp>
 #include <mesh.hpp>
 #include <parser.hpp>
 #include <interpolation.hpp> /* interpolateWavelength*/
@@ -63,7 +63,7 @@ WavelengthData calculateSigmas(
         fs::path inputPath,
         unsigned lambdaResolution
         ){
-        
+
     // Parse wavelengths from files
     std::vector<double> sigmaA  = fileToVector<double>(inputPath / "sigmaA.txt");
     std::vector<double> sigmaE  = fileToVector<double>(inputPath / "sigmaE.txt");
@@ -72,7 +72,7 @@ WavelengthData calculateSigmas(
 
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaA.size());
     lambdaResolution = std::max(lambdaResolution, (unsigned) lambdaE.size());
-  
+
     assert(sigmaA.size() == lambdaA.size());
     assert(sigmaE.size() == lambdaE.size());
 
@@ -319,7 +319,7 @@ void printCommandLine(const Modifiable_variables_map vm){
 
 
 Modifiable_variables_map checkParameterValidity(Modifiable_variables_map vm, const unsigned deviceCount){
-        
+
     double mseThreshold = vm[ExpSwitch::mse].as<double>();
     unsigned maxRaysPerSample = vm[ExpSwitch::max_rays].as<int>();
     unsigned maxgpus = vm[CompSwitch::ngpus].as<int>();
@@ -500,36 +500,36 @@ void assertMin([[maybe_unused]]const std::vector<T>& v,[[maybe_unused]]const  B 
  *
  * See parseMultiGPU for details on the parameters
  */
-Mesh createMesh(const std::vector<unsigned> &triangleIndices, 
-		const unsigned numberOfTriangles, 
-		const unsigned numberOfLevels,
-		const unsigned numberOfPoints, 
-		const float thicknessOfPrism,
-		std::vector<double> &pointsVector, 
-		std::vector<double> &xOfTriangleCenter, 
-		std::vector<double> &yOfTriangleCenter, 
-		std::vector<unsigned> &positionsOfNormalVectors,
-		std::vector<double> &xOfNormals, 
-		std::vector<double> &yOfNormals,
-		std::vector<int> &forbiddenVector, 
-		std::vector<int> &neighborsVector, 
-		std::vector<float> &surfacesVector,
-		std::vector<double> &betaValuesVector,
-		std::vector<double> &betaCells,
-		std::vector<unsigned> &cellTypes,
-		std::vector<float> & refractiveIndices,
-		std::vector<float> & reflectivities,
-		const float nTot,
-		const float crystalFluorescence,
-		const unsigned cladNumber,
-		const double cladAbsorption
-	       ) {
+Mesh createMesh(const std::vector<unsigned> &triangleIndices,
+        const unsigned numberOfTriangles,
+        const unsigned numberOfLevels,
+        const unsigned numberOfPoints,
+        const float thicknessOfPrism,
+        std::vector<double> &pointsVector,
+        std::vector<double> &xOfTriangleCenter,
+        std::vector<double> &yOfTriangleCenter,
+        std::vector<unsigned> &positionsOfNormalVectors,
+        std::vector<double> &xOfNormals,
+        std::vector<double> &yOfNormals,
+        std::vector<int> &forbiddenVector,
+        std::vector<int> &neighborsVector,
+        std::vector<float> &surfacesVector,
+        std::vector<double> &betaValuesVector,
+        std::vector<double> &betaCells,
+        std::vector<unsigned> &cellTypes,
+        std::vector<float> & refractiveIndices,
+        std::vector<float> & reflectivities,
+        const float nTot,
+        const float crystalFluorescence,
+        const unsigned cladNumber,
+        const double cladAbsorption
+           ) {
 
   // GPU variables
   double totalSurface = 0.;
 
   for(unsigned i=0;i<numberOfTriangles;++i){
-    totalSurface+=double(surfacesVector.at(i));	
+    totalSurface+=double(surfacesVector.at(i));
   }
 
   // Vector Preprocessing
@@ -543,30 +543,30 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
   }
 
    Mesh mesh( cladAbsorption,
-	     totalSurface,
-	     thicknessOfPrism,
-	     nTot,
-	     crystalFluorescence,
-	     numberOfTriangles,
-	     numberOfLevels,
-	     numberOfTriangles * (numberOfLevels-1),
-	     numberOfPoints,
-	     numberOfPoints * numberOfLevels,
-	     cladNumber,
-	     pointsVector,
-	     hostNormalVec,
-	     betaValuesVector,
-	     hostCenters,
-	     surfacesVector,
-	     forbiddenVector,
-	     betaCells,
-	     cellTypes,
-	     refractiveIndices,
-	     reflectivities,
-	     totalReflectionAngles,
-	     triangleIndices,
-	     neighborsVector,
-	     positionsOfNormalVectors);
+         totalSurface,
+         thicknessOfPrism,
+         nTot,
+         crystalFluorescence,
+         numberOfTriangles,
+         numberOfLevels,
+         numberOfTriangles * (numberOfLevels-1),
+         numberOfPoints,
+         numberOfPoints * numberOfLevels,
+         cladNumber,
+         pointsVector,
+         hostNormalVec,
+         betaValuesVector,
+         hostCenters,
+         surfacesVector,
+         forbiddenVector,
+         betaCells,
+         cellTypes,
+         refractiveIndices,
+         reflectivities,
+         totalReflectionAngles,
+         triangleIndices,
+         neighborsVector,
+         positionsOfNormalVectors);
   return mesh;
 
 }
@@ -576,7 +576,7 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
  *
  */
 std::vector<Mesh> parseMesh(const fs::path rootPath,
-			    std::vector<unsigned> devices) {
+                std::vector<unsigned> devices) {
 
   std::vector<Mesh> meshs;
 
@@ -642,31 +642,31 @@ std::vector<Mesh> parseMesh(const fs::path rootPath,
   for( unsigned i=0; i < devices.size(); i++){
     CUDA_CHECK_RETURN(cudaSetDevice(devices.at(i)) );
     meshs.push_back(
-		    createMesh(trianglePointIndices,
-			       numberOfTriangles,
-			       numberOfLevels,
-			       numberOfPoints,
-			       thickness,
-			       points,
-			       triangleCenterX,
-			       triangleCenterY,
-			       triangleNormalPoint,
-			       triangleNormalsX,
-			       triangleNormalsY,
-			       forbiddenEdge,
-			       triangleNeighbors,
-			       triangleSurfaces,
-			       betaVolume,
-			       betaCells,
-			       claddingCellTypes,
-			       refractiveIndices,
-			       reflectivities,
-			       nTot,
-			       crystalTFluo,
-			       claddingNumber,
-			       claddingAbsorption
-			       )
-		    );
+            createMesh(trianglePointIndices,
+                   numberOfTriangles,
+                   numberOfLevels,
+                   numberOfPoints,
+                   thickness,
+                   points,
+                   triangleCenterX,
+                   triangleCenterY,
+                   triangleNormalPoint,
+                   triangleNormalsX,
+                   triangleNormalsY,
+                   forbiddenEdge,
+                   triangleNeighbors,
+                   triangleSurfaces,
+                   betaVolume,
+                   betaCells,
+                   claddingCellTypes,
+                   refractiveIndices,
+                   reflectivities,
+                   nTot,
+                   crystalTFluo,
+                   claddingNumber,
+                   claddingAbsorption
+                   )
+            );
     cudaDeviceSynchronize();
   }
 

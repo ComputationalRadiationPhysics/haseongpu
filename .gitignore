@@ -81,3 +81,4 @@ talk/*.~lock.*
 cmake-build-debug/
 .idea/*
 .github/*
+*__pycache__/

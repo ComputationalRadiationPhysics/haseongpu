@@ -73,7 +73,7 @@ pulse = zeros(steps.time,1);
 
 
 time_step = pump.T/(steps.time-1);
-crystal_step = crystal.length/(steps.crys-1); 
+crystal_step = crystal.length/(steps.crys-1);
 
 gain_local = zeros(steps.crys,1);
 
@@ -174,12 +174,12 @@ set(haxes,...
     'XMinorTick', 'on',...
     'YMinorTick', 'on',...
     'LineWidth', 1);
-% 
-% 
+%
+%
 % % grid for second plot
 % grid_chart_x = 0:crystal_step:crystal.length;
 % grid_chart_y = pump.T*1000:-time_step*1000:0;
-% 
+%
 % % second image
 % figure(3);
 % beta_store = rot90(beta_store);

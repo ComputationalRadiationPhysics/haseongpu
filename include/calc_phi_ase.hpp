@@ -41,10 +41,11 @@
  * @param runtime          Reference to the needed runtime.
  *
  **/
-float calcPhiAse ( const ExperimentParameters& experiment,
-		   const ComputeParameters& compute,
-		   const Mesh& mesh,
-		   Result &result,
-		   const unsigned minSample_i,
-		   const unsigned maxSample_i,
-		   float &runtime);
+float calcPhiAse(
+    ExperimentParameters const& experiment,
+    ComputeParameters const& compute,
+    Mesh const& mesh,
+    Result& result,
+    unsigned const minSample_i,
+    unsigned const maxSample_i,
+    float& runtime);

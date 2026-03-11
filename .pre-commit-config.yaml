@@ -1,0 +1,41 @@
+minimum_pre_commit_version: 3.2.0 # necessitated by Lucas-C's hooks
+default_install_hook_types: [pre-commit, pre-push]
+exclude: "thirdParty"
+repos:
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v20.1.8
+  hooks:
+  - id: clang-format
+    files: \.(cpp|hpp)
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: no-commit-to-branch
+    args: [-b, develop]
+  - id: check-merge-conflict
+  - id: trailing-whitespace
+    exclude_types: [markdown, rst]
+  - id: end-of-file-fixer
+    exclude_types: [svg]
+  - id: check-yaml
+  - id: mixed-line-ending
+  - id: check-executables-have-shebangs
+  - id: check-shebang-scripts-are-executable
+- repo: https://github.com/Lucas-C/pre-commit-hooks
+  rev: v1.5.5
+  hooks:
+    - id: forbid-tabs
+      types_or: [file]
+      exclude_types: [rst]
+    - id: remove-tabs
+      types_or: [file]
+      exclude_types: [rst]
+    - id: forbid-crlf
+    - id: remove-crlf
+- repo: https://github.com/BlankSpruce/gersemi
+  rev: 0.22.1
+  hooks:
+    - id: gersemi
+      args: [-c, --diff]
+    - id: gersemi
+      args: [-i]

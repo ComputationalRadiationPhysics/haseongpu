@@ -64,9 +64,9 @@ namespace fs = boost::filesystem;
 #include <cuda_runtime_api.h> /* cudaDeviceReset */
 
 
-/** 
+/**
  * @brief Calculates dndt ASE from phi ASE values
- * 
+ *
  * @param mesh needed for some constants
  * @param sigmaA absorption
  * @param sigmaE emission
@@ -105,13 +105,13 @@ int main(int argc, char **argv){
     unsigned usedGPUs = 0;
     std::vector<ComputeParameters> computes(maxGpus, compute);
 
-    
+
     /***************************************************************************
      * COMPUTATIONS
-     **************************************************************************/    
-    
+     **************************************************************************/
+
     if (compute.deviceMode == DeviceMode::CPU){
-            
+
         // Possibly deprecated! (Definitely deprecated!)
         runtime = forLoopsClad( &(result.dndtAse),
                                 experiment.minRaysPerSample,
@@ -127,7 +127,7 @@ int main(int argc, char **argv){
                                 mesh.crystalTFluo);
 
     }else if(compute.deviceMode == DeviceMode::GPU){
-            
+
         if(compute.parallelMode == ParallelMode::THREADED){
 
             for(unsigned gpu_i = 0; gpu_i < maxGpus; ++gpu_i){
@@ -137,7 +137,7 @@ int main(int argc, char **argv){
                 unsigned maxSample_i = std::min((float)samplesPerNode, (gpu_i + 1) * samplePerGpu);
 
                 minSample_i += compute.minSampleRange;
-                maxSample_i += compute.minSampleRange; 
+                maxSample_i += compute.minSampleRange;
 
                 computes[gpu_i].gpu_i = gpu_i;
 
@@ -153,7 +153,7 @@ int main(int argc, char **argv){
             joinAll();
             usedGPUs = maxGpus;
             runtime = *(std::max_element(runtimes.begin(),runtimes.end()));
-            cudaDeviceReset();      
+            cudaDeviceReset();
         }
 
         else if(compute.parallelMode == ParallelMode::MPI){
@@ -242,7 +242,7 @@ int main(int argc, char **argv){
                           experiment.mseThreshold,
                           experiment.useReflections,
                           runtime );
-      
+
         writePointsToVtk( mesh,
                           tmpPhiAse,
                           vtkPath / fs::path("phiase_" + currentTime + ".vtk"),
@@ -251,7 +251,7 @@ int main(int argc, char **argv){
                           experiment.mseThreshold,
                           experiment.useReflections,
                           runtime );
-      
+
         writePointsToVtk( mesh,
                           result.mse,
                           vtkPath / fs::path("mse_" + currentTime + ".vtk"),
@@ -260,7 +260,7 @@ int main(int argc, char **argv){
                           experiment.mseThreshold,
                           experiment.useReflections,
                           runtime );
-      
+
         writePointsToVtk( mesh,
                           tmpTotalRays,
                           vtkPath / fs::path("total_rays_" + currentTime + ".vtk"),
@@ -318,7 +318,7 @@ int main(int argc, char **argv){
     for(Mesh &mesh : meshs){
         mesh.free();
     }
-    
+
     return 0;
 
 }

@@ -1,11 +1,11 @@
 #pragma once
 
 // STL
-#include <vector> /* std::vector */
-
-#include <cuda_utils.hpp> /* copyToDevice */
 #include <cuda_runtime_api.h>
+#include <cuda_utils.hpp> /* copyToDevice */
+
 #include <span>
+#include <vector> /* std::vector */
 
 /**
  * @brief Vector on host and array on device
@@ -14,49 +14,52 @@
  *
  **/
 template<class T>
-class ConstHybridVector {
+class ConstHybridVector
+{
 public:
+    ConstHybridVector(std::vector<T>& srcV) : hostV(srcV), deviceV(copyToDevice(srcV))
+    {
+    }
 
-  ConstHybridVector(std::vector<T> &srcV) :
-    hostV(srcV),
-    deviceV(copyToDevice(srcV)){
-      
-  }
-
-  __forceinline__ __host__ __device__ T at(int i) const{
+    __forceinline__ __host__ __device__ T at(int i) const
+    {
 #ifdef __CUDA_ARCH__
-    return deviceV[i];
+        return deviceV[i];
 #else
-    return hostV.at(i);
+        return hostV.at(i);
 #endif
-  }
+    }
 
-  __forceinline__ __host__ __device__ const T operator[] (int i) const {
+    __forceinline__ __host__ __device__ const T operator[](int i) const
+    {
 #ifdef __CUDA_ARCH__
-    return deviceV[i];
+        return deviceV[i];
 #else
-    return hostV[i];
+        return hostV[i];
 #endif
-  }
+    }
 
-  __host__  operator T*(){
-    return &(hostV.at(0));
-  }
+    __host__ operator T*()
+    {
+        return &(hostV.at(0));
+    }
 
-  __host__ auto toArray() const{
-    return std::span<const T>(hostV.data(), hostV.size());
-  }
+    __host__ auto toArray() const
+    {
+        return std::span<T const>(hostV.data(), hostV.size());
+    }
 
-  __host__ std::vector<T> toVector() const{
-    return hostV;
-  }
+    __host__ std::vector<T> toVector() const
+    {
+        return hostV;
+    }
 
-    __host__ void free() {
+    __host__ void free()
+    {
         cudaFree(deviceV);
     }
-  
-private:
-  T *deviceV;
-  std::vector<T> hostV;
 
+private:
+    T* deviceV;
+    std::vector<T> hostV;
 };

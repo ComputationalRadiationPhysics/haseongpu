@@ -37,7 +37,7 @@
  * @param sample_i         Index of sample point for which importance sampling should be done.
  * @param reflectionSlices 1 + (2 * maxReflections) - Coded information about how many
  *                         reflections a ray should do and on which surface to start.
- * @param dMesh            All information about triangles, points, contants. 
+ * @param dMesh            All information about triangles, points, contants.
  *                         Is located on device memory. See mesh.h for details.
  * @param sigmaA           Absorption value of the ray.
  * @param sigmaE           Emission value of the ray.
@@ -46,14 +46,15 @@
  * @param gridDim          Number of blocks per grid.
  *
  */
-void importanceSamplingPropagation(unsigned sample_i,
-				   const unsigned reflectionSlices,
-				   Mesh dMesh,
-				   const double sigmaA,
-				   const double sigmaE,
-				   double *preImportance,
-				   dim3 blockDim,
-				   dim3 gridDim);
+void importanceSamplingPropagation(
+    unsigned sample_i,
+    unsigned const reflectionSlices,
+    Mesh dMesh,
+    double const sigmaA,
+    double const sigmaE,
+    double* preImportance,
+    dim3 blockDim,
+    dim3 gridDim);
 
 /**
  * @brief Calculates importance and ray distribution on prisms.
@@ -61,7 +62,7 @@ void importanceSamplingPropagation(unsigned sample_i,
  *
  * @param reflectionSlices   1 + (2 * maxReflections) - Coded information about how many
  *                           reflections a ray should do and on which surface to start.
- * @param dMesh              All information about triangles, points, contants. 
+ * @param dMesh              All information about triangles, points, contants.
  *                           Is located on device memory. See mesh.h for details.
  * @param raysPerSample      Number of rays that should be distributed on gain medium.
  * @param preImportance      Values calculated from importanceSamplingPropagation.
@@ -74,14 +75,14 @@ void importanceSamplingPropagation(unsigned sample_i,
  * @param gridDim            Number of blocks per grid.
  *
  */
-unsigned importanceSamplingDistribution(const unsigned reflectionSlices,
-					Mesh dMesh,
-					const unsigned raysPerSample,
-					double *preImportance,
-					double *importance,
-					unsigned *raysPerPrism,
-					double hSumPhi,
-					const bool distributeRandomly,
-					dim3 blockDim,
-					dim3 gridDim);
-
+unsigned importanceSamplingDistribution(
+    unsigned const reflectionSlices,
+    Mesh dMesh,
+    unsigned const raysPerSample,
+    double* preImportance,
+    double* importance,
+    unsigned* raysPerPrism,
+    double hSumPhi,
+    bool const distributeRandomly,
+    dim3 blockDim,
+    dim3 gridDim);
