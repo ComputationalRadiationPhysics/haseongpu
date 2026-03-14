@@ -135,7 +135,7 @@ float calcPhiAse ( const ExperimentParameters& experiment,
     unsigned hRaysPerSampleDump = 0;
     raysPerSampleIter = raysPerSampleList.begin();
     bool mseTooHigh=true;
-
+    CUDA_CHECK_KERNEL_SYNC();
     importanceSamplingPropagation(sample_i,
                   reflectionSlices,
                   mesh,

@@ -47,7 +47,7 @@ Compiling
    + go to build directory: `cd haseongpu/build`
    + create Makefile `cmake ..`
    + build project : `make`
-GrayBat
+GrayBat (experimentell)
 =======
 
 <b>Gr</b>aph <b>A</b>pproach  for Highl<b>y</b>  Generic Communication
