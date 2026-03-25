@@ -35,3 +35,19 @@ include(CTest)
 include(Catch)
 
 catch_discover_tests(hase_tests)
+# ------------------------------------------------------------
+# Python test dependencies
+# ------------------------------------------------------------
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} -m pip install --user pytest
+    RESULT_VARIABLE PYTEST_INSTALL_RESULT
+)
+
+if(NOT PYTEST_INSTALL_RESULT EQUAL 0)
+    message(
+        WARNING
+        "pytest could not be installed automatically. Run '${Python3_EXECUTABLE} -m pip install --user pytest' manually."
+    )
+endif()

@@ -232,6 +232,8 @@ if(HASE_ENABLE_PYTHON)
         PROPERTIES BUILD_RPATH_USE_ORIGIN ON INSTALL_RPATH_USE_LINK_PATH ON
     )
     target_link_libraries(HASEonGPU PRIVATE hase_core)
+    install(TARGETS HASEonGPU LIBRARY DESTINATION HASEonGPU_Bindings)
+    install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
     install(FILES HASEonGPU.py DESTINATION .)
     install(
         DIRECTORY HASEonGPU_Bindings
@@ -239,6 +241,4 @@ if(HASE_ENABLE_PYTHON)
         FILES_MATCHING
         PATTERN "__init__.py"
     )
-
-    install(TARGETS HASEonGPU DESTINATION HASEonGPU_Bindings)
 endif()

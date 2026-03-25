@@ -623,8 +623,6 @@ void printCommandLine(const Modifiable_variables_map vm){
     for (const auto& it : vm) {
         std::stringstream ss;
         auto& value = it.second.value();
-        dout(V_INFO) << "[DEBUG] option '" << it.first
-                     << "' stored type: " << value.type().name() << std::endl;
 
         if      (auto v = boost::any_cast<uint32_t>   (&value)) ss << *v;
         else if (auto v = boost::any_cast<std::string>(&value)) ss << *v;

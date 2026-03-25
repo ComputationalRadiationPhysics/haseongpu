@@ -172,7 +172,6 @@ float forLoopsClad(
 
   for(i=0;i<size_p;i++)
   {
-      printf("Doing job on point %d of %d\n",i,size_p);
       p_cx = p_in[i];
       p_cy = p_in[size_p+i];
 
