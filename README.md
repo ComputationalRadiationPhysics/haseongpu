@@ -98,24 +98,29 @@ phi_ASE, mse_values, n_rays = calcPhiASE(
     deviceMode,
     parallelMode,
     maxGPUs,
-    nPerNode,
+    nPerNode
 )
 ```
-
+A detailed description of all arguments is provided below in Input argument description.
 ---
 
-#### Input Requirements (Important)
+#### Optional input formats for calcPhiASE (Python interface)
 
-- All array inputs must be **NumPy arrays (`np.ndarray`)**
-- Arrays must follow shape convention: **(N, components)**
+In addition to the layout described in Input argument description, the Python interface supports a few convenience formats:
 
-Example:
+Array inputs may be provided either as NumPy arrays (np.ndarray) or as plain Python lists
+Arrays may also be passed in matrix notation instead of the flattened README layout
+
+Example for additional supported matrix notation:
 ```text
-Correct:   (N_points, 2) → [[x0, y0], [x1, y1], ...]
-Incorrect: (2, N_points)
+(N_points, 2) → [[x0, y0], [x1, y1], ...]
 ```
-
-Incorrect shapes may not raise immediate errors but will lead to invalid results.
+ Original (supported aswell):
+```text
+ (2,N_points) → [x0, x1, ..., xn, y0, y1,..., yn]
+```
+Currently, point coordinates are restricted to two spatial dimensions.
+A three-dimensional structure is represented by extruding the 2D point set in the z-direction into multiple layers.
 
 ---
 
@@ -277,7 +282,7 @@ can be started by the following:
 
 ### Input argument description
 
-In the following all arguments of the MATLAB call are described.
+In the following all arguments of the MATLAB and PYTHON call are described.
 You will find on each point a head with datatype (an array when
 in brackets []), the size of the array and to which set of
 numbers the array belongs.
