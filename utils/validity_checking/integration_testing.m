@@ -28,7 +28,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% running all 3 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for test_dir={'graybat','mpi','threaded'}
+for test_dir={'mpi','threaded'}
     cd(test_dir{1})
     pwd
     tic
@@ -40,7 +40,7 @@ end
 
 addpath(pwd)
 
-for test_dir={'graybat','mpi','threaded'}
+for test_dir={'mpi','threaded'}
     cd(test_dir{1})
     gain_analysis
     cd ..

@@ -104,7 +104,7 @@ void CmdOptionsMap::construct()
     add(ExpSwitch::reflection,    "Use reflections or not", "true");
     add(ExpSwitch::spectral,      "The number of samples used to interpolate spectral intensities", "");
 
-    add(CompSwitch::parallel_mode, "Set the preferred way of parallelization (mpi, graybat, threaded), only valid with --device_mode=gpu", "threaded");
+    add(CompSwitch::parallel_mode, "Set the preferred way of parallelization (mpi, threaded), only valid with --device_mode=gpu", "threaded");
     add(CompSwitch::device_mode,   "Set the device to run the calculation (cpu, gpu)", "gpu");
     add(CompSwitch::ngpus,         "The maximum number of GPUs to be used on a single node", "1");
     add(CompSwitch::repetitions,   "The number of repetitions to try before the number of rays is increased by adaptive sampling", "4");

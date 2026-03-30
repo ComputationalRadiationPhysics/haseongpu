@@ -38,7 +38,6 @@ struct ParallelMode
     static inline std::string const NONE = "no_parallel_mode";
     static inline std::string const THREADED = "threaded";
     static inline std::string const MPI = "mpi";
-    static inline std::string const GRAYBAT = "graybat";
 };
 
 struct CompSwitch

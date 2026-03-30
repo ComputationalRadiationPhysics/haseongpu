@@ -47,8 +47,6 @@ Hardware requirements:
 Additional Notes
 ----------------
 
-For experimental GrayBat support, see :doc:`graybat`.
-
 For Windows-specific installation notes [deprecated], see :doc:`windows`.
 
 Compilation Notes

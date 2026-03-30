@@ -158,50 +158,6 @@ if(NOT DISABLE_MPI)
     else()
         message(STATUS "MPI is not found on your system. You can compile HASEonGPU without MPI by using DISABLE_MPI=ON")
     endif()
-    option(
-        USE_GRAYBAT
-        "Use Graph Approach for Highly Generic Communication Schemes Based on Adaptive Topologies (Graybat)"
-        OFF
-    )
-    if(USE_GRAYBAT)
-        include(FetchContent)
-
-        FetchContent_Declare(
-            graybat
-            GIT_REPOSITORY
-                https://github.com/ComputationalRadiationPhysics/graybat.git
-            GIT_TAG dev-c++11
-            GIT_SHALLOW TRUE
-        )
-
-        # Fetch sources, but do NOT add_subdirectory() / MakeAvailable()
-        FetchContent_GetProperties(graybat)
-        if(NOT graybat_POPULATED)
-            FetchContent_Populate(graybat)
-        endif()
-
-        # Graybat ships graybatConfig.cmake in its repo root, so we can use it directly
-        find_package(
-            graybat
-            1.0.0
-            REQUIRED
-            CONFIG
-            PATHS "${graybat_SOURCE_DIR}"
-        )
-
-        # Example integration with your target
-        target_include_directories(
-            hase_core
-            SYSTEM
-            PRIVATE ${graybat_INCLUDE_DIRS}
-        )
-        target_sources(hase_core PRIVATE ${graybat_GENERATED_FILES})
-
-        target_compile_definitions(hase_core PRIVATE ${graybat_DEFINITIONS})
-
-        target_link_libraries(hase_core PRIVATE ${graybat_LIBRARIES})
-        target_compile_definitions(hase_core PUBLIC USE_GRAYBAT)
-    endif()
 else()
     message(STATUS "MPI explicitly disabled via DISABLE_MPI=ON")
     target_compile_definitions(hase_core PUBLIC DISABLE_MPI)

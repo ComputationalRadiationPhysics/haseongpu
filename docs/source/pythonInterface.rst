@@ -28,7 +28,7 @@ The main Python entry point is:
 
 For single-node runs, the Python binding is used directly without disk I/O.
 
-If ``parallelMode`` is set to ``"mpi"`` or ``"graybat"``, the Python interface
+If ``parallelMode`` is set to ``"mpi"``, the Python interface
 writes input data to a temporary directory, launches the external
 ``calcPhiASE`` executable via ``mpiexec``, and reads the results back into
 Python.
@@ -616,7 +616,6 @@ The following section describes all arguments of the Python call.
 
   * ``"threaded"`` - threads distribute samples across GPUs/devices within one node
   * ``"mpi"`` - distributes samples across nodes;
-  * ``"graybat"`` - similar to MPI but supports a more refined node topology (experimental)
 
 * Description:
   Selects the parallelization mode.

@@ -1,4 +1,4 @@
-
+#pragma once
 
 #include <algorithm> /* std::max */
 #include <chrono> /* std::chrono::system_clock */
@@ -25,10 +25,6 @@
 #    include <calc_phi_ase_mpi.hpp>
 #endif
 
-
-#if defined(USE_GRAYBAT)
-#    include <calc_phi_ase_graybat.hpp>
-#endif
 
 #include <cuda_runtime_api.h> /* cudaDeviceReset */
 
@@ -141,14 +137,6 @@ int startSimulation(
             dout(V_ERROR) << "TURN 'DISABLE_MPI' to 'OFF' in order to run PhiASE on multiple nodes!";
             exit(1);
             #endif
-#endif
-        }
-
-
-        else if(compute.parallelMode == ParallelMode::GRAYBAT)
-        {
-#if defined(USE_GRAYBAT)
-            usedGPUs = calcPhiAseGrayBat(experiment, compute, mesh, result);
 #endif
         }
 

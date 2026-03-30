@@ -474,7 +474,7 @@ if __name__ == "__main__":
         "--parallel_mode",
         "-par",
         default="threaded",
-        help="The Parallel Mode used for phiASE [threaded|mpi|graybat] (default: threaded)",
+        help="The Parallel Mode used for phiASE [threaded|mpi] (default: threaded)",
     )
     args = parser.parse_args()
     material_path = Path(args.material)

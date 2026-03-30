@@ -106,16 +106,13 @@ Selects the hardware used for the simulation.
 * ``cpu`` uses the original single-core CPU algorithm
 * ``gpu`` uses NVIDIA CUDA GPUs
 
-``--parallel-mode=[threaded|mpi|graybat]``
+``--parallel-mode=[threaded|mpi]``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Selects the parallelization mode.
 
 * ``threaded`` uses pthreads on a single node
 * ``mpi`` uses MPI for distributed execution
-* ``graybat`` uses the experimental GrayBat communication framework
-
-For more information on GrayBat, see :doc:`graybat`.
 
 ``--min-rays=``
 ^^^^^^^^^^^^^^^

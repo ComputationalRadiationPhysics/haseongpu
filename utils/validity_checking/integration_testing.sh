@@ -24,12 +24,10 @@ HASE_ROOT=$(pwd)
 
 
 ## Prepare the folders
-
-mkdir "${INTEGRATION_DIR}/graybat"
 mkdir "${INTEGRATION_DIR}/mpi"
 mkdir "${INTEGRATION_DIR}/threaded"
 
-for i in {graybat,mpi,threaded}
+for i in {mpi,threaded}
 do
     cp -a example/matlab_example/* "${INTEGRATION_DIR}/$i/"
     cd "${INTEGRATION_DIR}/$i"

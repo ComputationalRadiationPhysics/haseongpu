@@ -156,7 +156,7 @@ def calcPhiASE_mpi(
     REFLECT = ' --reflection=1' if useReflections else ' --reflection=0'
 
     Prefix = ''
-    if parallelMode == 'mpi' or parallelMode == 'graybat':
+    if parallelMode == 'mpi':
         Prefix = f"mpiexec -npernode {nPerNode} "
         maxGPUs = 1
 
@@ -201,7 +201,7 @@ def calcPhiASE_mpi(
         TMP_FOLDER,
         packed["layout"]
     )
-    print("bef delete")
+
     clean_IO_files(TMP_FOLDER)
 
     if packed["layout"] == "matrix":
@@ -395,7 +395,7 @@ def calcPhiASE(
         numberOfLevels,
     )
 
-    if parallelMode == "mpi" or parallelMode == "graybat" or parallelMode == "debugFileIOPath":
+    if parallelMode == "mpi" or parallelMode == "debugFileIOPath":
         if parallelMode == "debugFileIOPath":
             parallelMode = "threaded"
         return calcPhiASE_mpi(

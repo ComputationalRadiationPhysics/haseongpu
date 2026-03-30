@@ -384,13 +384,12 @@ The following section describes all arguments of the MATLAB call.
 
 ``parallelMode``
 ^^^^^^^^^^^^^^^^
-
 * Type: ``str``
 * Allowed values:
 
   * ``"threaded"``: threads distribute samples across GPUs/devices within one node
-  * ``"mpi"``: distributes samples across nodes; the number of devices per node depends on ``nPerNode``
-  * ``"graybat"``: similar to MPI but supports a more refined node topology (experimental)
+  * ``"mpi"``: distributes samples across nodes
+
 
 * Description:
   Selects the parallelization mode.
