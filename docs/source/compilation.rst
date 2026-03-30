@@ -25,7 +25,7 @@ Clone the repository and build HASEonGPU with CMake:
    mkdir build
    cd build
    cmake ..
-   make
+   cmake --build .
 
 After compilation, the ``calcPhiASE`` binary is available under:
 
@@ -43,21 +43,21 @@ Minimal default build:
 .. code-block:: bash
 
    cmake ..
-   make
+   cmake --build .
 
 Build with MPI support:
 
 .. code-block:: bash
 
    cmake .. -DDISABLE_MPI=OFF
-   make
+   cmake --build .
 
 Build with GrayBat support:
 
 .. code-block:: bash
 
    cmake .. -DUSE_GRAYBAT=ON
-   make
+   cmake --build .
 
 CMake Options
 -------------

@@ -20,13 +20,12 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp> /* fs::path */
+#include <filesystem>
 
 #include <string>
 #include <vector>
 
-namespace fs = boost::filesystem;
-
+namespace fs = std::filesystem;
 struct DeviceMode
 {
     static inline std::string const NONE = "no_device_mode";

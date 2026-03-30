@@ -25,13 +25,9 @@
 #include <chrono> /* steady_clock, time_point */
 #include <sstream> /* stringstream */
 
-#include <boost/filesystem/fstream.hpp> /* fs::fstream */
-#include <boost/filesystem/path.hpp> /* fs::path */
-
 #include <progressbar.hpp>
 #include <logging.hpp>
 
-namespace fs = boost::filesystem;
 namespace chr = std::chrono;
 void printWave(std::ostream& stream, unsigned tic, int progress, int length)
 {

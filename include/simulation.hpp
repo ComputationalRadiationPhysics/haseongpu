@@ -9,10 +9,7 @@
 #include <string> /* string */
 #include <vector> /* vector */
 
-// BOOST
-#include <boost/filesystem.hpp> /* fs::path, fs::exists, fs::create_directory */
 
-namespace fs = boost::filesystem;
 
 // User header files
 #include <calc_phi_ase_threaded.hpp>
@@ -136,8 +133,14 @@ int startSimulation(
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
             usedGPUs = calcPhiAseMPI(experiment, compute, mesh, result);
 #else
+            #if !defined(MPI_FOUND)
+                dout(V_ERROR) << "Did not find MPI on your system!";
+                exit(1);
+            #else
+
             dout(V_ERROR) << "TURN 'DISABLE_MPI' to 'OFF' in order to run PhiASE on multiple nodes!";
             exit(1);
+            #endif
 #endif
         }
 

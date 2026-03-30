@@ -37,18 +37,11 @@
 #include <parser.hpp>
 #include <interpolation.hpp> /* interpolateWavelength*/
 
-// includes for commandline parsing
-#include <boost/program_options.hpp>
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/cmdline.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <boost/any.hpp> /* boost::any_cast */
-
-#include <boost/filesystem/path.hpp> /* fs::path */
-#include <boost/filesystem/operations.hpp>
-
-namespace fs = boost::filesystem;
-namespace po = boost::program_options;
+#include <any>
+#include <filesystem>
+#include <optional>
+#include <ranges>
+namespace fs = std::filesystem;
 
 
 struct WavelengthData{
@@ -378,11 +371,11 @@ WavelengthData calculateSigmas(
 }
 
 
-void checkPositive(int i, const std::string& name){
-    if(i < 0){
+void checkPositive(int i, const std::string& name, int threshhold=0){
+    if(i < threshhold){
         verbosity |= V_ERROR;
         dout(V_ERROR) << name << " must have a positive argument!" << std::endl;
-        throw po::invalid_option_value(std::to_string(i));
+        throw std::invalid_argument(std::to_string(i));
     }
 }
 
@@ -440,13 +433,15 @@ int parse( const int argc,
         std::vector<Mesh>& meshs,
         Result& result) {
 
-    Modifiable_variables_map vm = parseCommandLine(argc, argv);
+    auto vm = parseCommandLine(argc, argv);
     printCommandLine(vm);
 
     // Set/Test device to run experiment with
     //TODO: this call takes a LOT of time (2-5s). Can this be avoided?
     //      maybe move this to a place where GPUs are actually needed (for_loops_clad doesn't even need GPUs!)
-    std::vector<unsigned>devices = getFreeDevices(vm[CompSwitch::ngpus].as<int>());
+    auto &nr_gpuOpt=vm[CompSwitch::ngpus];
+    checkPositive(nr_gpuOpt.as<int>(),nr_gpuOpt.name);
+    std::vector<unsigned>devices = getFreeDevices(nr_gpuOpt.as<int>());
     ensureOrThrow(!devices.empty()," No cuda capable device found!");
     HostMesh host_mesh = createHostMeshFromFile(vm[ExpSwitch::input_path].as<fs::path>());
     validateHostMesh(host_mesh);
@@ -454,12 +449,15 @@ int parse( const int argc,
 
     WavelengthData waveD = calculateSigmas(
             vm[ExpSwitch::input_path].as<fs::path>(),
-            vm.count(ExpSwitch::spectral) ? vm[ExpSwitch::spectral].as<int>() : 0
+            vm.isExplicitlySet(ExpSwitch::spectral) ? vm[ExpSwitch::spectral].as<int>() : 0
             );
-
+    auto &min_rayOpt=vm[ExpSwitch::min_rays];
+    auto &max_rayOpt=vm[ExpSwitch::max_rays];
+    checkPositive(min_rayOpt.as<int>(),min_rayOpt.name);
+    checkPositive(max_rayOpt.as<int>(),max_rayOpt.name);
     experiment = ExperimentParameters (
-            static_cast<unsigned>(vm[ExpSwitch::min_rays].as<int>()),
-            static_cast<unsigned>(vm[ExpSwitch::max_rays].as<int>()),
+            static_cast<unsigned>(min_rayOpt.as<int>()),
+            static_cast<unsigned>(max_rayOpt.as<int>()),
             waveD.sigmaAInterpolated,
             waveD.sigmaEInterpolated,
             waveD.maxSigmaA,
@@ -467,10 +465,13 @@ int parse( const int argc,
             vm[ExpSwitch::mse].as<double>(),
             vm[ExpSwitch::reflection].as<bool>() );
 
-
+    auto &repetionOpt=vm[ExpSwitch::min_rays];
+    auto &adaptiveStepOpt=vm[ExpSwitch::max_rays];
+    checkPositive(repetionOpt.as<int>(),repetionOpt.name);
+    checkPositive(adaptiveStepOpt.as<int>(),adaptiveStepOpt.name);
     compute = ComputeParameters (
-    static_cast<unsigned>(vm[CompSwitch::repetitions].as<int>()),
-    static_cast<unsigned>(vm[CompSwitch::adaptive_steps].as<int>()),
+    static_cast<unsigned>(repetionOpt.as<int>()),
+    static_cast<unsigned>(adaptiveStepOpt.as<int>()),
             devices.at(0),
             vm[CompSwitch::device_mode].as<std::string>(),
             vm[CompSwitch::parallel_mode].as<std::string>(),
@@ -480,161 +481,76 @@ int parse( const int argc,
             devices,
             vm[CompSwitch::min_sample_i].as<unsigned>(),
             vm[CompSwitch::max_sample_i].as<unsigned>(),
-            vm[CompSwitch::ngpus].as<int>());
+            nr_gpuOpt.as<int>());
     validateInput(experiment,compute,devices.size());
     validateSampleRange(compute,meshs[0].numberOfSamples);
     initializeResult(result, meshs[0].numberOfSamples);
     return 0;
 }
 
+inline CmdOptionsMap parseCommandLine(int argc, char** argv)
+{
+    CmdOptionsMap cfg{};
 
-po::variables_map parseCommandLine(const int argc, char** argv) {
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string_view arg = argv[i];
 
-    po::options_description experiment_options( "Experiment Options" );
-    experiment_options.add_options()
-        ( std::string(ExpSwitch::input_path + ",i").c_str(),
-          po::value<fs::path> ()->required(),
-          "The path to a folder that contains the input files")
-        ( std::string(ExpSwitch::output_path + ",o").c_str(),
-          po::value<fs::path> ()->required(),
-          "The path to a folder that contains the output files")
-        ( ExpSwitch::min_rays.c_str(),
-          po::value<int> ()
-          ->default_value(100000)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
-          "The minimal number of rays to use for each sample point")
-        ( ExpSwitch::max_rays.c_str(),
-          po::value<int> ()
-          ->default_value(100000)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::max_rays)),
-          "The maximal number of rays to use for each sample point")
-        ( std::string(ExpSwitch::mse + ",m").c_str(),
-          po::value<double> ()->default_value(0.1,"0.1"),
-          "The MSE threshold used for adaptive/repetitive sampling")
-        ( ExpSwitch::reflection.c_str(),
-          po::value<bool> ()->default_value(true),
-          "use reflections or not")
-        ( ExpSwitch::spectral.c_str(),
-          po::value<int> (),
-          "The number of samples used to interpolate spectral intensities")
-        ;
+        // allow --name=value form
+        auto splitEq = [&](std::string_view token) -> std::pair<std::string_view, std::optional<std::string_view>> {
+            auto pos = token.find('=');
+            if (pos == std::string_view::npos) {
+                return {token, std::nullopt};
+            }
+            return {token.substr(0, pos), token.substr(pos + 1)};
+        };
 
-    po::options_description compute_options( "Compute Options" );
-    compute_options.add_options()
-        ( CompSwitch::parallel_mode.c_str(),
-          po::value<std::string> ()->default_value("threaded"),
-          std::string("Set the preferred way of parellelization (mpi, graybat, threaded), only valid with --"
-              + CompSwitch::device_mode + "=gpu").c_str())
-        ( CompSwitch::device_mode.c_str(),
-          po::value<std::string> ()->default_value("gpu"),
-          "Set the device to run the calculation (cpu, gpu)")
-        ( std::string(CompSwitch::ngpus + ",g").c_str(),
-          po::value<int> ()
-          ->default_value(1)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::ngpus)),
-          std::string("The maximum number of GPUs to b used on a single node. Should be left unchanged for --"
-              + CompSwitch::parallel_mode + "=mpi").c_str())
-        ( std::string(CompSwitch::repetitions + ",r").c_str(),
-          po::value<int> ()
-          ->default_value(4)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::repetitions)),
-          "The number of repetitions to try, before the number of rays is increased by adaptive sampling")
-        ( std::string(CompSwitch::adaptive_steps + ",a").c_str(),
-          po::value<int> ()
-          ->default_value(5)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, CompSwitch::adaptive_steps)),
-          std::string("The number of adaptive sampling steps that are used to split the range between "
-              + ExpSwitch::min_rays + " and " + ExpSwitch::max_rays).c_str())
-        ( CompSwitch::min_sample_i.c_str(),
-          po::value<unsigned> ()
-          ->default_value(-1),
-          "The the minimum index of sample points to simulate")
-        ( CompSwitch::max_sample_i.c_str(),
-          po::value<unsigned> ()
-          ->default_value(-1),
-          "The the maximal index of sample points to simulate")
-        ( CompSwitch::write_vtk.c_str(),
-          po::value<bool> ()
-          ->default_value(false),
-          "Write VTK files of the computed ASE values")
-        ;
+        auto [name, inlineValue] = splitEq(arg);
 
-    po::options_description generic_options( "Generic Options" );
-    generic_options.add_options()
-        ( "verbosity,v",
-          po::value<int> ()
-          ->default_value(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT)
-          ->notifier(std::bind(checkPositive, std::placeholders::_1, ExpSwitch::min_rays)),
-          "Set the verbosity levels:\n\
-          \t 0 (quiet)\n\
-          \t 1 (error)\n\
-          \t 2 (warning)\n\
-          \t 4 (info)\n\
-          \t 8 (statistics)\n\
-          \t 16 (debug)\n\
-          \t 32 (progressbar)\n")
-        ;
+        auto getValue = [&](std::string_view optName) -> std::string_view {
+            if (inlineValue.has_value()) {
+                return *inlineValue;
+            }
+            return requireValue(i, argc, argv, optName);
+        };
+        auto removePreDashes = [&](std::string_view optName) -> std::string_view
+        {
+            if (optName.empty()) {
+                throw std::runtime_error("Invalid option name: empty string");
+            }
 
-    po::options_description cmd_only_options;
-    cmd_only_options.add_options()
-        ( "config,c",
-          po::value<fs::path> (),
-          "location of an optional config file")
-        ( "help,h",
-          "print this help message and exit" )
-        ;
+            if (optName[0] != '-') {
+                throw std::runtime_error(
+                    "Invalid option name '" + std::string(optName) + "': expected leading '-' or '--'"
+                );
+            }
 
-    po::variables_map vm;
+            const auto pos = optName.find_first_not_of('-');
+            if (pos == std::string_view::npos) {
+                throw std::runtime_error(
+                    "Invalid option name '" + std::string(optName) + "': missing option name after dashes"
+                );
+            }
 
-    po::options_description cmdline_options;
-    cmdline_options.add(experiment_options).add(compute_options).add(generic_options).add(cmd_only_options);
-    po::store(po::parse_command_line( argc, argv, cmdline_options ), vm);
-
-    if(vm.count("help")){
-        verbosity |= V_NOLABEL;
-        dout(V_NOLABEL) << "Usage: " << argv[0] << " -i <input folder> -o <output folder> [options] " << std::endl;
-        dout(V_NOLABEL) << cmdline_options << std::endl;
-        exit(0);
-    }
-
-    verbosity = vm["verbosity"].as<int>();
-
-    if(vm.count("config")){
-        fs::path configPath(vm["config"].as<fs::path>());
-        if(fs::exists(configPath)){
-            po::options_description configfile_options;
-            configfile_options.add(experiment_options).add(compute_options).add(generic_options);
-            std::ifstream configPathStream(configPath.string());
-            po::store(po::parse_config_file( configPathStream, configfile_options ), vm);
-        }else{
-            dout(V_ERROR) << "Configuration file could not be read. Possible problems: path "
-                << configPath << "does not exist or insufficient permissions" << std::endl;
-            exit(1);
+            return optName.substr(pos);
+        };
+        auto cleanName=removePreDashes(name);
+        if (cleanName == "help" || cleanName == "h")
+        {
+            cfg.printDescription();
+            std::terminate();
         }
-    }
+        cfg.set(std::string(cleanName),std::string(getValue(name)));
 
-    po::notify(vm);
-    return vm;
+    }
+    cfg.checkRequired();
+    return cfg;
 }
-
-
-void printCommandLine(const Modifiable_variables_map vm){
-
-    for (const auto& it : vm) {
-        std::stringstream ss;
-        auto& value = it.second.value();
-
-        if      (auto v = boost::any_cast<uint32_t>   (&value)) ss << *v;
-        else if (auto v = boost::any_cast<std::string>(&value)) ss << *v;
-        else if (auto v = boost::any_cast<int>        (&value)) ss << *v;
-        else if (auto v = boost::any_cast<bool>       (&value)) ss << *v;
-        else if (auto v = boost::any_cast<fs::path>   (&value)) ss << *v;
-        else if (auto v = boost::any_cast<double>     (&value)) ss << *v;
-        else{
-            dout(V_WARNING) << it.first << ": cast error" << std::endl;
-            continue;
-        }
-        dout(V_INFO) << it.first << ": " << ss.str() << std::endl;
+void printCommandLine(const CmdOptionsMap& vm)
+{
+    for (const auto& [name, opt] : vm.options) {
+        const std::string& shownValue = opt.hasValue ? opt.value : opt.defaultValue;
+        dout(V_INFO) << name << ": " << shownValue << std::endl;
     }
 }
 
@@ -687,7 +603,7 @@ Mesh createMesh(const std::vector<unsigned> &triangleIndices,
   }
 
    return { cladAbsorption,
-         totalSurface,
+         static_cast<float>(totalSurface), //this cast might needlessly cause precision loss
          thicknessOfPrism,
          nTot,
          crystalFluorescence,

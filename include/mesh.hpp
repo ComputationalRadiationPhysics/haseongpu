@@ -137,7 +137,7 @@ class Mesh
 public:
     Mesh(// Constants
        double claddingAbsorption,
-       float surfaceTotal,
+       float surfaceTotal, // TODO: think about making this parameter double precision
        float thickness,
        float nTot,
        float crystalTFluo,

@@ -23,12 +23,7 @@
 #include <iomanip> /* std::setprecision(), std::fixed() */
 
 #include <write_matlab_output.hpp>
-
-#include <boost/filesystem/fstream.hpp> /* fs::fstream */
-#include <boost/filesystem/path.hpp> /* fs::path */
-
-namespace fs = boost::filesystem;
-
+#include <fstream>
 /**
  * @brief write input data in a 3D-matrix which can be parsed by matlab with reshape
  *        (see calcPhiASE.m)
@@ -44,7 +39,7 @@ namespace fs = boost::filesystem;
 template <typename T>
 void write3dMatrix(
     const std::vector<T>& data,
-    fs::ofstream &file,
+    std::ofstream &file,
     const unsigned rowCount,
     const unsigned columnCount,
     const unsigned pageCount
@@ -66,16 +61,16 @@ void write3dMatrix(
 
 
 void writeMatlabOutput(
-    const fs::path experimentPath,
+    const std::filesystem::path experimentPath,
     const std::vector<float> ase,
     const std::vector<unsigned> N_rays,
     const std::vector<double> expectedValues,
     const unsigned numberOfSamples,
     const unsigned numberOfLevels){
 
-  fs::ofstream aseFile;
-  fs::ofstream raysFile;
-  fs::ofstream expectedValuesFile;
+  std::ofstream aseFile;
+  std::ofstream raysFile;
+  std::ofstream expectedValuesFile;
   const unsigned samplesPerLevel = numberOfSamples/numberOfLevels;
 
   aseFile.open(experimentPath / "phi_ASE.txt");

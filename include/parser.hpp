@@ -28,9 +28,6 @@
  */
 
 #pragma once
-#include <boost/filesystem/fstream.hpp> /* fs::fstream */
-#include <boost/filesystem/path.hpp> /* fs::path */
-#include <boost/program_options/variables_map.hpp>
 #include <logging.hpp>
 #include <mesh.hpp>
 #include <nan_fix.hpp>
@@ -38,11 +35,8 @@
 
 #include <string> /* string */
 #include <vector>
-
-namespace fs = boost::filesystem;
-namespace po = boost::program_options;
-
-typedef std::map<std::string, po::variable_value> Modifiable_variables_map;
+#include <fstream>
+#include <CmdOptionsMap.hpp>
 
 /**
  * @brief Parses a given file(filename) line by line.
@@ -56,7 +50,7 @@ typedef std::map<std::string, po::variable_value> Modifiable_variables_map;
 template<class T>
 std::vector<T> fileToVector(fs::path filename)
 {
-    fs::ifstream fileStream;
+    std::ifstream fileStream;
 
     fileStream.open(filename);
 
@@ -96,7 +90,7 @@ std::vector<T> fileToVector(fs::path filename)
 template<class T>
 T fileToValue(fs::path filename)
 {
-    fs::ifstream fileStream;
+    std::ifstream fileStream;
 
     fileStream.open(filename);
     if(fileStream.is_open())
@@ -113,16 +107,10 @@ T fileToValue(fs::path filename)
     }
 }
 
-po::variables_map parseCommandLine(int const argc, char** argv);
+CmdOptionsMap parseCommandLine(int const argc, char** argv);
 
 
-void printCommandLine(Modifiable_variables_map const);
-
-
-Modifiable_variables_map checkParameterValidity(Modifiable_variables_map, unsigned);
-
-
-Modifiable_variables_map checkSampleRange(Modifiable_variables_map vm, unsigned const numberOfSamples);
+void printCommandLine(CmdOptionsMap const &);
 
 Mesh createMesh(
     std::vector<unsigned> const& triangleIndices,

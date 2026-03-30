@@ -27,11 +27,9 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
-
 #include <string>
 #include <vector>
-
+#include <filesystem>
 /**
  * @brief writes a value to a file, where the filename is appended with 2 longish indices
  *
@@ -44,7 +42,7 @@
  */
 int writeValueToFile(
     float const value,
-    boost::filesystem::path const path,
+    std::filesystem::path const path,
     std::string const indexName1,
     int const index1,
     std::string const indexName2,
@@ -58,4 +56,4 @@ int writeValueToFile(
  * @param pFilename the name of the output file
  *
  */
-void writeVectorToFile(std::vector<double> v, boost::filesystem::path filename);
+void writeVectorToFile(std::vector<double> v, std::filesystem::path filename);

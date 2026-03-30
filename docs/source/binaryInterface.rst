@@ -187,6 +187,27 @@ Setting this to ``1`` disables adaptive stepping and uses only
 Resolution used for linear interpolation of the absorption and emission
 spectra.
 
+``--write-vtk=``
+^^^^^^^^^^^^^^^^
+
+Enables writing VTK output files for post-processing and visualization.
+
+When enabled, HASEonGPU creates a subdirectory named ``vtk`` inside the
+specified output directory and writes VTK files containing sampled result data,
+for example:
+
+* ``dndt_<timestamp>.vtk``
+* ``phiase_<timestamp>.vtk``
+* ``mse_<timestamp>.vtk``
+* ``total_rays_<timestamp>.vtk``
+
+Accepted values:
+
+* ``true`` / ``1``: enable VTK output
+* ``false`` / ``0``: disable VTK output
+
+Default: ``false``
+
 ``--config=``
 ^^^^^^^^^^^^^
 

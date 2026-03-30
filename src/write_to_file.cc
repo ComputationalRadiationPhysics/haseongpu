@@ -23,15 +23,11 @@
 #include <string> /* std::to_string */
 #include <iomanip> /* setw(), setfill */
 
-#include <boost/filesystem/fstream.hpp> /* fs::fstream */
-#include <boost/filesystem/path.hpp> /* fs::path */
 #include <ctime> /* time */
 #include <vector>
-
-namespace fs = boost::filesystem;
-
+#include <fstream>
 #include <write_to_file.hpp>
-
+namespace fs = std::filesystem;
 int writeValueToFile(
     const float value,
     const fs::path path,
@@ -45,7 +41,7 @@ int writeValueToFile(
   stringstream filenameStream;
   filenameStream << path << indexName1 << "_" << setfill('0') << setw(3) << index1 << "_" << indexName2 << setfill('0') << setw(6) << index2;
 
-  fs::ofstream oFile;
+  std::ofstream oFile;
   oFile.open(filenameStream.str());
   oFile << value << endl;
   oFile.close();
@@ -64,7 +60,7 @@ void writeVectorToFile(std::vector<double> v, fs::path filename){
   filename += ".dat";
 
   // Init filestream
-  fs::ofstream file;
+  std::ofstream file;
   file.open(filename);
 
   // Write vector data

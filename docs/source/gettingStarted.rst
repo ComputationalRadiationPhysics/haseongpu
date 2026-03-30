@@ -29,19 +29,12 @@ Dependencies
 Required software:
 
 * ``cmake >= 3.0.1``
-* ``make``
 * ``gcc >= 11``
 * ``cuda >= 11.0``
-* ``boost >= 1.70`` with:
-
-  * ``program_options``
-  * ``system``
-  * ``filesystem``
 
 Optional software and tools:
 
-* ``OpenMPI``
-* ``boost >= 1.70`` with ``boost_mpi``
+* ``OpenMPI >= 4.0``
 * ``Python >= 3.10``
 * MATLAB or Octave
 * ``ParaView`` for visualization of ``.vtk`` output
