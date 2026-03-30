@@ -36,199 +36,150 @@
 // Nodes
 #define HEAD_NODE 0
 
-// Tags
-#define RESULT_TAG 1
-#define SAMPLE_REQUEST_TAG 2
-#define SAMPLE_SEND_TAG 3
-#define RUNTIME_TAG 4
-
-// MSG SIZES
-#define RESULT_MSG_LENGTH 5
-#define SAMPLE_MSG_LENGTH 2
-
-/**
- * @brief Manages communication with compute nodes.
- *        There are 4 possible messages :
- *        1. Compute node request sample
- *        2. Compute node sends results
- *        3. Head sends sample
- *        4. Head sends abort signal
- *
- * @param phiASE    return for phi ASE
- * @param mse       return for Mean squared error
- * @param totalRays return for raysPerSample
+/***
+ * Performs ASE computation in MPI mode by statically partitioning the global
+ * sample range across all MPI ranks. Each rank (including the HEAD-Node) computes its assigned subset
+ * locally, and the partial results are gathered on the head node after all
+ * ranks have finished.
  */
-void mpiHead(Result &result,
-         std::vector<float> &runtimes,
-         const Mesh& mesh,
-         const unsigned numberOfComputeNodes,
-         const int sampleRange){
-  MPI_Status status;
-  float res[RESULT_MSG_LENGTH] = {0,0,0,0};
-  int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
-  unsigned finishedComputeNodes = 0;
-  unsigned sampleOffset = 0;
-  sample_i[1] = sampleRange;
-  ProgressBar bar;
-  while(finishedComputeNodes < numberOfComputeNodes){
-    MPI_Recv(res, RESULT_MSG_LENGTH, MPI_FLOAT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-
-    switch(status.MPI_TAG){
-      // Compute node finished and sends runtime
-    case RUNTIME_TAG:
-      runtimes.push_back(res[0]);
-      finishedComputeNodes++;
-      break;
-
-      // Compute node sends its results for sample_i
-    case RESULT_TAG:
-      /**
-       * res[0] : sample_i
-       * res[1] : phiASE
-       * res[2] : mse
-       * res[3] : totalRays
-       **/
-      sampleOffset = (unsigned)(res[0]);
-      result.phiAse.at(sampleOffset)    = res[1];
-      result.mse.at(sampleOffset)       = res[2];
-      result.totalRays.at(sampleOffset) = (unsigned)res[3];
-
-      bar.printFancyProgressBar(mesh.numberOfSamples);
-      break;
-
-      // Compute node requests new sample point for computation
-    case SAMPLE_REQUEST_TAG:
-      if(sample_i[0] == (int)mesh.numberOfSamples){
-    // No sample points left, abort computation
-    int abortMPI[2] = {-1,-1};
-    MPI_Send(abortMPI, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-      }
-      else{
-    // Send next sample range
-    MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, status.MPI_SOURCE, SAMPLE_SEND_TAG, MPI_COMM_WORLD);
-    sample_i[0] = std::min(sample_i[0] + sampleRange, (int)mesh.numberOfSamples); // min_sample_i
-    sample_i[1] = std::min(sample_i[1] + sampleRange, (int)mesh.numberOfSamples); // max_sample_i
-
-      }
-      break;
-
-    default:
-      break;
-
+float calcPhiAseMPI(
+    const ExperimentParameters& experiment,
+    const ComputeParameters& compute,
+    Mesh& mesh,
+    Result& result)
+{
+    int mpiError = MPI_Init(nullptr, nullptr);
+    if (mpiError != MPI_SUCCESS) {
+        dout(V_ERROR) << "Error starting MPI program." << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, mpiError);
+        return 1.0f;
     }
 
-  }
+    int rank = 0;
+    int size = 1;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-}
-
-/**
- * @brief This MPI-node make phiASE computations.
- *        It will request a sample point range from
- *        MPI head node, and send their results back
- *        sequentially.
- *
- **/
-void mpiCompute( const ExperimentParameters &experiment,
-         const ComputeParameters &compute,
-         const Mesh& mesh,
-         Result &result,
-         float &runtime ){
-  while(true){
-    MPI_Status status;
-    int sample_i[SAMPLE_MSG_LENGTH] = {0,0};
-    float totalRuntime = 0;
-    float res[RESULT_MSG_LENGTH] = {0,0,0,0};
-    MPI_Send(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_REQUEST_TAG, MPI_COMM_WORLD);
-    MPI_Recv(sample_i, SAMPLE_MSG_LENGTH, MPI_INT, HEAD_NODE, SAMPLE_SEND_TAG, MPI_COMM_WORLD, &status);
-
-
-    if(sample_i[0] == -1){
-      // Abort message received => send runtime
-      res[0] = runtime;
-      MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RUNTIME_TAG, MPI_COMM_WORLD);
-      break;
-    }
-    else{
-      // Sample range received => calculate
-    calcPhiAse ( experiment,
-             compute,
-             mesh,
-             result,
-             sample_i[0],
-             sample_i[1],
-             runtime);
-
-      // Extract results and send it to head node
-      for(int j=sample_i[0]; j < sample_i[1]; ++j){
-    unsigned sampleOffset = (unsigned)(j);
-    res[0] = (float)j;
-    res[1] = result.phiAse.at(sampleOffset);
-    res[2] = result.mse.at(sampleOffset);
-    res[3] = (float)result.totalRays.at(sampleOffset);
-    totalRuntime += runtime;
-    MPI_Send(res, RESULT_MSG_LENGTH, MPI_FLOAT, HEAD_NODE, RESULT_TAG, MPI_COMM_WORLD);
-      }
-
+    if (rank != HEAD_NODE) {
+        verbosity &= ~V_PROGRESS;
+        verbosity &= ~V_STAT;
+        verbosity &= ~V_INFO;
     }
 
-  }
+    const int totalSamples = static_cast<int>(mesh.numberOfSamples);
 
-}
+    const int base = totalSamples / size;
+    const int rem  = totalSamples % size;
 
-float calcPhiAseMPI ( const ExperimentParameters &experiment,
-              const ComputeParameters &compute,
-              Mesh& mesh,
-              Result &result ){
+    const int localBegin = rank * base + std::min(rank, rem);
+    const int localCount = base + (rank < rem ? 1 : 0);
+    const int localEnd   = localBegin + localCount;
 
-  // Init MPI
-  int mpiError = MPI_Init(NULL,NULL);
-  if(mpiError != MPI_SUCCESS){
-    dout(V_ERROR) << "Error starting MPI program." << std::endl;
-    MPI_Abort(MPI_COMM_WORLD,mpiError);
-    return 1;
-  }
+    float runtime = 0.0f;
 
-  // Get size and rank
-  int rank;
-  int size;
-  float runtime;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  std::vector<float> runtimes(size, 0);
+    if (localCount > 0) {
+        calcPhiAse(
+            experiment,
+            compute,
+            mesh,
+            result,
+            localBegin,
+            localEnd,
+            runtime
+        );
+    }
 
-  // Rank 0 will be head node
-  // all other ranks will be compute nodes
-  switch(rank){
-  case HEAD_NODE:
-    mpiHead( result,
-         runtimes,
-         mesh,
-         size-1,
-         1);
+    std::vector<int> recvCounts;
+    std::vector<int> displs;
 
+    if (rank == HEAD_NODE) {
+        recvCounts.resize(size);
+        displs.resize(size);
+
+        for (int r = 0; r < size; ++r) {
+            int rBegin = r * base + std::min(r, rem);
+            int rCount = base + (r < rem ? 1 : 0);
+            recvCounts[r] = rCount;
+            displs[r] = rBegin;
+        }
+    }
+
+    MPI_Gatherv(
+        localCount > 0 ? result.phiAse.data() + localBegin : nullptr,
+        localCount,
+        MPI_FLOAT,
+        rank == HEAD_NODE ? result.phiAse.data() : nullptr,
+        rank == HEAD_NODE ? recvCounts.data() : nullptr,
+        rank == HEAD_NODE ? displs.data() : nullptr,
+        MPI_FLOAT,
+        HEAD_NODE,
+        MPI_COMM_WORLD
+    );
+
+    MPI_Gatherv(
+        localCount > 0 ? result.mse.data() + localBegin : nullptr,
+        localCount,
+        MPI_DOUBLE,
+        rank == HEAD_NODE ? result.mse.data() : nullptr,
+        rank == HEAD_NODE ? recvCounts.data() : nullptr,
+        rank == HEAD_NODE ? displs.data() : nullptr,
+        MPI_DOUBLE,
+        HEAD_NODE,
+        MPI_COMM_WORLD
+    );
+
+    MPI_Gatherv(
+        localCount > 0 ? result.totalRays.data() + localBegin : nullptr,
+        localCount,
+        MPI_UNSIGNED,
+        rank == HEAD_NODE ? result.totalRays.data() : nullptr,
+        rank == HEAD_NODE ? recvCounts.data() : nullptr,
+        rank == HEAD_NODE ? displs.data() : nullptr,
+        MPI_UNSIGNED,
+        HEAD_NODE,
+        MPI_COMM_WORLD
+    );
+
+    MPI_Gatherv(
+    localCount > 0 ? result.dndtAse.data() + localBegin : nullptr,
+    localCount,
+    MPI_DOUBLE,
+    rank == HEAD_NODE ? result.dndtAse.data() : nullptr,
+    rank == HEAD_NODE ? recvCounts.data() : nullptr,
+    rank == HEAD_NODE ? displs.data() : nullptr,
+    MPI_DOUBLE,
+    HEAD_NODE,
+    MPI_COMM_WORLD
+);
+
+    // Gather runtimes to rank 0
+    std::vector<float> runtimes;
+    if (rank == HEAD_NODE) {
+        runtimes.resize(size, 0.0f);
+    }
+
+    MPI_Gather(
+        &runtime,
+        1,
+        MPI_FLOAT,
+        rank == HEAD_NODE ? runtimes.data() : nullptr,
+        1,
+        MPI_FLOAT,
+        HEAD_NODE,
+        MPI_COMM_WORLD
+    );
+
+    if (rank == HEAD_NODE) {
+        ProgressBar bar;
+        for (int i = 0; i < totalSamples; ++i) {
+            bar.printFancyProgressBar(mesh.numberOfSamples);
+        }
+    }
     cudaDeviceReset();
     MPI_Finalize();
-    mesh.free();
-    break;
 
 
-  default:
-    // disable Information verbosity for other nodes than HEADNODE
-    // (should have similar output anyway)
-    verbosity &= ~V_PROGRESS;
 
-    mpiCompute( experiment,
-        compute,
-        mesh,
-        result,
-        runtime );
-
-    cudaDeviceReset();
-    MPI_Finalize();
-    exit(0);
-    break;
-  };
-
-  return size - 1;
+    return static_cast<float>(size);
 }
 #endif
