@@ -246,7 +246,7 @@ def calcPhiASE(
         deviceMode,
         parallelMode,
         maxGPUs,
-        nPerNode
+        nPerNode = 1
 ):
     def transform_inputs(
             points,

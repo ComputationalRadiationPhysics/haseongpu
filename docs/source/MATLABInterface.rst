@@ -399,14 +399,19 @@ The following section describes all arguments of the MATLAB call.
 ^^^^^^^^^^^
 
 * Type: ``unsigned``
-* Size: ``1``
 * Description:
-  Maximum number of GPUs used in threaded execution mode.
+  Maximum number of GPUs used by a single process.
+
+  In ``threaded`` mode, this usually corresponds to the total number of GPUs
+  used on the local node.
+
+  In ``mpi`` mode, this corresponds to the number of GPUs used per MPI process
+  rank. Therefore, if ``nPerNode = 1 (default)`` , it corresponds to the number of
+  GPUs used per node.
 
 ``nPerNode``
 ^^^^^^^^^^^^
 
 * Type: ``unsigned``
-* Size: ``1``
 * Description:
-  Number of devices per MPI node.
+  Number of MPI process ranks launched per node (default = 1).

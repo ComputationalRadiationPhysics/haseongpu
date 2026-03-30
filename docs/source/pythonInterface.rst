@@ -615,7 +615,7 @@ The following section describes all arguments of the Python call.
 * Allowed values:
 
   * ``"threaded"`` - threads distribute samples across GPUs/devices within one node
-  * ``"mpi"`` - distributes samples across nodes; the number of devices per node depends on ``nPerNode``
+  * ``"mpi"`` - distributes samples across nodes;
   * ``"graybat"`` - similar to MPI but supports a more refined node topology (experimental)
 
 * Description:
@@ -626,11 +626,18 @@ The following section describes all arguments of the Python call.
 
 * Type: ``unsigned``
 * Description:
-  Maximum number of GPUs used in threaded execution mode.
+  Maximum number of GPUs used by a single process.
+
+  In ``threaded`` mode, this usually corresponds to the total number of GPUs
+  used on the local node.
+
+  In ``mpi`` mode, this corresponds to the number of GPUs used per MPI process
+  rank. Therefore, if ``nPerNode = 1 (default)`` , it corresponds to the number of
+  GPUs used per node.
 
 ``nPerNode``
 ^^^^^^^^^^^^
 
 * Type: ``unsigned``
 * Description:
-  Number of devices per MPI node.
+  Number of MPI process ranks launched per node (default = 1).
