@@ -262,9 +262,6 @@ void validateInput(
 #if !defined(DISABLE_MPI)
        && compute.parallelMode != ParallelMode::MPI
 #endif
-#if defined(USE_GRAYBAT)
-       && compute.parallelMode != ParallelMode::GRAYBAT
-#endif
     )
     {
         std::stringstream ss;
@@ -272,9 +269,6 @@ void validateInput(
            << ParallelMode::THREADED << "\"";
 #if !defined(DISABLE_MPI)
         ss << ", \"" << ParallelMode::MPI << "\"";
-#endif
-#if defined(USE_GRAYBAT)
-        ss << ", \"" << ParallelMode::GRAYBAT << "\"";
 #endif
         throw std::runtime_error(ss.str());
     }

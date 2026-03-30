@@ -52,13 +52,6 @@ Build with MPI support:
    cmake .. -DDISABLE_MPI=OFF
    cmake --build .
 
-Build with GrayBat support:
-
-.. code-block:: bash
-
-   cmake .. -DUSE_GRAYBAT=ON
-   cmake --build .
-
 CMake Options
 -------------
 
@@ -136,21 +129,6 @@ different systems, specifying the CUDA architecture is recommended.
   * ``ON``: test targets are enabled
 
 This option is primarily useful for development and validation work.
-
-``USE_GRAYBAT``
-^^^^^^^^^^^^^^^
-
-* Default: ``OFF``
-* Description:
-  Enables compilation with the experimental GrayBat support.
-  When deactivated graybat is not required as a dependency.
-
-* Values:
-
-  * ``OFF``: GrayBat support is disabled
-  * ``ON``: build with GrayBat support
-
-For more information, see :doc:`graybat`.
 
 Notes
 -----

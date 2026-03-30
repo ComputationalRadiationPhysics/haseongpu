@@ -17,7 +17,7 @@ On the HeadNode (hypnos5), run the script
  - This script needs as a parameter the folder where the comparison should be
    located. This location must be empty (empty folder is OK, nothing is also
    OK)
- - The script will copy the experiment 3 times (graybat,mpi,threaded) to the
+ - The script will copy the experiment 2 times (mpi,threaded) to the
    comparison folder
  - The laserPumpCladding example will be modified to use the correct
    communication framework
@@ -50,6 +50,6 @@ is no really nice way to continue. At least in the context of this framework.
 
 What you CAN do: if an experiment already completed, you can start the
 `gain_analysis.m` manually. To do that, go into the experiment folder
-(graybat,mpi, or threaded) and execute 
+(mpi or threaded) and execute 
 `matlab -r "addpath .. , gain_analysis ,exit"` 
 This will also place files in the parent folder.

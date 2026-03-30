@@ -53,10 +53,7 @@ Restrictions
 ^^^^^^^^^^^^
 
 The number of rays used for the Monte Carlo integration of a single sampling
-point is limited by the available GPU memory. In MPI mode, one process acts as
-the scheduling master, so its GPU does not participate in the computation.
-
-This limitation can be mitigated by integrating `Graybat <https://github.com/ComputationalRadiationPhysics/graybat>_`, which is currently still considered experimental.
+point is limited by the available GPU memory.
 
 Features
 ^^^^^^^^
