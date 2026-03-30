@@ -29,17 +29,17 @@ def create_calcPhiASE_input(
     os.chdir(FOLDER)
 
     try:
-        np.savetxt('points.txt', packed["p_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('triangleNormalsX.txt', packed["normals_x_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('triangleNormalsY.txt', packed["normals_y_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('points.txt', packed["points_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('triangleNormalsX.txt', packed["triangleNormalsX_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('triangleNormalsY.txt', packed["triangleNormalsY_flat"], delimiter='\n', fmt='%.50f')
 
         # signed integer arrays
-        np.savetxt('forbiddenEdge.txt', packed["forbidden_flat"], delimiter='\n', fmt='%d')
-        np.savetxt('triangleNeighbors.txt', packed["ordered_int_flat"], delimiter='\n', fmt='%d')
+        np.savetxt('forbiddenEdge.txt', packed["forbiddenEdge_flat"], delimiter='\n', fmt='%d')
+        np.savetxt('triangleNeighbors.txt', packed["triangleNeighbors_flat"], delimiter='\n', fmt='%d')
 
         # unsigned index arrays
-        np.savetxt('triangleNormalPoint.txt', packed["normals_p_flat"], delimiter='\n', fmt='%d')
-        np.savetxt('trianglePointIndices.txt', packed["t_int_flat"], delimiter='\n', fmt='%d')
+        np.savetxt('triangleNormalPoint.txt', packed["triangleNormalPoint_flat"], delimiter='\n', fmt='%d')
+        np.savetxt('trianglePointIndices.txt', packed["trianglePointIndices_flat"], delimiter='\n', fmt='%d')
 
         with open('thickness.txt', 'w') as f:
             f.write(str(thickness) + '\n')
@@ -53,21 +53,21 @@ def create_calcPhiASE_input(
         with open('nTot.txt', 'w') as f:
             f.write(str(float(nTot)) + '\n')
 
-        np.savetxt('betaVolume.txt', packed["beta_vol_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('sigmaA.txt', packed["laser"]["s_abs"], delimiter='\n', fmt='%.50f')
-        np.savetxt('sigmaE.txt', packed["laser"]["s_ems"], delimiter='\n', fmt='%.50f')
-        np.savetxt('lambdaA.txt', packed["laser"]["l_abs"], delimiter='\n', fmt='%.50f')
-        np.savetxt('lambdaE.txt', packed["laser"]["l_ems"], delimiter='\n', fmt='%.50f')
+        np.savetxt('betaVolume.txt', packed["betaVolume_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('sigmaA.txt', packed["laserParameter"]["s_abs"], delimiter='\n', fmt='%.50f')
+        np.savetxt('sigmaE.txt', packed["laserParameter"]["s_ems"], delimiter='\n', fmt='%.50f')
+        np.savetxt('lambdaA.txt', packed["laserParameter"]["l_abs"], delimiter='\n', fmt='%.50f')
+        np.savetxt('lambdaE.txt', packed["laserParameter"]["l_ems"], delimiter='\n', fmt='%.50f')
 
         with open('crystalTFluo.txt', 'w') as f:
             f.write(str(crystal['tfluo']) + '\n')
 
-        np.savetxt('betaCells.txt', packed["beta_cell_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('triangleSurfaces.txt', packed["surface_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('triangleCenterX.txt', packed["x_center_flat"], delimiter='\n', fmt='%.50f')
-        np.savetxt('triangleCenterY.txt', packed["y_center_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('betaCells.txt', packed["betaCells_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('triangleSurfaces.txt', packed["triangleSurfaces_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('triangleCenterX.txt', packed["triangleCenterX_flat"], delimiter='\n', fmt='%.50f')
+        np.savetxt('triangleCenterY.txt', packed["triangleCenterY_flat"], delimiter='\n', fmt='%.50f')
 
-        np.savetxt('claddingCellTypes.txt', packed["clad_int_flat"], delimiter='\n', fmt='%d')
+        np.savetxt('claddingCellTypes.txt', packed["claddingCellTypes_flat"], delimiter='\n', fmt='%d')
         with open('claddingNumber.txt', 'w') as f:
             f.write(str(claddingNumber) + '\n')
         with open('claddingAbsorption.txt', 'w') as f:
@@ -188,7 +188,7 @@ def calcPhiASE_mpi(
             + f' --ngpus={maxGPUs}'
             + f' --repetitions={repetitions}'
             + f' --mse-threshold={mseThreshold}'
-            + f' --spectral-resolution={packed["laser"]["l_res"]}'
+            + f' --spectral-resolution={packed["laserParameter"]["l_res"]}'
     )
     print(cmd)
     status = os.system(cmd)
@@ -197,20 +197,22 @@ def calcPhiASE_mpi(
         print('This step of the raytracing computation did NOT finish successfully. Aborting.')
         exit()
 
-    phiASE, mseValues, raysUsedPerSample = parse_calcPhiASE_output(
+    phiASE, mse_values, n_rays = parse_calcPhiASE_output(
         TMP_FOLDER,
         packed["layout"]
     )
     print("bef delete")
     clean_IO_files(TMP_FOLDER)
 
-    if packed["container"] == "list" and packed["layout"] != "matrix":
-        return phiASE.tolist(), mseValues.tolist(), raysUsedPerSample.tolist()
+    if packed["layout"] == "matrix":
+        phiASE = phiASE.reshape((nP, numberOfLevels), order="F")
+        mse_values = mse_values.reshape((nP, numberOfLevels), order="F")
+        n_rays = n_rays.reshape((nP, numberOfLevels), order="F")
 
     if packed["container"] == "list":
-        return phiASE.tolist(), mseValues.tolist(), raysUsedPerSample.tolist()
+        return phiASE.tolist(), mse_values.tolist(), n_rays.tolist()
 
-    return phiASE, mseValues, raysUsedPerSample
+    return phiASE, mse_values, n_rays
 
 
 def calcPhiASE(

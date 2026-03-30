@@ -116,7 +116,7 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
 
     # ASE application
     maxGPUs = gpus
-    nPerNode = 4
+    nPerNode = 1
     deviceMode = 'gpu'
     # parallelMode = 'mpi'
     # parallelMode = 'threaded'

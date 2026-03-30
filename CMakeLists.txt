@@ -8,13 +8,6 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     cmake_policy(SET CMP0167 NEW)
 endif()
 
-set(HASE_BOOST_COMPONENTS program_options system filesystem)
-
-if(NOT DISABLE_MPI)
-    list(APPEND HASE_BOOST_COMPONENTS mpi)
-endif()
-
-find_package(Boost 1.70.0 REQUIRED COMPONENTS ${HASE_BOOST_COMPONENTS})
 find_package(Threads REQUIRED)
 find_package(CUDAToolkit REQUIRED COMPONENTS cudart)
 
@@ -150,15 +143,21 @@ target_compile_options(
 target_link_libraries(
     hase_core
     PUBLIC
-        Boost::program_options
-        Boost::filesystem
-        Boost::system
         Threads::Threads
         CUDA::cudart
 )
 
+
+
 # enable/disable mpi dependency based on cmake option
 if(NOT DISABLE_MPI)
+    find_package(MPI QUIET)
+    if(MPI_FOUND)
+        target_compile_definitions(hase_core PUBLIC MPI_FOUND)
+        target_link_libraries(hase_core PUBLIC MPI::MPI_CXX)
+    else()
+        message(STATUS "MPI is not found on your system. You can compile HASEonGPU without MPI by using DISABLE_MPI=ON")
+    endif()
     option(
         USE_GRAYBAT
         "Use Graph Approach for Highly Generic Communication Schemes Based on Adaptive Topologies (Graybat)"
@@ -202,11 +201,9 @@ if(NOT DISABLE_MPI)
 
         target_link_libraries(hase_core PRIVATE ${graybat_LIBRARIES})
         target_compile_definitions(hase_core PUBLIC USE_GRAYBAT)
-        target_link_libraries(hase_core PUBLIC Boost::mpi)
     endif()
-    find_package(MPI REQUIRED)
-    target_link_libraries(hase_core PUBLIC MPI::MPI_CXX)
 else()
+    message(STATUS "MPI explicitly disabled via DISABLE_MPI=ON")
     target_compile_definitions(hase_core PUBLIC DISABLE_MPI)
 endif()
 

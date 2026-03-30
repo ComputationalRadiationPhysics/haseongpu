@@ -26,9 +26,8 @@
  */
 
 #pragma once
-#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
 #include <mesh.hpp>
-
+#include <filesystem>
 #include <vector>
 
 /**
@@ -49,7 +48,7 @@
 int writePointsToVtk(
     Mesh const& mesh,
     std::vector<double> const ase,
-    boost::filesystem::path const filename,
+    std::filesystem::path const filename,
     unsigned const minRaysPerSample,
     unsigned const maxRaysPerSample,
     float const mseThreshold,
@@ -74,7 +73,7 @@ int writePointsToVtk(
 int writePrismToVtk(
     Mesh const& mesh,
     std::vector<double> const prismData,
-    boost::filesystem::path const filename,
+    std::filesystem::path const filename,
     unsigned const minRaysPerSample,
     unsigned const maxRaysPerSample,
     float const mseThreshold,
@@ -89,4 +88,4 @@ int writePrismToVtk(
  * @return a vector containing the difference between "compare" and "data"
  *
  */
-std::vector<double> compareVtk(std::vector<double> compare, boost::filesystem::path const filename);
+std::vector<double> compareVtk(std::vector<double> compare, std::filesystem::path const filename);

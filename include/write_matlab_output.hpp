@@ -20,10 +20,8 @@
 
 
 #pragma once
-
-#include <boost/filesystem/path.hpp> /* boost::filesystem::path */
-
 #include <vector>
+#include <filesystem>
 
 /**
  * @brief creates textfiles containing all the results as a 2D matrix
@@ -43,7 +41,7 @@
  * @license GPLv3
  */
 void writeMatlabOutput(
-    boost::filesystem::path const experimentPath,
+    std::filesystem::path const experimentPath,
     std::vector<float> const ase,
     std::vector<unsigned> const N_rays,
     std::vector<double> const mse_values,

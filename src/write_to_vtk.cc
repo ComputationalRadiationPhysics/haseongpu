@@ -24,16 +24,11 @@
 #include <iomanip> /* std::fixed, std::setprecision() */
 #include <string> /* std::to_string() */
 
-#include <boost/filesystem/fstream.hpp> /* fs::ofstream, fs::ifstream */
-#include <boost/filesystem/path.hpp> /* fs::path */
-
-namespace fs = boost::filesystem;
-
 #include <write_to_vtk.hpp>
 #include <logging.hpp>
 #include <mesh.hpp>
-
-
+#include <filesystem>
+#include <fstream>
 /**
  * @brief takes data and creates a nice VTK-file usable with paraview
  *
@@ -41,7 +36,7 @@ namespace fs = boost::filesystem;
  */
 int writeToVtk(const Mesh& mesh,
            const std::vector<double> data,
-           fs::path filename,
+           std::filesystem::path filename,
            const unsigned raysPerSample,
            const unsigned maxRaysPerSample,
            const float expectationThreshold,
@@ -64,7 +59,7 @@ int writeToVtk(const Mesh& mesh,
   // Add time to filename
   dout(V_INFO) << "Write experiment data to vtk-file " << filename << std::endl;
 
-  fs::ofstream vtkFile;
+  std::ofstream vtkFile;
   vtkFile.open(filename);
 
   // Write header of vtk file
@@ -123,7 +118,7 @@ int writeToVtk(const Mesh& mesh,
 int writePrismToVtk(
     const Mesh& mesh,
     const std::vector<double> prismData,
-    const fs::path filename,
+    const std::filesystem::path filename,
     const unsigned raysPerSample,
     const unsigned maxRaysPerSample,
     const float expectationThreshold,
@@ -147,7 +142,7 @@ int writePrismToVtk(
 int writePointsToVtk(
     const Mesh& mesh,
     const std::vector<double> prismData,
-    const fs::path filename,
+    const std::filesystem::path filename,
     const unsigned raysPerSample,
     const unsigned maxRaysPerSample,
     const float expectationThreshold,
@@ -169,8 +164,8 @@ int writePointsToVtk(
 
 
 
-std::vector<double> compareVtk(std::vector<double> compare, const fs::path filename){
-  fs::ifstream filestream;
+std::vector<double> compareVtk(std::vector<double> compare, const std::filesystem::path filename){
+  std::ifstream filestream;
   std::string line;
   bool foundLine = false;
   double value = 0;
@@ -183,7 +178,7 @@ std::vector<double> compareVtk(std::vector<double> compare, const fs::path filen
   double smallDiff = 10;
 
   // No compare vtk was given
-  if(!filename.compare(fs::path(""))){
+  if(!filename.compare(std::filesystem::path(""))){
     return std::vector<double>();
   }
   dout(V_INFO) << "Compare solution with " << filename << std::endl;
@@ -192,7 +187,7 @@ std::vector<double> compareVtk(std::vector<double> compare, const fs::path filen
     aseTotal += compare.at(i);
   }
 
-  filestream.open(filename, fs::ifstream::in);
+  filestream.open(filename, std::ifstream::in);
 
   if(filestream.is_open()){
     while(filestream.good()){
