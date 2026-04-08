@@ -343,23 +343,83 @@ The following section describes all arguments of the MATLAB call.
 ``laserParameter``
 ^^^^^^^^^^^^^^^^^^
 
-* Type: structure-like input
+* Type: ``struct``
 * Description:
-  Structure containing the laser parameters.
+  Structure containing the laser material spectra.
+  It provides the absorption and emission spectrum values together with the
+  corresponding wavelength values.
 
-* Expected fields:
+* Required fields:
 
   * ``l_abs``
   * ``l_ems``
   * ``s_abs``
   * ``s_ems``
+  * ``l_res``
+
+* Field layouts:
+
+  * ``l_abs``
+    * Container type: vector
+    * Element type: ``double``
+    * Supported layout: flat
+    * Description:
+      Wavelength values of the absorption spectrum in ``nm``.
+      Accessed in MATLAB as ``laserParameter.l_abs``.
+
+  * ``l_ems``
+    * Container type: vector
+    * Element type: ``double``
+    * Supported layout: flat
+    * Description:
+      Wavelength values of the emission spectrum in ``nm``.
+      Accessed in MATLAB as ``laserParameter.l_ems``.
+
+  * ``s_abs``
+    * Container type: vector
+    * Element type: ``double``
+    * Supported layout: flat
+    * Description:
+      Values of the absorption spectrum in ``cm^2``, corresponding to
+      ``l_abs``.
+      Accessed in MATLAB as ``laserParameter.s_abs``.
+
+  * ``s_ems``
+    * Container type: vector
+    * Element type: ``double``
+    * Supported layout: flat
+    * Description:
+      Values of the emission spectrum in ``cm^2``, corresponding to
+      ``l_ems``.
+      Accessed in MATLAB as ``laserParameter.s_ems``.
+
+  * ``l_res``
+    * Type: scalar
+    * Element type: ``double``
+    * Description:
+      Resolution used for linear interpolation of the spectrum.
+      Accessed in MATLAB as ``laserParameter.l_res``.
+
 
 ``crystal``
 ^^^^^^^^^^^
 
-* Type: structure-like input
+* Type: ``struct``
 * Description:
   Structure containing the crystal parameters.
+
+* Required fields:
+
+  * ``tfluo``
+
+* Field layouts:
+
+  * ``tfluo``
+    * Type: scalar
+    * Element type: ``double``
+    * Description:
+      Fluorescence lifetime of the active medium in seconds.
+      Accessed in MATLAB as ``crystal.tfluo``.
 
 ``numberOfLevels``
 ^^^^^^^^^^^^^^^^^^
