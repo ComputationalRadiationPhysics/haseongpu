@@ -28,15 +28,15 @@
  */
 
 #pragma once
+#include <CmdOptionsMap.hpp>
 #include <logging.hpp>
 #include <mesh.hpp>
 #include <nan_fix.hpp>
 #include <types.hpp>
 
+#include <fstream>
 #include <string> /* string */
 #include <vector>
-#include <fstream>
-#include <CmdOptionsMap.hpp>
 
 /**
  * @brief Parses a given file(filename) line by line.
@@ -110,7 +110,7 @@ T fileToValue(fs::path filename)
 CmdOptionsMap parseCommandLine(int const argc, char** argv);
 
 
-void printCommandLine(CmdOptionsMap const &);
+void printCommandLine(CmdOptionsMap const&);
 
 Mesh createMesh(
     std::vector<unsigned> const& triangleIndices,

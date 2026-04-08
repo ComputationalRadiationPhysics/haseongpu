@@ -21,11 +21,11 @@
 #pragma once
 
 #include <filesystem>
-
 #include <string>
 #include <vector>
 
 namespace fs = std::filesystem;
+
 struct DeviceMode
 {
     static inline std::string const NONE = "no_device_mode";
