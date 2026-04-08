@@ -77,4 +77,3 @@ References
     *Influence of ASE on the gain distribution in large size, high gain
     Yb3+:YAG slabs*,
     Optics Express, 17(5), 2009, 3792–3801.
-

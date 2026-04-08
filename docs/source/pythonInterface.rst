@@ -49,11 +49,8 @@ Such a workflow is demonstrated by the accompanying example:
 Example
 -------
 
-A complete Python example using laser pumping and cladding is provided under:
-
-.. code-block:: text
-
-   example/python_example/laserPumpCladdingExample.py
+The example above demonstrates the use of ``calcPhiASE(...)`` as part of a
+larger simulation workflow including laser pumping and cladding.
 
 Minimal example (only using the library function call):
 
@@ -546,7 +543,9 @@ The following section describes all arguments of the Python call.
 
 * Type: ``dict``
 * Description:
-  Structure containing the laser parameters.
+  Dictionary containing the laser material spectra.
+  It provides the absorption and emission cross sections together with the
+  corresponding wavelength values.
 
 * Required fields:
 
@@ -562,31 +561,54 @@ The following section describes all arguments of the Python call.
     * Container type: ``list`` or ``ndarray``
     * Element type: ``float``
     * Supported layout: flat
+    * Description:
+      Wavelength values of the absorption spectrum in ``nm``.
 
   * ``l_ems``
     * Container type: ``list`` or ``ndarray``
     * Element type: ``float``
     * Supported layout: flat
+    * Description:
+      Wavelength values of the emission spectrum in ``nm``.
 
   * ``s_abs``
     * Container type: ``list`` or ``ndarray``
     * Element type: ``float``
     * Supported layout: flat
+    * Description:
+      Absorption cross section values in ``cm^2``, corresponding to ``l_abs``.
 
   * ``s_ems``
     * Container type: ``list`` or ``ndarray``
     * Element type: ``float``
     * Supported layout: flat
+    * Description:
+      Emission cross section values in ``cm^2``, corresponding to ``l_ems``.
 
   * ``l_res``
     * Type: scalar
+    * Description:
+      Resolution used for linear interpolation of the spectrum.
 
 ``crystal``
 ^^^^^^^^^^^
 
-* Type: structure-like input
+* Type: ``dict``
 * Description:
-  Structure containing the crystal parameters.
+  Dictionary containing the crystal parameters.
+
+* Required fields:
+
+  * ``tfluo``
+
+* Field layouts:
+
+  * ``tfluo``
+    * Type: scalar
+    * Element type: ``float``
+    * Description:
+      Fluorescence lifetime of the crystal.
+      Accessed as ``crystal['tfluo']``.
 
 ``numberOfLevels``
 ^^^^^^^^^^^^^^^^^^

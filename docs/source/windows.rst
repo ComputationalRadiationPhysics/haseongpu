@@ -22,11 +22,7 @@ A Windows build typically requires:
 * Visual Studio
 * CMake
 * CUDA
-* Boost
 * optionally an MPI implementation
-
-Depending on the local setup, it may be necessary to configure Boost-related
-paths manually in the CMake configuration.
 
 Notes
 -----
