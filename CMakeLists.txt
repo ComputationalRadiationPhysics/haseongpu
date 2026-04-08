@@ -140,14 +140,7 @@ target_compile_options(
         "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:${HASE_CLANG_FLAGS}>"
 )
 
-target_link_libraries(
-    hase_core
-    PUBLIC
-        Threads::Threads
-        CUDA::cudart
-)
-
-
+target_link_libraries(hase_core PUBLIC Threads::Threads CUDA::cudart)
 
 # enable/disable mpi dependency based on cmake option
 if(NOT DISABLE_MPI)
@@ -156,7 +149,10 @@ if(NOT DISABLE_MPI)
         target_compile_definitions(hase_core PUBLIC MPI_FOUND)
         target_link_libraries(hase_core PUBLIC MPI::MPI_CXX)
     else()
-        message(STATUS "MPI is not found on your system. You can compile HASEonGPU without MPI by using DISABLE_MPI=ON")
+        message(
+            STATUS
+            "MPI is not found on your system. You can compile HASEonGPU without MPI by using DISABLE_MPI=ON"
+        )
     endif()
 else()
     message(STATUS "MPI explicitly disabled via DISABLE_MPI=ON")
