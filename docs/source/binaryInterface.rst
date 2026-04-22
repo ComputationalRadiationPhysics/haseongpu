@@ -53,7 +53,7 @@ Single-node threaded run using the ``cylindrical`` example:
        --device-mode=gpu \
        --min-rays=10000 \
        --max-rays=100000 \
-       --reflection \
+       --reflection=1 \
        --repetitions=4 \
        --adaptive-steps=4 \
        --ngpus=4 \
@@ -72,7 +72,7 @@ MPI run with 4 GPUs per node using the same example:
        --device-mode=gpu \
        --min-rays=10000 \
        --max-rays=100000 \
-       --reflection \
+       --reflection=1 \
        --repetitions=4 \
        --adaptive-steps=4 \
        --ngpus=1 \
@@ -155,10 +155,16 @@ Verbosity level interpreted as a bitmask. Multiple values can be combined.
 * ``16``: debug
 * ``32``: progress bar
 
-``--reflection``
+``--reflection=``
 ^^^^^^^^^^^^^^^^
 
 Enables reflections on the upper and lower surfaces of the gain medium.
+
+``1``
+    enabled
+
+``0``
+    disabled
 
 ``--mse-threshold=``
 ^^^^^^^^^^^^^^^^^^^^

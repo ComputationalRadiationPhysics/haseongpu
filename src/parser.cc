@@ -459,8 +459,8 @@ int parse( const int argc,
             vm[ExpSwitch::mse].as<double>(),
             vm[ExpSwitch::reflection].as<bool>() );
 
-    auto &repetionOpt=vm[ExpSwitch::min_rays];
-    auto &adaptiveStepOpt=vm[ExpSwitch::max_rays];
+    auto &repetionOpt=vm[CompSwitch::repetitions];
+    auto &adaptiveStepOpt=vm[CompSwitch::adaptive_steps];
     checkPositive(repetionOpt.as<int>(),repetionOpt.name);
     checkPositive(adaptiveStepOpt.as<int>(),adaptiveStepOpt.name);
     compute = ComputeParameters (
