@@ -1,7 +1,12 @@
 HASEonGPU Documentation
 =======================
 
-HASEonGPU (High performance Amplified Spontaneous Emission on GPU) is an
+.. image:: _static/Logo_Lightmode.png
+   :alt: HASEonGPU logo
+   :width: 400px
+   :align: center
+
+HASEonGPU (**H**\ igh performance **A**\ mplified **S**\ pontaneous **E**\ mission on **GPU**) is an
 open-source HPC software for calculating amplified spontaneous emission (ASE)
 flux in laser gain media.
 
