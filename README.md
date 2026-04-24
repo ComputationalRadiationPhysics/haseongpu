@@ -1,7 +1,18 @@
 HASEonGPU
-==========
+=========
 
-<b>H</b>igh performance <b>A</b>mplified <b>S</b>pontaneous <b>E</b>mission <b>on GPU</b>
+<p style="font-size: 1.5em; margin-top: -0.5em;">
+ <strong>H</strong>igh performance <strong>A</strong>mplified <strong>S</strong>pontaneous <strong>E</strong>mission on <strong>GPU</strong>
+</p>
+
+<p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/source/_static/Logo_Darkmode.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/source/_static/Logo_Lightmode.png">
+    <img alt="HASEonGPU logo" src="docs/source/_static/Logo_Lightmode.png" width="400">
+  </picture>
+</p>
+
 
 Description
 -----------
