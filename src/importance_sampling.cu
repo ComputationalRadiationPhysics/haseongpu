@@ -193,7 +193,7 @@ __global__ void recalculateImportance(Mesh mesh,
   int startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
 
   if(raysPerPrism[startPrism + reflectionOffset] > 0){
-    importance[startPrism + reflectionOffset] = raysPerSample * mesh.triangleSurfaces[startTriangle] / (mesh.surfaceTotal * raysPerPrism[startPrism + reflectionOffset]);
+    importance[startPrism + reflectionOffset] = raysPerSample * mesh.triangleSurfaces[startTriangle] * mesh.thickness / raysPerPrism[startPrism + reflectionOffset];
   }
   else{
     importance[startPrism + reflectionOffset] = 0;
