@@ -27,8 +27,8 @@
 #include <geometry.hpp>
 
 __device__ double calcIntersectionAngle(const Ray ray, double *reflectionAngle){
-  // Calc intesection angle with z-plane
-  double nominator = abs(ray.dir.z);
+  // Calc intersection angle with z-plane
+  double nominator = fabs(ray.dir.z);
   double denominator = sqrt((ray.dir.x * ray.dir.x) + (ray.dir.y * ray.dir.y) + (ray.dir.z * ray.dir.z));
   if(denominator != 0.0){
     double radian = acos(nominator / denominator);
