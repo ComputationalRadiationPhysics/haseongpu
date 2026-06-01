@@ -1,7 +1,10 @@
 /**
  * Copyright 2026 Tim Hanel
- **/
-
+ *
+ * This file is part of HASEonGPU
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <hase/hase.hpp>
@@ -75,7 +78,7 @@ TEST_CASE("interpolateLinear: exact for linear functions (fixed seeds)", "[inter
 
         for(unsigned ni : nInterps)
         {
-            auto y_interp = interpolateLinear(y, x, ni);
+            auto y_interp = hase::utils::interpolateLinear(y, x, ni);
             REQUIRE(y_interp.size() == ni);
 
             auto x_interp = reconstructInterpolatedX(x, ni);
@@ -115,7 +118,7 @@ TEST_CASE("interpolateLinear: no overshoot between adjacent samples (fixed seeds
     for(auto& v : y)
         v = dist(rng);
 
-    auto y_interp = interpolateLinear(y, x, ni);
+    auto y_interp = hase::utils::interpolateLinear(y, x, ni);
     auto x_interp = reconstructInterpolatedX(x, ni);
 
     // Walk segments i and interpolated points j

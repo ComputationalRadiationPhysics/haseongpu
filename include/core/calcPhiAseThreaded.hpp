@@ -1,0 +1,152 @@
+/**
+ * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2026 Tim Hanel
+ *
+ * This file is part of HASEonGPU
+ *
+ * HASEonGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * HASEonGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with HASEonGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+/**
+ * @author Erik Zenker
+ * @author Carlchristian Eckert
+ * @licence GPLv3
+ *
+ */
+
+#pragma once
+
+#include <core/calcPhiAse.hpp>
+#include <core/mesh.hpp>
+#include <core/types.hpp>
+#include <utils/progressbar.hpp>
+
+#include <exception>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+/**
+ * @brief Wrapper for calcPhiAse on pthread base.
+ *        This function will spawn a thread for
+ *        each function call and start calcPhiAse.
+ *
+ * @param minRaysPerSample Lower bound for raysPerSample
+ *                         in case of adaptive sampling.
+ * @param maxRaysPerSample Uppper boud for raysPerSample
+ *                         in case of adaptive sampling.
+ * @param maxRepetitions   Number of Repetitions will
+ *                         be done, when not reaching mse threshold
+ * @param dMesh            All information about triangles, points, contants.
+ *                         Is located in device memory. See mesh.h for details.
+ * @param hMesh            Same as dMesh, but locatet in host memory.
+ * @param sigmaA           Vector with Absorption values
+ * @param sigmaE           Vector with Emission values
+ * @param mseThreshold     Threshold for adaptive and repetitive sampling.
+ *                         Not reaching this threshold leads to recomputations.
+ * @param useReflections   Rays can reflect on upper and lower surface of gain medium
+ * @param phiAse           Reference to phiAse result (one value for every sample point).
+ * @param mse              Reference to mse result (one value for every sample point).
+ * @param totalRays        Reference to numberOfRays simulated per sample point.
+ * @param gpu_i            Number of device that should be used.
+ * @param minSample_i      Smallest Index of sample point to calculate.
+ * @param maxSample_i      Biggest Index of sample point to calculate.
+ * @param runtime          Reference to the needed runtime.
+ *
+ * @deprecated will be completly replaced by mpi
+ *             or should be replaced by c++11 threads
+ * @return     threadId
+ */
+namespace hase::core
+{
+
+    static std::vector<std::thread> threadIds;
+    static std::vector<std::exception_ptr> threadExceptions;
+    static std::mutex threadExceptionsMutex;
+
+    template<alpaka::onHost::concepts::Device T_Device>
+    void calcPhiAseThreaded(
+        auto& devBundle,
+        ExperimentParameters const& experiment,
+        ComputeParameters const& compute,
+        HostMesh const& hostMesh,
+        DeviceMeshContainer<T_Device> const& mesh,
+        Result& result,
+        unsigned const minSample_i,
+        unsigned const maxSample_i,
+        float& runtime,
+        hase::utils::ProgressBar& bar)
+    {
+        bar.reset();
+        threadIds.emplace_back(
+            std::thread(
+                [&experiment,
+                 &compute,
+                 &hostMesh,
+                 &mesh,
+                 &result,
+                 minSample_i,
+                 maxSample_i,
+                 &runtime,
+                 &bar,
+                 devBundle]() mutable
+                {
+                    try
+                    {
+                        calcPhiAse(
+                            devBundle,
+                            experiment,
+                            compute,
+                            hostMesh,
+                            mesh,
+                            result,
+                            minSample_i,
+                            maxSample_i,
+                            runtime,
+                            bar);
+                    }
+                    catch(...)
+                    {
+                        std::lock_guard<std::mutex> lock(threadExceptionsMutex);
+                        threadExceptions.emplace_back(std::current_exception());
+                    }
+                }));
+    }
+
+    /**
+     * @brief Wait for all threads to finish
+     *
+     */
+    void joinAll()
+    {
+        for(auto& t : threadIds)
+        {
+            if(t.joinable())
+            {
+                t.join();
+            }
+        }
+        threadIds.clear();
+
+        if(!threadExceptions.empty())
+        {
+            auto exception = threadExceptions.front();
+            threadExceptions.clear();
+            std::rethrow_exception(exception);
+        }
+    }
+
+} // namespace hase::core

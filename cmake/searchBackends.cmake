@@ -75,25 +75,37 @@ if(NOT HASE_HAVE_OMP)
 endif()
 
 # -----------------------
-# Detect TBB (oneTBB or classic)
+# Detect TBB
 # -----------------------
 set(HASE_HAVE_TBB OFF)
-find_package(TBB QUIET)
+# this minimum Version (2021.10) is a constraint imposed by the current alpaka version if tbb detection succeeds
+# for a different subsequent alpaka cmake will result in a hard cmake error
+# Note: -- this workaround might get quickly deprecated
+set(HASE_MIN_TBB_VERSION 2021.10)
+
+find_package(TBB ${HASE_MIN_TBB_VERSION} QUIET CONFIG COMPONENTS tbb)
+
 if(TBB_FOUND)
     set(HASE_HAVE_TBB ON)
     set(alpaka_DEP_TBB ON CACHE BOOL "Enable Alpaka TBB backend" FORCE)
-    message(STATUS "Found TBB -> enabling Alpaka TBB backend")
+    message(
+        STATUS
+        "Found compatible TBB ${TBB_VERSION} >= ${HASE_MIN_TBB_VERSION} -> enabling Alpaka TBB backend"
+    )
 else()
-    find_package(oneTBB QUIET)
-    if(oneTBB_FOUND)
-        set(HASE_HAVE_TBB ON)
-        set(alpaka_DEP_TBB ON CACHE BOOL "Enable Alpaka TBB backend" FORCE)
-        message(STATUS "Found oneTBB -> enabling Alpaka TBB backend")
-    endif()
-endif()
-if(NOT HASE_HAVE_TBB)
     set(alpaka_DEP_TBB OFF CACHE BOOL "Enable Alpaka TBB backend" FORCE)
-    message(STATUS "TBB not found -> disabling Alpaka TBB backend")
+
+    # Optional diagnostic: check whether some older TBB exists.
+    find_package(TBB QUIET CONFIG COMPONENTS tbb)
+
+    if(TBB_FOUND)
+        message(
+            STATUS
+            "Found TBB ${TBB_VERSION}, but alpaka requires >= ${HASE_MIN_TBB_VERSION}; disabling Alpaka TBB backend"
+        )
+    else()
+        message(STATUS "TBB not found -> disabling Alpaka TBB backend")
+    endif()
 endif()
 # -----------------------
 # Backend conflict check

@@ -1,0 +1,293 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pre-commit
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+          python3 -m pip install --user pre-commit==4.3.0
+
+      - name: Run pre-commit
+        run: |
+          python3 -m pre_commit install
+          python3 -m pre_commit run --all-files --show-diff-on-failure
+
+  ci:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.config.container }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
+          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", simd: "EMULATION", hwloc: "no" }
+          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", simd: "EMULATION", hwloc: "no" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
+          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04" }
+          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04" }
+          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", simd: "EMULATION", hwloc: "no" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", simd: "EMULATION", hwloc: "no" }
+
+    env:
+      BUILD_DIR: build/ci
+      DEBIAN_FRONTEND: noninteractive
+      HASE_CMAKE_ARGS: >-
+        -DBUILD_TESTING=ON
+        -DHASE_TESTING=ON
+        -DDISABLE_MPI=ON
+        -DHASE_BUILD_RELEASE=ON
+        -DHASE_BUILD_PhiAse=ON
+        -DHASE_ENABLE_PYTHON=ON
+        -DCMAKE_CUDA_ARCHITECTURES=80
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            gnupg \
+            lsb-release \
+            ninja-build \
+            pkg-config \
+            python3 \
+            python3-dev \
+            python3-pip \
+            python3-venv \
+            libomp-dev \
+            libglu1 \
+            software-properties-common \
+            wget
+
+          if ! command -v cmake >/dev/null 2>&1; then
+            apt-get install -y --no-install-recommends cmake
+          fi
+
+          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
+            apt-get install -y --no-install-recommends libhwloc-dev
+          fi
+
+          if [[ "${{ matrix.config.tbb || 'off' }}" == "on" ]]; then
+            apt-get install -y --no-install-recommends libtbb-dev
+          fi
+
+          if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
+            apt-get install -y --no-install-recommends \
+              "gcc-${{ matrix.config.version }}" \
+              "g++-${{ matrix.config.version }}" || true
+          fi
+
+          if [[ "${{ matrix.config.compiler }}" == "clang" && "${{ matrix.config.hip }}" == "no" ]]; then
+            if ! command -v "clang-${{ matrix.config.version }}" >/dev/null 2>&1; then
+              wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+              chmod +x /tmp/llvm.sh
+              /tmp/llvm.sh "${{ matrix.config.version }}"
+            fi
+            apt-get install -y --no-install-recommends \
+              "clang-${{ matrix.config.version }}" \
+              "lld-${{ matrix.config.version }}" || true
+          fi
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
+          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
+
+      - name: Select compiler and runtime paths
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
+            if command -v "gcc-${{ matrix.config.version }}" >/dev/null 2>&1; then
+              echo "CC=$(command -v gcc-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+              echo "CXX=$(command -v g++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+            else
+              echo "CC=$(command -v gcc)" >> "$GITHUB_ENV"
+              echo "CXX=$(command -v g++)" >> "$GITHUB_ENV"
+            fi
+          elif [[ "${{ matrix.config.compiler }}" == "clang" ]]; then
+            if [[ "${{ matrix.config.hip }}" != "no" && -x /opt/rocm/llvm/bin/clang ]]; then
+              echo "CC=/opt/rocm/llvm/bin/clang" >> "$GITHUB_ENV"
+              echo "CXX=/opt/rocm/llvm/bin/clang++" >> "$GITHUB_ENV"
+            elif command -v "clang-${{ matrix.config.version }}" >/dev/null 2>&1; then
+              echo "CC=$(command -v clang-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+              echo "CXX=$(command -v clang++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
+                echo "CUDACXX=$(command -v clang++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+              fi
+            else
+              echo "CC=$(command -v clang)" >> "$GITHUB_ENV"
+              echo "CXX=$(command -v clang++)" >> "$GITHUB_ENV"
+              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
+                echo "CUDACXX=$(command -v clang++)" >> "$GITHUB_ENV"
+              fi
+            fi
+          elif [[ "${{ matrix.config.compiler }}" == "nvcc" ]]; then
+            echo "CUDACXX=$(command -v nvcc)" >> "$GITHUB_ENV"
+            echo "CC=$(command -v gcc)" >> "$GITHUB_ENV"
+            echo "CXX=$(command -v g++)" >> "$GITHUB_ENV"
+          fi
+
+          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
+            echo "ROCM_PATH=${ROCM_PATH:-/opt/rocm}" >> "$GITHUB_ENV"
+            if [[ -x /opt/rocm/llvm/bin/clang++ ]]; then
+              echo "HIPCXX=/opt/rocm/llvm/bin/clang++" >> "$GITHUB_ENV"
+            elif [[ -x /opt/rocm/bin/hipcc ]]; then
+              echo "HIPCXX=/opt/rocm/bin/hipcc" >> "$GITHUB_ENV"
+            fi
+          fi
+
+          runtime_paths=()
+          for cuda_dir in /usr/local/cuda /usr/local/cuda-*; do
+            if [[ -d "$cuda_dir/lib64" ]]; then
+              runtime_paths+=("$cuda_dir/lib64")
+            fi
+          done
+          if [[ -d /opt/rocm/lib ]]; then
+            runtime_paths+=("/opt/rocm/lib")
+          fi
+          if (( ${#runtime_paths[@]} > 0 )); then
+            current_ld_library_path="${LD_LIBRARY_PATH:-}"
+            printf 'LD_LIBRARY_PATH=%s:%s\n' "$(IFS=:; echo "${runtime_paths[*]}")" "$current_ld_library_path" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake_args=(
+            $HASE_CMAKE_ARGS
+          )
+
+          if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
+            cmake_args+=(-Dalpaka_SIMD=EMULATION)
+          fi
+
+          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
+            cmake_args+=(
+              -DCMAKE_PREFIX_PATH="${ROCM_PATH:-/opt/rocm}"
+              -DCMAKE_HIP_COMPILER="${HIPCXX:-/opt/rocm/llvm/bin/clang++}"
+              -DCMAKE_HIP_ARCHITECTURES=gfx900
+            )
+          fi
+
+          cmake -S . -B "$BUILD_DIR" -G Ninja \
+            "${cmake_args[@]}"
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --build "$BUILD_DIR" --parallel "$(nproc)"
+
+      - name: Install Python package
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          pip_cmake_args=(
+            $HASE_CMAKE_ARGS
+            -DBUILD_TESTING=OFF
+            -DHASE_TESTING=OFF
+          )
+
+          if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
+            pip_cmake_args+=(-Dalpaka_SIMD=EMULATION)
+          fi
+
+          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
+            pip_cmake_args+=(
+              -DCMAKE_PREFIX_PATH="${ROCM_PATH:-/opt/rocm}"
+              -DCMAKE_HIP_COMPILER="${HIPCXX:-/opt/rocm/llvm/bin/clang++}"
+              -DCMAKE_HIP_ARCHITECTURES=gfx900
+            )
+          fi
+
+          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install --no-build-isolation -e .
+
+      - name: Debug Python install
+        shell: bash
+        run: |
+          set -euxo pipefail
+          which python
+          python -V
+          python -m pip -V
+          python -m pip list
+          python - <<'PY'
+          import pathlib
+          import site
+          import sys
+
+          print("sys.executable =", sys.executable)
+          print("sys.path =", sys.path)
+          print("site-packages =", site.getsitepackages())
+          print("user-site =", site.getusersitepackages())
+
+          for p in site.getsitepackages() + [site.getusersitepackages()]:
+              pp = pathlib.Path(p)
+              if pp.exists():
+                  print("contents matching HASE* in", pp)
+                  print(list(pp.glob("HASE*")))
+
+          import HASEonGPU
+          print("HASEonGPU imported from:", HASEonGPU.__file__)
+          PY
+
+      - name: Run CTest
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ctest --test-dir "$BUILD_DIR" --output-on-failure
+
+      - name: Run pytest
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pytest tests

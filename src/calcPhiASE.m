@@ -63,7 +63,7 @@ function [phiASE, mseValues, raysUsedPerSample] = calcPhiASE(...
   numberOfLevels,...
   backend,...
   parallelMode,...
-  maxGPUs,...
+  numDevices,...
   nPerNode...
   )
 
@@ -81,7 +81,7 @@ end
 
 if(strcmpi(parallelMode,'mpi'))
   Prefix=[ 'mpiexec -npernode ' num2str(nPerNode) ' ' ];
-  maxGPUs=1;
+  numDevices=1;
 else
   Prefix='';
 end
@@ -94,13 +94,13 @@ TMP_FOLDER=[ CALCPHIASE_DIR filesep 'input_tmp' ];
 
 %%%%%%%%%%%%%%%%%% doing the computation %%%%%%%%%%%%%%%%%%
 % make sure that the temporary folder is clean
-clean_IO_files(TMP_FOLDER);
+clean_io_files(TMP_FOLDER);
 
 % create new input in the temporary folder
-create_calcPhiASE_input(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
+createCalcPhiASEInput(points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,TMP_FOLDER);
 
 % do the propagation
-status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--parallel-mode=' parallelMode ' --backend=' backend ' --min-rays=' num2str(minRaysPerSample) ' --max-rays=' num2str(maxRaysPerSample) REFLECT ' --input-path=' TMP_FOLDER ' --output-path=' TMP_FOLDER ' --min-sample-i=' num2str(minSample) ' --max-sample-i=' num2str(maxSample) ' --ngpus=' num2str(maxGPUs) ' --repetitions=' num2str(repetitions) ' --adaptive-steps=' num2str(adaptiveSteps) ' --mse-threshold=' num2str(mseThreshold) ' --spectral-resolution=' num2str(laserParameter.l_res) ]);
+status = system([ Prefix CALCPHIASE_DIR '/bin/calcPhiASE ' '--parallel-mode=' parallelMode ' --backend=' backend ' --min-rays=' num2str(minRaysPerSample) ' --max-rays=' num2str(maxRaysPerSample) REFLECT ' --input-path=' TMP_FOLDER ' --output-path=' TMP_FOLDER ' --min-sample-i=' num2str(minSample) ' --max-sample-i=' num2str(maxSample) ' --numDevices=' num2str(numDevices) ' --repetitions=' num2str(repetitions) ' --adaptive-steps=' num2str(adaptiveSteps) ' --mse-threshold=' num2str(mseThreshold) ' --spectral-resolution=' num2str(laserParameter.l_res) ]);
 
 if(status ~= 0)
     error(['this step of the raytracing computation did NOT finish successfully. Aborting.']);
@@ -110,7 +110,7 @@ end
 [ mseValues, raysUsedPerSample, phiASE ] = parse_calcPhiASE_output(TMP_FOLDER);
 
 % cleanup
-clean_IO_files(TMP_FOLDER);
+clean_io_files(TMP_FOLDER);
 
 end
 
@@ -130,7 +130,7 @@ end
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function create_calcPhiASE_input (points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,FOLDER)
+function createCalcPhiASEInput (points,triangleNormalsX,triangleNormalsY,forbiddenEdge,triangleNormalPoint,triangleNeighbors,trianglePointIndices,thickness,numberOfLevels,nTot,betaVolume,laserParameter,crystal,betaCells,triangleSurfaces,triangleCenterX,triangleCenterY,claddingCellTypes,claddingNumber,claddingAbsorption,refractiveIndices,reflectivities,FOLDER)
 CURRENT_DIR = pwd;
 
 mkdir(FOLDER);
@@ -293,14 +293,14 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% clean_IO_files %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% clean_io_files %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % deletes the temporary folder and the dndt_ASE.txt
 %
 % @param TMP_FOLDER the folder to remove
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function clean_IO_files (TMP_FOLDER)
+function clean_io_files (TMP_FOLDER)
 A = exist(TMP_FOLDER,'dir'); % continue only if the folder exists!
 if A == 7
   s = warning;
