@@ -4,6 +4,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from HASEonGPU_Bindings import *
-from pyInclude import *
-del HASEonGPU_Bindings.HostMesh
+from .AlpakaBackends import AlpakaBackends
+
+__all__ = ["AlpakaBackends"]

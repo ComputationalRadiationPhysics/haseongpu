@@ -1,22 +1,21 @@
-# ##################################################################################
- # Copyright 2013 Daniel Albach, Erik Zenker, Carlchristian Eckert
- #
- # This file is part of HASEonGPU
- #
- # HASEonGPU is free software: you can redistribute it and/or modify
- # it under the terms of the GNU General Public License as published by
- # the Free Software Foundation, either version 3 of the License, or
- # (at your option) any later version.
- #
- # HASEonGPU is distributed in the hope that it will be useful,
- # but WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- # GNU General Public License for more details.
- #
- # You should have received a copy of the GNU General Public License
- # along with HASEonGPU.
- # If not, see <http://www.gnu.org/licenses/>.
- #################################################################################
+# Copyright 2013 Daniel Albach, Erik Zenker, Carlchristian Eckert
+# Copyright 2026 Tim Hanel
+#
+# This file is part of HASEonGPU
+#
+# HASEonGPU is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# HASEonGPU is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with HASEonGPU.
+# If not, see <http://www.gnu.org/licenses/>.
 
 ############################### Laser pump routine ################################
 # ASE calulations main file 16kW
@@ -29,20 +28,68 @@
 #
 ###################################################################################
 import argparse
+import sys
 import time
+from pathlib import Path
+
 import numpy as np
 from scipy.io import loadmat, savemat
 from scipy.interpolate import griddata
 from beta_int3 import beta_int3Main
 from set_variables import set_variables
 from vtk_wedge import vtk_wedge
-from HASEonGPU import calcPhiASE
 import csv
-from pathlib import Path
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: str = "single"):
+Legacy_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR= Legacy_DIR
+BUILD_PYTHON_ROOT = Legacy_DIR / "build" / "python"
+
+sys.path.insert(0, str(Legacy_DIR))
+if BUILD_PYTHON_ROOT.is_dir():
+    sys.path.insert(0, str(BUILD_PYTHON_ROOT))
+
+from HASEonGPU import calcPhiASE
+
+
+def interpolate_beta_volume(beta_cell, p, x_center, y_center, number_of_triangles, mesh_z, z_mesh):
+    beta_vol = np.zeros((number_of_triangles, mesh_z - 1))
+    x_1 = p[:, 0]
+    y_1 = p[:, 1]
+    x_2 = p[:, 0]
+    y_2 = p[:, 1]
+    x = np.concatenate((x_1, x_2))
+    y = np.concatenate((y_1, y_2))
+    z = np.concatenate((np.zeros(x_1.shape[0]), np.zeros(x_2.shape[0]) + z_mesh))
+    xi = x_center
+    yi = y_center
+    zi = np.zeros(xi.shape) + z_mesh / 2
+
+    for i_z in range(mesh_z - 1):
+        v = np.concatenate((beta_cell[:, i_z], beta_cell[:, i_z + 1]))
+        beta_vol[:, i_z] = griddata((x, y, z), v, (xi, yi, zi), method='linear')
+        z = z + z_mesh
+        zi = zi + z_mesh
+    return beta_vol
+
+
+def main(
+    material_path: Path = SCRIPT_DIR / "pt.mat",
+    gpus: int = 1,
+    parallel_mode: str = "single",
+    backend_override: str | None = None,
+    min_rays: int | None = None,
+    max_rays: int | None = None,
+    use_reflections_override: bool | None = None,
+    repetitions_override: int | None = None,
+    adaptive_steps_override: int | None = None,
+    timeslice_override: int | None = None,
+    timeslice_total_override: int | None = None,
+    min_sample_range: int = 0,
+    max_sample_range: int | None = None,
+    snapshot_path: Path | None = None,
+):
+    print(f' root: {SCRIPT_DIR}')
     #precheck the file path and throw in case this is not present
     # Crystal parameter
     crystal = {
@@ -77,10 +124,10 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
     }
     # Laser parameter
     laser = {
-        's_abs' : np.loadtxt(material_path.parent/'sigma_a.txt'),  # Absorption spectrum cm2(1.16e-21 pour DA)
-        's_ems' : np.loadtxt(material_path.parent/'sigma_e.txt'), # Emission spectrum in cm2(2.48e-20)
-        'l_abs' : np.loadtxt(material_path.parent/'lambda_a.txt'), # Wavelengths absorption spectrum in nm (x values for absorption)
-        'l_ems' : np.loadtxt(material_path.parent/'lambda_e.txt'), # Wavelengths emission spectrum in nm (y values for emission)
+        's_abs' : np.loadtxt(material_path.parent.parent/'input'/'sigma_a.txt'),  # Absorption spectrum cm2(1.16e-21 pour DA)
+        's_ems' : np.loadtxt(material_path.parent.parent/'input'/'sigma_e.txt'), # Emission spectrum in cm2(2.48e-20)
+        'l_abs' : np.loadtxt(material_path.parent.parent/'input'/'lambda_a.txt'), # Wavelengths absorption spectrum in nm (x values for absorption)
+        'l_ems' : np.loadtxt(material_path.parent.parent/'input'/'lambda_e.txt'), # Wavelengths emission spectrum in nm (y values for emission)
         'l_res' : 1000,                      # Resolution of linear interpolated spectrum
         'I' : 1e6,                           # Laser intensity
         'T' : 1e-8,                          # Laser duration
@@ -109,23 +156,24 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
     Ntot_gradient[:] = crystal['doping'] * phy_const['N1per']
     mesh_z = crystal['levels']
     z_mesh = crystal['length'] / (mesh_z-1)
-    timeslice = 50
-    timeslice_tot = 150
+    timeslice = 50 if timeslice_override is None else int(timeslice_override)
+    timeslice_tot = 150 if timeslice_total_override is None else int(timeslice_total_override)
     timetotal = 1e-3  # [s]
     time_t = timetotal / timeslice
 
     # ASE application
-    maxGPUs = gpus
+    numDevices = gpus
     nPerNode = 1
-    backend = 'gpu'
+    backend = 'gpu' if backend_override is None else str(backend_override)
     # parallelMode = 'mpi'
     # parallelMode = 'single'
     parallelMode = parallel_mode
-    useReflections = True
+    useReflections = True if use_reflections_override is None else bool(use_reflections_override)
     refractiveIndices = [1.83, 1, 1.83, 1]
-    repetitions = 4
-    minRaysPerSample = 1e5
-    maxRaysPerSample = minRaysPerSample * 100
+    repetitions = 4 if repetitions_override is None else int(repetitions_override)
+    adaptiveSteps = 5 if adaptive_steps_override is None else int(adaptive_steps_override)
+    minRaysPerSample = 1e5 if min_rays is None else int(min_rays)
+    maxRaysPerSample = minRaysPerSample * 100 if max_rays is None else int(max_rays)
     mseThreshold = 0.005
 
     ## this is our starting counter
@@ -218,6 +266,7 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
             beta_cell[i_p, i_z] = crystal['tfluo'] * (dndt_pump[i_p,i_z] - dndt_ASE[i_p,i_z]) * (1-np.exp(-time_t/crystal['tfluo'])) + beta_cell[i_p,i_z]*np.exp(-time_t/crystal['tfluo'])
 
     vtk_wedge('beta_cell_1.vtk', beta_cell, p, t_int, mesh_z, z_mesh)
+    initial_beta_cell = beta_cell.copy()
 
     ################################ cladding ###########################
 
@@ -260,7 +309,7 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
     slice_times_series=[]
     ################################ Main pump loop ###################################
 
-    for i_slice in range(1, timeslice_tot):
+    for i_slice in range(0, timeslice_tot):
         start_slice_t=time.perf_counter()
         print('TimeSlice', i_slice, 'of', timeslice_tot-1, 'started')
         # ******************* BETA PUMP TEST ******************************
@@ -347,24 +396,32 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
             mesh_z,
             backend,
             parallelMode,
-            maxGPUs,
-            nPerNode)
+            numDevices,
+            adaptiveSteps,
+            nPerNode,
+            minSampleRange=min_sample_range,
+            maxSampleRange=max_sample_range,
+        )
         phi_ASECall_out_t=time.perf_counter()
         print(f'[TIME] Total extern phi call time: {phi_ASECall_out_t-phi_ASECall_in_t}')
+
+        dndt_ASE.fill(0.0)
+        flux_clad.fill(0.0)
+
         # Calc dn/dt ASE, change it to only the Yb:YAG points
         for i_p in range(length_Yb):
             for i_z in range(mesh_z):
                 pos_Yb = Yb_points_t[i_p]
-                # Calc local gain (g_l)
-                g_l = -(N_tot*laser['max_abs'] - N_tot*beta_cell[pos_Yb,i_z]*(laser['max_ems']+laser['max_abs']))
-                dndt_ASE[pos_Yb,i_z] = g_l * phi_ASE[pos_Yb,i_z] / crystal['tfluo']
+                # calcPhiASE returns phi_ASE already scaled by N_tot / crystal.tfluo.
+                g_l = beta_cell[pos_Yb,i_z] * (laser['max_ems'] + laser['max_abs']) - laser['max_abs']
+                dndt_ASE[pos_Yb,i_z] = g_l * phi_ASE[pos_Yb,i_z]
 
         # Now for the cladding points
         for i_p in range(length_clad):
             for i_z in range(mesh_z-1):
                 # Calc local gain (g_l)
                 pos_clad = clad_points_t[i_p]
-                flux_clad[pos_clad,i_z] = clad_abs*phi_ASE[pos_clad,i_z]/crystal['tfluo']
+                flux_clad[pos_clad,i_z] = clad_abs*phi_ASE[pos_clad,i_z]
         vtk_wedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh)
         vtk_wedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh)
         np.savez_compressed('save_' + str(i_slice) + '.npz', dndt_ASE=dndt_ASE, flux_clad=flux_clad)
@@ -420,6 +477,7 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
                         tfluo * (dndt_pump[i_p, i_z] - dndt_ASE[i_p, i_z]) * one_minus
                         + beta_cell[i_p, i_z] * exp_fac
                 )
+        beta_cell[:] = np.clip(beta_cell, 0.0, 1.0)
 
         end_slice_t = time.perf_counter()
         sliceTime=end_slice_t-start_slice_t
@@ -450,13 +508,13 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
     vtk_wedge(file_p, dndt_pump, p, t_int, mesh_z, z_mesh)
     vtk_wedge(file_A, dndt_ASE, p, t_int, mesh_z, z_mesh)
     vtk_wedge(file_C, flux_clad, p, t_int, mesh_z, z_mesh)
-
     print('Calculations finished')
     toc = time.perf_counter()
     elapsed_time= toc - tic
 
     print(f'Total time taken: {elapsed_time} seconds')
 if __name__ == "__main__":
+    print(SCRIPT_DIR)
     parser = argparse.ArgumentParser(description="HASEonGPU pump/ASE simulation")
     parser.add_argument(
         "--material",
@@ -476,6 +534,66 @@ if __name__ == "__main__":
         default="single",
         help="The Parallel Mode used for phiASE [single|mpi] (default: single)",
     )
+    parser.add_argument(
+        "--backend",
+        default=None,
+        help="Override the phiASE backend for this run (default: legacy script default)",
+    )
+    parser.add_argument(
+        "--min-rays",
+        type=int,
+        default=None,
+        help="Override minRaysPerSample for this run",
+    )
+    parser.add_argument(
+        "--max-rays",
+        type=int,
+        default=None,
+        help="Override maxRaysPerSample for this run",
+    )
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=None,
+        help="Override the number of phiASE repetitions for this run",
+    )
+    parser.add_argument(
+        "--adaptive-steps",
+        type=int,
+        default=None,
+        help="Override the number of phiASE adaptive ray-count steps for this run",
+    )
+    parser.add_argument(
+        "--reflection",
+        type=int,
+        choices=(0, 1),
+        default=None,
+        help="Override useReflections for this run (0 or 1)",
+    )
+    parser.add_argument(
+        "--timeslice",
+        type=int,
+        default=None,
+        help="Override the pump-on timeslice count for this run",
+    )
+    parser.add_argument(
+        "--timeslice-total",
+        type=int,
+        default=None,
+        help="Override the total legacy loop count for this run",
+    )
+    parser.add_argument(
+        "--min-sample-range",
+        type=int,
+        default=0,
+        help="First flattened sample index processed by phiASE (default: 0)",
+    )
+    parser.add_argument(
+        "--max-sample-range",
+        type=int,
+        default=None,
+        help="Last flattened sample index processed by phiASE (default: full mesh)",
+    )
     args = parser.parse_args()
     material_path = Path(args.material)
 
@@ -489,4 +607,18 @@ if __name__ == "__main__":
         raise ValueError(
             f"Material path '{material_path}' is not a file."
         )
-    main(material_path=material_path,gpus=args.number_of_gpus,parallel_mode=args.parallel_mode)
+    main(
+        material_path=material_path,
+        gpus=args.number_of_gpus,
+        parallel_mode=args.parallel_mode,
+        backend_override=args.backend,
+        min_rays=args.min_rays,
+        max_rays=args.max_rays,
+        use_reflections_override=None if args.reflection is None else bool(args.reflection),
+        repetitions_override=args.repetitions,
+        adaptive_steps_override=args.adaptive_steps,
+        timeslice_override=args.timeslice,
+        timeslice_total_override=args.timeslice_total,
+        min_sample_range=args.min_sample_range,
+        max_sample_range=args.max_sample_range,
+    )

@@ -1,0 +1,13 @@
+experiment:
+  minRaysPerSample: 1000
+  maxRaysPerSample: 100000
+  mseThreshold: 0.005
+  useReflections: true
+  monochromatic: false
+
+compute:
+  repetitions: 1
+  adaptiveSteps: 5
+  backend: Host_Cpu_CpuSerial
+  parallelMode: single
+  numDevices: 1

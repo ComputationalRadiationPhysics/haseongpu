@@ -1,3 +1,9 @@
+# Copyright 2026 Tim Hanel
+#
+# This file is part of HASEonGPU
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import shutil
 import warnings
 
@@ -7,14 +13,15 @@ import os
 from pathlib import Path
 Mesh=HASEonGPU_Bindings.HostMesh
 
-############################## clean_IO_files #################################
-def clean_IO_files(TMP_FOLDER):
+############################## cleanIOFiles #################################
+def cleanIOFiles(TMP_FOLDER):
     if os.path.exists(TMP_FOLDER) and os.path.isdir(TMP_FOLDER):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
+
             shutil.rmtree(TMP_FOLDER)
-########################### create_calcPhiASE_input ###########################
-def create_calcPhiASE_input(
+########################### createCalcPhiASEInput ###########################
+def createCalcPhiASEInput(
         packed,
         thickness,
         numberOfLevels,
@@ -81,11 +88,10 @@ def create_calcPhiASE_input(
 
 
 
-######################### parse_calcPhiASE_output #############################
-def parse_calcPhiASE_output(FOLDER, layout):
+######################### parseCalcPhiASEOutput #############################
+def parseCalcPhiASEOutput(FOLDER, layout):
     CURRENT_DIR = os.getcwd()
     os.chdir(FOLDER)
-
     try:
         def _read_array(fname, dtype=float):
             with open(fname, "r") as fid:
@@ -109,7 +115,7 @@ def parse_calcPhiASE_output(FOLDER, layout):
 
     return phiASE, mseValues, raysUsedPerSample
 
-def find_calcPhiASE_near_module():
+def findCalcPhiASENearModule():
     so_dir = Path(HASEonGPU_Bindings.__file__).resolve().parent
 
     # direct sibling
@@ -130,7 +136,7 @@ def find_calcPhiASE_near_module():
 
 
 ################################ calcPhiASE ########################################
-def calcPhiASE_mpi(
+def calcPhiASEMpi(
         packed,
         claddingNumber,
         claddingAbsorption,
@@ -145,8 +151,9 @@ def calcPhiASE_mpi(
         numberOfLevels,
         backend,
         parallelMode,
-        maxGPUs,
-        nPerNode
+        numDevices,
+        nPerNode,
+        adaptiveSteps
 ):
 
     minSample = 0
@@ -158,12 +165,12 @@ def calcPhiASE_mpi(
     Prefix = ''
     if parallelMode == 'mpi':
         Prefix = f"mpiexec -npernode {nPerNode} "
-        maxGPUs = 1
+        numDevices = 1
 
     CALCPHIASE_DIR = Path(__file__).resolve().parent
     TMP_FOLDER = os.path.join(CALCPHIASE_DIR, 'input_tmp')
 
-    create_calcPhiASE_input(
+    createCalcPhiASEInput(
         packed,
         thickness,
         numberOfLevels,
@@ -173,7 +180,7 @@ def calcPhiASE_mpi(
         claddingAbsorption,
         TMP_FOLDER
     )
-    exec_path = find_calcPhiASE_near_module().resolve()
+    exec_path = findCalcPhiASENearModule().resolve()
     cmd = (
             Prefix + str(exec_path)
             + f' --parallel-mode={parallelMode}'
@@ -185,8 +192,9 @@ def calcPhiASE_mpi(
             + f' --output-path={TMP_FOLDER}'
             + f' --min-sample-i={minSample}'
             + f' --max-sample-i={maxSample}'
-            + f' --ngpus={maxGPUs}'
+            + f' --numDevices={numDevices}'
             + f' --repetitions={repetitions}'
+            + f' --adaptive-steps={int(adaptiveSteps)}'
             + f' --mse-threshold={mseThreshold}'
             + f' --spectral-resolution={packed["laserParameter"]["l_res"]}'
     )
@@ -197,12 +205,12 @@ def calcPhiASE_mpi(
         print('This step of the raytracing computation did NOT finish successfully. Aborting.')
         exit()
 
-    phiASE, mse_values, n_rays = parse_calcPhiASE_output(
+    phiASE, mse_values, n_rays = parseCalcPhiASEOutput(
         TMP_FOLDER,
         packed["layout"]
     )
 
-    clean_IO_files(TMP_FOLDER)
+    cleanIOFiles(TMP_FOLDER)
 
     if packed["layout"] == "matrix":
         phiASE = phiASE.reshape((nP, numberOfLevels), order="F")
@@ -245,8 +253,11 @@ def calcPhiASE(
         numberOfLevels,
         backend,
         parallelMode,
-        maxGPUs,
-        nPerNode = 1
+        numDevices,
+        adaptiveSteps,
+        nPerNode = 1,
+        minSampleRange = 0,
+        maxSampleRange = None,
 ):
     def transform_inputs(
             points,
@@ -398,7 +409,7 @@ def calcPhiASE(
     if parallelMode == "mpi" or parallelMode == "debugFileIOPath":
         if parallelMode == "debugFileIOPath":
             parallelMode = "single"
-        return calcPhiASE_mpi(
+        return calcPhiASEMpi(
             packed,
             claddingNumber,
             claddingAbsorption,
@@ -413,8 +424,9 @@ def calcPhiASE(
             numberOfLevels,
             backend,
             parallelMode,
-            maxGPUs,
-            nPerNode
+            numDevices,
+            nPerNode,
+            adaptiveSteps
         )
 
     numberOfPoints = int(packed["numberOfPoints"])
@@ -434,43 +446,45 @@ def calcPhiASE(
         spectral=int(packed["laserParameter"]["l_res"]),
     )
 
+    if maxSampleRange is None:
+        maxSampleRange = int((numberOfPoints * numberOfLevels) - 1)
+
     compute = HASEonGPU_Bindings.ComputeParameters(
         maxRepetitions=int(repetitions),
-        adaptiveSteps=5,
-        maxGpus=int(maxGPUs),
-        gpu_i=0,
+        adaptiveSteps=int(adaptiveSteps),
+        numDevices=int(numDevices),
         backend=str(backend),
         parallelMode=str(parallelMode),
         writeVtk=False,
         devices=[],
-        minSampleRange=0,
-        maxSampleRange=int((numberOfPoints * numberOfLevels) - 1),
+        minSampleRange=int(minSampleRange),
+        maxSampleRange=int(maxSampleRange),
     )
 
     host_mesh = Mesh(
-        trianglePointIndices=packed["trianglePointIndices_flat"],
-        numberOfTriangles=int(packed["numberOfTriangles"]),
-        numberOfLevels=numberOfLevels,
-        numberOfPoints=numberOfPoints,
-        thickness=float(thickness),
-        points=packed["points_flat"],
-        triangleCenterX=packed["triangleCenterX_flat"],
-        triangleCenterY=packed["triangleCenterY_flat"],
-        triangleNormalPoint=packed["triangleNormalPoint_flat"],
-        triangleNormalsX=packed["triangleNormalsX_flat"],
-        triangleNormalsY=packed["triangleNormalsY_flat"],
-        forbiddenEdge=packed["forbiddenEdge_flat"],
-        triangleNeighbors=packed["triangleNeighbors_flat"],
-        triangleSurfaces=packed["triangleSurfaces_flat"],
-        betaVolume=packed["betaVolume_flat"],
-        betaCells=packed["betaCells_flat"],
-        claddingCellTypes=packed["claddingCellTypes_flat"],
-        refractiveIndices=packed["refractiveIndices_flat"],
-        reflectivities=packed["reflectivities_flat"],
-        nTot=float(nTot),
-        crystalTFluo=float(crystal["tfluo"]),
-        claddingNumber=int(claddingNumber),
-        claddingAbsorption=float(claddingAbsorption),
+        packed["trianglePointIndices_flat"],
+        int(packed["numberOfTriangles"]),
+        numberOfLevels,
+        numberOfPoints,
+        float(thickness),
+        packed["points_flat"],
+        packed["triangleCenterX_flat"],
+        packed["triangleCenterY_flat"],
+        packed["triangleNormalPoint_flat"],
+        packed["triangleNormalsX_flat"],
+        packed["triangleNormalsY_flat"],
+        packed["forbiddenEdge_flat"],
+        packed["triangleNeighbors_flat"],
+        packed["triangleSurfaces_flat"],
+        packed["betaVolume_flat"],
+        packed["betaCells_flat"],
+        packed["claddingCellTypes_flat"],
+        packed["refractiveIndices_flat"],
+        packed["reflectivities_flat"],
+        float(nTot),
+        float(crystal["tfluo"]),
+        int(claddingNumber),
+        float(claddingAbsorption),
     )
 
     result = HASEonGPU_Bindings.calcPhiASE(experiment, compute, host_mesh)
