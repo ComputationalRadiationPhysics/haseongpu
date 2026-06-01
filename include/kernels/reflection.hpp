@@ -1,0 +1,64 @@
+/**
+ * Copyright 2013 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2026 Tim Hanel
+ *
+ * This file is part of HASEonGPU
+ *
+ * HASEonGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * HASEonGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with HASEonGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+/**
+ * @author Erik Zenker
+ * @author Carlchristian Eckert
+ * @licence GPLv3
+ *
+ */
+
+#pragma once
+
+#include <core/geometry.hpp>
+#include <core/mesh.hpp>
+
+namespace hase::kernels
+{
+
+    /**
+     * @brief Calculates the reflectionPoint and reflectionAngle with upper or lower surface
+     *        of gain medium. Depending on the number of reflection the
+     *        ray still has to do and the reflection surface.
+     *
+     * @param startPoint      Point where the ray should start from.
+     * @param endPoint        Point where the will end.
+     * @param reflectionsLeft Number of reflections the ray will do
+     *                        from startPoint to endPoint.
+     * @param reflectionPlane Plane of first reflection (upper or lower surface of gain medium).
+     * @param reflectionPoint Pointer to the point the ray will be reflected.
+     * @param reflectionAngle Pointer to the value of the angle the ray will be reflected with.
+     *
+     * @return 0 if everything goes right
+     *         1 otherwise
+     *
+     */
+    ALPAKA_FN_ACC int calcNextReflection(
+        hase::core::Point const startPoint,
+        hase::core::Point const endPoint,
+        unsigned const reflectionsLeft,
+        hase::core::ReflectionPlane const reflectionPlane,
+        hase::core::Point* reflectionPoint,
+        double* reflectionAngle,
+        hase::core::DeviceMeshView const& mesh);
+
+} // namespace hase::kernels
