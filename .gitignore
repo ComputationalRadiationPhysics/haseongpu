@@ -27,6 +27,7 @@ utils/testdata_2/*.txt
 output/*.txt
 output
 tmp
+IO/
 phi_ASE.txt
 N_rays.txt
 expected_values.txt
@@ -81,5 +82,14 @@ talk/*.~lock.*
 cmake-build-debug/
 .idea/*
 .github/*
+!.github/
+!.github/workflows/
+!.github/workflows/ci.yml
 __pycache__/
 *.pyc
+HASEonGPU_Bindings/*.so
+HASEonGPU_Bindings/calcPhiASE
+utils/validity_checking/difference_plots/*
+tests/*.txt
+tests/data/*_results.csv
+docs/source/generated/*.rst

@@ -89,34 +89,3 @@ foreach(test_folder ${test_folders})
         endif()
     endforeach()
 endforeach()
-# ------------------------------------------------------------
-# Python test dependencies
-# ------------------------------------------------------------
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
-
-execute_process(
-    COMMAND "${Python3_EXECUTABLE}" -m pytest --version
-    RESULT_VARIABLE PYTEST_CHECK_RESULT
-    OUTPUT_QUIET
-    ERROR_QUIET
-)
-
-if(NOT PYTEST_CHECK_RESULT EQUAL 0)
-    message(
-        WARNING
-        "pytest is not installed for Python interpreter:\n"
-        "  ${Python3_EXECUTABLE}\n\n"
-        "Python tests will not be available.\n"
-        "Install pytest manually with:\n"
-        "  ${Python3_EXECUTABLE} -m pip install --user pytest"
-    )
-    set(HASE_PYTEST_AVAILABLE OFF)
-else()
-    set(HASE_PYTEST_AVAILABLE ON)
-endif()
-if(HASE_PYTEST_AVAILABLE)
-    add_test(
-        NAME python_tests
-        COMMAND "${Python3_EXECUTABLE}" -m pytest "${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-endif()

@@ -1,5 +1,6 @@
 /**
  * Copyright 2015 Erik Zenker, Carlchristian Eckert, Marius Melzer
+ * Copyright 2026 Tim Hanel
  *
  * This file is part of HASEonGPU
  *
@@ -31,21 +32,37 @@
 
 #include <alpaka/alpaka.hpp>
 
-#include <mesh.hpp>
-#include <parser.hpp>
-#include <simulation.hpp>
-#include <types.hpp>
+#include <core/mesh.hpp>
+#include <core/simulation.hpp>
+#include <core/types.hpp>
+#include <parse/parser.hpp>
+
+#include <exception>
+#include <iostream>
 
 int main(int argc, char** argv)
 {
-    // Simulation data
-    ExperimentParameters experiment;
-    ComputeParameters compute;
-    Result result;
-    std::optional<HostMesh> mesh;
-    // Parse commandline and prepate all data structures
-    parse(argc, argv, experiment, compute, mesh, result);
-    startSimulation<true>(experiment, compute, result, *mesh);
+    try
+    {
+        // Simulation data
+        hase::core::ExperimentParameters experiment;
+        hase::core::ComputeParameters compute;
+        hase::core::Result result;
+        std::optional<hase::core::HostMesh> mesh;
+        // Parse commandline and prepate all data structures
+        hase::parse::parse(argc, argv, experiment, compute, mesh, result);
+        return hase::core::startSimulation<true>(experiment, compute, result, *mesh);
+    }
+    catch(std::exception const& e)
+    {
+        std::cerr << "[ERROR] " << e.what() << std::endl;
+        return 1;
+    }
+    catch(...)
+    {
+        std::cerr << "[ERROR] Unknown exception" << std::endl;
+        return 1;
+    }
 
 
     return 0;
