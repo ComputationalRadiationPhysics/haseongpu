@@ -1,19 +1,29 @@
+/**
+ * Copyright 2026 Tim Hanel
+ *
+ * This file is part of HASEonGPU
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
+#include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <hase/hase.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <type_traits>
 #include <vector>
 namespace fs = std::filesystem;
 
-using namespace alpaka;
+using TestApis
+    = std::decay_t<decltype(alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
+
 #ifdef HASE_WORKDIR
 static std::string workingDIR = HASE_WORKDIR;
 #else
@@ -22,18 +32,18 @@ static std::string workingDIR = "..";
 struct TestData
 {
     std::string fileName;
-    ExperimentParameters expParams;
-    ComputeParameters compParams;
-    std::optional<HostMesh> mesh;
-    Result results;
+    hase::core::ExperimentParameters expParams;
+    hase::core::ComputeParameters compParams;
+    std::optional<hase::core::HostMesh> mesh;
+    hase::core::Result results;
 
     void createFromFile(fs::path const& cfg, fs::path const& dataFolder)
     {
-        auto optionsMap = constructOptionsMapFromFile(cfg);
+        auto optionsMap = hase::parse::constructOptionsMapFromFile(cfg);
 
-        optionsMap.set(ExpSwitch::input_path, dataFolder.string());
+        optionsMap.set(hase::core::ExpSwitch::input_path, dataFolder.string());
 
-        constructSimulationContextFromOptionsMap(optionsMap, expParams, compParams, mesh, results);
+        hase::parse::constructSimulationContextFromOptionsMap(optionsMap, expParams, compParams, mesh, results);
     }
 };
 
@@ -65,8 +75,16 @@ auto makeTestData(fs::path const& cfg, fs::path const& dataFolder)
 
 void runSerial(TestData& testData)
 {
-    auto startHandle = BaseVersionSerial{testData.expParams, testData.mesh.value(), testData.results};
+    auto startHandle = hase::core::BaseVersionSerial{testData.expParams, testData.mesh.value(), testData.results};
     startHandle(testData.compParams.minSampleRange, testData.compParams.maxSampleRange);
+}
+
+void resetResultForSimulation(hase::core::Result& result)
+{
+    std::ranges::fill(result.phiAse, 0.0f);
+    std::ranges::fill(result.mse, 100000.0);
+    std::ranges::fill(result.totalRays, 0u);
+    std::ranges::fill(result.dndtAse, 0.0);
 }
 
 fs::path comparisonCsvPath()
@@ -279,6 +297,15 @@ void assertVectorEqualWithin(
         auto const a = static_cast<double>(actual[i]);
         double const d = a - e;
 
+        INFO("Non-finite vector comparison value");
+        CAPTURE(backend);
+        CAPTURE(dataset);
+        CAPTURE(i);
+        CAPTURE(e);
+        CAPTURE(a);
+        REQUIRE(std::isfinite(e));
+        REQUIRE(std::isfinite(a));
+
         sumExp += e;
         sumAct += a;
         sqDiff += d * d;
@@ -299,8 +326,8 @@ void assertVectorEqualWithin(
 }
 
 void compareResults(
-    Result const& expected,
-    Result const& actual,
+    hase::core::Result const& expected,
+    hase::core::Result const& actual,
     std::pair<unsigned, unsigned> sampleRange,
     std::string const& backend,
     std::string const& dataset)
@@ -313,18 +340,19 @@ void compareResults(
 }
 
 template<typename TBackend>
-void runForEachBackend(Result const& serialResults, TestData& currentData, TBackend&& backend)
+void runForEachBackend(hase::core::Result const& serialResults, TestData& currentData, TBackend&& backend)
 {
-    auto devSelector = onHost::makeDeviceSelector(backend[object::deviceSpec]);
+    auto devSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
     if(devSelector.getDeviceCount() == 0)
     {
-        dout(V_WARNING) << " No device found for backend." << std::endl;
+        hase::core::dout(V_WARNING) << " No device found for backend." << std::endl;
         return;
     }
     auto sampleDevice = devSelector.makeDevice(0);
-    currentData.compParams.backend = getNameForBackend(backend, sampleDevice);
+    currentData.compParams.backend = hase::core::getNameForBackend(backend, sampleDevice);
     std::cout << "running simulation with backend: " << currentData.compParams.backend << std::endl;
-    startSimulation<true>(
+    resetResultForSimulation(currentData.results);
+    hase::core::startSimulation<false>(
         currentData.expParams,
         currentData.compParams,
         currentData.results,
@@ -339,7 +367,7 @@ void runForEachBackend(Result const& serialResults, TestData& currentData, TBack
         currentData.fileName);
 }
 
-TEST_CASE("Test compare to Serial", "[compSerial]")
+TEMPLATE_LIST_TEST_CASE("Test compare to Serial", "[compSerial]", TestApis)
 {
     auto configPath = workingDIR + "/tests/data/cfg/compSerial.cfg";
     auto inputDataPath = workingDIR + "/example/c_example/input";
@@ -349,7 +377,7 @@ TEST_CASE("Test compare to Serial", "[compSerial]")
         initializeComparisonCsv();
     }
 
-    auto testBackends = onHost::allBackends(onHost::enabledApis, exec::enabledExecutors);
+    auto backend = TestType::makeDict();
 
     for(auto& data : testData)
     {
@@ -367,10 +395,7 @@ TEST_CASE("Test compare to Serial", "[compSerial]")
             runSerial(data);
         }
         //  Hard copy of the serial result before overwriting data.results
-        Result serialResults = data.results;
-        std::apply(
-            [&]<typename... T0>(T0&&... backend)
-            { (runForEachBackend(serialResults, data, std::forward<T0>(backend)), ...); },
-            testBackends);
+        hase::core::Result serialResults = data.results;
+        runForEachBackend(serialResults, data, backend);
     }
 }
