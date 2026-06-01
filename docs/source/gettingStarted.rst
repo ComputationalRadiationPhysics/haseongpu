@@ -3,12 +3,14 @@
 Getting Started
 ===============
 
-This page provides a short guide to setting up HASEonGPU and choosing the
-interface that best fits your workflow.
+This guide covers setting up HASEonGPU and choosing an interface for a
+simulation workflow. For a compact project overview, see
+:doc:`HASEonGPU Documentation <index>`. For the ASE model and estimator, see
+:doc:`Theory and Model <theoryAndModel>`.
 
 HASEonGPU supports multiple usage paths:
 
-* :doc:`Python Interface <pythonInterface>` for direct usage from Python
+* :doc:`Python Interface Guide <pythonInterface>` for workflow-oriented Python usage
 * :doc:`Binary Interface <binaryInterface>` for command-line execution
 * :doc:`MATLAB Interface <MATLABInterface>` for integration into existing
   MATLAB or Octave workflows
@@ -24,18 +26,27 @@ Clone the repository from GitHub:
    cd haseongpu
 
 Dependencies
--------------------
+------------
 
 Required software:
 
-* ``cmake >= 3.0.1``
-* ``gcc >= 11``
-* ``cuda >= 11.0``
+* ``cmake``
+* ``ninja``
+* ``Python >= 3.11`` with ``pip``
+* A C++20-capable compiler, tested with:
+
+  * ``gcc >= 12``
+  * ``clang >= 17``
+
+Optional backend/runtime dependencies:
+
+* ``cuda >= 12.5`` tested up to ``cuda 13.2``
+* ``hip/rocm >= 6.2.4`` tested up to ``rocm 7.2``
+* ``hwloc`` unless disabled
 
 Optional software and tools:
 
 * ``OpenMPI >= 4.0``
-* ``Python >= 3.10``
 * MATLAB or Octave
 * ``ParaView`` for visualization of ``.vtk`` output
 
@@ -61,21 +72,21 @@ the hood during installation. For details on manual compilation, see
 Choose an Interface
 -------------------
 
-Python Interface
-^^^^^^^^^^^^^^^^
+Python Interface Guide
+^^^^^^^^^^^^^^^^^^^^^^
 
-The Python interface is the recommended starting point for most new users.
-It provides a library call that can be easily integrated into custom workflows.
-Additionally, the provided examples demonstrate this usage.
+The Python interface guide is the recommended starting point for most new users.
+It explains the high-level workflow and shows how to assemble geometry, material
+data, pump settings, ASE configuration, and time stepping in Python.
 
-
-Continue with :doc:`Python Interface <pythonInterface>`.
+Continue with :doc:`Python Interface Guide <pythonInterface>`.  When you need
+exact signatures or generated member lists, use the :doc:`Python API Reference <pythonAPI>`.
 
 Binary Interface
 ^^^^^^^^^^^^^^^^
 
-The binary interface is useful if you want to run HASEonGPU directly from the
-command line, or use it as an entry point for constructing a custom API call.
+The binary interface is useful for running HASEonGPU directly from the command
+line or as an entry point for constructing a custom API call.
 
 Continue with :doc:`Binary Interface <binaryInterface>`.
 
@@ -83,8 +94,8 @@ MATLAB Interface
 ^^^^^^^^^^^^^^^^
 
 The MATLAB-compatible interface is mainly intended for existing MATLAB or Octave
-workflows. If you are starting a new workflow, the Python interface is usually
-the better choice.
+workflows. For new workflows, the Python interface is usually the better
+choice.
 
 Continue with :doc:`MATLAB Interface <MATLABInterface>`.
 
@@ -97,11 +108,11 @@ A typical HASEonGPU setup consists of the following steps:
 #. Install the required dependencies
 #. Decide which interface to use
 #. Follow installation steps provided on the page of the chosen interface
-#. In order to verify your current setup run one of the provided interface-specific examples
-#. Use HASEonGPU in your own workflow
+#. Verify the setup with one of the provided interface-specific examples
+#. Use HASEonGPU in the target workflow
 
 Next Step
 ---------
 
-Proceed to one of the interface pages listed above, depending on how you want
-to use HASEonGPU.
+Proceed to one of the interface pages listed above, depending on the intended
+usage path.

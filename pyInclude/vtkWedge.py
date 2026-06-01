@@ -133,7 +133,6 @@ def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=No
 
     if isinstance(data, (GainMedium, MeshTopology)) and geometry is None:
         topology = _topology_from_geometry(data)
-
         def write_state(state):
             if int(every) <= 0:
                 raise ValueError("every must be a positive integer")

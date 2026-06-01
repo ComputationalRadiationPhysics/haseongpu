@@ -22,7 +22,7 @@
 % VTK Wedge (=13) Data writing
 % Daniel Albach                                         2009/05/29
 
-function vtk_wedge(file_n, phi_ASE, p, t_int, mesh_z, z_mesh)
+function vtkWedge(file_n, phi_ASE, p, t_int, mesh_z, z_mesh)
 
 % open a file
 filename = file_n;

@@ -1,2 +1,4 @@
+cmake>=3.24
+ninja
 sphinx
 sphinx-rtd-theme

@@ -50,15 +50,13 @@ Single-node run using the ``cylindrical`` example:
        --input-path=./example/c_example/input/cylindrical \
        --output-path=/tmp/ \
        --parallel-mode=single \
-       --backend=gpu \
+       --backend=Host_Cpu_CpuSerial \
        --min-rays=10000 \
        --max-rays=100000 \
-       --reflection=1 \
+       --reflection=0 \
        --repetitions=4 \
        --adaptive-steps=4 \
-       --ngpus=4 \
-       --min-sample-i=0 \
-       --max-sample-i=1234 \
+       --numDevices=1 \
        --mse-threshold=0.05
 
 MPI run with 4 GPUs per node using the same example:
@@ -69,13 +67,13 @@ MPI run with 4 GPUs per node using the same example:
        --input-path=./example/c_example/input/cylindrical \
        --output-path=/tmp/ \
        --parallel-mode=mpi \
-       --backend=gpu \
+       --backend=Host_Cpu_CpuSerial \
        --min-rays=10000 \
        --max-rays=100000 \
-       --reflection=1 \
+       --reflection=0 \
        --repetitions=4 \
        --adaptive-steps=4 \
-       --ngpus=1 \
+       --numDevices=1 \
        --min-sample-i=0 \
        --max-sample-i=1234 \
        --mse-threshold=0.05
@@ -98,20 +96,31 @@ Path to a writable output directory.
 
 This location is used to store generated output files.
 
-``--backend=[cpu|gpu]``
+``--backend=``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Selects the hardware used for the simulation.
+* Type: ``str``
 
-* ``cpu`` uses the original single-core CPU algorithm
-* ``gpu`` uses NVIDIA CUDA GPUs
+* Description:
+  Selects the alpaka backend used for the simulation.
+
+  For details on available runtime backends and backend naming, see the
+  runtime selection section of :doc:`Backend Selection <backendSelection>`.
+  Backend names depend on the alpaka backends compiled into the binary and on
+  the devices available on the machine where it is run.
+
+  If ``--backend=`` is set to a string that does not match any available
+  backend, ``calcPhiASE`` exits with an error and prints the backend names that
+  can be selected by this binary.  This is also a practical way to discover the
+  valid runtime strings for a compiled binary.
+
 
 ``--parallel-mode=[single|mpi]``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Selects the parallelization mode.
 
-* ``single`` runs haseongpu on a single node
+* ``single`` runs HASEonGPU on a single node
 * ``mpi`` uses MPI for distributed execution (run binary with mpiexec)
 
 ``--min-rays=``
@@ -124,10 +133,11 @@ Minimum number of rays used per sample point.
 
 Maximum number of rays used per sample point.
 
-``--ngpus=``
-^^^^^^^^^^^^
+``--nDevices=``
+^^^^^^^^^^^^^^^^
 
-Maximum number of GPUs to use.
+Number of Devices HASEonGPU should use.
+On Cuda or Hip Platform this is equivalent to the number of Gpus the application should use (on a single node).
 
 In ``single`` mode, this is typically the number of GPUs available on the
 local node. In ``mpi`` mode, this is usually set to ``1``.
@@ -155,16 +165,10 @@ Verbosity level interpreted as a bitmask. Multiple values can be combined.
 * ``16``: debug
 * ``32``: progress bar
 
-``--reflection=``
+``--reflection``
 ^^^^^^^^^^^^^^^^
 
 Enables reflections on the upper and lower surfaces of the gain medium.
-
-``1``
-    enabled
-
-``0``
-    disabled
 
 ``--mse-threshold=``
 ^^^^^^^^^^^^^^^^^^^^
@@ -196,12 +200,14 @@ spectra.
 Selects monochromatic or spectral propagation.
 
 When ``true``, HASEonGPU uses one constant absorption/emission cross-section
-pair for the whole calculation. The values are read from ``sigmaA.txt`` and
-``sigmaE.txt``. Wavelength files are ignored in this mode.
+pair, :math:`\sigma_a` and :math:`\sigma_e`, for the whole calculation. The
+values are read from ``sigmaA.txt`` and ``sigmaE.txt``. Wavelength files are
+ignored in this mode.
 
 When ``false``, HASEonGPU uses wavelength-dependent spectra:
 ``lambdaA.txt`` with ``sigmaA.txt`` for absorption and ``lambdaE.txt`` with
-``sigmaE.txt`` for emission. These spectra are interpolated according to
+``sigmaE.txt`` for emission, representing :math:`\sigma_a(\lambda)` and
+:math:`\sigma_e(\lambda)`. These spectra are interpolated according to
 ``--spectral-resolution``.
 
 Accepted values:
