@@ -28,7 +28,7 @@
  **/
 
 #pragma once
-#include <cuda_runtime_api.h>
+#include <alpaka/alpaka.hpp>
 
 struct TwoDimPoint
 {
@@ -69,7 +69,7 @@ enum ReflectionPlane
     BOTTOM_REFLECTION = -1
 };
 
-__host__ __device__ Vector direction(Point startPoint, Point endPoint);
-__host__ __device__ float distance(Point startPoint, Point endPoint);
-__host__ __device__ Ray generateRay(Point startPoint, Point endPoint);
-__host__ __device__ Ray normalizeRay(Ray ray);
+ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint);
+ALPAKA_FN_HOST_ACC Ray normalizeRay(Ray ray);

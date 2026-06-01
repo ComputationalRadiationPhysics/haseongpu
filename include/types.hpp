@@ -22,11 +22,12 @@
 
 #include <filesystem>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
 
-struct DeviceMode
+struct Backend
 {
     static inline std::string const NONE = "no_device_mode";
     static inline std::string const GPU = "gpu";
@@ -36,14 +37,14 @@ struct DeviceMode
 struct ParallelMode
 {
     static inline std::string const NONE = "no_parallel_mode";
-    static inline std::string const THREADED = "threaded";
+    static inline std::string const SINGLE = "single";
     static inline std::string const MPI = "mpi";
 };
 
 struct CompSwitch
 {
     static inline std::string const parallel_mode = "parallel-mode";
-    static inline std::string const device_mode = "device-mode";
+    static inline std::string const backend = "backend";
     static inline std::string const ngpus = "ngpus";
     static inline std::string const repetitions = "repetitions";
     static inline std::string const adaptive_steps = "adaptive-steps";
@@ -61,6 +62,7 @@ struct ExpSwitch
     static inline std::string const mse = "mse-threshold";
     static inline std::string const reflection = "reflection";
     static inline std::string const spectral = "spectral-resolution";
+    static inline std::string const monochromatic = "monochromatic";
 };
 
 struct ComputeParameters
@@ -73,7 +75,7 @@ struct ComputeParameters
         unsigned maxRepetitions,
         unsigned adaptiveSteps,
         unsigned gpu_i,
-        std::string deviceMode,
+        std::string backend,
         std::string parallelMode,
         bool writeVtk,
         fs::path inputPath,
@@ -86,12 +88,12 @@ struct ComputeParameters
         , adaptiveSteps(adaptiveSteps)
         , maxGpus(maxGpus)
         , gpu_i(gpu_i)
-        , deviceMode(deviceMode)
-        , parallelMode(parallelMode)
+        , backend(std::move(backend))
+        , parallelMode(std::move(parallelMode))
         , writeVtk(writeVtk)
-        , inputPath(inputPath)
-        , outputPath(outputPath)
-        , devices(devices)
+        , inputPath(std::move(inputPath))
+        , outputPath(std::move(outputPath))
+        , devices(std::move(devices))
         , minSampleRange(minSampleRange)
         , maxSampleRange(maxSampleRange)
     {
@@ -102,7 +104,7 @@ struct ComputeParameters
     // user defined nr of gpus
     unsigned maxGpus;
     unsigned gpu_i;
-    std::string deviceMode;
+    std::string backend;
     std::string parallelMode;
     bool writeVtk;
     fs::path inputPath;
@@ -124,10 +126,10 @@ struct Result
         std::vector<double> mse,
         std::vector<unsigned> totalRays,
         std::vector<double> dndtAse)
-        : phiAse(phiAse)
-        , mse(mse)
-        , totalRays(totalRays)
-        , dndtAse(dndtAse)
+        : phiAse(std::move(phiAse))
+        , mse(std::move(mse))
+        , totalRays(std::move(totalRays))
+        , dndtAse(std::move(dndtAse))
     {
     }
 
@@ -151,15 +153,17 @@ struct ExperimentParameters
         double maxSigmaA,
         double maxSigmaE,
         double mseThreshold,
-        bool useReflections)
+        bool useReflections,
+        bool monochromatic = false)
         : minRaysPerSample(minRaysPerSample)
         , maxRaysPerSample(maxRaysPerSample)
-        , sigmaA(sigmaA)
-        , sigmaE(sigmaE)
+        , sigmaA(std::move(sigmaA))
+        , sigmaE(std::move(sigmaE))
         , maxSigmaA(maxSigmaA)
         , maxSigmaE(maxSigmaE)
         , mseThreshold(mseThreshold)
         , useReflections(useReflections)
+        , monochromatic(monochromatic)
     {
     }
 
@@ -173,5 +177,6 @@ struct ExperimentParameters
     double maxSigmaE;
     double mseThreshold;
     bool useReflections;
+    bool monochromatic = false;
     unsigned spectral;
 };

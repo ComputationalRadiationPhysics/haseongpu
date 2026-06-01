@@ -112,12 +112,14 @@ CmdOptionsMap parseCommandLine(int const argc, char** argv);
 
 void printCommandLine(CmdOptionsMap const&);
 
-Mesh createMesh(
+template<alpaka::onHost::concepts::Device T_Device>
+DeviceMeshContainer<T_Device> createMesh(
+    T_Device& device,
     std::vector<unsigned> const& triangleIndices,
-    unsigned numberOfTriangles,
-    unsigned numberOfLevels,
-    unsigned numberOfPoints,
-    float thicknessOfPrism,
+    unsigned const numberOfTriangles,
+    unsigned const numberOfLevels,
+    unsigned const numberOfPoints,
+    float const thicknessOfPrism,
     std::vector<double>& pointsVector,
     std::vector<double>& xOfTriangleCenter,
     std::vector<double>& yOfTriangleCenter,
@@ -132,25 +134,25 @@ Mesh createMesh(
     std::vector<unsigned>& cellTypes,
     std::vector<float>& refractiveIndices,
     std::vector<float>& reflectivities,
-    float nTot,
-    float crystalFluorescence,
-    unsigned cladNumber,
-    double cladAbsorption);
-
-
-std::vector<Mesh> parseMesh(fs::path const rootPath, std::vector<unsigned> devices);
-
-int pythonParse(
+    std::vector<float>& totalReflectionAngles,
+    float const nTot,
+    float const crystalFluorescence,
+    unsigned const cladNumber,
+    double const cladAbsorption);
+HostMesh createHostMeshFromFile(fs::path rootPath);
+int constructSimulationContextFromOptionsMap(
+    CmdOptionsMap& vm,
     ExperimentParameters& experiment,
     ComputeParameters& compute,
-    HostMesh& host_mesh,
-    std::vector<Mesh>& mesh,
+    std::optional<HostMesh>& hostMesh,
     Result& result);
+CmdOptionsMap constructOptionsMapFromFile(std::filesystem::path const& cfgPath);
+int pythonParse(ExperimentParameters& experiment, ComputeParameters& compute, HostMesh& host_mesh, Result& result);
 
 int parse(
     int const argc,
     char** argv,
     ExperimentParameters& experiment,
     ComputeParameters& compute,
-    std::vector<Mesh>& mesh,
+    std::optional<HostMesh>& hostMesh,
     Result& result);

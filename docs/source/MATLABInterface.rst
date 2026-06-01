@@ -59,7 +59,7 @@ Call ``calcPhiASE`` from a MATLAB script:
        laserParameter,
        crystal,
        numberOfLevels,
-       deviceMode,
+       backend,
        parallelMode,
        maxGPUs,
        nPerNode
@@ -429,7 +429,7 @@ The following section describes all arguments of the MATLAB call.
 * Description:
   Total number of mesh levels in z-direction.
 
-``deviceMode``
+``backend``
 ^^^^^^^^^^^^^^
 
 * Type: ``str``
@@ -439,7 +439,7 @@ The following section describes all arguments of the MATLAB call.
   * ``"gpu"``
 
 * Description:
-  Selects whether the CPU or GPU implementation is used.
+  Selects the alpaka backend that is used is used.
   The CPU implementation is mostly deprecated.
 
 ``parallelMode``
@@ -447,7 +447,7 @@ The following section describes all arguments of the MATLAB call.
 * Type: ``str``
 * Allowed values:
 
-  * ``"threaded"``: threads distribute samples across GPUs/devices within one node
+  * ``"single"``: threads distribute samples across GPUs/devices within one node
   * ``"mpi"``: distributes samples across nodes
 
 
@@ -461,7 +461,7 @@ The following section describes all arguments of the MATLAB call.
 * Description:
   Maximum number of GPUs used by a single process.
 
-  In ``threaded`` mode, this usually corresponds to the total number of GPUs
+  In ``single`` mode, this usually corresponds to the total number of GPUs
   used on the local node.
 
   In ``mpi`` mode, this corresponds to the number of GPUs used per MPI process

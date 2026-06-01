@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
-project(HASEonGPU LANGUAGES CUDA CXX C)
+project(HASEonGPU)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
 
@@ -12,6 +13,12 @@ find_package(Threads REQUIRED)
 find_package(CUDAToolkit REQUIRED COMPONENTS cudart)
 
 # build options
+option(HASE_BUILD_PhiAse "Build the main calcPhiAse - HaseOnGPU Binary" ON)
+option(
+    HASE_SELECT_BACKEND_ALPAKA
+    "Use the cmake options provided by alpaka in order to select backend and executor manually"
+    OFF
+)
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
 option(HASE_CUDA_FASTMATH "Enable fast-math" ON)
 option(HASE_CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
@@ -25,15 +32,42 @@ option(
     "Show kernel lines in cuda-gdb and cuda-memcheck"
     OFF
 )
-option(
-    DISABLE_MPI
-    "toggle that allows compilation of haseongpu without requiring the MPI dependency"
-    OFF
+set(DISABLE_MPI
+    "AUTO"
+    CACHE STRING
+    "MPI support selection: AUTO -> MPI detection, ON -> MPI disabled, or OFF -> MPI enabled"
 )
+
+set_property(CACHE DISABLE_MPI PROPERTY STRINGS AUTO ON OFF)
+
+if(NOT DISABLE_MPI MATCHES "^(AUTO|ON|OFF)$")
+    message(
+        FATAL_ERROR
+        "Invalid value for DISABLE_MPI='${DISABLE_MPI}'. "
+        "Allowed values are: AUTO, ON, OFF."
+    )
+endif()
 option(HASE_TESTING "Build unit tests" OFF)
 option(HASE_ENABLE_PYTHON "Build Python bindings" OFF)
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
+
+# search for backends (dependent) -- important that this runs before making alpaka available
+if(NOT HASE_SELECT_BACKEND_ALPAKA)
+    include(cmake/searchBackends.cmake)
+endif()
+
+# install alpaka
+find_package(alpaka CONFIG)
+if(NOT alpaka_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        alpaka
+        GIT_REPOSITORY https://github.com/alpaka-group/alpaka3.git
+        GIT_TAG 245c74bf96d751cc52ec3f083934cf58d2b7313b
+    )
+    FetchContent_MakeAvailable(alpaka)
+endif()
 
 # CUDA compiler Flags
 set(HASE_NVCC_FLAGS "")
@@ -95,34 +129,12 @@ if(HASE_RELEASE)
 endif()
 
 # core library with all sources
-add_library(hase_core STATIC)
-
-file(
-    GLOB_RECURSE HASE_CORE_SOURCES
-    CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
-)
-set_target_properties(hase_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-file(
-    GLOB_RECURSE HASE_CORE_SOURCES
-    CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
-)
-list(REMOVE_ITEM HASE_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
-target_sources(hase_core PRIVATE ${HASE_CORE_SOURCES})
-
+add_library(hase_core INTERFACE)
+add_library(hase::core ALIAS hase_core)
+#target_sources(hase_core PRIVATE ${HASE_CORE_SOURCES})
 target_include_directories(
     hase_core
-    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 set_target_properties(
@@ -132,31 +144,50 @@ set_target_properties(
         CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
 
-target_compile_options(
-    hase_core
-    PRIVATE
-        "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:${HASE_NVCC_FLAGS}>"
-        "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:${HASE_GCC_FLAGS}>"
-        "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:${HASE_CLANG_FLAGS}>"
-)
-
-target_link_libraries(hase_core PUBLIC Threads::Threads CUDA::cudart)
-
-# enable/disable mpi dependency based on cmake option
-if(NOT DISABLE_MPI)
+if(DISABLE_MPI STREQUAL "AUTO")
     find_package(MPI QUIET)
-    if(MPI_FOUND)
-        target_compile_definitions(hase_core PUBLIC MPI_FOUND)
-        target_link_libraries(hase_core PUBLIC MPI::MPI_CXX)
-    else()
+    if(NOT MPI_FOUND)
         message(
             STATUS
-            "MPI is not found on your system. You can compile HASEonGPU without MPI by using DISABLE_MPI=ON"
+            "MPI is not found on your system - compilation will proceed without MPI Support."
         )
     endif()
+endif()
+if(DISABLE_MPI STREQUAL "OFF" OR MPI_FOUND)
+    target_compile_definitions(hase_core INTERFACE MPI_FOUND)
+    target_link_libraries(hase_core INTERFACE MPI::MPI_CXX)
 else()
-    message(STATUS "MPI explicitly disabled via DISABLE_MPI=ON")
-    target_compile_definitions(hase_core PUBLIC DISABLE_MPI)
+    message(STATUS "MPI disabled.")
+    target_compile_definitions(hase_core INTERFACE DISABLE_MPI)
+endif()
+
+target_link_libraries(hase_core INTERFACE alpaka::alpaka CUDA::cudart)
+
+file(
+    GLOB_RECURSE HASE_RUNTIME_SOURCES
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu"
+)
+
+list(
+    REMOVE_ITEM
+    HASE_RUNTIME_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+)
+add_library(hase STATIC ${HASE_RUNTIME_SOURCES})
+add_library(hase::hase ALIAS hase)
+set_target_properties(hase PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+target_link_libraries(hase PUBLIC hase::core)
+alpaka_finalize(hase)
+
+if(HASE_BUILD_PhiAse)
+    # --- main executable: main.cpp ---
+    add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+    set_target_properties(calcPhiASE PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_link_libraries(calcPhiASE PRIVATE hase::hase)
+    alpaka_finalize(calcPhiASE)
 endif()
 
 # enable Testing
@@ -164,15 +195,8 @@ if(HASE_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()
-# (keep your CUDA props / flags / link libs on hase_core as discussed)
-
-# --- main executable: main.cu + core lib ---
-add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
-
-target_link_libraries(calcPhiASE PRIVATE hase_core)
-
 if(HASE_ENABLE_PYTHON)
-    set_target_properties(hase_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(hase PROPERTIES POSITION_INDEPENDENT_CODE ON)
     find_package(pybind11 REQUIRED)
     pybind11_add_module(HASEonGPU HASEonGPU_Bindings/module.cpp)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
@@ -180,7 +204,7 @@ if(HASE_ENABLE_PYTHON)
         HASEonGPU
         PROPERTIES BUILD_RPATH_USE_ORIGIN ON INSTALL_RPATH_USE_LINK_PATH ON
     )
-    target_link_libraries(HASEonGPU PRIVATE hase_core)
+    target_link_libraries(HASEonGPU PRIVATE hase)
     install(TARGETS HASEonGPU LIBRARY DESTINATION HASEonGPU_Bindings)
     install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
     install(FILES HASEonGPU.py DESTINATION .)

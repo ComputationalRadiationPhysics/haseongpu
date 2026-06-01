@@ -143,7 +143,7 @@ def calcPhiASE_mpi(
         thickness,
         crystal,
         numberOfLevels,
-        deviceMode,
+        backend,
         parallelMode,
         maxGPUs,
         nPerNode
@@ -177,7 +177,7 @@ def calcPhiASE_mpi(
     cmd = (
             Prefix + str(exec_path)
             + f' --parallel-mode={parallelMode}'
-            + f' --device-mode={deviceMode}'
+            + f' --backend={backend}'
             + f' --min-rays={int(minRaysPerSample)}'
             + f' --max-rays={int(maxRaysPerSample)}'
             + REFLECT
@@ -243,7 +243,7 @@ def calcPhiASE(
         laserParameter,
         crystal,
         numberOfLevels,
-        deviceMode,
+        backend,
         parallelMode,
         maxGPUs,
         nPerNode = 1
@@ -397,7 +397,7 @@ def calcPhiASE(
 
     if parallelMode == "mpi" or parallelMode == "debugFileIOPath":
         if parallelMode == "debugFileIOPath":
-            parallelMode = "threaded"
+            parallelMode = "single"
         return calcPhiASE_mpi(
             packed,
             claddingNumber,
@@ -411,16 +411,14 @@ def calcPhiASE(
             thickness,
             crystal,
             numberOfLevels,
-            deviceMode,
+            backend,
             parallelMode,
             maxGPUs,
             nPerNode
         )
 
     numberOfPoints = int(packed["numberOfPoints"])
-    numberOfTriangles = int(packed["numberOfTriangles"])
     numberOfLevels = int(packed["numberOfLevels"])
-    thicknessOfPrism = float(thickness)
 
     experiment = HASEonGPU_Bindings.ExperimentParameters(
         minRaysPerSample=int(minRaysPerSample),
@@ -441,7 +439,7 @@ def calcPhiASE(
         adaptiveSteps=5,
         maxGpus=int(maxGPUs),
         gpu_i=0,
-        deviceMode=str(deviceMode),
+        backend=str(backend),
         parallelMode=str(parallelMode),
         writeVtk=False,
         devices=[],
@@ -450,23 +448,23 @@ def calcPhiASE(
     )
 
     host_mesh = Mesh(
-        triangleIndices=packed["trianglePointIndices_flat"],
-        numberOfTriangles=numberOfTriangles,
+        trianglePointIndices=packed["trianglePointIndices_flat"],
+        numberOfTriangles=int(packed["numberOfTriangles"]),
         numberOfLevels=numberOfLevels,
         numberOfPoints=numberOfPoints,
-        thicknessOfPrism=thicknessOfPrism,
-        pointsVector=packed["points_flat"],
-        xOfTriangleCenter=packed["triangleCenterX_flat"],
-        yOfTriangleCenter=packed["triangleCenterY_flat"],
-        positionsOfNormalVectors=packed["triangleNormalPoint_flat"],
-        xOfNormals=packed["triangleNormalsX_flat"],
-        yOfNormals=packed["triangleNormalsY_flat"],
-        forbiddenVector=packed["forbiddenEdge_flat"],
-        neighborsVector=packed["triangleNeighbors_flat"],
-        surfacesVector=packed["triangleSurfaces_flat"],
-        betaValuesVector=packed["betaVolume_flat"],
+        thickness=float(thickness),
+        points=packed["points_flat"],
+        triangleCenterX=packed["triangleCenterX_flat"],
+        triangleCenterY=packed["triangleCenterY_flat"],
+        triangleNormalPoint=packed["triangleNormalPoint_flat"],
+        triangleNormalsX=packed["triangleNormalsX_flat"],
+        triangleNormalsY=packed["triangleNormalsY_flat"],
+        forbiddenEdge=packed["forbiddenEdge_flat"],
+        triangleNeighbors=packed["triangleNeighbors_flat"],
+        triangleSurfaces=packed["triangleSurfaces_flat"],
+        betaVolume=packed["betaVolume_flat"],
         betaCells=packed["betaCells_flat"],
-        cellTypes=packed["claddingCellTypes_flat"],
+        claddingCellTypes=packed["claddingCellTypes_flat"],
         refractiveIndices=packed["refractiveIndices_flat"],
         reflectivities=packed["reflectivities_flat"],
         nTot=float(nTot),

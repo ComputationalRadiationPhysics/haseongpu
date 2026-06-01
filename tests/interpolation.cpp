@@ -4,7 +4,7 @@
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <interpolation.hpp>
+#include <hase/hase.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -12,7 +12,7 @@
 #include <random>
 #include <vector>
 
-std::vector<double> make_sorted_unique_x(std::size_t n, uint32_t seed)
+std::vector<double> makeSortedUniqueX(std::size_t n, uint32_t seed)
 {
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> dist(-1000.0, 1000.0);
@@ -32,7 +32,7 @@ std::vector<double> make_sorted_unique_x(std::size_t n, uint32_t seed)
     return x;
 }
 
-std::vector<double> make_linear_y(std::vector<double> const& x, double a, double b)
+std::vector<double> makeLinearY(std::vector<double> const& x, double a, double b)
 {
     std::vector<double> y(x.size());
     for(std::size_t i = 0; i < x.size(); ++i)
@@ -40,7 +40,7 @@ std::vector<double> make_linear_y(std::vector<double> const& x, double a, double
     return y;
 }
 
-std::vector<double> reconstruct_interpolated_x(std::vector<double> const& x, unsigned nInterpolations)
+std::vector<double> reconstructInterpolatedX(std::vector<double> const& x, unsigned nInterpolations)
 {
     if(nInterpolations == 0)
         return {};
@@ -70,15 +70,15 @@ TEST_CASE("interpolateLinear: exact for linear functions (fixed seeds)", "[inter
 
     for(std::size_t n : sizes)
     {
-        auto x = make_sorted_unique_x(n, /*seed=*/0xC0'FFEEu + static_cast<uint32_t>(n));
-        auto y = make_linear_y(x, m, b);
+        auto x = makeSortedUniqueX(n, /*seed=*/0xC0'FFEEu + static_cast<uint32_t>(n));
+        auto y = makeLinearY(x, m, b);
 
         for(unsigned ni : nInterps)
         {
             auto y_interp = interpolateLinear(y, x, ni);
             REQUIRE(y_interp.size() == ni);
 
-            auto x_interp = reconstruct_interpolated_x(x, ni);
+            auto x_interp = reconstructInterpolatedX(x, ni);
 
             double max_abs_err = 0.0;
             unsigned worst_j = 0;
@@ -106,7 +106,7 @@ TEST_CASE("interpolateLinear: no overshoot between adjacent samples (fixed seeds
     std::size_t const n = 1000;
     unsigned const ni = 100000;
 
-    auto x = make_sorted_unique_x(n, /*seed=*/0xBAD'C0DEu);
+    auto x = makeSortedUniqueX(n, /*seed=*/0xBAD'C0DEu);
 
     // fixed-seed y (random-looking but deterministic)
     std::mt19937 rng(0xDEAD'BEEFu);
@@ -116,7 +116,7 @@ TEST_CASE("interpolateLinear: no overshoot between adjacent samples (fixed seeds
         v = dist(rng);
 
     auto y_interp = interpolateLinear(y, x, ni);
-    auto x_interp = reconstruct_interpolated_x(x, ni);
+    auto x_interp = reconstructInterpolatedX(x, ni);
 
     // Walk segments i and interpolated points j
     std::size_t i = 0;

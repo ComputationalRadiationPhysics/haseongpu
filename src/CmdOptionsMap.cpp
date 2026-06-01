@@ -1,7 +1,9 @@
 /**
  * Copyright 2026 Tim Hanel
  */
-#include "CmdOptionsMap.hpp"
+#include <CmdOptionsMap.hpp>
+#include <logging.hpp>
+#include <types.hpp>
 
 #include <iostream>
 #include <limits>
@@ -104,11 +106,10 @@ void CmdOptionsMap::construct()
     add(ExpSwitch::mse, "The MSE threshold used for adaptive/repetitive sampling", "0.1");
     add(ExpSwitch::reflection, "Use reflections or not", "true");
     add(ExpSwitch::spectral, "The number of samples used to interpolate spectral intensities", "");
+    add(ExpSwitch::monochromatic, "Use one constant sigmaA/sigmaE pair and skip wavelength interpolation", "false");
 
-    add(CompSwitch::parallel_mode,
-        "Set the preferred way of parallelization (mpi, threaded), only valid with --device_mode=gpu",
-        "threaded");
-    add(CompSwitch::device_mode, "Set the device to run the calculation (cpu, gpu)", "gpu");
+    add(CompSwitch::parallel_mode, "Set the preferred way of parallelization (mpi, single)", "single");
+    add(CompSwitch::backend, "Set the device-backend to run the computation.", "gpu");
     add(CompSwitch::ngpus, "The maximum number of GPUs to be used on a single node", "1");
     add(CompSwitch::repetitions,
         "The number of repetitions to try before the number of rays is increased by adaptive sampling",
@@ -123,7 +124,7 @@ void CmdOptionsMap::construct()
         "The maximal index of sample points to simulate",
         std::to_string(std::numeric_limits<unsigned>::max()));
     add(CompSwitch::write_vtk, "Write VTK files of the computed ASE values", "false");
-
+    add(CompSwitch::backend, "The device-backend to use in order to perform the computation", "false");
     add("verbosity", "Set the verbosity levels", std::to_string(V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT));
     add("config", "Location of an optional config file", "");
     add("help", "Print this help message and exit", "false");

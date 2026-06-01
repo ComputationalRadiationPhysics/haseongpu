@@ -34,7 +34,8 @@ PYBIND11_MODULE(HASEonGPU, m)
                    double maxSigmaE,
                    double mseThreshold,
                    bool useReflections,
-                   unsigned spectral)
+                   unsigned spectral,
+                   bool monochromatic)
                 {
                     ExperimentParameters p{};
                     p.minRaysPerSample = minRaysPerSample;
@@ -48,6 +49,7 @@ PYBIND11_MODULE(HASEonGPU, m)
                     p.mseThreshold = mseThreshold;
                     p.useReflections = useReflections;
                     p.spectral = spectral;
+                    p.monochromatic = monochromatic;
                     return p;
                 }),
             py::arg("minRaysPerSample") = 100000u,
@@ -60,7 +62,8 @@ PYBIND11_MODULE(HASEonGPU, m)
             py::arg("maxSigmaE") = 0.0,
             py::arg("mseThreshold") = 0.1,
             py::arg("useReflections") = true,
-            py::arg("spectral") = 0u)
+            py::arg("spectral") = 0u,
+            py::arg("monochromatic") = false)
         .def_readwrite("minRaysPerSample", &ExperimentParameters::minRaysPerSample)
         .def_readwrite("maxRaysPerSample", &ExperimentParameters::maxRaysPerSample)
         .def_readwrite("lambdaA", &ExperimentParameters::lambdaA)
@@ -72,15 +75,16 @@ PYBIND11_MODULE(HASEonGPU, m)
         .def_readwrite("mseThreshold", &ExperimentParameters::mseThreshold)
         .def_readwrite("useReflections", &ExperimentParameters::useReflections)
         .def_readwrite("spectral", &ExperimentParameters::spectral)
+        .def_readwrite("monochromatic", &ExperimentParameters::monochromatic)
         .def(
             "__repr__",
             [](ExperimentParameters const& p)
             {
                 return "<ExperimentParameters minRaysPerSample=" + std::to_string(p.minRaysPerSample)
                        + ", maxRaysPerSample=" + std::to_string(p.maxRaysPerSample)
-                       + ", mseThreshold=" + std::to_string(p.mseThreshold)
-                       + ", useReflections=" + std::string(p.useReflections ? "True" : "False")
-                       + ", spectral=" + std::to_string(p.spectral) + ">";
+                       + ", mseThreshold=" + std::to_string(p.mseThreshold) + ", useReflections="
+                       + std::string(p.useReflections ? "True" : "False") + ", spectral=" + std::to_string(p.spectral)
+                       + ", monochromatic=" + std::string(p.monochromatic ? "True" : "False") + ">";
             });
 
     py::class_<Result>(m, "Result")
@@ -118,7 +122,7 @@ PYBIND11_MODULE(HASEonGPU, m)
                    unsigned adaptiveSteps,
                    unsigned maxGpus,
                    unsigned gpu_i,
-                   std::string deviceMode,
+                   std::string backend,
                    std::string parallelMode,
                    bool writeVtk,
                    std::vector<unsigned> devices,
@@ -130,7 +134,7 @@ PYBIND11_MODULE(HASEonGPU, m)
                     p.adaptiveSteps = adaptiveSteps;
                     p.maxGpus = maxGpus;
                     p.gpu_i = gpu_i;
-                    p.deviceMode = std::move(deviceMode);
+                    p.backend = std::move(backend);
                     p.parallelMode = std::move(parallelMode);
                     p.writeVtk = writeVtk;
                     p.devices = std::move(devices);
@@ -142,8 +146,8 @@ PYBIND11_MODULE(HASEonGPU, m)
             py::arg("adaptiveSteps") = 4u,
             py::arg("maxGpus") = 1u,
             py::arg("gpu_i") = 0u,
-            py::arg("deviceMode") = std::string("gpu"),
-            py::arg("parallelMode") = std::string("threaded"),
+            py::arg("backend") = std::string("gpu"),
+            py::arg("parallelMode") = std::string("single"),
             py::arg("writeVtk") = false,
             py::arg("devices") = std::vector<unsigned>{},
             py::arg("minSampleRange") = 0u,
@@ -152,7 +156,7 @@ PYBIND11_MODULE(HASEonGPU, m)
         .def_readwrite("adaptiveSteps", &ComputeParameters::adaptiveSteps)
         .def_readwrite("maxGpus", &ComputeParameters::maxGpus)
         .def_readwrite("gpu_i", &ComputeParameters::gpu_i)
-        .def_readwrite("deviceMode", &ComputeParameters::deviceMode)
+        .def_readwrite("backend", &ComputeParameters::backend)
         .def_readwrite("parallelMode", &ComputeParameters::parallelMode)
         .def_readwrite("writeVtk", &ComputeParameters::writeVtk)
         .def_readwrite("devices", &ComputeParameters::devices)
@@ -165,29 +169,29 @@ PYBIND11_MODULE(HASEonGPU, m)
                 return "<ComputeParameters maxRepetitions=" + std::to_string(p.maxRepetitions)
                        + ", adaptiveSteps=" + std::to_string(p.adaptiveSteps)
                        + ", maxGpus=" + std::to_string(p.maxGpus) + ", gpu_i=" + std::to_string(p.gpu_i)
-                       + ", deviceMode='" + p.deviceMode + "', parallelMode='" + p.parallelMode + "'>";
+                       + ", backend='" + p.backend + "', parallelMode='" + p.parallelMode + "'>";
             });
 
     py::class_<HostMesh>(m, "HostMesh")
         .def(
             py::init(
-                [](std::vector<unsigned> triangleIndices,
+                [](std::vector<unsigned> trianglePointIndices,
                    unsigned numberOfTriangles,
                    unsigned numberOfLevels,
                    unsigned numberOfPoints,
-                   float thicknessOfPrism,
-                   std::vector<double> pointsVector,
-                   std::vector<double> xOfTriangleCenter,
-                   std::vector<double> yOfTriangleCenter,
-                   std::vector<unsigned> positionsOfNormalVectors,
-                   std::vector<double> xOfNormals,
-                   std::vector<double> yOfNormals,
-                   std::vector<int> forbiddenVector,
-                   std::vector<int> neighborsVector,
-                   std::vector<float> surfacesVector,
-                   std::vector<double> betaValuesVector,
+                   float thickness,
+                   std::vector<double> points,
+                   std::vector<double> triangleCenterX,
+                   std::vector<double> triangleCenterY,
+                   std::vector<unsigned> triangleNormalPoint,
+                   std::vector<double> triangleNormalsX,
+                   std::vector<double> triangleNormalsY,
+                   std::vector<int> forbiddenEdge,
+                   std::vector<int> triangleNeighbors,
+                   std::vector<float> triangleSurfaces,
+                   std::vector<double> betaVolume,
                    std::vector<double> betaCells,
-                   std::vector<unsigned> cellTypes,
+                   std::vector<unsigned> claddingCellTypes,
                    std::vector<float> refractiveIndices,
                    std::vector<float> reflectivities,
                    float nTot,
@@ -196,23 +200,23 @@ PYBIND11_MODULE(HASEonGPU, m)
                    double claddingAbsorption)
                 {
                     return HostMesh(
-                        std::move(triangleIndices),
+                        std::move(trianglePointIndices),
                         numberOfTriangles,
                         numberOfLevels,
                         numberOfPoints,
-                        thicknessOfPrism,
-                        std::move(pointsVector),
-                        std::move(xOfTriangleCenter),
-                        std::move(yOfTriangleCenter),
-                        std::move(positionsOfNormalVectors),
-                        std::move(xOfNormals),
-                        std::move(yOfNormals),
-                        std::move(forbiddenVector),
-                        std::move(neighborsVector),
-                        std::move(surfacesVector),
-                        std::move(betaValuesVector),
+                        thickness,
+                        std::move(points),
+                        std::move(triangleCenterX),
+                        std::move(triangleCenterY),
+                        std::move(triangleNormalPoint),
+                        std::move(triangleNormalsX),
+                        std::move(triangleNormalsY),
+                        std::move(forbiddenEdge),
+                        std::move(triangleNeighbors),
+                        std::move(triangleSurfaces),
+                        std::move(betaVolume),
                         std::move(betaCells),
-                        std::move(cellTypes),
+                        std::move(claddingCellTypes),
                         std::move(refractiveIndices),
                         std::move(reflectivities),
                         nTot,
@@ -220,53 +224,53 @@ PYBIND11_MODULE(HASEonGPU, m)
                         claddingNumber,
                         claddingAbsorption);
                 }),
-            py::arg("triangleIndices") = std::vector<unsigned>{},
+            py::arg("trianglePointIndices") = std::vector<unsigned>{},
             py::arg("numberOfTriangles") = 0u,
             py::arg("numberOfLevels") = 0u,
             py::arg("numberOfPoints") = 0u,
-            py::arg("thicknessOfPrism") = 0.0f,
-            py::arg("pointsVector") = std::vector<double>{},
-            py::arg("xOfTriangleCenter") = std::vector<double>{},
-            py::arg("yOfTriangleCenter") = std::vector<double>{},
-            py::arg("positionsOfNormalVectors") = std::vector<unsigned>{},
-            py::arg("xOfNormals") = std::vector<double>{},
-            py::arg("yOfNormals") = std::vector<double>{},
-            py::arg("forbiddenVector") = std::vector<int>{},
-            py::arg("neighborsVector") = std::vector<int>{},
-            py::arg("surfacesVector") = std::vector<float>{},
-            py::arg("betaValuesVector") = std::vector<double>{},
+            py::arg("thickness") = 0.0f,
+            py::arg("points") = std::vector<double>{},
+            py::arg("triangleCenterX") = std::vector<double>{},
+            py::arg("triangleCenterY") = std::vector<double>{},
+            py::arg("triangleNormalPoint") = std::vector<unsigned>{},
+            py::arg("triangleNormalsX") = std::vector<double>{},
+            py::arg("triangleNormalsY") = std::vector<double>{},
+            py::arg("forbiddenEdge") = std::vector<int>{},
+            py::arg("triangleNeighbors") = std::vector<int>{},
+            py::arg("triangleSurfaces") = std::vector<float>{},
+            py::arg("betaVolume") = std::vector<double>{},
             py::arg("betaCells") = std::vector<double>{},
-            py::arg("cellTypes") = std::vector<unsigned>{},
+            py::arg("claddingCellTypes") = std::vector<unsigned>{},
             py::arg("refractiveIndices") = std::vector<float>{},
             py::arg("reflectivities") = std::vector<float>{},
             py::arg("nTot") = 0.0f,
             py::arg("crystalTFluo") = 0.0f,
             py::arg("claddingNumber") = 0u,
             py::arg("claddingAbsorption") = 0.0)
-        .def_property_readonly("triangleIndices", [](HostMesh const& m) { return m.triangleIndices; })
-        .def_property_readonly("numberOfTriangles", [](HostMesh const& m) { return m.numberOfTriangles; })
-        .def_property_readonly("numberOfLevels", [](HostMesh const& m) { return m.numberOfLevels; })
-        .def_property_readonly("numberOfPoints", [](HostMesh const& m) { return m.numberOfPoints; })
-        .def_property_readonly("thicknessOfPrism", [](HostMesh const& m) { return m.thicknessOfPrism; })
-        .def_readwrite("pointsVector", &HostMesh::pointsVector)
-        .def_readwrite("xOfTriangleCenter", &HostMesh::xOfTriangleCenter)
-        .def_readwrite("yOfTriangleCenter", &HostMesh::yOfTriangleCenter)
-        .def_readwrite("positionsOfNormalVectors", &HostMesh::positionsOfNormalVectors)
-        .def_readwrite("xOfNormals", &HostMesh::xOfNormals)
-        .def_readwrite("yOfNormals", &HostMesh::yOfNormals)
-        .def_readwrite("forbiddenVector", &HostMesh::forbiddenVector)
-        .def_readwrite("neighborsVector", &HostMesh::neighborsVector)
-        .def_readwrite("surfacesVector", &HostMesh::surfacesVector)
-        .def_readwrite("betaValuesVector", &HostMesh::betaValuesVector)
+        .def_readwrite("trianglePointIndices", &HostMesh::trianglePointIndices)
+        .def_readwrite("numberOfTriangles", &HostMesh::numberOfTriangles)
+        .def_readwrite("numberOfLevels", &HostMesh::numberOfLevels)
+        .def_readwrite("numberOfPoints", &HostMesh::numberOfPoints)
+        .def_readwrite("thickness", &HostMesh::thickness)
+        .def_readwrite("points", &HostMesh::points)
+        .def_readwrite("triangleCenterX", &HostMesh::triangleCenterX)
+        .def_readwrite("triangleCenterY", &HostMesh::triangleCenterY)
+        .def_readwrite("triangleNormalPoint", &HostMesh::triangleNormalPoint)
+        .def_readwrite("triangleNormalsX", &HostMesh::triangleNormalsX)
+        .def_readwrite("triangleNormalsY", &HostMesh::triangleNormalsY)
+        .def_readwrite("forbiddenEdge", &HostMesh::forbiddenEdge)
+        .def_readwrite("triangleNeighbors", &HostMesh::triangleNeighbors)
+        .def_readwrite("triangleSurfaces", &HostMesh::triangleSurfaces)
+        .def_readwrite("betaVolume", &HostMesh::betaVolume)
         .def_readwrite("betaCells", &HostMesh::betaCells)
-        .def_readwrite("cellTypes", &HostMesh::cellTypes)
+        .def_readwrite("claddingCellTypes", &HostMesh::claddingCellTypes)
         .def_readwrite("refractiveIndices", &HostMesh::refractiveIndices)
         .def_readwrite("reflectivities", &HostMesh::reflectivities)
         .def_readwrite("nTot", &HostMesh::nTot)
         .def_readwrite("crystalTFluo", &HostMesh::crystalTFluo)
         .def_readwrite("claddingNumber", &HostMesh::claddingNumber)
         .def_readwrite("claddingAbsorption", &HostMesh::claddingAbsorption)
-        .def("toMesh", &HostMesh::toMesh)
+        .def("calcTotalReflectionAngles", &HostMesh::calcTotalReflectionAngles)
         .def(
             "__repr__",
             [](HostMesh const& hm)

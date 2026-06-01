@@ -87,7 +87,7 @@ Minimal example (only using the library function call):
         laserParameter,
         crystal,
         numberOfLevels,
-        deviceMode,
+        backend,
         parallelMode,
         maxGPUs,
         nPerNode
@@ -547,6 +547,16 @@ The following section describes all arguments of the Python call.
   It provides the absorption and emission cross sections together with the
   corresponding wavelength values.
 
+  In binary input folders, these fields correspond to ``lambdaA.txt``,
+  ``lambdaE.txt``, ``sigmaA.txt``, and ``sigmaE.txt``.
+
+  For monochromatic calculations, provide one absorption and one emission cross
+  section via ``s_abs`` and ``s_ems``. The wavelength fields ``l_abs`` and
+  ``l_ems`` are ignored in monochromatic mode.
+
+  For spectral calculations, provide wavelength-dependent arrays:
+  ``l_abs``/``s_abs`` for absorption and ``l_ems``/``s_ems`` for emission.
+
 * Required fields:
 
   * ``l_abs``
@@ -563,6 +573,7 @@ The following section describes all arguments of the Python call.
     * Supported layout: flat
     * Description:
       Wavelength values of the absorption spectrum in ``nm``.
+      Ignored when monochromatic mode is enabled.
 
   * ``l_ems``
     * Container type: ``list`` or ``ndarray``
@@ -570,6 +581,7 @@ The following section describes all arguments of the Python call.
     * Supported layout: flat
     * Description:
       Wavelength values of the emission spectrum in ``nm``.
+      Ignored when monochromatic mode is enabled.
 
   * ``s_abs``
     * Container type: ``list`` or ``ndarray``
@@ -589,6 +601,7 @@ The following section describes all arguments of the Python call.
     * Type: scalar
     * Description:
       Resolution used for linear interpolation of the spectrum.
+      Ignored when monochromatic mode is enabled.
 
 ``crystal``
 ^^^^^^^^^^^
@@ -617,7 +630,7 @@ The following section describes all arguments of the Python call.
 * Description:
   Total number of mesh levels in z-direction.
 
-``deviceMode``
+``backend``
 ^^^^^^^^^^^^^^
 
 * Type: ``str``
@@ -627,7 +640,7 @@ The following section describes all arguments of the Python call.
   * ``"gpu"``
 
 * Description:
-  Selects whether the CPU or GPU implementation is used.
+  Selects whether the alpaka backend that will be used for execution.
   The CPU implementation is mostly deprecated.
 
 ``parallelMode``
@@ -636,7 +649,7 @@ The following section describes all arguments of the Python call.
 * Type: ``str``
 * Allowed values:
 
-  * ``"threaded"`` - threads distribute samples across GPUs/devices within one node
+  * ``"single"`` - threads distribute samples across GPUs/devices within one node
   * ``"mpi"`` - distributes samples across nodes;
 
 * Description:
@@ -649,7 +662,7 @@ The following section describes all arguments of the Python call.
 * Description:
   Maximum number of GPUs used by a single process.
 
-  In ``threaded`` mode, this usually corresponds to the total number of GPUs
+  In ``single`` mode, this usually corresponds to the total number of GPUs
   used on the local node.
 
   In ``mpi`` mode, this corresponds to the number of GPUs used per MPI process

@@ -42,7 +42,7 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: str = "threaded"):
+def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: str = "single"):
     #precheck the file path and throw in case this is not present
     # Crystal parameter
     crystal = {
@@ -117,9 +117,9 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
     # ASE application
     maxGPUs = gpus
     nPerNode = 1
-    deviceMode = 'gpu'
+    backend = 'gpu'
     # parallelMode = 'mpi'
-    # parallelMode = 'threaded'
+    # parallelMode = 'single'
     parallelMode = parallel_mode
     useReflections = True
     refractiveIndices = [1.83, 1, 1.83, 1]
@@ -345,7 +345,7 @@ def main(material_path: Path = SCRIPT_DIR / "pt.mat",gpus: int=1,parallel_mode: 
             laser,
             crystal,
             mesh_z,
-            deviceMode,
+            backend,
             parallelMode,
             maxGPUs,
             nPerNode)
@@ -473,8 +473,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--parallel_mode",
         "-par",
-        default="threaded",
-        help="The Parallel Mode used for phiASE [threaded|mpi] (default: threaded)",
+        default="single",
+        help="The Parallel Mode used for phiASE [single|mpi] (default: single)",
     )
     args = parser.parse_args()
     material_path = Path(args.material)

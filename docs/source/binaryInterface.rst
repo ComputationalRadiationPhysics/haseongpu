@@ -42,15 +42,15 @@ preprocessed input files are provided:
 * ``cuboid``
 * ``cylindrical``
 
-Single-node threaded run using the ``cylindrical`` example:
+Single-node run using the ``cylindrical`` example:
 
 .. code-block:: bash
 
    ./build/calcPhiASE \
        --input-path=./example/c_example/input/cylindrical \
        --output-path=/tmp/ \
-       --parallel-mode=threaded \
-       --device-mode=gpu \
+       --parallel-mode=single \
+       --backend=gpu \
        --min-rays=10000 \
        --max-rays=100000 \
        --reflection=1 \
@@ -69,7 +69,7 @@ MPI run with 4 GPUs per node using the same example:
        --input-path=./example/c_example/input/cylindrical \
        --output-path=/tmp/ \
        --parallel-mode=mpi \
-       --device-mode=gpu \
+       --backend=gpu \
        --min-rays=10000 \
        --max-rays=100000 \
        --reflection=1 \
@@ -98,7 +98,7 @@ Path to a writable output directory.
 
 This location is used to store generated output files.
 
-``--device-mode=[cpu|gpu]``
+``--backend=[cpu|gpu]``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Selects the hardware used for the simulation.
@@ -106,13 +106,13 @@ Selects the hardware used for the simulation.
 * ``cpu`` uses the original single-core CPU algorithm
 * ``gpu`` uses NVIDIA CUDA GPUs
 
-``--parallel-mode=[threaded|mpi]``
+``--parallel-mode=[single|mpi]``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Selects the parallelization mode.
 
-* ``threaded`` uses pthreads on a single node
-* ``mpi`` uses MPI for distributed execution
+* ``single`` runs haseongpu on a single node
+* ``mpi`` uses MPI for distributed execution (run binary with mpiexec)
 
 ``--min-rays=``
 ^^^^^^^^^^^^^^^
@@ -129,7 +129,7 @@ Maximum number of rays used per sample point.
 
 Maximum number of GPUs to use.
 
-In ``threaded`` mode, this is typically the number of GPUs available on the
+In ``single`` mode, this is typically the number of GPUs available on the
 local node. In ``mpi`` mode, this is usually set to ``1``.
 
 ``--min-sample-i=``
@@ -189,6 +189,27 @@ Setting this to ``1`` disables adaptive stepping and uses only
 
 Resolution used for linear interpolation of the absorption and emission
 spectra.
+
+``--monochromatic=``
+^^^^^^^^^^^^^^^^^^^^
+
+Selects monochromatic or spectral propagation.
+
+When ``true``, HASEonGPU uses one constant absorption/emission cross-section
+pair for the whole calculation. The values are read from ``sigmaA.txt`` and
+``sigmaE.txt``. Wavelength files are ignored in this mode.
+
+When ``false``, HASEonGPU uses wavelength-dependent spectra:
+``lambdaA.txt`` with ``sigmaA.txt`` for absorption and ``lambdaE.txt`` with
+``sigmaE.txt`` for emission. These spectra are interpolated according to
+``--spectral-resolution``.
+
+Accepted values:
+
+* ``true`` / ``1``: monochromatic calculation using one ``sigmaA``/``sigmaE`` pair
+* ``false`` / ``0``: spectral calculation using wavelength-dependent data
+
+Default: ``false``
 
 ``--write-vtk=``
 ^^^^^^^^^^^^^^^^
