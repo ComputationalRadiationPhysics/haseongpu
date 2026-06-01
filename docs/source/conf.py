@@ -1,3 +1,9 @@
+# Copyright 2026 Tim Hanel
+#
+# This file is part of HASEonGPU
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -20,9 +26,15 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
 ]
+
+autosummary_generate = True
+autosummary_generate_overwrite = True
+autodoc_typehints = "description"
+autodoc_member_order = "bysource"
 
 templates_path = ['_templates']
 exclude_patterns = []

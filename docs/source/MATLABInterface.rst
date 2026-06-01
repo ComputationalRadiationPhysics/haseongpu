@@ -5,7 +5,7 @@ This page documents the MATLAB-compatible interface of HASEonGPU.
 
 The MATLAB interface is mainly intended for compatibility with existing MATLAB
 or Octave workflows. If this is your first time using HASEonGPU, the
-:doc:`Python Interface <pythonInterface>` is usually the better starting point.
+:doc:`Python Interface Guide <pythonInterface>` is usually the better starting point.
 
 For general setup and dependency information, see
 :doc:`Getting Started <gettingStarted>`.
@@ -61,7 +61,7 @@ Call ``calcPhiASE`` from a MATLAB script:
        numberOfLevels,
        backend,
        parallelMode,
-       maxGPUs,
+       numDevices,
        nPerNode
    );
 
@@ -125,7 +125,7 @@ The following section describes all arguments of the MATLAB call.
 * Element type: ``float``
 * Size: ``numberOfPoints``
 * Description:
-  Stimulus values at the sample points.
+  Excited-state fraction :math:`\beta_i` at the sample points.
 
 ``betaVolume``
 ^^^^^^^^^^^^^^
@@ -133,7 +133,8 @@ The following section describes all arguments of the MATLAB call.
 * Element type: ``float``
 * Size: ``numberOfTriangles * (numberOfLevels - 1)``
 * Description:
-  Stimulus values in the prism volume.
+  Prism-centered excited-state fraction :math:`\beta_j` used by the ASE ray
+  integration.
 
   Prism values are ordered according to the prism ID:
 
@@ -286,7 +287,7 @@ The following section describes all arguments of the MATLAB call.
 * Type: ``unsigned``
 * Size: ``1``
 * Description:
-  Minimum number of rays used for adaptive sampling.
+  Minimum number of Monte Carlo rays :math:`N` used for adaptive sampling.
 
 ``maxRaysPerSample``
 ^^^^^^^^^^^^^^^^^^^^
@@ -330,7 +331,7 @@ The following section describes all arguments of the MATLAB call.
 * Type: ``float``
 * Size: ``1``
 * Description:
-  Doping of the active gain medium.
+  Active-ion concentration :math:`N_{\mathrm{tot}}` of the active gain medium.
 
 ``thickness``
 ^^^^^^^^^^^^^
@@ -338,7 +339,7 @@ The following section describes all arguments of the MATLAB call.
 * Type: ``float``
 * Size: ``1``
 * Description:
-  Thickness of one prism layer of the mesh.
+  Thickness :math:`\Delta z` of one prism layer of the mesh.
 
 ``laserParameter``
 ^^^^^^^^^^^^^^^^^^
@@ -346,8 +347,9 @@ The following section describes all arguments of the MATLAB call.
 * Type: ``struct``
 * Description:
   Structure containing the laser material spectra.
-  It provides the absorption and emission spectrum values together with the
-  corresponding wavelength values.
+  It provides the absorption and emission spectrum values,
+  :math:`\sigma_a(\lambda)` and :math:`\sigma_e(\lambda)`, together with the
+  corresponding wavelength values :math:`\lambda`.
 
 * Required fields:
 
@@ -359,46 +361,41 @@ The following section describes all arguments of the MATLAB call.
 
 * Field layouts:
 
-  * ``l_abs``
-    * Container type: vector
-    * Element type: ``double``
-    * Supported layout: flat
-    * Description:
-      Wavelength values of the absorption spectrum in ``nm``.
-      Accessed in MATLAB as ``laserParameter.l_abs``.
+  ``l_abs``
+    Container type: vector.
+    Element type: ``double``.
+    Supported layout: flat.
+    Wavelength values :math:`\lambda` of the absorption spectrum in ``nm``.
+    Accessed in MATLAB as ``laserParameter.l_abs``.
 
-  * ``l_ems``
-    * Container type: vector
-    * Element type: ``double``
-    * Supported layout: flat
-    * Description:
-      Wavelength values of the emission spectrum in ``nm``.
-      Accessed in MATLAB as ``laserParameter.l_ems``.
+  ``l_ems``
+    Container type: vector.
+    Element type: ``double``.
+    Supported layout: flat.
+    Wavelength values :math:`\lambda` of the emission spectrum in ``nm``.
+    Accessed in MATLAB as ``laserParameter.l_ems``.
 
-  * ``s_abs``
-    * Container type: vector
-    * Element type: ``double``
-    * Supported layout: flat
-    * Description:
-      Values of the absorption spectrum in ``cm^2``, corresponding to
-      ``l_abs``.
-      Accessed in MATLAB as ``laserParameter.s_abs``.
+  ``s_abs``
+    Container type: vector.
+    Element type: ``double``.
+    Supported layout: flat.
+    Absorption cross sections :math:`\sigma_a` in ``cm^2``, corresponding to
+    ``l_abs``.
+    Accessed in MATLAB as ``laserParameter.s_abs``.
 
-  * ``s_ems``
-    * Container type: vector
-    * Element type: ``double``
-    * Supported layout: flat
-    * Description:
-      Values of the emission spectrum in ``cm^2``, corresponding to
-      ``l_ems``.
-      Accessed in MATLAB as ``laserParameter.s_ems``.
+  ``s_ems``
+    Container type: vector.
+    Element type: ``double``.
+    Supported layout: flat.
+    Emission cross sections :math:`\sigma_e` in ``cm^2``, corresponding to
+    ``l_ems``.
+    Accessed in MATLAB as ``laserParameter.s_ems``.
 
-  * ``l_res``
-    * Type: scalar
-    * Element type: ``double``
-    * Description:
-      Resolution used for linear interpolation of the spectrum.
-      Accessed in MATLAB as ``laserParameter.l_res``.
+  ``l_res``
+    Type: scalar.
+    Element type: ``double``.
+    Resolution used for linear interpolation of the spectrum.
+    Accessed in MATLAB as ``laserParameter.l_res``.
 
 
 ``crystal``
@@ -414,12 +411,11 @@ The following section describes all arguments of the MATLAB call.
 
 * Field layouts:
 
-  * ``tfluo``
-    * Type: scalar
-    * Element type: ``double``
-    * Description:
-      Fluorescence lifetime of the active medium in seconds.
-      Accessed in MATLAB as ``crystal.tfluo``.
+  ``tfluo``
+    Type: scalar.
+    Element type: ``double``.
+    Fluorescence lifetime :math:`\tau` of the active medium in seconds.
+    Accessed in MATLAB as ``crystal.tfluo``.
 
 ``numberOfLevels``
 ^^^^^^^^^^^^^^^^^^
@@ -433,14 +429,12 @@ The following section describes all arguments of the MATLAB call.
 ^^^^^^^^^^^^^^
 
 * Type: ``str``
-* Allowed values:
-
-  * ``"cpu"``
-  * ``"gpu"``
 
 * Description:
-  Selects the alpaka backend that is used is used.
-  The CPU implementation is mostly deprecated.
+  Selects the alpaka backend used for the simulation.
+
+  For details on available runtime backends and backend naming, see the
+  runtime selection section of :doc:`Backend Selection <backendSelection>`.
 
 ``parallelMode``
 ^^^^^^^^^^^^^^^^
@@ -454,19 +448,20 @@ The following section describes all arguments of the MATLAB call.
 * Description:
   Selects the parallelization mode.
 
-``maxGPUs``
-^^^^^^^^^^^
+``numDevices``
+^^^^^^^^^^^^^^
 
 * Type: ``unsigned``
 * Description:
-  Maximum number of GPUs used by a single process.
+  Number of devices used by one process - internally HASEonGPU uses min(numDevices,availableDevices).
 
-  In ``single`` mode, this usually corresponds to the total number of GPUs
+  In ``single`` mode, this usually corresponds to the requested number of computing devices -
+  this can be gpus or cpu sockets depending on the alpaka backend -
   used on the local node.
 
-  In ``mpi`` mode, this corresponds to the number of GPUs used per MPI process
+  In ``mpi`` mode, this corresponds to the number of computing devices used per MPI process
   rank. Therefore, if ``nPerNode = 1 (default)`` , it corresponds to the number of
-  GPUs used per node.
+  devices used per node.
 
 ``nPerNode``
 ^^^^^^^^^^^^

@@ -60,12 +60,13 @@ The following CMake variables control important build options.
 ``DISABLE_MPI``
 ^^^^^^^^^^^^^^^
 
-* Default: ``OFF``
+* Default: ``AUTO``
 * Description:
   Enabling allows compilation without requiring MPI or BoostMPI as a dependency.
 
 * Values:
 
+  * ``AUTO``: CMAKE tries to detect whether MPI exists and sets this knob in correspondence
   * ``OFF``: MPI support remains - dependencies are required
   * ``ON``: MPI support is disabled
 
@@ -87,12 +88,11 @@ different systems, specifying the CUDA architecture is recommended.
 ``HASE_ENABLE_PYTHON``
 ^^^^^^^^^^^^^^^^^^^^^^
 
-* Default: ``OFF``
+* Default: ``ON``
 * Description:
 
-  This option usually does not need to be enabled manually unless you want to
-  customize the Python interface build. For normal Python installation and
-  usage, please refer to :doc:`Python Interface <pythonInterface>`.
+  If python as a dependency is missing on your system this knob can be turned off in order to use HASEonGPU from the command-line only.
+  For normal Python installation and usage, please refer to :doc:`Python Interface Guide <pythonInterface>`.
 
 
 * Values:
@@ -100,21 +100,67 @@ different systems, specifying the CUDA architecture is recommended.
   * ``OFF``: build only the C++ project and binary interface
   * ``ON``: build the Python interface
 
-``HASE_RELEASE``
-^^^^^^^^^^^^^^^^
+``HASE_BUILD_RELEASE``
+^^^^^^^^^^^^^^^^^^^^^^
 
 * Default: ``ON``
 * Description:
-  Controls whether HASEonGPU is built in release mode.
+  Controls whether HASEonGPU applies its release build configuration.  When
+  enabled, CMake forces ``CMAKE_BUILD_TYPE=Release`` and enables the release
+  optimization options used by the project, including native host compiler
+  tuning flags and CUDA/HIP fast-math related flags where applicable.
+
+  Important: ``HASE_BUILD_RELEASE=ON`` overwrites user-provided
+  ``CMAKE_BUILD_TYPE`` values and related optimization settings during
+  configuration.  Set ``HASE_BUILD_RELEASE=OFF`` if you need a custom build
+  type, debug flags, or manually controlled compiler optimization options.
 
 * Values:
 
-  * ``OFF``: non-release build
-  * ``ON``: release-oriented build
+  * ``OFF``: keep user-provided build type and optimization settings
+  * ``ON``: force the project release configuration
 
-  This option is enabled by default for performance-oriented builds. Disabling
-  it allows internal runtime assertions and is therefore mainly useful for
-  debugging and development.
+``HASE_SELECT_BACKEND_ALPAKA``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Default: ``OFF``
+
+* Description:
+  Controls whether HASEonGPU selects available alpaka backends automatically or
+  whether backend selection is delegated to alpaka's CMake options.
+
+  For general information about backend names and runtime backend selection,
+  see :doc:`Backend Selection <backendSelection>`.
+
+* Values:
+
+  * ``OFF``:
+    HASEonGPU automatically searches for supported backend dependencies such as
+    CUDA, HIP, and TBB and enables the corresponding alpaka backends when
+    possible.
+
+    If both HIP and CUDA are installed on the same system, automatic detection
+    may cause configuration issues in alpaka. In that case, manual backend
+    selection should be used to explicitly disable one of the conflicting
+    backends.
+
+  * ``ON``:
+    Enables manual backend selection using alpaka's existing CMake options.
+
+    The relevant alpaka CMake options are documented in the
+    `alpaka CMake argument documentation <https://alpaka3.readthedocs.io/en/latest/advanced/cmake.html#arguments>`__.
+
+    Example: configure HASEonGPU only for an NVIDIA GPU backend:
+
+    .. code-block:: bash
+
+       cmake -S . -B build \
+         -DHASE_SELECT_BACKEND_ALPAKA=ON \
+         -Dalpaka_DEP_CUDA=ON \
+         -Dalpaka_DEP_HIP=OFF \
+         -Dalpaka_DEP_TBB=OFF \
+         -Dalpaka_EXEC_CpuSerial=OFF
+
 
 ``HASE_TESTING``
 ^^^^^^^^^^^^^^^^

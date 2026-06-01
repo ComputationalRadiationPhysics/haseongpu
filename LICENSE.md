@@ -1,10 +1,7 @@
-License
-=======
+## License
 
+HASEonGPU is licensed under the GNU GPL-3 or subsequent versions GPL-3.0-or-later.
+
+Parts of the source code originate from earlier work by Erik Zenker and retain
+their original copyright notices.
 **Copyright 2015** Erik Zenker
-
-The **source code** of **GrayBat** is licensed under the <b>GPLv3+</b>. See
-[COPYING](COPYING). If not stated otherwise explicitly, that affects:
-
- + `src`
- + `include`

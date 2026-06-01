@@ -96,7 +96,7 @@ timetotal = 1e-3; %[s]
 time_t = timetotal/timeslice;
 
 % ASE application
-maxGPUs           = 2;
+numDevices           = 2;
 nPerNode          = 4;
 backend            = 'gpu';
 %parallelMode           = 'mpi';
@@ -138,9 +138,9 @@ flux_clad = phi_ASE(:,:);
 dndt_pump = (beta_cell);
 
 % Save values in file -> first timestep the phi_ASE is zero
-vtk_wedge('beta_cell_0.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
-vtk_wedge('dndt_pump_0.vtk',dndt_pump, p, t_int, mesh_z, z_mesh);
-vtk_wedge('dndt_ASE_0.vtk',dndt_ASE , p, t_int, mesh_z, z_mesh);
+vtkWedge('beta_cell_0.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
+vtkWedge('dndt_pump_0.vtk',dndt_pump, p, t_int, mesh_z, z_mesh);
+vtkWedge('dndt_ASE_0.vtk',dndt_ASE , p, t_int, mesh_z, z_mesh);
 save('save_0.mat');
 
 temp = pump.T;
@@ -180,7 +180,7 @@ for i_p=1:size(p,1)
     end
 end
 
-vtk_wedge('beta_cell_1.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
+vtkWedge('beta_cell_1.vtk',beta_cell, p, t_int, mesh_z, z_mesh);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Definition of cladding %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Which index is the cladding?
@@ -238,8 +238,8 @@ for i_slice=1:timeslice_tot-1
     file_A = ['dndt_ASE_' num2str(i_slice) '.vtk'];
     file_C = ['flux_clad_' num2str(i_slice) '.vtk'];
 
-    vtk_wedge(file_b,beta_cell, p, t_int, mesh_z, z_mesh);
-    vtk_wedge(file_p,dndt_pump, p, t_int, mesh_z, z_mesh);
+    vtkWedge(file_b,beta_cell, p, t_int, mesh_z, z_mesh);
+    vtkWedge(file_p,dndt_pump, p, t_int, mesh_z, z_mesh);
 
     % Interpolate beta_vol from beta_cell
     x_1 = p(:,1);
@@ -310,7 +310,7 @@ for i_slice=1:timeslice_tot-1
        mesh_z,...
        backend,...
        parallelMode,...
-       maxGPUs,...
+       numDevices,...
        nPerNode);
 
 
@@ -335,8 +335,8 @@ for i_slice=1:timeslice_tot-1
         end
     end
 
-    vtk_wedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh);
-    vtk_wedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh);
+    vtkWedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh);
+    vtkWedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh);
     save(['save_' num2str(i_slice) '.mat']);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%% Prepare next timeslice %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -380,10 +380,10 @@ file_p = ['dndt_pump_' num2str(timeslice_tot) '.vtk'];
 file_A = ['dndt_ASE_' num2str(timeslice_tot) '.vtk'];
 file_C = ['flux_clad_' num2str(timeslice_tot) '.vtk'];
 
-vtk_wedge(file_b,beta_cell, p, t_int, mesh_z, z_mesh);
-vtk_wedge(file_p,dndt_pump, p, t_int, mesh_z, z_mesh);
-vtk_wedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh);
-vtk_wedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh);
+vtkWedge(file_b,beta_cell, p, t_int, mesh_z, z_mesh);
+vtkWedge(file_p,dndt_pump, p, t_int, mesh_z, z_mesh);
+vtkWedge(file_A,dndt_ASE , p, t_int, mesh_z, z_mesh);
+vtkWedge(file_C,flux_clad , p, t_int, mesh_z, z_mesh);
 
 disp('Calculations finished');
 toc
