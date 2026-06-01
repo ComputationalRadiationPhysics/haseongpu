@@ -103,8 +103,8 @@ def createDummyData():
         "N_tot": 5.0,
         "z_mesh": 0.25,
         "mesh_z": mesh_z,
-        "deviceMode": "cpu",
-        "parallelMode": "threaded",
+        "backend": "cpu",
+        "parallelMode": "single",
         "maxGPUs": 1,
         "nPerNode": 1
     }
@@ -201,7 +201,7 @@ def run_withOptions(layout, container, parallel, data):
         case["laser"],
         case["crystal"],
         case["mesh_z"],
-        case["deviceMode"],
+        case["backend"],
         parallel,
         case["maxGPUs"],
         case["nPerNode"]
@@ -224,7 +224,7 @@ def reference_outputs(dummy_data):
     phi_ASE, mse_values, N_rays = run_withOptions(
         layout="matrix",
         container="ndarray",
-        parallel="threaded",
+        parallel="single",
         data=dummy_data,
     )
 
@@ -240,7 +240,7 @@ def reference_outputs(dummy_data):
 
 @pytest.mark.parametrize("layout", ["matrix", "flat"])
 @pytest.mark.parametrize("container", ["ndarray", "list"])
-@pytest.mark.parametrize("parallel", ["threaded", "debugFileIOPath"])
+@pytest.mark.parametrize("parallel", ["single", "debugFileIOPath"])
 def test_calcPhiASE_cases(layout, container, parallel, dummy_data, reference_outputs):
     phi_ASE, mse_values, N_rays = run_withOptions(layout, container, parallel, dummy_data)
 

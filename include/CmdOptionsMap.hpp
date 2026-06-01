@@ -3,13 +3,11 @@
  */
 #pragma once
 
-#include <logging.hpp>
-#include <types.hpp>
-
 #include <filesystem>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+
 namespace fs = std::filesystem;
 
 std::string_view requireValue(int& i, int argc, char** argv, std::string_view opt);

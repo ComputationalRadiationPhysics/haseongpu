@@ -48,11 +48,11 @@
  *         1 otherwise
  *
  */
-__device__ int calcNextReflection(
+ALPAKA_FN_ACC int calcNextReflection(
     Point const startPoint,
     Point const endPoint,
     unsigned const reflectionsLeft,
     ReflectionPlane const reflectionPlane,
     Point* reflectionPoint,
     double* reflectionAngle,
-    Mesh const& mesh);
+    DeviceMeshView const& mesh);

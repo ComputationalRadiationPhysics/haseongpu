@@ -25,9 +25,9 @@ HASE_ROOT=$(pwd)
 
 ## Prepare the folders
 mkdir "${INTEGRATION_DIR}/mpi"
-mkdir "${INTEGRATION_DIR}/threaded"
+mkdir "${INTEGRATION_DIR}/single
 
-for i in {mpi,threaded}
+for i in {mpi,single}
 do
     cp -a example/matlab_example/* "${INTEGRATION_DIR}/$i/"
     cd "${INTEGRATION_DIR}/$i"
