@@ -1,5 +1,5 @@
-####################################################################################
 # Copyright 2013 Daniel Albach, Erik Zenker, Carlchristian Eckert
+# Copyright 2026 Tim Hanel
 #
 # This file is part of HASEonGPU
 #
@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with HASEonGPU.
 # If not, see <http://www.gnu.org/licenses/>.
-###################################################################################
 
 import numpy as np
 import scipy

@@ -1,0 +1,88 @@
+# Copyright 2026 Tim Hanel
+#
+# This file is part of HASEonGPU
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import ctypes
+import ctypes.util
+import sys
+from pathlib import Path
+
+
+def _libraryNames():
+    if sys.platform == "win32":
+        return ("HaseAlpakaBackendNames.dll",)
+    if sys.platform == "darwin":
+        return ("libHaseAlpakaBackendNames.dylib",)
+    return ("libHaseAlpakaBackendNames.so",)
+
+
+def _candidatePaths():
+    moduleDir = Path(__file__).resolve().parent
+    for name in _libraryNames():
+        yield moduleDir / name
+
+    for parent in moduleDir.parents:
+        for name in _libraryNames():
+            yield parent / "build" / "python" / "HASEonGPU_Bindings" / name
+
+    try:
+        import HASEonGPU_Bindings
+    except ImportError:
+        return
+
+    for packageDir in getattr(HASEonGPU_Bindings, "__path__", []):
+        for name in _libraryNames():
+            yield Path(packageDir) / name
+
+
+def _loadLibrary():
+    checked = []
+    for path in _candidatePaths():
+        checked.append(str(path))
+        if path.is_file():
+            return ctypes.CDLL(str(path))
+
+    found = ctypes.util.find_library("HaseAlpakaBackendNames")
+    if found is not None:
+        return ctypes.CDLL(found)
+
+    searched = "\n".join(f"  - {path}" for path in checked)
+    raise RuntimeError(
+        "Could not find the CMake-built Alpaka backend-name library. "
+        "Build the HaseAlpakaBackendNames target first. Searched:\n" + searched
+    )
+
+
+def _loadBackendNames():
+    lib = _loadLibrary()
+    lib.haseAlpakaBackendCount.argtypes = ()
+    lib.haseAlpakaBackendCount.restype = ctypes.c_size_t
+    lib.haseAlpakaBackendName.argtypes = (ctypes.c_size_t,)
+    lib.haseAlpakaBackendName.restype = ctypes.c_char_p
+
+    names = []
+    for index in range(lib.haseAlpakaBackendCount()):
+        value = lib.haseAlpakaBackendName(index)
+        if value is None:
+            continue
+        names.append(value.decode("utf-8"))
+    return tuple(names)
+
+
+class AlpakaBackends:
+    _known = _loadBackendNames()
+
+    @classmethod
+    def all(cls):
+        return list(cls._known)
+
+    @classmethod
+    def known(cls):
+        return cls.all()
+
+
+for backendName in AlpakaBackends._known:
+    if backendName.isidentifier():
+        setattr(AlpakaBackends, backendName, backendName)

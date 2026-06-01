@@ -1,7 +1,19 @@
-import vtk
+# Copyright 2026 Tim Hanel
+#
+# This file is part of HASEonGPU
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import numpy as np
+try:
+    import vtk
+except ImportError:
+    vtk = None
 
 def vtk_wedge(file_n, phi_ASE, p, t_int, mesh_z, z_mesh):
+    if vtk is None:
+        return
+
     # Ensure file extension is .vtk
     if not file_n.endswith('.vtk'):
         file_n += '.vtk'
@@ -53,6 +65,7 @@ def vtk_wedge(file_n, phi_ASE, p, t_int, mesh_z, z_mesh):
     writer = vtk.vtkUnstructuredGridWriter()
     writer.SetFileName(file_n)
     writer.SetInputData(u_grid)
+    writer.SetFileVersion(42)
     writer.Write()
 
     print(f"File saved as {file_n}")

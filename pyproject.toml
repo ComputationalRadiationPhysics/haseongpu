@@ -1,9 +1,10 @@
 [build-system]
 requires = [
     "scikit-build-core>=0.10",
-    "pybind11>=2.10",
+    "pybind11>=3.0",
     "packaging>=23"
 ]
+
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -16,11 +17,15 @@ authors = [
     { name = "Carlchristian Eckert"}, {name="Tobias Hänel"}, {name= "Dr. Daniel Albach"}, {name="Tim Hanel" }
 ]
 dependencies=[
+    "pytest",
+    "scikit-build-core>=0.10",
+    "gmsh",
     "numpy",
     "scipy",
     "numba",
     "vtk",
     "matplotlib",
+    "pyyaml",
 ]
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
@@ -30,6 +35,11 @@ wheel.packages = ["HASEonGPU_Bindings"]
 build-type = "Release"
 [tool.scikit-build.cmake.define]
 HASE_ENABLE_PYTHON = "ON"
-HASE_RELEASE = "ON"
-HASE_CUDA_FASTMATH = "ON"
+HASE_BUILD_RELEASE = "ON"
 CMAKE_INTERPROCEDURAL_OPTIMIZATION = "OFF"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: tests that invoke external binaries or full example scripts",
+]

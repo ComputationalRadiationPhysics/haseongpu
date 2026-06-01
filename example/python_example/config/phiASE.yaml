@@ -1,0 +1,13 @@
+experiment:
+  minRaysPerSample: 1000
+  maxRaysPerSample: 100000
+  mseThreshold: 0.005
+  adaptiveSteps: 3
+  useReflections: true
+
+compute:
+  repetitions: 1
+  backend: Cuda_NvidiaGpu_GpuCuda
+  parallelMode: single
+  numDevices: 4
+  nPerNode: 1
