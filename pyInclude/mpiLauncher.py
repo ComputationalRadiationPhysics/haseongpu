@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""MPI launcher support for ``PhiASE(parallelMode="mpi")``."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,10 +26,16 @@ from .geometry import _flat
 
 @dataclass
 class PhiAseMpiResult:
+    """Result object shaped like the direct pybind ASE result."""
+
     phiAse: np.ndarray
+    """Flattened ASE flux :math:`\Phi_i` for each beta sample."""
     mse: np.ndarray
+    """Monte Carlo mean-squared-error estimate per sample."""
     totalRays: np.ndarray
+    """Number of rays used per sample."""
     dndtAse: np.ndarray
+    """ASE contribution to ``d beta / dt`` reconstructed in Python."""
 
 
 _PROBED_MPI_IO_ROOTS: set[tuple[Path, int]] = set()
@@ -132,6 +140,12 @@ def _packedFromModernInputs(gainMedium, laser):
 
 
 def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
+    """Run ``calcPhiASE`` through ``mpiexec`` and return arrays to Python.
+
+    The launcher writes temporary input files below ``IO/phiase_mpi`` so every
+    MPI rank can see the same directory, then reads the output files back into
+    a ``PhiAseMpiResult``.
+    """
     packed = _packedFromModernInputs(gainMedium, laser)
     topology = gainMedium.topology
     min_sample = 0 if phiAse.minSampleRange is None else int(phiAse.minSampleRange)

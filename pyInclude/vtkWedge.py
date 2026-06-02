@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Legacy ASCII VTK writer for wedge-prism HASEonGPU data."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +16,7 @@ from .geometry import GainMedium, MeshTopology
 
 
 def _topology_from_geometry(geometry):
+    """Extract ``MeshTopology`` from a topology or owning ``GainMedium``."""
     if isinstance(geometry, GainMedium):
         return geometry.topology
     if isinstance(geometry, MeshTopology):
@@ -22,6 +25,7 @@ def _topology_from_geometry(geometry):
 
 
 def _vtk_filename(file_name, state=None, field="phiAse"):
+    """Resolve ``{step}``, ``{time}``, and ``{field}`` filename placeholders."""
     text = str(file_name)
     if state is not None:
         text = text.format(
@@ -35,6 +39,7 @@ def _vtk_filename(file_name, state=None, field="phiAse"):
 
 
 def _as_named_array(data, field, scalar_name):
+    """Select a named scalar array from a state object or raw array."""
     if hasattr(data, field):
         values = getattr(data, field)
         name = scalar_name or field
@@ -47,6 +52,7 @@ def _as_named_array(data, field, scalar_name):
 
 
 def _resolve_data_shape(values, topology):
+    """Classify arrays as point-level or prism-level VTK scalar data."""
     point_shape = (topology.numberOfPoints, int(topology.levels))
     cell_shape = (topology.numberOfTriangles, int(topology.levels) - 1)
     if values.shape == point_shape:
@@ -64,6 +70,7 @@ def _resolve_data_shape(values, topology):
 
 
 def _write_ascii_wedge(file_name, values, topology, scalar_name="scalars"):
+    """Write scalar data on the topology's extruded wedge-prism mesh."""
     topology._require_levels()
     topology._require_thickness()
 
@@ -117,6 +124,7 @@ def _write_ascii_wedge(file_name, values, topology, scalar_name="scalars"):
 
 
 def _legacy_vtk_wedge(file_name, values, points, triangle_point_indices, mesh_z, z_mesh, scalar_name):
+    """Compatibility wrapper for the historical points/triangles signature."""
     topology = MeshTopology(
         points=np.asarray(points, dtype=np.float64),
         trianglePointIndices=np.asarray(triangle_point_indices, dtype=np.uint32),
@@ -127,8 +135,17 @@ def _legacy_vtk_wedge(file_name, values, points, triangle_point_indices, mesh_z,
 
 
 def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=None, every=1):
-    """
-        Write HASEonGPU wedge data to a legacy ASCII VTK file.
+    """Write HASEonGPU wedge data to a ASCII VTK file.
+
+    Direct use: pass ``data`` as a ``TimeStepState`` or array and ``geometry``
+    as a ``GainMedium`` or ``MeshTopology``. Callback use: pass the geometry as
+    ``data`` and omit ``geometry``; the returned ``write_state(state)`` function
+    can be registered with ``Simulation.onStep(...)``.
+
+    Point-shaped arrays ``(numberOfPoints, levels)`` become ``POINT_DATA``;
+    prism-shaped arrays ``(numberOfTriangles, levels - 1)`` become
+    ``CELL_DATA``. ``file_name`` may contain ``{step}``, ``{time}``, and
+    ``{field}`` placeholders when used as an ``onStep`` callback.
     """
 
     if isinstance(data, (GainMedium, MeshTopology)) and geometry is None:

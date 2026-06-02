@@ -42,14 +42,14 @@ For a prism index
 
    j = t + z N_{\mathrm{tri}},
 
-``t`` is the 2D triangle index, ``z`` is the layer index, and
-``N_{\mathrm{tri}}`` is the number of base triangles.  The prism volume is
+:math:`t` is the 2D triangle index, :math:`z` is the layer index, and
+:math:`N_{\mathrm{tri}}` is the number of base triangles.  The prism volume is
 
 .. math::
 
    V_j = A_t \Delta z,
 
-where ``A_t`` is the triangle area and ``Delta z`` is the layer thickness.
+where :math:`A_t` is the triangle area and :math:`\Delta z` is the layer thickness.
 
 For a source point ``q`` inside prism ``j``, HASEonGPU propagates a ray from
 ``q`` to ``p_i``.  Along that ray the path is split into prism segments
@@ -109,7 +109,7 @@ this raw importance:
    \frac{I_j^{\mathrm{raw}}}{S} N
    \right\rfloor,
 
-where ``N`` is ``ctx.NumRays``.  Any leftover rays caused by integer rounding
+where :math:`N` is ``ctx.NumRays``.  Any leftover rays caused by integer rounding
 are distributed randomly over the prisms.  If ``N_j`` rays are drawn from prism
 ``j``, then ``N_j / N`` approximates the sampling probability.  The final
 Monte Carlo weight is not the raw importance.  It is the prism volume corrected
@@ -131,7 +131,7 @@ In the serial code this is the assignment
    0, & N_j = 0,
    \end{cases}
 
-with ``A_t = surface_new[t]`` and ``Delta z = z_mesh``.
+with :math:`A_t` = ``surface_new[t]`` and :math:`\Delta z` = ``z_mesh``.
 
 The unscaled ASE flux estimator at sample point ``i`` is therefore
 
@@ -146,9 +146,9 @@ The unscaled ASE flux estimator at sample point ``i`` is therefore
    G(q_{j,k} \rightarrow p_i)
    W_j,
 
-where ``N_real`` is the actual number of rays used after integer ray allocation.
-For the serial implementation, ``N_real`` is the accumulated sum of allocated
-``N_j`` values for that sample.
+where :math:`N_{\mathrm{real}}` is the actual number of rays used after integer ray allocation.
+For the serial implementation, :math:`N_{\mathrm{real}}` is the accumulated sum of allocated
+:math:`N_j` values for that sample.
 
 The value returned by the high-level HASEonGPU backend as ``phiAse`` is already
 scaled by active-ion density and fluorescence lifetime:
@@ -161,7 +161,7 @@ scaled by active-ion density and fluorescence lifetime:
    \Phi_i^{0}.
 
 This convention matters for time stepping: ``phiAse`` already contains the
-``N_tot / tau`` factor.
+:math:`N_{\mathrm{tot}} / \tau` factor.
 
 ASE Population Derivative
 -------------------------
@@ -178,8 +178,8 @@ returned ``phiAse`` as
    \right]
    \Phi_i.
 
-Because ``Phi_i`` already includes ``N_tot / tau``, this derivative must not be
-multiplied by ``N_tot`` or divided by ``tau`` again.
+Because :math:`\Phi_i` already includes :math:`N_{\mathrm{tot}} / \tau`, this derivative must not be
+multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.
 
 Pump and Time Stepping
 ----------------------

@@ -31,6 +31,15 @@ dependencies=[
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
 
+[[tool.scikit-build.generate]]
+path = "HASEonGPU.py"
+template = """
+import HASEonGPU_Bindings
+from HASEonGPU_Bindings import *
+from pyInclude import *
+del HASEonGPU_Bindings.HostMesh
+"""
+
 [tool.scikit-build.cmake]
 build-type = "Release"
 [tool.scikit-build.cmake.define]

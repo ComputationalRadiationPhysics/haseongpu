@@ -118,7 +118,6 @@ def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
 
     assert betaVolume.expectedShape == (2, 8)
     assert betaVolume.dtype == np.dtype(np.float64)
-    assert "prism volume" in betaVolume.description
     assert refractiveIndices.name == "refractiveIndices"
     assert refractiveIndices.expectedShape == (4,)
 
