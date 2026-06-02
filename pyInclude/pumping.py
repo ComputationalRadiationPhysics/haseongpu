@@ -29,6 +29,13 @@
 # spatial), informations about the intensity filed (pump or pulse) and the
 # doping-gradient (given externally)
 
+"""Pump integration routines for evolving the excited-state fraction beta.
+
+The public entry point is ``integrateLaserPump``. The lower functions are the
+legacy beta-int3 algorithm, kept as implementation detail and accelerated with
+numba when available.
+"""
+
 import numpy as np
 try:
     from numba import njit
@@ -59,6 +66,8 @@ CONSTANT_ALIASES = {
 
 
 class Constants:
+     """Physical constants used by the pump energy-to-photon conversion."""
+
      def __init__(
           self,
           speedOfLight=CONSTANT_SPECS["speedOfLight"]["default"],
@@ -67,6 +76,7 @@ class Constants:
           c=None,
           h=None,
      ):
+          """Create constants, accepting either long names or ``c``/``h`` aliases."""
           if c is not None:
                speedOfLight = c
           if h is not None:
@@ -91,6 +101,7 @@ class Constants:
           self.planckConstant = float(value)
 
      def describeConstant(self, name):
+          """Return description, unit, and default for a known constant."""
           canonical = CONSTANT_ALIASES.get(name, name)
           try:
                return dict(CONSTANT_SPECS[canonical])
@@ -99,6 +110,7 @@ class Constants:
                raise KeyError(f"unknown physical constant '{name}'. Known constants: {known}") from exc
 
      def toDict(self):
+          """Return the compact dictionary consumed by the legacy pump kernel."""
           return {
               "c": float(self.speedOfLight),
               "h": float(self.planckConstant),
@@ -106,15 +118,14 @@ class Constants:
 
 
 def _constantsDict(constants):
+     """Normalize ``None``, ``Constants``, or mapping constants to a dictionary."""
      if constants is None:
           return Constants().toDict()
      if isinstance(constants, Constants):
           return constants.toDict()
      return constants
 
-"""
-    Just in time compilation of the hot loop (over time and pumping steps) using scratch memory arrays
-"""
+# Numba-compiled hot loop over time samples and crystal z steps.
 @njit(cache=True, fastmath=True)
 def beta_int3Kernel_jit(
           beta_crystal, pulse, beta_store, Ntot_gradient,
@@ -125,6 +136,7 @@ def beta_int3Kernel_jit(
           inv_photon_energy, inv_tau_fluo,
           extr, brm, R
 ):
+      """Propagate pump intensity and update beta along one crystal line."""
       # discretization
       steps_time = pulse.shape[0]
       steps_crystal = beta_crystal.shape[0]
@@ -186,9 +198,6 @@ def beta_int3Kernel_jit(
           #     if icrys or jcrys makes no difference
           for k in range(steps_crystal):
               beta_store[k, itime] = beta_crystal[k]
-"""
-    Runs the outer loop over all sample points.
-"""
 def beta_int3LoopOverPoints(
           p, beta_cell, pump_dict, intensity, beta_c_2,
           beta_crystal_scratch, pulse_scratch, beta_store_scratch,
@@ -202,6 +211,11 @@ def beta_int3LoopOverPoints(
           pump_scratch, pump_brm_scratch, pump_l_scratch,
           debug=False
 ):
+    """Run the one-dimensional pump kernel for every transverse mesh point.
+
+    The super-Gaussian factor turns the global pump intensity into a local
+    intensity for each ``(x, y)`` sample before z propagation starts.
+    """
     rx = float(pump_dict['rx'])
     ry = float(pump_dict['ry'])
     exp_ = float(pump_dict['exp'])
@@ -234,11 +248,13 @@ def beta_int3LoopOverPoints(
 
           # write back result for this point
           beta_c_2[i_p, :] = beta_crystal_scratch
-"""
-    Runs the beta-pumping step for each point.
-    This function acts as a hub that initializes constants and fields (once) and setup scratch pad memory arrays.
-"""
 def beta_int3Main(p, beta_cell, pump, beta_c_2, intensity, const, crystal, steps, int_field, mode, Ntot_gradient):
+     """Run one pump update over all transverse points and z levels.
+
+     ``beta_cell`` is the incoming point-level beta array. ``beta_c_2`` receives
+     the beta state after pumping. Scratch arrays are allocated once here and
+     reused by the inner loops for performance.
+     """
      # discretization
      steps_time = int(steps['time'])
      steps_crystal = int(steps['crys'])
@@ -320,6 +336,12 @@ def integrateLaserPump(
      constants=None,
      pumpSubsteps=100,
 ):
+     """Return ``betaCells`` after applying the configured pump.
+
+     ``points`` are transverse ``(x, y)`` topology coordinates. ``betaCells``
+     has shape ``(numberOfPoints, numberOfLevels)`` and stores the excited-state
+     fraction before pumping. The returned array has the same shape.
+     """
      constants = _constantsDict(constants)
      topology = gainMedium.topology
      beta_cells = np.ascontiguousarray(np.asarray(betaCells, dtype=np.float64))
@@ -358,7 +380,10 @@ runLaserPumpStep = integrateLaserPump
 
 
 class BetaIntegrationGaussianSolver:
+     """Default ``PumpProperties`` solver for a super-Gaussian pump beam."""
+
      def step(self, input, pump):
+          """Return beta after pumping using the Simulation pump-solver protocol."""
           medium = input["_medium"]
           timeStep = input["_timeStep"]
           return integrateLaserPump(

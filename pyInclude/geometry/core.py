@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Geometry, topology, and gain-medium state containers for Python users."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,6 +27,12 @@ except ImportError:
 
 @dataclass(frozen=True)
 class PhysicalPropertySpec:
+    """Metadata for a physical array or scalar stored on a ``GainMedium``.
+
+    ``shape`` is evaluated against the current ``MeshTopology`` so properties
+    can describe point, prism, triangle, surface, or scalar data.
+    """
+
     name: str
     dtype: object
     shape: callable
@@ -41,6 +49,12 @@ class PhysicalPropertySpec:
 
 
 class GainMediumProperty:
+    """Handle returned by ``GainMedium.get(...)``.
+
+    It carries the property's physical description, dtype, expected shape, and
+    a ``value`` setter that validates arrays before storing them on the medium.
+    """
+
     def __init__(self, medium, spec):
         self._medium = medium
         self.spec = spec
@@ -70,6 +84,7 @@ class GainMediumProperty:
         self._medium.set(self.name, values)
 
     def meta(self):
+        """Return serializable metadata for docs, inspection, or UI tooling."""
         return {
             "name": self.name,
             "description": self.description,
@@ -111,8 +126,8 @@ PHYSICAL_PROPERTY_SPECS = {
         dtype=np.float64,
         shape=_shape_prisms,
         description=(
-            "Stimulus values in each prism volume. Matrix layout is "
-            "(numberOfTriangles, numberOfLevels - 1)."
+            "Prism-centered excited-state fraction beta_j used by ASE. "
+            "Matrix layout is (numberOfTriangles, numberOfLevels - 1)."
         ),
         default=lambda topology: np.zeros(topology.numberOfPrisms, dtype=np.float64),
     ),
@@ -121,7 +136,7 @@ PHYSICAL_PROPERTY_SPECS = {
         dtype=np.float64,
         shape=_shape_cells,
         description=(
-            "Stimulus values at sample points (topology points). Matrix layout is "
+            "Point-centered excited-state fraction beta_i. Matrix layout is "
             "(numberOfPoints, numberOfLevels)."
         ),
         default=lambda topology: np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64),
@@ -130,7 +145,7 @@ PHYSICAL_PROPERTY_SPECS = {
         name="dntdAse",
         dtype=np.float64,
         shape=_shape_cells,
-        description="ASE contribution to the population derivative at sample points.",
+        description="ASE contribution to d beta / dt at sample points.",
         default=lambda topology: np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64),
     ),
     "claddingCellTypes": PhysicalPropertySpec(
@@ -170,7 +185,7 @@ PHYSICAL_PROPERTY_SPECS = {
         name="crystalTFluo",
         dtype=np.float64,
         shape=_shape_scalar,
-        description="Fluorescence lifetime of the gain medium.",
+        description="Fluorescence lifetime tau of the gain medium in seconds.",
         default=lambda _: 0.0,
     ),
     "claddingNumber": PhysicalPropertySpec(
@@ -434,6 +449,12 @@ def _flat(arr, width, dtype, name):
 
 
 class Grid:
+    """Regular rectangular helper that generates a 2D triangular base mesh.
+
+    ``xExtent`` and ``yExtent`` describe the transverse footprint. ``zExtent``
+    and ``tileSizeZ`` define the sampled crystal levels used for beta arrays.
+    """
+
     def __init__(
         self,
         xExtent=None,
@@ -445,6 +466,7 @@ class Grid:
         origin=(0.0, 0.0),
         **aliases,
     ):
+        """Create a grid from extents, tile sizes, and optional ``(x, y)`` origin."""
         if xExtent is None and "x" in aliases:
             xExtent = aliases.pop("x")
         if yExtent is None and "y" in aliases:
@@ -477,13 +499,16 @@ class Grid:
 
     @property
     def numberOfLevels(self):
+        """Number of z sample planes generated from ``zExtent`` and ``tileSizeZ``."""
         return len(self._axisValues(self.zExtent, self.tileSizeZ))
 
     @property
     def thickness(self):
+        """Distance between adjacent z levels."""
         return self.tileSizeZ
 
     def constructPoints(self):
+        """Return transverse topology points with shape ``(numberOfPoints, 2)``."""
         ox, oy = self.origin
         x_values = ox + self._axisValues(self.xExtent, self.tileSizeX)
         y_values = oy + self._axisValues(self.yExtent, self.tileSizeY)
@@ -502,19 +527,33 @@ class Grid:
 
 @dataclass
 class MeshTopology:
+    """Triangular base mesh extruded through z levels into wedge prisms.
+
+    ``points`` are transverse ``(x, y)`` coordinates. ``trianglePointIndices``
+    connect those points into the 2D base mesh. ``levels`` and ``thickness``
+    describe the z sampling used by ``betaCells`` and ``betaVolume``.
+    """
+
     points: np.ndarray
+    """Transverse coordinates with shape ``(numberOfPoints, 2)``."""
     trianglePointIndices: np.ndarray
+    """Triangle vertex indices with shape ``(numberOfTriangles, 3)``."""
     levels: int | None = None
+    """Number of z sample planes; at least two when simulation data is used."""
     thickness: float | None = None
+    """Distance between adjacent z sample planes."""
     metadata: dict = field(default_factory=dict)
+    """Importer or construction metadata kept for tooling and round-trips."""
 
     @classmethod
     def fromPoints(cls, points, numberOfLevels=None):
+        """Delaunay-triangulate transverse points into a ``MeshTopology``."""
         parsed_points, triangles = _delaunay(points)
         return cls(parsed_points, triangles, levels=numberOfLevels)
 
     @classmethod
     def fromGrid(cls, grid):
+        """Construct topology from a regular ``Grid`` helper."""
         if not isinstance(grid, Grid):
             raise TypeError("fromGrid expects a Grid instance")
         points, triangles = _grid_points_and_triangles(grid)
@@ -537,6 +576,7 @@ class MeshTopology:
 
     @classmethod
     def fromGmsh(cls, gmsh, *, numberOfLevels=None, thickness=None):
+        """Import a planar gmsh triangle mesh and attach z sampling."""
         if isinstance(gmsh, (str, Path)):
             gmsh = Gmsh.fromFile(gmsh)
         if not isinstance(gmsh, Gmsh):
@@ -545,6 +585,7 @@ class MeshTopology:
 
     @classmethod
     def fromFile(cls, filename, format=None, numberOfLevels=None, thickness=None):
+        """Load supported mesh formats: legacy VTK, planar STL, or gmsh."""
         path = Path(filename)
         mesh_format = (format or path.suffix.lstrip(".")).lower()
         if mesh_format in {"vtk", "legacy-vtk"}:
@@ -570,6 +611,7 @@ class MeshTopology:
         )
 
     def numberOfLevels(self, levels):
+        """Set the number of z sample planes and return ``self``."""
         levels = int(levels)
         if levels < 2:
             raise ValueError("numberOfLevels must be at least 2")
@@ -577,6 +619,7 @@ class MeshTopology:
         return self
 
     def withThickness(self, thickness):
+        """Set the spacing between adjacent z levels and return ``self``."""
         thickness = float(thickness)
         if thickness <= 0.0:
             raise ValueError("thickness must be positive")
@@ -584,11 +627,13 @@ class MeshTopology:
         return self
 
     def levelCoordinates(self):
+        """Return z coordinates for every level as ``0, thickness, ...``."""
         self._require_levels()
         self._require_thickness()
         return np.arange(int(self.levels), dtype=np.float64) * float(self.thickness)
 
     def pointIndexAt(self, x, y, *, tol=1e-12):
+        """Return the topology point index for a transverse coordinate."""
         query = np.asarray([x, y], dtype=np.float64)
         matches = np.flatnonzero(np.all(np.isclose(self.points, query, atol=tol, rtol=0.0), axis=1))
         if matches.size:
@@ -597,6 +642,7 @@ class MeshTopology:
         return int(np.argmin(distances))
 
     def levelIndexAt(self, z, *, tol=1e-12):
+        """Return the z-level index for a physical z coordinate."""
         levels = self.levelCoordinates()
         matches = np.flatnonzero(np.isclose(levels, float(z), atol=tol, rtol=0.0))
         if matches.size == 0:
@@ -604,6 +650,7 @@ class MeshTopology:
         return int(matches[0])
 
     def betaCellIndexAt(self, x, y, z, *, tol=1e-12, flat=False):
+        """Return the ``betaCells`` index for a physical ``(x, y, z)`` point."""
         point_index = self.pointIndexAt(x, y, tol=tol)
         level_index = self.levelIndexAt(z, tol=tol)
         if flat:
@@ -612,18 +659,22 @@ class MeshTopology:
 
     @property
     def numberOfTriangles(self):
+        """Number of base triangles, and therefore prisms per z interval."""
         return int(self.trianglePointIndices.shape[0])
 
     @property
     def numberOfPoints(self):
+        """Number of transverse sample points per z level."""
         return int(self.points.shape[0])
 
     @property
     def numberOfPrisms(self):
+        """Total number of wedge prisms in the extruded mesh."""
         self._require_levels()
         return self.numberOfTriangles * (self.levels - 1)
 
     def asGainMedium(self):
+        """Wrap this topology in an empty ``GainMedium``."""
         return GainMedium(topology=self)
 
     def _require_levels(self):
@@ -647,8 +698,17 @@ class MeshTopology:
 
 @dataclass
 class GainMedium:
+    """Mesh plus material/state properties required by ASE and pump models.
+
+    Use ``get(name)`` to inspect a property handle, including expected array
+    shape, then set ``prop.value`` or call ``set(name, value)``. Arrays may be
+    supplied in matrix shape and are stored internally in Fortran order.
+    """
+
     topology: MeshTopology
+    """Geometry and z-level sampling for this medium."""
     physical: dict = field(default_factory=dict)
+    """Canonical physical arrays and scalars stored by property name."""
 
     def __post_init__(self):
         gmsh = self.topology.metadata.get("gmsh")
@@ -659,6 +719,7 @@ class GainMedium:
 
     @classmethod
     def fromVtk(cls, filename, *, numberOfLevels=None, thickness=None):
+        """Load topology and physical fields from a legacy VTK wedge file."""
         return gainMediumFromVtk(
             filename,
             MeshTopology,
@@ -669,6 +730,7 @@ class GainMedium:
 
     @classmethod
     def fromFile(cls, filename, format=None, *, numberOfLevels=None, thickness=None):
+        """Load a gain medium; currently supports legacy VTK files."""
         path = Path(filename)
         mesh_format = (format or path.suffix.lstrip(".")).lower()
         if mesh_format in {"vtk", "legacy-vtk"}:
@@ -678,23 +740,29 @@ class GainMedium:
         )
 
     def withPhysicalProperties(self, **properties):
+        """Set several physical properties and return ``self`` for chaining."""
         for name, value in properties.items():
             self.set(name, value)
         return self
 
     def toVtk(self, filename):
+        """Write this gain medium to a legacy ASCII VTK wedge file."""
         return writeGainMediumVtk(filename, self)
 
     def emptyBetaCells(self, fill=0.0):
+        """Create a correctly shaped point-level beta array filled with ``fill``."""
         return np.full(self.get("betaCells").expectedShape, fill, dtype=np.float64)
 
     def betaCellIndexAt(self, x, y, z, *, tol=1e-12, flat=False):
+        """Forward coordinate lookup for a ``betaCells`` entry."""
         return self.topology.betaCellIndexAt(x, y, z, tol=tol, flat=flat)
 
     def listProperties(self):
+        """Return metadata for all known gain-medium properties."""
         return [self.get(name).meta() for name in PHYSICAL_PROPERTY_SPECS]
 
     def get(self, name):
+        """Return a ``GainMediumProperty`` handle by canonical name or alias."""
         canonical = PROPERTY_ALIASES.get(name, name)
         if canonical not in PHYSICAL_PROPERTY_SPECS:
             known = ", ".join(PHYSICAL_PROPERTY_SPECS)
@@ -702,6 +770,7 @@ class GainMedium:
         return GainMediumProperty(self, PHYSICAL_PROPERTY_SPECS[canonical])
 
     def set(self, name, value):
+        """Validate and store one physical property."""
         prop = self.get(name)
         if prop.expectedShape == ():
             self.physical[prop.name] = prop.dtype.type(value).item()
@@ -725,6 +794,7 @@ class GainMedium:
 
     @property
     def dntdAse(self):
+        """ASE contribution to ``d beta / dt`` at the sample points."""
         return self.get("dntdAse").value
 
     @property
@@ -741,6 +811,7 @@ class GainMedium:
 
     @property
     def numberOfLevels(self):
+        """Number of z sample planes in the attached topology."""
         self.topology._require_levels()
         return int(self.topology.levels)
 

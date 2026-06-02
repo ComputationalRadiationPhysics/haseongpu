@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Query Alpaka backend names compiled into the local HASEonGPU build."""
+
 import ctypes
 import ctypes.util
 import sys
@@ -72,14 +74,22 @@ def _loadBackendNames():
 
 
 class AlpakaBackends:
+    """Namespace of backend strings accepted by ``PhiASE`` and ``calcPhiASE``.
+
+    Backend availability depends on how the C++ extension was compiled. Use
+    ``AlpakaBackends.all()`` to inspect the strings for this environment.
+    """
+
     _known = _loadBackendNames()
 
     @classmethod
     def all(cls):
+        """Return all backend names reported by the compiled helper library."""
         return list(cls._known)
 
     @classmethod
     def known(cls):
+        """Alias for ``all()`` kept for discoverability."""
         return cls.all()
 
 

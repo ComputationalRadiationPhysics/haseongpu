@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""High-level Python simulation wrapper around pump, ASE, and time stepping."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,6 +22,11 @@ from .timeIntegration import TimeDerivative, TimeIntegrationSolver
 
 
 def _constructHostMesh(gainMedium):
+    """Build the pybind host mesh from a ``GainMedium``.
+
+    Arrays are flattened in Fortran order because the lower-level C++/legacy
+    interfaces index beta first by transverse sample and then by z level.
+    """
     topology = gainMedium.topology
     topology._require_levels()
     if topology.thickness is None:
@@ -61,28 +68,55 @@ def _constructHostMesh(gainMedium):
 
 @dataclass
 class PhiASE:
+    """Configure and run the ASE flux calculation for one gain-medium state.
+
+    ``Simulation`` normally owns this object and calls ``run(...)`` during each
+    time-step derivative evaluation. Advanced users can also call ``run``
+    directly with a ``GainMedium`` and ``CrossSectionData`` object.
+    """
+
     config: object | None = None
+    """Optional YAML filename or mapping with PhiASE run-control settings."""
     crossSections: CrossSectionData | None = None
+    """Absorption/emission spectra used by the ASE calculation."""
     spectralProperties: SpectralDecomposition | None = None
+    """Alias for ``crossSections`` kept for the public spectral API."""
     laserProperties: LaserProperties | None = None
+    """Lower-level laser property store accepted by legacy workflows."""
     gainMedium: GainMedium | None = None
+    """Optional medium stored for direct ``run()`` calls."""
 
     minRaysPerSample: int = 100000
+    """Minimum Monte Carlo rays launched for each beta sample."""
     maxRaysPerSample: int = 100000
+    """Maximum rays per sample allowed during adaptive refinement."""
     mseThreshold: float = 0.1
+    """Target mean-squared-error threshold for adaptive ASE sampling."""
     repetitions: int = 4
+    """Maximum repeated ASE estimates at a fixed ray count."""
     adaptiveSteps: int = 4
+    """Number of ray-count increases between min and max rays."""
     useReflections: bool = True
+    """Whether top/bottom surface reflectivities affect ray propagation."""
     monochromatic: bool = False
+    """Use only the first spectral samples instead of wavelength integration."""
 
     backend: str = None
+    """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
     parallelMode: str = "single"
+    """Execution mode: direct binding ``single`` or MPI launcher ``mpi``."""
     numDevices: int = 1
+    """Maximum compute devices made available to the lower-level run."""
     nPerNode: int = 1
+    """MPI launcher ranks per node when ``parallelMode`` is ``mpi``."""
     writeVtk: bool = False
+    """Request VTK output from lower-level compute paths when supported."""
     devices: list[int] = field(default_factory=list)
+    """Optional explicit device ids passed to the lower-level compute path."""
     minSampleRange: int | None = None
+    """Inclusive first flattened beta sample processed by ASE."""
     maxSampleRange: int | None = None
+    """Inclusive last flattened beta sample processed by ASE."""
 
     _experiment: object | None = field(default=None, init=False, repr=False)
     _compute: object | None = field(default=None, init=False, repr=False)
@@ -116,6 +150,7 @@ class PhiASE:
 
     @classmethod
     def fromYaml(cls, filename, **overrides):
+        """Create a ``PhiASE`` configuration from YAML plus Python overrides."""
         obj = cls(filename)
         for name, value in overrides.items():
             setattr(obj, name, value)
@@ -123,6 +158,7 @@ class PhiASE:
 
     @staticmethod
     def addArguments(parser):
+        """Add command-line arguments that map to ``PhiASE`` settings."""
         parser.add_argument("--phi-ase-config", default=None, help="YAML file with PhiASE compute/experiment settings")
         parser.add_argument("--min-rays-per-sample", type=int, default=None)
         parser.add_argument("--max-rays-per-sample", type=int, default=None)
@@ -137,6 +173,7 @@ class PhiASE:
 
     @classmethod
     def fromArgs(cls, args, **overrides):
+        """Create a ``PhiASE`` configuration from parsed argparse results."""
         config = getattr(args, "phi_ase_config", None)
         obj = cls(config) if config else cls()
         mapping = {
@@ -206,6 +243,11 @@ class PhiASE:
         return self
 
     def run(self, gainMedium=None, crossSections=None):
+        """Run ASE for the supplied or configured ``GainMedium``.
+
+        Returns ``self``. Use ``getResults()`` afterwards to access the raw
+        lower-level result, including ``phiAse``.
+        """
         medium = gainMedium if gainMedium is not None else self.gainMedium
         if medium is None:
             raise ValueError("PhiASE.run requires gainMedium; pass it through Simulation or run(gainMedium=...)")
@@ -262,27 +304,40 @@ class PhiASE:
         return self
 
     def getResults(self):
+        """Return the raw ASE result from the most recent ``run(...)`` call."""
         if self._result is None:
             raise RuntimeError("simulation has not been run yet")
         return self._result
 
     @property
     def experimentParameters(self):
+        """Low-level experiment parameters built for the last ``run(...)``."""
         return self._experiment
 
     @property
     def computeParameters(self):
+        """Low-level compute parameters built for the last ``run(...)``."""
         return self._compute
 
     @property
     def hostMesh(self):
+        """Low-level host mesh built from the last ``GainMedium`` input."""
         return self._hostMesh
 
+
 class LegacyGridDataBetaVolumeMapper:
+    """Map point-centered ``betaCells`` to prism-centered ``betaVolume``."""
+
     def __init__(self, method="linear"):
+        """Create a mapper using a scipy ``griddata`` interpolation method.
+
+        The mapper samples point-level beta values at prism centers so ASE can
+        use one representative excited-state fraction per wedge volume.
+        """
         self.method = method
 
     def map(self, medium):
+        """Return prism-centered ``betaVolume`` for the supplied medium."""
         try:
             from scipy.interpolate import griddata
         except ImportError as exc:
@@ -320,27 +375,60 @@ class LegacyGridDataBetaVolumeMapper:
 
 @dataclass
 class TimeStepState:
+    """Snapshot handed to ``onStep`` callbacks after a completed time step.
+
+    The arrays are copies of the simulation outputs at ``step``/``time``.
+    ``betaCells`` and ``phiAse`` are point-by-level arrays with shape
+    ``(numberOfPoints, numberOfLevels)``. ``betaVolume`` is prism-centered
+    with shape ``(numberOfTriangles, numberOfLevels - 1)``.
+    """
+
     step: int
+    """Completed one-based step index."""
     time: float
+    """Physical simulation time after the step, in seconds."""
     betaCells: np.ndarray
+    """Excited-state fraction at mesh points and z-levels."""
     betaVolume: np.ndarray
+    """Excited-state fraction interpolated to wedge-prism centers."""
     phiAse: np.ndarray | None
+    """ASE flux at mesh points and z-levels, or ``None`` if unavailable."""
     dndtAse: np.ndarray
+    """ASE depletion contribution to ``d beta / dt``."""
     dndtPump: np.ndarray
+    """Pump contribution to ``d beta / dt``."""
     aseResult: object | None
+    """Raw lower-level ASE result object for advanced inspection."""
 
 
 @dataclass
 class Simulation:
+    """High-level pump, ASE, fluorescence, and time-integration loop.
+
+    Register ``onInit`` or ``beforeStep`` callbacks when a function needs the
+    live ``Simulation`` object and may inspect or mutate it. Register
+    ``onStep`` callbacks when a function needs the completed ``TimeStepState``
+    snapshot produced by each step.
+    """
+
     gainMedium: GainMedium
+    """Geometry, material data, and current beta arrays."""
     pump: PumpProperties
+    """Pump model that adds population to ``betaCells``."""
     phiASE: PhiASE
+    """ASE configuration and execution handle."""
     timeIntegrationSolver: TimeIntegrationSolver
+    """Solver object that advances ``betaCells`` using ``d beta / dt``."""
     timeStep: float
+    """Physical time increment per step, in seconds."""
     crossSections: CrossSectionData | None = None
+    """Shared spectra used by pump and ASE when not set on either object."""
     endTime: float | None = None
+    """Optional target physical time for ``runUntil()``."""
     constants: Constants = field(default_factory=Constants)
+    """Physical constants used by the pump integrator."""
     updateTerminalLevel: bool = True
+    """Whether the last z-level beta values are advanced by the solver."""
 
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -375,18 +463,37 @@ class Simulation:
         raise ValueError("Simulation requires spectral properties via Simulation.crossSections, phiASE, or pump")
 
     def onStep(self, callback):
+        """Register ``callback(state)`` to run after every completed step.
+
+        ``state`` is a ``TimeStepState`` containing copied result arrays such as
+        ``betaCells``, ``betaVolume``, ``phiAse``, ``dndtPump``, and
+        ``dndtAse``. Callback return values are ignored.
+        """
         self._callbacks.append(callback)
         return self
 
     def onInit(self, callback):
+        """Register ``callback(simulation)`` to run once before the first step.
+
+        The callback receives this live ``Simulation`` object, so it can read
+        or change ``gainMedium``, ``pump``, ``phiASE``, ``timeStep``, and other
+        simulation settings before any derivative is evaluated.
+        """
         self._initCallbacks.append(callback)
         return self
 
     def beforeStep(self, callback):
+        """Register ``callback(simulation)`` to run before every step.
+
+        The callback receives this live ``Simulation`` object at the current
+        ``time`` and ``stepIndex``. Use this for controlled changes to inputs
+        before the next time-step update.
+        """
         self._beforeStepCallbacks.append(callback)
         return self
 
     def runUntil(self, endtime=None, endTime=None):
+        """Advance steps until the configured or supplied end time is reached."""
         target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
         if target is None:
             raise ValueError("runUntil requires endtime or an endTime configured on construction")
@@ -395,11 +502,13 @@ class Simulation:
         return self
 
     def runSteps(self, steps):
+        """Run exactly ``steps`` calls to ``step()`` and return ``self``."""
         for _ in range(int(steps)):
             self.step()
         return self
 
     def step(self):
+        """Advance one time step and return the completed ``TimeStepState``."""
         self._runInitCallbacks()
         for callback in self._beforeStepCallbacks:
             callback(self)
@@ -449,14 +558,17 @@ class Simulation:
         return state
 
     def getResults(self):
+        """Return all stored ``TimeStepState`` snapshots in step order."""
         return self._states
 
     @property
     def time(self):
+        """Current physical simulation time in seconds."""
         return self._time
 
     @property
     def stepIndex(self):
+        """Number of completed time steps."""
         return self._step
 
     def _ensureStateArrays(self):

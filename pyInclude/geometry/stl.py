@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Planar STL import helper for ``MeshTopology.fromFile``."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -44,6 +46,7 @@ def _read_stl_triangles(path):
 
 
 def from_stl(path):
+    """Return ``(points, triangles)`` from a planar ASCII or binary STL file."""
     triangles_3d = _read_stl_triangles(path)
     z = [vertex[2] for tri in triangles_3d for vertex in tri]
     if not np.allclose(z, z[0]):

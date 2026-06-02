@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Read and write legacy ASCII VTK wedge meshes for gain media."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -34,6 +36,8 @@ def _tokens(path):
 
 
 class _TokenReader:
+    """Small token stream used by the legacy VTK parser."""
+
     def __init__(self, tokens):
         self.tokens = tokens
         self.index = 0
@@ -160,6 +164,7 @@ def _topologyFromUnstructuredGrid(path):
 
 
 def topologyFromVtk(path, topologyCls):
+    """Create a ``MeshTopology`` from legacy VTK wedge cells."""
     points, triangles, levels, thickness, _ = _topologyFromUnstructuredGrid(path)
     return topologyCls(
         points=points,
@@ -171,6 +176,7 @@ def topologyFromVtk(path, topologyCls):
 
 
 def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, thickness=None):
+    """Load topology plus beta/material arrays from a legacy VTK file."""
     topology = topologyFromVtk(path, topologyCls)
     if numberOfLevels is not None:
         topology.numberOfLevels(numberOfLevels)
@@ -184,6 +190,11 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
 
 
 def writeGainMediumVtk(path, gainMedium):
+    """Write a ``GainMedium`` as legacy ASCII VTK wedge cells.
+
+    ``betaCells`` is written as point data and ``betaVolume`` as cell data;
+    scalar material properties are stored in a ``FIELD`` block.
+    """
     topology = gainMedium.topology
     topology._require_levels()
     topology._require_thickness()

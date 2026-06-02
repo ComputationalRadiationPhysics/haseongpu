@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""gmsh import helpers for planar triangle meshes."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,29 +18,48 @@ _GMSH_TRIANGLE = 2
 
 @dataclass(frozen=True)
 class GmshElement:
+    """One gmsh element with enough metadata to build topology and cladding."""
+
     element_id: int
+    """gmsh element id."""
     element_type: int
+    """gmsh element type; only triangle type 2 is imported as topology."""
     node_ids: tuple[int, ...]
+    """Node ids used by this element."""
     physical_tag: int | None = None
+    """Optional physical group tag used to infer cladding cells."""
 
 
 @dataclass
 class Gmsh:
-    """gmsh-backed mesh data accepted by MeshTopology."""
+    """gmsh-backed mesh data accepted by ``MeshTopology``.
+
+    HASEonGPU currently only accepts two-dimensional triangle meshes and
+    later extrudes them through ``numberOfLevels`` with a fixed ``thickness``.
+    Physical surface names containing ``cladding`` can populate
+    ``claddingCellTypes`` on a ``GainMedium``.
+    """
 
     nodes: dict[int, tuple[float, float, float]]
+    """Node id to ``(x, y, z)`` coordinate mapping."""
     elements: list[GmshElement]
+    """All gmsh elements read from the file."""
     physical_names: dict[int, dict[int, str]] = field(default_factory=dict)
+    """Physical names grouped by gmsh dimension and tag."""
     source: str | None = None
+    """Original gmsh filename, if loaded from disk."""
 
     @classmethod
     def fromFile(cls, filename):
+        """Read a gmsh ``.msh`` file using the gmsh Python package."""
         return _read_gmsh(filename)
 
     def topology(self, *, numberOfLevels=None, thickness=None):
+        """Convert planar triangle elements into an extruded ``MeshTopology``."""
         return _from_gmsh(self, numberOfLevels=numberOfLevels, thickness=thickness)
 
     def claddingCellTypes(self, topology):
+        """Return triangle-wise cladding tags inferred from physical names."""
         if topology.metadata.get("gmsh") is not self:
             raise ValueError("claddingCellTypes requires the MeshTopology created from this Gmsh object")
         return _gmsh_cladding_cell_types(self, topology)

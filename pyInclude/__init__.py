@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Public Python convenience exports for HASEonGPU."""
+
 import HASEonGPU_Bindings
 from .alpakaUtils import AlpakaBackends
 from .calcPhiASE import calcPhiASE

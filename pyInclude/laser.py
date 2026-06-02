@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Laser spectra and pump-beam configuration used by the Python interface."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -14,6 +16,12 @@ import numpy as np
 
 @dataclass(frozen=True)
 class LaserPropertySpec:
+    """Metadata for one low-level laser property.
+
+    The names match the historical ``calcPhiASE`` input fields. User-facing
+    code usually works through ``CrossSectionData`` or ``LaserProperties``.
+    """
+
     name: str
     dtype: object
     shape: tuple
@@ -22,6 +30,13 @@ class LaserPropertySpec:
 
 
 class LaserProperty:
+    """Handle returned by ``LaserProperties.get(...)``.
+
+    It exposes the property's physical description, expected dtype/shape, and
+    a validated ``value`` setter. The handle writes back to its parent
+    ``LaserProperties`` object.
+    """
+
     def __init__(self, laser, spec):
         self._laser = laser
         self.spec = spec
@@ -51,6 +66,7 @@ class LaserProperty:
         self._laser.set(self.name, values)
 
     def meta(self):
+        """Return serializable metadata for documentation or validation UIs."""
         return {
             "name": self.name,
             "description": self.description,
@@ -108,11 +124,24 @@ LASER_ALIASES = {
 
 @dataclass
 class CrossSectionData:
+    """Absorption and emission spectra for ASE and pump calculations.
+
+    Wavelength arrays store :math:`\lambda`; matching cross-section arrays
+    store :math:`\sigma_a` and :math:`\sigma_e` in ``cm^2``. The wavelength
+    unit is kept as supplied, with interpolation helpers handling the common
+    ``nm`` table versus ``m`` query mismatch.
+    """
+
     wavelengthsAbsorption: object
+    """Wavelength samples for the absorption spectrum."""
     crossSectionAbsorption: object
+    """Absorption cross sections :math:`\sigma_a` in ``cm^2``."""
     wavelengthsEmission: object
+    """Wavelength samples for the emission spectrum."""
     crossSectionEmission: object
+    """Emission cross sections :math:`\sigma_e` in ``cm^2``."""
     resolution: int = 1
+    """Spectral interpolation resolution passed to ``calcPhiASE``."""
 
     def __post_init__(self):
         self.wavelengthsAbsorption = np.asarray(self.wavelengthsAbsorption, dtype=np.float64).reshape(-1)
@@ -129,6 +158,7 @@ class CrossSectionData:
 
     @classmethod
     def monochromatic(cls, *, wavelength, crossSectionAbsorption, crossSectionEmission):
+        """Build a single-wavelength spectrum for monochromatic workflows."""
         return cls(
             wavelengthsAbsorption=[wavelength],
             crossSectionAbsorption=[crossSectionAbsorption],
@@ -139,6 +169,7 @@ class CrossSectionData:
 
     @classmethod
     def fromDirectory(cls, path, resolution=1000):
+        """Load ``lambda_a``, ``sigma_a``, ``lambda_e``, and ``sigma_e`` text files."""
         root = Path(path)
         return cls(
             wavelengthsAbsorption=np.loadtxt(root / "lambda_a.txt"),
@@ -149,12 +180,15 @@ class CrossSectionData:
         )
 
     def toLaserProperties(self):
+        """Wrap the same spectra in the lower-level ``LaserProperties`` store."""
         return LaserProperties(crossSections=self)
 
     def absorptionAt(self, wavelength):
+        """Interpolate :math:`\sigma_a` at ``wavelength``."""
         return self._interpolate(self.wavelengthsAbsorption, self.crossSectionAbsorption, wavelength)
 
     def emissionAt(self, wavelength):
+        """Interpolate :math:`\sigma_e` at ``wavelength``."""
         return self._interpolate(self.wavelengthsEmission, self.crossSectionEmission, wavelength)
 
     @staticmethod
@@ -177,6 +211,7 @@ class CrossSectionData:
         return float(np.interp(query, wavelengths[order], values[order]))
 
     def toDict(self):
+        """Return the dictionary layout expected by the low-level bindings."""
         return {
             "l_abs": self.wavelengthsAbsorption,
             "l_ems": self.wavelengthsEmission,
@@ -191,8 +226,17 @@ SpectralDecomposition = CrossSectionData
 
 @dataclass
 class LaserProperties:
+    """Mutable low-level laser-property store.
+
+    Prefer ``CrossSectionData`` for new simulations. This class remains useful
+    when code needs the historical ``l_abs``, ``s_abs``, ``l_ems``, ``s_ems``,
+    and ``l_res`` handles or aliases used by ``calcPhiASE``.
+    """
+
     crossSections: CrossSectionData | None = None
+    """Optional spectral data used to populate the property store."""
     values: dict = field(default_factory=dict)
+    """Canonical low-level property values."""
 
     def __post_init__(self):
         if self.crossSections is not None:
@@ -200,6 +244,7 @@ class LaserProperties:
 
     @classmethod
     def spectral(cls, **kwargs):
+        """Create ``LaserProperties`` from explicit spectral arrays."""
         if "absorption" in kwargs and "crossSectionAbsorption" not in kwargs:
             kwargs["crossSectionAbsorption"] = kwargs.pop("absorption")
         if "emission" in kwargs and "crossSectionEmission" not in kwargs:
@@ -208,6 +253,7 @@ class LaserProperties:
 
     @classmethod
     def monochromatic(cls, *, absorption, emission, wavelengthAbsorption=0.0, wavelengthEmission=0.0):
+        """Create a single-sample absorption/emission data set."""
         return cls.spectral(
             wavelengthsAbsorption=[wavelengthAbsorption],
             crossSectionAbsorption=[absorption],
@@ -218,14 +264,17 @@ class LaserProperties:
 
     @classmethod
     def fromDirectory(cls, path):
+        """Load spectral text files and wrap them as ``LaserProperties``."""
         return cls(crossSections=CrossSectionData.fromDirectory(path))
 
     def withProperties(self, **properties):
+        """Set multiple laser properties and return ``self`` for chaining."""
         for name, value in properties.items():
             self.set(name, value)
         return self
 
     def get(self, name):
+        """Return a ``LaserProperty`` handle by canonical name or alias."""
         canonical = LASER_ALIASES.get(name, name)
         if canonical not in LASER_PROPERTY_SPECS:
             known = ", ".join(LASER_PROPERTY_SPECS)
@@ -233,6 +282,7 @@ class LaserProperties:
         return LaserProperty(self, LASER_PROPERTY_SPECS[canonical])
 
     def set(self, name, value):
+        """Validate and store one laser property by canonical name or alias."""
         prop = self.get(name)
         if prop.expectedShape == ():
             self.values[prop.name] = prop.dtype.type(value).item()
@@ -246,9 +296,11 @@ class LaserProperties:
         return self
 
     def listProperties(self):
+        """Return metadata for all known laser properties."""
         return [self.get(name).meta() for name in LASER_PROPERTY_SPECS]
 
     def toDict(self):
+        """Return the complete low-level laser dictionary after validation."""
         self.validate(requiredOnly=True)
         return {
             "l_abs": self.values["l_abs"],
@@ -260,26 +312,31 @@ class LaserProperties:
 
     @property
     def maxSigmaA(self):
+        """Maximum absorption cross section :math:`\max(\sigma_a)`."""
         self.validate(requiredOnly=True)
         return float(np.max(self.values["s_abs"]))
 
     @property
     def maxSigmaE(self):
+        """Maximum emission cross section :math:`\max(\sigma_e)`."""
         self.validate(requiredOnly=True)
         return float(np.max(self.values["s_ems"]))
 
     @property
     def emissionPeakIndex(self):
+        """Index of the largest emission cross-section sample."""
         self.validate(requiredOnly=True)
         return int(np.argmax(self.values["s_ems"]))
 
     @property
     def absorptionAtEmissionPeak(self):
+        """Absorption cross section sampled at the emission peak index."""
         self.validate(requiredOnly=True)
         idx = min(self.emissionPeakIndex, len(self.values["s_abs"]) - 1)
         return float(self.values["s_abs"][idx])
 
     def validate(self, requiredOnly=False):
+        """Check required fields and matching wavelength/cross-section lengths."""
         missing = [
             name for name, spec in LASER_PROPERTY_SPECS.items()
             if spec.required and name not in self.values
@@ -303,12 +360,25 @@ class LaserProperties:
 
 @dataclass(init=False)
 class PumpProperties:
+    """Pump-beam settings used to raise the excited-state fraction ``beta``.
+
+    ``intensity`` is pump intensity :math:`I` in ``W / cm^2``. ``wavelength``
+    is the pump wavelength :math:`\lambda`. Built-in Gaussian pumping also
+    uses ``radiusX``, ``radiusY``, and ``exponent`` from ``customProperties``.
+    A custom ``solver`` may store its own knobs in the same dictionary.
+    """
+
     intensity: float
+    """Pump intensity :math:`I` in ``W / cm^2``."""
     wavelength: float | None
+    """Pump wavelength :math:`\lambda`; required for monochromatic data."""
     pumpSubsteps: int
+    """Number of time samples used by the built-in pump integrator."""
     customProperties: dict
+    """Extensible store for beam shape, reflection, spectra, and solver handles."""
 
     def __init__(self, *, intensity, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
+        """Create pump settings from core fields plus arbitrary custom properties."""
         self.intensity = float(intensity)
         self.wavelength = None if wavelength is None else float(wavelength)
         self.pumpSubsteps = int(pumpSubsteps)
@@ -342,6 +412,12 @@ class PumpProperties:
         customProperties=None,
         **extraProperties,
     ):
+        """Create settings for the built-in super-Gaussian pump profile.
+
+        The transverse profile is ``intensity * exp(-r ** exponent)`` with
+        radii ``radiusX`` and ``radiusY``. ``backReflection`` and
+        ``reflectivity`` control the backward pump pass.
+        """
         custom = dict(customProperties or {})
         custom.update(extraProperties)
         custom.update(
@@ -431,17 +507,21 @@ class PumpProperties:
         raise AttributeError(name)
 
     def withProperty(self, name, value):
+        """Set one custom pump property and return ``self``."""
         self.customProperties[name] = value
         return self
 
     def withProperties(self, **properties):
+        """Set several custom pump properties and return ``self``."""
         self.customProperties.update(properties)
         return self
 
     def getProperty(self, name, default=None):
+        """Read a custom pump property without raising ``AttributeError``."""
         return self.customProperties.get(name, default)
 
     def activeDuration(self, timeFrame):
+        """Return the pump duration used for one integration frame."""
         if self.pumpDuration is not None:
             return float(self.pumpDuration)
         if timeFrame is None:
@@ -449,12 +529,14 @@ class PumpProperties:
         return float(timeFrame)
 
     def intensityAt(self, points):
+        """Evaluate the super-Gaussian intensity profile at ``(x, y)`` points."""
         self._validateGaussianPumpParameters()
         points = np.asarray(points, dtype=np.float64)
         r = np.sqrt((points[:, 0] ** 2) / (self.radiusY ** 2) + (points[:, 1] ** 2) / (self.radiusX ** 2))
         return self.intensity * np.exp(-(r ** self.exponent))
 
     def toDict(self, timeFrame=None):
+        """Return the low-level pump dictionary consumed by ``pumping.py``."""
         self._validateGaussianPumpParameters()
         sigma_abs = self.crossSections.absorptionAt(self.wavelength)
         sigma_ems = self.crossSections.emissionAt(self.wavelength)
@@ -470,6 +552,7 @@ class PumpProperties:
         }
 
     def modeDict(self):
+        """Return low-level flags for extraction and backward reflection."""
         return {
             "BRM": int(self.backReflection),
             "R": float(self.reflectivity),

@@ -4,6 +4,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Legacy Python wrapper for direct ``calcPhiASE`` calls.
+
+New code should usually use ``PhiASE`` from ``simulation.py``. This module
+keeps the historical many-argument function and the temporary-file MPI path for
+compatibility with old scripts.
+"""
+
 import shutil
 import warnings
 
@@ -15,6 +22,7 @@ Mesh=HASEonGPU_Bindings.HostMesh
 
 ############################## cleanIOFiles #################################
 def cleanIOFiles(TMP_FOLDER):
+    """Remove a temporary legacy input/output directory if it exists."""
     if os.path.exists(TMP_FOLDER) and os.path.isdir(TMP_FOLDER):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -30,6 +38,11 @@ def createCalcPhiASEInput(
         claddingNumber,
         claddingAbsorption,
         FOLDER):
+    """Write text input files consumed by the ``calcPhiASE`` binary.
+
+    ``packed`` contains flattened geometry, beta, material, and spectral arrays.
+    The files mirror the historical MATLAB/Python interface layout.
+    """
 
     CURRENT_DIR = os.getcwd()
     os.makedirs(FOLDER, exist_ok=True)
@@ -90,6 +103,7 @@ def createCalcPhiASEInput(
 
 ######################### parseCalcPhiASEOutput #############################
 def parseCalcPhiASEOutput(FOLDER, layout):
+    """Read ``phi_ASE``, MSE, and ray-count files from a legacy run."""
     CURRENT_DIR = os.getcwd()
     os.chdir(FOLDER)
     try:
@@ -116,6 +130,7 @@ def parseCalcPhiASEOutput(FOLDER, layout):
     return phiASE, mseValues, raysUsedPerSample
 
 def findCalcPhiASENearModule():
+    """Find the packaged ``calcPhiASE`` executable next to the Python module."""
     so_dir = Path(HASEonGPU_Bindings.__file__).resolve().parent
 
     # direct sibling
@@ -155,6 +170,13 @@ def calcPhiASEMpi(
         nPerNode,
         adaptiveSteps
 ):
+
+    """Run the legacy temporary-file path, optionally through ``mpiexec``.
+
+    This function is used by old direct ``calcPhiASE`` scripts. It serializes
+    the input arrays, launches the standalone binary, then parses the output
+    arrays back into the caller's preferred layout.
+    """
 
     minSample = 0
     nP = int(packed["numberOfPoints"])
@@ -259,6 +281,15 @@ def calcPhiASE(
         minSampleRange = 0,
         maxSampleRange = None,
 ):
+    """Run ASE using the historical direct Python signature.
+
+    ``points`` may be flat or ``(numberOfPoints, 2)``. ``trianglePointIndices``
+    may be flat or ``(numberOfTriangles, 3)``. ``betaCells`` represents
+    point-level excited-state fraction, while ``betaVolume`` represents
+    prism-centered beta used by ray tracing. The modern ``PhiASE`` wrapper
+    builds these arguments from ``GainMedium`` automatically.
+    """
+
     def transform_inputs(
             points,
             trianglePointIndices,
@@ -278,6 +309,7 @@ def calcPhiASE(
             laserParameter,
             numberOfLevels,
     ):
+        """Validate user arrays and flatten them for the pybind/backend API."""
         def is_numpy(x):
             return isinstance(x, np.ndarray)
 
