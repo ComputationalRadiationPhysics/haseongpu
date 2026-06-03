@@ -119,38 +119,36 @@ def constructBetaCellsSphere(topology, *, center=(5.0, 5.0, 5.0), radius=5.0, be
             if r < radius:
                 betaCells[pointIndex, levelIndex] = float(beta)
     return betaCells
-
+nTot = np.float64(1.38e20 * 1.0)
+sigmaA = np.float64(0.11e-20)
+sigmaE = np.float64(2.1e-20)
 sphereCases = [
     (np.float64(radiusValue), np.float64(g0Value / 100))
     for radiusValue in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 40.0, 50.0, 70.0, 100.0]
-    for g0Value in range(5, 50, 5)
-    if 3.0 <= np.float64(radiusValue) * np.float64(g0Value / 100) <= 5.0
+    for g0Value in range(10, 405, 10)
+    if 5.0 >= np.float64(radiusValue) * np.float64(g0Value / 100) >= 1.0 >= calcBetaFromGain(g0Value/ 100, nTot, sigmaA, sigmaE) >= 0.0
 ]
 
 
 sphereCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in sphereCases]
 alpakaBackends = AlpakaBackends.all()
-
-
 @pytest.mark.parametrize("backend", alpakaBackends)
 @pytest.mark.parametrize(("radius", "g0"), sphereCases, ids=sphereCaseIds)
 def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAseTestConfigPath):
-    # g_0 von 0.05-0.5 [cm^-1], g_0R max 5 (ab g_0R > 3)
     xDim = radius * 2.0
-    nTot = np.float64(1.388e20 * 2.0)
-    sigmaA = np.float64(1.0e-24)
-    sigmaE = np.float64(1.0e-20)
+    nTot = np.float64(1.38e20 * 1.0)
+    sigmaA = np.float64(0.11e-20)
+    sigmaE = np.float64(2.1e-20)
     gain = g0
     beta = calcBetaFromGain(gain, nTot, sigmaA=sigmaA, sigmaE=sigmaE)
     print(f' running with: g0: {g0} and radius: {radius} and beta: {beta}')
     flourescenceLifetime = np.float64(9.41e-4)
 
     crossSections = SpectralDecomposition.monochromatic(
-        wavelength=np.float64(940e-9),
+        wavelength=np.float64(1030e-9),
         crossSectionAbsorption=sigmaA,
         crossSectionEmission=sigmaE,
     )
-
     center = (radius, radius, radius)
 
     grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 100)
@@ -159,7 +157,6 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
     betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
     betaVolume = constructBetaVolumeSphere(topology, center=center, radius=radius, beta=beta)
     flatBetaVolume = betaVolume.reshape(-1, order="F")
-
     assert np.any(flatBetaVolume > 0.0)
     assert np.any(betaCells > 0.0)
     cells = medium.get("betaCells").expectedShape

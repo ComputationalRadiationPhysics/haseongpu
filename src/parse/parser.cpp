@@ -32,6 +32,7 @@
 #include <cstdlib> /* exit() */
 #include <filesystem>
 #include <functional> /* bind, placeholders */
+#include <limits>
 #include <optional>
 #include <ranges>
 #include <sstream> /* stringstream */
@@ -413,7 +414,7 @@ namespace hase::parse
     {
         result = hase::core::Result(
             std::vector<float>(numberOfSamples, 0.0f),
-            std::vector<double>(numberOfSamples, 100000.0),
+            std::vector<double>(numberOfSamples, std::numeric_limits<double>::max()),
             std::vector<unsigned>(numberOfSamples, 0u),
             std::vector<double>(numberOfSamples, 0.0));
     }

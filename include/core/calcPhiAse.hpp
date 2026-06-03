@@ -53,6 +53,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <vector>
 #define SEED 4321
 
@@ -69,12 +70,15 @@ namespace hase::core
     };
 
     template<std::floating_point T_Elem>
-    T_Elem calcMSE(T_Elem const phiAse, T_Elem const phiAseSquare, unsigned const raysPerSample)
+    T_Elem calcMSE(T_Elem const gainSum, T_Elem const gainSumSquare, unsigned const raysPerSample)
     {
-        T_Elem a = phiAseSquare / raysPerSample;
-        T_Elem b = (phiAse / raysPerSample) * (phiAse / raysPerSample);
+        if(raysPerSample < 2)
+            return std::numeric_limits<T_Elem>::max();
 
-        return alpaka::math::sqrt(alpaka::math::abs((a - b) / raysPerSample));
+        auto const n = static_cast<T_Elem>(raysPerSample);
+        T_Elem const varianceOfMean = (gainSumSquare - gainSum * gainSum / n) / (n * (n - 1));
+
+        return alpaka::math::sqrt(alpaka::math::max(T_Elem{0}, varianceOfMean)) / (T_Elem{4} * M_PI);
     }
 
     inline std::vector<int> generateRaysPerSampleExpList(int minRaysPerSample, int maxRaysPerSample, int steps)
@@ -307,19 +311,24 @@ namespace hase::core
                     alpaka::onHost::memcpy(queue, hgainSumView, dGainSum);
                     alpaka::onHost::memcpy(queue, hgainSumSquareView, dGainSumSquare);
                     alpaka::onHost::wait(queue);
-                    float mseTmp = calcMSE(gainSumHost, gainSumSquareHost, hRaysPerSampleDump);
+                    double mseTmp = calcMSE(gainSumHost, gainSumSquareHost, hRaysPerSampleDump);
 
                     assert(!alpaka::math::isnan(hgainSumView[0]));
                     assert(!alpaka::math::isnan(hgainSumSquareView[0]));
                     assert(!alpaka::math::isnan(mseTmp));
-
-                    if(result.mse.at(sampleIdx) > mseTmp)
+                    auto updateSample = [&]()
                     {
                         result.mse.at(sampleIdx) = mseTmp;
                         result.phiAse.at(sampleIdx) = gainSumHost;
                         result.phiAse.at(sampleIdx) /= *raysPerSampleIter * 4.0f * M_PI;
                         result.totalRays.at(sampleIdx) = *raysPerSampleIter;
+                    };
+
+                    if(result.mse.at(sampleIdx) > mseTmp)
+                    {
+                        updateSample();
                     }
+
                     if(result.mse.at(sampleIdx) < experiment.mseThreshold)
                         mseTooHigh = false;
                 }

@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -82,7 +83,7 @@ void runSerial(TestData& testData)
 void resetResultForSimulation(hase::core::Result& result)
 {
     std::ranges::fill(result.phiAse, 0.0f);
-    std::ranges::fill(result.mse, 100000.0);
+    std::ranges::fill(result.mse, std::numeric_limits<double>::max());
     std::ranges::fill(result.totalRays, 0u);
     std::ranges::fill(result.dndtAse, 0.0);
 }
