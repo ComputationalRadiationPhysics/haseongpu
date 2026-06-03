@@ -124,8 +124,8 @@ sigmaA = np.float64(0.11e-20)
 sigmaE = np.float64(2.1e-20)
 sphereCases = [
     (np.float64(radiusValue), np.float64(g0Value / 100))
-    for radiusValue in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 40.0, 50.0, 70.0, 100.0]
-    for g0Value in range(10, 405, 10)
+    for radiusValue in np.geomspace(0.1, 100, num=9)
+    for g0Value in np.geomspace(5, 400, num=9)
     if 5.0 >= np.float64(radiusValue) * np.float64(g0Value / 100) >= 1.0 >= calcBetaFromGain(g0Value/ 100, nTot, sigmaA, sigmaE) >= 0.0
 ]
 
@@ -177,7 +177,7 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
         maxRaysPerSample=100000,
         repetitions=2,
         adaptiveSteps=3,
-        mseThreshold=0.1,
+        mseThreshold=0.05,
         useReflections=False,
         backend=backend,
         parallelMode="single",
@@ -209,8 +209,105 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
     # assert numerical > 0.0
     #
     # vtkWedge("phi0.vtk", data=phiAse, geometry=medium.topology,field="phiAse")
-    assert np.isclose(numerical, expected, rtol=0.1)
+    assert np.isclose(numerical, expected, rtol=0.05)
+def make_grid_within_radius(radius: float):
+    return [
+        (x, y)
+        for x in [i * radius / 10 for i in range(-10, 11)]
+        for y in [j * radius / 10 for j in range(-10, 11)]
+        if x * x + y * y <= radius * radius
+    ]
+diskCases = [
+    (np.float64(radiusValue), np.float64(g0Value / 100))
+    for radiusValue in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 40.0, 50.0, 70.0, 100.0]
+    for g0Value in range(10, 405, 10)
+    if 1.0 >= calcBetaFromGain(g0Value / 100, nTot, sigmaA, sigmaE) >= 0.0 and (g0Value / 100) * radiusValue == 2.0
+]
 
+diskCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in diskCases]
+@pytest.mark.parametrize(("radius", "g0"), diskCases, ids=diskCaseIds)
+def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath):
+    global expected
+    backend=alpakaBackends[-1]
+    xDim = radius * 2.0
+    nTot = np.float64(1.38e20 * 1.0)
+    sigmaA = np.float64(0.11e-20)
+    sigmaE = np.float64(2.1e-20)
+    gain = g0
+    beta = calcBetaFromGain(gain, nTot, sigmaA=sigmaA, sigmaE=sigmaE)
+    print(f' running with: g0: {g0} and radius: {radius} and beta: {beta}')
+    flourescenceLifetime = np.float64(9.41e-4)
+
+    crossSections = SpectralDecomposition.monochromatic(
+        wavelength=np.float64(1030e-9),
+        crossSectionAbsorption=sigmaA,
+        crossSectionEmission=sigmaE,
+    )
+    center = (radius, radius, radius)
+
+    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 100)
+    topology = MeshTopology.fromGrid(grid)
+    medium = GainMedium(topology=topology)
+    betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
+    betaVolume = constructBetaVolumeSphere(topology, center=center, radius=radius, beta=beta)
+    flatBetaVolume = betaVolume.reshape(-1, order="F")
+    assert np.any(flatBetaVolume > 0.0)
+    assert np.any(betaCells > 0.0)
+    cells = medium.get("betaCells").expectedShape
+    volume = medium.get("betaVolume").expectedShape
+    print(f'betaCells: {cells}, betaVolume: {volume}')
+    medium.withPhysicalProperties(
+        betaCells=betaCells,
+        betaVolume=betaVolume,
+        nTot=nTot,
+        crystalTFluo=flourescenceLifetime,
+    )
+    expectedValues=[]
+    for offsetX,offsetY in make_grid_within_radius(radius):
+        center = (radius+offsetX, radius+offsetY, radius)
+        centerSample = medium.betaCellIndexAt(*center, flat=True)
+        phiAse = PhiASE.fromYaml(
+            phiAseTestConfigPath,
+            spectralProperties=crossSections,
+            minRaysPerSample=10000,
+            maxRaysPerSample=100000,
+            repetitions=2,
+            adaptiveSteps=3,
+            mseThreshold=0.05,
+            useReflections=False,
+            backend=backend,
+            parallelMode="single",
+            numDevices=1,
+            minSampleRange=centerSample,
+            maxSampleRange=centerSample,
+            monochromatic=True,
+        )
+        try:
+            phiAse.run(gainMedium=medium)
+        except RuntimeError as exc:
+            if "return code 1" in str(exc):
+                pytest.skip(f"backend {backend} is not available in this build")
+            raise
+        result = phiAse.getResults()
+        shape = medium.get("betaCells").expectedShape
+        phiAseValues = np.array(result.phiAse, dtype=np.float64).reshape(shape, order="F")
+        numerical = phiAseValues.reshape(-1, order="F")[centerSample]
+
+        expected = analyticalPhiAseSphereCenter(
+            gain=gain,
+            radius=radius,
+            beta=beta,
+            nTot=nTot,
+            tauRad=flourescenceLifetime
+        )
+        print(f'expected: {expected}, numerical {numerical}')
+        # assert np.isfinite(numerical)
+        # assert numerical > 0.0
+        #
+        # vtkWedge("phi0.vtk", data=phiAse, geometry=medium.topology,field="phiAse")
+        assert np.isclose(numerical, expected, rtol=0.05)
+        expectedValues.append(expected)
+    assert all(np.allclose(a, expected[0], rtol=0.2) for a in expected[1:])
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
