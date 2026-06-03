@@ -51,6 +51,8 @@ def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i):
         str(compute["repetitions"]),
         "--adaptive-steps",
         str(compute["adaptiveSteps"]),
+        "--mse-threshold",
+        str(experiment["mseThreshold"]),
         "--timeslice",
         "50",
         "--timeslice-total",

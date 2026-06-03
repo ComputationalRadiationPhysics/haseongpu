@@ -1,7 +1,7 @@
 experiment:
   minRaysPerSample: 1000
   maxRaysPerSample: 100000
-  mseThreshold: 0.005
+  mseThreshold: 0.01087
   useReflections: true
   monochromatic: false
 

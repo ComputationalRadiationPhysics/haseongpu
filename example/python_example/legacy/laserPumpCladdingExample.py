@@ -87,6 +87,7 @@ def main(
     timeslice_total_override: int | None = None,
     min_sample_range: int = 0,
     max_sample_range: int | None = None,
+    mse_threshold_override: float | None = None,
     snapshot_path: Path | None = None,
 ):
     print(f' root: {SCRIPT_DIR}')
@@ -174,7 +175,8 @@ def main(
     adaptiveSteps = 5 if adaptive_steps_override is None else int(adaptive_steps_override)
     minRaysPerSample = 1e5 if min_rays is None else int(min_rays)
     maxRaysPerSample = minRaysPerSample * 100 if max_rays is None else int(max_rays)
-    mseThreshold = 0.005
+    # this is the volume weighting adjusted threshold (scaled the original 0.005 by thickness * mesh.surface )
+    mseThreshold = 0.01087 if mse_threshold_override is None else float(mse_threshold_override)
 
     ## this is our starting counter
     tic= time.perf_counter()
@@ -564,6 +566,12 @@ if __name__ == "__main__":
         help="Override the number of phiASE adaptive ray-count steps for this run",
     )
     parser.add_argument(
+        "--mse-threshold",
+        type=float,
+        default=None,
+        help="Override the phiASE MSE threshold for this run",
+    )
+    parser.add_argument(
         "--reflection",
         type=int,
         choices=(0, 1),
@@ -617,6 +625,7 @@ if __name__ == "__main__":
         use_reflections_override=None if args.reflection is None else bool(args.reflection),
         repetitions_override=args.repetitions,
         adaptive_steps_override=args.adaptive_steps,
+        mse_threshold_override=args.mse_threshold,
         timeslice_override=args.timeslice,
         timeslice_total_override=args.timeslice_total,
         min_sample_range=args.min_sample_range,
