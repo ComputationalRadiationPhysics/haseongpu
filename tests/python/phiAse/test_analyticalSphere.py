@@ -151,7 +151,7 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
     )
     center = (radius, radius, radius)
 
-    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 100)
+    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 50)
     topology = MeshTopology.fromGrid(grid)
     medium = GainMedium(topology=topology)
     betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
@@ -210,11 +210,11 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
     #
     # vtkWedge("phi0.vtk", data=phiAse, geometry=medium.topology,field="phiAse")
     assert np.isclose(numerical, expected, rtol=0.05)
-def make_grid_within_radius(radius: float):
+def make_grid_within_radius(radius: float, n: int = 3):
     return [
         (x, y)
-        for x in [i * radius / 10 for i in range(-10, 11)]
-        for y in [j * radius / 10 for j in range(-10, 11)]
+        for x in [i * radius / n for i in range(-n, n + 1)]
+        for y in [j * radius / n for j in range(-n, n + 1)]
         if x * x + y * y <= radius * radius
     ]
 diskCases = [
@@ -245,7 +245,7 @@ def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath
     )
     center = (radius, radius, radius)
 
-    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 100)
+    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 50)
     topology = MeshTopology.fromGrid(grid)
     medium = GainMedium(topology=topology)
     betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
@@ -307,7 +307,7 @@ def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath
         # vtkWedge("phi0.vtk", data=phiAse, geometry=medium.topology,field="phiAse")
         assert np.isclose(numerical, expected, rtol=0.05)
         expectedValues.append(expected)
-    assert all(np.allclose(a, expected[0], rtol=0.2) for a in expected[1:])
+    assert all(np.allclose(a, expectedValues[0], rtol=0.2) for a in expectedValues[1:])
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

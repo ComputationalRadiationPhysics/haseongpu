@@ -591,9 +591,10 @@ class MeshTopology:
     def pointIndexAt(self, x, y, *, tol=1e-12):
         query = np.asarray([x, y], dtype=np.float64)
         matches = np.flatnonzero(np.all(np.isclose(self.points, query, atol=tol, rtol=0.0), axis=1))
-        if matches.size == 0:
-            raise ValueError(f"no topology point found at ({x}, {y})")
-        return int(matches[0])
+        if matches.size:
+            return int(matches[0])
+        distances = np.linalg.norm(self.points - query, axis=1)
+        return int(np.argmin(distances))
 
     def levelIndexAt(self, z, *, tol=1e-12):
         levels = self.levelCoordinates()

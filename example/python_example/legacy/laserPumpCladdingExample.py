@@ -28,7 +28,6 @@
 #
 ###################################################################################
 import argparse
-import sys
 import time
 from pathlib import Path
 
@@ -43,12 +42,6 @@ import csv
 
 Legacy_DIR = Path(__file__).resolve().parent
 SCRIPT_DIR= Legacy_DIR
-BUILD_PYTHON_ROOT = Legacy_DIR / "build" / "python"
-
-sys.path.insert(0, str(Legacy_DIR))
-if BUILD_PYTHON_ROOT.is_dir():
-    sys.path.insert(0, str(BUILD_PYTHON_ROOT))
-
 from HASEonGPU import calcPhiASE
 
 
