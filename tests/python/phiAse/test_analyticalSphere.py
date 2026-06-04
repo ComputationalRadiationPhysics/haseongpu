@@ -124,8 +124,8 @@ sigmaA = np.float64(0.11e-20)
 sigmaE = np.float64(2.1e-20)
 sphereCases = [
     (np.float64(radiusValue), np.float64(g0Value / 100))
-    for radiusValue in np.geomspace(0.1, 100, num=9)
-    for g0Value in np.geomspace(5, 400, num=9)
+    for radiusValue in np.geomspace(0.1, 100, num=8)
+    for g0Value in np.geomspace(5, 400, num=8)
     if 5.0 >= np.float64(radiusValue) * np.float64(g0Value / 100) >= 1.0 >= calcBetaFromGain(g0Value/ 100, nTot, sigmaA, sigmaE) >= 0.0
 ]
 

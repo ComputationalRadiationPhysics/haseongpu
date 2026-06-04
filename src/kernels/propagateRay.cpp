@@ -241,6 +241,9 @@ namespace hase::kernels
         double gain = 1;
         int nextForbiddenEdge = -1;
         int nextEdge = -1;
+        // applies a small epsilon to "nudge" the ray along its trajectory in case we hit exactly on a triangle/surface
+        // intersection
+        constexpr double boundaryNudgeFactor = 64.0 * 2.2204460492503131e-16;
 
         // Length to small, could be same points
         if(distanceTotal < SMALL)
@@ -265,6 +268,14 @@ namespace hase::kernels
             if(nextEdge != -1)
             {
                 updateFromEdge(nextTriangle, &nextForbiddenEdge, nextLevel, mesh, nextEdge);
+
+                double const boundaryNudge = boundaryNudgeFactor * distanceTotal;
+                static_assert(SMALL > boundaryNudgeFactor);
+                if(length < boundaryNudge && distanceRemaining > boundaryNudge)
+                {
+                    nextRay = calcNextRay(nextRay, boundaryNudge);
+                    distanceRemaining -= boundaryNudge;
+                }
             }
         }
 
