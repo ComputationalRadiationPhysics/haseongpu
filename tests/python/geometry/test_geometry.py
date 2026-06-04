@@ -140,6 +140,15 @@ def testGridGeometrySatisfiesPhiAseGainMediumShapeContracts(grid, flat):
     _assertGainMediumLaunchContract(medium)
 
 
+def testPointIndexAtFallsBackToNearestTopologyPoint():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=1.0, tileSizeX=0.5))
+
+    exact = topology.pointIndexAt(0.5, 0.5)
+    nearest = topology.pointIndexAt(0.49, 0.49)
+
+    assert nearest == exact
+
+
 def testGainMediumRejectsArraysThatBreakGeometryDependencies():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)

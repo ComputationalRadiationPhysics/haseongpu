@@ -29,7 +29,7 @@ dependencies=[
 ]
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
-wheel.packages = ["HASEonGPU_Bindings"]
+wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
 
 [tool.scikit-build.cmake]
 build-type = "Release"
