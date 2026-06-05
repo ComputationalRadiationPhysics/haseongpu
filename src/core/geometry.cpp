@@ -31,13 +31,13 @@ namespace hase::core
         return v;
     }
 
-    ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint)
+    ALPAKA_FN_HOST_ACC double distance(Point startPoint, Point endPoint)
     {
-        float x, y, z;
+        double x, y, z;
         x = endPoint.x - startPoint.x;
         y = endPoint.y - startPoint.y;
         z = endPoint.z - startPoint.z;
-        float d = alpaka::math::sqrt(x * x + y * y + z * z);
+        double d = alpaka::math::sqrt(x * x + y * y + z * z);
         return alpaka::math::abs(d);
     }
 

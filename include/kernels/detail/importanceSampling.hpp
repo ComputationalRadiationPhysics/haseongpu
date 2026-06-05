@@ -213,10 +213,8 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{hase::alpakaUtils::Vec1D{raysPerSample}}))
             {
-                double const draw = alpaka::rand::distribution::UniformReal{
-                    0.0f,
-                    static_cast<float>(sumPhi),
-                    alpaka::rand::interval::co}(engine);
+                double const draw
+                    = alpaka::rand::distribution::UniformReal<double>{0.0, sumPhi, alpaka::rand::interval::co}(engine);
 
                 unsigned lower = 0u;
                 unsigned upper = numberOfWeightedPrisms;
@@ -234,8 +232,12 @@ namespace hase::kernels
                     }
                 }
 
-                if(lower < numberOfWeightedPrisms)
+                if(numberOfWeightedPrisms > 0u)
                 {
+                    if(lower >= numberOfWeightedPrisms)
+                    {
+                        lower = numberOfWeightedPrisms - 1u;
+                    }
                     alpaka::onAcc::atomicAdd(acc, &raysPerPrism[lower], 1u);
                 }
             }
