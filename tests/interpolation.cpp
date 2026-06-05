@@ -30,7 +30,7 @@ std::vector<double> makeSortedUniqueX(std::size_t n, uint32_t seed)
     for(std::size_t i = 1; i < x.size(); ++i)
     {
         if(x[i] <= x[i - 1])
-            x[i] = std::nextafter(x[i - 1], std::numeric_limits<double>::infinity());
+            x[i] = std::nextafter(x[i - 1], std::numeric_limits<double>::max());
     }
     return x;
 }

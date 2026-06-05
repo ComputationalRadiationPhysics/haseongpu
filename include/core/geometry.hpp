@@ -58,7 +58,7 @@ namespace hase::core
     {
         Point p;
         Vector dir;
-        float length;
+        double length;
     };
 
     struct NormalRay
@@ -74,7 +74,7 @@ namespace hase::core
     };
 
     ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint);
-    ALPAKA_FN_HOST_ACC float distance(Point startPoint, Point endPoint);
+    ALPAKA_FN_HOST_ACC double distance(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC Ray normalizeRay(Ray ray);
 

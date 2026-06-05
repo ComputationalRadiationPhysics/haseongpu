@@ -240,10 +240,10 @@ namespace hase::kernels
         double length = 0;
         double gain = 1;
         int nextForbiddenEdge = -1;
-        int nextEdge = -1;
         // applies a small epsilon to "nudge" the ray along its trajectory in case we hit exactly on a triangle/surface
         // intersection
-        constexpr double boundaryNudgeFactor = 64.0 * 2.2204460492503131e-16;
+        constexpr double numberOfEpsShifts = 64.0; // small eps factor
+        constexpr double boundaryNudgeFactor = numberOfEpsShifts * std::numeric_limits<double>::epsilon();
 
         // Length to small, could be same points
         if(distanceTotal < SMALL)
@@ -255,7 +255,7 @@ namespace hase::kernels
             assert(*nextLevel <= mesh.numberOfLevels);
             // Calc gain for triangle intersection
             length = distanceRemaining;
-            nextEdge
+            int const nextEdge
                 = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
             nextRay = calcNextRay(nextRay, length);
             double gainTmp = calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
