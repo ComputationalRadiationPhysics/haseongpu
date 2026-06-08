@@ -18,6 +18,7 @@ from .geometry import GainMedium, _flat
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
 from . import mpiLauncher
 from .pumping import BetaIntegrationGaussianSolver, Constants
+from .rng import defaultBackendRngSeed
 from .timeIntegration import TimeDerivative, TimeIntegrationSolver
 
 
@@ -281,14 +282,7 @@ class PhiASE:
             monochromatic=bool(self.monochromatic),
         )
 
-        topology = medium.topology
-        min_sample = 0 if self.minSampleRange is None else int(self.minSampleRange)
-        max_sample = (
-            topology.numberOfPoints * topology.levels - 1
-            if self.maxSampleRange is None
-            else int(self.maxSampleRange)
-        )
-
+        effective_rng_seed = int(self.rngSeed) if self.rngSeed is not None else defaultBackendRngSeed()
         self._compute = HASEonGPU_Bindings.ComputeParameters(
             maxRepetitions=int(self.repetitions),
             adaptiveSteps=int(self.adaptiveSteps),
@@ -297,11 +291,13 @@ class PhiASE:
             parallelMode=str(self.parallelMode),
             writeVtk=bool(self.writeVtk),
             devices=list(self.devices),
-            minSampleRange=min_sample,
-            maxSampleRange=max_sample,
+            rngSeed=effective_rng_seed,
         )
-        if self.rngSeed is not None:
-            self._compute.rngSeed = int(self.rngSeed)
+        if (self.minSampleRange is None) != (self.maxSampleRange is None):
+            raise ValueError("minSampleRange and maxSampleRange must be set together")
+        if self.minSampleRange is not None:
+            self._compute.minSampleRange = int(self.minSampleRange)
+            self._compute.maxSampleRange = int(self.maxSampleRange)
 
         if str(self.parallelMode).lower() == "mpi":
             self._result = mpiLauncher.runPhiaseMPI(self, medium, laser, laser_properties)

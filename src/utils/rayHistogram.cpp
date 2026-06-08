@@ -41,7 +41,8 @@ namespace hase::utils
         std::vector<unsigned> const totalRays,
         unsigned const max,
         double const mseThreshold,
-        std::vector<double> const mseValues)
+        std::vector<double> const mseValues,
+        std::vector<unsigned> const droppedRays)
     {
         // length of the maximum number of samples (e.g. max==4210)
         int fillwidth = alpaka::math::log10(max) + 4;
@@ -61,7 +62,7 @@ namespace hase::utils
                 histGreen.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
                 histRed.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
             }
-            if(mseValues.at(j) <= mseThreshold)
+            if(mseValues.at(j) <= mseThreshold && droppedRays.at(j) == 0u)
             {
                 histGreen.find(totalRays.at(j))->second++;
                 // itG->second++;

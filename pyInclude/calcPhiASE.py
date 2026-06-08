@@ -18,6 +18,9 @@ import HASEonGPU_Bindings
 import numpy as np
 import os
 from pathlib import Path
+
+from .rng import defaultBackendRngSeed
+
 Mesh=HASEonGPU_Bindings.HostMesh
 
 ############################## cleanIOFiles #################################
@@ -179,6 +182,8 @@ def calcPhiASEMpi(
     arrays back into the caller's preferred layout.
     """
 
+    rngSeed = int(rngSeed) if rngSeed is not None else defaultBackendRngSeed()
+
     minSample = 0
     nP = int(packed["numberOfPoints"])
     maxSample = (int(numberOfLevels) * nP) - 1
@@ -220,7 +225,7 @@ def calcPhiASEMpi(
             + f' --adaptive-steps={int(adaptiveSteps)}'
             + f' --mse-threshold={mseThreshold}'
             + f' --spectral-resolution={packed["laserParameter"]["l_res"]}'
-            + (f' --rng-seed={int(rngSeed)}' if rngSeed is not None else '')
+            + f' --rng-seed={rngSeed}'
     )
     print(cmd)
     status = os.system(cmd)
@@ -485,6 +490,7 @@ def calcPhiASE(
     if maxSampleRange is None:
         maxSampleRange = int((numberOfPoints * numberOfLevels) - 1)
 
+    effective_rng_seed = int(rngSeed) if rngSeed is not None else defaultBackendRngSeed()
     compute = HASEonGPU_Bindings.ComputeParameters(
         maxRepetitions=int(repetitions),
         adaptiveSteps=int(adaptiveSteps),
@@ -495,9 +501,8 @@ def calcPhiASE(
         devices=[],
         minSampleRange=int(minSampleRange),
         maxSampleRange=int(maxSampleRange),
+        rngSeed=effective_rng_seed,
     )
-    if rngSeed is not None:
-        compute.rngSeed = int(rngSeed)
 
     host_mesh = Mesh(
         packed["trianglePointIndices_flat"],

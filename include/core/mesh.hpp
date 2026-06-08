@@ -196,7 +196,7 @@ namespace hase::core
         }
 
         ALPAKA_FN_ACC Point genRndPoint(
-            auto const&,
+            Point& origin,
             unsigned triangle,
             unsigned level,
             alpaka::rand::engine::Philox4x32x10& rndEngine) const
@@ -221,7 +221,12 @@ namespace hase::core
             startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
             startPoint.y = (points[t1 + numberOfPoints] * u) + (points[t2 + numberOfPoints] * v)
                            + (points[t3 + numberOfPoints] * w);
-
+            if((origin - startPoint).euclidLength() < SMALL)
+            {
+                // regenerate ray point if two close to origin point
+                // -> fixes numerical instability 1/inf issue yet causes small calculation bias
+                return genRndPoint(origin, triangle, level, rndEngine);
+            }
             return startPoint;
         }
 

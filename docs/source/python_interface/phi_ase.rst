@@ -20,6 +20,7 @@ parameters, compute parameters, backend selection, and execution mode.
        backend="Host_Cpu_CpuSerial",
        parallelMode="single",
        numDevices=1,
+       rngSeed=1234,
    )
 
 Run One PhiASE Step
@@ -68,6 +69,12 @@ Sampling and Physics Settings
 
 ``monochromatic``
    This will enforce the phiASE computation to only consider the first cross-section emission and absorption for its calculation.
+
+``rngSeed``
+   Optional unsigned RNG seed for reproducible Monte Carlo ray sampling.  Set
+   this explicitly for reproducible runs.  If omitted, the Python wrapper
+   initializes a process-local NumPy seed stream from ``np.random.SeedSequence()``
+   and draws one unsigned 32-bit backend seed for each ASE invocation.
 
 Backend and Parallel Settings
 -----------------------------
@@ -143,6 +150,7 @@ A YAML file can keep experiment and compute settings together:
      write_vtk: false
      min_sample_range: 0
      max_sample_range: 999
+     rng_seed: 1234
 
 YAML keys may be placed at the top level or under ``phiASE``, ``phi_ase``,
 ``experiment``, or ``compute``.  If the same setting appears more than once,
@@ -155,7 +163,8 @@ Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``maxRaysPerSample``, ``min_rays_per_sample``, ``max_rays_per_sample``,
 ``mse_threshold``, ``adaptive_steps``, ``use_reflections``,
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
-``write_vtk``, ``min_sample_range``, and ``max_sample_range``.
+``write_vtk``, ``min_sample_range``, ``max_sample_range``, and
+``rng_seed``.
 
 Loading YAML requires ``PyYAML``.  The editable package installation installs
 this dependency from ``pyproject.toml``; source-tree usage must provide it in
@@ -171,7 +180,8 @@ For command-line tools:
 
 The command-line helper accepts ``--phi-ase-config`` first and then applies
 explicit command-line options such as ``--backend`` or
-``--min-rays-per-sample`` as overrides.
+``--min-rays-per-sample`` as overrides.  It also accepts ``--rng-seed`` for
+reproducible Monte Carlo sampling.
 
 Inspection After a Run
 ----------------------

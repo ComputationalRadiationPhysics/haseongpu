@@ -371,6 +371,17 @@ namespace hase::core
             HEAD_NODE,
             activeComm);
 
+        MPI_Gatherv(
+            localCount > 0 ? result.droppedRays.data() + localBegin : nullptr,
+            localCount,
+            MPI_UNSIGNED,
+            activeRank == HEAD_NODE ? result.droppedRays.data() : nullptr,
+            activeRank == HEAD_NODE ? recvCounts.data() : nullptr,
+            activeRank == HEAD_NODE ? displs.data() : nullptr,
+            MPI_UNSIGNED,
+            HEAD_NODE,
+            activeComm);
+
         MPI_Reduce(&runtime, &maxRankRuntime, 1, MPI_FLOAT, MPI_MAX, HEAD_NODE, activeComm);
 
         int totalUsedDevices = 0;

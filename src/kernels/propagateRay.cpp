@@ -260,8 +260,8 @@ namespace hase::kernels
             nextRay = calcNextRay(nextRay, length);
             double gainTmp = calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
             gain *= gainTmp;
-            assert(length >= 0);
 
+            assert(length >= 0);
             distanceRemaining -= length;
 
             // Calc nextTriangle, nextForbiddenEdge and nextLevel
