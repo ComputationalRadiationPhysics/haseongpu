@@ -12,6 +12,7 @@ import pytest
 
 
 alpakaBackends = AlpakaBackends.all()
+REGRESSION_RNG_SEED = 5489
 
 
 def toFlat(arr, width=None, dtype=None):
@@ -190,7 +191,7 @@ def convertCase(data, layout, container):
     return case
 
 
-def runWithOptions(layout, container, parallel, backend, data):
+def runWithOptions(layout, container, parallel, backend, data, rngSeed=None):
     case = convertCase(data, layout, container)
     case["backend"] = backend
 
@@ -226,7 +227,8 @@ def runWithOptions(layout, container, parallel, backend, data):
         parallel,
         case["numDevices"],
         case["adaptiveSteps"],
-        case["nPerNode"]
+        case["nPerNode"],
+        rngSeed=rngSeed,
     )
 
     return phiAseValues, mseValues, rayCounts
@@ -252,6 +254,7 @@ def referenceOutputs(dummyData, backend):
         parallel="single",
         backend=backend,
         data=dummyData,
+        rngSeed=REGRESSION_RNG_SEED,
     )
 
     nPoints = np.asarray(dummyData["p"]).shape[0]
@@ -269,7 +272,14 @@ def referenceOutputs(dummyData, backend):
 @pytest.mark.parametrize("container", ["ndarray", "list"])
 @pytest.mark.parametrize("parallel", ["single", "debugFileIOPath"])
 def testCalcPhiAseCases(backend, layout, container, parallel, dummyData, referenceOutputs):
-    phiAseValues, mseValues, rayCounts = runWithOptions(layout, container, parallel, backend, dummyData)
+    phiAseValues, mseValues, rayCounts = runWithOptions(
+        layout,
+        container,
+        parallel,
+        backend,
+        dummyData,
+        rngSeed=REGRESSION_RNG_SEED,
+    )
 
     nPoints = np.asarray(dummyData["p"]).shape[0]
     nLevels = int(dummyData["mesh_z"])
@@ -321,6 +331,7 @@ def testDirectRepeat(backend, dummyData):
         parallel="single",
         backend=backend,
         data=dummyData,
+        rngSeed=REGRESSION_RNG_SEED,
     )
     secondPhiAseValues, secondMseValues, secondRayCounts = runWithOptions(
         layout="matrix",
@@ -328,6 +339,7 @@ def testDirectRepeat(backend, dummyData):
         parallel="single",
         backend=backend,
         data=dummyData,
+        rngSeed=REGRESSION_RNG_SEED,
     )
 
     assert np.allclose(firstPhiAseValues, secondPhiAseValues)

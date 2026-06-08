@@ -8,10 +8,12 @@
 #pragma once
 #include <alpaka/alpaka.hpp>
 
+#include <concepts>
 #include <type_traits>
 
 namespace hase::concepts
 {
+
     template<typename T>
     struct IsQueue : std::false_type
     {

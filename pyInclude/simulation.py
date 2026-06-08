@@ -117,6 +117,8 @@ class PhiASE:
     """Inclusive first flattened beta sample processed by ASE."""
     maxSampleRange: int | None = None
     """Inclusive last flattened beta sample processed by ASE."""
+    rngSeed: int | None = None
+    """Optional RNG seed for reproducible Monte Carlo sampling."""
 
     _experiment: object | None = field(default=None, init=False, repr=False)
     _compute: object | None = field(default=None, init=False, repr=False)
@@ -169,6 +171,7 @@ class PhiASE:
         parser.add_argument("--parallel-mode", default=None)
         parser.add_argument("--max-gpus", type=int, default=None)
         parser.add_argument("--n-per-node", type=int, default=None)
+        parser.add_argument("--rng-seed", type=int, default=None)
         return parser
 
     @classmethod
@@ -186,6 +189,7 @@ class PhiASE:
             "parallel_mode": "parallelMode",
             "max_gpus": "numDevices",
             "n_per_node": "nPerNode",
+            "rng_seed": "rngSeed",
         }
         for arg_name, attr_name in mapping.items():
             value = getattr(args, arg_name, None)
@@ -229,11 +233,12 @@ class PhiASE:
             "write_vtk": "writeVtk",
             "min_sample_range": "minSampleRange",
             "max_sample_range": "maxSampleRange",
+            "rng_seed": "rngSeed",
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
-            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange",
+            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
         }
         for section in sections:
             for name, value in section.items():
@@ -295,12 +300,16 @@ class PhiASE:
             minSampleRange=min_sample,
             maxSampleRange=max_sample,
         )
+        if self.rngSeed is not None:
+            self._compute.rngSeed = int(self.rngSeed)
 
         if str(self.parallelMode).lower() == "mpi":
             self._result = mpiLauncher.runPhiaseMPI(self, medium, laser, laser_properties)
             return self
 
-        self._result = HASEonGPU_Bindings.calcPhiASE(self._experiment, self._compute, self._hostMesh)
+        self._result = HASEonGPU_Bindings.calcPhiASE(
+            self._experiment, self._compute, self._hostMesh
+        )
         return self
 
     def getResults(self):

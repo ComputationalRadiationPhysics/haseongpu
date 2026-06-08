@@ -25,9 +25,10 @@ from laserPumpCladding import runExample  # noqa: E402
 
 
 alpakaBackends = AlpakaBackends.all()
+REGRESSION_RNG_SEED = 5489
 
 
-def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i):
+def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i, rngSeed=None):
     experiment = phiAseConfig["experiment"]
     compute = phiAseConfig["compute"]
     command = [
@@ -60,8 +61,10 @@ def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i):
         "--min-sample-range",
         str(minSample_i),
         "--max-sample-range",
-        str(maxSample_i)
+        str(maxSample_i),
     ]
+    if rngSeed is not None:
+        command.extend(["--rng-seed", str(rngSeed)])
     completed = subprocess.run(
         command,
         cwd=workdir,
@@ -85,13 +88,21 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
     minSample_i=0
     maxSample_i=100
     timeSlices=2
-    _runLegacyScript(tmp_path, legacyPhiAseConfig, backend, minSample_i, maxSample_i)
+    _runLegacyScript(
+        tmp_path,
+        legacyPhiAseConfig,
+        backend,
+        minSample_i,
+        maxSample_i,
+        rngSeed=REGRESSION_RNG_SEED,
+    )
     modernState = runExample(
         phiAseConfigPath=legacyPhiAseConfigPath,
         timeSlices=timeSlices,
         minSampleRange=minSample_i,
         maxSampleRange=maxSample_i,
         backend=backend,
+        rngSeed=REGRESSION_RNG_SEED,
     )
     medium=GainMedium.fromVtk(tmp_path / f'dndt_ASE_{timeSlices-1}.vtk')
     legacyDndtAse=medium.dntdAse

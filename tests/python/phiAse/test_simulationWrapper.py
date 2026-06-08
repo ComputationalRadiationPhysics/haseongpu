@@ -43,6 +43,7 @@ def testSimulationRunBuildsBindingInputsAndStoresResults(
         backend="Host_Cpu_CpuOmpBlocks",
         parallelMode="single",
         useReflections=False,
+        rngSeed=1234,
     ).run(gainMedium=smallGainMedium)
 
     assert isinstance(phiAse.getResults(), DummyResult)
@@ -52,6 +53,7 @@ def testSimulationRunBuildsBindingInputsAndStoresResults(
     assert captured["compute"].maxSampleRange == 11
     assert captured["experiment"].minRaysPerSample == 1000
     assert captured["experiment"].useReflections is False
+    assert captured["compute"].rngSeed == 1234
 
 
 def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):

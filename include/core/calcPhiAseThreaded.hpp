@@ -87,6 +87,7 @@ namespace hase::core
         Result& result,
         unsigned const minSample_i,
         unsigned const maxSample_i,
+        unsigned rngSeed,
         float& runtime,
         hase::utils::ProgressBar& bar)
     {
@@ -102,7 +103,8 @@ namespace hase::core
                  maxSample_i,
                  &runtime,
                  &bar,
-                 devBundle]() mutable
+                 devBundle,
+                 rngSeed]() mutable
                 {
                     try
                     {
@@ -116,6 +118,7 @@ namespace hase::core
                             minSample_i,
                             maxSample_i,
                             runtime,
+                            rngSeed,
                             bar);
                     }
                     catch(...)

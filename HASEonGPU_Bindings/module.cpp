@@ -10,6 +10,7 @@
 #include <parse/parser.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <random/random.hpp>
 
 namespace py = pybind11;
 
@@ -20,6 +21,7 @@ namespace py = pybind11;
 
 #include <filesystem>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -113,7 +115,8 @@ PYBIND11_MODULE(HASEonGPU, m)
                    bool writeVtk,
                    std::vector<unsigned> devices,
                    unsigned minSampleRange,
-                   unsigned maxSampleRange)
+                   unsigned maxSampleRange,
+                   unsigned rngSeed)
                 {
                     return hase::core::ComputeParameters(
                         maxRepetitions,
@@ -125,7 +128,8 @@ PYBIND11_MODULE(HASEonGPU, m)
                         writeVtk,
                         std::move(devices),
                         minSampleRange,
-                        maxSampleRange);
+                        maxSampleRange,
+                        rngSeed);
                 }),
             py::arg("maxRepetitions") = 4u,
             py::arg("adaptiveSteps") = 4u,
@@ -135,7 +139,8 @@ PYBIND11_MODULE(HASEonGPU, m)
             py::arg("writeVtk") = false,
             py::arg("devices") = std::vector<unsigned>{},
             py::arg("minSampleRange") = 0u,
-            py::arg("maxSampleRange") = std::numeric_limits<unsigned>::max())
+            py::arg("maxSampleRange") = std::numeric_limits<unsigned>::max(),
+            py::arg("rngSeed") = hase::core::ComputeParameters::unspecifiedRngSeed)
         .def_readwrite("maxRepetitions", &hase::core::ComputeParameters::maxRepetitions)
         .def_readwrite("adaptiveSteps", &hase::core::ComputeParameters::adaptiveSteps)
         .def_readwrite("numDevices", &hase::core::ComputeParameters::numDevices)
@@ -145,6 +150,7 @@ PYBIND11_MODULE(HASEonGPU, m)
         .def_readwrite("devices", &hase::core::ComputeParameters::devices)
         .def_readwrite("minSampleRange", &hase::core::ComputeParameters::minSampleRange)
         .def_readwrite("maxSampleRange", &hase::core::ComputeParameters::maxSampleRange)
+        .def_readwrite("rngSeed", &hase::core::ComputeParameters::rngSeed)
         .def(
             "__repr__",
             [](hase::core::ComputeParameters const& p)
@@ -253,4 +259,7 @@ PYBIND11_MODULE(HASEonGPU, m)
         py::arg("experiment"),
         py::arg("compute"),
         py::arg("host_mesh"));
+
+    m.def("setRngSeed", [](unsigned seed) { hase::random::SeedGenerator::get().updateSeed(seed); }, py::arg("seed"));
+    m.def("getRngSeed", []() { return hase::random::SeedGenerator::get().getSeed(); });
 }
