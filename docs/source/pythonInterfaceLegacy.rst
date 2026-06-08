@@ -89,7 +89,8 @@ Minimal example (only using the library function call):
         backend,
         parallelMode,
         numDevices,
-        nPerNode
+        nPerNode,
+        rngSeed=1234
     )
 
 Input Conventions
@@ -672,3 +673,14 @@ The following section describes all arguments of the Python call.
 * Type: ``unsigned``
 * Description:
   Number of MPI process ranks launched per node (default = 1).
+
+``rngSeed``
+^^^^^^^^^^^
+
+* Type: ``unsigned`` or ``None``
+* Description:
+  Optional RNG seed for reproducible Monte Carlo ray sampling.  Set this
+  explicitly for reproducible runs.  If omitted, the Python wrapper initializes
+  a process-local NumPy seed stream from ``np.random.SeedSequence()`` and draws
+  one unsigned 32-bit backend seed before forwarding it to the direct binding
+  or MPI-launched ``calcPhiASE`` binary.

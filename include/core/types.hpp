@@ -175,18 +175,23 @@ namespace hase::core
             std::vector<float> phiAse,
             std::vector<double> mse,
             std::vector<unsigned> totalRays,
-            std::vector<double> dndtAse)
+            std::vector<double> dndtAse,
+            std::vector<unsigned> droppedRays = {})
             : phiAse(std::move(phiAse))
             , mse(std::move(mse))
             , totalRays(std::move(totalRays))
             , dndtAse(std::move(dndtAse))
+            , droppedRays(std::move(droppedRays))
         {
+            if(this->droppedRays.empty())
+                this->droppedRays.assign(this->phiAse.size(), 0u);
         }
 
         std::vector<float> phiAse;
         std::vector<double> mse;
         std::vector<unsigned> totalRays;
         std::vector<double> dndtAse;
+        std::vector<unsigned> droppedRays;
     };
 
     struct ExperimentParameters

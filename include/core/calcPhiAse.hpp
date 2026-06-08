@@ -138,9 +138,11 @@ namespace hase::core
         // stack allocated addresses for host-device result transfers
         double gainSumHost = 0.0;
         double gainSumSquareHost = 0.0;
+        unsigned droppedRaysHost = 0u;
         // view to the stack memory location
         auto hgainSumView = makeView(alpaka::api::host, &gainSumHost, alpaka::Vec{1u});
         auto hgainSumSquareView = makeView(alpaka::api::host, &gainSumSquareHost, alpaka::Vec{1u});
+        auto hDroppedRaysView = makeView(alpaka::api::host, &droppedRaysHost, alpaka::Vec{1u});
         //
         // Memory allocations
         auto dNumberOfReflectionSlices
@@ -163,6 +165,7 @@ namespace hase::core
         // Memory allocations + copy
         auto dGainSum = hase::alpakaUtils::toDevice(queue, hgainSumView);
         auto dGainSumSquare = hase::alpakaUtils::toDevice(queue, hgainSumSquareView);
+        auto dDroppedRays = hase::alpakaUtils::toDevice(queue, hDroppedRaysView);
 
         auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
         auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);
@@ -182,6 +185,7 @@ namespace hase::core
             unsigned hRaysPerSampleDump = 0;
             raysPerSampleIter = raysPerSampleList.begin();
             bool mseTooHigh = true;
+            unsigned observedDroppedRays = 0u;
             alpaka::onHost::wait(queue);
             {
                 BenchSync(queue, importanceSamplingPropagation)
@@ -249,6 +253,7 @@ namespace hase::core
                     // Start Kernel
                     alpaka::onHost::fill(queue, dGainSum, double{0}, Vec1D{1});
                     alpaka::onHost::fill(queue, dGainSumSquare, double{0}, Vec1D{1});
+                    alpaka::onHost::fill(queue, dDroppedRays, 0u, Vec1D{1});
                     alpaka::onHost::fill(queue, dGainOfRay, double{0}, alpaka::Vec{experiment.maxRaysPerSample});
 
                     auto frameSpec
@@ -269,6 +274,7 @@ namespace hase::core
                                     dImportance,
                                     hRaysPerSampleDump,
                                     dGainOfRay,
+                                    dDroppedRays,
                                     sampleIdx,
                                     dSigmaA,
                                     dSigmaE,
@@ -288,6 +294,7 @@ namespace hase::core
                                     dImportance,
                                     hRaysPerSampleDump,
                                     dGainOfRay,
+                                    dDroppedRays,
                                     sampleIdx,
                                     dSigmaA,
                                     dSigmaE,
@@ -309,8 +316,10 @@ namespace hase::core
                     alpaka::onHost::wait(queue);
                     alpaka::onHost::memcpy(queue, hgainSumView, dGainSum);
                     alpaka::onHost::memcpy(queue, hgainSumSquareView, dGainSumSquare);
+                    alpaka::onHost::memcpy(queue, hDroppedRaysView, dDroppedRays);
                     alpaka::onHost::wait(queue);
                     double mseTmp = calcMSE(gainSumHost, gainSumSquareHost, hRaysPerSampleDump);
+                    observedDroppedRays = std::max(observedDroppedRays, droppedRaysHost);
 
                     assert(!alpaka::math::isnan(hgainSumView[0]));
                     assert(!alpaka::math::isnan(hgainSumSquareView[0]));
@@ -321,14 +330,19 @@ namespace hase::core
                         result.phiAse.at(sampleIdx) = gainSumHost;
                         result.phiAse.at(sampleIdx) /= *raysPerSampleIter * 4.0f * M_PI;
                         result.totalRays.at(sampleIdx) = *raysPerSampleIter;
+                        result.droppedRays.at(sampleIdx) = droppedRaysHost;
                     };
 
-                    if(result.mse.at(sampleIdx) > mseTmp)
+                    if(droppedRaysHost == 0u && result.mse.at(sampleIdx) > mseTmp)
                     {
                         updateSample();
                     }
+                    else if(droppedRaysHost > 0u && result.totalRays.at(sampleIdx) == 0u)
+                    {
+                        result.droppedRays.at(sampleIdx) = droppedRaysHost;
+                    }
 
-                    if(result.mse.at(sampleIdx) < experiment.mseThreshold)
+                    if(result.mse.at(sampleIdx) < experiment.mseThreshold && result.droppedRays.at(sampleIdx) == 0u)
                         mseTooHigh = false;
                 }
 
@@ -338,11 +352,13 @@ namespace hase::core
                 {
                     if(mseTooHigh)
                     {
-                        dout(V_WARNING) << "For sample: " << sampleIdx
-                                        << " the requested mse threshold: " << experiment.mseThreshold
-                                        << " could not be reached given the maximum number of rays: "
-                                        << experiment.maxRaysPerSample
-                                        << " and the number of repetitions: " << compute.maxRepetitions;
+                        dout(V_WARNING)
+                            << "For sample: " << sampleIdx
+                            << " the requested mse threshold: " << experiment.mseThreshold
+                            << " and zero dropped rays could not be reached given the maximum number of rays: "
+                            << experiment.maxRaysPerSample
+                            << " and the number of repetitions: " << compute.maxRepetitions
+                            << ". Max dropped-ray count observed in an attempt: " << observedDroppedRays;
                     }
                     break;
                 }

@@ -12,6 +12,9 @@ from HASEonGPU import PhiASE
 import pyInclude.simulation as simulation_module
 
 
+UNSPECIFIED_SAMPLE_RANGE = 2**32 - 1
+
+
 class DummyResult:
     phiAse = [1.0]
     mse = [0.0]
@@ -49,8 +52,8 @@ def testSimulationRunBuildsBindingInputsAndStoresResults(
     assert isinstance(phiAse.getResults(), DummyResult)
     assert captured["host_mesh"].numberOfTriangles == 2
     assert captured["host_mesh"].numberOfLevels == 3
-    assert captured["compute"].minSampleRange == 0
-    assert captured["compute"].maxSampleRange == 11
+    assert captured["compute"].minSampleRange == UNSPECIFIED_SAMPLE_RANGE
+    assert captured["compute"].maxSampleRange == UNSPECIFIED_SAMPLE_RANGE
     assert captured["experiment"].minRaysPerSample == 1000
     assert captured["experiment"].useReflections is False
     assert captured["compute"].rngSeed == 1234

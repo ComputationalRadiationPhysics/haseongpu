@@ -477,7 +477,8 @@ namespace hase::core
                             result.totalRays,
                             experiment.maxRaysPerSample,
                             experiment.mseThreshold,
-                            result.mse);
+                            result.mse,
+                            result.droppedRays);
                     }
                     dout(V_STAT) << std::endl;
                 }

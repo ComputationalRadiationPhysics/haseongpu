@@ -31,6 +31,7 @@ namespace hase::utils
         std::vector<unsigned> const totalRays,
         unsigned const max,
         double const mseThreshold,
-        std::vector<double> const mseValues);
+        std::vector<double> const mseValues,
+        std::vector<unsigned> const droppedRays);
 
 } // namespace hase::utils

@@ -47,6 +47,16 @@ namespace hase::core
         double x;
         double y;
         double z;
+
+        constexpr Point operator-(Point const& other) const
+        {
+            return Point{x - other.x, y - other.y, z - other.z};
+        }
+
+        [[nodiscard]] constexpr auto euclidLength() const
+        {
+            return alpaka::math::sqrt(x * x + y * y + z * z);
+        }
     };
 
     typedef Point Vector;

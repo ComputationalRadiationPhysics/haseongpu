@@ -417,7 +417,8 @@ namespace hase::parse
             std::vector<float>(numberOfSamples, 0.0f),
             std::vector<double>(numberOfSamples, std::numeric_limits<double>::max()),
             std::vector<unsigned>(numberOfSamples, 0u),
-            std::vector<double>(numberOfSamples, 0.0));
+            std::vector<double>(numberOfSamples, 0.0),
+            std::vector<unsigned>(numberOfSamples, 0u));
     }
 
     int pythonParse(

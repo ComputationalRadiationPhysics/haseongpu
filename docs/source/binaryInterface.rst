@@ -57,7 +57,8 @@ Single-node run using the ``cylindrical`` example:
        --repetitions=4 \
        --adaptive-steps=4 \
        --numDevices=1 \
-       --mse-threshold=0.05
+       --mse-threshold=0.05 \
+       --rng-seed=1234
 
 MPI run with 4 GPUs per node using the same example:
 
@@ -76,7 +77,8 @@ MPI run with 4 GPUs per node using the same example:
        --numDevices=1 \
        --min-sample-i=0 \
        --max-sample-i=1234 \
-       --mse-threshold=0.05
+       --mse-threshold=0.05 \
+       --rng-seed=1234
 
 Command-Line Arguments
 ----------------------
@@ -237,6 +239,13 @@ Accepted values:
 * ``false`` / ``0``: disable VTK output
 
 Default: ``false``
+
+``--rng-seed=``
+^^^^^^^^^^^^^^^
+
+Optional unsigned RNG seed for reproducible Monte Carlo ray sampling.  Set
+this explicitly for reproducible runs.  If omitted, the C++ seed provider uses
+a default seed initialized from ``std::random_device``.
 
 ``--config=``
 ^^^^^^^^^^^^^

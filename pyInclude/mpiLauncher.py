@@ -34,6 +34,8 @@ class PhiAseMpiResult:
     """Monte Carlo mean-squared-error estimate per sample."""
     totalRays: np.ndarray
     """Number of rays used per sample."""
+    droppedRays: np.ndarray
+    """Number of non-finite ray contributions dropped per accepted sample."""
     dndtAse: np.ndarray
     """ASE contribution to ``d beta / dt`` reconstructed in Python."""
 
@@ -193,8 +195,8 @@ def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
             f"--monochromatic={1 if phiAse.monochromatic else 0}",
         ]
 
-        if phiAse.rngSeed is not None:
-            cmd.append(f"--rng-seed={int(phiAse.rngSeed)}")
+        rng_seed = int(getattr(phiAse._compute, "rngSeed", phiAse.rngSeed))
+        cmd.append(f"--rng-seed={rng_seed}")
 
         status = subprocess.run(cmd, check=False)
         if status.returncode != 0:
@@ -213,5 +215,6 @@ def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
         phiAse=phi_ase,
         mse=mse,
         totalRays=total_rays,
+        droppedRays=np.zeros_like(total_rays, dtype=np.uint32),
         dndtAse=gain_per_density * phi_ase,
     )

@@ -83,6 +83,7 @@ namespace hase::kernels
             alpaka::concepts::IMdSpan auto const importance,
             unsigned const raysPerSample,
             alpaka::concepts::IMdSpan auto dGainOfRay,
+            alpaka::concepts::IMdSpan auto droppedRays,
             unsigned const sample_i,
             alpaka::concepts::IMdSpan auto const sigmaA,
             alpaka::concepts::IMdSpan auto const sigmaE,
@@ -109,7 +110,7 @@ namespace hase::kernels
                 unsigned startLevel = startPrism / mesh.numberOfTriangles;
                 unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
                 unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-                hase::core::Point startPoint = mesh.genRndPoint(acc, startTriangle, startLevel, rndEngine);
+                hase::core::Point startPoint = mesh.genRndPoint(samplePoint, startTriangle, startLevel, rndEngine);
 
                 // get a random index in the wavelength array
                 unsigned sigma_i = GenRndSigmas{}(sigmaA.getExtents().product(), rndEngine);
@@ -132,8 +133,16 @@ namespace hase::kernels
                 assert(!alpaka::math::isnan(mesh.getBetaVolume(startPrism)));
                 assert(!alpaka::math::isnan(importance[startPrism + reflectionOffset]));
                 assert(!alpaka::math::isnan(gain));
-
-                dGainOfRay[rayNumber] = gain;
+                if(alpaka::math::isfinite(gain))
+                {
+                    // dead code only in case we use NDEBUG
+                    dGainOfRay[rayNumber] = gain;
+                }
+                else
+                {
+                    dGainOfRay[rayNumber] = 0.0;
+                    alpaka::onAcc::atomicAdd(acc, &droppedRays[0], 1u);
+                }
             }
         }
     };
@@ -148,6 +157,7 @@ namespace hase::kernels
             alpaka::concepts::IMdSpan auto const importance,
             unsigned const raysPerSample,
             alpaka::concepts::IMdSpan auto dGainOfRay,
+            alpaka::concepts::IMdSpan auto droppedRays,
             unsigned const sample_i,
             alpaka::concepts::IMdSpan auto const sigmaA,
             alpaka::concepts::IMdSpan auto const sigmaE,
@@ -170,7 +180,7 @@ namespace hase::kernels
 
                 unsigned startLevel = startPrism / mesh.numberOfTriangles;
                 unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-                hase::core::Point startPoint = mesh.genRndPoint(acc, startTriangle, startLevel, rndEngine);
+                hase::core::Point startPoint = mesh.genRndPoint(samplePoint, startTriangle, startLevel, rndEngine);
                 hase::core::Ray ray = hase::core::generateRay(startPoint, samplePoint);
 
                 // Get a random index in the wavelength array
@@ -182,7 +192,15 @@ namespace hase::kernels
                 gain /= ray.length * ray.length; // important, since usually done in the reflection device function
 
                 gain *= mesh.getBetaVolume(startPrism) * importance[startPrism];
-                dGainOfRay[rayNumber] = gain;
+                if(alpaka::math::isfinite(gain))
+                {
+                    dGainOfRay[rayNumber] = gain;
+                }
+                else
+                {
+                    dGainOfRay[rayNumber] = 0.0;
+                    alpaka::onAcc::atomicAdd(acc, &droppedRays[0], 1u);
+                }
             }
         }
     };

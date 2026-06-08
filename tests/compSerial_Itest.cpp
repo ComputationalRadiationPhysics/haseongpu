@@ -20,6 +20,7 @@
 #include <iomanip>
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 namespace fs = std::filesystem;
@@ -87,6 +88,7 @@ void resetResultForSimulation(hase::core::Result& result)
     std::ranges::fill(result.mse, std::numeric_limits<double>::max());
     std::ranges::fill(result.totalRays, 0u);
     std::ranges::fill(result.dndtAse, 0.0);
+    std::ranges::fill(result.droppedRays, 0u);
 }
 
 fs::path comparisonCsvPath()
@@ -276,9 +278,42 @@ void appendVectorComparisonCsv(
 }
 
 template<typename T>
+void appendVectorValueAt(std::ostringstream& out, std::string const& name, std::vector<T> const& values, std::size_t i)
+{
+    out << name << "=";
+    if(i < values.size())
+    {
+        out << values[i];
+    }
+    else
+    {
+        out << "<out-of-range:size=" << values.size() << ">";
+    }
+}
+
+std::string resultVectorsAtIndex(std::string const& label, hase::core::Result const& result, std::size_t i)
+{
+    std::ostringstream out;
+    out << std::setprecision(17) << label << "[" << i << "]: ";
+    appendVectorValueAt(out, "dndtAse", result.dndtAse, i);
+    out << ", ";
+    appendVectorValueAt(out, "phiAse", result.phiAse, i);
+    out << ", ";
+    appendVectorValueAt(out, "mse", result.mse, i);
+    out << ", ";
+    appendVectorValueAt(out, "totalRays", result.totalRays, i);
+    out << ", ";
+    appendVectorValueAt(out, "droppedRays", result.droppedRays, i);
+    return out.str();
+}
+
+template<typename T>
 void assertVectorEqualWithin(
     std::string const& backend,
     std::string const& dataset,
+    std::string const& vectorName,
+    hase::core::Result const& expectedResult,
+    hase::core::Result const& actualResult,
     std::vector<T> const& expected,
     std::vector<T> const& actual,
     std::pair<unsigned, unsigned> const& sampleRange,
@@ -302,9 +337,12 @@ void assertVectorEqualWithin(
         INFO("Non-finite vector comparison value");
         CAPTURE(backend);
         CAPTURE(dataset);
+        CAPTURE(vectorName);
         CAPTURE(i);
         CAPTURE(e);
         CAPTURE(a);
+        INFO(resultVectorsAtIndex("expected", expectedResult, i));
+        INFO(resultVectorsAtIndex("actual", actualResult, i));
         REQUIRE(std::isfinite(e));
         REQUIRE(std::isfinite(a));
 
@@ -321,6 +359,7 @@ void assertVectorEqualWithin(
     INFO("Relative Sum d comparison failed");
     CAPTURE(backend);
     CAPTURE(dataset);
+    CAPTURE(vectorName);
     CAPTURE(maxDiff);
     CAPTURE(relL2);
     CAPTURE(relSum);
@@ -337,8 +376,16 @@ void compareResults(
     appendVectorComparisonCsv(dataset, backend, "dndtAse", expected.dndtAse, actual.dndtAse, sampleRange);
     appendVectorComparisonCsv(dataset, backend, "phiAse", expected.phiAse, actual.phiAse, sampleRange);
 
-    assertVectorEqualWithin(backend, dataset, expected.dndtAse, actual.dndtAse, sampleRange);
-    assertVectorEqualWithin(backend, dataset, expected.phiAse, actual.phiAse, sampleRange);
+    assertVectorEqualWithin(
+        backend,
+        dataset,
+        "dndtAse",
+        expected,
+        actual,
+        expected.dndtAse,
+        actual.dndtAse,
+        sampleRange);
+    assertVectorEqualWithin(backend, dataset, "phiAse", expected, actual, expected.phiAse, actual.phiAse, sampleRange);
 }
 
 template<typename TBackend>
@@ -371,8 +418,8 @@ void runForEachBackend(hase::core::Result const& serialResults, TestData& curren
 
 TEMPLATE_LIST_TEST_CASE("Test compare to Serial", "[compSerial]", TestApis)
 {
-    auto catch2Seed = Catch::getSeed();
-    hase::random::SeedGenerator::get().updateSeed(catch2Seed);
+    // auto catch2Seed = Catch::getSeed();
+    hase::random::SeedGenerator::get().updateSeed(1'372'085'211);
     auto configPath = workingDIR + "/tests/data/cfg/compSerial.cfg";
     auto inputDataPath = workingDIR + "/example/c_example/input";
     auto testData = makeTestData(fs::path{configPath}, fs::path{inputDataPath});

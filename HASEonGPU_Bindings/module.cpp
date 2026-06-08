@@ -82,19 +82,27 @@ PYBIND11_MODULE(HASEonGPU, m)
 
     py::class_<hase::core::Result>(m, "Result")
         .def(
-            py::init<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<double>>(),
+            py::init<
+                std::vector<float>,
+                std::vector<double>,
+                std::vector<unsigned>,
+                std::vector<double>,
+                std::vector<unsigned>>(),
             py::arg("phiAse") = std::vector<float>{},
             py::arg("mse") = std::vector<double>{},
             py::arg("totalRays") = std::vector<unsigned>{},
-            py::arg("dndtAse") = std::vector<double>{})
+            py::arg("dndtAse") = std::vector<double>{},
+            py::arg("droppedRays") = std::vector<unsigned>{})
         .def_readwrite("phiAse", &hase::core::Result::phiAse)
         .def_readwrite("mse", &hase::core::Result::mse)
         .def_readwrite("totalRays", &hase::core::Result::totalRays)
         .def_readwrite("dndtAse", &hase::core::Result::dndtAse)
+        .def_readwrite("droppedRays", &hase::core::Result::droppedRays)
         .def_property_readonly("num_phiAse", [](hase::core::Result const& r) { return r.phiAse.size(); })
         .def_property_readonly("num_mse", [](hase::core::Result const& r) { return r.mse.size(); })
         .def_property_readonly("num_totalRays", [](hase::core::Result const& r) { return r.totalRays.size(); })
         .def_property_readonly("num_dndtAse", [](hase::core::Result const& r) { return r.dndtAse.size(); })
+        .def_property_readonly("num_droppedRays", [](hase::core::Result const& r) { return r.droppedRays.size(); })
         .def(
             "__repr__",
             [](hase::core::Result const& r)
@@ -138,7 +146,7 @@ PYBIND11_MODULE(HASEonGPU, m)
             py::arg("parallelMode") = std::string("single"),
             py::arg("writeVtk") = false,
             py::arg("devices") = std::vector<unsigned>{},
-            py::arg("minSampleRange") = 0u,
+            py::arg("minSampleRange") = std::numeric_limits<unsigned>::max(),
             py::arg("maxSampleRange") = std::numeric_limits<unsigned>::max(),
             py::arg("rngSeed") = hase::core::ComputeParameters::unspecifiedRngSeed)
         .def_readwrite("maxRepetitions", &hase::core::ComputeParameters::maxRepetitions)
