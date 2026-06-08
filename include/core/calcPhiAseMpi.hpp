@@ -36,6 +36,7 @@
 #    include <core/mesh.hpp>
 #    include <core/types.hpp>
 #    include <mpi.h>
+#    include <random/random.hpp>
 #    include <utils/progressbar.hpp>
 
 #    include <algorithm>
@@ -80,6 +81,11 @@ namespace hase::core
         int size = 1;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
+        unsigned baseSeed = rank == HEAD_NODE ? (compute.rngSeed == ComputeParameters::unspecifiedRngSeed
+                                                     ? hase::random::SeedGenerator::get().getSeed()
+                                                     : compute.rngSeed)
+                                              : 0u;
+        MPI_Bcast(&baseSeed, 1, MPI_UNSIGNED, HEAD_NODE, MPI_COMM_WORLD);
         std::array<char, MPI_MAX_PROCESSOR_NAME> processorName{};
         int processorNameLength = 0;
         MPI_Get_processor_name(processorName.data(), &processorNameLength);
@@ -295,6 +301,8 @@ namespace hase::core
 
                 rankComputes.at(deviceIndex).gpu_i = compute.devices.at(deviceIndex);
                 hase::alpakaUtils::DevBundle devBundle{meshes.at(deviceIndex).m_device, exec};
+                unsigned const rngSeed
+                    = hase::random::seedForWorker(baseSeed, static_cast<unsigned>(rank), deviceIndex);
                 calcPhiAseThreaded(
                     devBundle,
                     experiment,
@@ -304,6 +312,7 @@ namespace hase::core
                     result,
                     minSampleIdx,
                     maxSampleIdx,
+                    rngSeed,
                     deviceRuntimes.at(deviceIndex),
                     bar);
             }

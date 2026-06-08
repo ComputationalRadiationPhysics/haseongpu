@@ -80,6 +80,7 @@ def main(
     timeslice_total_override: int | None = None,
     min_sample_range: int = 0,
     max_sample_range: int | None = None,
+    rng_seed: int | None = None,
     mse_threshold_override: float | None = None,
     snapshot_path: Path | None = None,
 ):
@@ -396,6 +397,7 @@ def main(
             nPerNode,
             minSampleRange=min_sample_range,
             maxSampleRange=max_sample_range,
+            rngSeed=rng_seed,
         )
         phi_ASECall_out_t=time.perf_counter()
         print(f'[TIME] Total extern phi call time: {phi_ASECall_out_t-phi_ASECall_in_t}')
@@ -595,6 +597,12 @@ if __name__ == "__main__":
         default=None,
         help="Last flattened sample index processed by phiASE (default: full mesh)",
     )
+    parser.add_argument(
+        "--rng-seed",
+        type=int,
+        default=None,
+        help="Optional phiASE RNG seed for reproducible comparison runs",
+    )
     args = parser.parse_args()
     material_path = Path(args.material)
 
@@ -623,4 +631,5 @@ if __name__ == "__main__":
         timeslice_total_override=args.timeslice_total,
         min_sample_range=args.min_sample_range,
         max_sample_range=args.max_sample_range,
+        rng_seed=args.rng_seed,
     )

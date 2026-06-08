@@ -134,6 +134,7 @@ namespace hase::parse
             "The maximal index of sample points to simulate",
             std::to_string(std::numeric_limits<unsigned>::max()));
         add(hase::core::CompSwitch::write_vtk, "Write VTK files of the computed ASE values", "false");
+        add(hase::core::CompSwitch::rng_seed, "Optional RNG seed for reproducible Monte Carlo sampling", "");
         add(hase::core::CompSwitch::backend, "The device-backend to use in order to perform the computation", "false");
         add("nPerNode",
             "Accepted for compatibility with wrapper scripts. Actual active ranks per node are detected at runtime.",

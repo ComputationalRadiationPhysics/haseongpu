@@ -32,7 +32,6 @@
 
 #include <core/mesh.hpp>
 #include <core/types.hpp>
-
 /**
  * @brief Calculates Phi ASE. With minRaysPerSample < maxRaysPerSample
  *        adaptive sampling can be used to improve performance.
@@ -112,6 +111,7 @@ namespace hase::core
         unsigned const minSampleIdx,
         unsigned const maxSampleIdx,
         float& runtime,
+        unsigned threadLocalStridingRNG,
         Args&&... args)
     {
 #ifdef HASE_ENABLE_BENCHMARK
@@ -134,7 +134,6 @@ namespace hase::core
 
         // initialize our alpaka device queue
         auto queue = devBundle.device.makeQueue();
-        unsigned threadLocalStridingRNG = 0;
 
         // stack allocated addresses for host-device result transfers
         double gainSumHost = 0.0;

@@ -28,6 +28,7 @@
 #include <core/mesh.hpp>
 #include <core/types.hpp>
 #include <parse/parser.hpp> /* Backend, ParallelMode */
+#include <random/random.hpp>
 #include <utils/ray_histogram.hpp>
 #include <utils/writeMatlabOutput.hpp>
 #include <utils/writeToVtk.hpp>
@@ -58,6 +59,15 @@ namespace hase::core
     {
         double const gainPerDensity = mesh.betaCells[sample_i] * (sigmaE + sigmaA) - sigmaA;
         return gainPerDensity * phiAse;
+    }
+
+    inline unsigned baseRngSeed(ComputeParameters const& compute)
+    {
+        if(compute.rngSeed == ComputeParameters::unspecifiedRngSeed)
+        {
+            return random::SeedGenerator::get().getSeed();
+        }
+        return compute.rngSeed;
     }
 
     std::string getNameForBackend(auto const& backend, auto const& device)
@@ -205,7 +215,6 @@ namespace hase::core
                     unsigned const activeDevices = std::min(maxDevices, samplesPerNode);
                     unsigned const samplesPerGpu = samplesPerNode / activeDevices;
                     unsigned const remainder = samplesPerNode % activeDevices;
-
                     for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
                     {
                         auto& device_i = compute.devices.at(deviceIndex);
@@ -218,8 +227,10 @@ namespace hase::core
 
                         unsigned const minSampleIdx = compute.minSampleRange + beginOffset;
                         unsigned const maxSampleIdx = minSampleIdx + workingSampleCount - 1u;
-                        hase::alpakaUtils::DevBundle devBundle{meshes[device_i].m_device, exec};
+                        alpakaUtils::DevBundle devBundle{meshes[device_i].m_device, exec};
                         computes[device_i].gpu_i = compute.devices.at(device_i);
+                        unsigned const baseSeed = baseRngSeed(compute);
+                        unsigned const rngSeed = random::seedForWorker(baseSeed, 0u, deviceIndex);
                         calcPhiAseThreaded(
                             devBundle,
                             experiment,
@@ -229,6 +240,7 @@ namespace hase::core
                             result,
                             minSampleIdx,
                             maxSampleIdx,
+                            rngSeed,
                             runtimes.at(device_i),
                             bar);
                     }
@@ -428,6 +440,7 @@ namespace hase::core
                     dout(V_STAT | V_NOLABEL) << std::endl;
                     dout(V_STAT) << "=== Statistics ===" << std::endl;
                     dout(V_STAT) << "Backend       : " << compute.backend << std::endl;
+                    dout(V_STAT) << "RNG Seed      : " << baseRngSeed(compute) << std::endl;
                     dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
                     dout(V_STAT) << "Prisms            : " << meshes[0].numberOfPrisms << std::endl;
                     dout(V_STAT) << "Samples           : "

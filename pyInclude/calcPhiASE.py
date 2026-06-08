@@ -168,7 +168,8 @@ def calcPhiASEMpi(
         parallelMode,
         numDevices,
         nPerNode,
-        adaptiveSteps
+        adaptiveSteps,
+        rngSeed=None
 ):
 
     """Run the legacy temporary-file path, optionally through ``mpiexec``.
@@ -219,6 +220,7 @@ def calcPhiASEMpi(
             + f' --adaptive-steps={int(adaptiveSteps)}'
             + f' --mse-threshold={mseThreshold}'
             + f' --spectral-resolution={packed["laserParameter"]["l_res"]}'
+            + (f' --rng-seed={int(rngSeed)}' if rngSeed is not None else '')
     )
     print(cmd)
     status = os.system(cmd)
@@ -280,6 +282,7 @@ def calcPhiASE(
         nPerNode = 1,
         minSampleRange = 0,
         maxSampleRange = None,
+        rngSeed = None,
 ):
     """Run ASE using the historical direct Python signature.
 
@@ -458,7 +461,8 @@ def calcPhiASE(
             parallelMode,
             numDevices,
             nPerNode,
-            adaptiveSteps
+            adaptiveSteps,
+            rngSeed=rngSeed
         )
 
     numberOfPoints = int(packed["numberOfPoints"])
@@ -492,6 +496,8 @@ def calcPhiASE(
         minSampleRange=int(minSampleRange),
         maxSampleRange=int(maxSampleRange),
     )
+    if rngSeed is not None:
+        compute.rngSeed = int(rngSeed)
 
     host_mesh = Mesh(
         packed["trianglePointIndices_flat"],

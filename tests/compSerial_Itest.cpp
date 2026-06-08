@@ -7,9 +7,11 @@
  */
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 
+#include <catch2/catch_get_random_seed.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <hase/hase.hpp>
+#include <random/random.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -21,7 +23,6 @@
 #include <string>
 #include <vector>
 namespace fs = std::filesystem;
-
 using TestApis
     = std::decay_t<decltype(alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
 
@@ -370,6 +371,8 @@ void runForEachBackend(hase::core::Result const& serialResults, TestData& curren
 
 TEMPLATE_LIST_TEST_CASE("Test compare to Serial", "[compSerial]", TestApis)
 {
+    auto catch2Seed = Catch::getSeed();
+    hase::random::SeedGenerator::get().updateSeed(catch2Seed);
     auto configPath = workingDIR + "/tests/data/cfg/compSerial.cfg";
     auto inputDataPath = workingDIR + "/example/c_example/input";
     auto testData = makeTestData(fs::path{configPath}, fs::path{inputDataPath});

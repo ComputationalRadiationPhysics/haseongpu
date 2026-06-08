@@ -22,6 +22,7 @@
 #pragma once
 
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -54,6 +55,7 @@ namespace hase::core
         static inline std::string const min_sample_i = "min-sample-i";
         static inline std::string const max_sample_i = "max-sample-i";
         static inline std::string const write_vtk = "write-vtk";
+        static inline std::string const rng_seed = "rng-seed";
     };
 
     struct ExpSwitch
@@ -70,6 +72,8 @@ namespace hase::core
 
     struct ComputeParameters
     {
+        static constexpr unsigned unspecifiedRngSeed = std::numeric_limits<unsigned>::max();
+
         ComputeParameters()
         {
         }
@@ -84,7 +88,8 @@ namespace hase::core
             bool writeVtk,
             std::vector<unsigned> devices,
             unsigned minSampleRange,
-            unsigned maxSampleRange)
+            unsigned maxSampleRange,
+            unsigned rngSeed = unspecifiedRngSeed)
             : maxRepetitions(maxRepetitions)
             , adaptiveSteps(adaptiveSteps)
             , numDevices(numDevices)
@@ -95,6 +100,7 @@ namespace hase::core
             , devices(std::move(devices))
             , minSampleRange(minSampleRange)
             , maxSampleRange(maxSampleRange)
+            , rngSeed(rngSeed)
         {
         }
 
@@ -110,7 +116,8 @@ namespace hase::core
             std::vector<unsigned> devices,
             unsigned minSampleRange,
             unsigned maxSampleRange,
-            unsigned numDevices)
+            unsigned numDevices,
+            unsigned rngSeed = unspecifiedRngSeed)
             : maxRepetitions(maxRepetitions)
             , adaptiveSteps(adaptiveSteps)
             , numDevices(numDevices)
@@ -123,6 +130,7 @@ namespace hase::core
             , devices(std::move(devices))
             , minSampleRange(minSampleRange)
             , maxSampleRange(maxSampleRange)
+            , rngSeed(rngSeed)
         {
         }
 
@@ -140,6 +148,7 @@ namespace hase::core
         std::vector<unsigned> devices;
         unsigned minSampleRange;
         unsigned maxSampleRange;
+        unsigned rngSeed = unspecifiedRngSeed;
     };
 
     struct RuntimeTopology

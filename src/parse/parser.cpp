@@ -23,6 +23,7 @@
 #include <core/types.hpp>
 #include <parse/CmdOptionsMap.hpp>
 #include <parse/parser.hpp>
+#include <random/random.hpp>
 #include <utils/interpolation.hpp> /* interpolateWavelength*/
 
 #include <algorithm>
@@ -560,6 +561,11 @@ namespace hase::parse
             vm[hase::core::CompSwitch::min_sample_i].as<unsigned>(),
             vm[hase::core::CompSwitch::max_sample_i].as<unsigned>(),
             nr_gpuOpt.as<int>());
+        if(vm.isExplicitlySet(hase::core::CompSwitch::rng_seed))
+        {
+            compute.rngSeed = vm[hase::core::CompSwitch::rng_seed].as<unsigned>();
+        }
+
         validateInput(experiment, compute);
         validateSampleRange(compute, hostMesh->numberOfLevels * hostMesh->numberOfPoints);
         initializeResult(result, hostMesh->numberOfLevels * hostMesh->numberOfPoints);

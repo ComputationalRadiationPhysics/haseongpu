@@ -193,6 +193,9 @@ def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
             f"--monochromatic={1 if phiAse.monochromatic else 0}",
         ]
 
+        if phiAse.rngSeed is not None:
+            cmd.append(f"--rng-seed={int(phiAse.rngSeed)}")
+
         status = subprocess.run(cmd, check=False)
         if status.returncode != 0:
             raise RuntimeError(f"PhiASE MPI run failed with exit code {status.returncode}: {' '.join(cmd)}")
