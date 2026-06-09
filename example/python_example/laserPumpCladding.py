@@ -56,7 +56,7 @@ def prePumpInitialState(simulation):
     simulation._updateBetaVolumeFromCells()
 
 
-def laserPumpCladdingMedium(numberOfLevels=10, thickness=None):
+def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5.5):
     from scipy.io import loadmat
 
     materialPath = scriptDir / "legacy" / "pt.mat"
@@ -83,11 +83,17 @@ def laserPumpCladdingMedium(numberOfLevels=10, thickness=None):
         nTot=2.76e20,
         crystalTFluo=9.5e-4,
         claddingNumber=1,
-        claddingAbsorption=5.5,
+        claddingAbsorption=cladAbsorption,
     )
 
 
-def runExample(phiAseConfigPath=defaultPhiAseConfigPath, backend="UseConfig", timeSlices=150, **AseOverride):
+def runExample(
+    phiAseConfigPath=defaultPhiAseConfigPath,
+    backend="UseConfig",
+    timeSlices=150,
+    vtkOutputDir=scriptDir,
+    **AseOverride,
+):
     materialDir = scriptDir / "input"
     numberOfLevels = 10
     thickness = 0.7 / (numberOfLevels - 1)
@@ -105,9 +111,11 @@ def runExample(phiAseConfigPath=defaultPhiAseConfigPath, backend="UseConfig", ti
         crossSectionAbsorption=0.778e-20,
         crossSectionEmission=0.195e-20,
     )
+    absorption=5.5
     medium = laserPumpCladdingMedium(
         numberOfLevels=numberOfLevels,
         thickness=thickness,
+        absorption=absorption
     )
 
     phiAse = PhiASE.fromYaml(
@@ -145,19 +153,29 @@ def runExample(phiAseConfigPath=defaultPhiAseConfigPath, backend="UseConfig", ti
     )
     simulation.onInit(prePumpInitialState)
     simulation.onStep(printState)
-    simulation.onStep(vtkWedge("minimal_phi_ase_{step:03d}.vtk", medium))
+    vtkOutputDir = Path(vtkOutputDir)
+    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].phiAse))
+    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].dndtAse))
+    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].dndtAse))
+    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium))
     simulation.runSteps(timeSlices) # adjust this by number of steps
     return simulation.getResults()[-1] # return phiASE
 
-
+    # dndt_ASE, flux_clad
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Modern HASEonGPU laser-pump cladding example")
     parser.add_argument("--backend", type=str, default="UseConfig")
     parser.add_argument("--timeSteps", type=int, default=150)
     parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
+    parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     args = parser.parse_args(argv)
 
-    state = runExample(args.phi_ase_config,args.backend,timeSlices=args.timeSteps)
+    state = runExample(
+        args.phi_ase_config,
+        args.backend,
+        timeSlices=args.timeSteps,
+        vtkOutputDir=args.vtk_output_dir,
+    )
     print(f"phiAse shape: {state.phiAse.shape}")
     print(f"betaCells shape: {state.betaCells.shape}")
 

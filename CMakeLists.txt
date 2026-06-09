@@ -259,6 +259,10 @@ else()
     target_compile_definitions(hase_core INTERFACE DISABLE_MPI)
 endif()
 
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+set(CMAKE_INSTALL_RPATH "$ORIGIN")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+
 target_link_libraries(hase_core INTERFACE alpaka::alpaka)
 if(TARGET CUDA::cudart)
     target_link_libraries(hase_core INTERFACE CUDA::cudart)
@@ -300,6 +304,7 @@ if(HASE_BUILD_PhiAse)
         PROPERTIES
             BUILD_RPATH_USE_ORIGIN ON
             CUDA_SEPARABLE_COMPILATION ON
+            INSTALL_RPATH "$ORIGIN"
             INSTALL_RPATH_USE_LINK_PATH ON
     )
     target_link_libraries(calcPhiASE PRIVATE hase::hase)

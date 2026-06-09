@@ -23,12 +23,12 @@ configure_file(
     "${HASE_PYTHON_RUNTIME_DIR}/__init__.py"
     COPYONLY
 )
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 set_target_properties(
     HASEonGPU
     PROPERTIES
         BUILD_RPATH_USE_ORIGIN ON
         CUDA_SEPARABLE_COMPILATION ON
+        INSTALL_RPATH "$ORIGIN"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
 target_link_libraries(HASEonGPU PRIVATE hase)
