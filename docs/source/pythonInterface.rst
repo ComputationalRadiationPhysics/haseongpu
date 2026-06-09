@@ -290,9 +290,10 @@ The three callback registrations are optional but useful:
 ``onStep(printState)``
    Runs after every completed step and receives a ``TimeStepState`` snapshot.
 
-``onStep(vtkWedge(...))``
-   Writes ``phiAse`` (:math:`\Phi_i`) to VTK files for visualization.  The
-   filename template can use values from the state, such as ``{step:03d}``.
+``onStep(writeVtkState, "phi_{step:03d}.vtk")``
+   Registers a user callback. ``Simulation`` passes the ``TimeStepState`` as
+   the first argument and the filename as the second, so the callback can call
+   ``vtkWedge(filename, state)`` or compute derived fields before writing.
 
 One simulation step performs the physical update in this order: pump
 contribution, ASE calculation, fluorescence decay, time integration, beta

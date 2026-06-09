@@ -46,6 +46,61 @@ def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
     assert seen[-1].betaVolume.shape == (2, 2)
 
 
+def testOnStepPassesStateBeforeUserArguments(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    seen = []
+
+    def record(state, label, scale=1.0):
+        seen.append((label, state.step, scale, state.phiAse.shape))
+
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=ExponentialEuler(),
+        timeStep=1e-5,
+    ).onStep(record, "vtk", scale=2.0)
+
+    simulation.runSteps(2)
+
+    assert seen == [("vtk", 1, 2.0, (4, 3)), ("vtk", 2, 2.0, (4, 3))]
+
+
+def testInitAndBeforeStepPassSimulationBeforeUserArguments(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    events = []
+
+    def init(simulation, label, enabled=False):
+        events.append(("init", label, enabled, simulation.stepIndex))
+
+    def before(simulation, label, scale=1.0):
+        events.append(("before", label, scale, simulation.stepIndex))
+
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=ExponentialEuler(),
+        timeStep=1e-5,
+    ).onInit(init, "setup", enabled=True).beforeStep(before, "pre", scale=3.0)
+
+    simulation.runSteps(2)
+
+    assert events == [
+        ("init", "setup", True, 0),
+        ("before", "pre", 3.0, 0),
+        ("before", "pre", 3.0, 1),
+    ]
+
+
 def testTimeSteppedSimulationLifecycleHooksGetSimulation(
     smallGainMedium,
     smallTopology,

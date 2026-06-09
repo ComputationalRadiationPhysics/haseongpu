@@ -16,6 +16,11 @@ sys.path.insert(0, str(exampleDir))
 import laserPumpCladding  # noqa: E402
 
 
+def _vtkScalarNames(path):
+    tokens = path.read_text(encoding="utf-8").split()
+    return {tokens[index + 1] for index, token in enumerate(tokens) if token.upper() == "SCALARS"}
+
+
 class _NoPumpSolver:
     def step(self, input, pump):
         return np.asarray(input["betaCell"], dtype=np.float64).copy()
@@ -53,9 +58,10 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
 
     state = laserPumpCladding.runExample(timeSlices=2, vtkOutputDir=tmp_path)
 
-    first = tmp_path / "minimal_phi_ase_001.vtk"
-    second = tmp_path / "minimal_phi_ase_002.vtk"
+    first = tmp_path / "laserPumpCladding_001.vtk"
+    second = tmp_path / "laserPumpCladding_002.vtk"
     assert first.is_file()
     assert second.is_file()
     assert state.step == 2
-    assert "SCALARS phiAse float 1" in second.read_text(encoding="utf-8")
+    scalars = _vtkScalarNames(second)
+    assert {"betaCells", "phiASE", "dndtAse", "cladAbs"}.issubset(scalars)
