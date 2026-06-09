@@ -92,7 +92,6 @@ namespace hase::kernels
             hase::kernels::PropagateFromTriangleCenter{deviceMesh, sample_i, sigmaA, sigmaE},
             preImportance);
         alpaka::onHost::wait(queue);
-
     }
 
     /**

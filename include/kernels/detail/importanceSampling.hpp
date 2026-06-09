@@ -134,7 +134,6 @@ namespace hase::kernels
                     sigmaE);
                 if(!alpaka::math::isfinite(gain))
                 {
-
                 }
                 result[laneIdx] = mesh.getBetaVolume(startPrism[laneIdx]) * gain;
             }

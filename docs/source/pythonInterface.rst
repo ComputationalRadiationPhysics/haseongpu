@@ -37,20 +37,16 @@ Install the haseongpu Python package from the repository root:
 This installs the Python package in editable mode and also installs the Python
 dependencies declared in ``pyproject.toml``.
 
-Source-Tree Import
-------------------
+Compiler Runtime
+----------------
 
-If the wheel installation above does not work, you can use the source tree directly
-as a temporary workaround.
-
-Place or run your script inside the repository root. From there, Python should be
-able to import ``HASEonGPU`` directly without installing the package.
-
-For this workaround the dependencies have to be installed manually:
+The Python extension is built with an ``$ORIGIN`` RPATH so libraries installed
+next to the wheel extension are preferred at import time. If you change the GCC
+or C++ runtime version used to build HASEonGPU, rebuild and reinstall the wheel:
 
 .. code-block:: bash
 
-   python3 -m pip install -r requirements.txt
+   python3 -m pip install --force-reinstall --no-cache-dir .
 
 
 Concept Pages
