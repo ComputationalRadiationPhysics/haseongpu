@@ -1,5 +1,5 @@
 experiment:
-  minRaysPerSample: 1000
+  minRaysPerSample: 2000
   maxRaysPerSample: 1000000
   mseThreshold: 0.01087 # this is the volume weighting adjusted threshold (scaled the original 0.005 by thickness * mesh.surface )
   adaptiveSteps: 8

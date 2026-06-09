@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import os
+import signal
 import subprocess
 import tempfile
 import sys
@@ -41,6 +43,22 @@ class PhiAseMpiResult:
 
 
 _PROBED_MPI_IO_ROOTS: set[tuple[Path, int]] = set()
+
+
+def _runInterruptible(cmd: list[str]) -> subprocess.CompletedProcess:
+    process = subprocess.Popen(cmd, start_new_session=True)
+    try:
+        return subprocess.CompletedProcess(cmd, process.wait())
+    except KeyboardInterrupt:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except ProcessLookupError:
+            pass
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+        raise
 
 
 def _repoRoot() -> Path:
@@ -198,7 +216,7 @@ def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
         rng_seed = int(getattr(phiAse._compute, "rngSeed", phiAse.rngSeed))
         cmd.append(f"--rng-seed={rng_seed}")
 
-        status = subprocess.run(cmd, check=False)
+        status = _runInterruptible(cmd)
         if status.returncode != 0:
             raise RuntimeError(f"PhiASE MPI run failed with exit code {status.returncode}: {' '.join(cmd)}")
 

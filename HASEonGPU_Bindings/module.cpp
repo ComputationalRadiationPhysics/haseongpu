@@ -5,6 +5,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+#include <core/cancellation.hpp>
 #include <core/mesh.hpp>
 #include <core/types.hpp>
 #include <parse/parser.hpp>
@@ -19,7 +20,9 @@ namespace py = pybind11;
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
+#include <chrono>
 #include <filesystem>
+#include <future>
 #include <limits>
 #include <optional>
 #include <string>
@@ -256,13 +259,49 @@ PYBIND11_MODULE(HASEonGPU, m)
            hase::core::ComputeParameters& compute,
            hase::core::HostMesh& host_mesh)
         {
-            hase::core::Result result;
-            int const rc = hase::core::pythonEntry(experiment, compute, result, host_mesh);
-            if(rc != 0)
+            hase::core::clearCancellation();
+            auto future = std::async(
+                std::launch::async,
+                [experiment, compute, host_mesh]() mutable
+                {
+                    hase::core::Result result;
+                    int const rc = hase::core::pythonEntry(experiment, compute, result, host_mesh);
+                    if(rc != 0)
+                    {
+                        throw std::runtime_error(
+                            "hase::core::pythonEntry failed with return code " + std::to_string(rc));
+                    }
+                    return result;
+                });
+
+            while(future.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
             {
-                throw std::runtime_error("hase::core::pythonEntry failed with return code " + std::to_string(rc));
+                if(PyErr_CheckSignals() != 0)
+                {
+                    hase::core::requestCancellation();
+                    try
+                    {
+                        future.get();
+                    }
+                    catch(...)
+                    {
+                    }
+                    hase::core::clearCancellation();
+                    throw py::error_already_set();
+                }
             }
-            return result;
+
+            try
+            {
+                auto result = future.get();
+                hase::core::clearCancellation();
+                return result;
+            }
+            catch(...)
+            {
+                hase::core::clearCancellation();
+                throw;
+            }
         },
         py::arg("experiment"),
         py::arg("compute"),
