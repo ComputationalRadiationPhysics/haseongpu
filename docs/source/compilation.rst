@@ -73,17 +73,17 @@ The following CMake variables control important build options.
 ``HASE_CUDA_ARCHITECTURES``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Default: ``native``
+* Default: ``native`` with fallback to ``80`` when no local NVIDIA GPU is visible
 * Description:
   Selects the CUDA target architecture used for compilation.
 
 * Typical values:
 
   * ``native``: detect the local GPU architecture automatically
-  * explicit CUDA architectures such as ``75``, ``80``, ``86``
+  * explicit CUDA architectures such as ``80``, ``86``, ``89``, ``90``
 
-Using ``native`` is convenient for local builds. For reproducible and performance on
-different systems, specifying the CUDA architecture is recommended.
+Using ``native`` is convenient for local builds when CMake can query a local GPU.
+For reproducible builds on different systems, specifying the CUDA architecture is recommended.
 
 ``HASE_ENABLE_PYTHON``
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -136,9 +136,8 @@ The data shape must match either:
 Physical Constants
 ------------------
 
-``Constants`` stores the predefined physical constants used by the default pump
-routine.  ``Simulation`` creates this object automatically, so most users do
-not need to pass constants explicitly.
+``Constants`` stores predefined physical constants.
+``Simulation`` creates this object automatically, so most users do not need to pass constants explicitly.
 
 .. code-block:: python
 
