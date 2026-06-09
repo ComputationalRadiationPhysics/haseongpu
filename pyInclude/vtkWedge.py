@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,17 @@ def _topology_from_geometry(geometry):
     raise TypeError("geometry must be a GainMedium or MeshTopology")
 
 
+def _field_label(field):
+    """Create a stable filename label for one or more VTK fields."""
+    if isinstance(field, Mapping):
+        names = field.keys()
+    elif isinstance(field, Sequence) and not isinstance(field, (str, bytes)):
+        names = field
+    else:
+        names = (field,)
+    return "_".join(str(name) for name in names)
+
+
 def _vtk_filename(file_name, state=None, field="phiAse"):
     """Resolve ``{step}``, ``{time}``, and ``{field}`` filename placeholders."""
     text = str(file_name)
@@ -31,7 +43,7 @@ def _vtk_filename(file_name, state=None, field="phiAse"):
         text = text.format(
             step=getattr(state, "step", 0),
             time=getattr(state, "time", 0.0),
-            field=field,
+            field=_field_label(field),
         )
     if not text.endswith(".vtk"):
         text += ".vtk"
@@ -40,7 +52,10 @@ def _vtk_filename(file_name, state=None, field="phiAse"):
 
 def _as_named_array(data, field, scalar_name):
     """Select a named scalar array from a state object or raw array."""
-    if hasattr(data, field):
+    if isinstance(data, Mapping) and field in data:
+        values = data[field]
+        name = scalar_name or field
+    elif hasattr(data, field):
         values = getattr(data, field)
         name = scalar_name or field
     else:
@@ -48,7 +63,55 @@ def _as_named_array(data, field, scalar_name):
         name = scalar_name or "scalars"
     if values is None:
         raise ValueError(f"no data available for VTK field '{field}'")
-    return np.asarray(values, dtype=np.float64), name
+    return name, np.asarray(values, dtype=np.float64)
+
+
+def _scalar_name_for_field(scalar_name, field, index):
+    if scalar_name is None:
+        return None
+    if isinstance(scalar_name, Mapping):
+        return scalar_name.get(field)
+    if isinstance(scalar_name, Sequence) and not isinstance(scalar_name, (str, bytes)):
+        return scalar_name[index]
+    return scalar_name
+
+
+def _as_named_arrays(data, field, scalar_name=None, fields=None):
+    """Resolve one or more named scalar arrays from object attributes or mappings."""
+    if fields is not None:
+        if not isinstance(fields, Mapping):
+            raise TypeError("fields must be a mapping of scalar names to arrays or attribute names")
+        arrays = []
+        for name, source in fields.items():
+            if isinstance(source, str) and hasattr(data, source):
+                values = getattr(data, source)
+            elif isinstance(data, Mapping) and isinstance(source, str) and source in data:
+                values = data[source]
+            else:
+                values = source
+            if values is None:
+                raise ValueError(f"no data available for VTK field '{name}'")
+            arrays.append((str(name), np.asarray(values, dtype=np.float64)))
+        return arrays
+
+    if isinstance(field, Mapping):
+        arrays = []
+        for index, (name, source) in enumerate(field.items()):
+            alias = _scalar_name_for_field(scalar_name, name, index) or name
+            if isinstance(source, str):
+                _, values = _as_named_array(data, source, alias)
+            else:
+                values = np.asarray(source, dtype=np.float64)
+            arrays.append((str(alias), values))
+        return arrays
+
+    if isinstance(field, Sequence) and not isinstance(field, (str, bytes)):
+        return [
+            _as_named_array(data, item, _scalar_name_for_field(scalar_name, item, index))
+            for index, item in enumerate(field)
+        ]
+
+    return [_as_named_array(data, field, scalar_name)]
 
 
 def _resolve_data_shape(values, topology):
@@ -69,14 +132,26 @@ def _resolve_data_shape(values, topology):
     )
 
 
-def _write_ascii_wedge(file_name, values, topology, scalar_name="scalars"):
+def _write_ascii_wedge(file_name, arrays, topology, scalar_name="scalars"):
     """Write scalar data on the topology's extruded wedge-prism mesh."""
     topology._require_levels()
     topology._require_thickness()
 
-    values = np.asarray(values, dtype=np.float64)
-    data_kind, data_shape = _resolve_data_shape(values, topology)
-    values = values.reshape(data_shape, order="F")
+    if isinstance(arrays, tuple) and len(arrays) == 2 and isinstance(arrays[0], str):
+        named_arrays = [arrays]
+    elif isinstance(arrays, Sequence) and arrays and isinstance(arrays[0], tuple):
+        named_arrays = list(arrays)
+    else:
+        named_arrays = [(scalar_name, arrays)]
+
+    data_arrays = {"POINT_DATA": [], "CELL_DATA": []}
+    data_counts = {}
+    for name, values in named_arrays:
+        values = np.asarray(values, dtype=np.float64)
+        data_kind, data_shape = _resolve_data_shape(values, topology)
+        values = values.reshape(data_shape, order="F")
+        data_arrays[data_kind].append((str(name), values))
+        data_counts[data_kind] = values.size
 
     points = np.asarray(topology.points, dtype=np.float64)
     triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
@@ -114,11 +189,16 @@ def _write_ascii_wedge(file_name, values, topology, scalar_name="scalars"):
         for _ in range(number_of_cells):
             handle.write("13\n")
 
-        handle.write(f"{data_kind} {values.size}\n")
-        handle.write(f"SCALARS {scalar_name} float 1\n")
-        handle.write("LOOKUP_TABLE default\n")
-        for value in values.reshape(-1, order="F"):
-            handle.write(f"{float(value):.17g}\n")
+        for data_kind in ("POINT_DATA", "CELL_DATA"):
+            arrays_for_kind = data_arrays[data_kind]
+            if not arrays_for_kind:
+                continue
+            handle.write(f"{data_kind} {data_counts[data_kind]}\n")
+            for name, values in arrays_for_kind:
+                handle.write(f"SCALARS {name} float 1\n")
+                handle.write("LOOKUP_TABLE default\n")
+                for value in values.reshape(-1, order="F"):
+                    handle.write(f"{float(value):.17g}\n")
 
     return path
 
@@ -134,18 +214,32 @@ def _legacy_vtk_wedge(file_name, values, points, triangle_point_indices, mesh_z,
     return _write_ascii_wedge(file_name, values, topology, scalar_name=scalar_name)
 
 
-def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=None, every=1):
-    """Write HASEonGPU wedge data to a ASCII VTK file.
+def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=None, every=1, fields=None):
+    """Write scalar data on a wedge mesh to a legacy ASCII VTK file.
 
-    Direct use: pass ``data`` as a ``TimeStepState`` or array and ``geometry``
-    as a ``GainMedium`` or ``MeshTopology``. Callback use: pass the geometry as
-    ``data`` and omit ``geometry``; the returned ``write_state(state)`` function
-    can be registered with ``Simulation.onStep(...)``.
+    The preferred simulation callback form is ``vtkWedge(file_name, state,
+    fields=...)`` inside a user ``onStep`` function. ``state`` must be a
+    ``TimeStepState`` produced by ``Simulation``; it carries both the dynamic
+    arrays and the static topology needed to write VTK geometry. ``file_name``
+    may contain ``{step}``, ``{time}``, and ``{field}`` placeholders.
 
-    Point-shaped arrays ``(numberOfPoints, levels)`` become ``POINT_DATA``;
-    prism-shaped arrays ``(numberOfTriangles, levels - 1)`` become
-    ``CELL_DATA``. ``file_name`` may contain ``{step}``, ``{time}``, and
-    ``{field}`` placeholders when used as an ``onStep`` callback.
+    ``field`` selects attributes or mapping keys from ``data``. A string writes
+    one scalar array, a sequence writes several arrays with their original
+    names, and a mapping writes aliased names, for example
+    ``field={"phi": "phiAse"}``. ``fields`` is for explicit arrays and maps
+    VTK scalar names to arrays, for example
+    ``fields={"phiASE": state.phiAse, "cladAbs": state.phiAse * 5.5}``.
+    ``fields`` takes precedence over ``field``.
+
+    Point-shaped arrays ``(numberOfPoints, levels)`` are written as
+    ``POINT_DATA``. Prism-shaped arrays ``(numberOfTriangles, levels - 1)`` are
+    written as ``CELL_DATA``. Mixed point and cell arrays can be written to the
+    same file. For standalone array exports outside a ``TimeStepState``, pass
+    ``geometry`` as a ``GainMedium`` or ``MeshTopology``.
+
+    The legacy callback-factory form ``simulation.onStep(vtkWedge(path,
+    geometry, ...))`` is still accepted. In that form, ``every`` controls the
+    output period and must be a positive integer.
     """
 
     if isinstance(data, (GainMedium, MeshTopology)) and geometry is None:
@@ -155,14 +249,17 @@ def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=No
                 raise ValueError("every must be a positive integer")
             if getattr(state, "step", 0) % int(every) != 0:
                 return None
-            values, name = _as_named_array(state, field, scalar_name)
-            return _write_ascii_wedge(_vtk_filename(file_name, state, field), values, topology, name)
+            arrays = _as_named_arrays(state, field, scalar_name, fields=fields)
+            return _write_ascii_wedge(_vtk_filename(file_name, state, field), arrays, topology)
 
         return write_state
 
     if geometry is None:
-        raise TypeError("new-interface vtkWedge requires a GainMedium or MeshTopology")
+        topology = getattr(data, "topology", None)
+        if topology is None:
+            raise TypeError("vtkWedge requires a TimeStepState with topology or an explicit GainMedium/MeshTopology")
+    else:
+        topology = _topology_from_geometry(geometry)
 
-    topology = _topology_from_geometry(geometry)
-    values, name = _as_named_array(data, field, scalar_name)
-    return _write_ascii_wedge(_vtk_filename(file_name, data, field), values, topology, name)
+    arrays = _as_named_arrays(data, field, scalar_name, fields=fields)
+    return _write_ascii_wedge(_vtk_filename(file_name, data, field), arrays, topology)

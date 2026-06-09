@@ -43,6 +43,21 @@ def printState(state):
     )
 
 
+def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0):
+    if state.phiAse is None:
+        raise ValueError("VTK export requires state.phiAse")
+    return vtkWedge(
+        Path(vtkOutputDir) / f'laserPumpCladding_{state.step:03d}.vtk',
+        state,
+        fields={
+            "betaCells": state.betaCells,
+            "phiASE": state.phiAse,
+            "dndtAse": state.dndtAse,
+            "cladAbs": state.phiAse * np.float64(claddingAbsorption),
+        },
+    )
+
+
 def prePumpInitialState(simulation):
     medium = simulation.gainMedium
     beta_cells = np.asarray(medium.get("betaCells").value, dtype=np.float64).reshape(
@@ -94,6 +109,7 @@ def runExample(
     vtkOutputDir=scriptDir,
     **AseOverride,
 ):
+    vtkOutputDir = Path(vtkOutputDir)
     materialDir = scriptDir / "input"
     numberOfLevels = 10
     thickness = 0.7 / (numberOfLevels - 1)
@@ -115,7 +131,7 @@ def runExample(
     medium = laserPumpCladdingMedium(
         numberOfLevels=numberOfLevels,
         thickness=thickness,
-        absorption=absorption
+        cladAbsorption=absorption
     )
 
     phiAse = PhiASE.fromYaml(
@@ -152,14 +168,11 @@ def runExample(
         updateTerminalLevel=False,
     )
     simulation.onInit(prePumpInitialState)
+
     simulation.onStep(printState)
-    vtkOutputDir = Path(vtkOutputDir)
-    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].phiAse))
-    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].dndtAse))
-    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium,field=simulation.getResults()[-1].dndtAse))
-    simulation.onStep(vtkWedge(vtkOutputDir / "minimal_phi_ase_{step:03d}.vtk", medium))
+    simulation.onStep(writeVtkFields, vtkOutputDir, absorption)
     simulation.runSteps(timeSlices) # adjust this by number of steps
-    return simulation.getResults()[-1] # return phiASE
+    return simulation.getResults()[-1] # return the last phiASE as array to confirm shape.
 
     # dndt_ASE, flux_clad
 def main(argv=None):

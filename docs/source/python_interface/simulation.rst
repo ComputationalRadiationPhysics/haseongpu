@@ -63,28 +63,48 @@ Each call to ``step()`` performs:
 Callbacks
 ---------
 
-``onInit(callback)``
-   Registers a callback that receives the ``Simulation`` object before the
-   first step.
+Lifecycle hooks always insert the simulation-provided object as the first
+argument. Extra arguments passed during registration are appended after that
+first argument. Callback return values are ignored, and each registration method
+returns ``self`` so calls can be chained.
 
-``beforeStep(callback)``
-   Registers a callback that receives the ``Simulation`` object before every
-   step.
+``onInit(callback, *args, **kwargs)``
+   Runs once before the first step. The callback signature is
+   ``callback(simulation, *args, **kwargs)`` and receives the live
+   ``Simulation`` object first. Use it to initialize or normalize mutable
+   simulation inputs.
 
-``onStep(callback)``
-   Registers a callback that receives the completed ``TimeStepState``.
+``beforeStep(callback, *args, **kwargs)``
+   Runs before every step, after ``onInit`` has run. The callback signature is
+   ``callback(simulation, *args, **kwargs)`` and receives the live
+   ``Simulation`` object first. Use it for controlled pre-step changes such as
+   time-dependent pump settings.
 
-Example:
+``onStep(callback, *args, **kwargs)``
+   Runs after every completed step. The callback signature is
+   ``callback(state, *args, **kwargs)`` and receives the completed
+   ``TimeStepState`` first. Use it for logging, inspection, exporting, or
+   storing result snapshots.
+
+Examples:
 
 .. code-block:: python
 
-   def print_state(state):
+   def initialize(simulation, beta0):
+       simulation.gainMedium.get("betaCells").value = beta0
+
+   def adjust_pump(simulation, scale):
+       simulation.pump.withProperty("scale", scale)
+
+   def write_state(state, output_dir):
        print(state.step, state.time, state.betaCells.mean())
 
-   simulation.onStep(print_state)
+   simulation.onInit(initialize, beta0)
+   simulation.beforeStep(adjust_pump, 0.5)
+   simulation.onStep(write_state, output_dir)
 
-Callbacks return values are ignored, so they are best used for logging,
-inspection, exporting, or controlled mutation of the simulation before a step.
+This means ``simulation.onStep(write_state, output_dir)`` calls
+``write_state(state, output_dir)`` for every completed step.
 
 Results
 -------
@@ -109,6 +129,7 @@ Results
 * ``dndtAse``: ASE derivative contribution to :math:`d\beta/dt`.
 * ``dndtPump``: pump derivative contribution to :math:`d\beta/dt`.
 * ``aseResult``: raw lower-level ASE result object.
+* ``topology``: static mesh topology used by geometry-aware callbacks such as VTK export.
 
 Properties
 ----------

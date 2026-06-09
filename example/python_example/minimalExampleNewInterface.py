@@ -26,6 +26,10 @@ def printState(state):
         f"mean_beta={state.betaCells.mean():.6e} "
         f"mean_phi={state.phiAse.mean():.6e}"
     )
+
+
+def writeVtkState(state, outputFile):
+    vtkWedge(outputFile, state)
 # docs:start: custom-pump-solver
 class MyPumpSolver:
     def step(self, input, pump):
@@ -106,7 +110,7 @@ def main():
     )
     simulation.onInit(initFunc)
     simulation.onStep(printState)
-    simulation.onStep(vtkWedge("minimal_phi_ase_{step:03d}.vtk", medium))
+    simulation.onStep(writeVtkState, "minimal_phi_ase_{step:03d}.vtk")
     simulation.runSteps(3)
     # Equivalent long run:
     # simulation.runUntil(endtime=1e-3)

@@ -404,6 +404,8 @@ class TimeStepState:
     """Pump contribution to ``d beta / dt``."""
     aseResult: object | None
     """Raw lower-level ASE result object for advanced inspection."""
+    topology: object | None = None
+    """Static mesh topology used by geometry-aware state callbacks."""
 
 
 @dataclass
@@ -467,34 +469,52 @@ class Simulation:
             return self.pump.crossSections
         raise ValueError("Simulation requires spectral properties via Simulation.crossSections, phiASE, or pump")
 
-    def onStep(self, callback):
-        """Register ``callback(state)`` to run after every completed step.
+    def onStep(self, callback, *args, **kwargs):
+        """Register a post-step callback.
 
-        ``state`` is a ``TimeStepState`` containing copied result arrays such as
-        ``betaCells``, ``betaVolume``, ``phiAse``, ``dndtPump``, and
-        ``dndtAse``. Callback return values are ignored.
+        The callback signature is ``callback(state, *args, **kwargs)``.
+        ``Simulation`` always supplies the completed ``TimeStepState`` as the
+        first argument, then appends the positional and keyword arguments passed
+        to ``onStep``. For example,
+        ``simulation.onStep(write_vtk, output_dir, scale=5.5)`` calls
+        ``write_vtk(state, output_dir, scale=5.5)`` after every completed step.
+
+        Use this hook for logging, storing results, writing VTK files, or other
+        work that should consume the immutable step snapshot. Callback return
+        values are ignored. The method returns ``self`` so registrations can be
+        chained.
         """
-        self._callbacks.append(callback)
+        self._callbacks.append((callback, args, kwargs))
         return self
 
-    def onInit(self, callback):
-        """Register ``callback(simulation)`` to run once before the first step.
+    def onInit(self, callback, *args, **kwargs):
+        """Register a one-time initialization callback.
 
-        The callback receives this live ``Simulation`` object, so it can read
-        or change ``gainMedium``, ``pump``, ``phiASE``, ``timeStep``, and other
-        simulation settings before any derivative is evaluated.
+        The callback signature is ``callback(simulation, *args, **kwargs)``.
+        ``Simulation`` supplies the live simulation object as the first
+        argument, then appends the user arguments passed to ``onInit``. The hook
+        runs once, immediately before the first step is evaluated.
+
+        Use this hook to initialize or normalize mutable simulation inputs such
+        as ``gainMedium``, ``pump``, ``phiASE``, or ``timeStep``. Callback return
+        values are ignored. The method returns ``self`` for chaining.
         """
-        self._initCallbacks.append(callback)
+        self._initCallbacks.append((callback, args, kwargs))
         return self
 
-    def beforeStep(self, callback):
-        """Register ``callback(simulation)`` to run before every step.
+    def beforeStep(self, callback, *args, **kwargs):
+        """Register a pre-step callback.
 
-        The callback receives this live ``Simulation`` object at the current
-        ``time`` and ``stepIndex``. Use this for controlled changes to inputs
-        before the next time-step update.
+        The callback signature is ``callback(simulation, *args, **kwargs)``.
+        ``Simulation`` supplies the live simulation object as the first
+        argument, then appends the user arguments passed to ``beforeStep``. The
+        hook runs before every step, after one-time ``onInit`` callbacks.
+
+        Use this hook for controlled changes that must happen before derivative
+        evaluation, such as time-dependent pump settings. Callback return values
+        are ignored. The method returns ``self`` for chaining.
         """
-        self._beforeStepCallbacks.append(callback)
+        self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
 
     def runUntil(self, endtime=None, endTime=None):
@@ -515,8 +535,8 @@ class Simulation:
     def step(self):
         """Advance one time step and return the completed ``TimeStepState``."""
         self._runInitCallbacks()
-        for callback in self._beforeStepCallbacks:
-            callback(self)
+        for callback, args, kwargs in self._beforeStepCallbacks:
+            callback(self, *args, **kwargs)
 
         beta_cells = np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(
             self.gainMedium.get("betaCells").expectedShape,
@@ -556,10 +576,11 @@ class Simulation:
             dndtAse=derivative.dndtAse.copy(),
             dndtPump=derivative.dndtPump.copy(),
             aseResult=derivative.aseResult,
+            topology=self.gainMedium.topology,
         )
         self._states.append(state)
-        for callback in self._callbacks:
-            callback(state)
+        for callback, args, kwargs in self._callbacks:
+            callback(state, *args, **kwargs)
         return state
 
     def getResults(self):
@@ -587,8 +608,8 @@ class Simulation:
         if self._initialized:
             return
         self._initialized = True
-        for callback in self._initCallbacks:
-            callback(self)
+        for callback, args, kwargs in self._initCallbacks:
+            callback(self, *args, **kwargs)
 
     def _dndtPump(self, beta_cells):
         pump_duration = self.pump.activeDuration(self.timeStep)

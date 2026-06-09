@@ -73,34 +73,60 @@ VTK Export
 ----------
 
 ``vtkWedge`` writes point or cell data on the wedge mesh to a legacy ASCII
-VTK file.
+VTK file. In a ``Simulation.onStep`` callback, pass the ``TimeStepState`` to
+``vtkWedge``; the state carries the static topology and the dynamic arrays.
 
 Callback use:
 
 .. code-block:: python
 
-   simulation.onStep(vtkWedge("minimal_phi_ase_{step:03d}.vtk", medium))
+   def write_vtk(state, output_dir, cladding_absorption):
+       vtkWedge(
+           output_dir / "fields_{step:03d}.vtk",
+           state,
+           fields={
+               "betaCells": state.betaCells,
+               "phiASE": state.phiAse,
+               "dndtAse": state.dndtAse,
+               "cladAbs": state.phiAse * cladding_absorption,
+           },
+       )
 
-Direct use:
+   simulation.onStep(write_vtk, output_dir, 5.5)
+
+Direct use after one step:
 
 .. code-block:: python
 
    state = simulation.step()
-   vtkWedge("phi.vtk", state, medium)
-   vtkWedge("beta.vtk", state.betaCells, medium, scalar_name="betaCells")
+   vtkWedge("phi.vtk", state)
+   vtkWedge("fields.vtk", state, field=["phiAse", "dndtAse"])
+   vtkWedge("named.vtk", state, field={"phi": "phiAse", "dn": "dndtAse"})
 
-By default it reads ``state.phiAse`` (:math:`\Phi_i`).  Use ``field`` to export
-another field:
+For standalone array exports outside a simulation state, pass ``geometry`` as a
+``GainMedium`` or ``MeshTopology``:
 
 .. code-block:: python
 
-   simulation.onStep(vtkWedge("beta_{step:03d}.vtk", medium, field="betaCells"))
+   vtkWedge("fields.vtk", geometry=medium, fields={"phi": phi, "dn": dndt})
 
-Use ``every`` to reduce output frequency:
+The older callback-factory form is still accepted and can use ``every`` to
+reduce output frequency:
 
 .. code-block:: python
 
    simulation.onStep(vtkWedge("phi_{step:03d}.vtk", medium, every=10))
+
+For new code, prefer an explicit callback when output frequency or derived
+fields are needed:
+
+.. code-block:: python
+
+   def write_every_tenth(state, output_dir):
+       if state.step % 10 == 0:
+           vtkWedge(output_dir / "phi_{step:03d}.vtk", state)
+
+   simulation.onStep(write_every_tenth, output_dir)
 
 The data shape must match either:
 

@@ -36,6 +36,10 @@ def printState(state):
     )
 
 
+def writeVtkState(state, outputFile):
+    vtkWedge(outputFile, state)
+
+
 class MyPumpSolver:
     def step(self, input, pump):
         beta = input["betaCell"]
@@ -147,7 +151,7 @@ def main():
         )
         simulation.onInit(initFunc)
         simulation.onStep(printState)
-        simulation.onStep(vtkWedge("gmsh_minimal_phi_ase_{step:03d}.vtk", medium))
+        simulation.onStep(writeVtkState, "gmsh_minimal_phi_ase_{step:03d}.vtk")
         simulation.runSteps(3)
 
         results = simulation.getResults()
