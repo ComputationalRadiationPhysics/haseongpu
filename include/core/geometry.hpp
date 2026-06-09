@@ -59,7 +59,21 @@ namespace hase::core
         }
     };
 
+    using Position = Point;
     typedef Point Vector;
+
+    struct InfiniteRaySnapshot
+    {
+        Position start;
+        Position end;
+        Position direction;
+        double accumulatedLength;
+        double totalLength;
+        unsigned prism;
+        unsigned triangle;
+        unsigned level;
+        double gain;
+    };
 
     /**
      * @brief a Ray, defined by a startpoint, direction and length

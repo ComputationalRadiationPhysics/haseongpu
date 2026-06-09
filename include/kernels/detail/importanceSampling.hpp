@@ -95,50 +95,63 @@ namespace hase::kernels
      */
     struct PropagateFromTriangleCenter
     {
-        mutable core::DeviceMeshView mesh;
-        unsigned const sample_i;
-        double const sigmaA;
-        double const sigmaE;
-
-        ALPAKA_FN_HOST_ACC constexpr void operator()(alpaka::concepts::SimdPtr auto importance) const
+        ALPAKA_FN_HOST_ACC void operator()(
+            auto const& acc,
+            core::DeviceMeshView mesh,
+            unsigned const sample_i,
+            double const sigmaA,
+            double const sigmaE,
+            alpaka::concepts::IMdSpan auto importance,
+            alpaka::concepts::IMdSpan auto droppedRays,
+            alpaka::concepts::IMdSpan auto infiniteRaySnapshots) const
         {
-            alpaka::concepts::Vector auto packOffset = importance.getIdx();
-            constexpr uint32_t width = ALPAKA_TYPEOF(importance)::width();
-            alpaka::concepts::Simd auto prismIndex = alpaka::Simd<unsigned, width>::fill(packOffset[0]);
-            for(uint32_t laneIdx = 0; laneIdx < width; ++laneIdx)
-            {
-                prismIndex[laneIdx] += laneIdx;
-            }
-            alpaka::concepts::Simd auto reflection_i = prismIndex / mesh.numberOfPrisms;
-            alpaka::concepts::Simd auto startPrism = prismIndex % mesh.numberOfPrisms;
-            alpaka::concepts::Simd auto reflections = (reflection_i + 1u) / 2u;
-            alpaka::concepts::Simd auto startLevel = startPrism / mesh.numberOfTriangles;
-            alpaka::concepts::Simd auto startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-            alpaka::concepts::Simd auto startPoint = mesh.getSimdCenterPoint(startTriangle, startLevel);
+            using Vec1 = alpaka::Vec<uint32_t, 1>;
             core::Point samplePoint = mesh.getSamplePoint(sample_i);
-            alpaka::concepts::Simd auto result = alpaka::Simd<double, width>::fill(0);
 
-            for(uint32_t laneIdx = 0; laneIdx < width; ++laneIdx)
+            for(auto [prismIndex] : alpaka::onAcc::makeIdxMap(
+                    acc,
+                    alpaka::onAcc::worker::threadsInGrid,
+                    alpaka::IdxRange{Vec1{importance.getExtents().product()}}))
             {
+                unsigned const reflection_i = prismIndex / mesh.numberOfPrisms;
+                unsigned const startPrism = prismIndex % mesh.numberOfPrisms;
+                unsigned const reflections = (reflection_i + 1u) / 2u;
+                unsigned const startLevel = startPrism / mesh.numberOfTriangles;
+                unsigned const startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
+                core::Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
                 core::ReflectionPlane const reflectionPlane
-                    = (reflection_i[laneIdx] % 2u == 0u) ? core::BOTTOM_REFLECTION : core::TOP_REFLECTION;
+                    = (reflection_i % 2u == 0u) ? core::BOTTOM_REFLECTION : core::TOP_REFLECTION;
                 double gain = propagateRayWithReflection(
-                    startPoint[laneIdx],
+                    startPoint,
                     samplePoint,
-                    reflections[laneIdx],
+                    reflections,
                     reflectionPlane,
-                    startLevel[laneIdx],
-                    startTriangle[laneIdx],
+                    startLevel,
+                    startTriangle,
                     mesh,
                     sigmaA,
                     sigmaE);
                 if(!alpaka::math::isfinite(gain))
                 {
+                    if(droppedRays[0] == 0u)
+                    {
+                        core::Ray ray = core::generateRay(startPoint, samplePoint);
+                        infiniteRaySnapshots[0] = core::InfiniteRaySnapshot{
+                            startPoint,
+                            samplePoint,
+                            ray.dir,
+                            0.0,
+                            ray.length,
+                            startPrism,
+                            startTriangle,
+                            startLevel,
+                            gain};
+                    }
+                    alpaka::onAcc::atomicAdd(acc, &droppedRays[0], 1u);
+                    gain = 0.0;
                 }
-                result[laneIdx] = mesh.getBetaVolume(startPrism[laneIdx]) * gain;
+                importance[prismIndex] = mesh.getBetaVolume(startPrism) * gain;
             }
-
-            importance = result;
         }
     };
 

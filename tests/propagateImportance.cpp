@@ -231,6 +231,12 @@ TEMPLATE_LIST_TEST_CASE(
     auto preImportance = alpaka::onHost::alloc<double>(device, reflectionSlices * deviceMesh.numberOfPrisms);
     auto importance = alpaka::onHost::alloc<double>(device, reflectionSlices * deviceMesh.numberOfPrisms);
     auto raysPerPrism = alpaka::onHost::alloc<unsigned>(device, reflectionSlices * deviceMesh.numberOfPrisms);
+    unsigned droppedRays = 0u;
+    hase::core::InfiniteRaySnapshot infiniteRaySnapshot{};
+    auto droppedRaysView = alpaka::makeView(alpaka::api::host, &droppedRays, alpaka::Vec{1u});
+    auto infiniteRaySnapshotView = alpaka::makeView(alpaka::api::host, &infiniteRaySnapshot, alpaka::Vec{1u});
+    auto deviceDroppedRays = hase::alpakaUtils::toDevice(queue, droppedRaysView);
+    auto deviceInfiniteRaySnapshots = hase::alpakaUtils::toDevice(queue, infiniteRaySnapshotView);
 
     hase::kernels::importanceSamplingPropagation(
         devBundle,
@@ -239,7 +245,9 @@ TEMPLATE_LIST_TEST_CASE(
         deviceMesh.toView(),
         0.0,
         0.0,
-        preImportance);
+        preImportance,
+        deviceDroppedRays,
+        deviceInfiniteRaySnapshots);
 
     auto hostPreImportance = alpaka::onHost::allocHostLike(preImportance);
     alpaka::onHost::memcpy(queue, hostPreImportance, preImportance);
