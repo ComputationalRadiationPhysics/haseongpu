@@ -67,8 +67,6 @@ namespace hase::kernels
         alpaka::concepts::IBuffer auto& numberOfReflections,
         alpaka::concepts::IBuffer auto const& raysPerPrism,
         alpaka::concepts::IBuffer auto& prefixSum,
-        unsigned const reflectionSlices,
-        unsigned const raysPerSample,
         unsigned const numberOfPrisms);
 
 } // namespace hase::kernels

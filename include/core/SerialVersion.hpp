@@ -51,7 +51,6 @@ namespace hase::core
         void mainLoop(
             internal::BaseVersionSerialContext& ctx,
             std::vector<internal::PointM> const& points,
-            std::vector<double>& dndtAse,
             std::vector<double>& betaCells,
             float hostCrystalFluorescence,
             uint32_t minSampleI,

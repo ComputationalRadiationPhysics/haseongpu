@@ -129,9 +129,6 @@ namespace hase::kernels
         unsigned hRaysDump = 0;
         auto hRaysDumpView = alpaka::makeView(alpaka::api::host, &hRaysDump, alpaka::Vec{1u});
         auto dRaysDump = hase::alpakaUtils::toDevice(queue, hRaysDumpView);
-        using Vec3D = alpaka::Vec<uint32_t, 3>;
-        auto meshFrameSpec
-            = alpaka::onHost::getFrameSpec<uint32_t>(devBundle.device, Vec3D{reflectionSlices, 1, raysPerSample});
         if(!std::isfinite(hSumPhi) || hSumPhi <= 0.0)
         {
             alpaka::onHost::fill(queue, importance, 0.0);

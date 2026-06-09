@@ -179,7 +179,6 @@ namespace hase::utils
         double minDiff = 10000; // should be enough
         double maxDiff = 0;
         double totalDiff = 0;
-        double aseTotal = 0;
         double smallDiff = 10;
 
         // No compare vtk was given
@@ -188,11 +187,6 @@ namespace hase::utils
             return std::vector<double>();
         }
         hase::core::dout(V_INFO) << "Compare solution with " << filename << std::endl;
-
-        for(unsigned i = 0; i < compare.size(); ++i)
-        {
-            aseTotal += compare.at(i);
-        }
 
         filestream.open(filename, std::ifstream::in);
 

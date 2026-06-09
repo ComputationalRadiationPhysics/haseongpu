@@ -54,7 +54,10 @@ namespace hase::kernels
         unsigned sample_i)
     {
         assert(prism < mesh.numberOfPrisms);
-        assert(sample_i < mesh.numberOfSamples);
+        if(sample_i >= mesh.numberOfSamples)
+        {
+            assert(false);
+        }
         unsigned const level = prism / mesh.numberOfTriangles;
         [[maybe_unused]] unsigned const triangle = prism - mesh.numberOfTriangles * level;
 
@@ -106,14 +109,9 @@ namespace hase::kernels
             {
                 prismIndex[laneIdx] += laneIdx;
             }
-            alpaka::concepts::Simd auto reflectionPlane
-                = alpaka::Simd<core::ReflectionPlane, width>::fill(core::TOP_REFLECTION);
             alpaka::concepts::Simd auto reflection_i = prismIndex / mesh.numberOfPrisms;
             alpaka::concepts::Simd auto startPrism = prismIndex % mesh.numberOfPrisms;
             alpaka::concepts::Simd auto reflections = (reflection_i + 1u) / 2u;
-            alpaka::concepts::SimdMask auto mask = (reflection_i % 2u == 0u);
-            alpaka::where(mask, reflectionPlane)
-                = alpaka::Simd<core::ReflectionPlane, width>::fill(core::BOTTOM_REFLECTION);
             alpaka::concepts::Simd auto startLevel = startPrism / mesh.numberOfTriangles;
             alpaka::concepts::Simd auto startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
             alpaka::concepts::Simd auto startPoint = mesh.getSimdCenterPoint(startTriangle, startLevel);
@@ -122,11 +120,13 @@ namespace hase::kernels
 
             for(uint32_t laneIdx = 0; laneIdx < width; ++laneIdx)
             {
+                core::ReflectionPlane const reflectionPlane
+                    = (reflection_i[laneIdx] % 2u == 0u) ? core::BOTTOM_REFLECTION : core::TOP_REFLECTION;
                 double gain = propagateRayWithReflection(
                     startPoint[laneIdx],
                     samplePoint,
                     reflections[laneIdx],
-                    reflectionPlane[laneIdx],
+                    reflectionPlane,
                     startLevel[laneIdx],
                     startTriangle[laneIdx],
                     mesh,
@@ -216,6 +216,10 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{hase::alpakaUtils::Vec1D{raysPerSample}}))
             {
+                if(ray >= raysPerSample)
+                {
+                    continue;
+                }
                 double const draw
                     = alpaka::rand::distribution::UniformReal<double>{0.0, sumPhi, alpaka::rand::interval::co}(engine);
 
