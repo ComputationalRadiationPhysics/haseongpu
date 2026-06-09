@@ -78,14 +78,6 @@ foreach(test_folder ${test_folders})
                     PROPERTIES
                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             )
-            add_custom_command(
-                TARGET ${_test_target_name}
-                POST_BUILD
-                COMMAND
-                    ${CMAKE_COMMAND} -E copy_directory
-                    "${CMAKE_CURRENT_SOURCE_DIR}/data"
-                    "${CMAKE_BINARY_DIR}/data"
-            )
         endif()
     endforeach()
 endforeach()
