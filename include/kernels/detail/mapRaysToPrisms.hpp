@@ -102,15 +102,9 @@ namespace hase::kernels
         alpaka::concepts::IBuffer auto& numberOfReflections,
         alpaka::concepts::IBuffer auto& raysPerPrism,
         alpaka::concepts::IBuffer auto& prefixSum,
-        unsigned const reflectionSlices,
-        unsigned const raysPerSample,
         unsigned const numberOfPrisms)
     {
         auto queue = devBundle.device.makeQueue();
-        auto frameSpec = alpaka::onHost::getFrameSpec<Vec1D::type>(
-            devBundle.device,
-            alpaka::Vec{raysPerPrism.getExtents().product()});
-
         alpaka::onHost::exclusiveScan(queue, devBundle.executor, prefixSum, raysPerPrism);
         std::vector<unsigned> hRays(raysPerPrism.getExtents().product());
         std::vector<unsigned> hPrefix(prefixSum.getExtents().product());

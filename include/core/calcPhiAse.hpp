@@ -247,8 +247,6 @@ namespace hase::core
                                 dNumberOfReflectionSlices,
                                 dRaysPerPrism,
                                 dPrefixSum,
-                                reflectionSlices,
-                                *raysPerSampleIter,
                                 mesh.numberOfPrisms);
                     }
 

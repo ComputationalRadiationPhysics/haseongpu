@@ -331,7 +331,6 @@ namespace hase::internal
     {
         int Rays_dump = 0;
         double sum_phi = 0.0;
-        double surf_tot = 0.0;
 
         for(int i_t = 0; i_t < static_cast<int>(ctx.N_cells); ++i_t)
         {
@@ -346,8 +345,6 @@ namespace hase::internal
                 importance[prismIndex] = ctx.beta_v[prismIndex] * prop;
                 sum_phi += importance[prismIndex];
             }
-
-            surf_tot += ctx.surface_new[i_t];
         }
 
         for(int i_t = 0; i_t < static_cast<int>(ctx.N_cells); ++i_t)
@@ -469,7 +466,6 @@ namespace hase::core
     void BaseVersionSerial::mainLoop(
         hase::internal::BaseVersionSerialContext& ctx,
         std::vector<hase::internal::PointM> const& points,
-        std::vector<double>& dndtAse,
         std::vector<double>& betaCells,
         float hostCrystalFluorescence,
         uint32_t minSampleI,
@@ -480,15 +476,15 @@ namespace hase::core
 
         for(hase::internal::PointM const& sample_i : points)
         {
+            if(!sample_i.ptIndex.has_value() || !sample_i.zIndex.has_value())
+            {
+                throw std::runtime_error("Point initialization failed!");
+            }
             auto const sampleIndex = sample_i.ptIndex.value() + sample_i.zIndex.value() * ctx.nr_points;
 
             if(sampleIndex < minSampleI || sampleIndex > maxSampleI)
             {
                 continue;
-            }
-            if(!sample_i.ptIndex.has_value() || !sample_i.zIndex.has_value())
-            {
-                throw std::runtime_error("Point initialization failed!");
             }
 
             int realNumRays = 0;
@@ -556,14 +552,7 @@ namespace hase::core
 
         auto points = hase::internal::createPoints(context);
 
-        this->mainLoop(
-            context,
-            points,
-            m_result.dndtAse,
-            m_mesh.betaCells,
-            m_mesh.crystalTFluo,
-            minSampleI,
-            maxSampleI);
+        this->mainLoop(context, points, m_mesh.betaCells, m_mesh.crystalTFluo, minSampleI, maxSampleI);
     }
 
 } // namespace hase::core
