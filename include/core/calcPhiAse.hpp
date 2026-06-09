@@ -140,10 +140,12 @@ namespace hase::core
         double gainSumHost = 0.0;
         double gainSumSquareHost = 0.0;
         unsigned droppedRaysHost = 0u;
+        InfiniteRaySnapshot infiniteRaySnapshotHost{};
         // view to the stack memory location
         auto hgainSumView = makeView(alpaka::api::host, &gainSumHost, alpaka::Vec{1u});
         auto hgainSumSquareView = makeView(alpaka::api::host, &gainSumSquareHost, alpaka::Vec{1u});
         auto hDroppedRaysView = makeView(alpaka::api::host, &droppedRaysHost, alpaka::Vec{1u});
+        auto hInfiniteRaySnapshotView = makeView(alpaka::api::host, &infiniteRaySnapshotHost, alpaka::Vec{1u});
         //
         // Memory allocations
         auto dNumberOfReflectionSlices
@@ -167,6 +169,7 @@ namespace hase::core
         auto dGainSum = hase::alpakaUtils::toDevice(queue, hgainSumView);
         auto dGainSumSquare = hase::alpakaUtils::toDevice(queue, hgainSumSquareView);
         auto dDroppedRays = hase::alpakaUtils::toDevice(queue, hDroppedRaysView);
+        auto dInfiniteRaySnapshots = hase::alpakaUtils::toDevice(queue, hInfiniteRaySnapshotView);
 
         auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
         auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);
@@ -189,6 +192,7 @@ namespace hase::core
             bool mseTooHigh = true;
             unsigned observedDroppedRays = 0u;
             alpaka::onHost::wait(queue);
+            alpaka::onHost::fill(queue, dDroppedRays, 0u, Vec1D{1});
             {
                 BenchSync(queue, importanceSamplingPropagation)
                     // initial ray-trace to detect importance regions
@@ -199,7 +203,9 @@ namespace hase::core
                         mesh,
                         experiment.maxSigmaA,
                         experiment.maxSigmaE,
-                        dPreImportance);
+                        dPreImportance,
+                        dDroppedRays,
+                        dInfiniteRaySnapshots);
                 alpaka::onHost::reduce(
                     queue,
                     devBundle.executor,
@@ -215,12 +221,27 @@ namespace hase::core
                 queue,
                 alpaka::makeView(alpaka::api::host, &hSumPhi, alpaka::Vec{1U}),
                 dPreImpotanceReductionBuf);
+            alpaka::onHost::memcpy(queue, hDroppedRaysView, dDroppedRays);
             alpaka::onHost::wait(queue);
+            if(droppedRaysHost > 0u)
+            {
+                alpaka::onHost::memcpy(queue, hInfiniteRaySnapshotView, dInfiniteRaySnapshots);
+                alpaka::onHost::wait(queue);
+                auto const& snapshot = infiniteRaySnapshotHost;
+                dout(V_WARNING) << "Non-finite importance ray: sample=" << sampleIdx << " prism=" << snapshot.prism
+                                << " triangle=" << snapshot.triangle << " level=" << snapshot.level
+                                << " gain=" << snapshot.gain << " start=(" << snapshot.start.x << ", "
+                                << snapshot.start.y << ", " << snapshot.start.z << ") end=(" << snapshot.end.x << ", "
+                                << snapshot.end.y << ", " << snapshot.end.z << ") direction=(" << snapshot.direction.x
+                                << ", " << snapshot.direction.y << ", " << snapshot.direction.z
+                                << ") accumulatedLength=" << snapshot.accumulatedLength
+                                << " totalLength=" << snapshot.totalLength << std::endl;
+            }
             while(mseTooHigh)
             {
                 unsigned run = 0;
 
-                while(run++ < compute.maxRepetitions && mseTooHigh)
+                while(run < compute.maxRepetitions && mseTooHigh)
                 {
                     alpaka::onHost::wait(queue);
                     {
@@ -318,8 +339,17 @@ namespace hase::core
                     alpaka::onHost::memcpy(queue, hgainSumSquareView, dGainSumSquare);
                     alpaka::onHost::memcpy(queue, hDroppedRaysView, dDroppedRays);
                     alpaka::onHost::wait(queue);
-                    double mseTmp = calcMSE(gainSumHost, gainSumSquareHost, hRaysPerSampleDump);
                     observedDroppedRays = std::max(observedDroppedRays, droppedRaysHost);
+                    if(droppedRaysHost > 0u)
+                    {
+                        if(result.totalRays.at(sampleIdx) == 0u)
+                        {
+                            result.droppedRays.at(sampleIdx) = droppedRaysHost;
+                        }
+                        continue;
+                    }
+                    ++run;
+                    double mseTmp = calcMSE(gainSumHost, gainSumSquareHost, hRaysPerSampleDump);
 
                     assert(!alpaka::math::isnan(hgainSumView[0]));
                     assert(!alpaka::math::isnan(hgainSumSquareView[0]));

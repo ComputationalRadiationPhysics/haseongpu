@@ -63,7 +63,9 @@ namespace hase::kernels
         hase::core::DeviceMeshView const& deviceMesh,
         double const sigmaA,
         double const sigmaE,
-        alpaka::concepts::IMdSpan auto preImportance)
+        alpaka::concepts::IMdSpan auto preImportance,
+        alpaka::concepts::IMdSpan auto droppedRays,
+        alpaka::concepts::IMdSpan auto infiniteRaySnapshots)
     {
         auto queue = devBundle.device.makeQueue();
         auto validateMeshFrameSpec
@@ -82,15 +84,23 @@ namespace hase::kernels
                 return true;
             }()));
         alpaka::onHost::wait(queue);
-        auto propagateFrameSpec = alpaka::onHost::FrameSpec{
-            Vec3D{reflectionSlices, 1, validateMeshFrameSpec.getNumFrames().x()},
-            Vec3D{1, 1, validateMeshFrameSpec.getFrameExtents().x()}};
-        alpaka::onHost::concurrent<double>(
-            queue,
+        alpaka::concepts::IMdSpan auto preImportanceSpan = preImportance.getMdSpan();
+        alpaka::concepts::IMdSpan auto droppedRaysSpan = droppedRays.getMdSpan();
+        alpaka::concepts::IMdSpan auto infiniteRaySnapshotsSpan = infiniteRaySnapshots.getMdSpan();
+        auto propagateFrameSpec
+            = alpaka::onHost::getFrameSpec<uint32_t>(queue.getDevice(), Vec1D{preImportance.getExtents().product()});
+        queue.enqueue(
             devBundle.executor,
-            preImportance.getExtents(),
-            hase::kernels::PropagateFromTriangleCenter{deviceMesh, sample_i, sigmaA, sigmaE},
-            preImportance);
+            propagateFrameSpec,
+            alpaka::KernelBundle{
+                hase::kernels::PropagateFromTriangleCenter{},
+                deviceMesh,
+                sample_i,
+                sigmaA,
+                sigmaE,
+                preImportanceSpan,
+                droppedRaysSpan,
+                infiniteRaySnapshotsSpan});
         alpaka::onHost::wait(queue);
     }
 
