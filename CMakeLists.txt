@@ -104,6 +104,36 @@ if(alpaka_DEP_HIP)
 endif()
 
 include(cmake/findAlpaka.cmake)
+
+if(alpaka_DEP_CUDA AND NOT TARGET alpaka::cuda)
+    if(NVCC_EXECUTABLE)
+        set(HASE_NVCC_EXECUTABLE "${NVCC_EXECUTABLE}")
+    else()
+        find_program(
+            HASE_NVCC_EXECUTABLE
+            NAMES nvcc
+            HINTS
+                "${CMAKE_CUDA_COMPILER}"
+                "${CUDAToolkit_ROOT}/bin"
+                "$ENV{CUDAToolkit_ROOT}/bin"
+                "$ENV{CUDA_HOME}/bin"
+                "$ENV{CUDA_PATH}/bin"
+                "$ENV{CUDA_ROOT}/bin"
+            DOC "Path to NVIDIA nvcc compiler"
+        )
+    endif()
+
+    if(HASE_NVCC_EXECUTABLE)
+        message(
+            WARNING
+            "[alpaka CUDA] nvcc exists, but CMake did not accept CUDA as a language.\n"
+            "[alpaka CUDA] This usually means a configuration/compatibility problem,\n"
+            "[alpaka CUDA] e.g. CUDA does not support the host compiler.\n"
+            "[alpaka CUDA] nvcc found at: ${HASE_NVCC_EXECUTABLE}\n"
+            "[alpaka CUDA] Check ${CMAKE_BINARY_DIR}/CMakeFiles/CMakeError.log"
+        )
+    endif()
+endif()
 # CUDA compiler Flags
 set(HASE_NVCC_FLAGS "")
 set(HASE_CLANG_CUDA_FLAGS "")
