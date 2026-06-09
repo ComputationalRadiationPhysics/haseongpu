@@ -44,6 +44,7 @@
 
 #include <alpakaUtils/DevBundle.hpp>
 #include <benchmark.hpp>
+#include <core/cancellation.hpp>
 #include <core/logging.hpp>
 #include <kernels/calcSampleGainSum.hpp>
 #include <kernels/importanceSampling.hpp>
@@ -182,6 +183,7 @@ namespace hase::core
         // Calculation for each sample point
         for(unsigned sampleIdx = minSampleIdx; sampleIdx <= maxSampleIdx; ++sampleIdx)
         {
+            throwIfCancellationRequested();
             unsigned hRaysPerSampleDump = 0;
             raysPerSampleIter = raysPerSampleList.begin();
             bool mseTooHigh = true;
