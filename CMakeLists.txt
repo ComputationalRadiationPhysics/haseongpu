@@ -79,6 +79,28 @@ if(NOT HASE_SELECT_BACKEND_ALPAKA)
     include(cmake/searchBackends.cmake)
 endif()
 
+if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
+    execute_process(
+        COMMAND nvidia-smi -L
+        RESULT_VARIABLE HASE_NVIDIA_SMI_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(NOT HASE_NVIDIA_SMI_RESULT EQUAL 0)
+        message(
+            STATUS
+            "No visible NVIDIA GPU found; falling back to CUDA architecture 80."
+        )
+        set(HASE_CUDA_ARCHITECTURES
+            "80"
+            CACHE STRING
+            "CUDA Architectures"
+            FORCE
+        )
+    endif()
+    unset(HASE_NVIDIA_SMI_RESULT)
+endif()
+
 if(NOT alpaka_DEP_CUDA)
     set(alpaka_EXEC_GpuCuda OFF CACHE BOOL "Enable/Disable CUDA executor" FORCE)
 endif()
