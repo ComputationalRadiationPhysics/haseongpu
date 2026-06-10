@@ -68,12 +68,12 @@ namespace hase::kernels
         alpaka::concepts::IMdSpan auto infiniteRaySnapshots)
     {
         auto queue = devBundle.device.makeQueue();
-        auto validateMeshFrameSpec
-            = alpaka::onHost::getFrameSpec<Vec1D::type>(queue.getDevice(), Vec1D{deviceMesh.numberOfSamples});
         // wrapper for NDEBUG only be compiled in debug mode
         ALPAKA_ASSERT((
             [&]
             {
+                auto validateMeshFrameSpec
+                    = alpaka::onHost::getFrameSpec<Vec1D::type>(queue.getDevice(), Vec1D{deviceMesh.numberOfSamples});
                 queue.enqueue(
                     devBundle.executor,
                     validateMeshFrameSpec,
@@ -87,8 +87,9 @@ namespace hase::kernels
         alpaka::concepts::IMdSpan auto preImportanceSpan = preImportance.getMdSpan();
         alpaka::concepts::IMdSpan auto droppedRaysSpan = droppedRays.getMdSpan();
         alpaka::concepts::IMdSpan auto infiniteRaySnapshotsSpan = infiniteRaySnapshots.getMdSpan();
-        auto propagateFrameSpec
-            = alpaka::onHost::getFrameSpec<uint32_t>(queue.getDevice(), Vec1D{preImportance.getExtents().product()});
+        auto propagateFrameSpec = alpaka::onHost::getFrameSpec<uint32_t>(
+            queue.getDevice(),
+            Vec1D{reflectionSlices * deviceMesh.numberOfPrisms});
         queue.enqueue(
             devBundle.executor,
             propagateFrameSpec,

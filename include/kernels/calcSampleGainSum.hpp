@@ -91,9 +91,6 @@ namespace hase::kernels
         {
             using Vec1 = alpaka::Vec<uint32_t, 1>;
             hase::core::Point samplePoint = mesh.getSamplePoint(sample_i);
-            auto& blockOffset
-                = declareSharedVar<unsigned[4], alpaka::uniqueId()>(acc); // 4 in case of warp-based raynumber
-
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             auto rndEngine = alpaka::rand::engine::Philox4x32x10{threadLocalStridingRNG + tIdx};
             for(auto [rayNumber] : alpaka::onAcc::makeIdxMap(

@@ -54,22 +54,18 @@ add_custom_command(
         "Copying Alpaka backend-name library to build package ${HASE_PYTHON_RUNTIME_DIR}"
     VERBATIM
 )
-if(HASE_BUILD_PhiAse)
-    add_custom_command(
-        TARGET calcPhiASE
-        POST_BUILD
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:calcPhiASE>"
-            "${HASE_PYTHON_RUNTIME_DIR}/$<TARGET_FILE_NAME:calcPhiASE>"
-        COMMENT
-            "Copying calcPhiASE executable to build package ${HASE_PYTHON_RUNTIME_DIR}"
-        VERBATIM
-    )
-endif()
+add_custom_command(
+    TARGET calcPhiASE
+    POST_BUILD
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:calcPhiASE>"
+        "${HASE_PYTHON_RUNTIME_DIR}/$<TARGET_FILE_NAME:calcPhiASE>"
+    COMMENT
+        "Copying calcPhiASE executable to build package ${HASE_PYTHON_RUNTIME_DIR}"
+    VERBATIM
+)
 install(TARGETS HASEonGPU LIBRARY DESTINATION HASEonGPU_Bindings)
-if(HASE_BUILD_PhiAse)
-    install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
-endif()
+install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
 install(TARGETS HaseAlpakaBackendNames LIBRARY DESTINATION HASEonGPU_Bindings)
 install(FILES HASEonGPU.py DESTINATION .)
 install(

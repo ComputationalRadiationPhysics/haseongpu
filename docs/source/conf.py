@@ -15,7 +15,8 @@
 project = 'HASEonGPU'
 copyright = '2026, Erik Zenker, Carlchristian Eckert, Dr. Daniel Albach, Tim Hanel'
 author = 'Erik Zenker, Carlchristian Eckert, Dr. Daniel Albach, Tim Hanel'
-release = 'master'
+release = '2.0'
+version = '2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

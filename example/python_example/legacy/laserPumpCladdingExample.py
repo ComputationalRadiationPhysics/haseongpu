@@ -420,10 +420,6 @@ def main(
                 pos_clad = clad_points_t[i_p]
                 flux_clad[pos_clad,i_z] = clad_abs*phi_ASE[pos_clad,i_z]
 
-        vtk_wedge(file_A, dndt_ASE, p, t_int, mesh_z, z_mesh)
-        vtk_wedge(file_C, flux_clad, p, t_int, mesh_z, z_mesh)
-        np.savez_compressed('save_' + str(i_slice) + '.npz', dndt_ASE=dndt_ASE, flux_clad=flux_clad)
-
         ############################ Prepare next timeslice ###########################
         temp = pump['T']
         time_beta = 1e-6

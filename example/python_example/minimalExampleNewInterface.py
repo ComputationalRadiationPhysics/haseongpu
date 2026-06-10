@@ -40,7 +40,6 @@ class MyPumpSolver:
 # docs:end: custom-pump-solver
 
 def main():
-    # @TODO add support for gmsh
     # docs:start: topology
     topology = MeshTopology.fromGrid(
         Grid(xExtent=4, yExtent=4, zExtent=0.7, tileSizeX=0.25, tileSizeZ=0.7 / 9.0)
