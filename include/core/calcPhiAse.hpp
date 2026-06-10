@@ -277,15 +277,16 @@ namespace hase::core
                     alpaka::onHost::fill(queue, dDroppedRays, 0u, Vec1D{1});
                     alpaka::onHost::fill(queue, dGainOfRay, double{0}, alpaka::Vec{experiment.maxRaysPerSample});
 
-                    auto frameSpec
-                        = alpaka::onHost::getFrameSpec<unsigned>(devBundle.device, alpaka::Vec{*raysPerSampleIter});
+                    auto frameSpec = alpaka::onHost::getFrameSpec(
+                        devBundle.device,
+                        devBundle.executor,
+                        static_cast<unsigned int>(*raysPerSampleIter));
                     auto const threadLocalStridingIndex = threadLocalStridingRNG;
                     if(experiment.useReflections)
                     {
                         BenchSync(queue, CalcSampleGainSumWithReflection)
                             // main ray propagation routine with reflection
                             queue.enqueue(
-                                devBundle.executor,
                                 frameSpec,
                                 alpaka::KernelBundle{
                                     hase::kernels::CalcSampleGainSumWithReflection{},
@@ -306,7 +307,6 @@ namespace hase::core
                         BenchSync(queue, CalcSampleGainSum)
                             // main ray propagation routine
                             queue.enqueue(
-                                devBundle.executor,
                                 frameSpec,
                                 alpaka::KernelBundle{
                                     hase::kernels::CalcSampleGainSum{},

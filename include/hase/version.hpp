@@ -14,8 +14,8 @@
 #define HASEONGPU_PP_STRINGIFY_DETAIL(value) #value
 #define HASEONGPU_PP_STRINGIFY(value) HASEONGPU_PP_STRINGIFY_DETAIL(value)
 
-#define HASEONGPU_VERSION_STRING                                                                                    \
-    HASEONGPU_PP_STRINGIFY(HASEONGPU_VERSION_MAJOR)                                                                  \
+#define HASEONGPU_VERSION_STRING                                                                                      \
+    HASEONGPU_PP_STRINGIFY(HASEONGPU_VERSION_MAJOR)                                                                   \
     "." HASEONGPU_PP_STRINGIFY(HASEONGPU_VERSION_MINOR) "." HASEONGPU_PP_STRINGIFY(HASEONGPU_VERSION_PATCH)
 
 /* version number encoding
@@ -25,7 +25,7 @@
  * example: version 1.2.3 -> 0001 002 00003
  */
 #define HASEONGPU_VERSION_NUMBER(major, minor, patch)                                                                 \
-    ((((major) % 10000llu) * 100000000llu) + (((minor) % 1000llu) * 100000llu) + ((patch) % 100000llu))
+    ((((major) % 10000llu) * 100'000'000llu) + (((minor) % 1000llu) * 100000llu) + ((patch) % 100000llu))
 
 //! The HASEonGPU version number
 #define HASEONGPU_VERSION                                                                                             \

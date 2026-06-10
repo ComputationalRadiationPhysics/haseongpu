@@ -56,7 +56,7 @@ namespace hase::kernels
     {
         ALPAKA_FN_HOST_ACC void operator()(auto const& acc, core::DeviceMeshView const& mesh, unsigned sample_i) const
         {
-            for(auto [prism] : alpaka::onAcc::makeIdxMap(
+            for(auto prism : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfPrisms}))
@@ -89,13 +89,12 @@ namespace hase::kernels
             alpaka::concepts::IMdSpan auto droppedRays,
             alpaka::concepts::IMdSpan auto infiniteRaySnapshots) const
         {
-            using Vec1 = alpaka::Vec<uint32_t, 1>;
             core::Point samplePoint = mesh.getSamplePoint(sample_i);
 
             for(auto [prismIndex] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{Vec1{importance.getExtents().product()}}))
+                    alpaka::IdxRange{importance.getExtents().product()}))
             {
                 unsigned const reflection_i = prismIndex / mesh.numberOfPrisms;
                 unsigned const startPrism = prismIndex % mesh.numberOfPrisms;
@@ -173,10 +172,8 @@ namespace hase::kernels
         {
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             alpaka::rand::engine::Philox4x32x10 engine(threadLocalStridingRNG + tIdx);
-            for(auto [id] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{alpaka::Vec{raysLeft}}))
+            for(auto id :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysLeft}))
             {
                 // get random numbers floating for any vector size -> conversion float -> int does floor automatically
                 unsigned rand_t = alpaka::rand::distribution::UniformReal{
@@ -208,10 +205,8 @@ namespace hase::kernels
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             alpaka::rand::engine::Philox4x32x10 engine(threadLocalStridingRNG + tIdx);
 
-            for(auto [ray] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{hase::alpakaUtils::Vec1D{raysPerSample}}))
+            for(auto ray :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysPerSample}))
             {
                 if(ray >= raysPerSample)
                 {
