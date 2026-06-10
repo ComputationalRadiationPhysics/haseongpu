@@ -143,7 +143,8 @@ def runExample(
     if backend != "UseConfig" : phiAse.backend=backend
 
 
-    pumpProperties=PumpProperties( crossSections=pumpCrossSections,
+    pumpProperties=PumpProperties(
+                         crossSections=pumpCrossSections,
                          intensity=16e3,
                          pumpDuration=1e-6,
                          pumpSubsteps=100,

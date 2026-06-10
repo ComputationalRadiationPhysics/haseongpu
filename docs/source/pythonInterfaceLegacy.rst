@@ -12,11 +12,12 @@ For general setup and dependency information, see
 Installation
 ------------
 
-Install the haseongpu Python library from the repository root:
+Install the haseongpu Python library from the repository root using the same
+source-build path described in :doc:`Getting Started <gettingStarted>`:
 
 .. code-block:: bash
 
-   pip install -e .
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
 
 Usage
 -----

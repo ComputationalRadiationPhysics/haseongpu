@@ -28,14 +28,19 @@ evolution of gain propagation and population inversion can be monitored.
 Installation
 ------------
 
-Install the haseongpu Python package from the repository root:
+Install the haseongpu Python package from the repository root. The recommended
+path for performance-sensitive use is a source build with native host
+optimizations enabled:
 
 .. code-block:: bash
 
-   python3 -m pip install -e .
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
 
-This installs the Python package in editable mode and also installs the Python
-dependencies declared in ``pyproject.toml``.
+This installs the Python package in editable mode, builds the C++ extension
+locally, and installs the Python dependencies declared in ``pyproject.toml``.
+``HASE_NATIVE_OPTIMIZATIONS=ON`` enables host-specific ``-march=native`` and
+``-mtune=native`` tuning for the build machine. Disable it when building
+redistributable wheels or binaries for unknown CPUs.
 
 Compiler Runtime
 ----------------

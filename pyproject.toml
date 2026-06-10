@@ -9,12 +9,25 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "HASEonGPU"
-version = "0.1.0"
-description = "Python bindings for HASEonGPU"
+version = "2.0"
+description = "Python frontend and compiled C++ backend for HASEonGPU ASE simulations"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     { name = "Carlchristian Eckert"}, {name="Tobias Hänel"}, {name= "Dr. Daniel Albach"}, {name="Tim Hanel" }
+]
+license = { text = "GPL-3.0-or-later" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies=[
     "pytest",
@@ -27,6 +40,13 @@ dependencies=[
     "matplotlib",
     "pyyaml",
 ]
+
+[project.urls]
+Documentation = "https://haseongpu.readthedocs.io/en/latest/"
+Repository = "https://github.com/computationalradiationphysics/haseongpu"
+Issues = "https://github.com/computationalradiationphysics/haseongpu/issues"
+Changelog = "https://github.com/computationalradiationphysics/haseongpu/releases"
+
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
@@ -34,6 +54,7 @@ wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
 [[tool.scikit-build.generate]]
 path = "HASEonGPU.py"
 template = """
+__version__ = "2.0"
 import HASEonGPU_Bindings
 from HASEonGPU_Bindings import *
 from pyInclude import *

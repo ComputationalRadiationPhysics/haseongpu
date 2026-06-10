@@ -32,22 +32,6 @@
 namespace hase::kernels
 {
 
-    constexpr ALPAKA_FN_HOST_ACC bool deviceIsFinite(double x)
-    {
-        return alpaka::math::isfinite(x);
-    }
-
-    constexpr ALPAKA_FN_HOST_ACC inline bool deviceIsFinite(float x)
-    {
-        return alpaka::math::isfinite(x);
-    }
-
-    constexpr ALPAKA_FN_HOST_ACC bool debugAseWatchPrism(unsigned prism)
-    {
-        return prism == 989849u || prism == 929348u || prism == 888438u || prism == 568058u || prism == 467223u
-               || prism == 628094u;
-    }
-
     ALPAKA_FN_HOST_ACC void assertMeshPropagationInputs(
         core::DeviceMeshView const& mesh,
         unsigned prism,

@@ -69,6 +69,21 @@ For example, when using the Python interface, the C++ backend is built under
 the hood during installation. For details on manual compilation, see
 :doc:`compilation`.
 
+Recommended Python Source Install
+---------------------------------
+
+For performance-sensitive Python use, install from source so the C++ backend is
+compiled on the target machine:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
+
+This keeps the install editable while building a release-mode backend with
+host-specific CPU tuning. Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when
+building redistributable wheels or binaries for unknown CPUs. See
+:doc:`compilation` for the full CMake option reference.
+
 Choose an Interface
 -------------------
 

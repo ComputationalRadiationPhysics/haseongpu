@@ -7,6 +7,9 @@
 """Public Python convenience exports for HASEonGPU."""
 
 import HASEonGPU_Bindings
+
+__version__ = "2.0"
+
 from .alpakaUtils import AlpakaBackends
 from .calcPhiASE import calcPhiASE
 from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, writeGainMediumVtk

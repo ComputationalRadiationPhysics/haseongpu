@@ -1,0 +1,41 @@
+# Contribution Guidelines
+
+This document is for developers and maintainers. It describes validation before
+submitting changes to HASEonGPU; it is not user-facing installation guidance.
+
+Use CI as the CPU baseline, but do not treat it as complete Alpaka 3 backend
+coverage. Changes that affect kernels, backend selection, build flags,
+packaging, examples, or runtime behavior should also be validated with clean
+CUDA and HIP Alpaka backend builds on suitable machines before submission.
+Record the backend, compiler, toolkit/runtime version, and non-default CMake
+options used for that validation.
+
+Recommended validation flow:
+
+1. Start from a clean working tree.
+2. Configure a clean build with `-DHASE_BUILD_RELEASE=ON`,
+   `-DHASE_TESTING=ON`, and `-DHASE_ENABLE_PYTHON=ON`.
+3. Use `-DHASE_NATIVE_OPTIMIZATIONS=OFF` for redistributable binaries or wheels.
+4. Build the tree and run `ctest --output-on-failure`.
+5. Install the Python package before running Python tests; `pytest` from a raw
+   checkout is expected to fail because `HASEonGPU_Bindings.HASEonGPU` is a
+   compiled extension.
+6. Validate `import HASEonGPU`, then run `pytest tests`.
+7. Run `git diff --check` and pre-commit before merging or tagging.
+
+Pre-commit
+----------
+
+Install and enable the repository hooks before preparing changes:
+
+```bash
+python -m pip install pre-commit
+pre-commit install --install-hooks
+```
+
+The configuration installs both `pre-commit` and `pre-push` hooks. To validate
+the full tree manually, run:
+
+```bash
+pre-commit run --all-files
+```
