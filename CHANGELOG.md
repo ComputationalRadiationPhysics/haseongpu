@@ -1,9 +1,13 @@
 # Changelog
 
-## HASEonGPU 3.0
+## HASEonGPU 2.0 ⸻ alpaka3
 
-This release ports HASEonGPU to alpaka 3, introduces a more generic Python
+This release ports HASEonGPU to **alpaka 3**, introduces a more generic Python
 interface, and adds regression testing and CI coverage for the updated workflow.
+
+By adopting alpaka 3 as its backend abstraction, HASEonGPU becomes the
+first scientific projects to use the new alpaka 3 library for high-performance,
+platform-independent code.
 
 ### Highlights
 

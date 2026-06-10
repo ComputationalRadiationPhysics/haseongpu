@@ -62,10 +62,10 @@ struct PropagationKernel
     // this needs adjustment since only z is the only DOF for the rays - not comparable to real simulation
     ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto result) const
     {
-        for(auto [id] : alpaka::onAcc::makeIdxMap(
+        for(auto id : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
-                alpaka::IdxRange{hase::alpakaUtils::Vec1D{propagationBatchSize}}))
+                alpaka::IdxRange{propagationBatchSize}))
         {
             unsigned level = 0u;
             unsigned triangle = 0u;
@@ -85,10 +85,10 @@ struct ReflectionKernel
     // this needs adjustment since only the z is the only DOF for the rays - not comparable to real simulation
     ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto result) const
     {
-        for(auto [id] : alpaka::onAcc::makeIdxMap(
+        for(auto id : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
-                alpaka::IdxRange{hase::alpakaUtils::Vec1D{propagationBatchSize}}))
+                alpaka::IdxRange{propagationBatchSize}))
         {
             double const z = 0.1 + 0.01 * static_cast<double>(id);
             hase::core::Point startPoint{1.0 / 3.0, 1.0 / 3.0, z};

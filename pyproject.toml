@@ -18,7 +18,7 @@ authors = [
 ]
 license = { text = "GPL-3.0-or-later" }
 classifiers = [
-    "Development Status :: active maintenance and development",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: POSIX :: Linux",
@@ -31,8 +31,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies=[
-    "pytest",
-    "scikit-build-core>=0.10",
     "gmsh",
     "numpy",
     "scipy",
@@ -40,6 +38,18 @@ dependencies=[
     "vtk",
     "matplotlib",
     "pyyaml",
+]
+
+[project.optional-dependencies]
+build = [
+    "scikit-build-core>=0.10",
+]
+test = [
+    "pytest",
+]
+dev = [
+    "scikit-build-core>=0.10",
+    "pytest",
 ]
 
 [project.urls]

@@ -1,8 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
+#include <hase/version.hpp>
 
 #include <string>
-
-#include <hase/version.hpp>
 
 TEST_CASE("HASEonGPU version macros expose string and comparable numeric version", "[version]")
 {

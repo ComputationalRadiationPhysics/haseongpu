@@ -21,19 +21,33 @@ file(
     REGEX "#define HASEONGPU_VERSION_PATCH "
 )
 
-string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_MAJOR "${HASEONGPU_VERSION_MAJOR_HPP}")
-string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_MINOR "${HASEONGPU_VERSION_MINOR_HPP}")
-string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_PATCH "${HASEONGPU_VERSION_PATCH_HPP}")
+string(
+    REGEX MATCH
+    "([0-9]+)"
+    HASEONGPU_VERSION_MAJOR
+    "${HASEONGPU_VERSION_MAJOR_HPP}"
+)
+string(
+    REGEX MATCH
+    "([0-9]+)"
+    HASEONGPU_VERSION_MINOR
+    "${HASEONGPU_VERSION_MINOR_HPP}"
+)
+string(
+    REGEX MATCH
+    "([0-9]+)"
+    HASEONGPU_VERSION_PATCH
+    "${HASEONGPU_VERSION_PATCH_HPP}"
+)
 
 project(
     HASEonGPU
-    VERSION ${HASEONGPU_VERSION_MAJOR}.${HASEONGPU_VERSION_MINOR}.${HASEONGPU_VERSION_PATCH}
+    VERSION
+        ${HASEONGPU_VERSION_MAJOR}.${HASEONGPU_VERSION_MINOR}.${HASEONGPU_VERSION_PATCH}
 )
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
-include(CMakePackageConfigHelpers)
-include(GNUInstallDirs)
 
 # dependencies
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
@@ -42,6 +56,8 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# build options
+option(HASE_BUILD_PhiAse "Build the main calcPhiAse - HaseOnGPU Binary" ON)
 option(
     HASE_BUILD_RELEASE
     "Build release version; forces Release build type and release optimization options."
@@ -141,6 +157,15 @@ if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
         )
     endif()
     unset(HASE_NVIDIA_SMI_RESULT)
+endif()
+
+if(alpaka_DEP_CUDA)
+    set(CMAKE_CUDA_ARCHITECTURES
+        "${HASE_CUDA_ARCHITECTURES}"
+        CACHE STRING
+        "CUDA Architectures"
+        FORCE
+    )
 endif()
 
 if(NOT alpaka_DEP_CUDA)
@@ -254,7 +279,6 @@ endif()
 # core library with all sources
 add_library(hase_core INTERFACE)
 add_library(hase::core ALIAS hase_core)
-set_target_properties(hase_core PROPERTIES EXPORT_NAME core)
 
 target_compile_options(
     hase_core
@@ -284,7 +308,6 @@ target_include_directories(
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Benchmark>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 set_target_properties(
@@ -359,12 +382,7 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 set(CMAKE_INSTALL_RPATH "$ORIGIN")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
-target_link_libraries(
-    hase_core
-    INTERFACE
-        $<BUILD_INTERFACE:alpaka::alpaka>
-        $<INSTALL_INTERFACE:alpaka::alpaka>
-)
+target_link_libraries(hase_core INTERFACE alpaka::alpaka)
 if(TARGET CUDA::cudart)
     target_link_libraries(hase_core INTERFACE CUDA::cudart)
 endif()
@@ -387,7 +405,9 @@ add_library(hase STATIC ${HASE_RUNTIME_SOURCES})
 add_library(hase::hase ALIAS hase)
 set_target_properties(
     hase
-    PROPERTIES CUDA_SEPARABLE_COMPILATION ON EXPORT_NAME hase
+    PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
 target_link_libraries(hase PUBLIC hase::core)
 if(HASE_BENCHMARK)
@@ -400,59 +420,18 @@ endif()
 alpaka_finalize(hase)
 
 include(cmake/AlpakaBackendNames.cmake)
-# this binary is part of the Python/MPI runtime contract and is always built.
 add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 set_target_properties(
     calcPhiASE
     PROPERTIES
         BUILD_RPATH_USE_ORIGIN ON
         CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
         INSTALL_RPATH "$ORIGIN"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
 target_link_libraries(calcPhiASE PRIVATE hase::hase)
 alpaka_finalize(calcPhiASE)
-
-set(HASE_CONFIG_REQUIRES_MPI OFF)
-if(MPI_FOUND)
-    set(HASE_CONFIG_REQUIRES_MPI ON)
-endif()
-
-set(HASE_INSTALL_TARGETS hase hase_core HaseAlpakaBackendNames calcPhiASE)
-
-install(
-    TARGETS ${HASE_INSTALL_TARGETS}
-    EXPORT HASEonGPUTargets
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-)
-install(
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
-install(
-    EXPORT HASEonGPUTargets
-    NAMESPACE hase::
-    FILE HASEonGPUTargets.cmake
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/HASEonGPU"
-)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HASEonGPUConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/HASEonGPU"
-)
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfigVersion.cmake"
-    VERSION "${PROJECT_VERSION}"
-    COMPATIBILITY SameMajorVersion
-)
-install(
-    FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfig.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/HASEonGPU"
-)
 
 # Testing
 if(HASE_TESTING)

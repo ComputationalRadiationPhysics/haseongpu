@@ -89,14 +89,11 @@ namespace hase::kernels
             alpaka::concepts::IMdSpan auto const sigmaE,
             unsigned const threadLocalStridingRNG) const
         {
-            using Vec1 = alpaka::Vec<uint32_t, 1>;
             hase::core::Point samplePoint = mesh.getSamplePoint(sample_i);
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             auto rndEngine = alpaka::rand::engine::Philox4x32x10{threadLocalStridingRNG + tIdx};
-            for(auto [rayNumber] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{Vec1{raysPerSample}}))
+            for(auto rayNumber :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysPerSample}))
             {
                 // Get triangle/prism to start ray from
                 unsigned startPrism = indicesOfPrisms[rayNumber];
@@ -161,16 +158,13 @@ namespace hase::kernels
             unsigned const lambdaResolution,
             unsigned const threadLocalStridingRNG) const
         {
-            using Vec1 = alpaka::Vec<uint32_t, 1>;
             hase::core::Point samplePoint = mesh.getSamplePoint(sample_i);
 
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             auto rndEngine = alpaka::rand::engine::Philox4x32x10{threadLocalStridingRNG + tIdx};
 
-            for(auto [rayNumber] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{Vec1{raysPerSample}}))
+            for(auto rayNumber :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysPerSample}))
             {
                 // Get triangle/prism to start ray from
                 unsigned startPrism = indicesOfPrisms[rayNumber];
