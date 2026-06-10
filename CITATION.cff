@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use HASEonGPU, please cite the software and the associated publication."
+title: "HASEonGPU"
+version: "2.0"
+type: software
+abstract: "HASEonGPU - A open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media."
+license: GPL-3.0-or-later
+repository-code: "https://github.com/computationalradiationphysics/haseongpu"
+preferred-citation:
+  type: article
+  title: "HASEonGPU-An adaptive, load-balanced MPI/GPU-code for calculating the amplified spontaneous emission in high power laser media"
+  authors:
+    - family-names: "Eckert"
+      given-names: "C. H. J."
+    - family-names: "Zenker"
+      given-names: "E."
+    - family-names: "Bussmann"
+      given-names: "M."
+    - family-names: "Albach"
+      given-names: "D."
+  journal: "Computer Physics Communications"
+  volume: 207
+  start: 362
+  end: 374
+  year: 2016
+  doi: "10.1016/j.cpc.2016.05.019"
+references:
+  - type: article
+    title: "Influence of ASE on the gain distribution in large size, high gain Yb3+:YAG slabs"
+    authors:
+      - family-names: "Albach"
+        given-names: "D."
+      - family-names: "Chanteloup"
+        given-names: "J.-C."
+      - family-names: "Touze"
+        given-names: "G. le"
+    journal: "Optics Express"
+    volume: 17
+    issue: 5
+    start: 3792
+    end: 3801
+    year: 2009
+    doi: "10.1364/OE.17.003792"

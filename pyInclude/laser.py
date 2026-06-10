@@ -124,7 +124,7 @@ LASER_ALIASES = {
 
 @dataclass
 class CrossSectionData:
-    """Absorption and emission spectra for ASE and pump calculations.
+    r"""Absorption and emission spectra for ASE and pump calculations.
 
     Wavelength arrays store :math:`\lambda`; matching cross-section arrays
     store :math:`\sigma_a` and :math:`\sigma_e` in ``cm^2``. The wavelength
@@ -135,11 +135,11 @@ class CrossSectionData:
     wavelengthsAbsorption: object
     """Wavelength samples for the absorption spectrum."""
     crossSectionAbsorption: object
-    """Absorption cross sections :math:`\sigma_a` in ``cm^2``."""
+    r"""Absorption cross sections :math:`\sigma_a` in ``cm^2``."""
     wavelengthsEmission: object
     """Wavelength samples for the emission spectrum."""
     crossSectionEmission: object
-    """Emission cross sections :math:`\sigma_e` in ``cm^2``."""
+    r"""Emission cross sections :math:`\sigma_e` in ``cm^2``."""
     resolution: int = 1
     """Spectral interpolation resolution passed to ``calcPhiASE``."""
 
@@ -184,11 +184,11 @@ class CrossSectionData:
         return LaserProperties(crossSections=self)
 
     def absorptionAt(self, wavelength):
-        """Interpolate :math:`\sigma_a` at ``wavelength``."""
+        r"""Interpolate :math:`\sigma_a` at ``wavelength``."""
         return self._interpolate(self.wavelengthsAbsorption, self.crossSectionAbsorption, wavelength)
 
     def emissionAt(self, wavelength):
-        """Interpolate :math:`\sigma_e` at ``wavelength``."""
+        r"""Interpolate :math:`\sigma_e` at ``wavelength``."""
         return self._interpolate(self.wavelengthsEmission, self.crossSectionEmission, wavelength)
 
     @staticmethod
@@ -312,13 +312,13 @@ class LaserProperties:
 
     @property
     def maxSigmaA(self):
-        """Maximum absorption cross section :math:`\max(\sigma_a)`."""
+        r"""Maximum absorption cross section :math:`\max(\sigma_a)`."""
         self.validate(requiredOnly=True)
         return float(np.max(self.values["s_abs"]))
 
     @property
     def maxSigmaE(self):
-        """Maximum emission cross section :math:`\max(\sigma_e)`."""
+        r"""Maximum emission cross section :math:`\max(\sigma_e)`."""
         self.validate(requiredOnly=True)
         return float(np.max(self.values["s_ems"]))
 
@@ -360,7 +360,7 @@ class LaserProperties:
 
 @dataclass(init=False)
 class PumpProperties:
-    """Pump-beam settings used to raise the excited-state fraction ``beta``.
+    r"""Pump-beam settings used to raise the excited-state fraction ``beta``.
 
     ``intensity`` is pump intensity :math:`I` in ``W / cm^2``. ``wavelength``
     is the pump wavelength :math:`\lambda`. Built-in Gaussian pumping also
@@ -371,7 +371,7 @@ class PumpProperties:
     intensity: float
     """Pump intensity :math:`I` in ``W / cm^2``."""
     wavelength: float | None
-    """Pump wavelength :math:`\lambda`; required for monochromatic data."""
+    r"""Pump wavelength :math:`\lambda`; required for monochromatic data."""
     pumpSubsteps: int
     """Number of time samples used by the built-in pump integrator."""
     customProperties: dict

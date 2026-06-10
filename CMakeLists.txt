@@ -1,5 +1,34 @@
 cmake_minimum_required(VERSION 3.24)
-project(HASEonGPU VERSION 2.0)
+
+# Keep the public C++ version header as the single source of truth and read it
+# before project() so CMake package metadata cannot drift from the installed API.
+file(
+    STRINGS
+    "${CMAKE_CURRENT_LIST_DIR}/include/hase/version.hpp"
+    HASEONGPU_VERSION_MAJOR_HPP
+    REGEX "#define HASEONGPU_VERSION_MAJOR "
+)
+file(
+    STRINGS
+    "${CMAKE_CURRENT_LIST_DIR}/include/hase/version.hpp"
+    HASEONGPU_VERSION_MINOR_HPP
+    REGEX "#define HASEONGPU_VERSION_MINOR "
+)
+file(
+    STRINGS
+    "${CMAKE_CURRENT_LIST_DIR}/include/hase/version.hpp"
+    HASEONGPU_VERSION_PATCH_HPP
+    REGEX "#define HASEONGPU_VERSION_PATCH "
+)
+
+string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_MAJOR "${HASEONGPU_VERSION_MAJOR_HPP}")
+string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_MINOR "${HASEONGPU_VERSION_MINOR_HPP}")
+string(REGEX MATCH "([0-9]+)" HASEONGPU_VERSION_PATCH "${HASEONGPU_VERSION_PATCH_HPP}")
+
+project(
+    HASEonGPU
+    VERSION ${HASEONGPU_VERSION_MAJOR}.${HASEONGPU_VERSION_MINOR}.${HASEONGPU_VERSION_PATCH}
+)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
@@ -12,17 +41,6 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
 endif()
 
 find_package(Threads REQUIRED)
-
-set(HASE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
-if(HASE_VERSION_PATCH STREQUAL "")
-    set(HASE_VERSION_PATCH 0)
-endif()
-
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/haseVersion.hpp.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/hase/version.hpp"
-    @ONLY
-)
 
 option(
     HASE_BUILD_RELEASE
@@ -265,7 +283,6 @@ target_include_directories(
     hase_core
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Benchmark>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
@@ -413,10 +430,6 @@ install(
 install(
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
-install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/generated/hase/version.hpp"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hase"
 )
 install(
     EXPORT HASEonGPUTargets

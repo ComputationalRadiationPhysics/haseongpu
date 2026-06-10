@@ -29,6 +29,11 @@ Documentation
 
 The full project documentation is available at [https://haseongpu.readthedocs.io/en/latest/](https://haseongpu.readthedocs.io/en/latest/).
 
+Citation
+--------
+
+If you use **HASEonGPU** in research, please cite it using the metadata in [CITATION.cff](CITATION.cff).
+
 Referencing
 -----------
 
