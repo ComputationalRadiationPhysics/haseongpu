@@ -75,7 +75,6 @@ namespace hase::kernels
                 auto validateMeshFrameSpec
                     = alpaka::onHost::getFrameSpec(queue.getDevice(), devBundle.executor, deviceMesh.numberOfSamples);
                 queue.enqueue(
-                    devBundle.executor,
                     validateMeshFrameSpec,
                     alpaka::KernelBundle{hase::kernels::ValidateMeshKernel{}, deviceMesh, sample_i});
 

@@ -56,7 +56,7 @@ namespace hase::kernels
     {
         ALPAKA_FN_HOST_ACC void operator()(auto const& acc, core::DeviceMeshView const& mesh, unsigned sample_i) const
         {
-            for(auto prism : alpaka::onAcc::makeIdxMap(
+            for(auto [prism] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfPrisms}))
