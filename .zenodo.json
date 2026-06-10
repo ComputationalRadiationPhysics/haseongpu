@@ -1,5 +1,6 @@
 {
   "title": "HASEonGPU",
+  "version": "2.0.0",
   "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux for gain-medium geometry, pumping configuration, and material setup. Release 2.0 ships the Python frontend and compiled C++ backend as one supported release unit, using adaptive Monte Carlo ray tracing with GPU acceleration and distributed execution.",
   "creators": [
     {
@@ -19,16 +20,14 @@
     {
       "name": "Widera, Rene",
       "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
-      "orcid": "0000-0003-1642-0459",
-      "type": "Other"
+      "orcid": "0000-0003-1642-0459"
     }
   ],
   "contributors": [
     {
       "name": "Bussmann, Michael",
       "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
-      "orcid": "0000-0002-8258-3881",
-      "type": "Other"
+      "orcid": "0000-0002-8258-3881"
     },
     {
       "name": "Eckert, Carlchristian",
@@ -71,6 +70,11 @@
   ],
   "license": "GPL-3.0-or-later",
   "upload_type": "software",
+  "communities": [
+    {
+      "identifier": "hzdr"
+    }
+  ],
   "related_identifiers": [
     {
       "identifier": "https://github.com/computationalradiationphysics/haseongpu",

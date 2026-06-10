@@ -62,7 +62,7 @@ struct PropagationKernel
     // this needs adjustment since only z is the only DOF for the rays - not comparable to real simulation
     ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto result) const
     {
-        for(auto id : alpaka::onAcc::makeIdxMap(
+        for(auto [id] : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
                 alpaka::IdxRange{propagationBatchSize}))
@@ -85,7 +85,7 @@ struct ReflectionKernel
     // this needs adjustment since only the z is the only DOF for the rays - not comparable to real simulation
     ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto result) const
     {
-        for(auto id : alpaka::onAcc::makeIdxMap(
+        for(auto [id] : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
                 alpaka::IdxRange{propagationBatchSize}))
@@ -114,10 +114,8 @@ std::vector<double> runPropagationKernel(hase::core::HostMesh& hostMesh, T_Devic
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize * propagationResultWidth);
-    queue.enqueue(
-        executor,
-        alpaka::onHost::FrameSpec{hase::alpakaUtils::Vec1D{4u}, hase::alpakaUtils::Vec1D{8u}},
-        alpaka::KernelBundle{PropagationKernel{}, deviceMesh.toView(), result});
+    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    queue.enqueue(frameSpec, alpaka::KernelBundle{PropagationKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
     alpaka::onHost::wait(queue);
@@ -132,10 +130,8 @@ std::vector<double> runReflectionKernel(hase::core::HostMesh& hostMesh, T_Device
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize);
-    queue.enqueue(
-        executor,
-        alpaka::onHost::FrameSpec{hase::alpakaUtils::Vec1D{4u}, hase::alpakaUtils::Vec1D{8u}},
-        alpaka::KernelBundle{ReflectionKernel{}, deviceMesh.toView(), result});
+    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    queue.enqueue(frameSpec, alpaka::KernelBundle{ReflectionKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
     alpaka::onHost::wait(queue);
