@@ -26,15 +26,32 @@ Recommended validation flow:
 Pre-commit
 ----------
 
-Install and enable the repository hooks before preparing changes:
+This project is set up for use with `pre-commit`. Using it will make your code
+conform with most of the easily automatable code style guidelines before it
+reaches review.
+
+Install the `pre-commit` executable if it is not already available; see
+<https://pre-commit.com> for installation options. Then enable the repository
+hooks in your working clone:
 
 ```bash
+cd /path/to/HASEonGPU-working-clone
 python -m pip install pre-commit
 pre-commit install --install-hooks
 ```
 
-The configuration installs both `pre-commit` and `pre-push` hooks. To validate
-the full tree manually, run:
+The configuration installs both `pre-commit` and `pre-push` hooks. Git will run
+the configured checks before each commit and push, and will refuse the action if
+one of them fails. Some hooks, such as formatters or whitespace cleanup, may
+modify the working tree automatically. In that case, inspect the changes, stage
+them, and retry:
+
+```bash
+git add -u
+git commit
+```
+
+To validate the full tree manually, run:
 
 ```bash
 pre-commit run --all-files

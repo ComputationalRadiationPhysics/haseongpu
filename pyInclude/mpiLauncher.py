@@ -31,7 +31,7 @@ class PhiAseMpiResult:
     """Result object shaped like the direct pybind ASE result."""
 
     phiAse: np.ndarray
-    """Flattened ASE flux :math:`\Phi_i` for each beta sample."""
+    r"""Flattened ASE flux :math:`\Phi_i` for each beta sample."""
     mse: np.ndarray
     """Monte Carlo mean-squared-error estimate per sample."""
     totalRays: np.ndarray
