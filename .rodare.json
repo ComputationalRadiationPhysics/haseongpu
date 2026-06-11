@@ -1,0 +1,100 @@
+{
+  "title": "HASEonGPU",
+  "version": "2.0.0",
+  "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux in configurable gain media using a Monte Carlo ray-tracing approach.\nRelease 2.0.0 introduces a redesigned Python API, for setting up custom laser simulation workflows and inspecting the development of gain and ASE flux over multiple iterations. The API includes library utilities for geometry construction, laser pumping, and time integration.\nAdditionally, HASEonGPU is the first scientific software project to adopt the new heterogeneous programming library alpaka 3 (https://github.com/alpaka-group/alpaka3). It leverages alpaka 3’s redesigned programming interface and enhanced utilities, including SIMD abstractions, to support ASE calculations on CPU and GPU (CUDA, HIP) backends with improved performance portability.",
+  "creators": [
+    {
+      "name": "Hanel, Tim",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, TU Dresden",
+      "orcid": "0009-0008-6324-3946"
+    },
+    {
+      "name": "Manethia, Aditya Kumar",
+      "affiliation": "TU Bergakademie Freiberg"
+    },
+    {
+      "name": "Albach, Daniel",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+      "orcid": "0000-0001-5602-3007"
+    },
+    {
+      "name": "Widera, Rene",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+      "orcid": "0000-0003-1642-0459"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Bussmann, Michael",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, CASUS",
+      "orcid": "0000-0002-8258-3881"
+    },
+    {
+      "name": "Eckert, Carlchristian",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+      "orcid": "0000-0002-6459-0842"
+    },
+    {
+      "name": "Haenel, Tobias",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, TU Dresden"
+    },
+    {
+      "name": "Zenker, Erik",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+      "orcid": "0000-0001-9417-8712"
+    }
+  ],
+  "access_right": "open",
+  "keywords": [
+    "laser",
+    "laser-physics",
+    "laser-construction",
+    "high-intensity laser pulse",
+    "high-power laser systems",
+    "amplified spontaneous emission",
+    "ASE",
+    "gain media",
+    "Monte Carlo ray tracing",
+    "HPC",
+    "GPU",
+    "CUDA",
+    "HIP",
+    "MPI",
+    "alpaka",
+    "alpaka3",
+    "C++20",
+    "C++",
+    "Python",
+    "heterogeneous computing",
+    "distributed computing"
+  ],
+  "license": "GPL-3.0-or-later",
+  "upload_type": "software",
+  "communities": [
+    {
+      "identifier": "hzdr"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/computationalradiationphysics/haseongpu",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://haseongpu.readthedocs.io/en/latest/",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    },
+    {
+      "identifier": "10.1016/j.cpc.2016.05.019",
+      "relation": "cites",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.1364/OE.17.003792",
+      "relation": "cites",
+      "scheme": "doi"
+    }
+  ]
+}
