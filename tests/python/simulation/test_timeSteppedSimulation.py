@@ -39,7 +39,9 @@ def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
 
     simulation.runSteps(2)
 
-    assert len(simulation.getResults()) == 2
+    assert simulation.getLastState() is seen[-1]
+    assert simulation.getResults() is seen[-1]
+    assert simulation.lastState is seen[-1]
     assert len(seen) == 2
     assert seen[-1].step == 2
     assert seen[-1].betaCells.shape == (4, 3)

@@ -154,8 +154,8 @@ def main():
         simulation.onStep(writeVtkState, "gmsh_minimal_phi_ase_{step:03d}.vtk")
         simulation.runSteps(3)
 
-        results = simulation.getResults()
-        print(f"stored {len(results)} time-step states")
+        last_state = simulation.getLastState()
+        print(f"last completed step: {last_state.step}")
 
 
 if __name__ == "__main__":

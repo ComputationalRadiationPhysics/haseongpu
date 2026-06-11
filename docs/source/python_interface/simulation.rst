@@ -58,7 +58,7 @@ Each call to ``step()`` performs:
 6. Fluorescence decay using ``crystalTFluo`` (:math:`\tau`).
 7. Clipping of updated beta values to ``[0, 1]``.
 8. ``betaVolume`` update from ``betaCells``.
-9. Result storage and ``onStep`` callbacks.
+9. Latest-state update and ``onStep`` callbacks.
 
 Callbacks
 ---------
@@ -109,15 +109,18 @@ This means ``simulation.onStep(write_state, output_dir)`` calls
 Results
 -------
 
-``getResults()`` returns a list of ``TimeStepState`` snapshots:
+``getLastState()`` returns the most recent ``TimeStepState`` snapshot:
 
 .. code-block:: python
 
-   results = simulation.getResults()
-   last = results[-1]
+   last = simulation.getLastState()
    last.betaCells.shape
    last.betaVolume.shape
    last.phiAse.shape
+
+``Simulation`` keeps only the latest state in memory. Use ``onStep`` to write,
+inspect, or store state for every completed step. ``getResults()`` is retained
+as an alias for ``getLastState()``.
 
 ``TimeStepState`` fields are:
 

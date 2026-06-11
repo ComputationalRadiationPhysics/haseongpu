@@ -302,7 +302,7 @@ The three callback registrations are optional but useful:
 
 One simulation step performs the physical update in this order: pump
 contribution, ASE calculation, fluorescence decay, time integration, beta
-volume update, result storage, and step callbacks.
+volume update, latest-state update, and step callbacks.
 
 ``simulation.runSteps(3)`` runs exactly three steps.  For a time-based run use
 ``simulation.runUntil(endTime=1e-3)`` or set ``endTime`` in the constructor and
@@ -370,8 +370,8 @@ Inspect Results
    :start-after: # docs:start: results
    :end-before: # docs:end: results
 
-``simulation.getResults()`` returns the stored ``TimeStepState`` objects.  Each
+``simulation.getLastState()`` returns the most recent ``TimeStepState``.  The
 state contains the completed step index, physical time, ``betaCells``,
 ``betaVolume``, ``phiAse`` (:math:`\Phi_i`), pump derivative, ASE derivative,
-and the raw ASE result object.  These states are the main Python-side output
-of the time loop.
+and the raw ASE result object.  ``Simulation`` keeps only this latest snapshot
+in memory. Use ``onStep`` callbacks to write, inspect, or store every step.
