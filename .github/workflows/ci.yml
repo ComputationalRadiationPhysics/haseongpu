@@ -205,7 +205,12 @@ jobs:
           cmake_args=(
             $HASE_CMAKE_ARGS
           )
-
+          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
+            cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
+            cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
+          else
+            cmake_args+=(-Dalpaka_DEP_HWLOC=OFF)
+          fi
           if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
             cmake_args+=(-Dalpaka_SIMD=EMULATION)
           fi
@@ -237,6 +242,13 @@ jobs:
             -DBUILD_TESTING=OFF
             -DHASE_TESTING=OFF
           )
+
+          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
+            pip_cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
+            pip_cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
+          else
+            pip_cmake_args+=(-Dalpaka_DEP_HWLOC=OFF)
+          fi
 
           if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
             pip_cmake_args+=(-Dalpaka_SIMD=EMULATION)
