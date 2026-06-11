@@ -1,7 +1,7 @@
 {
   "title": "HASEonGPU",
   "version": "2.0.0",
-  "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux for gain-medium geometry, pumping configuration, and material setup. Release 2.0 ships the Python frontend and compiled C++ backend as one supported release unit, using adaptive Monte Carlo ray tracing with GPU acceleration and distributed execution.",
+  "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux in configurable gain media using a Monte Carlo ray-tracing approach. Release 2.0.0 marks HASEonGPU as the first scientific software based on the new heterogeneous alpaka 3 library (https://github.com/alpaka-group/alpaka3.git), leveraging its redesigned programming interface and enhanced utilities, including SIMD abstractions, to support ASE calculation on CPU and GPU (HIP, CUDA) backends with improved performance portability. In addition, this release ships a refactored Python API that provides library utilities for geometry construction, laser pumping, and time integration.",
   "creators": [
     {
       "name": "Hanel, Tim",
@@ -26,7 +26,7 @@
   "contributors": [
     {
       "name": "Bussmann, Michael",
-      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, CASUS",
       "orcid": "0000-0002-8258-3881"
     },
     {
@@ -48,20 +48,20 @@
   "keywords": [
     "laser",
     "laser-physics",
-    "laserconstruction",
+    "laser-construction",
     "high-intensity laser pulse",
     "high-power laser systems",
     "amplified spontaneous emission",
     "ASE",
     "gain media",
     "Monte Carlo ray tracing",
-    "adaptive sampling",
     "HPC",
     "GPU",
     "CUDA",
     "HIP",
     "MPI",
     "alpaka",
+    "alpaka3",
     "C++20",
     "C++",
     "Python",
