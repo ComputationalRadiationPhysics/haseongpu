@@ -116,8 +116,8 @@ def main():
     # docs:end: simulation
 
     # docs:start: results
-    results = simulation.getResults()
-    print(f"stored {len(results)} time-step states")
+    last_state = simulation.getLastState()
+    print(f"last completed step: {last_state.step}")
     # docs:end: results
 
 

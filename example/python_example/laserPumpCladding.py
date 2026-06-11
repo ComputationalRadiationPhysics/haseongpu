@@ -173,7 +173,7 @@ def runExample(
     simulation.onStep(printState)
     simulation.onStep(writeVtkFields, vtkOutputDir, absorption)
     simulation.runSteps(timeSlices) # adjust this by number of steps
-    return simulation.getResults()[-1] # return the last phiASE as array to confirm shape.
+    return simulation.getLastState() # return the last state to confirm shape.
 
     # dndt_ASE, flux_clad
 def main(argv=None):
