@@ -27,21 +27,25 @@
     {
       "name": "Bussmann, Michael",
       "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, CASUS",
-      "orcid": "0000-0002-8258-3881"
+      "orcid": "0000-0002-8258-3881",
+      "type": "Supervisor"
     },
     {
       "name": "Eckert, Carlchristian",
       "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
-      "orcid": "0000-0002-6459-0842"
+      "orcid": "0000-0002-6459-0842",
+      "type": "ProjectMember"
     },
     {
       "name": "Haenel, Tobias",
-      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, TU Dresden"
+      "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf, TU Dresden",
+      "type": "ProjectMember"
     },
     {
       "name": "Zenker, Erik",
       "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
-      "orcid": "0000-0001-9417-8712"
+      "orcid": "0000-0001-9417-8712",
+      "type": "ProjectMember"
     }
   ],
   "access_right": "open",
