@@ -104,7 +104,7 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
         backend=backend,
         rngSeed=REGRESSION_RNG_SEED,
     )
-    medium=GainMedium.fromVtk(tmp_path / f'dndt_ASE_{timeSlices-1}.vtk')
+    medium=GainMedium.fromVtk(tmp_path / f'dndt_ASE_{timeSlices}.vtk')
     legacyDndtAse=medium.dntdAse
     modernPhiAse = np.asarray(modernState.phiAse).reshape(-1, order="F")
     modernDndtAse = np.asarray(modernState.dndtAse).reshape(-1, order="F")

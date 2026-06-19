@@ -200,14 +200,11 @@ namespace hase::core
                 unsigned highMSE = 0;
                 time_t starttime = time(0);
                 unsigned maxDevices = compute.devices.size();
-                std::vector<float> runtimes(maxDevices, 0);
+                std::vector runtimes(maxDevices, 0.f);
                 unsigned usedGPUs = 0;
                 RuntimeTopology topology;
-                std::vector<ComputeParameters> computes(maxDevices, compute);
+                std::vector computes(maxDevices, compute);
                 hase::utils::ProgressBar bar;
-                // Single Threaded @TODO use for Validation
-
-
                 if(compute.parallelMode == ParallelMode::SINGLE)
                 {
                     unsigned const samplesPerNode = compute.maxSampleRange - compute.minSampleRange + 1u;

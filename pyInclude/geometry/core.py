@@ -229,6 +229,10 @@ def _as_points(points):
     return arr[np.sort(unique_idx)]
 
 
+def _cross2d(a, b):
+    return a[0] * b[1] - a[1] * b[0]
+
+
 def _circumcircle_contains(points, tri, point):
     a, b, c = points[list(tri)]
     ax, ay = a - point
@@ -239,7 +243,7 @@ def _circumcircle_contains(points, tri, point):
         - (bx * bx + by * by) * (ax * cy - cx * ay)
         + (cx * cx + cy * cy) * (ax * by - bx * ay)
     )
-    orient = np.cross(b - a, c - a)
+    orient = _cross2d(b - a, c - a)
     return det > 1e-12 if orient > 0 else det < -1e-12
 
 
@@ -277,7 +281,7 @@ def _delaunay(points):
             if count == 1:
                 tri = (edge[0], edge[1], point_id)
                 a, b, c = all_points[list(tri)]
-                if np.cross(b - a, c - a) < 0:
+                if _cross2d(b - a, c - a) < 0:
                     tri = (edge[1], edge[0], point_id)
                 triangles.append(tri)
 

@@ -64,7 +64,6 @@ namespace hase::kernels
         mutable T1 indicesOfPrisms;
         mutable T2 numberOfReflections;
 
-        //@TODO [performance] use alpaka scan or thrust scan instead
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::concepts::SimdPtr auto const raysPerPrism,
             alpaka::concepts::SimdPtr auto const prefixSum) const
@@ -89,9 +88,6 @@ namespace hase::kernels
 
 } // namespace hase::kernels
 
-#include <cassert>
-#include <vector>
-
 namespace hase::kernels
 {
     using hase::alpakaUtils::Vec1D;
@@ -106,11 +102,6 @@ namespace hase::kernels
     {
         auto queue = devBundle.device.makeQueue();
         alpaka::onHost::exclusiveScan(queue, devBundle.executor, prefixSum, raysPerPrism);
-        std::vector<unsigned> hRays(raysPerPrism.getExtents().product());
-        std::vector<unsigned> hPrefix(prefixSum.getExtents().product());
-        alpaka::onHost::memcpy(queue, hRays, raysPerPrism);
-        alpaka::onHost::memcpy(queue, hPrefix, prefixSum);
-        alpaka::onHost::wait(queue);
 
         alpaka::concepts::IMdSpan auto indicesSpan = indicesOfPrisms.getMdSpan();
         alpaka::concepts::IMdSpan auto reflectionSpan = numberOfReflections.getMdSpan();
