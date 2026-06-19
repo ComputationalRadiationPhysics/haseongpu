@@ -6,7 +6,7 @@ set(HASE_ALPAKA_GIT_REPOSITORY
     "Git repository used when fetching alpaka"
 )
 set(HASE_ALPAKA_GIT_TAG
-    "245c74bf96d751cc52ec3f083934cf58d2b7313b"
+    "58065f933b3d46406c4abb7c74111567938a0ee6"
     CACHE STRING
     "Git tag or commit used when fetching alpaka"
 )

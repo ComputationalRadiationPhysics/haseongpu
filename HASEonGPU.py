@@ -4,6 +4,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+__version__ = "2.0"
+
+import HASEonGPU_Bindings
 from HASEonGPU_Bindings import *
 from pyInclude import *
 del HASEonGPU_Bindings.HostMesh

@@ -107,8 +107,8 @@ For reproducible builds on different systems, specifying the CUDA architecture i
 * Description:
   Controls whether HASEonGPU applies its release build configuration.  When
   enabled, CMake forces ``CMAKE_BUILD_TYPE=Release`` and enables the release
-  optimization options used by the project, including native host compiler
-  tuning flags and CUDA/HIP fast-math related flags where applicable.
+  optimization options used by the project, including CUDA/HIP fast-math
+  related flags where applicable.
 
   Important: ``HASE_BUILD_RELEASE=ON`` overwrites user-provided
   ``CMAKE_BUILD_TYPE`` values and related optimization settings during
@@ -119,6 +119,33 @@ For reproducible builds on different systems, specifying the CUDA architecture i
 
   * ``OFF``: keep user-provided build type and optimization settings
   * ``ON``: force the project release configuration
+
+``HASE_NATIVE_OPTIMIZATIONS``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Default: ``ON``
+* Description:
+  Enables host-specific CPU tuning with ``-march=native`` and
+  ``-mtune=native``. Keep this enabled for local source builds when peak
+  performance on the build machine is desired. Disable it for redistributable
+  binaries or wheels that need to run on unknown CPUs.
+
+* Values:
+
+  * ``OFF``: do not add host-specific native CPU tuning flags
+  * ``ON``: build for the local host CPU
+
+For Python source installs, pass the option through ``CMAKE_ARGS``:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
+
+For redistributable wheels or binaries, configure with:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=OFF" python3 -m pip install .
 
 ``HASE_SELECT_BACKEND_ALPAKA``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
