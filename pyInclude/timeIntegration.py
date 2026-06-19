@@ -33,7 +33,7 @@ class TimeDerivative:
     tau: float
     """Fluorescence lifetime used for spontaneous decay, in seconds."""
     phiAse: np.ndarray | None = None
-    """ASE flux :math:`\Phi_i` from the derivative evaluation, if available."""
+    r"""ASE flux :math:`\Phi_i` from the derivative evaluation, if available."""
     aseResult: object | None = None
     """Raw lower-level ASE result object, if available."""
 

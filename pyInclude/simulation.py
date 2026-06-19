@@ -443,7 +443,7 @@ class Simulation:
     _initCallbacks: list = field(default_factory=list, init=False, repr=False)
     _beforeStepCallbacks: list = field(default_factory=list, init=False, repr=False)
     _callbacks: list = field(default_factory=list, init=False, repr=False)
-    _states: list[TimeStepState] = field(default_factory=list, init=False, repr=False)
+    _lastState: TimeStepState | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         if self.timeIntegrationSolver is None or not hasattr(self.timeIntegrationSolver, "step"):
@@ -479,9 +479,9 @@ class Simulation:
         ``simulation.onStep(write_vtk, output_dir, scale=5.5)`` calls
         ``write_vtk(state, output_dir, scale=5.5)`` after every completed step.
 
-        Use this hook for logging, storing results, writing VTK files, or other
-        work that should consume the immutable step snapshot. Callback return
-        values are ignored. The method returns ``self`` so registrations can be
+        Use this hook for logging, writing VTK files, explicit state storage,
+        or other work that should consume the immutable step snapshot. Callback
+        return values are ignored. The method returns ``self`` so registrations can be
         chained.
         """
         self._callbacks.append((callback, args, kwargs))
@@ -578,14 +578,29 @@ class Simulation:
             aseResult=derivative.aseResult,
             topology=self.gainMedium.topology,
         )
-        self._states.append(state)
+        self._lastState = state
         for callback, args, kwargs in self._callbacks:
             callback(state, *args, **kwargs)
         return state
 
+    def getLastState(self):
+        """Return the most recent completed ``TimeStepState`` snapshot."""
+        if self._lastState is None:
+            raise RuntimeError("simulation has not completed a time step yet")
+        return self._lastState
+
     def getResults(self):
-        """Return all stored ``TimeStepState`` snapshots in step order."""
-        return self._states
+        """Return the most recent completed ``TimeStepState`` snapshot.
+
+        ``Simulation`` does not retain a full time-step history. Register an
+        ``onStep`` callback to write or store per-step state explicitly.
+        """
+        return self.getLastState()
+
+    @property
+    def lastState(self):
+        """Most recent completed ``TimeStepState`` snapshot."""
+        return self.getLastState()
 
     @property
     def time(self):

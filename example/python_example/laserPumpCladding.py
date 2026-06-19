@@ -143,7 +143,8 @@ def runExample(
     if backend != "UseConfig" : phiAse.backend=backend
 
 
-    pumpProperties=PumpProperties( crossSections=pumpCrossSections,
+    pumpProperties=PumpProperties(
+                         crossSections=pumpCrossSections,
                          intensity=16e3,
                          pumpDuration=1e-6,
                          pumpSubsteps=100,
@@ -172,7 +173,7 @@ def runExample(
     simulation.onStep(printState)
     simulation.onStep(writeVtkFields, vtkOutputDir, absorption)
     simulation.runSteps(timeSlices) # adjust this by number of steps
-    return simulation.getResults()[-1] # return the last phiASE as array to confirm shape.
+    return simulation.getLastState() # return the last state to confirm shape.
 
     # dndt_ASE, flux_clad
 def main(argv=None):

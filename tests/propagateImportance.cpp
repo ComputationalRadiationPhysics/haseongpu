@@ -65,7 +65,7 @@ struct PropagationKernel
         for(auto [id] : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
-                alpaka::IdxRange{hase::alpakaUtils::Vec1D{propagationBatchSize}}))
+                alpaka::IdxRange{propagationBatchSize}))
         {
             unsigned level = 0u;
             unsigned triangle = 0u;
@@ -88,7 +88,7 @@ struct ReflectionKernel
         for(auto [id] : alpaka::onAcc::makeIdxMap(
                 acc,
                 alpaka::onAcc::worker::threadsInGrid,
-                alpaka::IdxRange{hase::alpakaUtils::Vec1D{propagationBatchSize}}))
+                alpaka::IdxRange{propagationBatchSize}))
         {
             double const z = 0.1 + 0.01 * static_cast<double>(id);
             hase::core::Point startPoint{1.0 / 3.0, 1.0 / 3.0, z};
@@ -114,10 +114,8 @@ std::vector<double> runPropagationKernel(hase::core::HostMesh& hostMesh, T_Devic
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize * propagationResultWidth);
-    queue.enqueue(
-        executor,
-        alpaka::onHost::FrameSpec{hase::alpakaUtils::Vec1D{4u}, hase::alpakaUtils::Vec1D{8u}},
-        alpaka::KernelBundle{PropagationKernel{}, deviceMesh.toView(), result});
+    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    queue.enqueue(frameSpec, alpaka::KernelBundle{PropagationKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
     alpaka::onHost::wait(queue);
@@ -132,10 +130,8 @@ std::vector<double> runReflectionKernel(hase::core::HostMesh& hostMesh, T_Device
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize);
-    queue.enqueue(
-        executor,
-        alpaka::onHost::FrameSpec{hase::alpakaUtils::Vec1D{4u}, hase::alpakaUtils::Vec1D{8u}},
-        alpaka::KernelBundle{ReflectionKernel{}, deviceMesh.toView(), result});
+    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    queue.enqueue(frameSpec, alpaka::KernelBundle{ReflectionKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
     alpaka::onHost::wait(queue);
