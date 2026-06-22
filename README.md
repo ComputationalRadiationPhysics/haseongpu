@@ -56,6 +56,7 @@ Active Team
 
 - Dr. Michael Bussmann
 - Dr. Daniel Albach
+- René Widera
 
 ### Maintainers and core developers
 
