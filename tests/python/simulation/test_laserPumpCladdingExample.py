@@ -26,6 +26,11 @@ class _NoPumpSolver:
         return np.asarray(input["betaCell"], dtype=np.float64).copy()
 
 
+class _ConstantPumpSolver:
+    def step(self, input, pump):
+        return np.asarray(input["betaCell"], dtype=np.float64) + 1.0e-6
+
+
 class _FakePhiASE:
     def __init__(self, spectralProperties=None, **overrides):
         self.crossSections = spectralProperties
@@ -56,7 +61,7 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
         classmethod(lambda cls, filename, **overrides: _FakePhiASE(**overrides)),
     )
 
-    state = laserPumpCladding.runExample(timeSlices=2, vtkOutputDir=tmp_path)
+    state = laserPumpCladding.runExample(timeSlices=2, pumpSteps=1, vtkOutputDir=tmp_path)
 
     first = tmp_path / "laserPumpCladding_001.vtk"
     second = tmp_path / "laserPumpCladding_002.vtk"
@@ -64,4 +69,18 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
     assert second.is_file()
     assert state.step == 2
     scalars = _vtkScalarNames(second)
-    assert {"betaCells", "phiASE", "dndtAse", "cladAbs", "gain"}.issubset(scalars)
+    assert {"betaCells", "phiASE", "dndtAse", "dndtPump", "cladAbs"}.issubset(scalars)
+
+
+def testLaserPumpCladdingExamplePassesPumpStepsToSimulation(monkeypatch, tmp_path, smallGainMedium):
+    monkeypatch.setattr(laserPumpCladding, "BetaIntegrationGaussianSolver", lambda: _ConstantPumpSolver())
+    monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
+    monkeypatch.setattr(
+        laserPumpCladding.PhiASE,
+        "fromYaml",
+        classmethod(lambda cls, filename, **overrides: _FakePhiASE(**overrides)),
+    )
+
+    state = laserPumpCladding.runExample(timeSlices=2, pumpSteps=1, vtkOutputDir=tmp_path)
+
+    assert np.allclose(state.dndtPump, 0.0)

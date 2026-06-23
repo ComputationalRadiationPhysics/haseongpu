@@ -35,8 +35,6 @@ from HASEonGPU import (  # noqa: E402
     Simulation,
     vtkWedge,
 )
-
-
 def printState(state):
     print(
         f"step={state.step:03d} "
@@ -115,6 +113,8 @@ def runExample(
     phiAseConfigPath=defaultPhiAseConfigPath,
     backend="UseConfig",
     timeSlices=150,
+    # pumpSteps: pumped outer simulation steps; None pumps for all timeSlices.
+    pumpSteps=100,
     vtkOutputDir=scriptDir,
     **AseOverride,
 ):
@@ -158,6 +158,7 @@ def runExample(
                          pumpDuration=1e-6,
                          pumpSubsteps=100,
                          temporaryFluorescence=1.0,
+                         pumpSteps=pumpSteps,
                          solver=BetaIntegrationGaussianSolver(),
                          wavelength=940e-9,
                          radiusX=1.5,
@@ -195,6 +196,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Modern HASEonGPU laser-pump cladding example")
     parser.add_argument("--backend", type=str, default="UseConfig")
     parser.add_argument("--timeSteps", type=int, default=150)
+    parser.add_argument(
+        "--pumpSteps",
+        type=int,
+        default=100,
+        help=(
+            "Number of outer simulation steps with pump contribution. "
+            "Default: 100. Use a value matching --timeSteps to pump for the full run. "
+            "This is distinct from "
+            "PumpProperties.pumpSubsteps, which is the internal pump "
+            "integration resolution."
+        ),
+    )
     parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     args = parser.parse_args(argv)
@@ -203,6 +216,7 @@ def main(argv=None):
         args.phi_ase_config,
         args.backend,
         timeSlices=args.timeSteps,
+        pumpSteps=args.pumpSteps,
         vtkOutputDir=args.vtk_output_dir,
     )
     print(f"phiAse shape: {state.phiAse.shape}")
