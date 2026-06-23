@@ -30,6 +30,7 @@ from .simulation import (
     TimeStepState,
     TimeSteppedSimulation,
 )
+from .gainMap import calcGainFromState
 from .vtkWedge import vtkWedge
 from .timeIntegration import (
     ExplicitEuler,

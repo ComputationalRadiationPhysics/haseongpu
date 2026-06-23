@@ -69,6 +69,7 @@ Pump solvers and utilities
    BetaIntegrationGaussianSolver
    Constants
    LegacyGridDataBetaVolumeMapper
+   calcGainFromState
    AlpakaBackends
    vtkWedge
    writeGainMediumVtk
@@ -103,6 +104,7 @@ inspect implementation-level helpers or extension points.
    laser
    pumping
    simulation
+   gainMap
    timeIntegration
    vtkWedge
    calcPhiASE

@@ -64,4 +64,4 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
     assert second.is_file()
     assert state.step == 2
     scalars = _vtkScalarNames(second)
-    assert {"betaCells", "phiASE", "dndtAse", "cladAbs"}.issubset(scalars)
+    assert {"betaCells", "phiASE", "dndtAse", "cladAbs", "gain"}.issubset(scalars)
