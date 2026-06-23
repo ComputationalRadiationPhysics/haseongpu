@@ -53,6 +53,16 @@ namespace hase::core
             return Point{x - other.x, y - other.y, z - other.z};
         }
 
+        constexpr Point operator+(Point const& other) const
+        {
+            return Point{x + other.x, y + other.y, z + other.z};
+        }
+
+        constexpr Point operator*(double const factor) const
+        {
+            return Point{x * factor, y * factor, z * factor};
+        }
+
         [[nodiscard]] constexpr auto euclidLength() const
         {
             return alpaka::math::sqrt(x * x + y * y + z * z);
@@ -69,9 +79,7 @@ namespace hase::core
         Position direction;
         double accumulatedLength;
         double totalLength;
-        unsigned prism;
-        unsigned triangle;
-        unsigned level;
+        unsigned cell;
         double gain;
     };
 
@@ -101,5 +109,18 @@ namespace hase::core
     ALPAKA_FN_HOST_ACC double distance(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC Ray normalizeRay(Ray ray);
+
+    [[nodiscard]] constexpr double dot(Point const a, Point const b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    [[nodiscard]] constexpr Point cross(Point const a, Point const b)
+    {
+        return Point{
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x};
+    }
 
 } // namespace hase::core

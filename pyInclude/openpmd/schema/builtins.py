@@ -13,7 +13,7 @@ from .unit_dimension import unitDimension
 HASE_TRANSPORT_ATTRIBUTES = {
     "haseTopologyConvention": "vtkWedgeExtrudedTriangularPrism",
     "simulationType": "laserCrystalASE",
-    "geometryType": "extrudedTriangularPrism",
+    "geometryType": "unstructuredPrism6",
 }
 
 

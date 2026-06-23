@@ -220,6 +220,19 @@ class VolumeTopology:
     def numberOfSamplePoints(self):
         return int(self.samplePoints.shape[0])
 
+    @property
+    def numberOfPrisms(self):
+        return self.numberOfCells
+
+    def openPmdAttributes(self, context=None):
+        context = context or self
+        return {
+            "numberOfPoints": int(context.numberOfPoints),
+            "numberOfTriangles": int(getattr(context, "numberOfCells", self.numberOfCells)),
+            "numberOfLevels": 1,
+            "thickness": 0.0,
+        }
+
     def cellsConnectivityFlat(self):
         return np.asarray(self.cellPointIndices, dtype=np.uint32).reshape(-1)
 

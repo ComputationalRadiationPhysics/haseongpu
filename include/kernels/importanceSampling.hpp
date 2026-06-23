@@ -48,7 +48,7 @@ namespace hase::kernels
      * @param sample_i         Index of sample point for which importance sampling should be done.
      * @param reflectionSlices 1 + (2 * maxReflections) - Coded information about how many
      *                         reflections a ray should do and on which surface to start.
-     * @param dMesh            All information about triangles, points, contants.
+     * @param dMesh            Explicit 3D cell mesh on device memory.
      *                         Is located on device memory. See mesh.h for details.
      * @param sigmaA           Absorption value of the ray.
      * @param sigmaE           Emission value of the ray.
@@ -96,7 +96,7 @@ namespace hase::kernels
         queue.enqueue(
             propagateFrameSpec,
             alpaka::KernelBundle{
-                PropagateFromTriangleCenter{},
+                PropagateFromCellCenter{},
                 deviceMesh,
                 sample_i,
                 sigmaA,
@@ -107,13 +107,12 @@ namespace hase::kernels
     }
 
     /**
-     * @brief Calculates importance and ray distribution on prisms.
-     *        Based on preImportance and triangle surfaces.
+     * @brief Calculates importance and ray distribution over explicit cells.
+     *        Based on preImportance and cell volumes.
      *
      * @param reflectionSlices   1 + (2 * maxReflections) - Coded information about how many
      *                           reflections a ray should do and on which surface to start.
-     * @param dMesh              All information about triangles, points, contants.
-     *                           Is located on device memory. See mesh.h for details.
+     * @param dMesh              Explicit 3D cell mesh on device memory.
      * @param raysPerSample      Number of rays that should be distributed on gain medium.
      * @param preImportance      Values calculated from importanceSamplingPropagation.
      * @param importance         Final importance values for this number of rays per sample.

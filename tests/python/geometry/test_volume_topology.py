@@ -210,15 +210,15 @@ def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
         assert iteration.meshes["core_sample_points"].get_attribute("geometryParameters") == "topology=explicit_volume_cells"
         np.testing.assert_array_equal(
             _read_openpmd_scalar(series, iteration, "core_cell_faces"),
-            topology.facePointIndices.reshape(-1, order="F"),
+            topology.facePointIndices.reshape(-1),
         )
         np.testing.assert_array_equal(
             _read_openpmd_scalar(series, iteration, "core_cell_neighbor_cells"),
-            topology.neighborCells.reshape(-1, order="F"),
+            topology.neighborCells.reshape(-1),
         )
         np.testing.assert_array_equal(
             _read_openpmd_scalar(series, iteration, "core_cell_face_boundaries"),
-            topology.faceBoundaries.reshape(-1, order="F"),
+            topology.faceBoundaries.reshape(-1),
         )
     finally:
         series.close()

@@ -34,21 +34,16 @@ namespace hase::kernels
 
     inline ALPAKA_FN_HOST_ACC void assertMeshPropagationInputs(
         core::DeviceMeshView const& mesh,
-        unsigned prism,
+        unsigned cell,
         unsigned sample_i)
     {
-        assert(prism < mesh.numberOfPrisms);
+        assert(cell < mesh.numberOfCells);
         if(sample_i >= mesh.numberOfSamples)
         {
             assert(false);
         }
-        unsigned const level = prism / mesh.numberOfTriangles;
-        [[maybe_unused]] unsigned const triangle = prism - mesh.numberOfTriangles * level;
 
-        assert(level < mesh.numberOfLevels);
-        assert(triangle < mesh.numberOfTriangles);
-
-        [[maybe_unused]] double const beta = mesh.getBetaVolume(prism);
+        [[maybe_unused]] double const beta = mesh.getBetaVolume(cell);
         assert(alpaka::math::isfinite(beta));
     }
 
@@ -77,7 +72,7 @@ namespace hase::kernels
      * For other parameters, see documentation of importanceSampling()
      *
      */
-    struct PropagateFromTriangleCenter
+    struct PropagateFromCellCenter
     {
         ALPAKA_FN_HOST_ACC void operator()(
             auto const& acc,
@@ -97,11 +92,9 @@ namespace hase::kernels
                     alpaka::IdxRange{importance.getExtents().product()}))
             {
                 unsigned const reflection_i = prismIndex / mesh.numberOfPrisms;
-                unsigned const startPrism = prismIndex % mesh.numberOfPrisms;
+                unsigned const startCell = prismIndex % mesh.numberOfPrisms;
                 unsigned const reflections = (reflection_i + 1u) / 2u;
-                unsigned const startLevel = startPrism / mesh.numberOfTriangles;
-                unsigned const startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-                core::Point startPoint = mesh.getCenterPoint(startTriangle, startLevel);
+                core::Point startPoint = mesh.getCellCenterPoint(startCell);
                 core::ReflectionPlane const reflectionPlane
                     = (reflection_i % 2u == 0u) ? core::BOTTOM_REFLECTION : core::TOP_REFLECTION;
                 double gain = propagateRayWithReflection(
@@ -109,8 +102,7 @@ namespace hase::kernels
                     samplePoint,
                     reflections,
                     reflectionPlane,
-                    startLevel,
-                    startTriangle,
+                    startCell,
                     mesh,
                     sigmaA,
                     sigmaE);
@@ -125,15 +117,13 @@ namespace hase::kernels
                             ray.dir,
                             0.0,
                             ray.length,
-                            startPrism,
-                            startTriangle,
-                            startLevel,
+                            startCell,
                             gain};
                     }
                     alpaka::onAcc::atomicAdd(acc, &droppedRays[0], 1u);
                     gain = 0.0;
                 }
-                importance[prismIndex] = mesh.getBetaVolume(startPrism) * gain;
+                importance[prismIndex] = mesh.getBetaVolume(startCell) * gain;
             }
         }
     };
@@ -175,16 +165,10 @@ namespace hase::kernels
             for(auto id :
                 alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysLeft}))
             {
-                // get random numbers floating for any vector size -> conversion float -> int does floor automatically
-                unsigned rand_t = alpaka::rand::distribution::UniformReal{
+                unsigned randomPrism = alpaka::rand::distribution::UniformReal{
                     0.0f,
-                    static_cast<float>(mesh.numberOfTriangles),
+                    static_cast<float>(mesh.numberOfPrisms),
                     alpaka::rand::interval::co}(engine);
-                unsigned rand_z = alpaka::rand::distribution::UniformReal{
-                    0.0f,
-                    static_cast<float>(mesh.numberOfLevels - 1),
-                    alpaka::rand::interval::co}(engine);
-                unsigned randomPrism = rand_t + rand_z * mesh.numberOfTriangles;
                 alpaka::onAcc::atomicAdd(acc, &raysPerPrism[randomPrism], static_cast<unsigned>(1));
                 alpaka::onAcc::atomicAdd(acc, &raysDump[0], static_cast<unsigned>(1));
             }
@@ -260,8 +244,6 @@ namespace hase::kernels
                 weightedPrism[laneIdx] += laneIdx;
             }
             alpaka::concepts::Simd auto const prism = weightedPrism % mesh.numberOfPrisms;
-            alpaka::concepts::Simd auto const level = prism / mesh.numberOfTriangles;
-            alpaka::concepts::Simd auto const triangle = prism - (mesh.numberOfTriangles * level);
 
             alpaka::concepts::Simd auto const preImportanceValues = preImportance.load();
             alpaka::concepts::Simd auto prismVolume = alpaka::Simd<double, width>::fill(0.0);
@@ -272,8 +254,7 @@ namespace hase::kernels
             {
                 if(preImportanceValues[laneIdx] > 0.0)
                 {
-                    prismVolume[laneIdx]
-                        = static_cast<double>(mesh.triangleSurfaces[triangle[laneIdx]]) * mesh.thickness;
+                    prismVolume[laneIdx] = mesh.getCellVolume(prism[laneIdx]);
                     safePreImportanceValues[laneIdx] = preImportanceValues[laneIdx];
                 }
             }

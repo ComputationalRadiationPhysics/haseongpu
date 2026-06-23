@@ -118,6 +118,22 @@ EXPLICIT_SAMPLE_POINTS_SPEC = FieldSpec(
     backendRequired=False,
 )
 DYNAMIC_FIELD_NAMES = {"betaVolume", "pointBeta"}
+EXPLICIT_BETA_VOLUME_SPEC = FieldSpec(
+    "betaVolume",
+    "beta_volume",
+    ("cell",),
+    np.float64,
+    lambda context: (context.numberOfCells,),
+    dynamic=True,
+)
+EXPLICIT_POINT_BETA_SPEC = FieldSpec(
+    "pointBeta",
+    "point_beta",
+    ("sample_point",),
+    np.float64,
+    lambda context: (context.numberOfSamplePoints,),
+    dynamic=True,
+)
 
 
 def _env_flag(name):
@@ -388,6 +404,14 @@ def _write_artifact_manifest(path: Path, *, backend, input_path, output_path, in
 
 def _fieldContext(gainMedium):
     topology = gainMedium.topology
+    if hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells"):
+        return SimpleNamespace(
+            numberOfPoints=topology.numberOfPoints,
+            numberOfTriangles=topology.numberOfCells,
+            numberOfCells=topology.numberOfCells,
+            numberOfLevels=1,
+            numberOfSamplePoints=topology.numberOfSamplePoints,
+        )
     topology._require_levels()
     if topology.thickness is None:
         raise ValueError("topology thickness is required before running a simulation")
@@ -418,9 +442,19 @@ def _attributeFields(phiAse, gainMedium, crossSections):
 def _attributeValues(phiAse, gainMedium, crossSections):
     _validatePhiAseTransportOptions(phiAse)
     context = _fieldContext(gainMedium)
-    number_of_samples = context.numberOfPoints * context.numberOfLevels
+    number_of_samples = getattr(context, "numberOfSamplePoints", context.numberOfPoints * context.numberOfLevels)
     values = {}
-    values.update(gainMedium.topology.openPmdAttributes(context))
+    if hasattr(gainMedium.topology, "openPmdAttributes"):
+        values.update(gainMedium.topology.openPmdAttributes(context))
+    else:
+        values.update(
+            {
+                "numberOfPoints": context.numberOfPoints,
+                "numberOfTriangles": context.numberOfCells,
+                "numberOfLevels": 1,
+                "thickness": 0.0,
+            }
+        )
     values.update(gainMedium.openPmdAttributes(context))
     values.update(crossSections.openPmdAttributes())
     values.update(phiAse.openPmdAttributes(numberOfSamples=number_of_samples))
@@ -826,7 +860,7 @@ def _write_explicit_static_topology(iteration, topology):
     sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
 
     def backend_flat(values):
-        return np.asarray(values).reshape(-1, order="F")
+        return np.asarray(values).reshape(-1)
 
     for spec, values in (
         (CANONICAL_CONNECTIVITY_SPEC, topology.cellsConnectivityFlat()),

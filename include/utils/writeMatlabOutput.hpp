@@ -32,8 +32,8 @@
  * @param ase the phi_ASE values to print
  * @param N_rays the number of rays used per sample point
  * @param mse_values the error for each sample point
- * @param numberOfSamples the amount of vertices that were sampled in the mesh (over all levels)
- * @param numberOfLevels the amount of levels in which the gain medium was split
+ * @param numberOfSamples the amount of sampled points in the mesh
+ * @param columnCount output column count for reshape-style post-processing
  *
  * @author Carlchristian Eckert
  * @author Erik Zenker
@@ -49,5 +49,5 @@ namespace hase::utils
         std::vector<unsigned> const N_rays,
         std::vector<double> const mse_values,
         unsigned const numberOfSamples,
-        unsigned const numberOfLevels);
+        unsigned const columnCount);
 } // namespace hase::utils

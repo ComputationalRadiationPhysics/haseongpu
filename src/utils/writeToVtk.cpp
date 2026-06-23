@@ -49,78 +49,52 @@ namespace hase::utils
         float const runtime,
         std::string const vtkType)
     {
-        std::vector<double> const& vertexCoordinates = mesh.points;
-        std::vector<unsigned> const& triangles = mesh.trianglePointIndices;
-        float const thicknessOfLevel = mesh.thickness;
-        unsigned const verticesPerLevel = mesh.numberOfPoints;
-        unsigned const trianglesPerLevel = mesh.numberOfTriangles;
-        unsigned const numberOfLevels = mesh.numberOfLevels;
-        unsigned const numberOfCells = trianglesPerLevel * (numberOfLevels - 1);
-        unsigned const numberOfVertices = numberOfLevels * verticesPerLevel;
-
-        // Construct experiment information
-        unsigned r = useReflections ? mesh.getMaxReflections() : 0;
-
-        // Add time to filename
         hase::core::dout(V_INFO) << "Write experiment data to vtk-file " << filename << std::endl;
 
         std::ofstream vtkFile;
         vtkFile.open(filename);
 
-        // Write header of vtk file
         vtkFile << "# vtk DataFile Version 2.0" << std::endl;
-        vtkFile << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=" << r
-                << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime << std::endl;
+        vtkFile << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=0"
+                << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime
+                << " REQUESTED_REFLECTIONS=" << useReflections << std::endl;
         vtkFile << "ASCII" << std::endl;
-
-        // Write point data
         vtkFile << "DATASET UNSTRUCTURED_GRID" << std::endl;
-        vtkFile << "POINTS " << verticesPerLevel * numberOfLevels << " float" << std::endl;
-        for(unsigned level_i = 0; level_i < numberOfLevels; ++level_i)
+
+        vtkFile << "POINTS " << mesh.numberOfPoints << " float" << std::endl;
+        for(unsigned point = 0u; point < mesh.numberOfPoints; ++point)
         {
-            for(unsigned point_i = 0; point_i < verticesPerLevel; ++point_i)
+            vtkFile << std::fixed << std::setprecision(6) << mesh.points.at(point) << " "
+                    << mesh.points.at(point + mesh.numberOfPoints) << " "
+                    << mesh.points.at(point + 2u * mesh.numberOfPoints) << std::endl;
+        }
+
+        vtkFile << "CELLS " << mesh.numberOfCells << " " << mesh.numberOfCells * 7u << std::endl;
+        for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
+        {
+            vtkFile << "6";
+            for(unsigned localVertex = 0u; localVertex < hase::core::prism6VertexCount; ++localVertex)
             {
-                vtkFile << std::fixed << std::setprecision(6) << vertexCoordinates[point_i] << " "
-                        << vertexCoordinates[point_i + verticesPerLevel] << " " << level_i * thicknessOfLevel
-                        << std::endl;
+                vtkFile << " " << mesh.cellPointIndices.at(cell * hase::core::prism6VertexCount + localVertex);
             }
+            vtkFile << std::endl;
         }
 
-        // Write cell data
-        vtkFile << "CELLS" << " " << numberOfCells << " " << numberOfCells * 7 << std::endl;
-        for(unsigned level_i = 0; level_i < (numberOfLevels - 1); ++level_i)
+        vtkFile << "CELL_TYPES " << mesh.numberOfCells << std::endl;
+        for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
         {
-            for(unsigned triangle_i = 0; triangle_i < trianglesPerLevel; ++triangle_i)
-            {
-                vtkFile << "6 " << level_i * verticesPerLevel + triangles[triangle_i] << " "
-                        << level_i * verticesPerLevel + triangles[trianglesPerLevel + triangle_i] << " "
-                        << level_i * verticesPerLevel + triangles[2 * trianglesPerLevel + triangle_i] << " "
-                        << (level_i + 1) * verticesPerLevel + triangles[triangle_i] << " "
-                        << (level_i + 1) * verticesPerLevel + triangles[trianglesPerLevel + triangle_i] << " "
-                        << (level_i + 1) * verticesPerLevel + triangles[2 * trianglesPerLevel + triangle_i]
-                        << std::endl;
-            }
+            vtkFile << mesh.cellTypes.at(cell) << std::endl;
         }
 
-        // Write cell type
-        vtkFile << "CELL_TYPES " << numberOfCells << std::endl;
-        for(unsigned i = 0; i < numberOfCells; ++i)
-        {
-            // 13 is the VTK type for this kind of cell (prism/wedge)
-            vtkFile << "13" << std::endl;
-        }
-
-        // Write data
-        vtkFile << vtkType << " " << numberOfVertices << std::endl;
+        vtkFile << vtkType << " " << data.size() << std::endl;
         vtkFile << "SCALARS scalars float 1" << std::endl;
         vtkFile << "LOOKUP_TABLE default" << std::endl;
-        for(unsigned i = 0; i < numberOfVertices; ++i)
+        for(double const value : data)
         {
-            vtkFile << std::fixed << std::setprecision(6) << data.at(i) << std::endl;
+            vtkFile << std::fixed << std::setprecision(6) << value << std::endl;
         }
 
         vtkFile.close();
-
         return 0;
     }
 

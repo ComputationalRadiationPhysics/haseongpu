@@ -21,17 +21,8 @@
 
 #pragma once
 
-#include <core/mesh.hpp>
-#include <core/types.hpp>
-
-#include <vector>
-#pragma once
-
-namespace hase::internal
-{
-    struct BaseVersionSerialContext;
-    struct PointM;
-} // namespace hase::internal
+#include <cstdint>
+#include <limits>
 
 namespace hase::core
 {
@@ -48,13 +39,6 @@ namespace hase::core
         void operator()(uint32_t minSampleI = 0, uint32_t maxSampleI = std::numeric_limits<uint32_t>::max());
 
     private:
-        void mainLoop(
-            internal::BaseVersionSerialContext& ctx,
-            std::vector<internal::PointM> const& points,
-            std::vector<double>& betaCells,
-            float hostCrystalFluorescence,
-            uint32_t minSampleI,
-            uint32_t maxSampleI);
         ExperimentParameters const& m_experiment;
         HostMesh& m_mesh;
         Result& m_result;

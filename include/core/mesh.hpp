@@ -41,6 +41,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <utility>
 #include <vector>
 #define REFLECTION_SMALL 1E-3
@@ -49,6 +50,10 @@
 
 namespace hase::core
 {
+    constexpr unsigned prism6VertexCount = 6u;
+    constexpr unsigned prism6FaceCount = 5u;
+    constexpr unsigned prism6FaceWidth = 4u;
+    constexpr unsigned vtkWedgeCellType = 13u;
 
     template<class T, class B, class E>
     inline void assertRange(
@@ -105,32 +110,6 @@ namespace hase::core
         return maxDistance;
     }
 
-    template<typename Mesh>
-    [[nodiscard]] constexpr float getReflectivity(ReflectionPlane reflectionPlane, unsigned triangle, Mesh const& mesh)
-    {
-        switch(reflectionPlane)
-        {
-        case BOTTOM_REFLECTION:
-            return mesh.reflectivities[triangle];
-        case TOP_REFLECTION:
-            return mesh.reflectivities[triangle + mesh.numberOfTriangles];
-        }
-        return 0.0f;
-    }
-
-    template<typename Mesh>
-    [[nodiscard]] constexpr float getReflectionAngle(ReflectionPlane reflectionPlane, Mesh const& mesh)
-    {
-        switch(reflectionPlane)
-        {
-        case BOTTOM_REFLECTION:
-            return mesh.totalReflectionAngles[0];
-        case TOP_REFLECTION:
-            return mesh.totalReflectionAngles[1];
-        }
-        return 0.0f;
-    }
-
     inline double calculateMaxDiameter(double const* points, unsigned const offset)
     {
         TwoDimPoint minX = {DBL_MAX, 0};
@@ -165,375 +144,217 @@ namespace hase::core
     {
         std::span<double const> points;
         std::span<double const> betaVolume;
-        std::span<double const> normalVec;
-        std::span<double const> centers;
-        std::span<float const> triangleSurfaces;
-        std::span<int const> forbiddenEdge;
         std::span<double const> betaCells;
         std::span<unsigned const> claddingCellTypes;
         std::span<float const> refractiveIndices;
         std::span<float const> reflectivities;
         std::span<float const> totalReflectionAngles;
-        std::span<unsigned const> trianglePointIndices;
-        std::span<int const> triangleNeighbors;
-        std::span<unsigned const> triangleNormalPoint;
+        std::span<unsigned const> cellPointIndices;
+        std::span<unsigned const> cellTypes;
+        std::span<int const> cellFaces;
+        std::span<int const> cellNeighborCells;
+        std::span<int const> cellNeighborLocalFaces;
+        std::span<int const> cellFaceBoundaries;
+        std::span<float const> cellVolumes;
+        std::span<double const> cellCenters;
+        std::span<double const> samplePoints;
 
         double claddingAbsorption;
-        float surfaceTotal;
-        float thickness;
         float nTot;
         float crystalTFluo;
-        unsigned numberOfTriangles;
-        unsigned numberOfLevels;
+        unsigned claddingNumber;
+        unsigned numberOfCells;
         unsigned numberOfPrisms;
         unsigned numberOfPoints;
         unsigned numberOfSamples;
-        unsigned claddingNumber;
+        unsigned numberOfFacesPerCell;
+        unsigned numberOfCellVertices;
 
-        [[nodiscard]] ALPAKA_FN_ACC int getNeighbor(unsigned triangle, int edge) const
+        [[nodiscard]] ALPAKA_FN_ACC Point getPoint(unsigned pointIndex) const
         {
-            return triangleNeighbors[triangle + edge * numberOfTriangles];
+            return Point{
+                points[pointIndex],
+                points[pointIndex + numberOfPoints],
+                points[pointIndex + 2u * numberOfPoints]};
         }
 
-        ALPAKA_FN_ACC Point genRndPoint(
-            Point& origin,
-            unsigned triangle,
-            unsigned level,
+        [[nodiscard]] ALPAKA_FN_ACC Point getCellPoint(unsigned cell, unsigned localVertex) const
+        {
+            return getPoint(cellPointIndices[cell * numberOfCellVertices + localVertex]);
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC int getCellFacePoint(unsigned cell, unsigned localFace, unsigned localVertex) const
+        {
+            return cellFaces[(cell * numberOfFacesPerCell + localFace) * prism6FaceWidth + localVertex];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC int getCellNeighbor(unsigned cell, unsigned localFace) const
+        {
+            return cellNeighborCells[cell * numberOfFacesPerCell + localFace];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC int getCellNeighborLocalFace(unsigned cell, unsigned localFace) const
+        {
+            return cellNeighborLocalFaces[cell * numberOfFacesPerCell + localFace];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC double getBetaVolume(unsigned cell) const
+        {
+            return betaVolume[cell];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC unsigned getCellType(unsigned cell) const
+        {
+            return claddingCellTypes[cell];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC double tetraVolume(
+            Point const a,
+            Point const b,
+            Point const c,
+            Point const d) const
+        {
+            return alpaka::math::abs(dot(cross(b - a, c - a), d - a)) / 6.0;
+        }
+
+        ALPAKA_FN_ACC Point genRndPointInTetra(
+            Point const a,
+            Point const b,
+            Point const c,
+            Point const d,
             alpaka::rand::engine::Philox4x32x10& rndEngine) const
         {
-            Point startPoint = {0, 0, 0};
+            double r0 = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
+            double r1 = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
+            double r2 = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
+            double r3 = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
+            r0 = -alpaka::math::log(alpaka::math::max(r0, std::numeric_limits<double>::min()));
+            r1 = -alpaka::math::log(alpaka::math::max(r1, std::numeric_limits<double>::min()));
+            r2 = -alpaka::math::log(alpaka::math::max(r2, std::numeric_limits<double>::min()));
+            r3 = -alpaka::math::log(alpaka::math::max(r3, std::numeric_limits<double>::min()));
+            double const invSum = 1.0 / (r0 + r1 + r2 + r3);
+            return a * (r0 * invSum) + b * (r1 * invSum) + c * (r2 * invSum) + d * (r3 * invSum);
+        }
 
-            double u = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
-            double v = alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
+        ALPAKA_FN_ACC Point genRndPointInCell(
+            Point& origin,
+            unsigned cell,
+            alpaka::rand::engine::Philox4x32x10& rndEngine) const
+        {
+            Point const p0 = getCellPoint(cell, 0u);
+            Point const p1 = getCellPoint(cell, 1u);
+            Point const p2 = getCellPoint(cell, 2u);
+            Point const p3 = getCellPoint(cell, 3u);
+            Point const p4 = getCellPoint(cell, 4u);
+            Point const p5 = getCellPoint(cell, 5u);
 
-            if((u + v) > 1.0)
-            {
-                u = 1.0 - u;
-                v = 1.0 - v;
-            }
+            double const v0 = tetraVolume(p0, p1, p2, p3);
+            double const v1 = tetraVolume(p1, p2, p4, p3);
+            double const v2 = tetraVolume(p2, p4, p5, p3);
+            double const draw = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * (v0 + v1 + v2);
 
-            double w = 1.0 - u - v;
-            unsigned t1 = trianglePointIndices[triangle];
-            unsigned t2 = trianglePointIndices[triangle + numberOfTriangles];
-            unsigned t3 = trianglePointIndices[triangle + 2 * numberOfTriangles];
-
-            startPoint.z = level * thickness + alpaka::rand::distribution::UniformReal<double>{}(rndEngine) *thickness;
-            startPoint.x = (points[t1] * u) + (points[t2] * v) + (points[t3] * w);
-            startPoint.y = (points[t1 + numberOfPoints] * u) + (points[t2 + numberOfPoints] * v)
-                           + (points[t3 + numberOfPoints] * w);
+            Point startPoint = draw < v0 ? genRndPointInTetra(p0, p1, p2, p3, rndEngine)
+                               : draw < v0 + v1
+                                   ? genRndPointInTetra(p1, p2, p4, p3, rndEngine)
+                                   : genRndPointInTetra(p2, p4, p5, p3, rndEngine);
             if((origin - startPoint).euclidLength() < SMALL)
             {
-                // regenerate ray point if two close to origin point
-                // -> fixes numerical instability 1/inf issue yet causes small calculation bias
-                return genRndPoint(origin, triangle, level, rndEngine);
+                return genRndPointInCell(origin, cell, rndEngine);
             }
             return startPoint;
         }
 
-        [[nodiscard]] ALPAKA_FN_ACC double getBetaVolume(unsigned triangle, unsigned level) const
+        [[nodiscard]] ALPAKA_FN_ACC Point getSamplePoint(unsigned sampleIndex) const
         {
-            return betaVolume[triangle + level * numberOfTriangles];
+            return Point{
+                samplePoints[sampleIndex],
+                samplePoints[sampleIndex + numberOfSamples],
+                samplePoints[sampleIndex + 2u * numberOfSamples]};
         }
 
-        [[nodiscard]] ALPAKA_FN_ACC double getBetaVolume(unsigned prism) const
+        [[nodiscard]] ALPAKA_FN_ACC Point getCellCenterPoint(unsigned cell) const
         {
-            return betaVolume[prism];
+            return Point{
+                cellCenters[cell],
+                cellCenters[cell + numberOfCells],
+                cellCenters[cell + 2u * numberOfCells]};
         }
 
-        ALPAKA_FN_ACC NormalRay getNormal(unsigned triangle, int edge) const
+        [[nodiscard]] ALPAKA_FN_ACC double getCellVolume(unsigned cell) const
         {
-            NormalRay ray = {{0, 0}, {0, 0}};
-            int offset = edge * numberOfTriangles + triangle;
-
-            ray.p.x = points[triangleNormalPoint[offset]];
-            ray.p.y = points[triangleNormalPoint[offset] + numberOfPoints];
-            ray.dir.x = normalVec[offset];
-            ray.dir.y = normalVec[offset + 3 * numberOfTriangles];
-
-            return ray;
-        }
-
-        ALPAKA_FN_ACC Point getSamplePoint(unsigned sample_i) const
-        {
-            Point p = {0, 0, 0};
-            unsigned level = sample_i / numberOfPoints;
-            unsigned pos = sample_i - (numberOfPoints * level);
-
-            p.z = level * thickness;
-            p.x = points[pos];
-            p.y = points[pos + numberOfPoints];
-
-            return p;
-        }
-
-        ALPAKA_FN_ACC alpaka::concepts::Simd auto getSimdCenterPoint(
-            alpaka::concepts::Simd auto triangles,
-            alpaka::concepts::Simd auto level) const
-        {
-            constexpr uint32_t width = ALPAKA_TYPEOF(triangles)::width();
-            alpaka::concepts::Simd auto points = alpaka::Simd<Point, width>::fill(Point{0, 0, 0});
-            for(uint32_t laneIdx = 0; laneIdx < width; ++laneIdx)
-            {
-                points[laneIdx].x = centers[triangles[laneIdx]];
-                points[laneIdx].y = centers[triangles[laneIdx] + numberOfTriangles];
-                points[laneIdx].z = (level[laneIdx] + 0.5f) * thickness;
-            }
-            return points;
-        }
-
-        ALPAKA_FN_ACC Point getCenterPoint(unsigned triangle, unsigned level) const
-        {
-            Point p = {0, 0, (level + 0.5f) * thickness};
-            p.x = centers[triangle];
-            p.y = centers[triangle + numberOfTriangles];
-            return p;
-        }
-
-        [[nodiscard]] ALPAKA_FN_ACC int getForbiddenEdge(unsigned triangle, int edge) const
-        {
-            return forbiddenEdge[edge * numberOfTriangles + triangle];
-        }
-
-        [[nodiscard]] ALPAKA_FN_ACC unsigned getCellType(unsigned triangle) const
-        {
-            return claddingCellTypes[triangle];
-        }
-
-        ALPAKA_FN_ACC void test() const
-        {
-            printf("Constants:\n");
-            printf("claddingAbsorption: %f\n", claddingAbsorption);
-            printf("surfaceTotal: %f\n", surfaceTotal);
-            printf("thickness: %f\n", thickness);
-            printf("nTot: %f\n", nTot);
-            printf("crystalTFluo: %f\n", crystalTFluo);
-            printf("numberOfTriangles: %u\n", numberOfTriangles);
-            printf("numberOfLevels: %u\n", numberOfLevels);
-            printf("numberOfPrisms: %u\n", numberOfPrisms);
-            printf("numberOfPoints: %u\n", numberOfPoints);
-            printf("numberOfSamples: %u\n", numberOfSamples);
-            printf("claddingNumber: %u\n", claddingNumber);
+            return static_cast<double>(cellVolumes[cell]);
         }
     };
-    template<alpaka::onHost::concepts::Device T_Device>
-    class DeviceMeshContainer;
 
-    /**
-     * @brief fills a device mesh with the correct datastructures
-     *
-     * See parseMultiGPU for details on the parameters
-     */
-    template<alpaka::onHost::concepts::Device T_Device>
-    DeviceMeshContainer<T_Device> createMesh(
-        T_Device& device,
-        std::vector<unsigned> const& triangleIndices,
-        unsigned const numberOfTriangles,
-        unsigned const numberOfLevels,
-        unsigned const numberOfPoints,
-        float const thicknessOfPrism,
-        std::vector<double>& pointsVector,
-        std::vector<double>& xOfTriangleCenter,
-        std::vector<double>& yOfTriangleCenter,
-        std::vector<unsigned>& positionsOfNormalVectors,
-        std::vector<double>& xOfNormals,
-        std::vector<double>& yOfNormals,
-        std::vector<int>& forbiddenVector,
-        std::vector<int>& neighborsVector,
-        std::vector<float>& surfacesVector,
-        std::vector<double>& betaValuesVector,
-        std::vector<double>& betaCells,
-        std::vector<unsigned>& cellTypes,
-        std::vector<float>& refractiveIndices,
-        std::vector<float>& reflectivities,
-        std::vector<float>& totalReflectionAngles,
-        float const nTot,
-        float const crystalFluorescence,
-        unsigned const cladNumber,
-        double const cladAbsorption
-
-    )
-    {
-        // GPU variables
-        double totalSurface = 0.;
-        totalSurface += std::reduce(surfacesVector.begin(), surfacesVector.begin() + numberOfTriangles, 0.0);
-
-        // Vector Preprocessing
-        std::vector<double> hostNormalVec(xOfNormals.begin(), xOfNormals.end());
-        hostNormalVec.insert(hostNormalVec.end(), yOfNormals.begin(), yOfNormals.end());
-        std::vector<double> hostCenters(xOfTriangleCenter.begin(), xOfTriangleCenter.end());
-        hostCenters.insert(hostCenters.end(), yOfTriangleCenter.begin(), yOfTriangleCenter.end());
-
-
-        return {
-            device,
-            cladAbsorption,
-            static_cast<float>(totalSurface), // this cast might needlessly cause precision loss
-            thicknessOfPrism,
-            nTot,
-            crystalFluorescence,
-            numberOfTriangles,
-            numberOfLevels,
-            numberOfTriangles * (numberOfLevels - 1),
-            numberOfPoints,
-            numberOfPoints * numberOfLevels,
-            cladNumber,
-            pointsVector,
-            hostNormalVec,
-            betaValuesVector,
-            hostCenters,
-            surfacesVector,
-            forbiddenVector,
-            betaCells,
-            cellTypes,
-            refractiveIndices,
-            reflectivities,
-            totalReflectionAngles,
-            triangleIndices,
-            neighborsVector,
-            positionsOfNormalVectors};
-    }
-
-    /**
-     * @brief Contains the structure of the crystal
-     *
-     * All the fixed values of how the crystal is meshed
-     *
-     * points The coordinates of the triangle vertices
-     *        All x coordinates followed by all of the y coordinates of the triangle vertices
-     *        structure: [x_1, x_2, ... x_n, y_1, y_2, ... y_n] (n == numberOfPoints)
-     *
-     * betaVolume beta values for all prisms ordered accordingly to the prismIDs:
-     *            prismID = triangleID + layer * numberOfTriangles;
-     *            therefore, all betaVolume for a layer are grouped together
-     *
-     * normalVec the normal vectors for each triangle edge
-     *           first half (size: 3*numberOfTriangles -> one for each side) contains
-     *           the x components of each vector, second half contains the y components.
-     *           the each half is ordered as follows:
-     *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
-     *           i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
-     *
-     * centers the coordinates of the center points for each triangle
-     *         All x coordinates followed by all y coordinates of the triangle vertices
-     *         similar to "points"
-     *
-     * triangleSurfaces the sizes of the surfaces of each triangle, ordered by the triangleID
-     *
-     * forbiddenEdge  describes the relation of edge indices of adjacent triangles
-     *           -1 means, there is no adjacent triangle to that edge
-     *           0,1,2 describes the index of the edge as seen from the ADJACENT triangle
-     *
-     *           order of data is similar to normalVec:
-     *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
-     *           i.e. all first edges of each triangle, followed by all second edges of each triangle and so on.
-     *
-     * trianglesPointIndices contains the indices to access the "points" datastructure
-     *           (each triangle has 3 points as vertices). Each entry is an
-     *           index from 0 to numberOfPoints, corresponding to the positions
-     *           of a vertex in "points".
-     *           structure is similar to "forbiddenEdge":
-     *           [ triangle1A, triangle2A, ... triangleNA, triangle1B, triangle2B, ... triangleNB, triangle1C, ... ]
-     *           i.e. for triangles with vertices A,B,C there are all the indices
-     *           of the A-vertices, followed by all the B and C vertices.
-     *
-     * triangleNeighbors describes the relation of triangle indices to each other.
-     *           Each entry corresponds to a triangleID (see "trianglePointIndices") which
-     *           is adjacent to the current triangle.
-     *           structure is similar to "forbiddenEdge":
-     *           [ triangle1edge0, triangle2edge0, ... triangleNedge0, triangle1edge1, triangle2edge1, ... ]
-     *
-     * triangleNormalPoint contains indices to the x and y components of the positions where the
-     *             normalVectors start (see normalVec). For each Triangle 3 points (3 sides)
-     *             are stored in this list.
-     *             Indices point to locations in "points" (i.e. normal vectors start at
-     *             triangle vertices!)
-     *             structure is VERY similar to trianglePointIndices:
-     *             [ triangle1p0, triangle2p0, ... triangleNp0, triangle1p1, triangle2p1, ... ]
-     *
-     * refractiveIndices [0]->bottomInside, [1]->bottomOutside, [2]->topInside, [3]->topOutside
-     *
-     * reflectivities Contains the reflectivities for upper and lower surface of gain medium
-     *                Structure is based on 2 layers of triangles:
-     *                [refl_tri1_bott, refl_tri2_bott, ...,refl_triN_bott, refl_tri1_top, refl_tri2_top, ...,
-     * refl_triN_top]
-     *
-     * totalReflectionAngles [0]-> bottomTotalReflectionAngle, [1]-> topTotalReflectionAngle
-     */
     template<alpaka::onHost::concepts::Device T_Device>
     class DeviceMeshContainer
     {
-        using T_Extent = alpaka::Vec<std::size_t, 1>;
         using T_Queue = ALPAKA_TYPEOF(std::declval<T_Device>().makeQueue(alpaka::queueKind::blocking));
 
     public:
         DeviceMeshContainer(
             T_Device device,
             double claddingAbsorption,
-            float surfaceTotal,
-            float thickness,
             float nTot,
             float crystalTFluo,
-            unsigned numberOfTriangles,
-            unsigned numberOfLevels,
-            unsigned numberOfPrisms,
+            unsigned claddingNumber,
+            unsigned numberOfCells,
             unsigned numberOfPoints,
             unsigned numberOfSamples,
-            unsigned claddingNumber,
+            unsigned numberOfFacesPerCell,
+            unsigned numberOfCellVertices,
             std::vector<double> points,
-            std::vector<double> normalVec,
             std::vector<double> betaVolume,
-            std::vector<double> centers,
-            std::vector<float> triangleSurfaces,
-            std::vector<int> forbiddenEdge,
             std::vector<double> betaCells,
             std::vector<unsigned> claddingCellTypes,
             std::vector<float> refractiveIndices,
             std::vector<float> reflectivities,
             std::vector<float> totalReflectionAngles,
-            std::vector<unsigned> trianglePointIndices,
-            std::vector<int> triangleNeighbors,
-            std::vector<unsigned> triangleNormalPoint)
+            std::vector<unsigned> cellPointIndices,
+            std::vector<unsigned> cellTypes,
+            std::vector<int> cellFaces,
+            std::vector<int> cellNeighborCells,
+            std::vector<int> cellNeighborLocalFaces,
+            std::vector<int> cellFaceBoundaries,
+            std::vector<float> cellVolumes,
+            std::vector<double> cellCenters,
+            std::vector<double> samplePoints)
             : m_device(device)
             , m_queue(device.makeQueue(alpaka::queueKind::blocking))
             , points(hase::alpakaUtils::toDevice(m_queue, points))
             , betaVolume(hase::alpakaUtils::toDevice(m_queue, betaVolume))
-            , normalVec(hase::alpakaUtils::toDevice(m_queue, normalVec))
-            , centers(hase::alpakaUtils::toDevice(m_queue, centers))
-            , triangleSurfaces(hase::alpakaUtils::toDevice(m_queue, triangleSurfaces))
-            , forbiddenEdge(hase::alpakaUtils::toDevice(m_queue, forbiddenEdge))
             , betaCells(hase::alpakaUtils::toDevice(m_queue, betaCells))
             , claddingCellTypes(hase::alpakaUtils::toDevice(m_queue, claddingCellTypes))
             , refractiveIndices(hase::alpakaUtils::toDevice(m_queue, refractiveIndices))
             , reflectivities(hase::alpakaUtils::toDevice(m_queue, reflectivities))
             , totalReflectionAngles(hase::alpakaUtils::toDevice(m_queue, totalReflectionAngles))
-            , trianglePointIndices(hase::alpakaUtils::toDevice(m_queue, trianglePointIndices))
-            , triangleNeighbors(hase::alpakaUtils::toDevice(m_queue, triangleNeighbors))
-            , triangleNormalPoint(hase::alpakaUtils::toDevice(m_queue, triangleNormalPoint))
+            , cellPointIndices(hase::alpakaUtils::toDevice(m_queue, cellPointIndices))
+            , cellTypes(hase::alpakaUtils::toDevice(m_queue, cellTypes))
+            , cellFaces(hase::alpakaUtils::toDevice(m_queue, cellFaces))
+            , cellNeighborCells(hase::alpakaUtils::toDevice(m_queue, cellNeighborCells))
+            , cellNeighborLocalFaces(hase::alpakaUtils::toDevice(m_queue, cellNeighborLocalFaces))
+            , cellFaceBoundaries(hase::alpakaUtils::toDevice(m_queue, cellFaceBoundaries))
+            , cellVolumes(hase::alpakaUtils::toDevice(m_queue, cellVolumes))
+            , cellCenters(hase::alpakaUtils::toDevice(m_queue, cellCenters))
+            , samplePoints(hase::alpakaUtils::toDevice(m_queue, samplePoints))
             , claddingAbsorption(claddingAbsorption)
-            , surfaceTotal(surfaceTotal)
-            , thickness(thickness)
             , nTot(nTot)
             , crystalTFluo(crystalTFluo)
-            , numberOfTriangles(numberOfTriangles)
-            , numberOfLevels(numberOfLevels)
-            , numberOfPrisms(numberOfPrisms)
+            , claddingNumber(claddingNumber)
+            , numberOfCells(numberOfCells)
+            , numberOfPrisms(numberOfCells)
             , numberOfPoints(numberOfPoints)
             , numberOfSamples(numberOfSamples)
-            , claddingNumber(claddingNumber)
+            , numberOfFacesPerCell(numberOfFacesPerCell)
+            , numberOfCellVertices(numberOfCellVertices)
         {
         }
-
-        ~DeviceMeshContainer() = default;
 
         [[nodiscard]] auto toView() const -> DeviceMeshView
         {
             return {
                 std::span<double const>(points.data(), points.getMdSpan().getExtents().x()),
                 std::span<double const>(betaVolume.data(), betaVolume.getMdSpan().getExtents().x()),
-                std::span<double const>(normalVec.data(), normalVec.getMdSpan().getExtents().x()),
-                std::span<double const>(centers.data(), centers.getMdSpan().getExtents().x()),
-                std::span<float const>(triangleSurfaces.data(), triangleSurfaces.getMdSpan().getExtents().x()),
-                std::span<int const>(forbiddenEdge.data(), forbiddenEdge.getMdSpan().getExtents().x()),
                 std::span<double const>(betaCells.data(), betaCells.getMdSpan().getExtents().x()),
                 std::span<unsigned const>(claddingCellTypes.data(), claddingCellTypes.getMdSpan().getExtents().x()),
                 std::span<float const>(refractiveIndices.data(), refractiveIndices.getMdSpan().getExtents().x()),
@@ -541,24 +362,27 @@ namespace hase::core
                 std::span<float const>(
                     totalReflectionAngles.data(),
                     totalReflectionAngles.getMdSpan().getExtents().x()),
-                std::span<unsigned const>(
-                    trianglePointIndices.data(),
-                    trianglePointIndices.getMdSpan().getExtents().x()),
-                std::span<int const>(triangleNeighbors.data(), triangleNeighbors.getMdSpan().getExtents().x()),
-                std::span<unsigned const>(
-                    triangleNormalPoint.data(),
-                    triangleNormalPoint.getMdSpan().getExtents().x()),
+                std::span<unsigned const>(cellPointIndices.data(), cellPointIndices.getMdSpan().getExtents().x()),
+                std::span<unsigned const>(cellTypes.data(), cellTypes.getMdSpan().getExtents().x()),
+                std::span<int const>(cellFaces.data(), cellFaces.getMdSpan().getExtents().x()),
+                std::span<int const>(cellNeighborCells.data(), cellNeighborCells.getMdSpan().getExtents().x()),
+                std::span<int const>(
+                    cellNeighborLocalFaces.data(),
+                    cellNeighborLocalFaces.getMdSpan().getExtents().x()),
+                std::span<int const>(cellFaceBoundaries.data(), cellFaceBoundaries.getMdSpan().getExtents().x()),
+                std::span<float const>(cellVolumes.data(), cellVolumes.getMdSpan().getExtents().x()),
+                std::span<double const>(cellCenters.data(), cellCenters.getMdSpan().getExtents().x()),
+                std::span<double const>(samplePoints.data(), samplePoints.getMdSpan().getExtents().x()),
                 claddingAbsorption,
-                surfaceTotal,
-                thickness,
                 nTot,
                 crystalTFluo,
-                numberOfTriangles,
-                numberOfLevels,
-                numberOfPrisms,
+                claddingNumber,
+                numberOfCells,
+                numberOfCells,
                 numberOfPoints,
                 numberOfSamples,
-                claddingNumber};
+                numberOfFacesPerCell,
+                numberOfCellVertices};
         }
 
         T_Device m_device;
@@ -571,79 +395,79 @@ namespace hase::core
         using T_Buffer = std::remove_cvref_t<decltype(hase::alpakaUtils::toDevice(
             std::declval<T_Queue const&>(),
             std::declval<std::vector<T_Data> const&>()))>;
+
         T_Buffer<double> points;
         T_Buffer<double> betaVolume;
-        T_Buffer<double> normalVec;
-        T_Buffer<double> centers;
-        T_Buffer<float> triangleSurfaces;
-        T_Buffer<int> forbiddenEdge;
         T_Buffer<double> betaCells;
         T_Buffer<unsigned> claddingCellTypes;
         T_Buffer<float> refractiveIndices;
         T_Buffer<float> reflectivities;
         T_Buffer<float> totalReflectionAngles;
-        T_Buffer<unsigned> trianglePointIndices;
-        T_Buffer<int> triangleNeighbors;
-        T_Buffer<unsigned> triangleNormalPoint;
+        T_Buffer<unsigned> cellPointIndices;
+        T_Buffer<unsigned> cellTypes;
+        T_Buffer<int> cellFaces;
+        T_Buffer<int> cellNeighborCells;
+        T_Buffer<int> cellNeighborLocalFaces;
+        T_Buffer<int> cellFaceBoundaries;
+        T_Buffer<float> cellVolumes;
+        T_Buffer<double> cellCenters;
+        T_Buffer<double> samplePoints;
 
         double claddingAbsorption;
-        float surfaceTotal;
-        float thickness;
         float nTot;
         float crystalTFluo;
-        unsigned numberOfTriangles;
-        unsigned numberOfLevels;
+        unsigned claddingNumber;
+        unsigned numberOfCells;
         unsigned numberOfPrisms;
         unsigned numberOfPoints;
         unsigned numberOfSamples;
-        unsigned claddingNumber;
+        unsigned numberOfFacesPerCell;
+        unsigned numberOfCellVertices;
     };
 
     class HostMesh
     {
     public:
-        std::vector<unsigned> trianglePointIndices;
-        unsigned numberOfTriangles;
-        unsigned numberOfLevels;
-        unsigned numberOfPoints;
-        float thickness;
         std::vector<double> points;
-        std::vector<double> triangleCenterX;
-        std::vector<double> triangleCenterY;
-        std::vector<unsigned> triangleNormalPoint;
-        std::vector<double> triangleNormalsX;
-        std::vector<double> triangleNormalsY;
-        std::vector<int> forbiddenEdge;
-        std::vector<int> triangleNeighbors;
-        std::vector<float> triangleSurfaces;
         std::vector<double> betaVolume;
         std::vector<double> betaCells;
         std::vector<unsigned> claddingCellTypes;
         std::vector<float> refractiveIndices;
         std::vector<float> reflectivities;
-        float nTot;
-        float crystalTFluo;
-        unsigned claddingNumber;
-        double claddingAbsorption;
         std::vector<float> totalReflectionAngles;
+        std::vector<unsigned> cellPointIndices;
+        std::vector<unsigned> cellTypes;
+        std::vector<int> cellFaces;
+        std::vector<int> cellNeighborCells;
+        std::vector<int> cellNeighborLocalFaces;
+        std::vector<int> cellFaceBoundaries;
+        std::vector<float> cellVolumes;
+        std::vector<double> cellCenters;
+        std::vector<double> samplePoints;
+        float nTot = 0.0f;
+        float crystalTFluo = 0.0f;
+        unsigned claddingNumber = 1u;
+        double claddingAbsorption = 0.0;
+        unsigned numberOfCells = 0u;
+        unsigned numberOfPrisms = 0u;
+        unsigned numberOfPoints = 0u;
+        unsigned numberOfSamples = 0u;
+        unsigned numberOfFacesPerCell = prism6FaceCount;
+        unsigned numberOfCellVertices = prism6VertexCount;
 
         HostMesh() = default;
 
         HostMesh(
-            std::vector<unsigned> trianglePointIndices,
-            unsigned numberOfTriangles,
-            unsigned numberOfLevels,
-            unsigned numberOfPoints,
-            float thickness,
+            std::vector<unsigned> cellPointIndices,
+            std::vector<unsigned> cellTypes,
+            std::vector<int> cellFaces,
+            std::vector<int> cellNeighborCells,
+            std::vector<int> cellNeighborLocalFaces,
+            std::vector<int> cellFaceBoundaries,
+            std::vector<float> cellVolumes,
             std::vector<double> points,
-            std::vector<double> triangleCenterX,
-            std::vector<double> triangleCenterY,
-            std::vector<unsigned> triangleNormalPoint,
-            std::vector<double> triangleNormalsX,
-            std::vector<double> triangleNormalsY,
-            std::vector<int> forbiddenEdge,
-            std::vector<int> triangleNeighbors,
-            std::vector<float> triangleSurfaces,
+            std::vector<double> samplePoints,
+            std::vector<double> cellCenters,
             std::vector<double> betaVolume,
             std::vector<double> betaCells,
             std::vector<unsigned> claddingCellTypes,
@@ -653,88 +477,74 @@ namespace hase::core
             float crystalTFluo,
             unsigned claddingNumber,
             double claddingAbsorption)
-            : trianglePointIndices(std::move(trianglePointIndices))
-            , numberOfTriangles(numberOfTriangles)
-            , numberOfLevels(numberOfLevels)
-            , numberOfPoints(numberOfPoints)
-            , thickness(thickness)
-            , points(std::move(points))
-            , triangleCenterX(std::move(triangleCenterX))
-            , triangleCenterY(std::move(triangleCenterY))
-            , triangleNormalPoint(std::move(triangleNormalPoint))
-            , triangleNormalsX(std::move(triangleNormalsX))
-            , triangleNormalsY(std::move(triangleNormalsY))
-            , forbiddenEdge(std::move(forbiddenEdge))
-            , triangleNeighbors(std::move(triangleNeighbors))
-            , triangleSurfaces(std::move(triangleSurfaces))
+            : points(std::move(points))
             , betaVolume(std::move(betaVolume))
             , betaCells(std::move(betaCells))
             , claddingCellTypes(std::move(claddingCellTypes))
             , refractiveIndices(std::move(refractiveIndices))
             , reflectivities(std::move(reflectivities))
+            , cellPointIndices(std::move(cellPointIndices))
+            , cellTypes(std::move(cellTypes))
+            , cellFaces(std::move(cellFaces))
+            , cellNeighborCells(std::move(cellNeighborCells))
+            , cellNeighborLocalFaces(std::move(cellNeighborLocalFaces))
+            , cellFaceBoundaries(std::move(cellFaceBoundaries))
+            , cellVolumes(std::move(cellVolumes))
+            , cellCenters(std::move(cellCenters))
+            , samplePoints(std::move(samplePoints))
             , nTot(nTot)
             , crystalTFluo(crystalTFluo)
             , claddingNumber(claddingNumber)
             , claddingAbsorption(claddingAbsorption)
+            , numberOfCells(static_cast<unsigned>(this->cellTypes.size()))
+            , numberOfPrisms(numberOfCells)
+            , numberOfPoints(static_cast<unsigned>(this->points.size() / 3u))
+            , numberOfSamples(static_cast<unsigned>(this->samplePoints.size() / 3u))
         {
         }
 
         void calcTotalReflectionAngles()
         {
-            std::vector<float> totalReflectionAngles_(refractiveIndices.size() / 2, 0);
-            for(unsigned i = 0; i < refractiveIndices.size(); i += 2)
+            std::vector<float> angles(refractiveIndices.size() / 2u, 0.0f);
+            for(unsigned i = 0; i + 1u < refractiveIndices.size(); i += 2u)
             {
-                totalReflectionAngles_.at(i / 2)
-                    = (180. / M_PI * alpaka::math::asin(refractiveIndices.at(i + 1) / refractiveIndices.at(i)));
+                angles.at(i / 2u)
+                    = 180.0f / static_cast<float>(M_PI)
+                      * alpaka::math::asin(refractiveIndices.at(i + 1u) / refractiveIndices.at(i));
             }
-            totalReflectionAngles = std::move(totalReflectionAngles_);
+            totalReflectionAngles = std::move(angles);
         }
 
         template<typename T_Device>
         [[nodiscard]] DeviceMeshContainer<T_Device> toDevice(T_Device& device)
         {
-            return createMesh(
+            return DeviceMeshContainer<T_Device>{
                 device,
-                trianglePointIndices,
-                numberOfTriangles,
-                numberOfLevels,
+                claddingAbsorption,
+                nTot,
+                crystalTFluo,
+                claddingNumber,
+                numberOfCells,
                 numberOfPoints,
-                thickness,
+                numberOfSamples,
+                numberOfFacesPerCell,
+                numberOfCellVertices,
                 points,
-                triangleCenterX,
-                triangleCenterY,
-                triangleNormalPoint,
-                triangleNormalsX,
-                triangleNormalsY,
-                forbiddenEdge,
-                triangleNeighbors,
-                triangleSurfaces,
                 betaVolume,
                 betaCells,
                 claddingCellTypes,
                 refractiveIndices,
                 reflectivities,
                 totalReflectionAngles,
-                nTot,
-                crystalTFluo,
-                claddingNumber,
-                claddingAbsorption);
-        }
-
-        [[nodiscard]] unsigned getMaxReflections(ReflectionPlane reflectionPlane) const
-        {
-            double d = calculateMaxDiameter(points.data(), numberOfPoints);
-            float alpha = getReflectionAngle(reflectionPlane, *this) * static_cast<float>(M_PI) / 180.0f;
-            double h = (numberOfLevels - 1u) * thickness;
-            double z = d / std::tan(alpha);
-            return static_cast<unsigned>(std::ceil(z / h));
-        }
-
-        [[nodiscard]] unsigned getMaxReflections() const
-        {
-            unsigned top = getMaxReflections(TOP_REFLECTION);
-            unsigned bottom = getMaxReflections(BOTTOM_REFLECTION);
-            return std::max(top, bottom);
+                 cellPointIndices,
+                 cellTypes,
+                 cellFaces,
+                cellNeighborCells,
+                cellNeighborLocalFaces,
+                cellFaceBoundaries,
+                 cellVolumes,
+                 cellCenters,
+                 samplePoints};
         }
     };
 

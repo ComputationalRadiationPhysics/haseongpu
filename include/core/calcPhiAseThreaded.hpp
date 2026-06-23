@@ -50,14 +50,13 @@
  *                         in case of adaptive sampling.
  * @param maxRepetitions   Number of Repetitions will
  *                         be done, when not reaching mse threshold
- * @param dMesh            All information about triangles, points, contants.
- *                         Is located in device memory. See mesh.h for details.
- * @param hMesh            Same as dMesh, but locatet in host memory.
+ * @param dMesh            Explicit 3D cell mesh in device memory.
+ * @param hMesh            Same as dMesh, but located in host memory.
  * @param sigmaA           Vector with Absorption values
  * @param sigmaE           Vector with Emission values
  * @param mseThreshold     Threshold for adaptive and repetitive sampling.
  *                         Not reaching this threshold leads to recomputations.
- * @param useReflections   Rays can reflect on upper and lower surface of gain medium
+ * @param useReflections   Whether reflective boundary propagation is requested.
  * @param phiAse           Reference to phiAse result (one value for every sample point).
  * @param mse              Reference to mse result (one value for every sample point).
  * @param totalRays        Reference to numberOfRays simulated per sample point.
