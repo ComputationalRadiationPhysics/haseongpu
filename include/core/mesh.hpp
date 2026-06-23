@@ -50,10 +50,10 @@
 
 namespace hase::core
 {
-    constexpr unsigned prism6VertexCount = 6u;
-    constexpr unsigned prism6FaceCount = 5u;
-    constexpr unsigned prism6FaceWidth = 4u;
-    constexpr unsigned vtkWedgeCellType = 13u;
+    constexpr unsigned tet4VertexCount = 4u;
+    constexpr unsigned tet4FaceCount = 4u;
+    constexpr unsigned tet4FaceWidth = 3u;
+    constexpr unsigned vtkTetraCellType = 10u;
 
     template<class T, class B, class E>
     inline void assertRange(
@@ -185,7 +185,7 @@ namespace hase::core
 
         [[nodiscard]] ALPAKA_FN_ACC int getCellFacePoint(unsigned cell, unsigned localFace, unsigned localVertex) const
         {
-            return cellFaces[(cell * numberOfFacesPerCell + localFace) * prism6FaceWidth + localVertex];
+            return cellFaces[(cell * numberOfFacesPerCell + localFace) * tet4FaceWidth + localVertex];
         }
 
         [[nodiscard]] ALPAKA_FN_ACC int getCellNeighbor(unsigned cell, unsigned localFace) const
@@ -245,18 +245,8 @@ namespace hase::core
             Point const p1 = getCellPoint(cell, 1u);
             Point const p2 = getCellPoint(cell, 2u);
             Point const p3 = getCellPoint(cell, 3u);
-            Point const p4 = getCellPoint(cell, 4u);
-            Point const p5 = getCellPoint(cell, 5u);
 
-            double const v0 = tetraVolume(p0, p1, p2, p3);
-            double const v1 = tetraVolume(p1, p2, p4, p3);
-            double const v2 = tetraVolume(p2, p4, p5, p3);
-            double const draw = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * (v0 + v1 + v2);
-
-            Point startPoint = draw < v0 ? genRndPointInTetra(p0, p1, p2, p3, rndEngine)
-                               : draw < v0 + v1
-                                   ? genRndPointInTetra(p1, p2, p4, p3, rndEngine)
-                                   : genRndPointInTetra(p2, p4, p5, p3, rndEngine);
+            Point startPoint = genRndPointInTetra(p0, p1, p2, p3, rndEngine);
             if((origin - startPoint).euclidLength() < SMALL)
             {
                 return genRndPointInCell(origin, cell, rndEngine);
@@ -452,8 +442,8 @@ namespace hase::core
         unsigned numberOfPrisms = 0u;
         unsigned numberOfPoints = 0u;
         unsigned numberOfSamples = 0u;
-        unsigned numberOfFacesPerCell = prism6FaceCount;
-        unsigned numberOfCellVertices = prism6VertexCount;
+        unsigned numberOfFacesPerCell = tet4FaceCount;
+        unsigned numberOfCellVertices = tet4VertexCount;
 
         HostMesh() = default;
 

@@ -898,11 +898,11 @@ class Grid:
 
 @dataclass
 class MeshTopology:
-    """Triangular base mesh extruded through z levels into wedge prisms.
+    """Planar triangular mesh with optional z-level metadata.
 
     ``points`` are transverse ``(x, y)`` coordinates. ``trianglePointIndices``
-    connect those points into the 2D base mesh. ``levels`` and ``thickness``
-    describe the z sampling used by ``betaCells`` and ``betaVolume``.
+    connect those points into the 2D base mesh. Runtime propagation uses
+    ``VolumeTopology`` Tet4 cells instead.
     """
 
     points: np.ndarray
@@ -956,35 +956,13 @@ class MeshTopology:
 
     @classmethod
     def fromVtk(cls, filename, *, numberOfLevels=None, thickness=None):
-        """Load topology from a legacy VTK wedge file."""
-        topology = topologyFromVtk(filename, cls)
-        if numberOfLevels is not None:
-            topology.numberOfLevels(numberOfLevels)
-        if thickness is not None:
-            topology.withThickness(thickness)
-        return topology
+        """MeshTopology VTK import is no longer supported for runtime geometry."""
+        raise NotImplementedError("MeshTopology VTK import was removed; use VolumeTopology.fromVtk for Tet4 volumes")
 
     @classmethod
     def fromFile(cls, filename, format=None, numberOfLevels=None, thickness=None):
-        """Load supported mesh formats: legacy VTK, planar STL, or gmsh."""
-        path = Path(filename)
-        mesh_format = (format or path.suffix.lstrip(".")).lower()
-        if mesh_format in {"vtk", "legacy-vtk"}:
-            return cls.fromVtk(path, numberOfLevels=numberOfLevels, thickness=thickness)
-        if mesh_format in {"stl", "ascii-stl", "binary-stl", "dea/stl", "dae/stl"}:
-            points, triangles = from_stl(path)
-            return cls(
-                points,
-                triangles,
-                levels=numberOfLevels,
-                metadata={"source": str(path), "format": mesh_format},
-            )
-        if mesh_format in {"msh", "gmsh"}:
-            gmsh = Gmsh.fromFile(path)
-            return cls.fromGmsh(gmsh, numberOfLevels=numberOfLevels, thickness=thickness)
-        raise NotImplementedError(
-            f"mesh format '{mesh_format}' is not supported yet; supported formats: vtk, stl, gmsh"
-        )
+        """MeshTopology file import is no longer supported for runtime geometry."""
+        raise NotImplementedError("MeshTopology file import was removed; use VolumeTopology.fromFile for Tet4 volumes")
 
     def numberOfLevels(self, levels):
         """Set the number of z sample planes and return ``self``."""
@@ -1035,7 +1013,7 @@ class MeshTopology:
 
     @property
     def numberOfTriangles(self):
-        """Number of base triangles, and therefore prisms per z interval."""
+        """Number of base triangles."""
         return int(self.trianglePointIndices.shape[0])
 
     @property
@@ -1045,7 +1023,7 @@ class MeshTopology:
 
     @property
     def numberOfPrisms(self):
-        """Total number of wedge prisms in the extruded mesh."""
+        """Compatibility count for triangle × z-interval cells."""
         self._require_levels()
         return self.numberOfTriangles * (self.levels - 1)
 
@@ -1151,17 +1129,23 @@ class GainMedium:
 
     def __post_init__(self):
         gmsh = self.topology.metadata.get("gmsh")
-        if isinstance(gmsh, Gmsh) and "claddingCellTypes" not in self.physical:
+        if (
+            isinstance(gmsh, Gmsh)
+            and not hasattr(self.topology, "cellPointIndices")
+            and "claddingCellTypes" not in self.physical
+        ):
             cladding = gmsh.claddingCellTypes(self.topology)
             if np.any(cladding):
                 self.physical["claddingCellTypes"] = cladding
 
     @classmethod
     def fromVtk(cls, filename, *, numberOfLevels=None, thickness=None):
-        """Load topology and physical fields from a legacy VTK wedge file."""
+        """Load Tet4 topology and physical fields from a VTK file."""
+        from .volume import VolumeTopology
+
         return gainMediumFromVtk(
             filename,
-            MeshTopology,
+            VolumeTopology,
             cls,
             numberOfLevels=numberOfLevels,
             thickness=thickness,
@@ -1169,13 +1153,13 @@ class GainMedium:
 
     @classmethod
     def fromFile(cls, filename, format=None, *, numberOfLevels=None, thickness=None):
-        """Load a gain medium; currently supports legacy VTK files."""
+        """Load a Tet4 gain medium from VTK."""
         path = Path(filename)
         mesh_format = (format or path.suffix.lstrip(".")).lower()
-        if mesh_format in {"vtk", "legacy-vtk"}:
+        if mesh_format in {"vtk"}:
             return cls.fromVtk(path, numberOfLevels=numberOfLevels, thickness=thickness)
         raise NotImplementedError(
-            f"gain medium format '{mesh_format}' is not supported yet; supported formats: vtk"
+            f"gain medium format '{mesh_format}' is not supported; supported formats: vtk"
         )
 
     def withPhysicalProperties(self, **properties):
@@ -1185,7 +1169,7 @@ class GainMedium:
         return self
 
     def toVtk(self, filename):
-        """Write this gain medium to a legacy ASCII VTK wedge file."""
+        """Write this Tet4 gain medium to an ASCII VTK file."""
         return writeGainMediumVtk(filename, self)
 
     def defineField(

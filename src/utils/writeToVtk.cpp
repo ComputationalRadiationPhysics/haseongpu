@@ -69,13 +69,13 @@ namespace hase::utils
                     << mesh.points.at(point + 2u * mesh.numberOfPoints) << std::endl;
         }
 
-        vtkFile << "CELLS " << mesh.numberOfCells << " " << mesh.numberOfCells * 7u << std::endl;
+        vtkFile << "CELLS " << mesh.numberOfCells << " " << mesh.numberOfCells * (hase::core::tet4VertexCount + 1u) << std::endl;
         for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
         {
-            vtkFile << "6";
-            for(unsigned localVertex = 0u; localVertex < hase::core::prism6VertexCount; ++localVertex)
+            vtkFile << hase::core::tet4VertexCount;
+            for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
             {
-                vtkFile << " " << mesh.cellPointIndices.at(cell * hase::core::prism6VertexCount + localVertex);
+                vtkFile << " " << mesh.cellPointIndices.at(cell * hase::core::tet4VertexCount + localVertex);
             }
             vtkFile << std::endl;
         }

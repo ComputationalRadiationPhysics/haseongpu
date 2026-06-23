@@ -703,11 +703,11 @@ namespace hase::openpmd
         for(unsigned cell = 0u; cell < numberOfCells; ++cell)
         {
             core::Point center{0.0, 0.0, 0.0};
-            for(unsigned localVertex = 0u; localVertex < core::prism6VertexCount; ++localVertex)
+            for(unsigned localVertex = 0u; localVertex < core::tet4VertexCount; ++localVertex)
             {
-                center = center + pointAt(points, numberOfPoints, connectivity.at(cell * core::prism6VertexCount + localVertex));
+                center = center + pointAt(points, numberOfPoints, connectivity.at(cell * core::tet4VertexCount + localVertex));
             }
-            center = center * (1.0 / static_cast<double>(core::prism6VertexCount));
+            center = center * (1.0 / static_cast<double>(core::tet4VertexCount));
             centers.at(cell) = center.x;
             centers.at(cell + numberOfCells) = center.y;
             centers.at(cell + 2u * numberOfCells) = center.z;
@@ -724,15 +724,13 @@ namespace hase::openpmd
         std::vector<float> volumes(numberOfCells, 0.0f);
         for(unsigned cell = 0u; cell < numberOfCells; ++cell)
         {
-            std::array<core::Point, core::prism6VertexCount> p{};
-            for(unsigned localVertex = 0u; localVertex < core::prism6VertexCount; ++localVertex)
+            std::array<core::Point, core::tet4VertexCount> p{};
+            for(unsigned localVertex = 0u; localVertex < core::tet4VertexCount; ++localVertex)
             {
                 p.at(localVertex)
-                    = pointAt(points, numberOfPoints, connectivity.at(cell * core::prism6VertexCount + localVertex));
+                    = pointAt(points, numberOfPoints, connectivity.at(cell * core::tet4VertexCount + localVertex));
             }
-            volumes.at(cell) = static_cast<float>(
-                tetraVolume(p[0], p[1], p[2], p[3]) + tetraVolume(p[1], p[2], p[4], p[3])
-                + tetraVolume(p[2], p[4], p[5], p[3]));
+            volumes.at(cell) = static_cast<float>(tetraVolume(p[0], p[1], p[2], p[3]));
         }
         return volumes;
     }
@@ -836,9 +834,9 @@ namespace hase::openpmd
             series,
             iteration,
             prefix + "cells_connectivity",
-            io::Extent{core::prism6VertexCount * numberOfCells},
+            io::Extent{core::tet4VertexCount * numberOfCells},
             {"cell", "local_vertex"},
-            {numberOfCells, core::prism6VertexCount},
+            {numberOfCells, core::tet4VertexCount},
             false,
             false);
         auto offsets = loadScalar<unsigned>(
@@ -861,14 +859,14 @@ namespace hase::openpmd
             false);
         for(unsigned cell = 0u; cell < numberOfCells; ++cell)
         {
-            if(offsets.at(cell) != core::prism6VertexCount * cell || cellTypes.at(cell) != core::vtkWedgeCellType)
+            if(offsets.at(cell) != core::tet4VertexCount * cell || cellTypes.at(cell) != core::vtkTetraCellType)
             {
-                validationError("explicit topology", "only contiguous VTK_WEDGE Prism6 cells are supported");
+                validationError("explicit topology", "only contiguous VTK_TETRA Tet4 cells are supported");
             }
         }
-        if(offsets.back() != core::prism6VertexCount * numberOfCells)
+        if(offsets.back() != core::tet4VertexCount * numberOfCells)
         {
-            validationError("explicit topology", "cell offsets do not match Prism6 connectivity");
+            validationError("explicit topology", "cell offsets do not match Tet4 connectivity");
         }
 
         unsigned const numberOfSamples = componentExtent(iteration, prefix + "sample_points", "x");
@@ -887,36 +885,36 @@ namespace hase::openpmd
                 series,
                 iteration,
                 prefix + "cell_faces",
-                io::Extent{numberOfCells * core::prism6FaceCount * core::prism6FaceWidth},
+                io::Extent{numberOfCells * core::tet4FaceCount * core::tet4FaceWidth},
                 {"cell", "local_face", "local_vertex"},
-                {numberOfCells, core::prism6FaceCount, core::prism6FaceWidth},
+                {numberOfCells, core::tet4FaceCount, core::tet4FaceWidth},
                 false,
                 false),
             loadScalar<int>(
                 series,
                 iteration,
                 prefix + "cell_neighbor_cells",
-                io::Extent{numberOfCells * core::prism6FaceCount},
+                io::Extent{numberOfCells * core::tet4FaceCount},
                 {"cell", "local_face"},
-                {numberOfCells, core::prism6FaceCount},
+                {numberOfCells, core::tet4FaceCount},
                 false,
                 false),
             loadScalar<int>(
                 series,
                 iteration,
                 prefix + "cell_neighbor_local_faces",
-                io::Extent{numberOfCells * core::prism6FaceCount},
+                io::Extent{numberOfCells * core::tet4FaceCount},
                 {"cell", "local_face"},
-                {numberOfCells, core::prism6FaceCount},
+                {numberOfCells, core::tet4FaceCount},
                 false,
                 false),
             loadScalar<int>(
                 series,
                 iteration,
                 prefix + "cell_face_boundaries",
-                io::Extent{numberOfCells * core::prism6FaceCount},
+                io::Extent{numberOfCells * core::tet4FaceCount},
                 {"cell", "local_face"},
-                {numberOfCells, core::prism6FaceCount},
+                {numberOfCells, core::tet4FaceCount},
                 false,
                 false),
             std::move(cellVolumes),

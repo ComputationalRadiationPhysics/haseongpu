@@ -67,7 +67,6 @@ namespace hase::kernels
         int const p0 = mesh.getCellFacePoint(cell, localFace, 0u);
         int const p1 = mesh.getCellFacePoint(cell, localFace, 1u);
         int const p2 = mesh.getCellFacePoint(cell, localFace, 2u);
-        int const p3 = mesh.getCellFacePoint(cell, localFace, 3u);
         if(p0 < 0 || p1 < 0 || p2 < 0)
         {
             return false;
@@ -75,16 +74,7 @@ namespace hase::kernels
         hase::core::Point const a = mesh.getPoint(static_cast<unsigned>(p0));
         hase::core::Point const b = mesh.getPoint(static_cast<unsigned>(p1));
         hase::core::Point const c = mesh.getPoint(static_cast<unsigned>(p2));
-        if(pointInTriangle3D(point, a, b, c))
-        {
-            return true;
-        }
-        if(p3 < 0)
-        {
-            return false;
-        }
-        hase::core::Point const d = mesh.getPoint(static_cast<unsigned>(p3));
-        return pointInTriangle3D(point, a, c, d);
+        return pointInTriangle3D(point, a, b, c);
     }
 
     ALPAKA_FN_ACC double checkCellFace(
