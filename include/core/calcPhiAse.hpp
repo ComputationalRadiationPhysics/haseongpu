@@ -54,6 +54,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <stdexcept>
 #include <vector>
 #define SEED 4321
 
@@ -122,8 +123,13 @@ namespace hase::core
             "minSampleIdx=" + std::to_string(minSampleIdx) + ";maxSampleIdx=" + std::to_string(maxSampleIdx)};
 #endif
         DeviceMeshView mesh = meshContainer.toView();
+        (void) hostMesh;
         time_t starttime = time(0);
-        unsigned maxReflections = experiment.useReflections ? hostMesh.getMaxReflections() : 0;
+        if(experiment.useReflections)
+        {
+            throw std::runtime_error("Explicit 3D backend reflection support is planned as a follow-up.");
+        }
+        unsigned maxReflections = 0u;
         unsigned reflectionSlices = 1 + (2 * maxReflections);
         // Divide RaysPerSample range into steps
         std::vector<int> raysPerSampleList = generateRaysPerSampleExpList(
@@ -229,8 +235,7 @@ namespace hase::core
                 alpaka::onHost::memcpy(queue, hInfiniteRaySnapshotView, dInfiniteRaySnapshots);
                 alpaka::onHost::wait(queue);
                 auto const& snapshot = infiniteRaySnapshotHost;
-                dout(V_WARNING) << "Non-finite importance ray: sample=" << sampleIdx << " prism=" << snapshot.prism
-                                << " triangle=" << snapshot.triangle << " level=" << snapshot.level
+                dout(V_WARNING) << "Non-finite importance ray: sample=" << sampleIdx << " cell=" << snapshot.cell
                                 << " gain=" << snapshot.gain << " start=(" << snapshot.start.x << ", "
                                 << snapshot.start.y << ", " << snapshot.start.z << ") end=(" << snapshot.end.x << ", "
                                 << snapshot.end.y << ", " << snapshot.end.z << ") direction=(" << snapshot.direction.x

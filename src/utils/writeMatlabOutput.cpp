@@ -69,23 +69,23 @@ namespace hase::utils
         std::vector<unsigned> const N_rays,
         std::vector<double> const expectedValues,
         unsigned const numberOfSamples,
-        unsigned const numberOfLevels)
+        unsigned const columnCount)
     {
         std::ofstream aseFile;
         std::ofstream raysFile;
         std::ofstream expectedValuesFile;
-        unsigned const samplesPerLevel = numberOfSamples / numberOfLevels;
+        unsigned const rowCount = numberOfSamples / columnCount;
 
         aseFile.open(experimentPath / "phi_ASE.txt");
-        write3dMatrix(ase, aseFile, samplesPerLevel, numberOfLevels, 1);
+        write3dMatrix(ase, aseFile, rowCount, columnCount, 1);
         aseFile.close();
 
         raysFile.open(experimentPath / "N_rays.txt");
-        write3dMatrix(N_rays, raysFile, samplesPerLevel, numberOfLevels, 1);
+        write3dMatrix(N_rays, raysFile, rowCount, columnCount, 1);
         raysFile.close();
 
         expectedValuesFile.open(experimentPath / "mse_values.txt");
-        write3dMatrix(expectedValues, expectedValuesFile, samplesPerLevel, numberOfLevels, 1);
+        write3dMatrix(expectedValues, expectedValuesFile, rowCount, columnCount, 1);
         expectedValuesFile.close();
     }
 

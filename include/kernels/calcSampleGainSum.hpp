@@ -95,16 +95,13 @@ namespace hase::kernels
             for(auto rayNumber :
                 alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysPerSample}))
             {
-                // Get triangle/prism to start ray from
-                unsigned startPrism = indicesOfPrisms[rayNumber];
+                unsigned const sampledCell = indicesOfPrisms[rayNumber];
                 unsigned reflection_i = numberOfReflectionSlices[rayNumber];
                 unsigned reflections = (reflection_i + 1) / 2;
                 hase::core::ReflectionPlane reflectionPlane
                     = (reflection_i % 2 == 0) ? hase::core::BOTTOM_REFLECTION : hase::core::TOP_REFLECTION;
-                unsigned startLevel = startPrism / mesh.numberOfTriangles;
-                unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
                 unsigned reflectionOffset = reflection_i * mesh.numberOfPrisms;
-                hase::core::Point startPoint = mesh.genRndPoint(samplePoint, startTriangle, startLevel, rndEngine);
+                hase::core::Point startPoint = mesh.genRndPointInCell(samplePoint, sampledCell, rndEngine);
 
                 // get a random index in the wavelength array
                 unsigned sigma_i = GenRndSigmas{}(sigmaA.getExtents().product(), rndEngine);
@@ -115,17 +112,16 @@ namespace hase::kernels
                     samplePoint,
                     reflections,
                     reflectionPlane,
-                    startLevel,
-                    startTriangle,
+                    sampledCell,
                     mesh,
                     sigmaA[sigma_i],
                     sigmaE[sigma_i]);
 
                 // include the stimulus from the starting prism and the importance of that ray
-                gain *= mesh.getBetaVolume(startPrism) * importance[startPrism + reflectionOffset];
+                gain *= mesh.getBetaVolume(sampledCell) * importance[sampledCell + reflectionOffset];
 
-                assert(!alpaka::math::isnan(mesh.getBetaVolume(startPrism)));
-                assert(!alpaka::math::isnan(importance[startPrism + reflectionOffset]));
+                assert(!alpaka::math::isnan(mesh.getBetaVolume(sampledCell)));
+                assert(!alpaka::math::isnan(importance[sampledCell + reflectionOffset]));
                 assert(!alpaka::math::isnan(gain));
                 if(alpaka::math::isfinite(gain))
                 {
@@ -166,23 +162,21 @@ namespace hase::kernels
             for(auto rayNumber :
                 alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{raysPerSample}))
             {
-                // Get triangle/prism to start ray from
-                unsigned startPrism = indicesOfPrisms[rayNumber];
+                unsigned const sampledCell = indicesOfPrisms[rayNumber];
 
-                unsigned startLevel = startPrism / mesh.numberOfTriangles;
-                unsigned startTriangle = startPrism - (mesh.numberOfTriangles * startLevel);
-                hase::core::Point startPoint = mesh.genRndPoint(samplePoint, startTriangle, startLevel, rndEngine);
+                hase::core::Point startPoint = mesh.genRndPointInCell(samplePoint, sampledCell, rndEngine);
                 hase::core::Ray ray = hase::core::generateRay(startPoint, samplePoint);
+                unsigned startCell = sampledCell;
 
                 // Get a random index in the wavelength array
                 unsigned sigma_i = GenRndSigmas{}(lambdaResolution, rndEngine);
                 assert(sigma_i < lambdaResolution);
 
                 // Calculate the gain for the whole ray at once
-                double gain = propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
+                double gain = propagateRay(ray, &startCell, mesh, sigmaA[sigma_i], sigmaE[sigma_i]);
                 gain /= ray.length * ray.length; // important, since usually done in the reflection device function
 
-                gain *= mesh.getBetaVolume(startPrism) * importance[startPrism];
+                gain *= mesh.getBetaVolume(sampledCell) * importance[sampledCell];
                 if(alpaka::math::isfinite(gain))
                 {
                     dGainOfRay[rayNumber] = gain;

@@ -433,20 +433,28 @@ class GainMediumProperty:
 
 
 def _shape_prisms(topology):
+    if hasattr(topology, "cellPointIndices"):
+        return (topology.numberOfCells,)
     topology._require_levels()
     return (topology.numberOfTriangles, topology.levels - 1)
 
 
 def _shape_cells(topology):
+    if hasattr(topology, "cellPointIndices"):
+        return (topology.numberOfSamplePoints,)
     topology._require_levels()
     return (topology.numberOfPoints, topology.levels)
 
 
 def _shape_triangles(topology):
+    if hasattr(topology, "cellPointIndices"):
+        return (topology.numberOfCells,)
     return (topology.numberOfTriangles,)
 
 
 def _shape_reflectivities(topology):
+    if hasattr(topology, "cellPointIndices"):
+        return (topology.numberOfCells, 2)
     return (topology.numberOfTriangles, 2)
 
 
@@ -458,6 +466,27 @@ def _shape_scalar(_):
     return ()
 
 
+def _default_beta_volume(topology):
+    size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfPrisms
+    return np.zeros(size, dtype=np.float64)
+
+
+def _default_sample_values(topology):
+    if hasattr(topology, "cellPointIndices"):
+        return np.zeros(topology.numberOfSamplePoints, dtype=np.float64)
+    return np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64)
+
+
+def _default_cladding_cell_types(topology):
+    size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfTriangles
+    return np.zeros(size, dtype=np.uint32)
+
+
+def _default_reflectivities(topology):
+    size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfTriangles
+    return np.ones(2 * size, dtype=np.float32)
+
+
 PHYSICAL_PROPERTY_SPECS = {
     "betaVolume": PhysicalPropertySpec(
         name="betaVolume",
@@ -467,7 +496,7 @@ PHYSICAL_PROPERTY_SPECS = {
             "Prism-centered excited-state fraction beta_j used by ASE. "
             "Matrix layout is (numberOfTriangles, numberOfLevels - 1)."
         ),
-        default=lambda topology: np.zeros(topology.numberOfPrisms, dtype=np.float64),
+        default=_default_beta_volume,
     ),
     "betaCells": PhysicalPropertySpec(
         name="betaCells",
@@ -477,21 +506,21 @@ PHYSICAL_PROPERTY_SPECS = {
             "Point-centered excited-state fraction beta_i. Matrix layout is "
             "(numberOfPoints, numberOfLevels)."
         ),
-        default=lambda topology: np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64),
+        default=_default_sample_values,
     ),
     "dntdAse": PhysicalPropertySpec(
         name="dntdAse",
         dtype=np.float64,
         shape=_shape_cells,
         description="ASE contribution to d beta / dt at sample points.",
-        default=lambda topology: np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64),
+        default=_default_sample_values,
     ),
     "claddingCellTypes": PhysicalPropertySpec(
         name="claddingCellTypes",
         dtype=np.uint32,
         shape=_shape_triangles,
         description="Cladding type index for each triangle.",
-        default=lambda topology: np.zeros(topology.numberOfTriangles, dtype=np.uint32),
+        default=_default_cladding_cell_types,
     ),
     "refractiveIndices": PhysicalPropertySpec(
         name="refractiveIndices",
@@ -508,7 +537,7 @@ PHYSICAL_PROPERTY_SPECS = {
             "Surface reflectivity per triangle. Matrix layout is "
             "(numberOfTriangles, 2): column 0 bottom, column 1 top."
         ),
-        default=lambda topology: np.ones(2 * topology.numberOfTriangles, dtype=np.float32),
+        default=_default_reflectivities,
     ),
     "nTot": PhysicalPropertySpec(
         name="nTot",
@@ -1249,6 +1278,18 @@ class GainMedium:
         )
 
     def _fieldContext(self):
+        if hasattr(self.topology, "cellPointIndices"):
+            return type(
+                "GainMediumFieldContext",
+                (),
+                {
+                    "numberOfPoints": self.topology.numberOfPoints,
+                    "numberOfTriangles": self.topology.numberOfCells,
+                    "numberOfCells": self.topology.numberOfCells,
+                    "numberOfLevels": 1,
+                    "numberOfSamplePoints": self.topology.numberOfSamplePoints,
+                },
+            )()
         self.topology._require_levels()
         return type(
             "GainMediumFieldContext",
@@ -1428,6 +1469,13 @@ class GainMedium:
 
     def getPrisms(self):
         fields = {"betaVolume": self._fieldView("betaVolume")}
+        if hasattr(self.topology, "cellPointIndices"):
+            fields.update(self._customFieldViews(("cell",)))
+            metadata = {
+                "betaVolume": self._propertyFieldMeta("betaVolume", entity="cell", axes=("cell",)),
+            }
+            metadata.update(self._customFieldMetadata(("cell",)))
+            return PrimitiveView("prism", (self.topology.numberOfCells,), fields, metadata)
         fields.update(self._customFieldViews(("cell", "layer")))
         metadata = {
             "betaVolume": self._propertyFieldMeta("betaVolume", entity="cell_layer", axes=("cell", "layer")),
@@ -1453,6 +1501,39 @@ class GainMedium:
     def openPmdFields(self, context=None):
         context = self._fieldContext() if context is None else context
         topology = self.topology
+        if hasattr(topology, "cellPointIndices"):
+            yield OpenPmdScalarField(
+                "betaVolume",
+                _flat(self.get("betaVolume").value, None, np.float64, "betaVolume"),
+                context,
+                spec=FieldSpec(
+                    "betaVolume",
+                    "beta_volume",
+                    ("cell",),
+                    np.float64,
+                    lambda ctx: (ctx.numberOfCells,),
+                    dynamic=True,
+                ),
+            )
+            yield OpenPmdScalarField(
+                "pointBeta",
+                _flat(self.get("betaCells").value, None, np.float64, "betaCells"),
+                context,
+                spec=FieldSpec(
+                    "pointBeta",
+                    "point_beta",
+                    ("sample_point",),
+                    np.float64,
+                    lambda ctx: (ctx.numberOfSamplePoints,),
+                    dynamic=True,
+                ),
+            )
+            yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
+            yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
+            yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
+            for field in self.customFields.values():
+                yield OpenPmdScalarField(field.spec.name, field.value, context, prefix="", spec=field.spec)
+            return
         yield OpenPmdScalarField("betaVolume", _flat(self.get("betaVolume").value, topology.levels - 1, np.float64, "betaVolume"), context)
         yield OpenPmdScalarField("pointBeta", _flat(self.get("betaCells").value, topology.levels, np.float64, "betaCells"), context)
         yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
@@ -1517,6 +1598,8 @@ class GainMedium:
 
     @property
     def numberOfTriangles(self):
+        if hasattr(self.topology, "cellPointIndices"):
+            return self.topology.numberOfCells
         return self.topology.numberOfTriangles
 
     @property
@@ -1525,11 +1608,15 @@ class GainMedium:
 
     @property
     def numberOfPrisms(self):
+        if hasattr(self.topology, "cellPointIndices"):
+            return self.topology.numberOfCells
         return self.topology.numberOfPrisms
 
     @property
     def numberOfLevels(self):
         """Number of z sample planes in the attached topology."""
+        if hasattr(self.topology, "cellPointIndices"):
+            return 1
         self.topology._require_levels()
         return int(self.topology.levels)
 

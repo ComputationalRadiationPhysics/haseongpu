@@ -38,7 +38,7 @@ namespace hase::utils
      * @brief creates a VTK file based on the mesh structure and
      *        the dnd_ase values from a finished experiment
      *
-     * @param mesh all information about triangles, points, contants. See mesh.h for details
+     * @param mesh explicit 3D cell mesh to write
      * @param ase the input data to write (one value for each vertex in the grid)
      * @param filename the output filename to write
      * @param minRaysPerSample with which the experiment was started (see README)
@@ -63,7 +63,7 @@ namespace hase::utils
      * @brief creates a VTK file based on the mesh structure and
      *        the values within prisms from a finished experiment
      *
-     * @param mesh all information about triangles, points, contants. See mesh.h for details
+     * @param mesh explicit 3D cell mesh to write
      * @param ase the input data to write (one value for each vertex in the grid)
      * @param filename the output filename to write
      * @param minRaysPerSample with which the experiment was started (see README)

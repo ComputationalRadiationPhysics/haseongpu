@@ -19,266 +19,198 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kernels/propagateRay.hpp>
-#include <kernels/reflection.hpp> /* calcNextReflection */
-
 #include <cassert> /* assert */
 #include <cstdio>
 
 namespace hase::kernels
 {
-
-    /**
-     * @brief Checks a level-plane(currentLevel * thickness) for intersection with an ray (zPos, zVec).
-     *        If the intersection-length is greater then length.
-     *        Than the intersection-length will be returned.
-     *        Otherwise 0 will be returned.
-     *
-     * @return intersection-length if intersection-length <= length
-     * @return 0 if intersection-length > length
-     *
-     **/
-    ALPAKA_FN_ACC double checkSurface(
-        int const currentLevel,
-        double const zPos,
-        double const zVec,
-        double const length,
-        double const thickness)
-    {
-        double denominator = zVec;
-        if(denominator != 0.0)
-        {
-            double nominator = currentLevel * thickness - zPos;
-            double lengthTmp = nominator / denominator;
-            if(lengthTmp <= length && lengthTmp > 0.0)
-            {
-                return lengthTmp;
-            }
-        }
-        return 0;
-    }
-
-    /**
-     * @brief Checks an edges of the given triangle/prism for an intersection
-     *        with ray and calculates the intersection-length. If the intersection-length
-     *        is greater then length. Than the intersection-length will be
-     *        returned. Otherwise 0 will be returned.
-     *
-     * @return intersection-length if intersection-length <= length
-     * @return 0 if intersection-length > length
-     **/
-    ALPAKA_FN_ACC double checkEdge(
-        unsigned const triangle,
-        int const edge,
-        hase::core::Ray const ray,
-        hase::core::DeviceMeshView const& mesh,
-        double const length)
-    {
-        hase::core::NormalRay normal = mesh.getNormal(triangle, edge);
-        double denominator = normal.dir.x * ray.dir.x + normal.dir.y * ray.dir.y;
-
-        if(denominator != 0.0)
-        {
-            double nominator = normal.dir.x * normal.p.x + normal.dir.y * normal.p.y - normal.dir.x * ray.p.x
-                               - normal.dir.y * ray.p.y;
-
-            double lengthTmp = nominator / denominator;
-            if(lengthTmp <= length && lengthTmp > 0.0)
-            {
-                return lengthTmp;
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * @brief Calculates the intersection-length for the propagated ray and
-     *        the current triangle.
-     *
-     * @return edge number of the intesected edge (-1 for no intersection)
-     *
-     **/
-    ALPAKA_FN_ACC int calcTriangleRayIntersection(
-        double* length,
-        unsigned const triangle,
-        hase::core::Ray const ray,
-        unsigned const level,
-        int const forbiddenEdge,
-        hase::core::DeviceMeshView const& mesh)
-    {
-        int edge = -1;
-// Check 3 edges of triangle
-#pragma unroll 3
-        for(int edge_i = 0; edge_i < 3; ++edge_i)
-        {
-            if(edge_i != forbiddenEdge)
-            {
-                double lengthTmp = checkEdge(triangle, edge_i, ray, mesh, *length);
-                if(lengthTmp)
-                {
-                    *length = lengthTmp;
-                    edge = edge_i;
-                }
-            }
-        }
-
-        // check the upper surface
-        if(forbiddenEdge != 3)
-        {
-            double lengthTmp = checkSurface(level + 1, ray.p.z, ray.dir.z, *length, mesh.thickness);
-            if(lengthTmp)
-            {
-                *length = lengthTmp;
-                edge = 3;
-            }
-        }
-
-        // check the lower surface
-        if(forbiddenEdge != 4)
-        {
-            double lengthTmp = checkSurface(level, ray.p.z, ray.dir.z, *length, mesh.thickness);
-            if(lengthTmp)
-            {
-                *length = lengthTmp;
-                edge = 4;
-            }
-        }
-        return edge;
-    }
-
-    /**
-     * @brief This is simple vector calculation. The startpoint
-     *        of ray will be moved by length.
-     *
-     * @return ray is the ray with moved startpoint
-     *
-     **/
     ALPAKA_FN_ACC hase::core::Ray calcNextRay(hase::core::Ray ray, double const length)
     {
         ray.p.x = ray.p.x + length * ray.dir.x;
         ray.p.y = ray.p.y + length * ray.dir.y;
         ray.p.z = ray.p.z + length * ray.dir.z;
-
         return ray;
     }
 
-    /**
-     * @brief Calculates the gain for the given prism(triangle and level) and
-     *        the intersection-length of the ray.
-     *
-     * @return gain
-     *
-     **/
-    ALPAKA_FN_ACC double calcPrismGain(
-        unsigned const triangle,
-        unsigned const level,
+    ALPAKA_FN_ACC bool pointInTriangle3D(
+        hase::core::Point const point,
+        hase::core::Point const a,
+        hase::core::Point const b,
+        hase::core::Point const c)
+    {
+        hase::core::Point const v0 = c - a;
+        hase::core::Point const v1 = b - a;
+        hase::core::Point const v2 = point - a;
+        double const dot00 = hase::core::dot(v0, v0);
+        double const dot01 = hase::core::dot(v0, v1);
+        double const dot02 = hase::core::dot(v0, v2);
+        double const dot11 = hase::core::dot(v1, v1);
+        double const dot12 = hase::core::dot(v1, v2);
+        double const denominator = dot00 * dot11 - dot01 * dot01;
+        if(alpaka::math::abs(denominator) <= std::numeric_limits<double>::epsilon())
+        {
+            return false;
+        }
+        double const invDenominator = 1.0 / denominator;
+        double const u = (dot11 * dot02 - dot01 * dot12) * invDenominator;
+        double const v = (dot00 * dot12 - dot01 * dot02) * invDenominator;
+        constexpr double tolerance = 1.0e-10;
+        return u >= -tolerance && v >= -tolerance && (u + v) <= 1.0 + tolerance;
+    }
+
+    ALPAKA_FN_ACC bool pointInFace(
+        hase::core::Point const point,
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const cell,
+        unsigned const localFace)
+    {
+        int const p0 = mesh.getCellFacePoint(cell, localFace, 0u);
+        int const p1 = mesh.getCellFacePoint(cell, localFace, 1u);
+        int const p2 = mesh.getCellFacePoint(cell, localFace, 2u);
+        int const p3 = mesh.getCellFacePoint(cell, localFace, 3u);
+        if(p0 < 0 || p1 < 0 || p2 < 0)
+        {
+            return false;
+        }
+        hase::core::Point const a = mesh.getPoint(static_cast<unsigned>(p0));
+        hase::core::Point const b = mesh.getPoint(static_cast<unsigned>(p1));
+        hase::core::Point const c = mesh.getPoint(static_cast<unsigned>(p2));
+        if(pointInTriangle3D(point, a, b, c))
+        {
+            return true;
+        }
+        if(p3 < 0)
+        {
+            return false;
+        }
+        hase::core::Point const d = mesh.getPoint(static_cast<unsigned>(p3));
+        return pointInTriangle3D(point, a, c, d);
+    }
+
+    ALPAKA_FN_ACC double checkCellFace(
+        unsigned const cell,
+        unsigned const localFace,
+        hase::core::Ray const ray,
+        hase::core::DeviceMeshView const& mesh,
+        double const length)
+    {
+        int const p0 = mesh.getCellFacePoint(cell, localFace, 0u);
+        int const p1 = mesh.getCellFacePoint(cell, localFace, 1u);
+        int const p2 = mesh.getCellFacePoint(cell, localFace, 2u);
+        if(p0 < 0 || p1 < 0 || p2 < 0)
+        {
+            return 0.0;
+        }
+        hase::core::Point const a = mesh.getPoint(static_cast<unsigned>(p0));
+        hase::core::Point const b = mesh.getPoint(static_cast<unsigned>(p1));
+        hase::core::Point const c = mesh.getPoint(static_cast<unsigned>(p2));
+        hase::core::Point const normal = hase::core::cross(b - a, c - a);
+        double const denominator = hase::core::dot(normal, ray.dir);
+        if(alpaka::math::abs(denominator) <= std::numeric_limits<double>::epsilon())
+        {
+            return 0.0;
+        }
+        double const lengthTmp = hase::core::dot(normal, a - ray.p) / denominator;
+        constexpr double tolerance = 1.0e-10;
+        if(lengthTmp <= tolerance || lengthTmp > length)
+        {
+            return 0.0;
+        }
+        hase::core::Point const intersection = calcNextRay(ray, lengthTmp).p;
+        return pointInFace(intersection, mesh, cell, localFace) ? lengthTmp : 0.0;
+    }
+
+    ALPAKA_FN_ACC int calcCellRayIntersection(
+        double* length,
+        unsigned const cell,
+        hase::core::Ray const ray,
+        int const forbiddenFace,
+        hase::core::DeviceMeshView const& mesh)
+    {
+        int nextFace = -1;
+        for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
+        {
+            if(static_cast<int>(localFace) == forbiddenFace)
+            {
+                continue;
+            }
+            double const lengthTmp = checkCellFace(cell, localFace, ray, mesh, *length);
+            if(lengthTmp > 0.0)
+            {
+                *length = lengthTmp;
+                nextFace = static_cast<int>(localFace);
+            }
+        }
+        return nextFace;
+    }
+
+    ALPAKA_FN_ACC double calcCellGain(
+        unsigned const cell,
         double const length,
         hase::core::DeviceMeshView const& mesh,
         double const sigmaA,
         double const sigmaE)
     {
-        if(mesh.getCellType(triangle) == mesh.claddingNumber)
+        if(mesh.getCellType(cell) == mesh.claddingNumber)
         {
             return alpaka::math::exp(-(mesh.claddingAbsorption) * length);
         }
-        else
-        {
-            return (double) alpaka::math::exp(
-                mesh.nTot * (mesh.getBetaVolume(triangle, level) * (sigmaE + sigmaA) - sigmaA) * length);
-        }
-    }
-
-    /**
-     * @brief Sets the next triangle, next forbiddenEdge
-     *        and next level depending on the cutted edge of
-     *        the current triangle and the propagated ray.
-     *
-     **/
-    ALPAKA_FN_ACC void updateFromEdge(
-        unsigned* triangle,
-        int* forbiddenEdge,
-        unsigned* level,
-        hase::core::DeviceMeshView const& mesh,
-        int const edge)
-    {
-        switch(edge)
-        {
-        case 0:
-        case 1:
-        case 2:
-            // One of three edges
-            *forbiddenEdge = mesh.getForbiddenEdge(*triangle, edge);
-            *triangle = mesh.getNeighbor(*triangle, edge);
-            break;
-
-        case 3:
-            // Upper surface
-            *forbiddenEdge = 4;
-            if(*level != (mesh.numberOfLevels - 2))
-                (*level)++;
-            break;
-
-        case 4:
-            // Lower surface
-            *forbiddenEdge = 3;
-            if(*level != 0)
-                (*level)--;
-            break;
-        }
+        return static_cast<double>(
+            alpaka::math::exp(mesh.nTot * (mesh.getBetaVolume(cell) * (sigmaE + sigmaA) - sigmaA) * length));
     }
 
     ALPAKA_FN_ACC double propagateRay(
         hase::core::Ray nextRay,
-        unsigned* nextLevel,
-        unsigned* nextTriangle,
+        unsigned* nextCell,
         hase::core::DeviceMeshView const& mesh,
         double sigmaA,
         double sigmaE)
     {
-        double distanceTotal = nextRay.length;
+        double const distanceTotal = nextRay.length;
         double distanceRemaining = nextRay.length;
-        double length = 0;
-        double gain = 1;
-        int nextForbiddenEdge = -1;
-        // applies a small epsilon to "nudge" the ray along its trajectory in case we hit exactly on a triangle/surface
-        // intersection
-        constexpr double numberOfEpsShifts = 64.0; // small eps factor
+        double length = 0.0;
+        double gain = 1.0;
+        int nextForbiddenFace = -1;
+        constexpr double numberOfEpsShifts = 64.0;
         constexpr double boundaryNudgeFactor = numberOfEpsShifts * std::numeric_limits<double>::epsilon();
 
-        // Length to small, could be same points
         if(distanceTotal < SMALL)
-            return 1;
+        {
+            return 1.0;
+        }
 
         nextRay = hase::core::normalizeRay(nextRay);
         while(alpaka::math::abs(distanceRemaining) > SMALL)
         {
-            assert(*nextLevel <= mesh.numberOfLevels);
-            // Calc gain for triangle intersection
+            assert(*nextCell < mesh.numberOfCells);
             length = distanceRemaining;
-            int const nextEdge
-                = calcTriangleRayIntersection(&length, *nextTriangle, nextRay, *nextLevel, nextForbiddenEdge, mesh);
+            int const nextFace = calcCellRayIntersection(&length, *nextCell, nextRay, nextForbiddenFace, mesh);
             nextRay = calcNextRay(nextRay, length);
-            double gainTmp = calcPrismGain(*nextTriangle, *nextLevel, length, mesh, sigmaA, sigmaE);
-            gain *= gainTmp;
-
-            assert(length >= 0);
+            gain *= calcCellGain(*nextCell, length, mesh, sigmaA, sigmaE);
+            assert(length >= 0.0);
             distanceRemaining -= length;
 
-            // Calc nextTriangle, nextForbiddenEdge and nextLevel
-            if(nextEdge != -1)
+            if(nextFace < 0)
             {
-                updateFromEdge(nextTriangle, &nextForbiddenEdge, nextLevel, mesh, nextEdge);
+                break;
+            }
 
-                double const boundaryNudge = boundaryNudgeFactor * distanceTotal;
-                static_assert(SMALL > boundaryNudgeFactor);
-                if(length < boundaryNudge && distanceRemaining > boundaryNudge)
-                {
-                    nextRay = calcNextRay(nextRay, boundaryNudge);
-                    distanceRemaining -= boundaryNudge;
-                }
+            int const neighbor = mesh.getCellNeighbor(*nextCell, static_cast<unsigned>(nextFace));
+            if(neighbor < 0)
+            {
+                break;
+            }
+            nextForbiddenFace = mesh.getCellNeighborLocalFace(*nextCell, static_cast<unsigned>(nextFace));
+            *nextCell = static_cast<unsigned>(neighbor);
+
+            double const boundaryNudge = boundaryNudgeFactor * distanceTotal;
+            static_assert(SMALL > boundaryNudgeFactor);
+            if(length < boundaryNudge && distanceRemaining > boundaryNudge)
+            {
+                nextRay = calcNextRay(nextRay, boundaryNudge);
+                distanceRemaining -= boundaryNudge;
             }
         }
-
         return gain;
     }
 
@@ -286,59 +218,17 @@ namespace hase::kernels
         hase::core::Point startPoint,
         hase::core::Point const endPoint,
         unsigned const reflections,
-        hase::core::ReflectionPlane reflectionPlane,
-        unsigned startLevel,
-        unsigned startTriangle,
+        hase::core::ReflectionPlane,
+        unsigned startCell,
         hase::core::DeviceMeshView const& mesh,
         double const sigmaA,
         double const sigmaE)
     {
-        double distanceTotal = 0;
-        double gain = 1.0;
-
-        for(unsigned reflection = 0; reflection < reflections; ++reflection)
-        {
-            float reflectivity = hase::core::getReflectivity(reflectionPlane, startTriangle, mesh);
-            float totalReflectionAngle = hase::core::getReflectionAngle(reflectionPlane, mesh);
-            hase::core::Point reflectionPoint = {0, 0, 0};
-            double reflectionAngle = 0;
-
-            // Calc reflectionPoint and reflectionAngle
-            calcNextReflection(
-                startPoint,
-                endPoint,
-                (reflections - reflection),
-                reflectionPlane,
-                &reflectionPoint,
-                &reflectionAngle,
-                mesh);
-            hase::core::Ray reflectionRay = hase::core::generateRay(startPoint, reflectionPoint);
-            distanceTotal += reflectionRay.length;
-            gain *= propagateRay(reflectionRay, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-
-            assert(reflectionAngle <= 90);
-            assert(reflectionAngle >= 0);
-
-            if(reflectionAngle <= totalReflectionAngle)
-            {
-                gain *= reflectivity;
-                if(gain == 0)
-                {
-                    return 0;
-                }
-            }
-
-            startPoint = reflectionPoint;
-            reflectionPlane = reflectionPlane == hase::core::TOP_REFLECTION ? hase::core::BOTTOM_REFLECTION
-                                                                            : hase::core::TOP_REFLECTION;
-        }
-
+        (void) reflections;
+        assert(reflections == 0u);
         hase::core::Ray ray = hase::core::generateRay(startPoint, endPoint);
-        gain *= propagateRay(ray, &startLevel, &startTriangle, mesh, sigmaA, sigmaE);
-
-        distanceTotal += ray.length;
-
-        return gain / (distanceTotal * distanceTotal);
+        double gain = propagateRay(ray, &startCell, mesh, sigmaA, sigmaE);
+        return gain / (ray.length * ray.length);
     }
 
 } // namespace hase::kernels

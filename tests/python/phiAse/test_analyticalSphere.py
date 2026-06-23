@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from HASEonGPU import AlpakaBackends, GainMedium, Grid, MeshTopology, PhiASE, SpectralDecomposition, vtkWedge
+from HASEonGPU import AlpakaBackends, GainMedium, Grid, MeshTopology, PhiASE, SpectralDecomposition, VolumeTopology, vtkWedge
 
 
 def analyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad):
@@ -119,6 +119,22 @@ def constructBetaCellsSphere(topology, *, center=(5.0, 5.0, 5.0), radius=5.0, be
             if r < radius:
                 betaCells[pointIndex, levelIndex] = float(beta)
     return betaCells
+
+
+def constructExplicitSphereTopology(radius, *, samplePoints):
+    xDim = radius * 2.0
+    center = np.asarray((radius, radius, radius), dtype=np.float64)
+    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 50)
+    baseTopology = MeshTopology.fromGrid(grid)
+    volumeTopology = VolumeTopology.fromExtrudedTopology(baseTopology)
+    mask = _flatPrismMaskSphere(baseTopology, center=center, radius=radius)
+    cells = np.asarray(volumeTopology.cellPointIndices[mask], dtype=np.uint32)
+    usedPoints, inverse = np.unique(cells.reshape(-1), return_inverse=True)
+    points = np.asarray(volumeTopology.points[usedPoints], dtype=np.float64)
+    cells = inverse.reshape(cells.shape).astype(np.uint32, copy=False)
+    topology = VolumeTopology.fromPrisms(points, cells)
+    topology.samplePoints = np.asarray(samplePoints, dtype=np.float64).reshape((-1, 3))
+    return topology
 nTot = np.float64(1.38e20 * 1.0)
 sigmaA = np.float64(0.11e-20)
 sigmaE = np.float64(2.1e-20)
@@ -167,12 +183,11 @@ def test_centerPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAs
     )
     center = (radius, radius, radius)
 
-    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 50)
-    topology = MeshTopology.fromGrid(grid)
+    topology = constructExplicitSphereTopology(radius, samplePoints=[center])
     medium = GainMedium(topology=topology)
-    betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
-    betaVolume = constructBetaVolumeSphere(topology, center=center, radius=radius, beta=beta)
-    flatBetaVolume = betaVolume.reshape(-1, order="F")
+    betaCells = np.full(topology.numberOfSamplePoints, beta, dtype=np.float64)
+    betaVolume = np.full(topology.numberOfCells, beta, dtype=np.float64)
+    flatBetaVolume = betaVolume.reshape(-1)
     assert np.any(flatBetaVolume > 0.0)
     assert np.any(betaCells > 0.0)
     cells = medium.get("betaCells").expectedShape
@@ -185,7 +200,7 @@ def test_centerPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAs
         crystalTFluo=flourescenceLifetime,
     )
 
-    centerSample = medium.betaCellIndexAt(*center, flat=True)
+    centerSample = 0
     phiAse = PhiASE.fromYaml(
         phiAseTestConfigPath,
         spectralProperties=crossSections,
@@ -205,9 +220,7 @@ def test_centerPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAs
     )
     phiAse.run(gainMedium=medium)
     result = phiAse.getResults()
-    shape = medium.get("betaCells").expectedShape
-    phiAseValues = np.array(result.phiAse, dtype=np.float64).reshape(shape, order="F")
-    numerical = phiAseValues.reshape(-1, order="F")[centerSample]
+    numerical = np.array(result.phiAse, dtype=np.float64).reshape(-1)[centerSample]
 
     expected = analyticalPhiAseSphereCenter(
         gain=gain,
@@ -260,12 +273,12 @@ def test_diskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPat
     )
     center = (radius, radius, radius)
 
-    grid = Grid(xExtent=xDim, yExtent=xDim, zExtent=xDim, tileSizeX=xDim / 50)
-    topology = MeshTopology.fromGrid(grid)
+    samplePoints = [(radius + offsetX, radius + offsetY, radius) for offsetX, offsetY in make_grid_within_radius(radius)]
+    topology = constructExplicitSphereTopology(radius, samplePoints=samplePoints)
     medium = GainMedium(topology=topology)
-    betaCells = constructBetaCellsSphere(topology, center=center, radius=radius, beta=beta)
-    betaVolume = constructBetaVolumeSphere(topology, center=center, radius=radius, beta=beta)
-    flatBetaVolume = betaVolume.reshape(-1, order="F")
+    betaCells = np.full(topology.numberOfSamplePoints, beta, dtype=np.float64)
+    betaVolume = np.full(topology.numberOfCells, beta, dtype=np.float64)
+    flatBetaVolume = betaVolume.reshape(-1)
     assert np.any(flatBetaVolume > 0.0)
     assert np.any(betaCells > 0.0)
     cells = medium.get("betaCells").expectedShape
@@ -278,9 +291,7 @@ def test_diskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPat
         crystalTFluo=flourescenceLifetime,
     )
     expectedValues=[]
-    for offsetX,offsetY in make_grid_within_radius(radius):
-        center = (radius+offsetX, radius+offsetY, radius)
-        centerSample = medium.betaCellIndexAt(*center, flat=True)
+    for centerSample, center in enumerate(samplePoints):
         phiAse = PhiASE.fromYaml(
             phiAseTestConfigPath,
             spectralProperties=crossSections,
@@ -300,9 +311,7 @@ def test_diskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPat
         )
         phiAse.run(gainMedium=medium)
         result = phiAse.getResults()
-        shape = medium.get("betaCells").expectedShape
-        phiAseValues = np.array(result.phiAse, dtype=np.float64).reshape(shape, order="F")
-        numerical = phiAseValues.reshape(-1, order="F")[centerSample]
+        numerical = np.array(result.phiAse, dtype=np.float64).reshape(-1)[centerSample]
 
         expected = analyticalPhiAseSphereCenter(
             gain=gain,
