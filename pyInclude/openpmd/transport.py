@@ -59,6 +59,64 @@ CANONICAL_CELL_TYPES_SPEC = FieldSpec(
     unitDimension=unitDimension.canonicalCellTypes,
     backendRequired=False,
 )
+EXPLICIT_CELL_FACE_OFFSETS_SPEC = FieldSpec(
+    "explicitCellFaceOffsets",
+    "cell_face_offsets",
+    ("cell_offset",),
+    np.uint32,
+    lambda context: (context.numberOfCells + 1,),
+    backendRequired=False,
+)
+EXPLICIT_CELL_FACES_SPEC = FieldSpec(
+    "explicitCellFaces",
+    "cell_faces",
+    ("cell", "local_face", "local_vertex"),
+    np.int32,
+    lambda context: (context.numberOfCells, context.numberOfFacesPerCell, 4),
+    backendRequired=False,
+)
+EXPLICIT_CELL_NEIGHBORS_SPEC = FieldSpec(
+    "explicitCellNeighbors",
+    "cell_neighbor_cells",
+    ("cell", "local_face"),
+    np.int32,
+    lambda context: (context.numberOfCells, context.numberOfFacesPerCell),
+    backendRequired=False,
+)
+EXPLICIT_CELL_NEIGHBOR_FACES_SPEC = FieldSpec(
+    "explicitCellNeighborFaces",
+    "cell_neighbor_local_faces",
+    ("cell", "local_face"),
+    np.int32,
+    lambda context: (context.numberOfCells, context.numberOfFacesPerCell),
+    backendRequired=False,
+)
+EXPLICIT_FACE_BOUNDARIES_SPEC = FieldSpec(
+    "explicitFaceBoundaries",
+    "cell_face_boundaries",
+    ("cell", "local_face"),
+    np.int32,
+    lambda context: (context.numberOfCells, context.numberOfFacesPerCell),
+    backendRequired=False,
+)
+EXPLICIT_CELL_DOMAINS_SPEC = FieldSpec(
+    "explicitCellDomains",
+    "cell_domains",
+    ("cell",),
+    np.int32,
+    lambda context: (context.numberOfCells,),
+    backendRequired=False,
+)
+EXPLICIT_SAMPLE_POINTS_SPEC = FieldSpec(
+    "explicitSamplePoints",
+    "sample_points",
+    ("coordinate", "sample_point"),
+    np.float64,
+    lambda context: (3, context.numberOfSamplePoints),
+    unit="m",
+    unitDimension=(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    backendRequired=False,
+)
 DYNAMIC_FIELD_NAMES = {"betaVolume", "pointBeta"}
 
 
@@ -643,6 +701,16 @@ def _canonical_topology_context(topology):
     )
 
 
+def _explicit_topology_context(topology):
+    return SimpleNamespace(
+        numberOfMeshPoints=topology.numberOfPoints,
+        numberOfCells=topology.numberOfCells,
+        numberOfPrisms=topology.numberOfCells,
+        numberOfFacesPerCell=topology.numberOfFacesPerCell,
+        numberOfSamplePoints=topology.numberOfSamplePoints,
+    )
+
+
 def _canonical_point_components(topology):
     points = np.asarray(topology.points, dtype=np.float64)
     z_values = topology.levelCoordinates()
@@ -650,6 +718,24 @@ def _canonical_point_components(topology):
         "x": np.tile(points[:, 0], z_values.size),
         "y": np.tile(points[:, 1], z_values.size),
         "z": np.repeat(z_values, topology.numberOfPoints),
+    }
+
+
+def _explicit_point_components(topology):
+    points = np.asarray(topology.points, dtype=np.float64)
+    return {
+        "x": points[:, 0],
+        "y": points[:, 1],
+        "z": points[:, 2],
+    }
+
+
+def _explicit_sample_point_components(topology):
+    points = np.asarray(topology.samplePoints, dtype=np.float64)
+    return {
+        "x": points[:, 0],
+        "y": points[:, 1],
+        "z": points[:, 2],
     }
 
 
@@ -707,6 +793,56 @@ def _write_canonical_static_topology(iteration, gainMedium):
         np.full(context.numberOfPrisms, 13, dtype=np.uint32),
         context,
     )
+
+
+def _write_explicit_static_topology(iteration, topology):
+    context = _explicit_topology_context(topology)
+    record = iteration.meshes["core_" + CANONICAL_POINTS_SPEC.recordName]
+    for component_name, values in _explicit_point_components(topology).items():
+        _resetComponent(
+            record,
+            component_name,
+            np.ascontiguousarray(values),
+            ["mesh_point"],
+            _unit_dimension(_io(), CANONICAL_POINTS_SPEC.unitDimension),
+            CANONICAL_POINTS_SPEC.unitSI,
+        )
+    _record_metadata(record, CANONICAL_POINTS_SPEC)
+    record.set_attribute("geometryParameters", "topology=explicit_volume_cells")
+    record.set_attribute("hasePrimitiveShape", list(CANONICAL_POINTS_SPEC.expectedShape(context)))
+
+    sample_record = iteration.meshes["core_" + EXPLICIT_SAMPLE_POINTS_SPEC.recordName]
+    for component_name, values in _explicit_sample_point_components(topology).items():
+        _resetComponent(
+            sample_record,
+            component_name,
+            np.ascontiguousarray(values),
+            ["sample_point"],
+            _unit_dimension(_io(), EXPLICIT_SAMPLE_POINTS_SPEC.unitDimension),
+            EXPLICIT_SAMPLE_POINTS_SPEC.unitSI,
+        )
+    _record_metadata(sample_record, EXPLICIT_SAMPLE_POINTS_SPEC)
+    sample_record.set_attribute("geometryParameters", "topology=explicit_volume_cells")
+    sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
+
+    def backend_flat(values):
+        return np.asarray(values).reshape(-1, order="F")
+
+    for spec, values in (
+        (CANONICAL_CONNECTIVITY_SPEC, topology.cellsConnectivityFlat()),
+        (CANONICAL_OFFSETS_SPEC, topology.cellsOffsets()),
+        (CANONICAL_CELL_TYPES_SPEC, topology.cellTypes),
+        (
+            EXPLICIT_CELL_FACE_OFFSETS_SPEC,
+            np.arange(context.numberOfCells + 1, dtype=np.uint32) * np.uint32(context.numberOfFacesPerCell),
+        ),
+        (EXPLICIT_CELL_FACES_SPEC, backend_flat(topology.facePointIndices)),
+        (EXPLICIT_CELL_NEIGHBORS_SPEC, backend_flat(topology.neighborCells)),
+        (EXPLICIT_CELL_NEIGHBOR_FACES_SPEC, backend_flat(topology.neighborLocalFaces)),
+        (EXPLICIT_FACE_BOUNDARIES_SPEC, backend_flat(topology.faceBoundaries)),
+        (EXPLICIT_CELL_DOMAINS_SPEC, topology.cellDomains),
+    ):
+        _resetFlatField(iteration.meshes["core_" + spec.recordName], spec, values, context)
 
 def _loadScalar(series, iteration, name, dtype):
     io = _io()
@@ -785,7 +921,11 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
 
     if include_static:
         iteration.set_attribute("haseStaticUpdate", True)
-        _write_canonical_static_topology(iteration, gainMedium)
+        topology = gainMedium.topology
+        if hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells"):
+            _write_explicit_static_topology(iteration, topology)
+        else:
+            _write_canonical_static_topology(iteration, gainMedium)
     else:
         iteration.set_attribute("haseStaticUpdate", False)
 

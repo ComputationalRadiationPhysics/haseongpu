@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""gmsh import helpers for planar triangle meshes."""
+"""gmsh import helpers for planar triangle and explicit 3D volume meshes."""
 
 from __future__ import annotations
 
@@ -58,6 +58,12 @@ class Gmsh:
         """Convert planar triangle elements into an extruded ``MeshTopology``."""
         return _from_gmsh(self, numberOfLevels=numberOfLevels, thickness=thickness)
 
+    def volumeTopology(self, **kwargs):
+        """Convert 3D gmsh Prism6 elements into an explicit ``VolumeTopology``."""
+        from .volume import VolumeTopology
+
+        return VolumeTopology.fromGmsh(self, **kwargs)
+
     def claddingCellTypes(self, topology):
         """Return triangle-wise cladding tags inferred from physical names."""
         if topology.metadata.get("gmsh") is not self:
@@ -108,10 +114,10 @@ def _read_physical_names(gmsh_api):
 
 def _read_elements(gmsh_api):
     physical_by_element = {}
-    for _, entity_tag in gmsh_api.model.getEntities(2):
-        physical = gmsh_api.model.getPhysicalGroupsForEntity(2, entity_tag)
+    for dim, entity_tag in gmsh_api.model.getEntities():
+        physical = gmsh_api.model.getPhysicalGroupsForEntity(dim, entity_tag)
         physical_tag = int(physical[0]) if len(physical) else None
-        _, tags, _ = gmsh_api.model.mesh.getElements(2, entity_tag)
+        _, tags, _ = gmsh_api.model.mesh.getElements(dim, entity_tag)
         for type_tags in tags:
             for element_id in type_tags:
                 physical_by_element[int(element_id)] = physical_tag

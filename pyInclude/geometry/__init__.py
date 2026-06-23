@@ -6,6 +6,7 @@
 
 from .core import GainMedium, GainMediumGeometry, Grid, MeshTopology, OpenPmdComponentField, OpenPmdScalarField, _flat
 from .msh import Gmsh, GmshElement
+from .volume import VolumeTopology
 from .vtk import writeGainMediumVtk
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "MeshTopology",
     "OpenPmdComponentField",
     "OpenPmdScalarField",
+    "VolumeTopology",
     "writeGainMediumVtk",
     "_flat",
 ]

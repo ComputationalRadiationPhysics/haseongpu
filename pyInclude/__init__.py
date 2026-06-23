@@ -26,7 +26,7 @@ from .openpmd import (
     backendFlat,
     unitDimension,
 )
-from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, writeGainMediumVtk
+from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, VolumeTopology, writeGainMediumVtk
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
 from .simulation import (
     ConnectivityAverageBetaVolumeMapper,
