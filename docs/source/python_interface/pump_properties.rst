@@ -53,8 +53,21 @@ custom pump solvers do not need to provide Gaussian beam parameters.
    ``40.0``.
 
 ``pumpSubsteps``
-   Optional.  Number of time samples used by the default pump integration.
-   Defaults to ``100`` and must be at least 2 when supplied.
+   Optional.  Number of time samples used by the default pump integration
+   inside one pumped simulation step.  Defaults to ``100`` and must be at
+   least 2 when supplied.
+
+   This is not the number of outer simulation steps that receive pump energy.
+   Use ``Simulation.runSteps(steps, pumpSteps=...)`` or set ``pumpSteps`` on
+   ``PumpProperties`` for that.  For example, ``runSteps(150, pumpSteps=50)``
+   pumps the first 50 outer steps and then continues ASE and fluorescence
+   without pump contribution for the remaining 100 steps.
+
+``pumpSteps``
+   Optional custom property.  Number of outer simulation steps with pump
+   contribution when ``Simulation.runSteps(steps)`` is called without an
+   explicit ``pumpSteps`` override.  Omit it, or set it to ``None``, to pump for
+   every outer step.
 
 ``solver``
    Optional.  Custom pump solver.  If omitted, ``Simulation`` uses the built-in

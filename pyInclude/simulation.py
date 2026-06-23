@@ -444,6 +444,7 @@ class Simulation:
     _beforeStepCallbacks: list = field(default_factory=list, init=False, repr=False)
     _callbacks: list = field(default_factory=list, init=False, repr=False)
     _lastState: TimeStepState | None = field(default=None, init=False, repr=False)
+    _pumpEnabled: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self):
         if self.timeIntegrationSolver is None or not hasattr(self.timeIntegrationSolver, "step"):
@@ -526,10 +527,35 @@ class Simulation:
             self.step()
         return self
 
-    def runSteps(self, steps):
-        """Run exactly ``steps`` calls to ``step()`` and return ``self``."""
-        for _ in range(int(steps)):
-            self.step()
+    def runSteps(self, steps, pumpSteps=None):
+        """Run exactly ``steps`` calls to ``step()`` and return ``self``.
+
+        ``pumpSteps`` optionally limits the pump contribution to the first
+        ``pumpSteps`` calls in this run. When omitted, ``PumpProperties`` may
+        provide a ``pumpSteps`` custom property. If neither is set, the pump is
+        active for every step, matching the historical ``runSteps(steps)``
+        behavior. ``PumpProperties.pumpSubsteps`` is separate: it controls the
+        internal pump integration resolution inside one pumped simulation step.
+        """
+        steps = int(steps)
+        if pumpSteps is None:
+            pumpSteps = self.pump.getProperty("pumpSteps")
+        if pumpSteps is None:
+            for _ in range(steps):
+                self.step()
+            return self
+
+        pumpSteps = int(pumpSteps)
+        if pumpSteps < 0:
+            raise ValueError("pumpSteps must be non-negative")
+
+        previousPumpEnabled = self._pumpEnabled
+        try:
+            for index in range(steps):
+                self._pumpEnabled = index < pumpSteps
+                self.step()
+        finally:
+            self._pumpEnabled = previousPumpEnabled
         return self
 
     def step(self):
@@ -627,6 +653,8 @@ class Simulation:
             callback(self, *args, **kwargs)
 
     def _dndtPump(self, beta_cells):
+        if not self._pumpEnabled:
+            return np.zeros_like(beta_cells, dtype=np.float64)
         pump_duration = self.pump.activeDuration(self.timeStep)
         solver = self.pump.solver if self.pump.solver is not None else BetaIntegrationGaussianSolver()
         updated = solver.step(

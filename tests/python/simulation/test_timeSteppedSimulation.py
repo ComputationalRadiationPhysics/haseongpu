@@ -48,6 +48,61 @@ def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
     assert seen[-1].betaVolume.shape == (2, 2)
 
 
+def testRunStepsCanLimitPumpContribution(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    class ConstantPumpSolver:
+        def step(self, input, pump):
+            return np.asarray(input["betaCell"], dtype=np.float64) + 1.0e-6
+
+    pumpProperties.customProperties["solver"] = ConstantPumpSolver()
+    seen = []
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=ExponentialEuler(),
+        timeStep=1e-5,
+    ).onStep(seen.append)
+
+    simulation.runSteps(3, pumpSteps=1)
+
+    assert np.any(seen[0].dndtPump > 0.0)
+    assert np.allclose(seen[1].dndtPump, 0.0)
+    assert np.allclose(seen[2].dndtPump, 0.0)
+
+
+def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    class ConstantPumpSolver:
+        def step(self, input, pump):
+            return np.asarray(input["betaCell"], dtype=np.float64) + 1.0e-6
+
+    pumpProperties.customProperties["solver"] = ConstantPumpSolver()
+    pumpProperties.customProperties["pumpSteps"] = 1
+    seen = []
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=ExponentialEuler(),
+        timeStep=1e-5,
+    ).onStep(seen.append)
+
+    simulation.runSteps(3)
+
+    assert np.any(seen[0].dndtPump > 0.0)
+    assert np.allclose(seen[1].dndtPump, 0.0)
+    assert np.allclose(seen[2].dndtPump, 0.0)
+
+
 def testOnStepPassesStateBeforeUserArguments(
     smallGainMedium,
     smallTopology,

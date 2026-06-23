@@ -304,7 +304,13 @@ One simulation step performs the physical update in this order: pump
 contribution, ASE calculation, fluorescence decay, time integration, beta
 volume update, latest-state update, and step callbacks.
 
-``simulation.runSteps(3)`` runs exactly three steps.  For a time-based run use
+``simulation.runSteps(3)`` runs exactly three steps.  Pass
+``pumpSteps`` to limit pump action to the first outer simulation steps while
+ASE and fluorescence continue, for example ``simulation.runSteps(150,
+pumpSteps=50)``.  The same value may be stored on ``PumpProperties`` when the
+pump schedule belongs with the pump setup.  ``pumpSteps`` is distinct from
+``PumpProperties.pumpSubsteps``: ``pumpSubsteps`` is only the internal pump
+integration resolution inside one pumped outer step.  For a time-based run use
 ``simulation.runUntil(endTime=1e-3)`` or set ``endTime`` in the constructor and
 call ``simulation.runUntil()``.
 

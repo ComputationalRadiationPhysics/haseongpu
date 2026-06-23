@@ -26,6 +26,20 @@ Run a fixed number of steps:
 
    simulation.runSteps(3)
 
+Limit pumping to the first outer simulation steps while ASE and fluorescence
+continue for the full run:
+
+.. code-block:: python
+
+   simulation.runSteps(150, pumpSteps=50)
+
+``pumpSteps`` counts outer calls to ``Simulation.step()``.  You can pass it
+to ``runSteps`` or store it on ``PumpProperties`` and then call
+``simulation.runSteps(150)``.  When neither location provides ``pumpSteps``, the
+pump is active for every step passed to ``runSteps``.  This is different from
+``PumpProperties.pumpSubsteps``, which only controls the internal time
+resolution of the pump integration inside one pumped simulation step.
+
 Run until a target time:
 
 .. code-block:: python
