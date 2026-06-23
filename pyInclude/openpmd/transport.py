@@ -37,7 +37,7 @@ CANONICAL_CONNECTIVITY_SPEC = FieldSpec(
     "cells_connectivity",
     ("cell", "local_vertex"),
     np.uint32,
-    lambda context: (context.numberOfPrisms, 6),
+    lambda context: (context.numberOfCells, 4),
     unitDimension=unitDimension.canonicalConnectivity,
     backendRequired=False,
 )
@@ -46,7 +46,7 @@ CANONICAL_OFFSETS_SPEC = FieldSpec(
     "cells_offsets",
     ("cell_offset",),
     np.uint32,
-    lambda context: (context.numberOfPrisms + 1,),
+    lambda context: (context.numberOfCells + 1,),
     unitDimension=unitDimension.canonicalOffsets,
     backendRequired=False,
 )
@@ -55,7 +55,7 @@ CANONICAL_CELL_TYPES_SPEC = FieldSpec(
     "cells_types",
     ("cell",),
     np.uint32,
-    lambda context: (context.numberOfPrisms,),
+    lambda context: (context.numberOfCells,),
     unitDimension=unitDimension.canonicalCellTypes,
     backendRequired=False,
 )
@@ -72,7 +72,7 @@ EXPLICIT_CELL_FACES_SPEC = FieldSpec(
     "cell_faces",
     ("cell", "local_face", "local_vertex"),
     np.int32,
-    lambda context: (context.numberOfCells, context.numberOfFacesPerCell, 4),
+    lambda context: (context.numberOfCells, context.numberOfFacesPerCell, 3),
     backendRequired=False,
 )
 EXPLICIT_CELL_NEIGHBORS_SPEC = FieldSpec(
@@ -412,14 +412,7 @@ def _fieldContext(gainMedium):
             numberOfLevels=1,
             numberOfSamplePoints=topology.numberOfSamplePoints,
         )
-    topology._require_levels()
-    if topology.thickness is None:
-        raise ValueError("topology thickness is required before running a simulation")
-    return SimpleNamespace(
-        numberOfPoints=topology.numberOfPoints,
-        numberOfTriangles=topology.numberOfTriangles,
-        numberOfLevels=int(topology.levels),
-    )
+    raise TypeError("PhiASE openPMD transport requires a Tet4 VolumeTopology")
 
 
 def _validatePhiAseTransportOptions(phiAse):
@@ -655,7 +648,7 @@ def _reset_scalar_record(
     grid_unit_si=1.0,
     grid_spacing=None,
     grid_global_offset=None,
-    geometry_parameters="topology=unstructured_triangular_prism",
+    geometry_parameters="topology=explicit_tet4_volume",
 ):
     io = _io()
     record.set_attribute("geometry", "other")
@@ -710,7 +703,7 @@ def _resetFlatField(record, spec: FieldSpec, values, context):
 def _resetComponent(record, component_name, data, axis_labels, unit_dimension, unit_si=1.0):
     io = _io()
     record.set_attribute("geometry", "other")
-    record.set_attribute("geometryParameters", "topology=unstructured_triangular_prism")
+    record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
     record.set_attribute("dataOrder", "C")
     record.axis_labels = axis_labels
     # ADIOS2 SST may not preserve openPMD axisLabels on streamed mesh records.
@@ -727,32 +720,14 @@ def _resetComponent(record, component_name, data, axis_labels, unit_dimension, u
     component.store_chunk(data)
 
 
-def _canonical_topology_context(topology):
-    topology._require_levels()
-    return SimpleNamespace(
-        numberOfMeshPoints=topology.numberOfPoints * int(topology.levels),
-        numberOfPrisms=topology.numberOfTriangles * (int(topology.levels) - 1),
-    )
-
-
 def _explicit_topology_context(topology):
     return SimpleNamespace(
         numberOfMeshPoints=topology.numberOfPoints,
         numberOfCells=topology.numberOfCells,
-        numberOfPrisms=topology.numberOfCells,
         numberOfFacesPerCell=topology.numberOfFacesPerCell,
+        numberOfCellVertices=4,
         numberOfSamplePoints=topology.numberOfSamplePoints,
     )
-
-
-def _canonical_point_components(topology):
-    points = np.asarray(topology.points, dtype=np.float64)
-    z_values = topology.levelCoordinates()
-    return {
-        "x": np.tile(points[:, 0], z_values.size),
-        "y": np.tile(points[:, 1], z_values.size),
-        "z": np.repeat(z_values, topology.numberOfPoints),
-    }
 
 
 def _explicit_point_components(topology):
@@ -773,62 +748,6 @@ def _explicit_sample_point_components(topology):
     }
 
 
-def _canonical_cell_connectivity(topology):
-    triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
-    rows = []
-    for level in range(int(topology.levels) - 1):
-        lower = level * topology.numberOfPoints
-        upper = (level + 1) * topology.numberOfPoints
-        for tri in triangles:
-            ids = [int(vertex) for vertex in tri]
-            rows.append([
-                ids[0] + lower,
-                ids[1] + lower,
-                ids[2] + lower,
-                ids[0] + upper,
-                ids[1] + upper,
-                ids[2] + upper,
-            ])
-    return np.asarray(rows, dtype=np.uint32).reshape(-1)
-
-
-def _write_canonical_static_topology(iteration, gainMedium):
-    topology = gainMedium.topology
-    context = _canonical_topology_context(topology)
-    record = iteration.meshes["core_" + CANONICAL_POINTS_SPEC.recordName]
-    for component_name, values in _canonical_point_components(topology).items():
-        _resetComponent(
-            record,
-            component_name,
-            np.ascontiguousarray(values),
-            ["mesh_point"],
-            _unit_dimension(_io(), CANONICAL_POINTS_SPEC.unitDimension),
-            CANONICAL_POINTS_SPEC.unitSI,
-        )
-    _record_metadata(record, CANONICAL_POINTS_SPEC)
-    record.set_attribute("hasePrimitiveShape", list(CANONICAL_POINTS_SPEC.expectedShape(context)))
-
-    connectivity = _canonical_cell_connectivity(topology)
-    _resetFlatField(
-        iteration.meshes["core_" + CANONICAL_CONNECTIVITY_SPEC.recordName],
-        CANONICAL_CONNECTIVITY_SPEC,
-        connectivity,
-        context,
-    )
-    _resetFlatField(
-        iteration.meshes["core_" + CANONICAL_OFFSETS_SPEC.recordName],
-        CANONICAL_OFFSETS_SPEC,
-        np.arange(context.numberOfPrisms + 1, dtype=np.uint32) * np.uint32(6),
-        context,
-    )
-    _resetFlatField(
-        iteration.meshes["core_" + CANONICAL_CELL_TYPES_SPEC.recordName],
-        CANONICAL_CELL_TYPES_SPEC,
-        np.full(context.numberOfPrisms, 13, dtype=np.uint32),
-        context,
-    )
-
-
 def _write_explicit_static_topology(iteration, topology):
     context = _explicit_topology_context(topology)
     record = iteration.meshes["core_" + CANONICAL_POINTS_SPEC.recordName]
@@ -842,7 +761,7 @@ def _write_explicit_static_topology(iteration, topology):
             CANONICAL_POINTS_SPEC.unitSI,
         )
     _record_metadata(record, CANONICAL_POINTS_SPEC)
-    record.set_attribute("geometryParameters", "topology=explicit_volume_cells")
+    record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
     record.set_attribute("hasePrimitiveShape", list(CANONICAL_POINTS_SPEC.expectedShape(context)))
 
     sample_record = iteration.meshes["core_" + EXPLICIT_SAMPLE_POINTS_SPEC.recordName]
@@ -856,7 +775,7 @@ def _write_explicit_static_topology(iteration, topology):
             EXPLICIT_SAMPLE_POINTS_SPEC.unitSI,
         )
     _record_metadata(sample_record, EXPLICIT_SAMPLE_POINTS_SPEC)
-    sample_record.set_attribute("geometryParameters", "topology=explicit_volume_cells")
+    sample_record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
     sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
 
     def backend_flat(values):
@@ -956,10 +875,9 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
     if include_static:
         iteration.set_attribute("haseStaticUpdate", True)
         topology = gainMedium.topology
-        if hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells"):
-            _write_explicit_static_topology(iteration, topology)
-        else:
-            _write_canonical_static_topology(iteration, gainMedium)
+        if not (hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells")):
+            raise TypeError("PhiASE openPMD transport requires a Tet4 VolumeTopology")
+        _write_explicit_static_topology(iteration, topology)
     else:
         iteration.set_attribute("haseStaticUpdate", False)
 

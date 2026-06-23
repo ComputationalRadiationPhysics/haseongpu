@@ -59,7 +59,7 @@ class Gmsh:
         return _from_gmsh(self, numberOfLevels=numberOfLevels, thickness=thickness)
 
     def volumeTopology(self, **kwargs):
-        """Convert 3D gmsh Prism6 elements into an explicit ``VolumeTopology``."""
+        """Convert 3D gmsh Tet4 elements into an explicit ``VolumeTopology``."""
         from .volume import VolumeTopology
 
         return VolumeTopology.fromGmsh(self, **kwargs)
