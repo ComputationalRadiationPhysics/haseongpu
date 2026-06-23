@@ -133,6 +133,24 @@ The data shape must match either:
 * point data: ``(numberOfPoints, numberOfLevels)``
 * cell data: ``(numberOfTriangles, numberOfLevels - 1)``
 
+Gain Field Export
+-----------------
+
+``calcGainFromState`` calculates small-signal laser gain from a
+``TimeStepState`` and returns a point-shaped array that can be written directly
+with ``vtkWedge``:
+
+.. code-block:: python
+
+   vtkWedge(
+       output_path,
+       state,
+       fields={
+           "gain": calcGainFromState(state, spectra, nTot),
+       },
+   )
+
+
 Physical Constants
 ------------------
 

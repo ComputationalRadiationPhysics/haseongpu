@@ -24,6 +24,7 @@ if buildPythonRoot.is_dir():
 
 from HASEonGPU import (  # noqa: E402
     BetaIntegrationGaussianSolver,
+    calcGainFromState,
     Constants,
     CrossSectionData,
     ExponentialEuler,
@@ -32,8 +33,10 @@ from HASEonGPU import (  # noqa: E402
     PhiASE,
     PumpProperties,
     Simulation,
-    vtkWedge
+    vtkWedge,
 )
+
+
 def printState(state):
     print(
         f"step={state.step:03d} "
@@ -43,9 +46,14 @@ def printState(state):
     )
 
 
-def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0):
+def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossSections=None, nTot=None):
     if state.phiAse is None:
         raise ValueError("VTK export requires state.phiAse")
+    if crossSections is None:
+        raise ValueError("VTK export requires crossSections for gain")
+    if nTot is None:
+        raise ValueError("VTK export requires nTot for gain")
+
     return vtkWedge(
         Path(vtkOutputDir) / f'laserPumpCladding_{state.step:03d}.vtk',
         state,
@@ -54,6 +62,7 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0):
             "phiASE": state.phiAse,
             "dndtAse": state.dndtAse,
             "cladAbs": state.phiAse * np.float64(claddingAbsorption),
+            "gain": calcGainFromState(state, crossSections, nTot),
         },
     )
 
@@ -171,7 +180,13 @@ def runExample(
     simulation.onInit(prePumpInitialState)
 
     simulation.onStep(printState)
-    simulation.onStep(writeVtkFields, vtkOutputDir, absorption)
+    simulation.onStep(
+        writeVtkFields,
+        vtkOutputDir,
+        absorption,
+        spectralProperties,
+        medium.get("nTot").value,
+    )
     simulation.runSteps(timeSlices) # adjust this by number of steps
     return simulation.getLastState() # return the last state to confirm shape.
 
