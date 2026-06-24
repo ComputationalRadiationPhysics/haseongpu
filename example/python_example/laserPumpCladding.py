@@ -59,6 +59,7 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
             "betaCells": state.betaCells,
             "phiASE": state.phiAse,
             "dndtAse": state.dndtAse,
+            "dndtPump": state.dndtPump,
             "cladAbs": state.phiAse * np.float64(claddingAbsorption),
             "gain": calcGainFromState(state, crossSections, nTot),
         },
