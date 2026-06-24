@@ -8,11 +8,33 @@
 from HASEonGPU import AlpakaBackends, calcPhiASE
 import numpy as np
 import copy
+import importlib
 import pytest
+from types import SimpleNamespace
+
+calcPhiASEModule = importlib.import_module("pyInclude.calcPhiASE")
 
 
 alpakaBackends = AlpakaBackends.all()
 REGRESSION_RNG_SEED = 5489
+
+
+def testFindCalcPhiASENearModuleFallsBackToInstalledBindingsPath(monkeypatch, tmp_path):
+    localBindings = tmp_path / "repo" / "HASEonGPU_Bindings"
+    installedBindings = tmp_path / "site-packages" / "HASEonGPU_Bindings"
+    localBindings.mkdir(parents=True)
+    installedBindings.mkdir(parents=True)
+
+    expected = installedBindings / "calcPhiASE"
+    expected.write_text("", encoding="utf-8")
+
+    fakeBindings = SimpleNamespace(
+        __file__=str(localBindings / "__init__.py"),
+        __path__=[str(localBindings), str(installedBindings)],
+    )
+    monkeypatch.setattr(calcPhiASEModule, "HASEonGPU_Bindings", fakeBindings)
+
+    assert calcPhiASEModule.findCalcPhiASENearModule().resolve() == expected.resolve()
 
 
 def toFlat(arr, width=None, dtype=None):

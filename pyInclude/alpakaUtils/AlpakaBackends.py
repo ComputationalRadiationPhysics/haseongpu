@@ -22,12 +22,33 @@ def _libraryNames():
 
 def _candidatePaths():
     moduleDir = Path(__file__).resolve().parent
+    seen = set()
+
+    def yieldPath(path):
+        normalized = str(path.resolve())
+        if normalized in seen:
+            return
+        seen.add(normalized)
+        return path
+
     for name in _libraryNames():
-        yield moduleDir / name
+        candidate = yieldPath(moduleDir / name)
+        if candidate is not None:
+            yield candidate
 
     for parent in moduleDir.parents:
         for name in _libraryNames():
-            yield parent / "build" / "python" / "HASEonGPU_Bindings" / name
+            candidate = yieldPath(parent / "build" / "python" / "HASEonGPU_Bindings" / name)
+            if candidate is not None:
+                yield candidate
+        buildRoot = parent / "build"
+        if not buildRoot.is_dir():
+            continue
+        for bindingDir in sorted(buildRoot.glob("*/python/HASEonGPU_Bindings")):
+            for name in _libraryNames():
+                candidate = yieldPath(bindingDir / name)
+                if candidate is not None:
+                    yield candidate
 
     try:
         import HASEonGPU_Bindings
@@ -36,7 +57,9 @@ def _candidatePaths():
 
     for packageDir in getattr(HASEonGPU_Bindings, "__path__", []):
         for name in _libraryNames():
-            yield Path(packageDir) / name
+            candidate = yieldPath(Path(packageDir) / name)
+            if candidate is not None:
+                yield candidate
 
 
 def _loadLibrary():

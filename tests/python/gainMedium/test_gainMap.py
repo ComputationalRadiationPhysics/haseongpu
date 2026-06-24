@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import numpy as np
+import pytest
 
 from HASEonGPU import TimeStepState, calcGainFromState
 
@@ -31,21 +32,14 @@ def testCalcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
 
     sigma_abs = crossSections.crossSectionAbsorption[0]
     sigma_ems = crossSections.crossSectionEmission[0]
-    expected_segment = sigma_abs - 0.25 * (sigma_abs + sigma_ems)
-    expected = np.exp(-expected_segment * 2.0 * smallTopology.thickness * (smallTopology.levels - 1))
+    expected = (0.25 * (sigma_abs + sigma_ems) - sigma_abs) * 2.0
     assert gain.shape == (smallTopology.numberOfPoints, smallTopology.levels)
     assert np.allclose(gain, expected)
 
 
-def testCalcGainFromStateSupportsPerSegmentNTot(smallTopology, crossSections):
+def testCalcGainFromStateRequiresNTot(smallTopology, crossSections):
     beta = np.ones((smallTopology.numberOfPoints, smallTopology.levels), dtype=np.float64)
     state = _state(smallTopology, beta)
 
-    gain = calcGainFromState(state, crossSections, nTotGradient=[1.0, 3.0])
-
-    sigma_abs = crossSections.crossSectionAbsorption[0]
-    sigma_ems = crossSections.crossSectionEmission[0]
-    expected_segment = sigma_abs - sigma_abs - sigma_ems
-    expected = np.exp(-expected_segment * smallTopology.thickness * (1.0 + 3.0))
-    assert gain.shape == (smallTopology.numberOfPoints, smallTopology.levels)
-    assert np.allclose(gain, expected)
+    with pytest.raises(ValueError, match="requires nTot"):
+        calcGainFromState(state, crossSections)

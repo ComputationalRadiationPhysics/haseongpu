@@ -77,10 +77,10 @@ compiled on the target machine:
 
 .. code-block:: bash
 
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
 
-This keeps the install editable while building a release-mode backend with
-host-specific CPU tuning. Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when
+This builds and installs a release-mode backend with host-specific CPU tuning.
+Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when
 building redistributable wheels or binaries for unknown CPUs. See
 :doc:`compilation` for the full CMake option reference.
 

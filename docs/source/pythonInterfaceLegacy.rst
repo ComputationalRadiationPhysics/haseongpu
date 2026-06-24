@@ -17,7 +17,7 @@ source-build path described in :doc:`Getting Started <gettingStarted>`:
 
 .. code-block:: bash
 
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
 
 Usage
 -----
