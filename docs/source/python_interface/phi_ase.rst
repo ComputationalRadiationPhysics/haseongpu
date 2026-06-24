@@ -166,9 +166,9 @@ Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``write_vtk``, ``min_sample_range``, ``max_sample_range``, and
 ``rng_seed``.
 
-Loading YAML requires ``PyYAML``.  The editable package installation installs
-this dependency from ``pyproject.toml``; source-tree usage must provide it in
-the Python environment.
+Loading YAML requires ``PyYAML``. The package installation installs this
+dependency from ``pyproject.toml``; source-tree usage must provide it in the
+Python environment.
 
 For command-line tools:
 

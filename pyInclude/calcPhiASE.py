@@ -133,23 +133,33 @@ def parseCalcPhiASEOutput(FOLDER, layout):
     return phiASE, mseValues, raysUsedPerSample
 
 def findCalcPhiASENearModule():
-    """Find the packaged ``calcPhiASE`` executable next to the Python module."""
-    so_dir = Path(HASEonGPU_Bindings.__file__).resolve().parent
+    """Find the packaged ``calcPhiASE`` executable for legacy file-based runs."""
+    checked = []
+    package_dirs = [
+        Path(packageDir).resolve()
+        for packageDir in getattr(HASEonGPU_Bindings, "__path__", [])
+    ]
+    if not package_dirs:
+        package_dirs = [Path(HASEonGPU_Bindings.__file__).resolve().parent]
 
-    # direct sibling
-    direct = so_dir / "calcPhiASE"
-    if direct.is_file():
-        return direct
+    for package_dir in package_dirs:
+        direct = package_dir / "calcPhiASE"
+        checked.append(str(direct))
+        if direct.is_file():
+            return direct
 
-    # one level below
-    for sub in so_dir.iterdir():
-        if sub.is_dir():
+        for sub in sorted(package_dir.iterdir()) if package_dir.is_dir() else ():
+            if not sub.is_dir():
+                continue
             candidate = sub / "calcPhiASE"
+            checked.append(str(candidate))
             if candidate.is_file():
                 return candidate
 
+    searched = "\n".join(f"  - {path}" for path in checked)
     raise FileNotFoundError(
-        f"Could not find calcPhiASE near module location: {so_dir}"
+        "Could not find calcPhiASE near any HASEonGPU_Bindings package path. "
+        "Searched:\n" + searched
     )
 
 

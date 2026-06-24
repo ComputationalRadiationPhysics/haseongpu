@@ -61,7 +61,7 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
             "dndtAse": state.dndtAse,
             "dndtPump": state.dndtPump,
             "cladAbs": state.phiAse * np.float64(claddingAbsorption),
-            "gain": calcGainFromState(state, crossSections, nTot),
+            "localGain": calcGainFromState(state, crossSections, nTot),
         },
     )
 
@@ -115,7 +115,7 @@ def runExample(
     backend="UseConfig",
     timeSlices=150,
     # pumpSteps: pumped outer simulation steps; None pumps for all timeSlices.
-    pumpSteps=100,
+    pumpSteps=50,
     vtkOutputDir=scriptDir,
     **AseOverride,
 ):

@@ -262,7 +262,7 @@ jobs:
             )
           fi
 
-          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install --no-build-isolation -e .
+          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install --no-build-isolation .
 
       - name: Debug Python install
         shell: bash
@@ -291,6 +291,14 @@ jobs:
           import HASEonGPU
           print("HASEonGPU imported from:", HASEonGPU.__file__)
           PY
+
+      - name: Run installed-package smoke test from /tmp
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
+          cd /tmp
+          python hase_bindings_smoketest.py
 
       - name: Run CTest
         shell: bash

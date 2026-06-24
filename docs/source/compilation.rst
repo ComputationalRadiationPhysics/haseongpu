@@ -139,7 +139,7 @@ For Python source installs, pass the option through ``CMAKE_ARGS``:
 
 .. code-block:: bash
 
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install -e .
+   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
 
 For redistributable wheels or binaries, configure with:
 
