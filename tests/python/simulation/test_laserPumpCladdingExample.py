@@ -53,7 +53,7 @@ class _FakePhiASE:
 
 
 def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, smallGainMedium):
-    monkeypatch.setattr(laserPumpCladding, "BetaIntegrationGaussianSolver", lambda: _NoPumpSolver())
+    monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _NoPumpSolver())
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
     monkeypatch.setattr(
         laserPumpCladding.PhiASE,
@@ -73,7 +73,7 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
 
 
 def testLaserPumpCladdingExamplePassesPumpStepsToSimulation(monkeypatch, tmp_path, smallGainMedium):
-    monkeypatch.setattr(laserPumpCladding, "BetaIntegrationGaussianSolver", lambda: _ConstantPumpSolver())
+    monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _ConstantPumpSolver())
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
     monkeypatch.setattr(
         laserPumpCladding.PhiASE,

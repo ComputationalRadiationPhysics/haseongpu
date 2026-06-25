@@ -13,12 +13,14 @@ __version__ = "2.0"
 from .alpakaUtils import AlpakaBackends
 from .calcPhiASE import calcPhiASE
 from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, writeGainMediumVtk
-from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
+from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition, PumpRadiationProfile
 from .pumping import (
     BetaInt3PumpSolver,
     BetaIntegrationSolver,
     BetaIntegrationGaussianSolver,
     Constants,
+    OneDimensionalZTraversal,
+    oneDimensionalZTraversalPumpRate,
     beta_int3Main,
     integrateLaserPump,
     runLaserPumpStep,

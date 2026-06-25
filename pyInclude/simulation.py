@@ -436,6 +436,8 @@ class Simulation:
     """Physical constants used by the pump integrator."""
     updateTerminalLevel: bool = True
     """Whether the last z-level beta values are advanced by the solver."""
+    enableAse: bool = True
+    """Whether each derivative evaluation runs ASE depletion through ``PhiASE``."""
 
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -657,6 +659,7 @@ class Simulation:
             return np.zeros_like(beta_cells, dtype=np.float64)
         pump_duration = self.pump.activeDuration(self.timeStep)
         solver = self.pump.solver if self.pump.solver is not None else BetaIntegrationGaussianSolver()
+        # Pump solvers return β(t + Δt); this converts the update into ∂β/∂t|pump.
         updated = solver.step(
             {
                 "betaCell": beta_cells,
@@ -676,10 +679,15 @@ class Simulation:
         )
         self.gainMedium.get("betaCells").value = beta_cells
         self._updateBetaVolumeFromCells()
-        self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
-        ase_result = self.phiASE.getResults()
-        phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
-        dndt_ase = self._aseDerivative(phi_ase, betaCells=beta_cells)
+        if self.enableAse:
+            self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
+            ase_result = self.phiASE.getResults()
+            phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
+            dndt_ase = self._aseDerivative(phi_ase, betaCells=beta_cells)
+        else:
+            ase_result = None
+            phi_ase = np.zeros_like(beta_cells, dtype=np.float64)
+            dndt_ase = np.zeros_like(beta_cells, dtype=np.float64)
         dndt_pump = self._dndtPump(beta_cells)
         tau = max(float(self.gainMedium.get("crystalTFluo").value), np.finfo(float).tiny)
         total_derivative = dndt_pump - dndt_ase - beta_cells / tau

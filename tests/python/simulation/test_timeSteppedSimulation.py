@@ -9,6 +9,8 @@ import numpy as np
 
 from HASEonGPU import (
     Constants,
+    OneDimensionalZTraversal,
+    CrossSectionData,
     ExponentialEuler,
     ExplicitEuler,
     GainMedium,
@@ -18,6 +20,8 @@ from HASEonGPU import (
     PumpProperties,
     RungeKutta4,
     Simulation,
+    PumpRadiationProfile,
+    oneDimensionalZTraversalPumpRate,
 )
 
 
@@ -46,6 +50,35 @@ def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
     assert seen[-1].step == 2
     assert seen[-1].betaCells.shape == (4, 3)
     assert seen[-1].betaVolume.shape == (2, 2)
+
+
+def testSimulationCanDisableAseWithoutBreakingState(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    phiAse = makeFakePhiAse(smallTopology)
+
+    def failRun(*args, **kwargs):
+        raise AssertionError("PhiASE.run should not be called when enableAse=False")
+
+    phiAse.run = failRun
+    state = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=phiAse,
+        timeIntegrationSolver=ExponentialEuler(),
+        timeStep=1e-5,
+        enableAse=False,
+    ).step()
+
+    assert state.aseResult is None
+    assert state.phiAse.shape == (smallTopology.numberOfPoints, smallTopology.levels)
+    assert state.dndtAse.shape == (smallTopology.numberOfPoints, smallTopology.levels)
+    assert np.allclose(state.phiAse, 0.0)
+    assert np.allclose(state.dndtAse, 0.0)
+    assert np.all(np.isfinite(state.betaCells))
 
 
 def testRunStepsCanLimitPumpContribution(
@@ -265,6 +298,191 @@ def testCustomPumpSolverCanReadAdditionalPumpProperties(
     assert np.allclose(state.betaCells, expected)
 
 
+def testOneDimensionalZTraversalProducesFrozenStatePumpRate(
+    smallGainMedium,
+    smallTopology,
+    crossSections,
+    makeFakePhiAse,
+):
+    pump = PumpProperties(
+        spectralProperties=crossSections,
+        intensity=16e3,
+        wavelength=940e-9,
+        radiusX=1.5,
+        backReflection=False,
+        propagationDirection=(0.0, 0.0, 1.0),
+        solver=OneDimensionalZTraversal(),
+    )
+    state = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pump,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=ExplicitEuler(),
+        timeStep=1e-5,
+        enableAse=False,
+    ).step()
+
+    expected = oneDimensionalZTraversalPumpRate(
+        smallTopology.points,
+        np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+        pump,
+        smallGainMedium,
+    )
+
+    assert np.allclose(state.dndtPump, expected)
+    assert np.all(state.dndtPump >= 0.0)
+    assert np.allclose(state.phiAse, 0.0)
+
+
+def testOneDimensionalZTraversalUsesProfileCenter(
+    smallTopology,
+):
+    spectra = CrossSectionData.monochromatic(
+        wavelength=940e-9,
+        crossSectionAbsorption=1.0e-22,
+        crossSectionEmission=0.0,
+    )
+    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
+        betaCells=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=np.zeros((2, smallTopology.numberOfTriangles)),
+        nTot=0.0,
+        crystalTFluo=9.5e-4,
+        claddingNumber=1,
+        claddingAbsorption=0.0,
+    )
+    profile = PumpRadiationProfile(
+        intensity=1.0,
+        wavelengths=[940e-9],
+        waist=(0.2, 0.2),
+        center=smallTopology.points[0],
+        propagationDirection=(0.0, 0.0, 1.0),
+        backReflection=False,
+        superGaussianOrder=2,
+    )
+    pump = PumpProperties(crossSections=spectra, profile=profile, solver=OneDimensionalZTraversal())
+
+    rate = oneDimensionalZTraversalPumpRate(
+        smallTopology.points,
+        medium.get("betaCells").value,
+        pump,
+        medium,
+    )
+
+    assert np.all(rate[0] >= rate[1:])
+    assert np.any(rate[0] > rate[1:])
+
+
+def testPumpRadiationProfileUsesCrystalSpectraAndDefaultUnitWeights(
+    smallTopology,
+):
+    spectra = CrossSectionData(
+        wavelengthsAbsorption=[900e-9, 940e-9],
+        crossSectionAbsorption=[1.0e-22, 2.0e-22],
+        wavelengthsEmission=[900e-9, 940e-9],
+        crossSectionEmission=[0.0, 0.0],
+    )
+    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
+        betaCells=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=np.zeros((2, smallTopology.numberOfTriangles)),
+        nTot=0.0,
+        crystalTFluo=9.5e-4,
+        claddingNumber=1,
+        claddingAbsorption=0.0,
+    )
+    profile = PumpRadiationProfile(
+        intensity=10.0,
+        wavelengths=[900e-9, 940e-9],
+        waist=(1.5, 1.5),
+        propagationDirection=(0.0, 0.0, 1.0),
+        backReflection=False,
+        superGaussianOrder=40,
+    )
+    pump = PumpProperties(
+        crossSections=spectra,
+        profile=profile,
+        solver=OneDimensionalZTraversal(),
+    )
+
+    rate = oneDimensionalZTraversalPumpRate(
+        smallTopology.points,
+        medium.get("betaCells").value,
+        pump,
+        medium,
+        Constants(c=3.0e8, h=6.0e-34),
+    )
+
+    points = np.asarray(smallTopology.points, dtype=np.float64)
+    intensity = 10.0 * np.exp(-((points[:, 0] ** 2 + points[:, 1] ** 2) / (1.5 ** 2)) ** 20.0)
+    expected_per_point = intensity * (
+        1.0e-22 * 900e-9 / (6.0e-34 * 3.0e8)
+        + 2.0e-22 * 940e-9 / (6.0e-34 * 3.0e8)
+    )
+
+    assert np.allclose(rate, expected_per_point[:, None])
+
+
+def testOneDimensionalZTraversalSupportsMultichromaticWeightsAndDirection(
+    smallTopology,
+):
+    spectra = CrossSectionData(
+        wavelengthsAbsorption=[900e-9, 940e-9],
+        crossSectionAbsorption=[1.0e-22, 2.0e-22],
+        wavelengthsEmission=[900e-9, 940e-9],
+        crossSectionEmission=[0.5e-22, 1.0e-22],
+    )
+    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
+        betaCells=np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.25),
+        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=np.zeros((2, smallTopology.numberOfTriangles)),
+        nTot=0.0,
+        crystalTFluo=9.5e-4,
+        claddingNumber=1,
+        claddingAbsorption=0.0,
+    )
+    pump = PumpProperties(
+        spectralProperties=spectra,
+        intensity=10.0,
+        radiusX=1.5,
+        backReflection=True,
+        reflectivity=0.5,
+        propagationDirection=(0.0, 0.0, -1.0),
+        spectralWeights=[0.25, 0.75],
+        solver=OneDimensionalZTraversal(),
+    )
+
+    rate = oneDimensionalZTraversalPumpRate(
+        smallTopology.points,
+        medium.get("betaCells").value,
+        pump,
+        medium,
+        Constants(c=3.0e8, h=6.0e-34),
+    )
+
+    points = np.asarray(smallTopology.points, dtype=np.float64)
+    intensity = 10.0 * np.exp(-((points[:, 0] ** 2 + points[:, 1] ** 2) / (1.5 ** 2)) ** 20.0)
+    wavelengths = np.asarray([900e-9, 940e-9])
+    sigma_abs = np.asarray([1.0e-22, 2.0e-22])
+    sigma_ems = np.asarray([0.5e-22, 1.0e-22])
+    weights = np.asarray([0.25, 0.75])
+    beta = 0.25
+    expected_per_point = np.sum(
+        weights
+        * (sigma_abs - beta * (sigma_abs + sigma_ems))
+        * (1.0 + 0.5)
+        * intensity[:, None]
+        * wavelengths
+        / (6.0e-34 * 3.0e8),
+        axis=1,
+    )
+
+    assert np.allclose(rate, expected_per_point[:, None])
+
+
 def testDefaultPumpSolverRequiresGaussianRadius(crossSections):
     try:
         PumpProperties(
@@ -312,14 +530,14 @@ def testPumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
         wavelength=940e-9,
         radiusX=1.5,
         radiusY=1.5,
-        exponent=40,
+        superGaussianOrder=40,
         ji=3,
     )
 
     assert pump.getProperty("ji") == 3
     assert pump.ji == 3
     assert pump.radiusX == 1.5
-    assert pump.exponent == 40
+    assert pump.superGaussianOrder == 40
 
 
 def testTimeIntegrationSolverIsMandatory(
