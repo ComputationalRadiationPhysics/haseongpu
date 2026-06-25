@@ -31,16 +31,21 @@ namespace hase::kernels::forward
         }
 
         double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * totalVolume;
-        double prefix = 0.0;
-        for(unsigned tet = 0u; tet < mesh.numberOfCells; ++tet)
+        unsigned lower = 0u;
+        unsigned upper = mesh.numberOfCells;
+        while(lower < upper)
         {
-            prefix += mesh.getCellVolume(tet);
-            if(target <= prefix)
+            unsigned const middle = lower + (upper - lower) / 2u;
+            if(target <= mesh.cellVolumePrefix[middle])
             {
-                return tet;
+                upper = middle;
+            }
+            else
+            {
+                lower = middle + 1u;
             }
         }
-        return mesh.numberOfCells - 1u;
+        return lower < mesh.numberOfCells ? lower : mesh.numberOfCells - 1u;
     }
 
     [[nodiscard]] ALPAKA_FN_ACC hase::core::Point samplePointInVolume(

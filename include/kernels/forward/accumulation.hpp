@@ -41,6 +41,7 @@ namespace hase::kernels::forward
             {
                 (void) rayNumber;
                 unsigned tet = sampleVolumeByVolume(mesh, totalVolume, rndEngine);
+                double const sourceBeta = mesh.getBetaVolume(tet);
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
                 unsigned const sigmaIndex = hase::kernels::GenRndSigmas{}(lambdaResolution, rndEngine);
@@ -51,6 +52,7 @@ namespace hase::kernels::forward
                     origin,
                     direction,
                     forwardRayLength,
+                    sourceBeta,
                     sigmaA[sigmaIndex],
                     sigmaE[sigmaIndex],
                     phiAccumulator,
@@ -66,6 +68,7 @@ namespace hase::kernels::forward
             hase::core::Point origin,
             hase::core::Point const direction,
             double remaining,
+            double const sourceBeta,
             double const sigmaA,
             double const sigmaE,
             alpaka::concepts::IMdSpan auto phiAccumulator,
@@ -73,6 +76,7 @@ namespace hase::kernels::forward
             alpaka::concepts::IMdSpan auto droppedRays) const
         {
             int forbiddenFace = -1;
+            double accumulatedGain = 1.0;
             constexpr double nudgeFactor = 64.0 * std::numeric_limits<double>::epsilon();
             while(remaining > SMALL)
             {
@@ -80,9 +84,11 @@ namespace hase::kernels::forward
                 double segmentLength = remaining;
                 int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
                 hase::core::Point const midpoint = advance(origin, direction, 0.5 * segmentLength);
-                double contribution = mesh.getBetaVolume(tet) * segmentLength;
-                contribution *= localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
-                contribution *= segmentCenterWeight(mesh, tet, midpoint);
+                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
+                double contribution = sourceBeta * accumulatedGain;
+                contribution *= alpaka::math::sqrt(alpaka::math::max(0.0, segmentGain));
+                (void) midpoint;
+                contribution *= segmentLength;
                 if(alpaka::math::isfinite(contribution))
                 {
                     alpaka::onAcc::atomicAdd(acc, &phiAccumulator[tet], contribution);
@@ -93,6 +99,7 @@ namespace hase::kernels::forward
                     alpaka::onAcc::atomicAdd(acc, &droppedRays[tet], 1u);
                 }
 
+                accumulatedGain *= segmentGain;
                 origin = advance(origin, direction, segmentLength);
                 remaining -= segmentLength;
                 if(nextFace < 0)
