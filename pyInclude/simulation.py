@@ -62,18 +62,24 @@ class PhiASE:
     gainMedium: GainMedium | None = None
     """Optional medium stored for direct ``run()`` calls."""
 
+    propagationMode: str = "forward"
+    """ASE propagation mode: ``forward`` by default, or ``backward`` for regression runs."""
     minRaysPerSample: int = 100000
-    """Minimum Monte Carlo rays launched for each beta sample."""
+    """Minimum Monte Carlo rays launched for each beta sample in backward mode."""
     maxRaysPerSample: int = 100000
     """Maximum rays per sample allowed during adaptive refinement."""
+    forwardRayCount: int | None = None
+    """Number of globally launched forward rays; defaults to ``maxRaysPerSample``."""
+    forwardRayLength: float | None = None
+    """Fixed forward ray length in metres; required for forward mode."""
     mseThreshold: float = 0.1
     """Target mean-squared-error threshold for adaptive ASE sampling."""
     repetitions: int = 4
     """Maximum repeated ASE estimates at a fixed ray count."""
     adaptiveSteps: int = 4
     """Number of ray-count increases between min and max rays."""
-    useReflections: bool = True
-    """Whether top/bottom surface reflectivities affect ray propagation."""
+    useReflections: bool = False
+    """Whether surface reflectivities affect propagation; unsupported for forward mode."""
     monochromatic: bool = False
     """Use only the first spectral samples instead of wavelength integration."""
 
@@ -140,6 +146,9 @@ class PhiASE:
         parser.add_argument("--phi-ase-config", default=None, help="YAML file with PhiASE compute/experiment settings")
         parser.add_argument("--min-rays-per-sample", type=int, default=None)
         parser.add_argument("--max-rays-per-sample", type=int, default=None)
+        parser.add_argument("--propagation-mode", choices=("forward", "backward"), default=None)
+        parser.add_argument("--forward-ray-count", type=int, default=None)
+        parser.add_argument("--forward-ray-length", type=float, default=None)
         parser.add_argument("--mse-threshold", type=float, default=None)
         parser.add_argument("--repetitions", type=int, default=None)
         parser.add_argument("--adaptive-steps", type=int, default=None)
@@ -159,6 +168,9 @@ class PhiASE:
         mapping = {
             "min_rays_per_sample": "minRaysPerSample",
             "max_rays_per_sample": "maxRaysPerSample",
+            "propagation_mode": "propagationMode",
+            "forward_ray_count": "forwardRayCount",
+            "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
             "repetitions": "repetitions",
             "adaptive_steps": "adaptiveSteps",
@@ -202,6 +214,9 @@ class PhiASE:
             "maxRays": "maxRaysPerSample",
             "min_rays_per_sample": "minRaysPerSample",
             "max_rays_per_sample": "maxRaysPerSample",
+            "propagation_mode": "propagationMode",
+            "forward_ray_count": "forwardRayCount",
+            "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
             "adaptive_steps": "adaptiveSteps",
             "use_reflections": "useReflections",
@@ -215,6 +230,10 @@ class PhiASE:
             "rng_seed": "rngSeed",
         }
         allowed = {
+            "minRaysPerSample", "maxRaysPerSample", "propagationMode", "forwardRayCount",
+            "forwardRayLength", "mseThreshold", "repetitions",
+            "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
+            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
             "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
             "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
@@ -233,6 +252,8 @@ class PhiASE:
         attributes = {
             "minRaysPerSample": self.minRaysPerSample,
             "maxRaysPerSample": self.maxRaysPerSample,
+            "propagationMode": self.propagationMode,
+            "forwardRayCount": self.maxRaysPerSample if self.forwardRayCount is None else self.forwardRayCount,
             "mseThreshold": self.mseThreshold,
             "repetitions": self.repetitions,
             "adaptiveSteps": self.adaptiveSteps,
@@ -244,6 +265,8 @@ class PhiASE:
             "minSampleRange": min_sample,
             "maxSampleRange": max_sample,
         }
+        if self.forwardRayLength is not None:
+            attributes["forwardRayLength"] = float(self.forwardRayLength)
         if self.rngSeed is not None:
             attributes["rngSeed"] = int(self.rngSeed)
         return attributes

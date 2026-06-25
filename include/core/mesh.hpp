@@ -444,6 +444,7 @@ namespace hase::core
         unsigned numberOfSamples = 0u;
         unsigned numberOfFacesPerCell = tet4FaceCount;
         unsigned numberOfCellVertices = tet4VertexCount;
+        bool resultAtVolumes = false;
 
         HostMesh() = default;
 

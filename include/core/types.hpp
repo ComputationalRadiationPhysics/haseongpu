@@ -252,8 +252,26 @@ namespace hase::core
         {
         }
 
+        [[nodiscard]] bool isForwardPropagation() const
+        {
+            return propagationMode == "forward";
+        }
+
+        [[nodiscard]] bool isBackwardPropagation() const
+        {
+            return propagationMode == "backward";
+        }
+
+        [[nodiscard]] unsigned resolvedForwardRayCount() const
+        {
+            return forwardRayCount == 0u ? maxRaysPerSample : forwardRayCount;
+        }
+
         unsigned minRaysPerSample;
         unsigned maxRaysPerSample;
+        unsigned forwardRayCount = 0u;
+        double forwardRayLength = 0.0;
+        std::string propagationMode = "forward";
         std::vector<double> lambdaA;
         std::vector<double> lambdaE;
         std::vector<double> sigmaA;

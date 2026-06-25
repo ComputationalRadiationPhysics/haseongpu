@@ -32,6 +32,9 @@ namespace
         constexpr char const* claddingAbsorption = "cladding_absorption";
         constexpr char const* minRaysPerSample = "min_rays_per_sample";
         constexpr char const* maxRaysPerSample = "max_rays_per_sample";
+        constexpr char const* propagationMode = "propagation_mode";
+        constexpr char const* forwardRayCount = "forward_ray_count";
+        constexpr char const* forwardRayLength = "forward_ray_length";
         constexpr char const* mseThreshold = "mse_threshold";
         constexpr char const* useReflections = "use_reflections";
         constexpr char const* spectralResolution = "spectral_resolution";
@@ -450,14 +453,17 @@ namespace
         return first;
     }
 
-    void initializeResultForMesh(hase::core::Result& result, hase::core::HostMesh const& mesh)
+    void initializeResultForMesh(
+        hase::core::Result& result,
+        hase::core::HostMesh const& mesh,
+        hase::core::ExperimentParameters const& experiment)
     {
-        auto const numberOfSamples = mesh.numberOfSamples;
+        auto const resultSize = experiment.isForwardPropagation() ? mesh.numberOfCells : mesh.numberOfSamples;
         result = hase::core::Result(
-            std::vector<float>(numberOfSamples, 0.0f),
-            std::vector<double>(numberOfSamples, 100000.0),
-            std::vector<unsigned>(numberOfSamples, 0u),
-            std::vector<double>(numberOfSamples, 0.0));
+            std::vector<float>(resultSize, 0.0f),
+            std::vector<double>(resultSize, 100000.0),
+            std::vector<unsigned>(resultSize, 0u),
+            std::vector<double>(resultSize, 0.0));
     }
 
     template<typename T>
@@ -469,11 +475,12 @@ namespace
         std::vector<std::string> const& axisLabels,
         std::string const& unit = "1",
         double unitSI = 1.0,
-        std::array<double, 7> unitDimension = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
+        std::array<double, 7> unitDimension = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        std::string const& geometryEntity = "sample_point")
     {
         auto record = iteration.meshes[name];
         record.setAttribute("geometry", "other");
-        record.setAttribute("geometryParameters", "entity=sample_point");
+        record.setAttribute("geometryParameters", "entity=" + geometryEntity);
         record.setAttribute("dataOrder", "C");
         record.setAxisLabels(axisLabels);
         record.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
@@ -816,10 +823,16 @@ namespace hase::openpmd
 
         auto const numberOfPoints = attribute<unsigned>(iteration, field::numberOfPoints);
         auto const numberOfCells = attribute<unsigned>(iteration, field::numberOfCells);
+        auto const propagationMode = attributeOr<std::string>(iteration, field::propagationMode, std::string{"forward"});
+        if(propagationMode != "forward" && propagationMode != "backward")
+        {
+            validationError("propagation_mode", "expected 'forward' or 'backward'");
+        }
+        bool const forwardMode = propagationMode == "forward";
         if(!iteration.meshes.contains(prefix + "points") || !iteration.meshes.contains(prefix + "cell_faces")
            || !iteration.meshes.contains(prefix + "cell_neighbor_cells")
            || !iteration.meshes.contains(prefix + "cell_neighbor_local_faces")
-           || !iteration.meshes.contains(prefix + "sample_points"))
+           || (!forwardMode && !iteration.meshes.contains(prefix + "sample_points")))
         {
             validationError("explicit topology", "backend requires explicit 3D unstructured cell records");
         }
@@ -869,14 +882,22 @@ namespace hase::openpmd
             validationError("explicit topology", "cell offsets do not match Tet4 connectivity");
         }
 
-        unsigned const numberOfSamples = componentExtent(iteration, prefix + "sample_points", "x");
-        std::vector<double> samplePoints = concatenate(
-            concatenate(
-                loadComponent<double>(series, iteration, prefix + "sample_points", "x", io::Extent{numberOfSamples}),
-                loadComponent<double>(series, iteration, prefix + "sample_points", "y", io::Extent{numberOfSamples})),
-            loadComponent<double>(series, iteration, prefix + "sample_points", "z", io::Extent{numberOfSamples}));
         auto cellVolumes = deriveCellVolumes(points, connectivity, numberOfPoints, numberOfCells);
         auto cellCenters = deriveCellCenters(points, connectivity, numberOfPoints, numberOfCells);
+        unsigned const numberOfSamples = forwardMode ? numberOfCells : componentExtent(iteration, prefix + "sample_points", "x");
+        std::vector<double> samplePoints;
+        if(forwardMode)
+        {
+            samplePoints = cellCenters;
+        }
+        else
+        {
+            samplePoints = concatenate(
+                concatenate(
+                    loadComponent<double>(series, iteration, prefix + "sample_points", "x", io::Extent{numberOfSamples}),
+                    loadComponent<double>(series, iteration, prefix + "sample_points", "y", io::Extent{numberOfSamples})),
+                loadComponent<double>(series, iteration, prefix + "sample_points", "z", io::Extent{numberOfSamples}));
+        }
 
         core::HostMesh mesh(
             std::move(connectivity),
@@ -930,15 +951,17 @@ namespace hase::openpmd
                 {numberOfCells},
                 true,
                 true),
-            loadScalar<double>(
-                series,
-                iteration,
-                prefix + "point_beta",
-                io::Extent{numberOfSamples},
-                {"sample_point"},
-                {numberOfSamples},
-                true,
-                true),
+            forwardMode
+                ? std::vector<double>{}
+                : loadScalar<double>(
+                    series,
+                    iteration,
+                    prefix + "point_beta",
+                    io::Extent{numberOfSamples},
+                    {"sample_point"},
+                    {numberOfSamples},
+                    true,
+                    true),
             loadScalar<unsigned>(
                 series,
                 iteration,
@@ -1021,6 +1044,27 @@ namespace hase::openpmd
             attribute<unsigned>(iteration, field::spectralResolution),
             attributeOr<bool>(iteration, field::monochromatic, false));
 
+        experiment.propagationMode = propagationMode;
+        experiment.forwardRayCount
+            = attributeOr<unsigned>(iteration, field::forwardRayCount, experiment.maxRaysPerSample);
+        if(forwardMode)
+        {
+            if(!iteration.containsAttribute(field::forwardRayLength))
+            {
+                validationError("forward_ray_length", "required when propagation_mode is 'forward'");
+            }
+            experiment.forwardRayLength = attribute<double>(iteration, field::forwardRayLength);
+            if(experiment.forwardRayLength <= 0.0)
+            {
+                validationError("forward_ray_length", "must be positive");
+            }
+            if(experiment.useReflections)
+            {
+                validationError(
+                    "use_reflections",
+                    "forward propagation terminates at surfaces and does not support reflections");
+            }
+        }
         experiment.maxSigmaA = attributeOr<double>(iteration, field::maxSigmaAbsorption, experiment.maxSigmaA);
         experiment.maxSigmaE = attributeOr<double>(iteration, field::maxSigmaEmission, experiment.maxSigmaE);
 
@@ -1036,7 +1080,10 @@ namespace hase::openpmd
             false,
             std::vector<unsigned>{},
             attributeOr<unsigned>(iteration, field::minSampleRange, 0u),
-            attributeOr<unsigned>(iteration, field::maxSampleRange, numberOfSamples - 1u),
+            attributeOr<unsigned>(
+                iteration,
+                field::maxSampleRange,
+                (forwardMode ? numberOfCells : numberOfSamples) - 1u),
             attributeOr<unsigned>(iteration, field::rngSeed, core::ComputeParameters::unspecifiedRngSeed));
 
         core::SimulationRunControl run;
@@ -1065,9 +1112,10 @@ namespace hase::openpmd
         run.pump.temporaryFluorescence = attributeOr<double>(iteration, field::pumpTemporaryFluorescence, 0.0);
 
         mesh.calcTotalReflectionAngles();
+        mesh.resultAtVolumes = forwardMode;
 
         core::Result result;
-        initializeResultForMesh(result, mesh);
+        initializeResultForMesh(result, mesh, experiment);
         iteration.close();
         return {std::move(experiment), std::move(compute), std::move(mesh), std::move(result), std::move(run)};
     }
@@ -1089,16 +1137,19 @@ namespace hase::openpmd
             {numberOfCells},
             true,
             true);
-        simulation.mesh.betaCells = loadScalar<double>(
-            series,
-            iteration,
-            prefix + "point_beta",
-            io::Extent{numberOfSamples},
-            {"sample_point"},
-            {numberOfSamples},
-            true,
-            true);
-        initializeResultForMesh(simulation.result, simulation.mesh);
+        if(simulation.experiment.isBackwardPropagation())
+        {
+            simulation.mesh.betaCells = loadScalar<double>(
+                series,
+                iteration,
+                prefix + "point_beta",
+                io::Extent{numberOfSamples},
+                {"sample_point"},
+                {numberOfSamples},
+                true,
+                true);
+        }
+        initializeResultForMesh(simulation.result, simulation.mesh, simulation.experiment);
         iteration.close();
     }
 
@@ -1129,7 +1180,11 @@ namespace hase::openpmd
         core::Result const& result,
         core::HostMesh const& mesh)
     {
-        auto const extent = io::Extent{mesh.numberOfSamples};
+        bool const volumeResult = mesh.resultAtVolumes;
+        auto const extent = io::Extent{volumeResult ? mesh.numberOfCells : mesh.numberOfSamples};
+        auto const resultAxes
+            = volumeResult ? std::vector<std::string>{"cell"} : std::vector<std::string>{"sample_point"};
+        auto const resultEntity = volumeResult ? std::string{"cell"} : std::string{"sample_point"};
         auto iterations = series.writeIterations();
         auto iteration = iterations[iterationIndex];
         iteration.setTime(0.0);
@@ -1148,21 +1203,41 @@ namespace hase::openpmd
             prefix + "phi_ase",
             phiAse,
             extent,
-            {"sample_point"},
+            resultAxes,
             "cm^-2 s^-1",
             1.0e4,
-            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(iteration, prefix + "mse", mse, extent, {"sample_point"});
-        writeScalar(iteration, prefix + "total_rays", totalRays, extent, {"sample_point"}, "count");
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0},
+            resultEntity);
+        writeScalar(
+            iteration,
+            prefix + "mse",
+            mse,
+            extent,
+            resultAxes,
+            "1",
+            1.0,
+            {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+            resultEntity);
+        writeScalar(
+            iteration,
+            prefix + "total_rays",
+            totalRays,
+            extent,
+            resultAxes,
+            "count",
+            1.0,
+            {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+            resultEntity);
         writeScalar(
             iteration,
             prefix + "dndt_ase",
             dndtAse,
             extent,
-            {"sample_point"},
+            resultAxes,
             "s^-1",
             1.0,
-            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0},
+            resultEntity);
 
         iteration.close();
     }
