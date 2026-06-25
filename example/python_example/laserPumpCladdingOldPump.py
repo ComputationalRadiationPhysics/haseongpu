@@ -23,7 +23,7 @@ if buildPythonRoot.is_dir():
     sys.path.insert(0, str(buildPythonRoot))
 
 from HASEonGPU import (  # noqa: E402
-    OneDimensionalZTraversal,
+    BetaIntegrationGaussianSolver,
     calcGainFromState,
     Constants,
     CrossSectionData,
@@ -33,7 +33,6 @@ from HASEonGPU import (  # noqa: E402
     PhiASE,
     PumpProperties,
     Simulation,
-    PumpRadiationProfile,
     vtkWedge,
 )
 def printState(state):
@@ -134,14 +133,10 @@ def runExample(
         resolution=1000,
     )
 
-    pumpProfile = PumpRadiationProfile(
-        intensity=16e3, # KW/cm^2
-        wavelengths=[940e-9],
-        waist=(1.5, 1.5),
-        superGaussianOrder=40,
-        propagationDirection=(0.0, 0.0, 1.0),
-        backReflection=True,
-        reflectivity=1.0,
+    pumpCrossSections = CrossSectionData.monochromatic(
+        wavelength=940e-9,
+        crossSectionAbsorption=0.778e-20,
+        crossSectionEmission=0.195e-20,
     )
     absorption=5.5
     medium = laserPumpCladdingMedium(
@@ -160,10 +155,19 @@ def runExample(
 
 
     pumpProperties=PumpProperties(
-                         crossSections=spectralProperties,
-                         profile=pumpProfile,
-                         pumpSteps=pumpSteps, # allows stopping pumping earlier to see gain degrading
-                         solver=OneDimensionalZTraversal(),
+                         crossSections=pumpCrossSections,
+                         intensity=16e3, # KW/cm^2
+                         pumpDuration=1e-6, # 1 μs
+                         pumpSubsteps=100, #
+                         temporaryFluorescence=1.0,
+                         pumpSteps=pumpSteps,
+                         solver=BetaIntegrationGaussianSolver(),
+                         wavelength=940e-9,
+                         radiusX=1.5,
+                         radiusY=1.5,
+                         superGaussianOrder=40,
+                         backReflection=True,
+                         reflectivity=1.0,
                          extraction=False)
     print(f"Running simulation with backend {phiAse.backend}")
     simulation = Simulation(
@@ -202,13 +206,13 @@ def main(argv=None):
         help=(
             "Number of outer simulation steps with pump contribution. "
             "Default: 100. Use a value matching --timeSteps to pump for the full run. "
-            "The continuous pump solver evaluates dndtPump once per outer step; "
-            "there are no internal pump substeps."
+            "This is distinct from "
+            "PumpProperties.pumpSubsteps, which is the internal pump "
+            "integration resolution."
         ),
     )
     parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
-    parser.add_argument("--disable-ase", action="store_true", help="Skip PhiASE backend runs and use zero ASE depletion")
     args = parser.parse_args(argv)
 
     state = runExample(
@@ -217,7 +221,7 @@ def main(argv=None):
         timeSlices=args.timeSteps,
         pumpSteps=args.pumpSteps,
         vtkOutputDir=args.vtk_output_dir,
-        enableAse=not args.disable_ase,
+        enableAse=False,
     )
     print(f"phiAse shape: {state.phiAse.shape}")
     print(f"betaCells shape: {state.betaCells.shape}")

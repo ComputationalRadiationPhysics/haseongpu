@@ -379,6 +379,147 @@ def integrateLaserPump(
 runLaserPumpStep = integrateLaserPump
 
 
+def _pumpSpectralSamples(pumpProperties):
+     """Return wavelength, sigma_abs, sigma_ems, and raw spectral weights arrays."""
+     spectra = pumpProperties.crossSections
+     explicit_wavelengths = pumpProperties.getProperty("wavelengths")
+     multichromatic = bool(pumpProperties.getProperty("multichromatic", False))
+     explicit_wavelength = bool(getattr(pumpProperties, "_explicitWavelength", True))
+
+     if explicit_wavelengths is not None:
+          wavelengths = np.asarray(explicit_wavelengths, dtype=np.float64).reshape(-1)
+          sigma_abs = np.asarray([spectra.absorptionAt(wavelength) for wavelength in wavelengths], dtype=np.float64)
+          sigma_ems = np.asarray([spectra.emissionAt(wavelength) for wavelength in wavelengths], dtype=np.float64)
+     elif multichromatic or not explicit_wavelength:
+          wavelengths = np.asarray(spectra.wavelengthsAbsorption, dtype=np.float64).reshape(-1)
+          sigma_abs = np.asarray(spectra.crossSectionAbsorption, dtype=np.float64).reshape(-1)
+          sigma_ems = np.asarray([spectra.emissionAt(wavelength) for wavelength in wavelengths], dtype=np.float64)
+     else:
+          wavelengths = np.asarray([float(pumpProperties.wavelength)], dtype=np.float64)
+          sigma_abs = np.asarray([spectra.absorptionAt(float(pumpProperties.wavelength))], dtype=np.float64)
+          sigma_ems = np.asarray([spectra.emissionAt(float(pumpProperties.wavelength))], dtype=np.float64)
+
+     if wavelengths.size == 0:
+          raise ValueError("one-dimensional z-traversal pump requires at least one wavelength sample")
+
+     weights = pumpProperties.getProperty("spectralWeights")
+     if weights is None:
+          weights = np.ones(wavelengths.shape, dtype=np.float64)
+     else:
+          weights = np.asarray(weights, dtype=np.float64).reshape(-1)
+          if weights.size != wavelengths.size:
+               raise ValueError("spectralWeights must have the same length as pump wavelength samples")
+          if not np.all(np.isfinite(weights)):
+               raise ValueError("spectralWeights must be finite")
+     return wavelengths, sigma_abs, sigma_ems, weights
+
+
+def _directionSign(direction):
+     if direction is None:
+          raise ValueError("OneDimensionalZTraversal requires propagationDirection")
+     if isinstance(direction, str) or np.isscalar(direction):
+          raise TypeError("OneDimensionalZTraversal propagationDirection must be a 3-vector")
+     values = np.asarray(direction, dtype=np.float64).reshape(-1)
+     if values.size != 3:
+          raise ValueError("OneDimensionalZTraversal propagationDirection must be a 3-vector")
+     if not np.all(np.isfinite(values)):
+          raise ValueError("OneDimensionalZTraversal propagationDirection must be finite")
+     norm = float(np.linalg.norm(values))
+     if norm == 0.0:
+          raise ValueError("OneDimensionalZTraversal propagationDirection must not be zero")
+     z_component = float(values[2] / norm)
+     if z_component > 0.0:
+          return 1
+     if z_component < 0.0:
+          return -1
+     raise ValueError("OneDimensionalZTraversal currently requires propagationDirection with a non-zero z component")
+
+
+def oneDimensionalZTraversalPumpRate(points, betaCells, pumpProperties, gainMedium, constants=None):
+     """Return frozen-state pump contribution using a 1D z traversal model."""
+     constants = _constantsDict(constants)
+     topology = gainMedium.topology
+     topology._require_levels()
+     beta_cells = np.asarray(betaCells, dtype=np.float64).reshape(
+          (topology.numberOfPoints, topology.levels),
+          order="F",
+     )
+     points = np.asarray(points, dtype=np.float64)
+     wavelengths, sigma_abs, sigma_ems, weights = _pumpSpectralSamples(pumpProperties)
+     direction = _directionSign(pumpProperties.propagationDirection)
+
+     transverse_profile = str(pumpProperties.getProperty("transverseProfile", "superGaussian"))
+     if transverse_profile != "superGaussian":
+          raise ValueError("OneDimensionalZTraversal currently supports transverseProfile='superGaussian'")
+     rx = float(pumpProperties.radiusX)
+     ry = float(pumpProperties.radiusY)
+     center = np.asarray(pumpProperties.getProperty("center", (0.0, 0.0)), dtype=np.float64).reshape(-1)
+     if center.size not in {2, 3}:
+          raise ValueError("OneDimensionalZTraversal center must be a 2D or 3D point")
+     x_rel = points[:, 0] - center[0]
+     y_rel = points[:, 1] - center[1]
+     super_gaussian_order = float(pumpProperties.superGaussianOrder)
+     r = np.sqrt((x_rel ** 2) / (ry ** 2) + (y_rel ** 2) / (rx ** 2))
+     pump_input = float(pumpProperties.intensity) * np.exp(-(r ** super_gaussian_order))
+     spectral_input = pump_input[:, None] * weights[None, :]
+
+     sigma_sum = sigma_abs + sigma_ems
+     n_tot = float(gainMedium.get("nTot").value)
+     crystal_step = float(topology.thickness)
+     beta_average = 0.5 * (beta_cells[:, :-1] + beta_cells[:, 1:])
+     propagation = np.exp(
+          -(
+              sigma_abs[None, :, None]
+              - beta_average[:, None, :] * sigma_sum[None, :, None]
+          )
+          * n_tot
+          * crystal_step
+     )
+
+     pump_primary = np.empty((beta_cells.shape[0], wavelengths.size, beta_cells.shape[1]), dtype=np.float64)
+     if direction == 1:
+          pump_primary[:, :, 0] = spectral_input
+          pump_primary[:, :, 1:] = spectral_input[:, :, None] * np.cumprod(propagation, axis=2)
+     else:
+          pump_primary[:, :, -1] = spectral_input
+          pump_primary[:, :, :-1] = spectral_input[:, :, None] * np.cumprod(propagation[:, :, ::-1], axis=2)[:, :, ::-1]
+
+     pump_total = pump_primary
+     if bool(pumpProperties.backReflection):
+          reflected = np.empty_like(pump_primary)
+          reflectivity = float(pumpProperties.reflectivity)
+          if direction == 1:
+               reflected[:, :, -1] = pump_primary[:, :, -1] * reflectivity
+               reflected[:, :, :-1] = reflected[:, :, -1:] * np.cumprod(propagation[:, :, ::-1], axis=2)[:, :, ::-1]
+          else:
+               reflected[:, :, 0] = pump_primary[:, :, 0] * reflectivity
+               reflected[:, :, 1:] = reflected[:, :, :1] * np.cumprod(propagation, axis=2)
+          pump_total = pump_total + reflected
+
+     # Φₖ = Iₖ λₖ / (h c), ∂β/∂t|pump = Σₖ [σₐₖ - β(σₐₖ + σₑₖ)] Φₖ.
+     photon_flux_scale = wavelengths / (float(constants["h"]) * float(constants["c"]))
+     gain_per_flux = sigma_abs[None, :, None] - beta_cells[:, None, :] * sigma_sum[None, :, None]
+     rate_by_wavelength = gain_per_flux * pump_total * photon_flux_scale[None, :, None]
+     return np.sum(rate_by_wavelength, axis=1)
+
+
+class OneDimensionalZTraversal:
+     """Pump solver using z-aligned 1D traversal."""
+
+     def step(self, input, pump):
+          """Return beta advanced by one outer time step using instantaneous pump rate."""
+          medium = input["_medium"]
+          beta_cells = np.asarray(input["betaCell"], dtype=np.float64)
+          rate = oneDimensionalZTraversalPumpRate(
+               points=medium.topology.points,
+               betaCells=beta_cells,
+               pumpProperties=pump,
+               gainMedium=medium,
+               constants=input.get("_constants"),
+          )
+          return beta_cells + float(input["_timeStep"]) * rate
+
+
 class BetaIntegrationGaussianSolver:
      """Default ``PumpProperties`` solver for a super-Gaussian pump beam."""
 

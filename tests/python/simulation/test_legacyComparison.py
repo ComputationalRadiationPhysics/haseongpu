@@ -21,7 +21,7 @@ legacyScript = repoRoot / "example" / "python_example" / "legacy" / "laserPumpCl
 legacyMaterial = repoRoot / "example" / "python_example" / "legacy" / "pt.mat"
 newExampleDir = repoRoot / "example" / "python_example"
 sys.path.insert(0, str(newExampleDir))
-from laserPumpCladding import runExample  # noqa: E402
+from laserPumpCladdingOldPump import runExample  # noqa: E402
 
 
 alpakaBackends = AlpakaBackends.all()

@@ -124,7 +124,7 @@ def main():
             solver=MyPumpSolver(),
             radiusX=1.5,
             radiusY=1.5,
-            exponent=40,
+            superGaussianOrder=40,
             myCustomVar=6,
         )
 

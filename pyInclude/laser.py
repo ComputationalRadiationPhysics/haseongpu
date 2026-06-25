@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 
 import numpy as np
@@ -357,6 +357,67 @@ class LaserProperties:
             if len(self.values["l_ems"]) != len(self.values["s_ems"]):
                 raise ValueError("l_ems and s_ems must have the same length")
 
+def _profileProperties(profile):
+    """Return property-style data from a user pump profile object."""
+    if profile is None:
+        return {}
+    if hasattr(profile, "toPumpProperties"):
+        return dict(profile.toPumpProperties())
+    if isinstance(profile, dict):
+        return dict(profile)
+    if is_dataclass(profile):
+        return asdict(profile)
+    names = [name for name in dir(profile) if not name.startswith("_")]
+    values = {}
+    for name in names:
+        value = getattr(profile, name)
+        if not callable(value):
+            values[name] = value
+    return values
+
+
+@dataclass
+class PumpRadiationProfile:
+    r"""Generic pump-radiation profile consumed by pump transport solvers.
+
+    The crystal still provides material cross sections. This profile describes
+    the incoming pump radiation: intensity, wavelengths, transverse waist,
+    spectral weights, propagation direction, transverse shape, and optional
+    back reflection. Solvers may consume only the fields they support.
+    """
+
+    intensity: float
+    wavelengths: object
+    waist: object
+    center: object = (0.0, 0.0)
+    spectralWeights: object | None = None
+    propagationDirection: object = (0.0, 0.0, 1.0)
+    transverseProfile: str = "superGaussian"
+    superGaussianOrder: float = 40.0
+    backReflection: bool = True
+    reflectivity: float = 1.0
+
+    def __post_init__(self):
+        self.intensity = float(self.intensity)
+        self.superGaussianOrder = float(self.superGaussianOrder)
+        self.backReflection = bool(self.backReflection)
+        self.reflectivity = float(self.reflectivity)
+
+    def toPumpProperties(self):
+        """Return profile fields in the generic ``PumpProperties`` store layout."""
+        return {
+            "intensity": self.intensity,
+            "wavelengths": self.wavelengths,
+            "waist": self.waist,
+            "center": self.center,
+            "spectralWeights": self.spectralWeights,
+            "propagationDirection": self.propagationDirection,
+            "transverseProfile": self.transverseProfile,
+            "superGaussianOrder": self.superGaussianOrder,
+            "backReflection": self.backReflection,
+            "reflectivity": self.reflectivity,
+        }
+
 
 @dataclass(init=False)
 class PumpProperties:
@@ -364,7 +425,7 @@ class PumpProperties:
 
     ``intensity`` is pump intensity :math:`I` in ``W / cm^2``. ``wavelength``
     is the pump wavelength :math:`\lambda`. Built-in Gaussian pumping also
-    uses ``radiusX``, ``radiusY``, and ``exponent`` from ``customProperties``.
+    stores generic profile and solver configuration in ``customProperties``.
     A custom ``solver`` may store its own knobs in the same dictionary.
     """
 
@@ -377,12 +438,22 @@ class PumpProperties:
     customProperties: dict
     """Extensible store for beam shape, reflection, spectra, and solver handles."""
 
-    def __init__(self, *, intensity, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
+    def __init__(self, *, intensity=None, profile=None, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
         """Create pump settings from core fields plus arbitrary custom properties."""
+        profile_properties = _profileProperties(profile)
+        self.profile = profile
+        self.customProperties = dict(customProperties or {})
+        self.customProperties.update(profile_properties)
+        if profile is not None:
+            self.customProperties["profile"] = profile
+        if intensity is None:
+            intensity = profile_properties.get("intensity")
+        if intensity is None:
+            raise ValueError("PumpProperties requires intensity or a pump-radiation profile with intensity")
         self.intensity = float(intensity)
+        self._explicitWavelength = wavelength is not None
         self.wavelength = None if wavelength is None else float(wavelength)
         self.pumpSubsteps = int(pumpSubsteps)
-        self.customProperties = dict(customProperties or {})
         self.customProperties.update(properties)
         self._normalizeProperties()
 
@@ -391,8 +462,8 @@ class PumpProperties:
         cls,
         *,
         intensity,
-        wavelength,
         radiusX,
+        wavelength=None,
         pumpDuration=None,
         duration=None,
         pumpSubsteps=100,
@@ -406,7 +477,7 @@ class PumpProperties:
         absorption=None,
         emission=None,
         radiusY=None,
-        exponent=40.0,
+        superGaussianOrder=40.0,
         backReflection=True,
         reflectivity=1.0,
         customProperties=None,
@@ -414,7 +485,7 @@ class PumpProperties:
     ):
         """Create settings for the built-in super-Gaussian pump profile.
 
-        The transverse profile is ``intensity * exp(-r ** exponent)`` with
+        The transverse profile is ``intensity * exp(-r ** superGaussianOrder)`` with
         radii ``radiusX`` and ``radiusY``. ``backReflection`` and
         ``reflectivity`` control the backward pump pass.
         """
@@ -424,7 +495,7 @@ class PumpProperties:
             {
                 "radiusX": radiusX,
                 "radiusY": radiusX if radiusY is None else radiusY,
-                "exponent": exponent,
+                "superGaussianOrder": superGaussianOrder,
                 "pumpDuration": pumpDuration if pumpDuration is not None else duration,
                 "temporaryFluorescence": temporaryFluorescence,
                 "solver": solver,
@@ -476,32 +547,49 @@ class PumpProperties:
             raise ValueError("temporaryFluorescence must be positive")
 
     def _validateGaussianPumpParameters(self):
-        radius_x = self.getProperty("radiusX")
+        radius_x = self.radiusX
         radius_y = self.radiusY
         if radius_x is None:
-            raise ValueError("default Gaussian pump solver requires radiusX")
+            raise ValueError("default Gaussian pump solver requires radiusX or waist")
         if radius_y is None:
-            raise ValueError("default Gaussian pump solver requires radiusY or radiusX")
+            raise ValueError("default Gaussian pump solver requires radiusY, radiusX, or waist")
         if float(radius_x) <= 0.0 or float(radius_y) <= 0.0:
             raise ValueError("pump radii must be positive")
 
     def __getattr__(self, name):
         if "customProperties" in self.__dict__ and name in self.customProperties:
             return self.customProperties[name]
+        if name == "profile":
+            return self.__dict__.get("profile")
         if name == "crossSections":
             return self.customProperties.get("crossSections")
         if name == "spectralProperties":
             return self.customProperties.get("spectralProperties")
+        if name == "radiusX":
+            waist = self.customProperties.get("waist")
+            if waist is None:
+                return self.customProperties.get("radiusX")
+            if np.isscalar(waist):
+                return waist
+            return np.asarray(waist, dtype=np.float64).reshape(-1)[0]
         if name == "radiusY":
-            return self.customProperties.get("radiusY", self.customProperties.get("radiusX"))
-        if name == "exponent":
-            return self.customProperties.get("exponent", 40.0)
+            waist = self.customProperties.get("waist")
+            if waist is None:
+                return self.customProperties.get("radiusY", self.customProperties.get("radiusX"))
+            if np.isscalar(waist):
+                return waist
+            values = np.asarray(waist, dtype=np.float64).reshape(-1)
+            return values[1] if values.size > 1 else values[0]
+        if name == "superGaussianOrder":
+            return self.customProperties.get("superGaussianOrder", 40.0)
         if name == "backReflection":
             return self.customProperties.get("backReflection", True)
         if name == "reflectivity":
             return self.customProperties.get("reflectivity", 1.0)
         if name == "extraction":
             return self.customProperties.get("extraction", False)
+        if name == "propagationDirection":
+            return self.customProperties.get("propagationDirection")
         if name in {"pumpDuration", "temporaryFluorescence", "solver", "gainMedium", "duration", "crossSectionAbsorption", "crossSectionEmission"}:
             return self.customProperties.get(name)
         raise AttributeError(name)
@@ -533,7 +621,7 @@ class PumpProperties:
         self._validateGaussianPumpParameters()
         points = np.asarray(points, dtype=np.float64)
         r = np.sqrt((points[:, 0] ** 2) / (self.radiusY ** 2) + (points[:, 1] ** 2) / (self.radiusX ** 2))
-        return self.intensity * np.exp(-(r ** self.exponent))
+        return self.intensity * np.exp(-(r ** self.superGaussianOrder))
 
     def toDict(self, timeFrame=None):
         """Return the low-level pump dictionary consumed by ``pumping.py``."""
@@ -548,7 +636,7 @@ class PumpProperties:
             "wavelength": float(self.wavelength),
             "rx": float(self.radiusX),
             "ry": float(self.radiusY),
-            "exp": float(self.exponent),
+            "exp": float(self.superGaussianOrder),
         }
 
     def modeDict(self):
