@@ -44,7 +44,7 @@ namespace hase::core
         DeviceMeshView mesh = meshContainer.toView();
         unsigned const volumeCount = mesh.numberOfCells;
         unsigned const rayCount = experiment.resolvedForwardRayCount();
-        double const totalVolume = std::accumulate(hostMesh.cellVolumes.begin(), hostMesh.cellVolumes.end(), 0.0);
+        double const totalVolume = hostMesh.cellVolumePrefix.empty() ? 0.0 : hostMesh.cellVolumePrefix.back();
 
         auto dPhiAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
         auto dVolumeRayVisits = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
@@ -99,9 +99,11 @@ namespace hase::core
             unsigned const visits = visitsData[volume];
             result.totalRays.at(volume) = visits;
             result.droppedRays.at(volume) = droppedData[volume];
-            if(visits > 0u)
+            double const volumeSize = hostMesh.cellVolumes.at(volume);
+            if(volumeSize > 0.0 && rayCount > 0u)
             {
-                result.phiAse.at(volume) = static_cast<float>(phiData[volume] / static_cast<double>(visits));
+                double const estimate = phiData[volume] * totalVolume / (static_cast<double>(rayCount) * volumeSize);
+                result.phiAse.at(volume) = static_cast<float>(estimate);
             }
             else
             {

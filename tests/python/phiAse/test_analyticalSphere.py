@@ -28,7 +28,7 @@ def calcBetaFromGain(gain, nTot, sigmaA, sigmaE):
     return (gain / nTot + sigmaA) / (sigmaA + sigmaE)
 
 
-def constructExplicitSphereTopology(radius, *, samplePoints):
+def constructExplicitSphereTopology(radius, *, samplePoints=None, meshSizeDivisor=8.0):
     gmshApi = pytest.importorskip("gmsh")
     center = np.asarray((radius, radius, radius), dtype=np.float64)
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -46,7 +46,7 @@ def constructExplicitSphereTopology(radius, *, samplePoints):
             if surfaces:
                 gmshApi.model.addPhysicalGroup(2, surfaces, 2)
                 gmshApi.model.setPhysicalName(2, 2, "outer")
-            meshSize = max(float(radius) / 8.0, 1.0e-3)
+            meshSize = max(float(radius) / float(meshSizeDivisor), 1.0e-3)
             gmshApi.option.setNumber("Mesh.CharacteristicLengthMin", meshSize)
             gmshApi.option.setNumber("Mesh.CharacteristicLengthMax", meshSize)
             gmshApi.model.mesh.generate(3)
@@ -54,8 +54,15 @@ def constructExplicitSphereTopology(radius, *, samplePoints):
         finally:
             gmshApi.finalize()
         topology = VolumeTopology.fromFile(msh)
-    topology.samplePoints = np.asarray(samplePoints, dtype=np.float64).reshape((-1, 3))
+    if samplePoints is not None:
+        topology.samplePoints = np.asarray(samplePoints, dtype=np.float64).reshape((-1, 3))
     return topology
+
+
+def nearestVolumeIndex(topology, point):
+    point = np.asarray(point, dtype=np.float64)
+    distances = np.linalg.norm(np.asarray(topology.cellCenters, dtype=np.float64) - point, axis=1)
+    return int(np.argmin(distances))
 
 
 nTot = np.float64(1.38e20 * 1.0)
@@ -155,6 +162,80 @@ def test_centerPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAs
     assert np.isfinite(numerical)
     assert numerical > 0.0
     assert np.isclose(numerical, expected, rtol=0.05)
+
+
+@pytest.mark.parametrize("backend", ["Host_Cpu_CpuOmpBlocks"])
+def testForwardSphereCenterVolumeMatchesAnalyticalSolutionOnOmp(backend):
+    radius = np.float64(0.7196856730011522)
+    gain = np.float64(2.14)
+    nTot = np.float64(1.38e20)
+    sigmaA = np.float64(0.11e-20)
+    sigmaE = np.float64(2.1e-20)
+    beta = calcBetaFromGain(gain, nTot, sigmaA=sigmaA, sigmaE=sigmaE)
+    flourescenceLifetime = np.float64(9.41e-4)
+    center = np.asarray((radius, radius, radius), dtype=np.float64)
+
+    topology = constructExplicitSphereTopology(radius, meshSizeDivisor=17.0)
+    assert topology.numberOfCells >= 80_000
+
+    centerVolume = nearestVolumeIndex(topology, center)
+    medium = GainMedium(topology=topology)
+    medium.withPhysicalProperties(
+        betaVolume=np.full(topology.numberOfCells, beta, dtype=np.float64),
+        claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
+        nTot=nTot,
+        crystalTFluo=flourescenceLifetime,
+    )
+    crossSections = SpectralDecomposition.monochromatic(
+        wavelength=np.float64(1030e-9),
+        crossSectionAbsorption=sigmaA,
+        crossSectionEmission=sigmaE,
+    )
+    phiAse = PhiASE(
+        spectralProperties=crossSections,
+        maxRaysPerSample=1_000_000,
+        forwardRayCount=1_000_000,
+        forwardRayLength=2.0 * float(radius),
+        repetitions=1,
+        adaptiveSteps=1,
+        mseThreshold=0.05,
+        useReflections=False,
+        backend=backend,
+        parallelMode="single",
+        numDevices=1,
+        monochromatic=True,
+        rngSeed=1234,
+    )
+
+    try:
+        phiAse.run(gainMedium=medium)
+    except RuntimeError as exc:
+        if "return code 1" in str(exc):
+            pytest.skip(f"backend {backend} is not available in this build")
+        raise
+
+    result = phiAse.getResults()
+    phiAseValues = np.asarray(result.phiAse, dtype=np.float64).reshape(-1)
+    totalRays = np.asarray(result.totalRays, dtype=np.uint32).reshape(-1)
+    assert phiAseValues.size == topology.numberOfCells
+    assert totalRays[centerVolume] > 0
+
+    numerical = phiAseValues[centerVolume]
+    expected = analyticalPhiAseSphereCenter(
+        gain=gain,
+        radius=radius,
+        beta=beta,
+        nTot=nTot,
+        tauRad=flourescenceLifetime,
+    )
+    print(
+        f"forward center volume: tets={topology.numberOfCells}, "
+        f"centerVolume={centerVolume}, visits={int(totalRays[centerVolume])}, "
+        f"expected={expected}, numerical={numerical}"
+    )
+    assert np.isfinite(numerical)
+    assert numerical > 0.0
+    assert np.isclose(numerical, expected, rtol=0.2)
 
 
 if __name__ == "__main__":
