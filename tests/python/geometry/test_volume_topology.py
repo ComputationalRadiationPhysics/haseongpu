@@ -223,3 +223,33 @@ def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
         np.testing.assert_array_equal(_readOpenPmdScalar(series, iteration, "core_cell_face_boundaries"), topology.faceBoundaries.reshape(-1))
     finally:
         series.close()
+
+
+def testForwardOpenPmdInputOmitsSamplePointRecords(tmp_path):
+    from HASEonGPU import GainMedium, PhiASE, SpectralDecomposition
+
+    topology = _oneTetTopology()
+    medium = GainMedium(topology=topology)
+    medium.withPhysicalProperties(betaVolume=np.ones(topology.numberOfCells, dtype=np.float64))
+    crossSections = SpectralDecomposition.monochromatic(
+        wavelength=1.0,
+        crossSectionAbsorption=0.0,
+        crossSectionEmission=0.0,
+    )
+    phiAse = PhiASE(spectralProperties=crossSections, forwardRayLength=1.0)
+    path = tmp_path / ("forward_volume" + transport._backend_spec("adios").suffix)
+
+    with transport.OpenPmdInputSeries(path, backend="adios") as series:
+        series.write(phiAse, medium, crossSections)
+
+    io = transport._io()
+    series = io.Series(str(path), io.Access.read_only)
+    iteration = series.iterations[0]
+    try:
+        assert iteration.get_attribute("propagation_mode") == "forward"
+        assert "core_points" in iteration.meshes
+        assert "core_sample_points" not in iteration.meshes
+        assert "core_point_beta" not in iteration.meshes
+        assert "core_beta_volume" in iteration.meshes
+    finally:
+        series.close()

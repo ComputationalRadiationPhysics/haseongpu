@@ -23,6 +23,7 @@
 
 #include <alpakaUtils/DevBundle.hpp>
 #include <core/SerialVersion.hpp>
+#include <core/calcForwardPhiAse.hpp>
 #include <core/calcPhiAseThreaded.hpp>
 #include <core/logging.hpp>
 #include <core/mesh.hpp>
@@ -56,6 +57,17 @@ namespace hase::core
         unsigned const sample_i)
     {
         double const gainPerDensity = mesh.betaCells[sample_i] * (sigmaE + sigmaA) - sigmaA;
+        return gainPerDensity * phiAse;
+    }
+
+    inline double calcVolumeDndtAse(
+        HostMesh const& mesh,
+        double const sigmaA,
+        double const sigmaE,
+        float const phiAse,
+        unsigned const volume)
+    {
+        double const gainPerDensity = mesh.betaVolume[volume] * (sigmaE + sigmaA) - sigmaA;
         return gainPerDensity * phiAse;
     }
 
@@ -207,7 +219,29 @@ namespace hase::core
                 RuntimeTopology topology;
                 std::vector computes(maxDevices, compute);
                 hase::utils::ProgressBar bar;
-                if(compute.parallelMode == ParallelMode::SINGLE)
+                if(experiment.isForwardPropagation())
+                {
+                    if(compute.parallelMode == ParallelMode::MPI)
+                    {
+                        throw std::runtime_error("Forward volume propagation does not support MPI mode yet.");
+                    }
+                    alpakaUtils::DevBundle devBundle{meshes.front().m_device, exec};
+                    unsigned const rngSeed = baseRngSeed(compute);
+                    calcForwardPhiAse(devBundle, experiment, hostMesh, meshes.front(), result, runtime, rngSeed);
+                    usedGPUs = 1u;
+                    topology = RuntimeTopology{};
+                    topology.activeNodes = 1u;
+                    topology.activeRanks = 1u;
+                    topology.avgActiveRanksPerNode = 1.0;
+                    topology.minActiveRanksPerNode = 1u;
+                    topology.maxActiveRanksPerNode = 1u;
+                    topology.activeGpus = usedGPUs;
+                    topology.avgGpusPerRank = static_cast<double>(usedGPUs);
+                    topology.avgGpusPerNode = static_cast<double>(usedGPUs);
+                    topology.minGpusPerNode = usedGPUs;
+                    topology.maxGpusPerNode = usedGPUs;
+                }
+                else if(compute.parallelMode == ParallelMode::SINGLE)
                 {
                     unsigned const samplesPerNode = compute.maxSampleRange - compute.minSampleRange + 1u;
 
@@ -305,27 +339,47 @@ namespace hase::core
                              << " avg (min=" << topology.minGpusPerNode << ", max=" << topology.maxGpusPerNode << ")"
                              << std::endl;
 
-                for(unsigned sample_i = compute.minSampleRange;
-                    sample_i < meshes[0].numberOfSamples && sample_i <= compute.maxSampleRange;
-                    ++sample_i)
+                if(experiment.isForwardPropagation())
                 {
-                    result.phiAse.at(sample_i) *= (hostMesh.nTot / hostMesh.crystalTFluo);
-                    result.dndtAse.at(sample_i) = calcDndtAse(
-                        hostMesh,
-                        experiment.maxSigmaA,
-                        experiment.maxSigmaE,
-                        result.phiAse.at(sample_i),
-                        sample_i);
-                    if(sample_i <= 10)
-                        dout(V_DEBUG) << " Dndt ASE[ " << sample_i << " ]: " << result.dndtAse.at(sample_i) << " "
-                                      << result.mse.at(sample_i) << std::endl;
+                    for(unsigned volume = 0u; volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
+                        ++volume)
+                    {
+                        result.phiAse.at(volume) *= (hostMesh.nTot / hostMesh.crystalTFluo);
+                        result.dndtAse.at(volume) = calcVolumeDndtAse(
+                            hostMesh,
+                            experiment.maxSigmaA,
+                            experiment.maxSigmaE,
+                            result.phiAse.at(volume),
+                            volume);
+                    }
+                }
+                else
+                {
+                    for(unsigned sample_i = compute.minSampleRange;
+                        sample_i < meshes[0].numberOfSamples && sample_i <= compute.maxSampleRange;
+                        ++sample_i)
+                    {
+                        result.phiAse.at(sample_i) *= (hostMesh.nTot / hostMesh.crystalTFluo);
+                        result.dndtAse.at(sample_i) = calcDndtAse(
+                            hostMesh,
+                            experiment.maxSigmaA,
+                            experiment.maxSigmaE,
+                            result.phiAse.at(sample_i),
+                            sample_i);
+                        if(sample_i <= 10)
+                            dout(V_DEBUG) << " Dndt ASE[ " << sample_i << " ]: " << result.dndtAse.at(sample_i) << " "
+                                          << result.mse.at(sample_i) << std::endl;
+                    }
                 }
                 /***************************************************************************
                  * PRINT SOLUTION
                  **************************************************************************/
                 if(verbosity & V_DEBUG)
                 {
-                    for(unsigned sample_i = 0; sample_i < meshes[0].numberOfSamples; ++sample_i)
+                    unsigned const debugResultSize = experiment.isForwardPropagation()
+                                                       ? static_cast<unsigned>(result.phiAse.size())
+                                                       : meshes[0].numberOfSamples;
+                    for(unsigned sample_i = 0; sample_i < debugResultSize; ++sample_i)
                     {
                         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " "
                                       << result.mse.at(sample_i) << std::endl;

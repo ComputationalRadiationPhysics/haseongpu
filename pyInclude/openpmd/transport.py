@@ -18,7 +18,18 @@ import numpy as np
 from ..geometry import OpenPmdComponentField, OpenPmdScalarField
 from .._runtime import runtime_config, runtime_executable_candidates, runtime_root
 from .backends import _clean_backend_names, _load_backend_names
-from . import HASE_TRANSPORT_VERSION, FieldSpec, backendFlatArray, fieldSpec, flatEntityLabel, haseTransportAttributes, resultFieldSpecs, simulationAttributeSpecs, spectralContext, unitDimension
+from . import (
+    HASE_TRANSPORT_VERSION,
+    FieldSpec,
+    backendFlatArray,
+    fieldSpec,
+    flatEntityLabel,
+    haseTransportAttributes,
+    resultFieldSpecs,
+    simulationAttributeSpecs,
+    spectralContext,
+    unitDimension,
+)
 from ..structures import Result
 
 
@@ -426,7 +437,7 @@ def _attributeFields(phiAse, gainMedium, crossSections):
     values = _attributeValues(phiAse, gainMedium, crossSections)
     for spec in simulationAttributeSpecs:
         if spec.name not in values:
-            if spec.name == "rngSeed":
+            if spec.name in {"rngSeed", "forwardRayLength"}:
                 continue
             raise KeyError(spec.name)
         yield _AttributeField(spec.attribute, spec.cast(values[spec.name]))
@@ -435,7 +446,9 @@ def _attributeFields(phiAse, gainMedium, crossSections):
 def _attributeValues(phiAse, gainMedium, crossSections):
     _validatePhiAseTransportOptions(phiAse)
     context = _fieldContext(gainMedium)
-    number_of_samples = getattr(context, "numberOfSamplePoints", context.numberOfPoints * context.numberOfLevels)
+    number_of_samples = (
+        context.numberOfCells
+    )
     values = {}
     if hasattr(gainMedium.topology, "openPmdAttributes"):
         values.update(gainMedium.topology.openPmdAttributes(context))
@@ -453,9 +466,11 @@ def _attributeValues(phiAse, gainMedium, crossSections):
     values.update(phiAse.openPmdAttributes(numberOfSamples=number_of_samples))
     return values
 
-def _arrayFields(gainMedium, crossSections, *, include_static=True):
+def _arrayFields(gainMedium, crossSections, *, phiAse=None, include_static=True):
     context = _fieldContext(gainMedium)
     for field in _fieldsFromDomain(gainMedium.openPmdFields(context)):
+        if field.spec.name == "pointBeta":
+            continue
         if include_static or field.spec.name in DYNAMIC_FIELD_NAMES:
             yield field
     if include_static:
@@ -748,7 +763,7 @@ def _explicit_sample_point_components(topology):
     }
 
 
-def _write_explicit_static_topology(iteration, topology):
+def _write_explicit_static_topology(iteration, topology, *, include_sample_points=True):
     context = _explicit_topology_context(topology)
     record = iteration.meshes["core_" + CANONICAL_POINTS_SPEC.recordName]
     for component_name, values in _explicit_point_components(topology).items():
@@ -764,19 +779,20 @@ def _write_explicit_static_topology(iteration, topology):
     record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
     record.set_attribute("hasePrimitiveShape", list(CANONICAL_POINTS_SPEC.expectedShape(context)))
 
-    sample_record = iteration.meshes["core_" + EXPLICIT_SAMPLE_POINTS_SPEC.recordName]
-    for component_name, values in _explicit_sample_point_components(topology).items():
-        _resetComponent(
-            sample_record,
-            component_name,
-            np.ascontiguousarray(values),
-            ["sample_point"],
-            _unit_dimension(_io(), EXPLICIT_SAMPLE_POINTS_SPEC.unitDimension),
-            EXPLICIT_SAMPLE_POINTS_SPEC.unitSI,
-        )
-    _record_metadata(sample_record, EXPLICIT_SAMPLE_POINTS_SPEC)
-    sample_record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
-    sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
+    if include_sample_points:
+        sample_record = iteration.meshes["core_" + EXPLICIT_SAMPLE_POINTS_SPEC.recordName]
+        for component_name, values in _explicit_sample_point_components(topology).items():
+            _resetComponent(
+                sample_record,
+                component_name,
+                np.ascontiguousarray(values),
+                ["sample_point"],
+                _unit_dimension(_io(), EXPLICIT_SAMPLE_POINTS_SPEC.unitDimension),
+                EXPLICIT_SAMPLE_POINTS_SPEC.unitSI,
+            )
+        _record_metadata(sample_record, EXPLICIT_SAMPLE_POINTS_SPEC)
+        sample_record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
+        sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
 
     def backend_flat(values):
         return np.asarray(values).reshape(-1)
@@ -877,11 +893,11 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
         topology = gainMedium.topology
         if not (hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells")):
             raise TypeError("PhiASE openPMD transport requires a Tet4 VolumeTopology")
-        _write_explicit_static_topology(iteration, topology)
+        _write_explicit_static_topology(iteration, topology, include_sample_points=True)
     else:
         iteration.set_attribute("haseStaticUpdate", False)
 
-    for field in _arrayFields(gainMedium, crossSections, include_static=include_static):
+    for field in _arrayFields(gainMedium, crossSections, phiAse=phiAse, include_static=include_static):
         _writeArrayField(iteration, field)
 
     iteration.close()
