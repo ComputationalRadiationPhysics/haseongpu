@@ -3,7 +3,8 @@
 from pathlib import Path
 
 import HASEonGPU
-from HASEonGPU import ExperimentParameters, Result
+from HASEonGPU import Result
+from HASEonGPU_Bindings import ExperimentParameters
 
 
 module_path = Path(HASEonGPU.__file__).resolve()

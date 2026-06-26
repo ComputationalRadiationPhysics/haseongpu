@@ -477,6 +477,7 @@ def calcPhiASE(
         int(claddingNumber),
         float(claddingAbsorption),
     )
+    host_mesh.calcTotalReflectionAngles()
 
     result = HASEonGPU_Bindings.calcPhiASE(experiment, compute, host_mesh)
 
