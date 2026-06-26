@@ -186,6 +186,7 @@ namespace hase::core
         // Calculation for each sample point
         for(unsigned sampleIdx = minSampleIdx; sampleIdx <= maxSampleIdx; ++sampleIdx)
         {
+            // process potentially incoming Sigkill or Sigterm signals once per sample
             throwIfCancellationRequested();
             unsigned hRaysPerSampleDump = 0;
             raysPerSampleIter = raysPerSampleList.begin();
@@ -194,18 +195,19 @@ namespace hase::core
             alpaka::onHost::wait(queue);
             alpaka::onHost::fill(queue, dDroppedRays, 0u, Vec1D{1});
             {
-                BenchSync(queue, importanceSamplingPropagation)
-                    // initial ray-trace to detect importance regions
-                    hase::kernels::importanceSamplingPropagation(
-                        devBundle,
-                        sampleIdx,
-                        reflectionSlices,
-                        mesh,
-                        experiment.maxSigmaA,
-                        experiment.maxSigmaE,
-                        dPreImportance,
-                        dDroppedRays,
-                        dInfiniteRaySnapshots);
+                BenchSync(queue, importanceSamplingPropagation);
+                // initial ray-trace to detect importance regions
+                kernels::importanceSamplingPropagation(
+                    devBundle,
+                    queue,
+                    sampleIdx,
+                    reflectionSlices,
+                    mesh,
+                    experiment.maxSigmaA,
+                    experiment.maxSigmaE,
+                    dPreImportance,
+                    dDroppedRays,
+                    dInfiniteRaySnapshots);
                 alpaka::onHost::reduce(
                     queue,
                     devBundle.executor,
@@ -214,7 +216,6 @@ namespace hase::core
                     std::plus{},
                     dPreImportance);
             }
-            alpaka::onHost::wait(queue);
             double hSumPhi = 0.0;
 
             alpaka::onHost::memcpy(
@@ -245,30 +246,31 @@ namespace hase::core
                 {
                     alpaka::onHost::wait(queue);
                     {
-                        BenchSync(queue, importanceSamplingDistribution)
-                            // map importance to raysPerPrism
-                            hRaysPerSampleDump
-                            = hase::kernels::importanceSamplingDistribution(
-                                devBundle,
-                                reflectionSlices,
-                                mesh,
-                                *raysPerSampleIter,
-                                dPreImportance,
-                                dImportance,
-                                dRaysPerPrism,
-                                hSumPhi,
-                                threadLocalStridingRNG);
+                        BenchSync(queue, importanceSamplingDistribution);
+                        // map importance to raysPerPrism
+                        hRaysPerSampleDump = kernels::importanceSamplingDistribution(
+                            devBundle,
+                            queue,
+                            reflectionSlices,
+                            mesh,
+                            *raysPerSampleIter,
+                            dPreImportance,
+                            dImportance,
+                            dRaysPerPrism,
+                            hSumPhi,
+                            threadLocalStridingRNG);
                     }
                     {
-                        BenchSync(queue, mapRaysToPrisms)
-                            // Prism scheduling for gpu threads
-                            hase::kernels::mapRaysToPrisms(
-                                devBundle,
-                                dIndicesOfPrisms,
-                                dNumberOfReflectionSlices,
-                                dRaysPerPrism,
-                                dPrefixSum,
-                                mesh.numberOfPrisms);
+                        BenchSync(queue, mapRaysToPrisms);
+                        // Prism scheduling for gpu threads
+                        kernels::mapRaysToPrisms(
+                            devBundle,
+                            queue,
+                            dIndicesOfPrisms,
+                            dNumberOfReflectionSlices,
+                            dRaysPerPrism,
+                            dPrefixSum,
+                            mesh.numberOfPrisms);
                     }
 
                     // Start Kernel
@@ -277,50 +279,50 @@ namespace hase::core
                     alpaka::onHost::fill(queue, dDroppedRays, 0u, Vec1D{1});
                     alpaka::onHost::fill(queue, dGainOfRay, double{0}, alpaka::Vec{experiment.maxRaysPerSample});
 
-                    auto frameSpec = alpaka::onHost::getFrameSpec(
+                    auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                         devBundle.device,
                         devBundle.executor,
-                        static_cast<unsigned int>(*raysPerSampleIter));
+                        alpaka::Vec{static_cast<unsigned int>(*raysPerSampleIter)});
                     auto const threadLocalStridingIndex = threadLocalStridingRNG;
                     if(experiment.useReflections)
                     {
-                        BenchSync(queue, CalcSampleGainSumWithReflection)
-                            // main ray propagation routine with reflection
-                            queue.enqueue(
-                                frameSpec,
-                                alpaka::KernelBundle{
-                                    hase::kernels::CalcSampleGainSumWithReflection{},
-                                    mesh,
-                                    dIndicesOfPrisms,
-                                    dNumberOfReflectionSlices,
-                                    dImportance,
-                                    hRaysPerSampleDump,
-                                    dGainOfRay,
-                                    dDroppedRays,
-                                    sampleIdx,
-                                    dSigmaA,
-                                    dSigmaE,
-                                    threadLocalStridingIndex});
+                        BenchSync(queue, CalcSampleGainSumWithReflection);
+                        // main ray propagation routine with reflection
+                        queue.enqueue(
+                            frameSpec,
+                            alpaka::KernelBundle{
+                                hase::kernels::CalcSampleGainSumWithReflection{},
+                                mesh,
+                                dIndicesOfPrisms,
+                                dNumberOfReflectionSlices,
+                                dImportance,
+                                hRaysPerSampleDump,
+                                dGainOfRay,
+                                dDroppedRays,
+                                sampleIdx,
+                                dSigmaA,
+                                dSigmaE,
+                                threadLocalStridingIndex});
                     }
                     else
                     {
-                        BenchSync(queue, CalcSampleGainSum)
-                            // main ray propagation routine
-                            queue.enqueue(
-                                frameSpec,
-                                alpaka::KernelBundle{
-                                    hase::kernels::CalcSampleGainSum{},
-                                    mesh,
-                                    dIndicesOfPrisms,
-                                    dImportance,
-                                    hRaysPerSampleDump,
-                                    dGainOfRay,
-                                    dDroppedRays,
-                                    sampleIdx,
-                                    dSigmaA,
-                                    dSigmaE,
-                                    experiment.sigmaA.size(),
-                                    threadLocalStridingIndex});
+                        BenchSync(queue, CalcSampleGainSum);
+                        // main ray propagation routine
+                        queue.enqueue(
+                            frameSpec,
+                            alpaka::KernelBundle{
+                                hase::kernels::CalcSampleGainSum{},
+                                mesh,
+                                dIndicesOfPrisms,
+                                dImportance,
+                                hRaysPerSampleDump,
+                                dGainOfRay,
+                                dDroppedRays,
+                                sampleIdx,
+                                dSigmaA,
+                                dSigmaE,
+                                experiment.sigmaA.size(),
+                                threadLocalStridingIndex});
                     }
                     alpaka::onHost::reduce(queue, devBundle.executor, 0.0, dGainSum, std::plus{}, dGainOfRay);
                     alpaka::onHost::transformReduce(
@@ -334,7 +336,6 @@ namespace hase::core
                     // add stride since rng seed has been used in CalcSampleGainSum
                     threadLocalStridingRNG
                         += (frameSpec.getNumFrames().product() * frameSpec.getFrameExtents().product());
-                    alpaka::onHost::wait(queue);
                     alpaka::onHost::memcpy(queue, hgainSumView, dGainSum);
                     alpaka::onHost::memcpy(queue, hgainSumSquareView, dGainSumSquare);
                     alpaka::onHost::memcpy(queue, hDroppedRaysView, dDroppedRays);

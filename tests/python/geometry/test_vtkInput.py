@@ -4,9 +4,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from pathlib import Path
+
 import numpy as np
 
 from HASEonGPU import GainMedium, MeshTopology
+
+
+repoRoot = Path(__file__).resolve().parents[3]
 
 
 def testGainMediumRoundTripsThroughLegacyVtk(tmp_path, smallGainMedium):
@@ -42,3 +47,27 @@ def testMeshTopologyCanBeLoadedFromVtk(tmp_path, smallGainMedium):
     assert topology.numberOfTriangles == smallGainMedium.topology.numberOfTriangles
     assert topology.levels == smallGainMedium.topology.levels
     assert topology.thickness == smallGainMedium.topology.thickness
+
+
+def testBundledExampleVtkFixturesExposeFrontendFields():
+    fixtures = {
+        "pt.vtk": (421, 812, 10),
+        "cuboid.vtk": (321, 600, 10),
+        "cylindrical.vtk": (421, 812, 10),
+    }
+
+    for filename, (points, triangles, levels) in fixtures.items():
+        medium = GainMedium.fromVtk(repoRoot / "example" / "data" / filename)
+
+        assert medium.numberOfPoints == points
+        assert medium.numberOfTriangles == triangles
+        assert medium.numberOfLevels == levels
+        assert np.asarray(medium.get("betaCells").value).size == points * levels
+        assert np.asarray(medium.get("betaVolume").value).size == triangles * (levels - 1)
+        assert np.asarray(medium.get("claddingCellTypes").value).shape == (triangles,)
+        assert np.asarray(medium.get("refractiveIndices").value).shape == (4,)
+        assert np.asarray(medium.get("reflectivities").value).size == triangles * 2
+        assert np.isfinite(medium.get("nTot").value)
+        assert np.isfinite(medium.get("crystalTFluo").value)
+        assert medium.get("claddingNumber").value >= 1
+        assert np.isfinite(medium.get("claddingAbsorption").value)

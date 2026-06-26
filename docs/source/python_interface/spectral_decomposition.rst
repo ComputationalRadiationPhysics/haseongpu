@@ -61,7 +61,7 @@ in ``nm`` and a pump wavelength is supplied in ``m``.
 Conversion Utilities
 --------------------
 
-``toDict()`` returns the low-level laser property dictionary:
+``toDict()`` returns the backend-compatible laser property dictionary:
 
 .. code-block:: python
 
@@ -80,6 +80,6 @@ Conversion Utilities
    laser.maxSigmaA
    laser.maxSigmaE
 
-``LaserProperties`` remains available for lower-level workflows, but new
-simulation code usually passes ``SpectralDecomposition`` directly to
+``LaserProperties`` remains available for compatibility workflows, but normal
+simulation code passes ``SpectralDecomposition`` directly to
 ``PumpProperties``, ``PhiASE``, or ``Simulation``.

@@ -13,6 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
+from .geometry import OpenPmdScalarField
+from .openpmd import fieldSpec
+
 
 @dataclass(frozen=True)
 class LaserPropertySpec:
@@ -122,6 +125,60 @@ LASER_ALIASES = {
 }
 
 
+_CROSS_SECTION_FIELD_ATTRS = {
+    "lambdaAbsorption": "wavelengthsAbsorption",
+    "lambdaEmission": "wavelengthsEmission",
+    "sigmaAbsorption": "crossSectionAbsorption",
+    "sigmaEmission": "crossSectionEmission",
+}
+_CROSS_SECTION_FIELD_ALIASES = {
+    "wavelengthsAbsorption": "lambdaAbsorption",
+    "wavelengthsEmission": "lambdaEmission",
+    "crossSectionAbsorption": "sigmaAbsorption",
+    "crossSectionEmission": "sigmaEmission",
+    "lambdaA": "lambdaAbsorption",
+    "lambdaE": "lambdaEmission",
+    "sigmaA": "sigmaAbsorption",
+    "sigmaE": "sigmaEmission",
+}
+_MISSING_SPECTRAL_FIELD_VALUE = object()
+
+
+class SpectralField:
+    def __init__(self, crossSections, name):
+        self._crossSections = crossSections
+        self.name = name
+        self.spec = fieldSpec(name)
+
+    def value(self, newValue=_MISSING_SPECTRAL_FIELD_VALUE):
+        attr = _CROSS_SECTION_FIELD_ATTRS[self.name]
+        if newValue is _MISSING_SPECTRAL_FIELD_VALUE:
+            return getattr(self._crossSections, attr)
+        self._crossSections._setField(self.name, newValue)
+        return self
+
+    def meta(self):
+        values = self.value()
+        return {
+            "name": self.name,
+            "recordName": self.spec.recordName,
+            "entity": self.spec.entity,
+            "axes": self.spec.axes,
+            "dtype": str(self.spec.dtypeObject),
+            "unit": self.spec.unit,
+            "unitSI": self.spec.unitSI,
+            "expectedShape": values.shape,
+            "isSet": True,
+        }
+
+    def __repr__(self):
+        meta = self.meta()
+        return (
+            f"SpectralField(name={self.name!r}, dtype={meta['dtype']!r}, "
+            f"unit={meta['unit']!r}, shape={meta['expectedShape']!r})"
+        )
+
+
 @dataclass
 class CrossSectionData:
     r"""Absorption and emission spectra for ASE and pump calculations.
@@ -144,17 +201,42 @@ class CrossSectionData:
     """Spectral interpolation resolution passed to ``calcPhiASE``."""
 
     def __post_init__(self):
-        self.wavelengthsAbsorption = np.asarray(self.wavelengthsAbsorption, dtype=np.float64).reshape(-1)
-        self.crossSectionAbsorption = np.asarray(self.crossSectionAbsorption, dtype=np.float64).reshape(-1)
-        self.wavelengthsEmission = np.asarray(self.wavelengthsEmission, dtype=np.float64).reshape(-1)
-        self.crossSectionEmission = np.asarray(self.crossSectionEmission, dtype=np.float64).reshape(-1)
+        for attr in _CROSS_SECTION_FIELD_ATTRS.values():
+            setattr(self, attr, np.asarray(getattr(self, attr), dtype=np.float64).reshape(-1))
         self.resolution = int(self.resolution)
+        self._validate()
+
+    def _validate(self):
         if self.wavelengthsAbsorption.size != self.crossSectionAbsorption.size:
             raise ValueError("wavelengthsAbsorption and crossSectionAbsorption must have the same length")
         if self.wavelengthsEmission.size != self.crossSectionEmission.size:
             raise ValueError("wavelengthsEmission and crossSectionEmission must have the same length")
         if self.resolution < 1:
             raise ValueError("resolution must be positive")
+
+    def _canonicalFieldName(self, name):
+        canonical = _CROSS_SECTION_FIELD_ALIASES.get(name, name)
+        if canonical not in _CROSS_SECTION_FIELD_ATTRS:
+            known = ", ".join(_CROSS_SECTION_FIELD_ATTRS)
+            raise KeyError(f"unknown spectral field '{name}'. Known fields: {known}")
+        return canonical
+
+    def _setField(self, name, values):
+        canonical = self._canonicalFieldName(name)
+        attr = _CROSS_SECTION_FIELD_ATTRS[canonical]
+        old = getattr(self, attr)
+        setattr(self, attr, np.asarray(values, dtype=fieldSpec(canonical).dtypeObject).reshape(-1))
+        try:
+            self._validate()
+        except Exception:
+            setattr(self, attr, old)
+            raise
+
+    def getField(self, name):
+        return SpectralField(self, self._canonicalFieldName(name))
+
+    def getFields(self):
+        return [SpectralField(self, name) for name in _CROSS_SECTION_FIELD_ATTRS]
 
     @classmethod
     def monochromatic(cls, *, wavelength, crossSectionAbsorption, crossSectionEmission):
@@ -219,6 +301,23 @@ class CrossSectionData:
             "s_ems": self.crossSectionEmission,
             "l_res": int(self.resolution),
         }
+
+    def openPmdAttributes(self):
+        laser = LaserProperties(crossSections=self)
+        return {
+            "spectralResolution": self.resolution,
+            "maxSigmaAbsorption": laser.maxSigmaA,
+            "maxSigmaEmission": laser.maxSigmaE,
+        }
+
+    def openPmdFields(self, spectralContext):
+        for field in self.getFields():
+            yield OpenPmdScalarField(
+                field.name,
+                field.value(),
+                spectralContext(field.value()),
+                spec=field.spec,
+            )
 
 
 SpectralDecomposition = CrossSectionData

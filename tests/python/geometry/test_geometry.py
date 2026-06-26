@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from HASEonGPU import GainMedium, Grid, MeshTopology
+from HASEonGPU import GainMedium, Grid, MeshTopology, backendFlat, unitDimension
 
 
 def _lineCount(path):
@@ -71,7 +71,7 @@ def _assertGainMediumLaunchContract(medium):
     assert medium.get("betaCells").expectedShape == (numberOfPoints, numberOfLevels)
     assert medium.get("betaVolume").expectedShape == (numberOfTriangles, numberOfLevels - 1)
     assert medium.get("claddingCellTypes").expectedShape == (numberOfTriangles,)
-    assert medium.get("reflectivities").expectedShape == (2, numberOfTriangles)
+    assert medium.get("reflectivities").expectedShape == (numberOfTriangles, 2)
     assert medium.get("refractiveIndices").expectedShape == (4,)
 
     betaCells = np.asarray(medium.get("betaCells").value)
@@ -109,14 +109,14 @@ def _mediumForGrid(grid, *, flat):
     if not flat:
         betaCells = betaCells.reshape((topology.numberOfPoints, topology.levels), order="F")
         betaVolume = betaVolume.reshape((topology.numberOfTriangles, topology.levels - 1), order="F")
-        reflectivities = reflectivities.reshape((2, topology.numberOfTriangles), order="F")
+        reflectivities = reflectivities.reshape((topology.numberOfTriangles, 2), order="F")
 
     medium.withPhysicalProperties(
-        betaCells=betaCells,
-        betaVolume=betaVolume,
+        betaCells=backendFlat(betaCells) if flat else betaCells,
+        betaVolume=backendFlat(betaVolume) if flat else betaVolume,
         claddingCellTypes=cladding,
         refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=reflectivities,
+        reflectivities=backendFlat(reflectivities) if flat else reflectivities,
         nTot=1.0,
         crystalTFluo=1.0,
         claddingNumber=0,
@@ -149,6 +149,49 @@ def testPointIndexAtFallsBackToNearestTopologyPoint():
     assert nearest == exact
 
 
+
+def testGainMediumPrimitiveViewsShareCanonicalFlatStorage():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology).withPhysicalProperties(
+        betaCells=backendFlat(np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64)),
+        betaVolume=backendFlat(np.array([0.1, 0.3, 0.2, 0.4], dtype=np.float64)),
+        claddingCellTypes=np.array([0, 1], dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=backendFlat(np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)),
+    )
+
+    prismView = medium.getPrisms()["betaVolume"]
+    pointView = medium.getPoints()["betaCells"]
+    triangleView = medium.getTriangles()["reflectivities"]
+
+    assert prismView.shape == (topology.numberOfTriangles, topology.levels - 1)
+    assert pointView.shape == (topology.numberOfPoints, topology.levels)
+    assert triangleView.shape == (topology.numberOfTriangles, 2)
+    assert np.shares_memory(prismView, medium.get("betaVolume").value)
+    assert np.shares_memory(pointView, medium.get("betaCells").value)
+    assert np.shares_memory(triangleView, medium.get("reflectivities").value)
+
+    prismView[1, 1] = 9.0
+    pointView[2, 1] = 8.0
+    triangleView[0, 1] = 0.75
+
+    assert medium.get("betaVolume").value[1 + topology.numberOfTriangles] == 9.0
+    assert medium.get("betaCells").value[2 + topology.numberOfPoints] == 8.0
+    assert medium.get("reflectivities").value[topology.numberOfTriangles] == np.float32(0.75)
+
+
+def testGainMediumRejectsAmbiguousFlatArraysUnlessMarkedBackendFlat():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology)
+    flat = np.arange(topology.numberOfPrisms, dtype=np.float64)
+
+    with pytest.raises(ValueError, match="ambiguous flat array"):
+        medium.withPhysicalProperties(betaVolume=flat)
+
+    medium.withPhysicalProperties(betaVolume=backendFlat(flat))
+    np.testing.assert_array_equal(medium.get("betaVolume").value, flat)
+
+
 def testGainMediumRejectsArraysThatBreakGeometryDependencies():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
@@ -163,4 +206,67 @@ def testGainMediumRejectsArraysThatBreakGeometryDependencies():
         medium.withPhysicalProperties(claddingCellTypes=np.zeros(topology.numberOfTriangles + 1, dtype=np.uint32))
 
     with pytest.raises(ValueError, match="reflectivities expects"):
-        medium.withPhysicalProperties(reflectivities=np.zeros((2, topology.numberOfTriangles + 1)))
+        medium.withPhysicalProperties(reflectivities=np.zeros((topology.numberOfTriangles + 1, 2)))
+
+
+
+def testGainMediumDefineFieldAttachesCustomFieldsToPrimitiveViews():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology)
+    temperature = np.array(
+        [[300.0, 301.0], [310.0, 311.0]],
+        dtype=np.float64,
+    )
+    marker = np.array([4, 5], dtype=np.int32)
+
+    medium.defineField(
+        "temperature",
+        entity=("cell", "layer"),
+        values=temperature,
+        unit="K",
+        unitDimension=unitDimension.tFluo,
+    )
+    medium.defineField("triangleMarker", entity="triangle", values=marker, dtype=np.int32, unit="1")
+
+    prismView = medium.getPrisms()["temperature"]
+    triangleView = medium.getTriangles()["triangleMarker"]
+
+    assert prismView.shape == (topology.numberOfTriangles, topology.levels - 1)
+    assert triangleView.shape == (topology.numberOfTriangles,)
+    np.testing.assert_array_equal(prismView, temperature)
+    np.testing.assert_array_equal(triangleView, marker)
+    assert np.shares_memory(prismView, medium.customFields["temperature"].value)
+    assert medium.customFields["temperature"].spec.unitDimension == unitDimension.tFluo
+
+    prismView[1, 1] = 333.0
+    assert medium.customFields["temperature"].value[1 + topology.numberOfTriangles] == 333.0
+    assert medium.customFields["temperature"].dynamic is False
+    assert medium.customFields["temperature"].spec.backendRequired is False
+
+
+def testGainMediumDefineFieldValidatesNameEntityDtypeUnitAndFlatOrder():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology)
+
+    with pytest.raises(ValueError, match="field name"):
+        medium.defineField("1bad", entity="point", values=np.zeros(topology.numberOfPoints))
+
+    with pytest.raises(ValueError, match="unknown field entity"):
+        medium.defineField("foo", entity="unknown", values=np.zeros(topology.numberOfPoints))
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        medium.defineField("foo", entity="point", values=np.zeros(topology.numberOfPoints), unit="")
+
+    with pytest.raises(ValueError, match="unitDimension"):
+        medium.defineField("foo", entity="point", values=np.zeros(topology.numberOfPoints), unitDimension=(0.0, 0.0))
+
+    with pytest.raises(ValueError, match="not supported"):
+        medium.defineField("labels", entity="point", values=np.array(["a"] * topology.numberOfPoints))
+
+    flat = np.arange(topology.numberOfTriangles * (topology.levels - 1), dtype=np.float64)
+    with pytest.raises(ValueError, match="ambiguous flat array"):
+        medium.defineField("temperature", entity="prism", values=flat, unit="K")
+
+    medium.defineField("temperature", entity="prism", values=backendFlat(flat), unit="K", dynamic=True)
+    assert medium.customFields["temperature"].dynamic is True
+    np.testing.assert_array_equal(medium.getPrisms()["temperature"].reshape(-1, order="F"), flat)

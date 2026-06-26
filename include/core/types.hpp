@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <core/mesh.hpp>
+
 #include <filesystem>
 #include <limits>
 #include <string>
@@ -262,6 +264,14 @@ namespace hase::core
         bool useReflections;
         bool monochromatic = false;
         unsigned spectral;
+    };
+
+    struct SimulationContext
+    {
+        core::ExperimentParameters experiment;
+        core::ComputeParameters compute;
+        core::HostMesh mesh;
+        core::Result result;
     };
 
 } // namespace hase::core

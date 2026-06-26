@@ -27,6 +27,7 @@
 #pragma once
 #include <alpaka/alpaka.hpp>
 
+#include <concepts/concepts.hpp>
 #include <kernels/detail/mapRaysToPrisms.hpp>
 
 namespace hase::kernels
@@ -63,9 +64,10 @@ namespace hase::kernels
      */
     void mapRaysToPrisms(
         auto& devBundle,
+        hase::concepts::Queue auto const& queue,
         alpaka::concepts::IBuffer auto& indicesOfPrisms,
         alpaka::concepts::IBuffer auto& numberOfReflections,
-        alpaka::concepts::IBuffer auto const& raysPerPrism,
+        alpaka::concepts::IBuffer auto& raysPerPrism,
         alpaka::concepts::IBuffer auto& prefixSum,
         unsigned const numberOfPrisms);
 

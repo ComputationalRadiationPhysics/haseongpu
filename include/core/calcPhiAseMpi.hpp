@@ -69,12 +69,18 @@ namespace hase::core
         RuntimeTopology& topology,
         float& maxRankRuntime)
     {
-        int mpiError = MPI_Init(nullptr, nullptr);
-        if(mpiError != MPI_SUCCESS)
+        int mpiAlreadyInitialized = 0;
+        MPI_Initialized(&mpiAlreadyInitialized);
+        bool const ownsMpiLifetime = mpiAlreadyInitialized == 0;
+        if(ownsMpiLifetime)
         {
-            dout(V_ERROR) << "Error starting MPI program." << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, mpiError);
-            return 1.0f;
+            int mpiError = MPI_Init(nullptr, nullptr);
+            if(mpiError != MPI_SUCCESS)
+            {
+                dout(V_ERROR) << "Error starting MPI program." << std::endl;
+                MPI_Abort(MPI_COMM_WORLD, mpiError);
+                return 1.0f;
+            }
         }
 
         int rank = 0;
@@ -271,7 +277,10 @@ namespace hase::core
         if(assignedDeviceCount == 0)
         {
             MPI_Comm_free(&nodeComm);
-            MPI_Finalize();
+            if(ownsMpiLifetime)
+            {
+                MPI_Finalize();
+            }
             return 0.0f;
         }
 
@@ -397,7 +406,10 @@ namespace hase::core
         }
         MPI_Comm_free(&activeComm);
         MPI_Comm_free(&nodeComm);
-        MPI_Finalize();
+        if(ownsMpiLifetime)
+        {
+            MPI_Finalize();
+        }
 
 
         return activeRank == HEAD_NODE ? static_cast<float>(totalUsedDevices) : 0.0f;

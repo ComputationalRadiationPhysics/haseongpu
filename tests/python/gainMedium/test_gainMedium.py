@@ -6,7 +6,8 @@
 
 
 import numpy as np
-from HASEonGPU import GainMedium, Grid, MeshTopology
+from HASEonGPU import GainMedium, Grid, MeshTopology, backendFlat
+from pyInclude.openpmd import PrimitiveFieldSpec, PrismSchema
 
 
 def testMeshTopologyFromPointsConstructsTriangles():
@@ -97,7 +98,7 @@ def testGainMediumOwnsPhysicalProperties():
             betaCells=np.ones((topology.numberOfPoints, topology.levels), dtype=np.float64),
             claddingCellTypes=np.zeros(2, dtype=np.uint32),
             refractiveIndices=np.array([1.8, 1.0, 1.8, 1.0], dtype=np.float32),
-            reflectivities=np.ones(4, dtype=np.float32),
+            reflectivities=backendFlat(np.ones(4, dtype=np.float32)),
             nTot=5.0,
             crystalTFluo=1.23,
             claddingNumber=2,
@@ -107,6 +108,13 @@ def testGainMediumOwnsPhysicalProperties():
 
     assert gainMedium.numberOfPrisms == 16
     assert not hasattr(gainMedium, "toHostMesh")
+
+
+def testTopLevelFrontendDoesNotExposeLegacyBackendAdapters():
+    import HASEonGPU
+
+    for name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh", "calcPhiASE"):
+        assert not hasattr(HASEonGPU, name)
 
 
 def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
@@ -127,3 +135,95 @@ def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
     assert gainMedium.physical["betaVolume"].shape == (16,)
     assert np.allclose(gainMedium.get("refractiveIndices").value, [1.8, 1.0, 1.8, 1.0])
     assert any(item["name"] == "reflectivities" for item in gainMedium.listProperties())
+
+
+
+def testGainMediumAcceptsInheritedPrimitiveSchemaFields():
+    class ThermalPrism(PrismSchema):
+        temperature = PrimitiveFieldSpec("temperature", "custom_temperature", np.float64, unit="K", backendRequired=False)
+
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    values = np.array([[300.0, 310.0], [320.0, 330.0]], dtype=np.float64)
+
+    medium = GainMedium(topology=topology).withPrimitiveSchema(ThermalPrism, temperature=values)
+
+    field = medium.getField("temperature")
+    assert field.unit == "K"
+    assert field.entity == "cell_layer"
+    np.testing.assert_array_equal(field.primitiveView(), values)
+    np.testing.assert_array_equal(medium.getPrisms()["temperature"], values)
+    assert [prism.temperature for prism in medium.getPrisms()] == [300.0, 310.0, 320.0, 330.0]
+
+
+def testPrimitiveElementsAssignFieldsAndExposeMetadata():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology)
+
+    for point in medium.getPoints():
+        point.betaCells = 0.25
+    for prism in medium.getPrisms():
+        prism.betaVolume = 0.5
+    for triangle in medium.getTriangles():
+        triangle.claddingGroup = 7
+        triangle.reflectivities = [0.1, 0.2]
+
+    np.testing.assert_array_equal(
+        medium.get("betaCells").value.reshape(medium.get("betaCells").expectedShape, order="F"),
+        np.full(medium.get("betaCells").expectedShape, 0.25),
+    )
+    np.testing.assert_array_equal(
+        medium.get("betaVolume").value.reshape(medium.get("betaVolume").expectedShape, order="F"),
+        np.full(medium.get("betaVolume").expectedShape, 0.5),
+    )
+    np.testing.assert_array_equal(
+        medium.get("claddingCellTypes").value.reshape(medium.get("claddingCellTypes").expectedShape, order="F"),
+        np.full(medium.get("claddingCellTypes").expectedShape, 7, dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        medium.get("reflectivities").value.reshape(medium.get("reflectivities").expectedShape, order="F"),
+        np.tile(np.array([[0.1, 0.2]], dtype=np.float32), (medium.numberOfTriangles, 1)),
+    )
+
+    prism = next(iter(medium.getPrisms()))
+    fields = {field.name: field for field in prism.getFields()}
+    assert fields["betaVolume"].meta()["entity"] == "cell_layer"
+    fields["betaVolume"].value(0.75)
+    assert next(iter(medium.getPrisms())).betaVolume == 0.75
+
+
+def testMeshPrimitiveViewsExposeVectorFields():
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology)
+
+    point = next(iter(medium.getPoints()))
+    triangle = next(iter(medium.getTriangles()))
+
+    np.testing.assert_array_equal(point.position, topology.points[0])
+    np.testing.assert_array_equal(point.coordinates, topology.points[0])
+    assert triangle.connectivity.shape == (3,)
+    assert triangle.center.shape == (2,)
+    assert triangle.normal.shape == (3, 2)
+    assert triangle.neighbors.shape == (3,)
+    assert triangle.normalPoints.shape == (3,)
+    assert triangle.claddingGroup == triangle.claddingCellTypes
+
+    fields = {field.name: field for field in triangle.getFields()}
+    assert fields["center"].meta()["axes"] == ("cell", "coordinate")
+    assert fields["normal"].meta()["axes"] == ("cell", "local_side", "coordinate")
+
+
+def testPrimitiveSchemaCanBeRegisteredBeforeValuesAreAssigned():
+    class ThermalPrism(PrismSchema):
+        temperature = PrimitiveFieldSpec("temperature", "custom_temperature", np.float64, unit="K", backendRequired=False)
+
+    topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
+    medium = GainMedium(topology=topology).withPrimitiveSchema(ThermalPrism)
+
+    assert medium.getField("temperature").primitiveView().shape == medium.getPrisms().shape
+    np.testing.assert_array_equal(medium.getField("temperature").primitiveView(), np.zeros(medium.getPrisms().shape))
+
+    for prism in medium.getPrisms():
+        prism.temperature = 300.0
+
+    assert [prism.temperature for prism in medium.getPrisms()] == [300.0, 300.0, 300.0, 300.0]
+    assert next(iter(medium.getPrisms())).getFields()[1].meta()["unit"] == "K"

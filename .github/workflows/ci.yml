@@ -30,48 +30,47 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
-          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
-          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04" }
-          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", simd: "EMULATION", hwloc: "no" }
+          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "hdf5" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "adios-sst" }
+          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4", openpmd_backend: "adios" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", openpmd_backend: "adios" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
 
     env:
-      BUILD_DIR: build/ci
       DEBIAN_FRONTEND: noninteractive
+      HASE_OPENPMD_BACKEND: ${{ matrix.config.openpmd_backend }}
+      HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
+      BUILD_DIR: build/ci
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
         -DDISABLE_MPI=ON
-        -DHASE_BUILD_RELEASE=ON
-        -DHASE_BUILD_PhiAse=ON
-        -DHASE_ENABLE_PYTHON=ON
-        -DCMAKE_CUDA_ARCHITECTURES=80
+        -DHASE_OPENPMD_BACKEND=${{ matrix.config.openpmd_backend }}
 
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +110,10 @@ jobs:
             apt-get install -y --no-install-recommends libtbb-dev
           fi
 
+          if [[ "$HASE_OPENPMD_BACKEND" == "hdf5" ]]; then
+            apt-get install -y --no-install-recommends libhdf5-dev
+          fi
+
           if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
             apt-get install -y --no-install-recommends \
               "gcc-${{ matrix.config.version }}" \
@@ -134,8 +137,7 @@ jobs:
           set -euxo pipefail
           python3 -m venv .venv
           . .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pip
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
           echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
 
@@ -197,6 +199,7 @@ jobs:
             current_ld_library_path="${LD_LIBRARY_PATH:-}"
             printf 'LD_LIBRARY_PATH=%s:%s\n' "$(IFS=:; echo "${runtime_paths[*]}")" "$current_ld_library_path" >> "$GITHUB_ENV"
           fi
+
 
       - name: Configure
         shell: bash
@@ -262,7 +265,7 @@ jobs:
             )
           fi
 
-          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install --no-build-isolation .
+          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install ".[test]"
 
       - name: Debug Python install
         shell: bash
@@ -288,6 +291,14 @@ jobs:
                   print("contents matching HASE* in", pp)
                   print(list(pp.glob("HASE*")))
 
+          # The workflow checkout is on sys.path when Python starts in the
+          # repository root. Import from outside the checkout so this debug
+          # step validates the wheel installed above, not the source-tree
+          # fallback package.
+          import os
+          os.chdir("/tmp")
+          sys.path[0] = ""
+
           import HASEonGPU
           print("HASEonGPU imported from:", HASEonGPU.__file__)
           PY
@@ -299,6 +310,22 @@ jobs:
           cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
           cd /tmp
           python hase_bindings_smoketest.py
+
+      - name: Run laserPumpCladding example from installed package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          example_output_dir=/tmp/hase-laser-pump-cladding
+          mkdir -p "$example_output_dir"
+          cd "$example_output_dir"
+          python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
+            --backend Host_Cpu_CpuSerial \
+            --timeSteps 1 \
+            --pumpSteps 1 \
+            --vtk-output-dir "$example_output_dir" \
+            --min-sample-range 0 \
+            --max-sample-range 100 \
+            --rng-seed 5489
 
       - name: Run CTest
         shell: bash

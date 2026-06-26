@@ -184,82 +184,15 @@ def calcPhiASEMpi(
         adaptiveSteps,
         rngSeed=None
 ):
+    """Reject the removed legacy temporary-file binary path.
 
-    """Run the legacy temporary-file path, optionally through ``mpiexec``.
-
-    This function is used by old direct ``calcPhiASE`` scripts. It serializes
-    the input arrays, launches the standalone binary, then parses the output
-    arrays back into the caller's preferred layout.
+    The standalone binary now consumes only openPMD input and output series.
+    Use ``PhiASE(...).run(...)`` for the routed openPMD transport path.
     """
-
-    rngSeed = int(rngSeed) if rngSeed is not None else defaultBackendRngSeed()
-
-    minSample = 0
-    nP = int(packed["numberOfPoints"])
-    maxSample = (int(numberOfLevels) * nP) - 1
-
-    REFLECT = ' --reflection=1' if useReflections else ' --reflection=0'
-
-    Prefix = ''
-    if parallelMode == 'mpi':
-        Prefix = f"mpiexec -npernode {nPerNode} "
-        numDevices = 1
-
-    CALCPHIASE_DIR = Path(__file__).resolve().parent
-    TMP_FOLDER = os.path.join(CALCPHIASE_DIR, 'input_tmp')
-
-    createCalcPhiASEInput(
-        packed,
-        thickness,
-        numberOfLevels,
-        nTot,
-        crystal,
-        claddingNumber,
-        claddingAbsorption,
-        TMP_FOLDER
+    raise RuntimeError(
+        "The legacy text-file calcPhiASE launcher was removed with the backend parser. "
+        "Use the PhiASE/openPMD transport path instead."
     )
-    exec_path = findCalcPhiASENearModule().resolve()
-    cmd = (
-            Prefix + str(exec_path)
-            + f' --parallel-mode={parallelMode}'
-            + f' --backend={backend}'
-            + f' --min-rays={int(minRaysPerSample)}'
-            + f' --max-rays={int(maxRaysPerSample)}'
-            + REFLECT
-            + f' --input-path={TMP_FOLDER}'
-            + f' --output-path={TMP_FOLDER}'
-            + f' --min-sample-i={minSample}'
-            + f' --max-sample-i={maxSample}'
-            + f' --numDevices={numDevices}'
-            + f' --repetitions={repetitions}'
-            + f' --adaptive-steps={int(adaptiveSteps)}'
-            + f' --mse-threshold={mseThreshold}'
-            + f' --spectral-resolution={packed["laserParameter"]["l_res"]}'
-            + f' --rng-seed={rngSeed}'
-    )
-    print(cmd)
-    status = os.system(cmd)
-
-    if status != 0:
-        print('This step of the raytracing computation did NOT finish successfully. Aborting.')
-        exit()
-
-    phiASE, mse_values, n_rays = parseCalcPhiASEOutput(
-        TMP_FOLDER,
-        packed["layout"]
-    )
-
-    cleanIOFiles(TMP_FOLDER)
-
-    if packed["layout"] == "matrix":
-        phiASE = phiASE.reshape((nP, numberOfLevels), order="F")
-        mse_values = mse_values.reshape((nP, numberOfLevels), order="F")
-        n_rays = n_rays.reshape((nP, numberOfLevels), order="F")
-
-    if packed["container"] == "list":
-        return phiASE.tolist(), mse_values.tolist(), n_rays.tolist()
-
-    return phiASE, mse_values, n_rays
 
 
 def calcPhiASE(
@@ -456,9 +389,14 @@ def calcPhiASE(
         numberOfLevels,
     )
 
-    if parallelMode == "mpi" or parallelMode == "debugFileIOPath":
-        if parallelMode == "debugFileIOPath":
-            parallelMode = "single"
+    if parallelMode == "debugFileIOPath":
+        warnings.warn(
+            "parallelMode='debugFileIOPath' used the removed legacy backend parser; running the direct binding path instead.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        parallelMode = "single"
+    if parallelMode == "mpi":
         return calcPhiASEMpi(
             packed,
             claddingNumber,

@@ -189,6 +189,6 @@ Common attributes include:
 * ``extraction``
 * ``solver``
 
-``toDict(timeFrame=None)`` produces the low-level pump dictionary used by the
-default solver.  ``modeDict()`` returns the pump mode flags for back reflection,
+``toDict(timeFrame=None)`` produces the pump dictionary used by the default
+solver.  ``modeDict()`` returns the pump mode flags for back reflection,
 reflectivity, and extraction.
