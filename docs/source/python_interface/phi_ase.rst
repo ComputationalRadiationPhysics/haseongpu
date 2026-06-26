@@ -56,19 +56,23 @@ Sampling and Physics Settings
    Target mean squared error threshold for the ASE estimate.
 
 ``repetitions``
-   Maximum number of repeated phiASE runs using the same number of rays if the MSE target is not reached.
-   Since the importance-sampling distribution assigns rays to prisms stochastically, repeating the phiASE
-   calculation can improve the estimate without increasing the number of rays per run.
+   Maximum number of repeated ``PhiASE`` runs using the same number of rays if
+   the MSE target is not reached.  Since the importance-sampling distribution
+   assigns rays to prisms stochastically, repeating the calculation can improve
+   the estimate without increasing the number of rays per run.
 
 ``adaptiveSteps``
-   Given the mse threshold is not reached for one phiASE backend run - HASEonGPU will linearly increase the rays per sample.
-   This parameter controls how many steps there should be between minRaysPerSample and maxRaysPerSample.
+   If the MSE threshold is not reached for one backend run, HASEonGPU increases
+   the rays per sample up to ``maxRaysPerSample``.  This parameter controls how
+   many ray-count steps are available between ``minRaysPerSample`` and
+   ``maxRaysPerSample``.
 
 ``useReflections``
    Enables or disables reflections at the top and bottom surfaces.
 
 ``monochromatic``
-   This will enforce the phiASE computation to only consider the first cross-section emission and absorption for its calculation.
+   Forces the ASE computation to use only the first absorption and emission
+   cross-section samples instead of spectral interpolation.
 
 ``rngSeed``
    Optional unsigned RNG seed for reproducible Monte Carlo ray sampling.  Set

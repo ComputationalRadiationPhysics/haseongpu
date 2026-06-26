@@ -151,6 +151,22 @@ with ``vtkWedge``:
    )
 
 
+Pump Solver Utilities
+---------------------
+
+``OneDimensionalZTraversal`` is the built-in continuous pump solver.  It reads
+``PumpProperties`` and returns beta advanced by one outer time step using the
+instantaneous one-dimensional z-traversal pump rate.  For diagnostics, call
+``oneDimensionalZTraversalPumpRate(...)`` directly to inspect the frozen-state
+contribution :math:`d\beta/dt` that the solver uses.
+
+``BetaIntegrationGaussianSolver`` is the legacy/default super-Gaussian pump
+solver.  ``BetaIntegrationSolver`` and ``BetaInt3PumpSolver`` are compatibility
+aliases for the same solver.  The lower-level helpers ``integrateLaserPump`` and
+``runLaserPumpStep`` remain available for workflows that need the historical
+analytical pump update directly.
+
+
 Physical Constants
 ------------------
 

@@ -10,7 +10,7 @@ For general setup and dependency information, see
 Compilation
 -----------
 
-In order to use haseongpu from the command line, manual compilation is required.
+To use HASEonGPU from the command line, manual compilation is required.
 
 For compilation details see :doc:`compilation`.
 
@@ -36,7 +36,7 @@ workflow.
 Example
 -------
 
-Under ``haseongpu/example/c_example/input``, two example meshes with already
+Under ``example/c_example/input``, two example meshes with already
 preprocessed input files are provided:
 
 * ``cuboid``
@@ -135,11 +135,11 @@ Minimum number of rays used per sample point.
 
 Maximum number of rays used per sample point.
 
-``--nDevices=``
-^^^^^^^^^^^^^^^^
+``--numDevices=``
+^^^^^^^^^^^^^^^^^^
 
-Number of Devices HASEonGPU should use.
-On Cuda or Hip Platform this is equivalent to the number of Gpus the application should use (on a single node).
+Maximum number of devices HASEonGPU should make available to one process.
+On CUDA or HIP backends this is the maximum number of GPUs used on one node.
 
 In ``single`` mode, this is typically the number of GPUs available on the
 local node. In ``mpi`` mode, this is usually set to ``1``.
@@ -167,10 +167,11 @@ Verbosity level interpreted as a bitmask. Multiple values can be combined.
 * ``16``: debug
 * ``32``: progress bar
 
-``--reflection``
-^^^^^^^^^^^^^^^^
+``--reflection=``
+^^^^^^^^^^^^^^^^^^
 
-Enables reflections on the upper and lower surfaces of the gain medium.
+Enables or disables reflections on the upper and lower surfaces of the gain
+medium. Accepted values include ``true`` / ``1`` and ``false`` / ``0``.
 
 ``--mse-threshold=``
 ^^^^^^^^^^^^^^^^^^^^
@@ -244,8 +245,8 @@ Default: ``false``
 ^^^^^^^^^^^^^^^
 
 Optional unsigned RNG seed for reproducible Monte Carlo ray sampling.  Set
-this explicitly for reproducible runs.  If omitted, the C++ seed provider uses
-a default seed initialized from ``std::random_device``.
+this explicitly for reproducible runs.  If omitted, the backend uses its
+built-in default seed provider.
 
 ``--config=``
 ^^^^^^^^^^^^^

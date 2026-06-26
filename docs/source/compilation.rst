@@ -2,7 +2,7 @@
 
 :doc:`<- Back to Matlab Interface <MATLABInterface>`
 
-:doc:`<- Back to Binaray Interface <binaryInterface>`
+:doc:`<- Back to Binary Interface <binaryInterface>`
 
 Compilation
 ===========
@@ -22,10 +22,8 @@ Clone the repository and build HASEonGPU with CMake:
 
    git clone https://github.com/computationalradiationphysics/haseongpu.git
    cd haseongpu
-   mkdir build
-   cd build
-   cmake ..
-   cmake --build .
+   cmake -S . -B build
+   cmake --build build
 
 After compilation, the ``calcPhiASE`` binary is available under:
 
@@ -42,15 +40,15 @@ Minimal default build:
 
 .. code-block:: bash
 
-   cmake ..
-   cmake --build .
+   cmake -S . -B build
+   cmake --build build
 
 Build with MPI support:
 
 .. code-block:: bash
 
-   cmake .. -DDISABLE_MPI=OFF
-   cmake --build .
+   cmake -S . -B build -DDISABLE_MPI=OFF
+   cmake --build build
 
 CMake Options
 -------------
@@ -62,13 +60,29 @@ The following CMake variables control important build options.
 
 * Default: ``AUTO``
 * Description:
-  Enabling allows compilation without requiring MPI or BoostMPI as a dependency.
+  Controls whether MPI support is built.
 
 * Values:
 
-  * ``AUTO``: CMAKE tries to detect whether MPI exists and sets this knob in correspondence
-  * ``OFF``: MPI support remains - dependencies are required
+  * ``AUTO``: CMake tries to detect MPI and disables MPI support when it is unavailable
+  * ``OFF``: MPI support is required; configuration fails if dependencies are missing
   * ``ON``: MPI support is disabled
+
+``HASE_BUILD_PhiAse``
+^^^^^^^^^^^^^^^^^^^^^
+
+* Default: ``ON``
+* Description:
+  Builds the standalone ``calcPhiASE`` command-line executable.  Disable this
+  only when a build needs the libraries or Python package but not the binary.
+
+``HASE_USE_SYSTEM_ALPAKA``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Default: ``OFF``
+* Description:
+  Uses an existing alpaka package from ``alpaka_DIR`` or ``CMAKE_PREFIX_PATH``
+  instead of fetching the pinned alpaka version during CMake configuration.
 
 ``HASE_CUDA_ARCHITECTURES``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -91,7 +105,8 @@ For reproducible builds on different systems, specifying the CUDA architecture i
 * Default: ``ON``
 * Description:
 
-  If python as a dependency is missing on your system this knob can be turned off in order to use HASEonGPU from the command-line only.
+  If Python support is unavailable or not needed, this option can be turned off
+  to build HASEonGPU for command-line use only.
   For normal Python installation and usage, please refer to :doc:`Python Interface Guide <pythonInterface>`.
 
 

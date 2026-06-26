@@ -28,7 +28,7 @@ evolution of gain propagation and population inversion can be monitored.
 Installation
 ------------
 
-Install the haseongpu Python package from the repository root. The recommended
+Install the HASEonGPU Python package from the repository root. The recommended
 path for performance-sensitive use is a source build with native host
 optimizations enabled:
 
@@ -128,7 +128,7 @@ for the expected shape before allocating data.  For example,
 ``(numberOfPoints, numberOfLevels)``.  ``reflectivities`` returns
 ``(2, numberOfTriangles)`` because there is one value for the bottom surface
 and one for the top surface of every triangle.
-In general the data-layout is still in-line with the pythonInterfaceLegacy in :doc:`pythonInterfaceLegacy`.
+The data layout remains compatible with the low-level arrays documented in :doc:`pythonInterfaceLegacy`.
 
 The properties in this minimal setup are:
 
@@ -173,7 +173,7 @@ absorption cross section :math:`\sigma_a` at the pump wavelength
 :math:`\lambda` to update the excited population.  The ASE calculation uses
 the absorption and emission spectra, :math:`\sigma_a(\lambda)` and
 :math:`\sigma_e(\lambda)`, to compute wavelength-dependent amplification and
-loss. This enables mult-chromatic ASE calculation.
+loss. This enables multichromatic ASE calculation.
 
 .. literalinclude:: ../../example/python_example/minimalExampleNewInterface.py
    :language: python
@@ -189,38 +189,65 @@ is passed to the ASE backend as the spectral interpolation resolution.
 Describe the Pump
 ^^^^^^^^^^^^^^^^^
 
-The pump defines how energy is deposited into ``betaCells``
-(:math:`\beta_i`) during one time step.  In the minimal setup the pump is a
-super-Gaussian beam with wavelength :math:`\lambda`, intensity :math:`I`,
-radii, and exponent.  It uses the same spectral data object created above.
+The pump defines how external radiation changes ``betaCells``
+(:math:`\beta_i`) during a time-dependent simulation.  HASEonGPU separates the
+radiation description from the solver: ``PumpProperties`` stores spectra, beam
+parameters, a solver object, and any custom values that a solver needs.
+
+The minimal example intentionally uses a toy custom solver to demonstrate the
+extension point rather than a physical pump model:
 
 .. literalinclude:: ../../example/python_example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: pump-properties
    :end-before: # docs:end: pump-properties
 
-``PumpProperties`` is intentionally flexible.  Standard pump parameters such as
-``intensity``, ``wavelength``, ``radiusX``, ``radiusY``, and ``exponent`` are
-read by the default pump routine.  Additional keyword arguments are stored as
-custom properties and can be read by user-defined pump solvers.
-
-The default solver is ``BetaIntegrationGaussianSolver``.  It evaluates the
-super-Gaussian intensity profile :math:`I(x, y)` at each transverse topology
-point, propagates the pump through the z-levels (one-dimensional pump), optionally adds back
-reflection, and returns the beta distribution :math:`\beta` after pumping.
-
-The example passes a custom solver to show the extension point:
+A custom pump solver only needs a ``step(input, pump)`` method.  It receives
+the current beta array :math:`\beta` as ``input["betaCell"]`` and returns an
+updated beta array with the same shape.  ``pump.getProperty(...)`` is how
+custom solver parameters are read:
 
 .. literalinclude:: ../../example/python_example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: custom-pump-solver
    :end-before: # docs:end: custom-pump-solver
 
-A custom pump solver only needs a ``step(input, pump)`` method.  It receives
-the current beta array :math:`\beta` as ``input["betaCell"]`` and returns the
-updated beta array with the same shape.  ``pump.getProperty(...)`` is how
-custom solver parameters are read.  More realistic pump construction is covered in
-:doc:`python_interface/pump_properties`.
+For physical pumping, use one of the built-in solvers.  The continuous
+``OneDimensionalZTraversal`` solver takes a ``PumpRadiationProfile`` and
+computes :math:`d\beta/dt` from the local pump intensity, material cross
+sections, and photon flux:
+
+.. code-block:: python
+
+   from HASEonGPU import (
+       OneDimensionalZTraversal,
+       PumpProperties,
+       PumpRadiationProfile,
+   )
+
+   profile = PumpRadiationProfile(
+       intensity=16e3,
+       wavelengths=[940e-9],
+       waist=(1.5, 1.5),
+       propagationDirection=(0.0, 0.0, 1.0),
+       superGaussianOrder=40,
+       backReflection=True,
+       reflectivity=1.0,
+   )
+
+   pump = PumpProperties(
+       crossSections=cross_sections_data,
+       profile=profile,
+       solver=OneDimensionalZTraversal(),
+   )
+
+If no solver is supplied, ``Simulation`` uses the legacy
+``BetaIntegrationGaussianSolver``.  Both built-in solvers support a
+super-Gaussian transverse profile, but they differ in time treatment: the
+legacy solver integrates an analytical update over ``pumpSubsteps``, while the
+continuous solver evaluates an instantaneous pump rate once per derivative
+evaluation.  See :doc:`python_interface/pump_properties` for the detailed
+physics and parameter reference.
 
 Configure PhiASE
 ^^^^^^^^^^^^^^^^
@@ -228,7 +255,7 @@ Configure PhiASE
 At this point the geometry, material state, spectra, and pump are known.  The
 remaining question is how the ASE calculation should be executed.
 To answer that question, the interface provides a ``PhiASE`` object, which is a configuration object for the HASEonGPU ASE
-c++ backend, which sets sampling limits, adaptive convergence settings, reflection handling,
+C++ backend, which sets sampling limits, adaptive convergence settings, reflection handling,
 backend name, and parallel execution mode.
 
 .. literalinclude:: ../../example/python_example/minimalExampleNewInterface.py
@@ -273,10 +300,10 @@ Assemble the Time Simulation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``Simulation`` connects the objects above into a time-dependent calculation.
-It owns the current time, runs a pump routine, calls ``PhiASE`` for ASE,
-combines pump gain, ASE depletion, and fluorescence decay into a derivative
-called ``dndtASE`` (:math:`d\beta/dt`), and advances ``betaCells`` with the
-selected time integration method.
+It owns the current time, evaluates the pump contribution, calls ``PhiASE`` for
+ASE when enabled, combines pump gain, ASE depletion, and fluorescence decay
+into :math:`d\beta/dt`, and advances ``betaCells`` with the selected time
+integration method.
 
 .. literalinclude:: ../../example/python_example/minimalExampleNewInterface.py
    :language: python
@@ -300,9 +327,12 @@ The three callback registrations are optional but useful:
    the first argument and the filename as the second, so the callback can call
    ``vtkWedge(filename, state)`` or compute derived fields before writing.
 
-One simulation step performs the physical update in this order: pump
-contribution, ASE calculation, fluorescence decay, time integration, beta
-volume update, latest-state update, and step callbacks.
+One simulation step runs ``onInit`` once, then ``beforeStep`` callbacks.  The
+time-integration solver evaluates the derivative as needed; each derivative
+evaluation updates ``betaVolume``, runs ASE if enabled, computes
+``dndtAse`` and ``dndtPump``, and adds fluorescence decay.  After integration,
+``Simulation`` clips beta to ``[0, 1]``, refreshes ``betaVolume``, stores the
+latest ``TimeStepState``, and runs ``onStep`` callbacks.
 
 ``simulation.runSteps(3)`` runs exactly three steps.  Pass
 ``pumpSteps`` to limit pump action to the first outer simulation steps while

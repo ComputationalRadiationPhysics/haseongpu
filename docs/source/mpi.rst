@@ -46,8 +46,8 @@ physical GPUs.
 
 Important Settings
 ------------------
-These settings can be used in the pythonLegacy path or as arguments for the phiASE object.
-Additionally they can be adjusted in a configuration yaml file if that setting is enabled.
+These settings can be used by the legacy Python ``calcPhiASE(...)`` path, by a
+``PhiASE`` object, or in a ``PhiASE`` YAML configuration file.
 
 ``parallelMode``
    Selects the execution path.

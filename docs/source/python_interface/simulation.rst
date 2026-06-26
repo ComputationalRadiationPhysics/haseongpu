@@ -38,7 +38,7 @@ to ``runSteps`` or store it on ``PumpProperties`` and then call
 ``simulation.runSteps(150)``.  When neither location provides ``pumpSteps``, the
 pump is active for every step passed to ``runSteps``.  This is different from
 ``PumpProperties.pumpSubsteps``, which only controls the internal time
-resolution of the pump integration inside one pumped simulation step.
+resolution of the legacy pump integration inside one pumped simulation step.
 
 Run until a target time:
 
@@ -66,13 +66,14 @@ Each call to ``step()`` performs:
 
 1. One-time ``onInit`` callbacks.
 2. ``beforeStep`` callbacks.
-3. Time integration of the beta derivative :math:`d\beta/dt`.
-4. Pump contribution through the configured pump solver.
-5. ASE contribution through ``phiASE.run(...)``.
-6. Fluorescence decay using ``crystalTFluo`` (:math:`\tau`).
-7. Clipping of updated beta values to ``[0, 1]``.
-8. ``betaVolume`` update from ``betaCells``.
-9. Latest-state update and ``onStep`` callbacks.
+3. Time integration of the beta derivative :math:`d\beta/dt`.  The selected
+   time-integration solver may evaluate this derivative more than once.
+4. During each derivative evaluation, ``Simulation`` updates ``betaVolume``,
+   calls ``phiASE.run(...)`` when ASE is enabled, computes the pump rate through
+   the configured pump solver, and combines pump, ASE, and fluorescence decay.
+5. Clipping of updated beta values to ``[0, 1]``.
+6. Final ``betaVolume`` update from ``betaCells``.
+7. Latest-state update and ``onStep`` callbacks.
 
 Callbacks
 ---------
