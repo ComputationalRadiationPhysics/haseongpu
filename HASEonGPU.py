@@ -9,4 +9,8 @@ __version__ = "2.0.2"
 import HASEonGPU_Bindings
 from HASEonGPU_Bindings import *
 from pyInclude import *
-del HASEonGPU_Bindings.HostMesh
+for _name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh", "calcPhiASE"):
+    globals().pop(_name, None)
+del _name
+if hasattr(HASEonGPU_Bindings, "HostMesh"):
+    del HASEonGPU_Bindings.HostMesh
