@@ -263,7 +263,12 @@ PYBIND11_MODULE(HASEonGPU, m)
                 std::launch::async,
                 [experiment, compute, host_mesh]() mutable
                 {
-                    hase::core::Result result;
+                    auto const numberOfSamples = host_mesh.numberOfPoints * host_mesh.numberOfLevels;
+                    hase::core::Result result{
+                        std::vector<float>(numberOfSamples, 0.0f),
+                        std::vector<double>(numberOfSamples, 100000.0),
+                        std::vector<unsigned>(numberOfSamples, 0u),
+                        std::vector<double>(numberOfSamples, 0.0)};
                     int const rc = hase::core::startSimulation<false>(experiment, compute, result, host_mesh);
                     if(rc != 0)
                     {

@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import pyInclude.openpmd.transport as transport
+from pyInclude import AlpakaBackends
 from pyInclude.geometry import GainMedium, MeshTopology
 from pyInclude.laser import CrossSectionData
 from pyInclude.openpmd import HASE_TRANSPORT_VERSION, PrimitiveFieldSpec, PrismSchema, backendFlat, backendFlatArray, fieldSpec, haseTransportAttributes, primitiveView, spectralContext, unitDimension
@@ -35,6 +36,16 @@ MESH_FIELD_VALUES = {
     "refractiveIndex": np.array([1.80, 1.20, 1.65, 1.05], dtype=np.float32),
     "reflectivity": np.array([0.01, 0.03, 0.05, 0.02, 0.04, 0.06], dtype=np.float32),
 }
+
+
+def _launch_backend():
+    backends = AlpakaBackends.all()
+    for backend in backends:
+        if "CpuOmpBlocks" in backend:
+            return backend
+    if not backends:
+        pytest.skip("no Alpaka backend is available in this build")
+    return backends[0]
 
 SPECTRAL_FIELD_VALUES = {
     "lambdaAbsorption": np.array([900e-9, 910e-9, 930e-9], dtype=np.float64),
@@ -102,7 +113,7 @@ def asymmetric_phi_ase():
         repetitions=1,
         adaptiveSteps=1,
         useReflections=True,
-        backend="Host_Cpu_CpuSerial",
+        backend=_launch_backend(),
         parallelMode="single",
         numDevices=1,
         minSampleRange=0,
@@ -152,7 +163,7 @@ def launch_smoke_phi_ase():
         repetitions=1,
         adaptiveSteps=1,
         useReflections=False,
-        backend="Host_Cpu_CpuSerial",
+        backend=_launch_backend(),
         parallelMode="single",
         numDevices=1,
         minSampleRange=0,

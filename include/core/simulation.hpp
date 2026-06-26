@@ -155,8 +155,11 @@ namespace hase::core
 
                 auto devSelector = alpaka::onHost::makeDeviceSelector(deviceSpec);
 
-                // this code block is not executed if deviceCount is zero
                 std::size_t deviceCount = devSelector.getDeviceCount();
+                if(deviceCount == 0u)
+                {
+                    return 0;
+                }
                 compute.devices = std::vector<unsigned>(deviceCount);
                 std::iota(compute.devices.begin(), compute.devices.end(), 0u);
                 compute.gpu_i = compute.devices.front();
