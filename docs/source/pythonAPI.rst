@@ -57,8 +57,8 @@ Simulation and time integration
    Midpoint
    RungeKutta4
 
-Pump solvers and utilities
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Pump solvers, field helpers, and utilities
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated
@@ -71,17 +71,26 @@ Pump solvers and utilities
    LegacyGridDataBetaVolumeMapper
    calcGainFromState
    AlpakaBackends
+   BaseSchema
+   PointSchema
+   TriangleSchema
+   PrismSchema
+   PrimitiveFieldSpec
+   backendFlat
    vtkWedge
    writeGainMediumVtk
 
-Lower-level compatibility helpers
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The ``unitDimension`` namespace is exported from ``HASEonGPU`` and contains
+predefined openPMD unit-dimension tuples for HASE transport variables and common
+dimensions.
+
+Compatibility helpers
+^^^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated
    :nosignatures:
 
-   calcPhiASE
    beta_int3Main
    integrateLaserPump
    runLaserPumpStep
@@ -89,8 +98,8 @@ Lower-level compatibility helpers
 Module Summaries
 ----------------
 
-These modules back the public API.  They are documented for users who need to
-inspect implementation-level helpers or extension points.
+These modules back the public API. They are documented for users who need to
+inspect implementation helpers or extension points.
 
 .. currentmodule:: pyInclude
 
@@ -107,4 +116,3 @@ inspect implementation-level helpers or extension points.
    gainMap
    timeIntegration
    vtkWedge
-   calcPhiASE

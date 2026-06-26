@@ -195,8 +195,9 @@ Beta Volume Mapping
 
 ``Simulation`` updates ``betaVolume`` (:math:`\beta_j`) from ``betaCells``
 (:math:`\beta_i`) after each step using ``LegacyGridDataBetaVolumeMapper``.
-The mapper interpolates beta values from topology points and z-levels to prism
-centers.  It requires ``scipy``.
+Despite the historical class name, this is the current default mapper: it
+interpolates beta values from topology points and z-levels to prism centers.
+It requires ``scipy``.
 
 ``updateTerminalLevel``
 -----------------------

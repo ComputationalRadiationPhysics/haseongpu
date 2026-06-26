@@ -21,9 +21,7 @@ Solution Method
 
 HASEonGPU addresses this by combining a non-uniform spatial sampling of the
 gain medium with Monte Carlo integration, importance sampling, adaptive
-sampling, and GPU parallelization [1]. The code also supports execution on GPU
-clusters, where the workload is distributed across multiple GPUs using MPI in a
-master-worker scheme.
+sampling, and GPU parallelization [1]. The code also supports execution on GPU clusters, where the sample range is distributed across MPI ranks and each rank can use one or more local devices.
 
 ASE Estimator
 -------------
@@ -231,8 +229,7 @@ point is limited by the available GPU memory.
 Features
 --------
 
-HASEonGPU can run both on a single workstation in threaded mode and on larger
-GPU clusters in MPI mode. The simulation supports features such as
+HASEonGPU can run on a single workstation and on larger GPU clusters in MPI mode. The simulation supports features such as
 polychromatic laser pulses, cladding, surface coatings, refractive indices, and
 reflections on the upper and lower surfaces of the gain medium. If a target
 mean squared error is not reached with the current number of rays, the

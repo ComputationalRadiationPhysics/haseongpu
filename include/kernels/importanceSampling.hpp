@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <alpakaUtils/DevBundle.hpp>
+#include <concepts/concepts.hpp>
 #include <core/mesh.hpp>
 #include <kernels/detail/importanceSampling.hpp>
 
@@ -57,23 +59,25 @@ namespace hase::kernels
      */
     void importanceSamplingPropagation(
         auto& devBundle, // makes this function a template -> hence the function definition was moved into this header
-                         // file
+        concepts::Queue auto const&
+            queue, // we need to hand in the queue to enable synchronization being orchestrated from the outside
         unsigned sample_i,
         unsigned const reflectionSlices,
-        hase::core::DeviceMeshView const& deviceMesh,
+        core::DeviceMeshView const& deviceMesh,
         double const sigmaA,
         double const sigmaE,
         alpaka::concepts::IMdSpan auto preImportance,
         alpaka::concepts::IMdSpan auto droppedRays,
         alpaka::concepts::IMdSpan auto infiniteRaySnapshots)
     {
-        auto queue = devBundle.device.makeQueue();
         // wrapper for NDEBUG only be compiled in debug mode
         ALPAKA_ASSERT((
             [&]
             {
-                auto validateMeshFrameSpec
-                    = alpaka::onHost::getFrameSpec(queue.getDevice(), devBundle.executor, deviceMesh.numberOfSamples);
+                auto validateMeshFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+                    queue.getDevice(),
+                    devBundle.executor,
+                    alpaka::Vec{deviceMesh.numberOfSamples});
                 queue.enqueue(
                     validateMeshFrameSpec,
                     alpaka::KernelBundle{hase::kernels::ValidateMeshKernel{}, deviceMesh, sample_i});
@@ -82,14 +86,13 @@ namespace hase::kernels
 
                 return true;
             }()));
-        alpaka::onHost::wait(queue);
         alpaka::concepts::IMdSpan auto preImportanceSpan = preImportance.getMdSpan();
         alpaka::concepts::IMdSpan auto droppedRaysSpan = droppedRays.getMdSpan();
         alpaka::concepts::IMdSpan auto infiniteRaySnapshotsSpan = infiniteRaySnapshots.getMdSpan();
-        auto propagateFrameSpec = alpaka::onHost::getFrameSpec(
+        auto propagateFrameSpec = alpakaUtils::getFrameSpec<uint32_t>(
             queue.getDevice(),
             devBundle.executor,
-            static_cast<uint32_t>(reflectionSlices * deviceMesh.numberOfPrisms));
+            alpaka::Vec{static_cast<uint32_t>(reflectionSlices * deviceMesh.numberOfPrisms)});
         queue.enqueue(
             propagateFrameSpec,
             alpaka::KernelBundle{
@@ -101,7 +104,6 @@ namespace hase::kernels
                 preImportanceSpan,
                 droppedRaysSpan,
                 infiniteRaySnapshotsSpan});
-        alpaka::onHost::wait(queue);
     }
 
     /**
@@ -125,8 +127,10 @@ namespace hase::kernels
      */
     unsigned importanceSamplingDistribution(
         auto& devBundle,
+        concepts::Queue auto const&
+            queue, // we need to hand in the queue to enable synchronization being orchestrated from the outside
         unsigned reflectionSlices,
-        hase::core::DeviceMeshView deviceMesh,
+        core::DeviceMeshView deviceMesh,
         unsigned raysPerSample,
         alpaka::concepts::IBuffer auto preImportance,
         alpaka::concepts::IBuffer auto importance,
@@ -134,11 +138,10 @@ namespace hase::kernels
         double hSumPhi,
         unsigned& threadLocalStridingRNG)
     {
-        auto queue = devBundle.device.makeQueue();
         alpaka::onHost::fill(queue, raysPerPrism, 0u);
         unsigned hRaysDump = 0;
         auto hRaysDumpView = alpaka::makeView(alpaka::api::host, &hRaysDump, alpaka::Vec{1u});
-        auto dRaysDump = hase::alpakaUtils::toDevice(queue, hRaysDumpView);
+        auto dRaysDump = alpakaUtils::toDevice(queue, hRaysDumpView);
         if(!std::isfinite(hSumPhi) || hSumPhi <= 0.0)
         {
             alpaka::onHost::fill(queue, importance, 0.0);
@@ -147,7 +150,8 @@ namespace hase::kernels
         }
         alpaka::onHost::inclusiveScan(queue, devBundle.executor, importance, preImportance);
 
-        auto const drawFrameSpec = alpaka::onHost::getFrameSpec(devBundle.device, devBundle.executor, raysPerSample);
+        auto const drawFrameSpec
+            = alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{raysPerSample});
         auto const drawThreadLocalStridingIndex = threadLocalStridingRNG;
         queue.enqueue(
             drawFrameSpec,
@@ -165,11 +169,9 @@ namespace hase::kernels
             queue,
             devBundle.executor,
             preImportance.getExtents(),
-            hase::kernels::RecalculateUnbiasedImportance{deviceMesh, hSumPhi},
+            RecalculateUnbiasedImportance{deviceMesh, hSumPhi},
             preImportance,
             importance);
-
-        alpaka::onHost::wait(queue);
         return raysPerSample;
     }
 
