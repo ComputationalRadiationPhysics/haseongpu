@@ -415,7 +415,7 @@ def main(
 
         # Now for the cladding points
         for i_p in range(length_clad):
-            for i_z in range(mesh_z-1):
+            for i_z in range(mesh_z):
                 # Calc local gain (g_l)
                 pos_clad = clad_points_t[i_p]
                 flux_clad[pos_clad,i_z] = clad_abs*phi_ASE[pos_clad,i_z]
@@ -466,7 +466,7 @@ def main(
         one_minus = (1.0 - exp_fac)
 
         for i_p in range(p.shape[0]):
-            for i_z in range(mesh_z - 1):
+            for i_z in range(mesh_z):
                 beta_cell[i_p, i_z] = (
                         tfluo * (dndt_pump[i_p, i_z] - dndt_ASE[i_p, i_z]) * one_minus
                         + beta_cell[i_p, i_z] * exp_fac

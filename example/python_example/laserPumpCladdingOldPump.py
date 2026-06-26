@@ -178,7 +178,6 @@ def runExample(
         timeStep=2e-5, #20 μs
         crossSections=spectralProperties,
         constants=Constants(c=3e8, h=6.626e-34), ## these constants match legacy skript values
-        updateTerminalLevel=False,
         enableAse=enableAse,
     )
     simulation.onInit(prePumpInitialState)
