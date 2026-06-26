@@ -33,6 +33,47 @@ from HASEonGPU import (  # noqa: E402
 )
 
 
+def laserPumpCladdingSpectralProperties():
+    materialDir = scriptDir / "input"
+    return CrossSectionData(
+        wavelengthsAbsorption=np.loadtxt(materialDir / "lambda_a.txt"),
+        crossSectionAbsorption=np.loadtxt(materialDir / "sigma_a.txt"),
+        wavelengthsEmission=np.loadtxt(materialDir / "lambda_e.txt"),
+        crossSectionEmission=np.loadtxt(materialDir / "sigma_e.txt"),
+        resolution=np.loadtxt(materialDir / "lambda_a.txt").size,
+    )
+
+
+def loadLaserPumpCladdingTet4Medium(materialPath):
+    """Load a Tet4 laserPumpCladding state for PhiASE-only runs.
+
+    Converted legacy VTK fixtures store ``betaCells`` on the VTK points.  The
+    Tet4 importer uses those points as explicit ASE sample points, so backward
+    PhiASE results keep the same sample count as the legacy wedge input while
+    the volume transport uses tetrahedral cells.
+    """
+    return GainMedium.fromVtk(materialPath)
+
+
+def runTet4PhiAseInput(
+    materialPath,
+    phiAseConfigPath=defaultPhiAseConfigPath,
+    backend="UseConfig",
+    **AseOverride,
+):
+    spectralProperties = laserPumpCladdingSpectralProperties()
+    medium = loadLaserPumpCladdingTet4Medium(materialPath)
+    phiAse = PhiASE.fromYaml(
+        phiAseConfigPath,
+        spectralProperties=spectralProperties,
+        **AseOverride,
+    )
+    if backend != "UseConfig":
+        phiAse.backend = backend
+    phiAse.run(gainMedium=medium, crossSections=spectralProperties)
+    return phiAse.getResults()
+
+
 def printState(state):
     print(
         f"step={state.step:03d} "
@@ -102,17 +143,10 @@ def runExample(
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
-    materialDir = scriptDir / "input"
     numberOfLevels = 10
     thickness = 0.7 / (numberOfLevels - 1)
 
-    spectralProperties = CrossSectionData(
-        wavelengthsAbsorption=np.loadtxt(materialDir / "lambda_a.txt"),
-        crossSectionAbsorption=np.loadtxt(materialDir / "sigma_a.txt"),
-        wavelengthsEmission=np.loadtxt(materialDir / "lambda_e.txt"),
-        crossSectionEmission=np.loadtxt(materialDir / "sigma_e.txt"),
-        resolution=np.loadtxt(materialDir / "lambda_a.txt").size,
-    )
+    spectralProperties = laserPumpCladdingSpectralProperties()
 
     pumpCrossSections = CrossSectionData.monochromatic(
         wavelength=940e-9,
@@ -205,6 +239,8 @@ def main(argv=None):
         action="store_true",
         help="Disable ASE depletion during the time-stepped pump simulation.",
     )
+    parser.add_argument("--tet4-input", type=Path, default=None)
+    parser.add_argument("--phiase-only", action="store_true")
     parser.add_argument("--min-sample-range", type=int, default=None)
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
@@ -217,6 +253,21 @@ def main(argv=None):
         aseOverrides["maxSampleRange"] = args.max_sample_range
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
+
+    if args.phiase_only:
+        if args.tet4_input is None:
+            parser.error("--phiase-only requires --tet4-input")
+        aseOverrides.setdefault("propagationMode", "backward")
+        result = runTet4PhiAseInput(
+            args.tet4_input,
+            args.phi_ase_config,
+            args.backend,
+            **aseOverrides,
+        )
+        phi = np.asarray(result.phiAse)
+        print(f"phiAse shape: {phi.shape}")
+        print(f"meanPhi: {float(phi.mean()):.17g}")
+        return
 
     state = runExample(
         args.phi_ase_config,

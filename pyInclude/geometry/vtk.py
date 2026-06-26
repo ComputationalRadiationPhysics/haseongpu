@@ -199,11 +199,17 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
         ),
         metadata={"source": str(path), "format": "vtk"},
     )
+    beta_cells = physical.get("betaCells")
+    if beta_cells is not None and np.asarray(beta_cells).size == points.shape[0]:
+        topology.samplePoints = np.asarray(points, dtype=np.float64)
     medium = gainMediumCls(topology=topology)
     for name, value in physical.items():
         if name in {"cellDomains", "faceBoundaries"}:
             continue
-        medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
+        try:
+            medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
+        except KeyError:
+            continue
     return medium
 
 
