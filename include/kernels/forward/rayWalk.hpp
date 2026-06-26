@@ -127,6 +127,20 @@ namespace hase::kernels::forward
         return nextFace;
     }
 
+    [[nodiscard]] ALPAKA_FN_ACC double localGainCoefficient(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        double const sigmaA,
+        double const sigmaE)
+    {
+        if(mesh.getCellType(tet) == mesh.claddingNumber)
+        {
+            return -mesh.claddingAbsorption;
+        }
+        double const gainPerDensity = mesh.getBetaVolume(tet) * (sigmaE + sigmaA) - sigmaA;
+        return static_cast<double>(mesh.nTot) * gainPerDensity;
+    }
+
     [[nodiscard]] ALPAKA_FN_ACC double localSegmentGain(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
@@ -134,12 +148,23 @@ namespace hase::kernels::forward
         double const sigmaA,
         double const sigmaE)
     {
-        if(mesh.getCellType(tet) == mesh.claddingNumber)
+        return alpaka::math::exp(localGainCoefficient(mesh, tet, sigmaA, sigmaE) * length);
+    }
+
+    [[nodiscard]] ALPAKA_FN_ACC double localSegmentTrackLengthIntegral(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        double const length,
+        double const sigmaA,
+        double const sigmaE)
+    {
+        double const gainCoefficient = localGainCoefficient(mesh, tet, sigmaA, sigmaE);
+        double const gainLength = gainCoefficient * length;
+        if(alpaka::math::abs(gainLength) < 1.0e-8)
         {
-            return alpaka::math::exp(-mesh.claddingAbsorption * length);
+            return length;
         }
-        double const gainPerDensity = mesh.getBetaVolume(tet) * (sigmaE + sigmaA) - sigmaA;
-        return alpaka::math::exp(static_cast<double>(mesh.nTot) * gainPerDensity * length);
+        return (alpaka::math::exp(gainLength) - 1.0) / gainCoefficient;
     }
 
     [[nodiscard]] ALPAKA_FN_ACC double segmentCenterWeight(

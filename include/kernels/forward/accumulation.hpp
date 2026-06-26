@@ -83,12 +83,9 @@ namespace hase::kernels::forward
                 assert(tet < mesh.numberOfCells);
                 double segmentLength = remaining;
                 int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
-                hase::core::Point const midpoint = advance(origin, direction, 0.5 * segmentLength);
                 double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
                 double contribution = sourceBeta * accumulatedGain;
-                contribution *= alpaka::math::sqrt(alpaka::math::max(0.0, segmentGain));
-                (void) midpoint;
-                contribution *= segmentLength;
+                contribution *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaA, sigmaE);
                 if(alpaka::math::isfinite(contribution))
                 {
                     alpaka::onAcc::atomicAdd(acc, &phiAccumulator[tet], contribution);
