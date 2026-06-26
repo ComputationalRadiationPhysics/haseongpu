@@ -357,10 +357,7 @@ namespace
     }
 
     template<typename T>
-    void validateUnchangedAttribute(
-        io::Iteration const& iteration,
-        std::string const& name,
-        T const& expected)
+    void validateUnchangedAttribute(io::Iteration const& iteration, std::string const& name, T const& expected)
     {
         if(!iteration.containsAttribute(name))
         {
@@ -373,7 +370,7 @@ namespace
             validationError(
                 "dynamic iteration/" + name,
                 "non-dynamic attribute changed after iteration 0; dynamic-only iterations may update only "
-                    "core_beta_volume and core_point_beta");
+                "core_beta_volume and core_point_beta");
         }
     }
 
@@ -726,11 +723,9 @@ namespace hase::openpmd
     bool Parser::containsStaticMeshUpdate(io::Iteration const& iteration) const
     {
         std::string const prefix = m_meshGroup + "_";
-        return iteration.meshes.contains(prefix + "points")
-               || iteration.meshes.contains(prefix + "cells_connectivity")
+        return iteration.meshes.contains(prefix + "points") || iteration.meshes.contains(prefix + "cells_connectivity")
                || iteration.meshes.contains(prefix + "cells_offsets")
-               || iteration.meshes.contains(prefix + "cells_types")
-               || iteration.meshes.contains(prefix + "vertices")
+               || iteration.meshes.contains(prefix + "cells_types") || iteration.meshes.contains(prefix + "vertices")
                || iteration.meshes.contains(prefix + "connectivity");
     }
 
@@ -777,7 +772,7 @@ namespace hase::openpmd
                 validationError(
                     name,
                     "non-dynamic mesh record present after iteration 0; dynamic-only iterations may update only "
-                        "core_beta_volume and core_point_beta");
+                    "core_beta_volume and core_point_beta");
             }
         }
 
@@ -786,7 +781,7 @@ namespace hase::openpmd
             validationError(
                 "dynamic iteration/haseStaticUpdate",
                 "static updates after iteration 0 are not supported; dynamic-only iterations may update only "
-                    "core_beta_volume and core_point_beta");
+                "core_beta_volume and core_point_beta");
         }
 
         validateComputeSettings(iteration);
@@ -1125,7 +1120,7 @@ namespace hase::openpmd
                     validationError(
                         "dynamic iteration",
                         "static topology updates after iteration 0 are not supported; dynamic-only iterations may "
-                            "update only core_beta_volume and core_point_beta");
+                        "update only core_beta_volume and core_point_beta");
                 }
                 validateDynamicOnlyIteration(iteration, *simulation);
                 updateDynamicIteration(inputSeries, iteration, *simulation);

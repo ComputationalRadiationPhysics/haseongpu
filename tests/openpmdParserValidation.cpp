@@ -805,9 +805,7 @@ TEST_CASE("openPMD parser rejects non-dynamic changes after iteration 0", "[open
         auto const input = writeCanonicalStaticDynamicInput(
             "dynamic_contract_static_record",
             [](io::Series& series, io::Iteration& iteration)
-            {
-                writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u}, {"cell"}, {1u});
-            });
+            { writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u}, {"cell"}, {1u}); });
         auto const error = expectDynamicError(input);
         REQUIRE(error.find("openPMD validation error for 'core_cladding_cell_type'") != std::string::npos);
         REQUIRE(error.find("non-dynamic mesh record") != std::string::npos);
@@ -837,7 +835,8 @@ TEST_CASE("openPMD parser rejects non-dynamic changes after iteration 0", "[open
                 iteration.setAttribute("spectral_resolution", 3u);
             });
         auto const error = expectDynamicError(input);
-        REQUIRE(error.find("openPMD validation error for 'dynamic iteration/spectral_resolution'") != std::string::npos);
+        REQUIRE(
+            error.find("openPMD validation error for 'dynamic iteration/spectral_resolution'") != std::string::npos);
         REQUIRE(error.find("non-dynamic attribute changed after iteration 0") != std::string::npos);
     }
 

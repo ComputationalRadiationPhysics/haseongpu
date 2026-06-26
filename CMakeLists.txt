@@ -394,7 +394,11 @@ set(HASE_INSTALL_LIB_RPATH "$ORIGIN")
 include(cmake/findOpenPmd.cmake)
 foreach(HASE_BUILD_RPATH_TARGET IN ITEMS openPMD hdf5-shared)
     if(TARGET ${HASE_BUILD_RPATH_TARGET})
-        list(APPEND HASE_BUILD_TREE_RPATH "$<TARGET_FILE_DIR:${HASE_BUILD_RPATH_TARGET}>")
+        list(
+            APPEND
+            HASE_BUILD_TREE_RPATH
+            "$<TARGET_FILE_DIR:${HASE_BUILD_RPATH_TARGET}>"
+        )
     endif()
 endforeach()
 target_link_libraries(hase_core INTERFACE openPMD::openPMD)
