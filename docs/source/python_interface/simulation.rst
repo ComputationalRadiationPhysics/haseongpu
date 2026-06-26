@@ -198,10 +198,3 @@ Beta Volume Mapping
 (:math:`\beta_i`) after each step using ``LegacyGridDataBetaVolumeMapper``.
 The mapper interpolates beta values from topology points and z-levels to prism
 centers.  It requires ``scipy``.
-
-``updateTerminalLevel``
------------------------
-
-By default ``updateTerminalLevel=True`` and every z-level is updated.  If it is
-set to ``False``, the terminal level is preserved while the other levels are
-advanced.

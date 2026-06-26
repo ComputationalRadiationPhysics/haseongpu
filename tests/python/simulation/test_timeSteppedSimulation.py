@@ -262,6 +262,7 @@ def testTimeSteppedSimulationAcceptsCustomPumpSolver(
     tau = 9.5e-4
     expected = tau * (0.25 / 1e-5) * (1.0 - np.exp(-1e-5 / tau))
     assert np.allclose(state.betaCells, expected)
+    assert np.allclose(state.betaCells[:, -1], expected)
 
 
 def testCustomPumpSolverCanReadAdditionalPumpProperties(
