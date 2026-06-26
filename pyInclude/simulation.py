@@ -434,8 +434,6 @@ class Simulation:
     """Optional target physical time for ``runUntil()``."""
     constants: Constants = field(default_factory=Constants)
     """Physical constants used by the pump integrator."""
-    updateTerminalLevel: bool = True
-    """Whether the last z-level beta values are advanced by the solver."""
     enableAse: bool = True
     """Whether each derivative evaluation runs ASE depletion through ``PhiASE``."""
 
@@ -580,10 +578,7 @@ class Simulation:
         updated_beta = integration_result.betaCells
         derivative = integration_result.evaluation
 
-        beta_next = updated_beta if self.updateTerminalLevel else beta_cells.copy()
-        if not self.updateTerminalLevel:
-            beta_next[:, :-1] = updated_beta[:, :-1]
-        self.gainMedium.get("betaCells").value = np.clip(beta_next, 0.0, 1.0)
+        self.gainMedium.get("betaCells").value = np.clip(updated_beta, 0.0, 1.0)
         self._updateBetaVolumeFromCells()
 
         self._step += 1
