@@ -12,7 +12,7 @@ For general setup and dependency information, see
 Installation
 ------------
 
-Install the haseongpu Python library from the repository root using the same
+Install the HASEonGPU Python package from the repository root using the same
 source-build path described in :doc:`Getting Started <gettingStarted>`:
 
 .. code-block:: bash
@@ -658,11 +658,12 @@ The following section describes all arguments of the Python call.
 
 * Type: ``unsigned``
 * Description:
-  Number of devices used by one process - internally HASEonGPU uses min(numDevices,availableDevices).
+  Maximum number of devices made available to one process.  Internally,
+  HASEonGPU uses no more than the devices available for the selected backend.
 
-  In ``single`` mode, this usually corresponds to the requested number of computing devices -
-  this can be gpus or cpu sockets depending on the alpaka backend -
-  used on the local node.
+  In ``single`` mode, this usually corresponds to the requested number of
+  compute devices on the local node.  Depending on the alpaka backend, those
+  devices may be GPUs or CPU devices.
 
   In ``mpi`` mode, this corresponds to the number of computing devices used per MPI process
   rank. Therefore, if ``nPerNode = 1 (default)`` , it corresponds to the number of

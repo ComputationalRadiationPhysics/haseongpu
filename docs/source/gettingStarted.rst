@@ -52,8 +52,9 @@ Optional software and tools:
 
 Hardware requirements:
 
-* NVIDIA GPU with CUDA support
-* For GPU execution, a CUDA-capable device is required
+* CPU execution works through host alpaka backends.
+* GPU execution requires a backend-supported device, for example NVIDIA/CUDA or
+  AMD/HIP hardware, and a build configured for that backend.
 
 Additional Notes
 ----------------

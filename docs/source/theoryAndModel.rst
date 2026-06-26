@@ -179,7 +179,10 @@ returned ``phiAse`` as
    \Phi_i.
 
 Because :math:`\Phi_i` already includes :math:`N_{\mathrm{tot}} / \tau`, this derivative must not be
-multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.
+multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.  In the
+Python ``Simulation`` time loop, the cross sections used for this scalar
+conversion are the maximum emission cross section and the absorption cross
+section at the emission-peak wavelength.
 
 Pump and Time Stepping
 ----------------------
@@ -198,9 +201,49 @@ combining pump excitation, ASE depletion, and fluorescence decay:
    -
    \frac{\beta}{\tau}.
 
-The default pump routine evaluates a super-Gaussian transverse pump profile,
-propagates pump intensity through the crystal layers, and applies the local
-analytical update
+HASEonGPU provides two built-in pump solvers.  Both use the same local pump
+physics but package the time update differently.  The transverse input field is
+represented as a super-Gaussian profile,
+
+.. math::
+
+   I_0(x,y) = I_{\mathrm{peak}}
+   \exp\left[-\left(\sqrt{\frac{(x-x_c)^2}{r_y^2}
+   + \frac{(y-y_c)^2}{r_x^2}}\right)^q\right].
+
+The continuous ``OneDimensionalZTraversal`` solver propagates each wavelength
+sample along the z levels.  Between two adjacent levels it uses the average
+population :math:`\bar\beta_z` and the active-ion density
+:math:`N_{\mathrm{tot}}`:
+
+.. math::
+
+   I_{k,z+\Delta z} = I_{k,z}
+   \exp\left[-\left(\sigma_{a,k}
+   - \bar\beta_z(\sigma_{a,k}+\sigma_{e,k})\right)
+   N_{\mathrm{tot}}\Delta z\right].
+
+The local photon flux is
+
+.. math::
+
+   \Phi_k = I_k\frac{\lambda_k}{hc},
+
+and the frozen-state pump rate is
+
+.. math::
+
+   \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
+   =
+   \sum_k\left[\sigma_{a,k}
+   - \beta(\sigma_{a,k}+\sigma_{e,k})\right]\Phi_k.
+
+If back reflection is enabled, the transmitted intensity at the far crystal
+surface is multiplied by the configured reflectivity and propagated back through
+the same layer factors before the forward and reflected intensities are summed.
+
+The legacy/default ``BetaIntegrationGaussianSolver`` instead advances beta with
+a local analytical update over internal pump substeps:
 
 .. math::
 

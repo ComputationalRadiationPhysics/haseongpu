@@ -34,6 +34,7 @@ Spectra, pump, and ASE configuration
    CrossSectionData
    LaserProperties
    SpectralDecomposition
+   PumpRadiationProfile
    PumpProperties
    PhiASE
 
@@ -67,6 +68,8 @@ Pump solvers and utilities
    BetaInt3PumpSolver
    BetaIntegrationSolver
    BetaIntegrationGaussianSolver
+   OneDimensionalZTraversal
+   oneDimensionalZTraversalPumpRate
    Constants
    LegacyGridDataBetaVolumeMapper
    calcGainFromState
