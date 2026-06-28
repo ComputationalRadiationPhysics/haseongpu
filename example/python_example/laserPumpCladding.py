@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
+from pyInclude import FrozenPhiAseRungeKutta4
 
 scriptDir = Path(__file__).resolve().parent
 repoRoot = scriptDir.parents[1]
@@ -157,7 +158,7 @@ def runExample(
         gainMedium=medium,
         pump=pumpProperties,
         phiASE=phiAse,
-        timeIntegrationSolver=RungeKutta4(),
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
         timeStep=2e-5, #20 μs
         crossSections=spectralProperties,
         constants=Constants(c=3e8, h=6.626e-34), ## these constants match legacy skript values

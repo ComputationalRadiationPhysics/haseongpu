@@ -16,6 +16,7 @@ Import built-in solvers from ``HASEonGPU``:
        Heun,
        Midpoint,
        RungeKutta4,
+       FrozenPhiAseRungeKutta4,
        ImplicitEuler,
        ExponentialEuler,
    )
@@ -26,8 +27,14 @@ Available solvers:
 * ``Heun()``
 * ``Midpoint()``
 * ``RungeKutta4()``
+* ``FrozenPhiAseRungeKutta4()``
 * ``ImplicitEuler(iterations=8, tolerance=1e-10)``
 * ``ExponentialEuler()``
+
+``FrozenPhiAseRungeKutta4`` computes ``phiASE`` once per outer simulation step,
+then reuses that fixed ASE flux while RK4 re-evaluates the pump and local ASE
+coupling terms for each stage. Use it to reduce ASE backend cost when a
+stage-by-stage transport solve is not required.
 
 All solvers implement:
 

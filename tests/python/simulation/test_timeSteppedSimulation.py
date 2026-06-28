@@ -13,6 +13,7 @@ from HASEonGPU import (
     CrossSectionData,
     ExponentialEuler,
     ExplicitEuler,
+    FrozenPhiAseRungeKutta4,
     GainMedium,
     Heun,
     ImplicitEuler,
@@ -563,13 +564,132 @@ def testTimeIntegrationSolverIsMandatory(
         raise AssertionError("Simulation accepted a missing timeIntegrationSolver")
 
 
+def _mediumLikeSmallTopology(smallTopology, betaCells=None):
+    if betaCells is None:
+        betaCells = np.zeros((smallTopology.numberOfPoints, smallTopology.levels))
+    return GainMedium(topology=smallTopology).withPhysicalProperties(
+        betaCells=betaCells,
+        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=np.zeros((2, smallTopology.numberOfTriangles)),
+        nTot=2.76e20,
+        crystalTFluo=9.5e-4,
+        claddingNumber=1,
+        claddingAbsorption=0.0,
+    )
+
+
+def testFrozenPhiAseRungeKutta4RunsAseBackendOncePerStep(
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    phiAse = makeFakePhiAse(smallTopology)
+    calls = []
+
+    def run(*args, **kwargs):
+        calls.append(np.asarray(kwargs["gainMedium"].get("betaCells").value).copy())
+        return phiAse
+
+    phiAse.run = run
+    state = Simulation(
+        gainMedium=_mediumLikeSmallTopology(smallTopology),
+        pump=pumpProperties,
+        phiASE=phiAse,
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
+        timeStep=1e-5,
+    ).step()
+
+    assert len(calls) == 1
+    assert state.aseResult is not None
+    assert state.phiAse.shape == (smallTopology.numberOfPoints, smallTopology.levels)
+
+
+def testFrozenPhiAseRungeKutta4SkipsAseBackendWhenDisabled(
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    class LinearPumpSolver:
+        def step(self, input, pump):
+            beta = np.asarray(input["betaCell"], dtype=np.float64)
+            return beta + input["_timeStep"] * (0.2 + 0.05 * beta)
+
+    pumpProperties.customProperties["solver"] = LinearPumpSolver()
+    initial = np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.1)
+
+    frozenPhiAse = makeFakePhiAse(smallTopology)
+    frozenPhiAse.run = lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("PhiASE.run should not be called when enableAse=False")
+    )
+    frozenState = Simulation(
+        gainMedium=_mediumLikeSmallTopology(smallTopology, betaCells=initial.copy()),
+        pump=pumpProperties,
+        phiASE=frozenPhiAse,
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
+        timeStep=1e-5,
+        enableAse=False,
+    ).step()
+
+    regularPhiAse = makeFakePhiAse(smallTopology)
+    regularPhiAse.run = lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("PhiASE.run should not be called when enableAse=False")
+    )
+    regularState = Simulation(
+        gainMedium=_mediumLikeSmallTopology(smallTopology, betaCells=initial.copy()),
+        pump=pumpProperties,
+        phiASE=regularPhiAse,
+        timeIntegrationSolver=RungeKutta4(),
+        timeStep=1e-5,
+        enableAse=False,
+    ).step()
+
+    assert np.allclose(frozenState.betaCells, regularState.betaCells)
+    assert np.allclose(frozenState.phiAse, 0.0)
+    assert np.allclose(frozenState.dndtAse, 0.0)
+
+
+def testFrozenPhiAseDerivativeReusesPhiAseWhileAseCouplingFollowsBeta(
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    crossSections,
+    makeFakePhiAse,
+):
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=makeFakePhiAse(smallTopology),
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
+        timeStep=1e-5,
+        crossSections=crossSections,
+    )
+    phiAse = np.full((smallTopology.numberOfPoints, smallTopology.levels), 2.0)
+    lowBeta = np.full_like(phiAse, 0.1)
+    highBeta = np.full_like(phiAse, 0.4)
+
+    low = simulation._timeDerivativeWithFrozenPhiAse(lowBeta, 0.0, phiAse, object())
+    high = simulation._timeDerivativeWithFrozenPhiAse(highBeta, 0.0, phiAse, object())
+
+    assert np.allclose(low.phiAse, phiAse)
+    assert np.allclose(high.phiAse, phiAse)
+    assert not np.array_equal(low.dndtAse, high.dndtAse)
+
+
 def testTimeIntegrationSolversCanStepSimulation(
     smallGainMedium,
     pumpProperties,
     makeFakePhiAse,
     smallTopology,
 ):
-    solvers = [ExplicitEuler(), Heun(), Midpoint(), RungeKutta4(), ImplicitEuler(iterations=2)]
+    solvers = [
+        ExplicitEuler(),
+        Heun(),
+        Midpoint(),
+        RungeKutta4(),
+        FrozenPhiAseRungeKutta4(),
+        ImplicitEuler(iterations=2),
+    ]
 
     for solver in solvers:
         medium = GainMedium(topology=smallTopology).withPhysicalProperties(

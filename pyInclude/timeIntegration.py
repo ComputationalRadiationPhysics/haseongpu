@@ -116,6 +116,46 @@ class RungeKutta4(TimeIntegrationSolver):
         return TimeIntegrationResult(updated, k4)
 
 
+class FrozenPhiAseRungeKutta4(TimeIntegrationSolver):
+    """Fourth-order beta update with one frozen ASE transport solve per step.
+
+    ``Simulation`` computes the ASE flux once from the step-start beta field
+    and reuses that fixed ``phiAse`` in all RK4 stages. Pump and local ASE
+    coupling terms are still re-evaluated for each trial beta value. This
+    reduces expensive ASE backend calls, but it is not identical to full RK4 of
+    the coupled beta/ASE-transport system.
+    """
+
+    name = "frozen-phi-ase-runge-kutta-4"
+
+    def stepSimulation(self, simulation, betaCells, time, timeStep):
+        """Advance one ``Simulation`` step while freezing the ASE flux."""
+        phi_ase, ase_result = simulation._runPhiAseForBeta(betaCells)
+        k1 = simulation._timeDerivativeWithFrozenPhiAse(betaCells, time, phi_ase, ase_result)
+        k2 = simulation._timeDerivativeWithFrozenPhiAse(
+            betaCells + 0.5 * timeStep * k1.derivative,
+            time + 0.5 * timeStep,
+            phi_ase,
+            ase_result,
+        )
+        k3 = simulation._timeDerivativeWithFrozenPhiAse(
+            betaCells + 0.5 * timeStep * k2.derivative,
+            time + 0.5 * timeStep,
+            phi_ase,
+            ase_result,
+        )
+        k4 = simulation._timeDerivativeWithFrozenPhiAse(
+            betaCells + timeStep * k3.derivative,
+            time + timeStep,
+            phi_ase,
+            ase_result,
+        )
+        updated = betaCells + (timeStep / 6.0) * (
+            k1.derivative + 2.0 * k2.derivative + 2.0 * k3.derivative + k4.derivative
+        )
+        return TimeIntegrationResult(updated, k4)
+
+
 class ImplicitEuler(TimeIntegrationSolver):
     """Fixed-point implicit Euler beta update for stiff beta dynamics."""
 

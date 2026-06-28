@@ -71,6 +71,8 @@ Each call to ``step()`` performs:
 4. During each derivative evaluation, ``Simulation`` updates ``betaVolume``,
    calls ``phiASE.run(...)`` when ASE is enabled, computes the pump rate through
    the configured pump solver, and combines pump, ASE, and fluorescence decay.
+   Higher-order solvers can therefore call the ASE backend more than once per
+   outer ``step()``.
 5. Clipping of updated beta values to ``[0, 1]``.
 6. Final ``betaVolume`` update from ``betaCells``.
 7. Latest-state update and ``onStep`` callbacks.
@@ -190,6 +192,11 @@ Time Integration
    step(rhs, betaCells, time, timeStep)
 
 Built-in solvers are documented in :doc:`utilities`.
+
+``FrozenPhiAseRungeKutta4`` is a special simulation-aware solver: it runs
+``phiASE`` once at the beginning of the outer step and keeps that ASE flux
+constant for all RK4 stages. Pump and local terms are still evaluated for each
+stage trial beta value.
 
 Beta Volume Mapping
 -------------------
