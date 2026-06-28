@@ -27,13 +27,13 @@ from HASEonGPU import (  # noqa: E402
     calcGainFromState,
     Constants,
     CrossSectionData,
-    ExponentialEuler,
     GainMedium,
     MeshTopology,
     PhiASE,
     PumpProperties,
     Simulation,
     PumpRadiationProfile,
+    RungeKutta4,
     vtkWedge,
 )
 def printState(state):
@@ -65,19 +65,6 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
             "localGain": calcGainFromState(state, crossSections, nTot),
         },
     )
-
-
-def prePumpInitialState(simulation):
-    medium = simulation.gainMedium
-    beta_cells = np.asarray(medium.get("betaCells").value, dtype=np.float64).reshape(
-        medium.get("betaCells").expectedShape,
-        order="F",
-    )
-    dndt_pump = simulation._dndtPump(beta_cells)
-    tau = float(medium.get("crystalTFluo").value)
-    decay = np.exp(-simulation.timeStep / tau)
-    medium.get("betaCells").value = tau * dndt_pump * (1.0 - decay) + beta_cells * decay
-    simulation._updateBetaVolumeFromCells()
 
 
 def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5.5):
@@ -170,13 +157,12 @@ def runExample(
         gainMedium=medium,
         pump=pumpProperties,
         phiASE=phiAse,
-        timeIntegrationSolver=ExponentialEuler(),
+        timeIntegrationSolver=RungeKutta4(),
         timeStep=2e-5, #20 μs
         crossSections=spectralProperties,
         constants=Constants(c=3e8, h=6.626e-34), ## these constants match legacy skript values
         enableAse=enableAse,
     )
-    simulation.onInit(prePumpInitialState)
 
     simulation.onStep(printState)
     simulation.onStep(
