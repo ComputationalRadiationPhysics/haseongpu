@@ -53,6 +53,7 @@ Simulation and time integration
    TimeIntegrationSolver
    ExplicitEuler
    ExponentialEuler
+   FrozenPhiAseRungeKutta4
    Heun
    ImplicitEuler
    Midpoint

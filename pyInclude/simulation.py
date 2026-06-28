@@ -447,8 +447,10 @@ class Simulation:
     _pumpEnabled: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self):
-        if self.timeIntegrationSolver is None or not hasattr(self.timeIntegrationSolver, "step"):
-            raise ValueError("Simulation requires a timeIntegrationSolver with a step(rhs, betaCells, time, timeStep) method")
+        has_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "step")
+        has_simulation_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "stepSimulation")
+        if not has_step and not has_simulation_step:
+            raise ValueError("Simulation requires a timeIntegrationSolver with step(...) or stepSimulation(...)")
         if self.timeStep <= 0.0:
             raise ValueError("timeStep must be positive")
         if self.crossSections is None:
@@ -569,12 +571,20 @@ class Simulation:
             order="F",
         )
 
-        integration_result = self.timeIntegrationSolver.step(
-            self._timeDerivative,
-            beta_cells.copy(),
-            self._time,
-            self.timeStep,
-        )
+        if hasattr(self.timeIntegrationSolver, "stepSimulation"):
+            integration_result = self.timeIntegrationSolver.stepSimulation(
+                self,
+                beta_cells.copy(),
+                self._time,
+                self.timeStep,
+            )
+        else:
+            integration_result = self.timeIntegrationSolver.step(
+                self._timeDerivative,
+                beta_cells.copy(),
+                self._time,
+                self.timeStep,
+            )
         updated_beta = integration_result.betaCells
         derivative = integration_result.evaluation
 
@@ -672,17 +682,33 @@ class Simulation:
             self.gainMedium.get("betaCells").expectedShape,
             order="F",
         )
+        phi_ase, ase_result = self._runPhiAseForBeta(beta_cells)
+        return self._timeDerivativeWithFrozenPhiAse(beta_cells, time, phi_ase, ase_result)
+
+    def _runPhiAseForBeta(self, beta_cells):
+        beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
+            self.gainMedium.get("betaCells").expectedShape,
+            order="F",
+        )
         self.gainMedium.get("betaCells").value = beta_cells
         self._updateBetaVolumeFromCells()
-        if self.enableAse:
-            self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
-            ase_result = self.phiASE.getResults()
-            phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
-            dndt_ase = self._aseDerivative(phi_ase, betaCells=beta_cells)
-        else:
-            ase_result = None
-            phi_ase = np.zeros_like(beta_cells, dtype=np.float64)
-            dndt_ase = np.zeros_like(beta_cells, dtype=np.float64)
+        if not self.enableAse:
+            return np.zeros_like(beta_cells, dtype=np.float64), None
+
+        self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
+        ase_result = self.phiASE.getResults()
+        phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
+        return phi_ase.copy(), ase_result
+
+    def _timeDerivativeWithFrozenPhiAse(self, beta_cells, time, phi_ase, ase_result):
+        beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
+            self.gainMedium.get("betaCells").expectedShape,
+            order="F",
+        )
+        phi_ase = np.asarray(phi_ase, dtype=np.float64).reshape(beta_cells.shape, order="F")
+        self.gainMedium.get("betaCells").value = beta_cells
+        self._updateBetaVolumeFromCells()
+        dndt_ase = self._aseDerivative(phi_ase, betaCells=beta_cells) if self.enableAse else np.zeros_like(beta_cells)
         dndt_pump = self._dndtPump(beta_cells)
         tau = max(float(self.gainMedium.get("crystalTFluo").value), np.finfo(float).tiny)
         total_derivative = dndt_pump - dndt_ase - beta_cells / tau
