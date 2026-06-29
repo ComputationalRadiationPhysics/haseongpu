@@ -16,20 +16,30 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <vector>
 
 namespace hase::core
 {
+    struct BetaVolumeContribution
+    {
+        constexpr auto operator()(alpaka::concepts::Simd auto const& beta, alpaka::concepts::Simd auto const& volume)
+            const
+        {
+            return beta * alpaka::pCast<double>(volume);
+        }
+    };
+
     [[nodiscard]] inline double calcForwardStandardError(
         double const scoreSum,
         double const scoreSquareSum,
         unsigned const rayCount,
-        double const totalVolume,
+        double const normalizationVolume,
         double const volumeSize)
     {
-        if(rayCount < 2u || volumeSize <= 0.0 || totalVolume <= 0.0 || !std::isfinite(scoreSum)
+        if(rayCount < 2u || volumeSize <= 0.0 || normalizationVolume < 0.0 || !std::isfinite(scoreSum)
            || !std::isfinite(scoreSquareSum))
         {
             return std::numeric_limits<double>::max();
@@ -37,7 +47,7 @@ namespace hase::core
 
         double const n = static_cast<double>(rayCount);
         double const varianceOfMean = (scoreSquareSum - scoreSum * scoreSum / n) / (n * (n - 1.0));
-        double const volumeScale = totalVolume / volumeSize;
+        double const volumeScale = normalizationVolume / volumeSize;
         return std::sqrt(std::max(0.0, varianceOfMean)) * volumeScale;
     }
 
@@ -65,7 +75,21 @@ namespace hase::core
         DeviceMeshView mesh = meshContainer.toView();
         unsigned const volumeCount = mesh.numberOfCells;
         unsigned const rayCount = experiment.resolvedForwardRayCount();
-        double const totalVolume = hostMesh.cellVolumePrefix.empty() ? 0.0 : hostMesh.cellVolumePrefix.back();
+
+        double betaVolumeTotal = 0.0;
+        auto hBetaVolumeTotalView = makeView(alpaka::api::host, &betaVolumeTotal, alpaka::Vec{1u});
+        auto dBetaVolumeTotal = hase::alpakaUtils::toDevice(queue, hBetaVolumeTotalView);
+        alpaka::onHost::transformReduce(
+            queue,
+            devBundle.executor,
+            double{0},
+            dBetaVolumeTotal,
+            std::plus{},
+            BetaVolumeContribution{},
+            meshContainer.betaVolume,
+            meshContainer.cellVolumes);
+        alpaka::onHost::memcpy(queue, hBetaVolumeTotalView, dBetaVolumeTotal);
+        alpaka::onHost::wait(queue);
 
         auto dPhiAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
         auto dPhiSquareAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
@@ -91,7 +115,7 @@ namespace hase::core
                 mesh,
                 rayCount,
                 experiment.forwardRayLength,
-                totalVolume,
+                betaVolumeTotal,
                 dPhiAccumulator,
                 dPhiSquareAccumulator,
                 dVolumeRayVisits,
@@ -129,14 +153,15 @@ namespace hase::core
             double const volumeSize = hostMesh.cellVolumes.at(volume);
             if(volumeSize > 0.0 && rayCount > 0u)
             {
-                double const estimate = phiData[volume] * totalVolume / (static_cast<double>(rayCount) * volumeSize);
+                double const estimate
+                    = phiData[volume] * betaVolumeTotal / (static_cast<double>(rayCount) * volumeSize);
                 result.phiAse.at(volume) = static_cast<float>(estimate);
                 result.mse.at(volume) = droppedData[volume] == 0u
                                            ? calcForwardStandardError(
                                                  phiData[volume],
                                                  phiSquareData[volume],
                                                  rayCount,
-                                                 totalVolume,
+                                                 betaVolumeTotal,
                                                  volumeSize)
                                            : std::numeric_limits<double>::max();
             }

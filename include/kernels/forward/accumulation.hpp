@@ -23,7 +23,7 @@ namespace hase::kernels::forward
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
             double const forwardRayLength,
-            double const totalVolume,
+            double const betaVolumeTotal,
             alpaka::concepts::IMdSpan auto phiAccumulator,
             alpaka::concepts::IMdSpan auto phiSquareAccumulator,
             alpaka::concepts::IMdSpan auto volumeRayVisits,
@@ -41,8 +41,8 @@ namespace hase::kernels::forward
                     alpaka::IdxRange{forwardRayCount}))
             {
                 (void) rayNumber;
-                unsigned tet = sampleVolumeByVolume(mesh, totalVolume, rndEngine);
-                double const sourceBeta = mesh.getBetaVolume(tet);
+                unsigned tet = sampleVolumeByBetaVolume(mesh, betaVolumeTotal, rndEngine);
+                double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
                 unsigned const sigmaIndex = hase::kernels::GenRndSigmas{}(lambdaResolution, rndEngine);
@@ -53,7 +53,7 @@ namespace hase::kernels::forward
                     origin,
                     direction,
                     forwardRayLength,
-                    sourceBeta,
+                    sourceWeight,
                     sigmaA[sigmaIndex],
                     sigmaE[sigmaIndex],
                     phiAccumulator,
@@ -70,7 +70,7 @@ namespace hase::kernels::forward
             hase::core::Point origin,
             hase::core::Point const direction,
             double remaining,
-            double const sourceBeta,
+            double const sourceWeight,
             double const sigmaA,
             double const sigmaE,
             alpaka::concepts::IMdSpan auto phiAccumulator,
@@ -87,7 +87,7 @@ namespace hase::kernels::forward
                 double segmentLength = remaining;
                 int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
                 double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
-                double contribution = sourceBeta * accumulatedGain;
+                double contribution = sourceWeight * accumulatedGain;
                 contribution *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaA, sigmaE);
                 if(alpaka::math::isfinite(contribution))
                 {

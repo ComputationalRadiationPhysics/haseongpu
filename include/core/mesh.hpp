@@ -158,6 +158,7 @@ namespace hase::core
         std::span<int const> cellFaceBoundaries;
         std::span<float const> cellVolumes;
         std::span<double const> cellVolumePrefix;
+        std::span<double const> betaVolumePrefix;
         std::span<double const> cellCenters;
         std::span<double const> samplePoints;
 
@@ -310,6 +311,7 @@ namespace hase::core
             std::vector<int> cellFaceBoundaries,
             std::vector<float> cellVolumes,
             std::vector<double> cellVolumePrefix,
+            std::vector<double> betaVolumePrefix,
             std::vector<double> cellCenters,
             std::vector<double> samplePoints)
             : m_device(device)
@@ -329,6 +331,7 @@ namespace hase::core
             , cellFaceBoundaries(hase::alpakaUtils::toDevice(m_queue, cellFaceBoundaries))
             , cellVolumes(hase::alpakaUtils::toDevice(m_queue, cellVolumes))
             , cellVolumePrefix(hase::alpakaUtils::toDevice(m_queue, cellVolumePrefix))
+            , betaVolumePrefix(hase::alpakaUtils::toDevice(m_queue, betaVolumePrefix))
             , cellCenters(hase::alpakaUtils::toDevice(m_queue, cellCenters))
             , samplePoints(hase::alpakaUtils::toDevice(m_queue, samplePoints))
             , claddingAbsorption(claddingAbsorption)
@@ -366,6 +369,7 @@ namespace hase::core
                 std::span<int const>(cellFaceBoundaries.data(), cellFaceBoundaries.getMdSpan().getExtents().x()),
                 std::span<float const>(cellVolumes.data(), cellVolumes.getMdSpan().getExtents().x()),
                 std::span<double const>(cellVolumePrefix.data(), cellVolumePrefix.getMdSpan().getExtents().x()),
+                std::span<double const>(betaVolumePrefix.data(), betaVolumePrefix.getMdSpan().getExtents().x()),
                 std::span<double const>(cellCenters.data(), cellCenters.getMdSpan().getExtents().x()),
                 std::span<double const>(samplePoints.data(), samplePoints.getMdSpan().getExtents().x()),
                 claddingAbsorption,
@@ -406,6 +410,7 @@ namespace hase::core
         T_Buffer<int> cellFaceBoundaries;
         T_Buffer<float> cellVolumes;
         T_Buffer<double> cellVolumePrefix;
+        T_Buffer<double> betaVolumePrefix;
         T_Buffer<double> cellCenters;
         T_Buffer<double> samplePoints;
 
@@ -439,6 +444,7 @@ namespace hase::core
         std::vector<int> cellFaceBoundaries;
         std::vector<float> cellVolumes;
         std::vector<double> cellVolumePrefix;
+        std::vector<double> betaVolumePrefix;
         std::vector<double> cellCenters;
         std::vector<double> samplePoints;
         float nTot = 0.0f;
@@ -506,6 +512,15 @@ namespace hase::core
         {
             cellVolumePrefix.resize(cellVolumes.size());
             std::partial_sum(cellVolumes.begin(), cellVolumes.end(), cellVolumePrefix.begin());
+
+            betaVolumePrefix.resize(cellVolumes.size());
+            double runningBetaVolume = 0.0;
+            for(std::size_t cell = 0u; cell < cellVolumes.size(); ++cell)
+            {
+                double const beta = cell < betaVolume.size() ? betaVolume[cell] : 0.0;
+                runningBetaVolume += beta * static_cast<double>(cellVolumes[cell]);
+                betaVolumePrefix[cell] = runningBetaVolume;
+            }
         }
 
         void calcTotalReflectionAngles()
@@ -549,6 +564,7 @@ namespace hase::core
                 cellFaceBoundaries,
                  cellVolumes,
                  cellVolumePrefix,
+                 betaVolumePrefix,
                  cellCenters,
                  samplePoints};
         }
