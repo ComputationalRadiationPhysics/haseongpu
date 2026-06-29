@@ -107,6 +107,7 @@ def runExample(
     pumpSteps=50,
     vtkOutputDir=scriptDir,
     enableAse=True,
+    prePump=True,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -163,6 +164,7 @@ def runExample(
         crossSections=spectralProperties,
         constants=Constants(c=3e8, h=6.626e-34), ## these constants match legacy skript values
         enableAse=enableAse,
+        prePump=prePump,
     )
 
     simulation.onStep(printState)
@@ -195,6 +197,11 @@ def main(argv=None):
     parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--disable-ase", action="store_true", help="Skip PhiASE backend runs and use zero ASE depletion")
+    parser.add_argument(
+        "--disable-pre-pump",
+        action="store_true",
+        help="Run ASE from the first simulation step instead of first seeding beta with pump only",
+    )
     args = parser.parse_args(argv)
 
     state = runExample(
@@ -204,6 +211,7 @@ def main(argv=None):
         pumpSteps=args.pumpSteps,
         vtkOutputDir=args.vtk_output_dir,
         enableAse=not args.disable_ase,
+        prePump=not args.disable_pre_pump,
     )
     print(f"phiAse shape: {state.phiAse.shape}")
     print(f"betaCells shape: {state.betaCells.shape}")

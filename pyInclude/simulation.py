@@ -436,6 +436,8 @@ class Simulation:
     """Physical constants used by the pump integrator."""
     enableAse: bool = True
     """Whether each derivative evaluation runs ASE depletion through ``PhiASE``."""
+    prePump: bool = False
+    """When true, the first time step advances without ASE so pump can seed beta."""
 
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
@@ -685,6 +687,9 @@ class Simulation:
         phi_ase, ase_result = self._runPhiAseForBeta(beta_cells)
         return self._timeDerivativeWithFrozenPhiAse(beta_cells, time, phi_ase, ase_result)
 
+    def _aseEnabledForCurrentStep(self):
+        return self.enableAse and not (self.prePump and self._step == 0)
+
     def _runPhiAseForBeta(self, beta_cells):
         beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
             self.gainMedium.get("betaCells").expectedShape,
@@ -692,7 +697,7 @@ class Simulation:
         )
         self.gainMedium.get("betaCells").value = beta_cells
         self._updateBetaVolumeFromCells()
-        if not self.enableAse:
+        if not self._aseEnabledForCurrentStep():
             return np.zeros_like(beta_cells, dtype=np.float64), None
 
         self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
@@ -708,7 +713,11 @@ class Simulation:
         phi_ase = np.asarray(phi_ase, dtype=np.float64).reshape(beta_cells.shape, order="F")
         self.gainMedium.get("betaCells").value = beta_cells
         self._updateBetaVolumeFromCells()
-        dndt_ase = self._aseDerivative(phi_ase, betaCells=beta_cells) if self.enableAse else np.zeros_like(beta_cells)
+        dndt_ase = (
+            self._aseDerivative(phi_ase, betaCells=beta_cells)
+            if self._aseEnabledForCurrentStep()
+            else np.zeros_like(beta_cells)
+        )
         dndt_pump = self._dndtPump(beta_cells)
         tau = max(float(self.gainMedium.get("crystalTFluo").value), np.finfo(float).tiny)
         total_derivative = dndt_pump - dndt_ase - beta_cells / tau
