@@ -57,7 +57,6 @@ endif()
 find_package(Threads REQUIRED)
 
 # build options
-option(HASE_BUILD_PhiAse "Build the main calcPhiAse - HaseOnGPU Binary" ON)
 option(
     HASE_BUILD_RELEASE
     "Build release version; forces Release build type and release optimization options."
@@ -77,6 +76,11 @@ option(
     HASE_USE_SYSTEM_ALPAKA
     "Use an existing alpaka package from alpaka_DIR/CMAKE_PREFIX_PATH instead of fetching the pinned version"
     OFF
+)
+option(
+    HASE_ENABLE_PYTHON
+    "Build the HASEonGPU Python extension and installable Python package artifacts"
+    ON
 )
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
 option(HASE_CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
@@ -106,12 +110,12 @@ if(NOT DISABLE_MPI MATCHES "^(AUTO|ON|OFF)$")
     )
 endif()
 option(HASE_TESTING "Build unit tests" OFF)
-option(
-    HASE_ENABLE_PYTHON
-    "Build Python bindings - requires python dependency."
-    ON
-)
 option(HASE_BENCHMARK "Enable scoped PhiASE benchmark CSV output" OFF)
+option(
+    HASE_FORWARD_LOGGING
+    "Forward captured calcPhiASE stdout and stderr through the Python openPMD launcher."
+    OFF
+)
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 if(
@@ -411,7 +415,25 @@ endif()
 set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 set(CMAKE_INSTALL_RPATH "$ORIGIN")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+set(HASE_BUILD_TREE_RPATH
+    "$ORIGIN/lib;$ORIGIN/_deps/adios2-build/lib;$ORIGIN/../../lib;$ORIGIN/../../_deps/adios2-build/lib"
+)
+set(HASE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib")
+set(HASE_INSTALL_LIB_RPATH "$ORIGIN")
 
+include(cmake/findOpenPmd.cmake)
+foreach(HASE_BUILD_RPATH_TARGET IN ITEMS openPMD hdf5-shared)
+    if(TARGET ${HASE_BUILD_RPATH_TARGET})
+        list(APPEND HASE_BUILD_TREE_RPATH "$<TARGET_FILE_DIR:${HASE_BUILD_RPATH_TARGET}>")
+    endif()
+endforeach()
+target_link_libraries(hase_core INTERFACE openPMD::openPMD)
+target_compile_definitions(
+    hase_core
+    INTERFACE
+        HASE_ENABLE_OPENPMD
+        HASE_OPENPMD_FILE_EXTENSION=\"${HASE_OPENPMD_FILE_EXTENSION}\"
+)
 target_link_libraries(hase_core INTERFACE alpaka::alpaka)
 if(TARGET CUDA::cudart)
     target_link_libraries(hase_core INTERFACE CUDA::cudart)
@@ -428,7 +450,7 @@ file(
 list(
     REMOVE_ITEM
     HASE_RUNTIME_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/alpakaUtils/backendNamesLibrary.cpp"
 )
 add_library(hase STATIC ${HASE_RUNTIME_SOURCES})
@@ -447,28 +469,37 @@ if(HASE_BENCHMARK)
     )
     target_compile_definitions(hase_core INTERFACE HASE_ENABLE_BENCHMARK)
 endif()
+if(HASE_FORWARD_LOGGING)
+    target_compile_definitions(hase_core INTERFACE HASE_FORWARD_LOGGING)
+endif()
 alpaka_finalize(hase)
 
 include(cmake/AlpakaBackendNames.cmake)
-add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp")
 set_target_properties(
     calcPhiASE
     PROPERTIES
         BUILD_RPATH_USE_ORIGIN ON
+        BUILD_RPATH "${HASE_BUILD_TREE_RPATH}"
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
-        INSTALL_RPATH "$ORIGIN"
+        INSTALL_RPATH "${HASE_INSTALL_RPATH}"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
 target_link_libraries(calcPhiASE PRIVATE hase::hase)
+foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
+    if(TARGET ${HASE_ADIOS2_RUNTIME_MODULE})
+        add_dependencies(calcPhiASE ${HASE_ADIOS2_RUNTIME_MODULE})
+    endif()
+endforeach()
 alpaka_finalize(calcPhiASE)
+
+if(HASE_ENABLE_PYTHON)
+    include(cmake/pythonBindings.cmake)
+endif()
 
 # Testing
 if(HASE_TESTING)
     enable_testing()
     add_subdirectory(tests)
-    # Python
-endif()
-if(HASE_ENABLE_PYTHON)
-    include(cmake/pythonBindings.cmake)
 endif()

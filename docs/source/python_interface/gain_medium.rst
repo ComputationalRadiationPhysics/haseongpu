@@ -10,35 +10,30 @@ that the ASE calculation needs.
 
    medium = GainMedium(topology=topology)
 
-Physical Properties
--------------------
+Required Fields
+---------------
 
-The most important pattern is to ask the property object for its expected
-shape, then create an array with that shape:
-
-.. code-block:: python
-
-   beta_shape = medium.get("betaCells").expectedShape
-   medium.get("betaCells").value = np.zeros(beta_shape)
-
-You can set several properties at once:
+Assign the built-in transport fields directly on the medium.  For arrays, ask
+the field for its primitive shape first so the code follows the topology:
 
 .. code-block:: python
 
-   medium.withPhysicalProperties(
-       betaCells=np.zeros(medium.get("betaCells").expectedShape),
-       betaVolume=np.zeros(medium.get("betaVolume").expectedShape),
-       claddingCellTypes=np.zeros(medium.get("claddingCellTypes").expectedShape, dtype=np.uint32),
-       refractiveIndices=[2.0, 1.0, 2.0, 1.0],
-       reflectivities=np.zeros(medium.get("reflectivities").expectedShape),
-       nTot=2.776e20,
-       crystalTFluo=9.41e-4,
-       claddingNumber=1,
-       claddingAbsorption=5.5,
+   medium.get("betaCells").value = np.zeros(medium.get("betaCells").expectedShape)
+   medium.get("betaVolume").value = np.zeros(medium.get("betaVolume").expectedShape)
+   medium.get("claddingCellTypes").value = np.zeros(
+       medium.get("claddingCellTypes").expectedShape, dtype=np.uint32
    )
+   medium.get("refractiveIndices").value = np.asarray([2.0, 1.0, 2.0, 1.0], dtype=np.float32)
+   medium.get("reflectivities").value = np.zeros(
+       medium.get("reflectivities").expectedShape, dtype=np.float32
+   )
+   medium.get("nTot").value = 2.776e20
+   medium.get("crystalTFluo").value = 9.41e-4
+   medium.get("claddingNumber").value = 1
+   medium.get("claddingAbsorption").value = 5.5
 
-``withPhysicalProperties`` returns the same ``GainMedium`` instance, so it can
-be chained.
+The transport writer reads these named fields from the medium; examples do not
+construct a separate adapter object for backend input.
 
 Property Reference
 ------------------
@@ -60,7 +55,7 @@ Property Reference
 
 ``reflectivities``
    Surface reflectivity per triangle.  Matrix shape:
-   ``(2, numberOfTriangles)`` where row 0 is bottom and row 1 is top.
+   ``(numberOfTriangles, 2)`` where column 0 is bottom and column 1 is top.
 
 ``nTot``
    Total active-ion concentration :math:`N_{\mathrm{tot}}` in ``cm^-3``.
@@ -138,3 +133,61 @@ Convenience Dimensions
 .. code-block:: python
 
    medium.get("betaCells").value = medium.emptyBetaCells(fill=0.0)
+
+Custom Fields
+-------------
+
+``GainMedium.defineField(...)`` attaches additional primitive fields to the
+medium. Custom fields are persisted by the openPMD transport as normal mesh
+records with the same base openPMD metadata as built-in scalar records. They
+are useful for downstream tools or future backends; the current ASE backend
+does not consume them unless a backend explicitly opts in.
+
+If no unit metadata is provided, custom fields default to ``unitSI=1.0`` and
+``unitDimension=unitDimension.dimensionless``. Provide a raw seven-entry
+openPMD dimension tuple or one of the predefined ``unitDimension`` entries when
+the field has a physical dimension:
+
+.. code-block:: python
+
+   import numpy as np
+   from HASEonGPU import unitDimension
+
+   temperature = np.full(
+       (medium.topology.numberOfTriangles, medium.topology.levels - 1),
+       300.0,
+   )
+
+   medium.defineField(
+       "temperature",
+       entity="prism",
+       values=temperature,
+       unit="K",
+       unitSI=1.0,
+       unitDimension=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+   )
+
+For Python inheritance-based field declarations, put the same unit metadata on
+``PrimitiveFieldSpec``:
+
+.. code-block:: python
+
+   import numpy as np
+   from HASEonGPU import PrimitiveFieldSpec, PrismSchema, unitDimension
+
+   class ThermalPrism(PrismSchema):
+       temperature = PrimitiveFieldSpec(
+           "temperature",
+           "custom_temperature",
+           np.float64,
+           unit="K",
+           unitSI=1.0,
+           unitDimension=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+           backendRequired=False,
+       )
+
+   medium.withPrimitiveSchema(ThermalPrism, temperature=temperature)
+
+Use the predefined constants for built-in HASE dimensions, for example
+``unitDimension.lambdaAbsorption``, ``unitDimension.crystalTFluo``,
+``unitDimension.phiAse``, and ``unitDimension.dimensionless``.

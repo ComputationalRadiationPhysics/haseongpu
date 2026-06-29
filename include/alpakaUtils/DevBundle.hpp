@@ -10,6 +10,19 @@
 
 namespace hase::alpakaUtils
 {
+    template<typename T_DataType>
+    auto getFrameSpec(auto const& device, auto const& executor, auto const& extents)
+    {
+        if constexpr(requires { alpaka::onHost::getFrameSpec(device, executor, extents); })
+        {
+            return alpaka::onHost::getFrameSpec(device, executor, extents);
+        }
+        else
+        {
+            return alpaka::onHost::getFrameSpec<T_DataType>(device, extents);
+        }
+    }
+
     template<alpaka::onHost::concepts::Device T_Device, alpaka::concepts::Executor T_Executor>
     struct DevBundle
     {

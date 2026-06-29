@@ -12,8 +12,7 @@ HASEonGPU supports multiple usage paths:
 
 * :doc:`Python Interface Guide <pythonInterface>` for workflow-oriented Python usage
 * :doc:`Binary Interface <binaryInterface>` for command-line execution
-* :doc:`MATLAB Interface <MATLABInterface>` for integration into existing
-  MATLAB or Octave workflows
+* :doc:`openPMD Transport <openpmdTransport>` for the Python-to-C++ transport contract
 
 Repository Setup
 ----------------
@@ -32,7 +31,7 @@ Required software:
 
 * ``cmake``
 * ``ninja``
-* ``Python >= 3.11`` with ``pip``
+* ``Python >= 3.10`` with ``pip``
 * A C++20-capable compiler, tested with:
 
   * ``gcc >= 12``
@@ -47,7 +46,6 @@ Optional backend/runtime dependencies:
 Optional software and tools:
 
 * ``OpenMPI >= 4.0``
-* MATLAB or Octave
 * ``ParaView`` for visualization of ``.vtk`` output
 * ``matplotlib`` for the optional plotting helper in :doc:`scripts`
 
@@ -60,7 +58,7 @@ Hardware requirements:
 Additional Notes
 ----------------
 
-For Windows-specific installation notes [deprecated], see :doc:`windows`.
+For Windows-specific limitations, see :doc:`windows`.
 
 Compilation Notes
 -----------------
@@ -105,16 +103,7 @@ Binary Interface
 The binary interface is useful for running HASEonGPU directly from the command
 line or as an entry point for constructing a custom API call.
 
-Continue with :doc:`Binary Interface <binaryInterface>`.
-
-MATLAB Interface
-^^^^^^^^^^^^^^^^
-
-The MATLAB-compatible interface is mainly intended for existing MATLAB or Octave
-workflows. For new workflows, the Python interface is usually the better
-choice.
-
-Continue with :doc:`MATLAB Interface <MATLABInterface>`.
+Continue with :doc:`Binary Interface <binaryInterface>`. For the openPMD record layout and transport backends used by both Python and the binary, see :doc:`openPMD Transport <openpmdTransport>`.
 
 Typical Workflow
 ----------------

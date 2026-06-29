@@ -95,14 +95,14 @@ copies the helper library into the Python runtime package.
 Runtime backend selection
 -------------------------
 
-At runtime, the ``--backend=`` command-line option, or the equivalent
-``backend`` option in the MATLAB and Python interfaces, selects which of the
-compiled backends should be used for the simulation.
+At runtime, the ``backend`` setting in the Python interface, or the equivalent
+openPMD transport metadata consumed by the command-line binary, selects which
+of the compiled backends should be used for the simulation.
 
-If the command-line binary is given a backend string that does not match any
-compiled backend with an available device, it prints the list of currently
-available runtime backends before exiting.  Use one of those names as the
-``--backend=`` value.
+If the openPMD input metadata contains a backend string that does not match any
+compiled backend with an available device, the binary prints the list of
+currently available runtime backends before exiting. Use one of those names as
+the Python ``backend`` value or openPMD ``backend`` metadata value.
 
 Backend names are constructed from alpaka's ``api``, ``deviceKind``, and
 ``executor``:
@@ -139,7 +139,7 @@ attribute:
 
    backend = AlpakaBackends.Host_Cpu_CpuSerial
 
-The returned strings are the values to pass to the new Python interface:
+The returned strings are the values to pass to the Python interface:
 
 .. code-block:: python
 
@@ -150,12 +150,6 @@ The returned strings are the values to pass to the new Python interface:
        backend=AlpakaBackends.Host_Cpu_CpuSerial,
        parallelMode="single",
    )
-
-or to the command-line binary:
-
-.. code-block:: bash
-
-   ./build/calcPhiASE --backend=Host_Cpu_CpuSerial ...
 
 If importing ``AlpakaBackends`` raises an error about the backend-name library,
 the Python package can see the Python files but not the compiled helper

@@ -24,6 +24,9 @@ octrace.e*
 octrace.o*
 utils/testdata_2/*.txt
 *.vtk
+!example/data/pt.vtk
+!example/data/cuboid.vtk
+!example/data/cylindrical.vtk
 output/*.txt
 output
 tmp

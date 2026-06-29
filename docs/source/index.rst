@@ -37,7 +37,8 @@ Contents
    scripts
    windows
    binaryInterface
+   openpmdTransport
    mpi
-   MATLABInterface
    pythonInterface
    pythonAPI
+   pythonInterfaceLegacy

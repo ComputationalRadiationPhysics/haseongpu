@@ -70,7 +70,9 @@ foreach(test_folder ${test_folders})
             )
             target_compile_definitions(
                 ${_test_target_name}
-                PRIVATE HASE_WORKDIR="${PROJECT_SOURCE_DIR}"
+                PRIVATE
+                    HASE_WORKDIR="${PROJECT_SOURCE_DIR}"
+                    HASE_OPENPMD_TEST_FILE_EXTENSION="${HASE_OPENPMD_TEST_FILE_EXTENSION}"
             )
             alpaka_finalize(${_test_target_name})
             catch_discover_tests(

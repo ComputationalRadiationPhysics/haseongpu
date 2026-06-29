@@ -7,17 +7,108 @@
 import sys
 from pathlib import Path
 import copy
+import importlib
 
 repoRoot = Path(__file__).resolve().parents[1]
-buildPythonRoot = repoRoot / "build" / "python"
 pythonTestPhiAseConfig = Path(__file__).parent / "data" / "cfg" / "phiAseTestConfig.yaml"
 legacyPhiAseConfigFile = Path(__file__).parent / "data" / "cfg" / "legacy_config.yaml"
+requiredHaseApi = (
+    "GainMedium",
+    "Grid",
+    "MeshTopology",
+    "PhiASE",
+    "PumpProperties",
+    "SpectralDecomposition",
+)
 
-sys.path.insert(0, str(repoRoot))
-if buildPythonRoot.is_dir():
-    sys.path.insert(0, str(buildPythonRoot))
 
-from HASEonGPU import GainMedium, Grid, MeshTopology, PhiASE, PumpProperties, SpectralDecomposition
+def _resolve_import_path(entry):
+    path = Path.cwd() if entry == "" else Path(entry)
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def _is_under_repo(path):
+    try:
+        path.resolve().relative_to(repoRoot)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _editable_finder_matches_checkout(finder):
+    if finder.__class__.__module__ != "_HASEonGPU_editable":
+        return True
+
+    source_files = getattr(finder, "known_source_files", {})
+    if any(_is_under_repo(Path(path)) for path in source_files.values()):
+        return True
+
+    build_path = getattr(finder, "path", None)
+    return build_path is not None and _is_under_repo(Path(build_path))
+
+
+sys.meta_path = [finder for finder in sys.meta_path if _editable_finder_matches_checkout(finder)]
+
+
+def _remove_checkout_import_paths():
+    sys.path[:] = [entry for entry in sys.path if _resolve_import_path(entry) != repoRoot]
+
+
+def _build_python_roots():
+    candidates = [repoRoot / "build" / "python"]
+    candidates.extend(
+        sorted(
+            repoRoot.glob("build/cp*/python"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    )
+    return [path for path in candidates if path.is_dir()]
+
+
+def _clear_hase_modules():
+    for name in list(sys.modules):
+        if name == "HASEonGPU" or name.startswith("HASEonGPU."):
+            del sys.modules[name]
+        elif name == "HASEonGPU_Bindings" or name.startswith("HASEonGPU_Bindings."):
+            del sys.modules[name]
+        elif name == "pyInclude" or name.startswith("pyInclude."):
+            del sys.modules[name]
+
+
+def _has_required_api(module):
+    return all(hasattr(module, name) for name in requiredHaseApi)
+
+
+def _import_hase_api():
+    _remove_checkout_import_paths()
+    try:
+        module = importlib.import_module("HASEonGPU")
+        if _has_required_api(module):
+            return module
+    except ModuleNotFoundError as err:
+        if err.name not in {"HASEonGPU", "HASEonGPU_Bindings", "HASEonGPU_Bindings.HASEonGPU"}:
+            raise
+    _clear_hase_modules()
+    sys.path[:0] = [str(path) for path in _build_python_roots()]
+    sys.path.append(str(repoRoot))
+    module = importlib.import_module("HASEonGPU")
+    if not _has_required_api(module):
+        missing = ", ".join(name for name in requiredHaseApi if not hasattr(module, name))
+        raise ImportError(f"HASEonGPU import did not expose required test API: {missing}")
+    return module
+
+
+_hase_api = _import_hase_api()
+GainMedium = _hase_api.GainMedium
+Grid = _hase_api.Grid
+MeshTopology = _hase_api.MeshTopology
+PhiASE = _hase_api.PhiASE
+PumpProperties = _hase_api.PumpProperties
+SpectralDecomposition = _hase_api.SpectralDecomposition
 
 import numpy as np
 import pytest

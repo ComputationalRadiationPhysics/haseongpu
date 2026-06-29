@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from .core import GainMedium, GainMediumGeometry, Grid, MeshTopology, _flat
+from .core import GainMedium, GainMediumGeometry, Grid, MeshTopology, OpenPmdComponentField, OpenPmdScalarField, _flat
 from .msh import Gmsh, GmshElement
 from .vtk import writeGainMediumVtk
 
@@ -15,6 +15,8 @@ __all__ = [
     "GmshElement",
     "Grid",
     "MeshTopology",
+    "OpenPmdComponentField",
+    "OpenPmdScalarField",
     "writeGainMediumVtk",
     "_flat",
 ]

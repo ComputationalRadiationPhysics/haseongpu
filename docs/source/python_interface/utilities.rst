@@ -190,7 +190,7 @@ Physical Constants
 
 These correspond to :math:`c` and :math:`h` in the pump equations.
 
-The short names used by the low-level pump routine remain available as aliases:
+The short names used by the pump implementation remain available as aliases:
 
 .. code-block:: python
 
@@ -204,8 +204,7 @@ Backend Names
 
 ``AlpakaBackends`` can list backend names discovered from the installed
 HASEonGPU backend-name library.  Use these strings wherever the Python
-interface accepts a ``backend`` option, for example in ``PhiASE`` or the
-low-level ``calcPhiASE(...)`` call:
+interface accepts a ``backend`` option, for example in ``PhiASE``:
 
 .. code-block:: python
 
