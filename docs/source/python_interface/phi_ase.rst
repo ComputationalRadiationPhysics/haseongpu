@@ -1,9 +1,9 @@
 PhiASE
 ======
 
-``PhiASE`` configures and runs the ASE calculation.  It behaves like a Python
-configuration class for the lower-level HASEonGPU host mesh, experiment
-parameters, compute parameters, backend selection, and execution mode.
+``PhiASE`` configures and runs the ASE calculation from domain-level Python
+objects: a ``GainMedium``, spectral data, and solver/backend settings. The backend transport data is built internally and is not part of the
+frontend modeling interface.
 
 .. code-block:: python
 
@@ -38,10 +38,10 @@ ASE can be run once without a ``Simulation`` time loop:
        order="F",
    )
 
-``run(...)`` constructs the low-level host mesh from ``GainMedium``, creates
-the experiment and compute parameter objects, calls HASEonGPU, stores the raw
-result, and returns ``self``.  The returned ``result.phiAse`` values correspond
-to the ASE flux :math:`\Phi_i` described in the scientific background.
+``run(...)`` canonicalizes the domain objects for the openPMD transport,
+launches the compiled ``calcPhiASE`` backend, stores the raw result, and
+returns ``self``. The returned ``result.phiAse`` values correspond to the ASE
+flux :math:`\Phi_i` described in the scientific background.
 
 Sampling and Physics Settings
 -----------------------------
@@ -90,10 +90,11 @@ Backend and Parallel Settings
    See :doc:`../backendSelection`.
 
 ``parallelMode``
-   Execution mode.  ``"single"`` uses the direct pybind binding.
-   ``"mpi"`` uses the internal MPI launcher path, writes the temporary binary
-   input files, launches ``calcPhiASE`` with ``mpiexec``, and reads the result
-   files back into the ``PhiASE`` result object.
+   Backend compute mode written to the openPMD ``parallel_mode`` metadata.
+   ``"single"`` runs without MPI communication inside one launched process.
+   ``"mpi"`` is meaningful when ``calcPhiASE`` is launched under MPI, for
+   example through the transport ``command_prefix`` helper or directly with
+   ``mpiexec``. Setting this value alone does not create MPI ranks.
 
 ``numDevices``
    Maximum number of devices made available on each node for the compute run.
@@ -101,26 +102,42 @@ Backend and Parallel Settings
    that are active on the same node.
 
 ``nPerNode``
-   MPI launcher setting used when ``parallelMode="mpi"``.  The Python
-   interface launches the ``calcPhiASE`` binary with
-   ``mpiexec -npernode nPerNode``.  This option controls how many MPI ranks
-   are started per node by the launcher; it is not a device count inside one
-   rank.  See :doc:`../mpi` for the interaction between ``parallelMode``,
-   ``numDevices``, and ``nPerNode``.
+   Launcher setting for Python paths that explicitly call ``mpiexec``. It is
+   not serialized as a HASE openPMD transport attribute. See :doc:`../mpi` and
+   :doc:`../openpmdTransport` for the interaction between process launching,
+   ``parallelMode``, and ``numDevices``.
 
 ``minSampleRange`` and ``maxSampleRange``
    Optional inclusive sample-index range.  When omitted, all beta samples
    :math:`\beta_i` are processed.
 
 ``writeVtk``
-   Requests VTK output from the lower-level compute path when supported.
+   Not supported by the openPMD transport. Keep this false and use the
+   Python-side VTK helpers in :doc:`utilities` for visualization output.
+
+openPMD Transport Options
+-------------------------
+
+The openPMD storage backend is selected separately from ``PhiASE.backend``.
+Use the ``HASE_OPENPMD_BACKEND`` environment variable for normal ``PhiASE``
+runs, or call ``pyInclude.openpmd.transport.runPhiASE(..., transport=...)``
+for explicit helper-driven runs. Accepted values are ``adios``, ``hdf5``,
+and ``adios-sst``. Prefer ``adios`` or ``hdf5`` for local tests; SST requires
+concurrent producer/consumer execution and can wait if only one side is
+started.
+
+For repeated or streaming use, the transport can keep a session open and write
+only dynamic fields after the first iteration. See :doc:`../openpmdTransport`
+for the openPMD record layout, storage backend options, artifact-retention environment
+variables, and MPI command-prefix examples.
 
 Configuration Helpers
 ---------------------
 
 ``PhiASE`` can read settings from a dictionary or YAML file.  This is intended
 for run-control values: sampling, convergence, reflection flags, backend
-selection, MPI launcher settings, optional sample ranges, and VTK output.
+selection, MPI launcher settings, optional sample ranges, and the disabled
+``writeVtk`` compatibility key.
 Objects such as ``GainMedium``, ``SpectralDecomposition``, and pump solvers are
 still passed from Python.
 
@@ -151,7 +168,7 @@ A YAML file can keep experiment and compute settings together:
      parallel_mode: single
      numDevices: 1
      n_per_node: 1
-     write_vtk: false
+     write_vtk: false  # must remain false for the openPMD transport
      min_sample_range: 0
      max_sample_range: 999
      rng_seed: 1234
@@ -168,7 +185,8 @@ Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``mse_threshold``, ``adaptive_steps``, ``use_reflections``,
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
 ``write_vtk``, ``min_sample_range``, ``max_sample_range``, and
-``rng_seed``.
+``rng_seed``. ``write_vtk`` is accepted as a configuration key, but the
+openPMD transport rejects true values.
 
 Loading YAML requires ``PyYAML``. The package installation installs this
 dependency from ``pyproject.toml``; source-tree usage must provide it in the
@@ -190,13 +208,13 @@ reproducible Monte Carlo sampling.
 Inspection After a Run
 ----------------------
 
-After ``run(...)``:
+After ``run(...)``, inspect the simulation result and the original domain
+objects rather than backend adapter containers:
 
 .. code-block:: python
 
-   phi_ase.hostMesh
-   phi_ase.experimentParameters
-   phi_ase.computeParameters
-   phi_ase.getResults()
+   result = phi_ase.getResults()
+   points = medium.getPoints()
+   prisms = medium.getPrisms()
 
 ``getResults()`` raises ``RuntimeError`` if the object has not been run yet.

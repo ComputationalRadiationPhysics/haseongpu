@@ -11,53 +11,35 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from pyInclude import AlpakaBackends, GainMedium
+from pyInclude import AlpakaBackends
+from pyInclude.geometry.vtk import _parseVtk
 
 pytest.importorskip("scipy")
 
 
 repoRoot = Path(__file__).resolve().parents[3]
-legacyScript = repoRoot / "example" / "python_example" / "legacy" / "laserPumpCladdingExample.py"
-legacyMaterial = repoRoot / "example" / "python_example" / "legacy" / "pt.mat"
-newExampleDir = repoRoot / "example" / "python_example"
-sys.path.insert(0, str(newExampleDir))
-from laserPumpCladdingOldPump import runExample  # noqa: E402
+exampleScript = repoRoot / "example" / "laserPumpCladding.py"
+exampleDir = repoRoot / "example"
+sys.path.insert(0, str(exampleDir))
+from laserPumpCladding import runExample  # noqa: E402
 
 
 alpakaBackends = AlpakaBackends.all()
 REGRESSION_RNG_SEED = 5489
 
 
-def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i, rngSeed=None):
-    experiment = phiAseConfig["experiment"]
-    compute = phiAseConfig["compute"]
+def _runExampleScript(workdir, phiAseConfigPath, backend, timeSlices, minSample_i, maxSample_i, rngSeed=None):
     command = [
         sys.executable,
-        str(legacyScript),
-        "--material",
-        str(legacyMaterial),
+        str(exampleScript),
+        "--phi-ase-config",
+        str(phiAseConfigPath),
         "--backend",
         str(backend),
-        "--number_of_gpus",
-        str(compute["numDevices"]),
-        "--parallel_mode",
-        str(compute["parallelMode"]),
-        "--min-rays",
-        str(experiment["minRaysPerSample"]),
-        "--max-rays",
-        str(experiment["maxRaysPerSample"]),
-        "--reflection",
-        str(int(bool(experiment["useReflections"]))),
-        "--repetitions",
-        str(compute["repetitions"]),
-        "--adaptive-steps",
-        str(compute["adaptiveSteps"]),
-        "--mse-threshold",
-        str(experiment["mseThreshold"]),
-        "--timeslice",
-        "50",
-        "--timeslice-total",
-        "2",
+        "--timeSteps",
+        str(timeSlices),
+        "--vtk-output-dir",
+        str(workdir),
         "--min-sample-range",
         str(minSample_i),
         "--max-sample-range",
@@ -82,16 +64,16 @@ def _runLegacyScript(workdir, phiAseConfig, backend, minSample_i, maxSample_i, r
 def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
     backend,
     tmp_path,
-    legacyPhiAseConfig,
     legacyPhiAseConfigPath,
 ):
     minSample_i=0
     maxSample_i=100
     timeSlices=2
-    _runLegacyScript(
+    _runExampleScript(
         tmp_path,
-        legacyPhiAseConfig,
+        legacyPhiAseConfigPath,
         backend,
+        timeSlices,
         minSample_i,
         maxSample_i,
         rngSeed=REGRESSION_RNG_SEED,
@@ -104,16 +86,16 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
         backend=backend,
         rngSeed=REGRESSION_RNG_SEED,
     )
-    medium=GainMedium.fromVtk(tmp_path / f'dndt_ASE_{timeSlices}.vtk')
-    legacyDndtAse=medium.dntdAse
+    _, _, _, pointData, _, _ = _parseVtk(tmp_path / f"laserPumpCladding_{timeSlices:03d}.vtk")
+    scriptDndtAse = np.asarray(pointData["dndtAse"])
     modernPhiAse = np.asarray(modernState.phiAse).reshape(-1, order="F")
     modernDndtAse = np.asarray(modernState.dndtAse).reshape(-1, order="F")
 
     assert np.isfinite(modernState.betaCells).all()
     assert np.isfinite(modernState.betaVolume).all()
     assert np.isfinite(modernPhiAse).all()
-    assert len(modernPhiAse) == len(legacyDndtAse)
+    assert len(modernPhiAse) == len(scriptDndtAse)
 
-    assert np.allclose(modernDndtAse, legacyDndtAse, rtol=1e-5, atol=1e-4)
+    assert np.allclose(modernDndtAse, scriptDndtAse, rtol=1e-5, atol=1e-4)
     assert np.all(modernState.betaCells >= 0.0)
     assert np.all(modernState.betaCells <= 1.0)

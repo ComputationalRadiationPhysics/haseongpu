@@ -5,7 +5,7 @@ Windows Notes
 
 This page contains Windows-specific notes for HASEonGPU.
 
-Windows support is experimental.
+Windows support is experimental and is not part of the main validation path.
 
 Overview
 --------
@@ -21,8 +21,9 @@ A Windows build typically requires:
 
 * Visual Studio
 * CMake
-* CUDA
+* CUDA or another supported accelerator stack when GPU execution is needed
 * optionally an MPI implementation
+* openPMD-api dependencies matching the selected transport backend
 
 Notes
 -----

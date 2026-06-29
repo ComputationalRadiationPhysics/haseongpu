@@ -8,6 +8,7 @@
 
 import ctypes
 import ctypes.util
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -20,6 +21,13 @@ def _libraryNames():
     return ("libHaseAlpakaBackendNames.so",)
 
 
+def _bindingPackageDirs():
+    spec = importlib.util.find_spec("HASEonGPU_Bindings")
+    if spec is None or spec.submodule_search_locations is None:
+        return ()
+    return tuple(Path(path) for path in spec.submodule_search_locations)
+
+
 def _candidatePaths():
     moduleDir = Path(__file__).resolve().parent
     seen = set()
@@ -30,6 +38,12 @@ def _candidatePaths():
             return
         seen.add(normalized)
         return path
+
+    for packageDir in _bindingPackageDirs():
+        for name in _libraryNames():
+            candidate = yieldPath(packageDir / name)
+            if candidate is not None:
+                yield candidate
 
     for name in _libraryNames():
         candidate = yieldPath(moduleDir / name)
@@ -49,17 +63,11 @@ def _candidatePaths():
                 candidate = yieldPath(bindingDir / name)
                 if candidate is not None:
                     yield candidate
-
-    try:
-        import HASEonGPU_Bindings
-    except ImportError:
-        return
-
-    for packageDir in getattr(HASEonGPU_Bindings, "__path__", []):
-        for name in _libraryNames():
-            candidate = yieldPath(Path(packageDir) / name)
-            if candidate is not None:
-                yield candidate
+        for buildDir in sorted(buildRoot.glob("cp*")):
+            for name in _libraryNames():
+                candidate = yieldPath(buildDir / name)
+                if candidate is not None:
+                    yield candidate
 
 
 def _loadLibrary():

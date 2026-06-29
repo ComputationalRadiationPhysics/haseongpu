@@ -22,8 +22,8 @@ support enabled.  The CMake option ``DISABLE_MPI`` controls this at build time:
    Builds without MPI support.
 
 An MPI-enabled build links against the MPI C++ target found by CMake.  A
-runtime started with ``--parallel-mode=mpi`` exits with an error if the binary
-was built without MPI support.
+runtime started from openPMD metadata with ``parallelMode = mpi`` exits with an
+error if the binary was built without MPI support.
 
 Execution Model
 ---------------
@@ -46,8 +46,7 @@ physical GPUs.
 
 Important Settings
 ------------------
-These settings can be used by the legacy Python ``calcPhiASE(...)`` path, by a
-``PhiASE`` object, or in a ``PhiASE`` YAML configuration file.
+These settings can be written through ``PhiASE`` configuration and are serialized into the openPMD compute metadata. The MPI process topology is controlled by how ``calcPhiASE`` is launched, for example with ``mpiexec`` or a scheduler.
 
 ``parallelMode``
    Selects the execution path.
@@ -72,10 +71,8 @@ These settings can be used by the legacy Python ``calcPhiASE(...)`` path, by a
    * 2 ranks per node and ``numDevices=4`` gives each rank two GPUs.
 
 ``nPerNode``
-   Controls the number of MPI ranks launched per node in wrapper paths that
-   call ``mpiexec``.  The legacy Python ``calcPhiASE(...)`` MPI path uses
-   ``mpiexec -npernode nPerNode`` and then passes ``--parallel-mode=mpi`` to
-   the ``calcPhiASE`` binary.
+   Controls the number of MPI ranks launched per node in Python helper paths
+   that explicitly call ``mpiexec`` for the ``calcPhiASE`` binary.
 
    ``nPerNode`` is a launcher setting, not a GPU count inside the C++ compute
    kernel.  After MPI has started the processes, the C++ executable detects the
