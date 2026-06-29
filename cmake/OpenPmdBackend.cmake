@@ -7,8 +7,11 @@ endif()
 set(HASE_OPENPMD_BACKEND_DESCRIPTION
     "openPMD backend used by the HASE transport: adios, adios-sst, or hdf5"
 )
+if(NOT DEFINED HASE_OPENPMD_BACKEND_DEFAULT)
+    set(HASE_OPENPMD_BACKEND_DEFAULT "adios")
+endif()
 set(HASE_OPENPMD_BACKEND
-    "adios"
+    "${HASE_OPENPMD_BACKEND_DEFAULT}"
     CACHE STRING
     "${HASE_OPENPMD_BACKEND_DESCRIPTION}"
 )

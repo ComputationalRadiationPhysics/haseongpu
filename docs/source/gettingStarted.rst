@@ -32,6 +32,7 @@ Required software:
 * ``cmake``
 * ``ninja``
 * ``Python >= 3.10`` with ``pip``
+* openPMD-api C++ package with the backends used by HASEonGPU
 * A C++20-capable compiler, tested with:
 
   * ``gcc >= 12``
@@ -73,16 +74,43 @@ Recommended Python Source Install
 ---------------------------------
 
 For performance-sensitive Python use, install from source so the C++ backend is
-compiled on the target machine:
+compiled on the target machine. The default install expects an external
+openPMD-api C++ package and a matching Python ``openpmd_api`` package:
 
 .. code-block:: bash
 
+   python3 -m pip install openpmd-api
    CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
 
 This builds and installs a release-mode backend with host-specific CPU tuning.
 Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when
 building redistributable wheels or binaries for unknown CPUs. See
 :doc:`compilation` for the full CMake option reference.
+
+Install or load the matching openPMD C++ package with the same backend choices
+before installing HASEonGPU, for example through Spack, Conda, modules, or a
+source install. Point CMake to it with ``CMAKE_PREFIX_PATH`` or ``openPMD_DIR``
+if it is not in a default prefix. See the
+`openPMD-api installation guide <https://openpmd-api.readthedocs.io/en/latest/install/install.html>`__
+for provider-specific commands.
+
+Examples:
+
+.. code-block:: bash
+
+   openPMD_CMAKE_openPMD_USE_ADIOS2=ON python3 -m pip install --no-binary openpmd-api openpmd-api
+   spack install openpmd-api +python +adios2
+
+Choose the same MPI setting for the Python and C++ providers. With
+``HASE_BUILD_OPENPMD_FROM_SOURCE=ON``, HASEonGPU derives openPMD MPI support
+from ``DISABLE_MPI``.
+
+If no matching external openPMD installation is available, use the legacy
+self-contained source-build path:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" python3 -m pip install .
 
 Choose an Interface
 -------------------

@@ -96,38 +96,41 @@ binary configuration. Runtime Python selection still requires the matching
 openPMD-api Python module and backend support to be available.
 
 The Python transport requires the frontend ``openpmd_api`` module and the
-compiled ``calcPhiASE`` reader to use the same openPMD-api provider. With the
-default bundled build, HASEonGPU builds and installs that Python module next to
-the package automatically. With ``HASE_USE_SYSTEM_OPENPMD=ON``, the system
-openPMD C++ package must be paired with the Python ``openpmd_api`` package from
-the same system installation. CMake records the matching package directory in
-``HASE_OPENPMD_PYTHON_PACKAGE_DIR`` and the runtime imports from that directory
-before accepting a pre-imported module.
+compiled ``calcPhiASE`` reader to use the same openPMD-api provider. By
+default, HASEonGPU uses an external C++ ``openPMD::openPMD`` package found by
+CMake and the ``openpmd_api`` module installed in the active Python
+environment. Both sides must have the same backend support, for example ADIOS2
+for ``adios``/``adios-sst`` or HDF5 for ``hdf5``.
 
-For a pip editable install, either make the matching module importable in the
-same Python environment used by the build, or pass the package directory
-explicitly:
+For a pip editable install with an external provider, install or load the
+matching openPMD C++ package first and make the Python module available in the
+same environment:
 
 .. code-block:: bash
 
-   CMAKE_ARGS="-DHASE_USE_SYSTEM_OPENPMD=ON \
-     -DHASE_OPENPMD_PYTHON_PACKAGE_DIR=/path/to/site-packages" \
-     python -m pip install -e .
+   python -m pip install openpmd-api
+   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python -m pip install -e .
 
-For a source-tree CMake build with Python enabled, use the same cache variable:
+For a source-tree CMake build with Python enabled, point CMake at the same C++
+provider:
 
 .. code-block:: bash
 
    cmake -S . -B build \
      -DHASE_ENABLE_PYTHON=ON \
-     -DHASE_USE_SYSTEM_OPENPMD=ON \
-     -DHASE_OPENPMD_PYTHON_PACKAGE_DIR=/path/to/site-packages
+     -DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix
 
-``HASE_OPENPMD_PYTHON_PACKAGE_DIR`` must point to the directory containing the
-``openpmd_api`` package, not to an unrelated PyPI wheel. As an explicit runtime
-escape hatch, ``HASE_OPENPMD_PYTHONPATH`` may be set to the matching package
-directory before importing HASEonGPU. Do not use it to mix unrelated frontend
-and backend openPMD builds.
+If the matching Python package is not on the normal Python path, set
+``HASE_OPENPMD_PYTHON_PACKAGE_DIR`` to the directory containing
+``openpmd_api``. Do not use it to mix unrelated frontend and backend openPMD
+builds.
+
+To use the old self-contained path where HASEonGPU fetches and builds openPMD,
+configure with ``-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON``. In that mode HASEonGPU
+builds the matching Python bindings and installs the resulting openPMD runtime
+libraries into the HASE package. As an explicit runtime escape hatch,
+``HASE_OPENPMD_PYTHONPATH`` may be set to the matching package directory before
+importing HASEonGPU.
 
 openPMD Record Layout
 ---------------------

@@ -197,6 +197,7 @@ def main(argv=None):
         help="Run ASE from the first simulation step instead of first seeding beta with pump only",
     )
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
+    parser.add_argument("--openpmd-backend", type=str, default=None)
     parser.add_argument("--min-sample-range", type=int, default=None)
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
@@ -209,6 +210,8 @@ def main(argv=None):
         aseOverrides["maxSampleRange"] = args.max_sample_range
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
+    if args.openpmd_backend is not None:
+        aseOverrides["openpmdBackend"] = args.openpmd_backend
 
     state = runExample(
         args.phi_ase_config,

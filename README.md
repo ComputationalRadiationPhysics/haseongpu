@@ -29,6 +29,33 @@ Documentation
 
 The full project documentation is available at [https://haseongpu.readthedocs.io/en/latest/](https://haseongpu.readthedocs.io/en/latest/).
 
+Installation Notes
+------------------
+
+HASEonGPU uses openPMD as the Python-to-C++ transport. By default, a source
+install expects an external openPMD-api C++ package discoverable by CMake
+(`openPMD::openPMD`) and a matching Python `openpmd_api` package in the active
+Python environment:
+
+```bash
+python3 -m pip install openpmd-api
+CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python3 -m pip install .
+```
+
+The C++ and Python openPMD providers must be built with the same required
+backends, for example ADIOS2 for `adios`/`adios-sst` or HDF5 for `hdf5`. See the
+[openPMD-api installation guide](https://openpmd-api.readthedocs.io/en/latest/install/install.html)
+for Spack, Conda, pip, and source-install options. For ADIOS2-capable installs,
+use provider options such as `spack install openpmd-api +python +adios2` or
+`openPMD_CMAKE_openPMD_USE_ADIOS2=ON python3 -m pip install --no-binary openpmd-api openpmd-api`.
+
+If no matching external openPMD installation is available, HASEonGPU can use the
+legacy self-contained source-build path:
+
+```bash
+CMAKE_ARGS="-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" python3 -m pip install .
+```
+
 Citation
 --------
 

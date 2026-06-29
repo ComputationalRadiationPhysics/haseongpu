@@ -28,10 +28,13 @@ Installation
 
 Install the HASEonGPU Python package from the repository root. The recommended
 path for performance-sensitive use is a source build with native host
-optimizations enabled:
+optimizations enabled. The default install uses an externally installed
+openPMD-api C++ package and the ``openpmd-api`` Python package from the active
+Python environment:
 
 .. code-block:: bash
 
+   python3 -m pip install openpmd-api
    CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
 
 This builds and installs the C++ extension locally and installs the Python
@@ -39,6 +42,13 @@ dependencies declared in ``pyproject.toml``. ``HASE_NATIVE_OPTIMIZATIONS=ON``
 enables host-specific ``-march=native`` and ``-mtune=native`` tuning for the
 build machine. Disable it when building redistributable wheels or binaries for
 unknown CPUs.
+
+The external C++ ``openPMD::openPMD`` package and Python ``openpmd_api`` module
+must come from the same provider and must enable the same storage backends. If
+the C++ package is installed in a non-default prefix, pass its location through
+``CMAKE_PREFIX_PATH`` or ``openPMD_DIR``. Use
+``-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON`` only when HASEonGPU should fetch and
+build the pinned openPMD provider itself.
 
 Compiler Runtime
 ----------------
