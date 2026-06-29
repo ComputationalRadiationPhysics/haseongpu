@@ -94,13 +94,13 @@ namespace hase::kernels
 
     void mapRaysToPrisms(
         auto& devBundle,
+        hase::concepts::Queue auto const& queue,
         alpaka::concepts::IBuffer auto& indicesOfPrisms,
         alpaka::concepts::IBuffer auto& numberOfReflections,
         alpaka::concepts::IBuffer auto& raysPerPrism,
         alpaka::concepts::IBuffer auto& prefixSum,
         unsigned const numberOfPrisms)
     {
-        auto queue = devBundle.device.makeQueue();
         alpaka::onHost::exclusiveScan(queue, devBundle.executor, prefixSum, raysPerPrism);
 
         alpaka::concepts::IMdSpan auto indicesSpan = indicesOfPrisms.getMdSpan();
@@ -115,7 +115,6 @@ namespace hase::kernels
                 reflectionSpan},
             raysPerPrism,
             prefixSum);
-        alpaka::onHost::wait(queue);
     }
 
 } // namespace hase::kernels

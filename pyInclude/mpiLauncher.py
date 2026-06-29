@@ -18,11 +18,8 @@ import sys
 
 import numpy as np
 
-from .calcPhiASE import (
-    createCalcPhiASEInput,
-    findCalcPhiASENearModule,
-    parseCalcPhiASEOutput,
-)
+from .laser import CrossSectionData
+from .openpmd import transport
 from .geometry import _flat
 
 
@@ -162,77 +159,32 @@ def _packedFromModernInputs(gainMedium, laser):
 def runPhiaseMPI(phiAse, gainMedium, laser, laserProperties):
     """Run ``calcPhiASE`` through ``mpiexec`` and return arrays to Python.
 
-    The launcher writes temporary input files below ``IO/phiase_mpi`` so every
-    MPI rank can see the same directory, then reads the output files back into
-    a ``PhiAseMpiResult``.
+    The launcher writes an openPMD input series below ``IO/phiase_mpi`` so every
+    MPI rank can see the same directory, then reads the openPMD result series
+    back into a ``PhiAseMpiResult``.
     """
-    packed = _packedFromModernInputs(gainMedium, laser)
-    topology = gainMedium.topology
-    min_sample = 0 if phiAse.minSampleRange is None else int(phiAse.minSampleRange)
-    max_sample = (
-        int(topology.numberOfPoints * topology.levels) - 1
-        if phiAse.maxSampleRange is None
-        else int(phiAse.maxSampleRange)
-    )
-
     io_root = _mpiIoRoot()
     _ensureMpiIoVisible(io_root, int(phiAse.nPerNode))
 
-    with tempfile.TemporaryDirectory(prefix="hase_phiase_mpi_", dir=io_root) as tmp_dir:
-        createCalcPhiASEInput(
-            packed,
-            float(topology.thickness),
-            int(topology.levels),
-            float(gainMedium.get("nTot").value),
-            {"tfluo": float(gainMedium.get("crystalTFluo").value)},
-            int(gainMedium.get("claddingNumber").value),
-            float(gainMedium.get("claddingAbsorption").value),
-            tmp_dir,
-        )
-
-        exec_path = findCalcPhiASENearModule().resolve()
-        cmd = [
-            "mpiexec",
-            "-npernode",
-            str(int(phiAse.nPerNode)),
-            str(exec_path),
-            "--parallel-mode=mpi",
-            f"--backend={phiAse.backend}",
-            f"--min-rays={int(phiAse.minRaysPerSample)}",
-            f"--max-rays={int(phiAse.maxRaysPerSample)}",
-            f"--reflection={1 if phiAse.useReflections else 0}",
-            f"--input-path={tmp_dir}",
-            f"--output-path={tmp_dir}",
-            f"--min-sample-i={min_sample}",
-            f"--max-sample-i={max_sample}",
-            f"--numDevices={int(phiAse.numDevices)}",
-            f"--repetitions={int(phiAse.repetitions)}",
-            f"--adaptive-steps={int(phiAse.adaptiveSteps)}",
-            f"--mse-threshold={float(phiAse.mseThreshold)}",
-            f"--spectral-resolution={int(laser['l_res'])}",
-            f"--monochromatic={1 if phiAse.monochromatic else 0}",
-        ]
-
-        rng_seed = int(getattr(phiAse._compute, "rngSeed", phiAse.rngSeed))
-        cmd.append(f"--rng-seed={rng_seed}")
-
-        status = _runInterruptible(cmd)
-        if status.returncode != 0:
-            raise RuntimeError(f"PhiASE MPI run failed with exit code {status.returncode}: {' '.join(cmd)}")
-
-        phi_ase, mse, total_rays = parseCalcPhiASEOutput(tmp_dir, packed["layout"])
-
-    phi_ase = np.asarray(phi_ase, dtype=np.float64).reshape(-1, order="F")
-    mse = np.asarray(mse, dtype=np.float64).reshape(-1, order="F")
-    total_rays = np.asarray(total_rays, dtype=np.uint32).reshape(-1, order="F")
-    beta_cells = _flat(gainMedium.get("betaCells").value, topology.levels, np.float64, "betaCells")
-    gain_per_density = (
-        beta_cells * (laserProperties.maxSigmaE + laserProperties.maxSigmaA) - laserProperties.maxSigmaA
+    cross_sections = CrossSectionData(
+        wavelengthsAbsorption=laser["l_abs"],
+        crossSectionAbsorption=laser["s_abs"],
+        wavelengthsEmission=laser["l_ems"],
+        crossSectionEmission=laser["s_ems"],
+        resolution=laser["l_res"],
     )
+    result = transport.runPhiASE(
+        phiAse,
+        gainMedium,
+        cross_sections,
+        command_prefix=["mpiexec", "-npernode", str(int(phiAse.nPerNode))],
+        workspace_dir=io_root,
+    )
+
     return PhiAseMpiResult(
-        phiAse=phi_ase,
-        mse=mse,
-        totalRays=total_rays,
-        droppedRays=np.zeros_like(total_rays, dtype=np.uint32),
-        dndtAse=gain_per_density * phi_ase,
+        phiAse=np.asarray(result.phiAse, dtype=np.float64).reshape(-1),
+        mse=np.asarray(result.mse, dtype=np.float64).reshape(-1),
+        totalRays=np.asarray(result.totalRays, dtype=np.uint32).reshape(-1),
+        droppedRays=np.asarray(getattr(result, "droppedRays", np.zeros_like(result.totalRays)), dtype=np.uint32).reshape(-1),
+        dndtAse=np.asarray(result.dndtAse, dtype=np.float64).reshape(-1),
     )

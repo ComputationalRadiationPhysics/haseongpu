@@ -114,7 +114,7 @@ std::vector<double> runPropagationKernel(hase::core::HostMesh& hostMesh, T_Devic
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize * propagationResultWidth);
-    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(device, executor, alpaka::Vec{propagationBatchSize});
     queue.enqueue(frameSpec, alpaka::KernelBundle{PropagationKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
@@ -130,7 +130,7 @@ std::vector<double> runReflectionKernel(hase::core::HostMesh& hostMesh, T_Device
     auto queue = device.makeQueue();
     auto deviceMesh = hostMesh.toDevice(device);
     auto result = alpaka::onHost::alloc<double>(device, propagationBatchSize);
-    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, propagationBatchSize);
+    auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(device, executor, alpaka::Vec{propagationBatchSize});
     queue.enqueue(frameSpec, alpaka::KernelBundle{ReflectionKernel{}, deviceMesh.toView(), result});
     auto hostResult = alpaka::onHost::allocHostLike(result);
     alpaka::onHost::memcpy(queue, hostResult, result);
@@ -236,6 +236,7 @@ TEMPLATE_LIST_TEST_CASE(
 
     hase::kernels::importanceSamplingPropagation(
         devBundle,
+        queue,
         0u,
         reflectionSlices,
         deviceMesh.toView(),
@@ -253,6 +254,7 @@ TEMPLATE_LIST_TEST_CASE(
     unsigned rngStride = 0u;
     unsigned const distributedRays = hase::kernels::importanceSamplingDistribution(
         devBundle,
+        queue,
         reflectionSlices,
         deviceMesh.toView(),
         raysPerSample,
@@ -309,6 +311,7 @@ TEMPLATE_LIST_TEST_CASE("importance sampling distribution skips zero total pre-i
     unsigned rngStride = 0u;
     unsigned const distributedRays = hase::kernels::importanceSamplingDistribution(
         devBundle,
+        queue,
         reflectionSlices,
         deviceMesh.toView(),
         raysPerSample,

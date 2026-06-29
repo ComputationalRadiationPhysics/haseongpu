@@ -8,7 +8,6 @@
 #include <core/cancellation.hpp>
 #include <core/mesh.hpp>
 #include <core/types.hpp>
-#include <parse/parser.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <random/random.hpp>
@@ -265,7 +264,7 @@ PYBIND11_MODULE(HASEonGPU, m)
                 [experiment, compute, host_mesh]() mutable
                 {
                     hase::core::Result result;
-                    int const rc = hase::core::pythonEntry(experiment, compute, result, host_mesh);
+                    int const rc = hase::core::startSimulation<false>(experiment, compute, result, host_mesh);
                     if(rc != 0)
                     {
                         throw std::runtime_error(

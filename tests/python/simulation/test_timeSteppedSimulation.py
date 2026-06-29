@@ -6,6 +6,7 @@
 
 
 import numpy as np
+import pytest
 
 from HASEonGPU import (
     Constants,
@@ -24,6 +25,11 @@ from HASEonGPU import (
     PumpRadiationProfile,
     oneDimensionalZTraversalPumpRate,
 )
+
+
+@pytest.fixture(autouse=True)
+def _use_file_openpmd_backend(monkeypatch):
+    monkeypatch.setenv("HASE_OPENPMD_BACKEND", "adios")
 
 
 def testTimeSteppedSimulationRunsCallbacksWithFakeAse(

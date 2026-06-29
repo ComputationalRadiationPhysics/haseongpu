@@ -11,60 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import HASEonGPU_Bindings.HASEonGPU as HASEonGPU_Bindings
 import numpy as np
 
-from .geometry import GainMedium, _flat
+from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
-from . import mpiLauncher
+from .openpmd import transport
 from .pumping import BetaIntegrationGaussianSolver, Constants
-from .rng import defaultBackendRngSeed
 from .timeIntegration import TimeDerivative, TimeIntegrationSolver
 
-
-def _constructHostMesh(gainMedium):
-    """Build the pybind host mesh from a ``GainMedium``.
-
-    Arrays are flattened in Fortran order because the lower-level C++/legacy
-    interfaces index beta first by transverse sample and then by z level.
-    """
-    topology = gainMedium.topology
-    topology._require_levels()
-    if topology.thickness is None:
-        raise ValueError("topology thickness is required before running a simulation")
-
-    derived = topology._topology()
-    beta_volume = gainMedium.get("betaVolume").value
-    beta_cells = gainMedium.get("betaCells").value
-    cladding = gainMedium.get("claddingCellTypes").value
-    refractive = gainMedium.get("refractiveIndices").value
-    reflective = gainMedium.get("reflectivities").value
-
-    return HASEonGPU_Bindings.HostMesh(
-        _flat(topology.trianglePointIndices, 3, np.uint32, "trianglePointIndices"),
-        topology.numberOfTriangles,
-        int(topology.levels),
-        topology.numberOfPoints,
-        float(topology.thickness),
-        _flat(topology.points, 2, np.float64, "points"),
-        derived["triangleCenterX"],
-        derived["triangleCenterY"],
-        derived["triangleNormalPoint"],
-        derived["triangleNormalsX"],
-        derived["triangleNormalsY"],
-        derived["forbiddenEdge"],
-        derived["triangleNeighbors"],
-        derived["triangleSurfaces"],
-        _flat(beta_volume, topology.levels - 1, np.float64, "betaVolume"),
-        _flat(beta_cells, topology.levels, np.float64, "betaCells"),
-        _flat(cladding, None, np.uint32, "claddingCellTypes"),
-        _flat(refractive, None, np.float32, "refractiveIndices"),
-        _flat(reflective, None, np.float32, "reflectivities"),
-        float(gainMedium.get("nTot").value),
-        float(gainMedium.get("crystalTFluo").value),
-        int(gainMedium.get("claddingNumber").value),
-        float(gainMedium.get("claddingAbsorption").value),
-    )
 
 
 @dataclass
@@ -121,9 +75,6 @@ class PhiASE:
     rngSeed: int | None = None
     """Optional RNG seed for reproducible Monte Carlo sampling."""
 
-    _experiment: object | None = field(default=None, init=False, repr=False)
-    _compute: object | None = field(default=None, init=False, repr=False)
-    _hostMesh: object | None = field(default=None, init=False, repr=False)
     _result: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
@@ -248,6 +199,27 @@ class PhiASE:
                     setattr(self, attr, value)
         return self
 
+    def openPmdAttributes(self, *, numberOfSamples):
+        min_sample = 0 if self.minSampleRange is None else int(self.minSampleRange)
+        max_sample = int(numberOfSamples) - 1 if self.maxSampleRange is None else int(self.maxSampleRange)
+        attributes = {
+            "minRaysPerSample": self.minRaysPerSample,
+            "maxRaysPerSample": self.maxRaysPerSample,
+            "mseThreshold": self.mseThreshold,
+            "repetitions": self.repetitions,
+            "adaptiveSteps": self.adaptiveSteps,
+            "useReflections": self.useReflections,
+            "monochromatic": self.monochromatic,
+            "backend": "gpu" if self.backend is None else self.backend,
+            "maxGpus": self.numDevices,
+            "parallelMode": self.parallelMode,
+            "minSampleRange": min_sample,
+            "maxSampleRange": max_sample,
+        }
+        if self.rngSeed is not None:
+            attributes["rngSeed"] = int(self.rngSeed)
+        return attributes
+
     def run(self, gainMedium=None, crossSections=None):
         """Run ASE for the supplied or configured ``GainMedium``.
 
@@ -263,49 +235,7 @@ class PhiASE:
         if cross_sections is None:
             raise ValueError("PhiASE.run requires crossSections")
 
-        self._hostMesh = _constructHostMesh(medium)
-        laser_properties = LaserProperties(crossSections=cross_sections)
-        laser = laser_properties.toDict()
-
-        self._experiment = HASEonGPU_Bindings.ExperimentParameters(
-            minRaysPerSample=int(self.minRaysPerSample),
-            maxRaysPerSample=int(self.maxRaysPerSample),
-            lambdaA=laser["l_abs"],
-            lambdaE=laser["l_ems"],
-            sigmaA=laser["s_abs"],
-            sigmaE=laser["s_ems"],
-            maxSigmaA=laser_properties.maxSigmaA,
-            maxSigmaE=laser_properties.maxSigmaE,
-            mseThreshold=float(self.mseThreshold),
-            useReflections=bool(self.useReflections),
-            spectral=int(laser["l_res"]),
-            monochromatic=bool(self.monochromatic),
-        )
-
-        effective_rng_seed = int(self.rngSeed) if self.rngSeed is not None else defaultBackendRngSeed()
-        self._compute = HASEonGPU_Bindings.ComputeParameters(
-            maxRepetitions=int(self.repetitions),
-            adaptiveSteps=int(self.adaptiveSteps),
-            numDevices=int(self.numDevices),
-            backend=str(self.backend),
-            parallelMode=str(self.parallelMode),
-            writeVtk=bool(self.writeVtk),
-            devices=list(self.devices),
-            rngSeed=effective_rng_seed,
-        )
-        if (self.minSampleRange is None) != (self.maxSampleRange is None):
-            raise ValueError("minSampleRange and maxSampleRange must be set together")
-        if self.minSampleRange is not None:
-            self._compute.minSampleRange = int(self.minSampleRange)
-            self._compute.maxSampleRange = int(self.maxSampleRange)
-
-        if str(self.parallelMode).lower() == "mpi":
-            self._result = mpiLauncher.runPhiaseMPI(self, medium, laser, laser_properties)
-            return self
-
-        self._result = HASEonGPU_Bindings.calcPhiASE(
-            self._experiment, self._compute, self._hostMesh
-        )
+        self._result = transport.runPhiASE(self, medium, cross_sections)
         return self
 
     def getResults(self):
@@ -314,20 +244,6 @@ class PhiASE:
             raise RuntimeError("simulation has not been run yet")
         return self._result
 
-    @property
-    def experimentParameters(self):
-        """Low-level experiment parameters built for the last ``run(...)``."""
-        return self._experiment
-
-    @property
-    def computeParameters(self):
-        """Low-level compute parameters built for the last ``run(...)``."""
-        return self._compute
-
-    @property
-    def hostMesh(self):
-        """Low-level host mesh built from the last ``GainMedium`` input."""
-        return self._hostMesh
 
 
 class LegacyGridDataBetaVolumeMapper:
