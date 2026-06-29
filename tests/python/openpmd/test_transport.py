@@ -14,13 +14,35 @@ import pytest
 import pyInclude.openpmd.transport as transport
 from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
 from pyInclude import AlpakaBackends
-from pyInclude.geometry import GainMedium, MeshTopology
+from pyInclude.geometry import GainMedium, MeshTopology, VolumeTopology
 from pyInclude.laser import CrossSectionData
 from pyInclude.openpmd import HASE_TRANSPORT_VERSION, PrimitiveFieldSpec, PrismSchema, backendFlat, backendFlatArray, fieldSpec, haseTransportAttributes, primitiveView, spectralContext, unitDimension
 from pyInclude.simulation import PhiASE
 
 
 
+
+
+VOLUME_POINTS = np.array(
+    [
+        [0.0, 0.0, 0.0],
+        [1.5, -0.5, 0.0],
+        [0.25, 1.25, 0.0],
+        [2.25, 2.5, 1.0],
+        [-0.75, 3.75, 1.0],
+    ],
+    dtype=np.float64,
+)
+VOLUME_CELLS = np.array(
+    [
+        [0, 1, 2, 3],
+        [0, 2, 3, 4],
+        [1, 2, 3, 4],
+    ],
+    dtype=np.uint32,
+)
+VOLUME_BETA = np.array([0.11, 0.21, 0.31], dtype=np.float64)
+VOLUME_POINT_BETA = np.array([100.0, 110.0, 120.0], dtype=np.float64)
 
 MESH_FIELD_VALUES = {
     "points": np.array([0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75], dtype=np.float64),
@@ -78,15 +100,13 @@ SCALAR_RECORD_SPECS = {
 
 
 def asymmetric_topology():
-    points = np.column_stack((MESH_FIELD_VALUES["points"][:5], MESH_FIELD_VALUES["points"][5:]))
-    triangles = MESH_FIELD_VALUES["connectivity"].reshape((3, 3), order="F")
-    return MeshTopology(points, triangles, levels=6, thickness=0.375)
+    return VolumeTopology.fromTetrahedra(VOLUME_POINTS, VOLUME_CELLS)
 
 
 def asymmetric_medium():
     return GainMedium(asymmetric_topology()).withPhysicalProperties(
-        betaVolume=backendFlat(MESH_FIELD_VALUES["betaVolume"]),
-        betaCells=backendFlat(MESH_FIELD_VALUES["pointBeta"]),
+        betaVolume=backendFlat(VOLUME_BETA),
+        betaCells=backendFlat(VOLUME_POINT_BETA),
         claddingCellTypes=MESH_FIELD_VALUES["claddingCellType"],
         refractiveIndices=MESH_FIELD_VALUES["refractiveIndex"],
         reflectivities=backendFlat(MESH_FIELD_VALUES["reflectivity"]),
@@ -122,20 +142,24 @@ def asymmetric_phi_ase():
         minSampleRange=0,
         maxSampleRange=0,
         rngSeed=1234,
+        propagationMode="backward",
     )
 
 
 def launch_smoke_topology():
-    points = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], dtype=np.float64)
-    triangles = np.array([[0, 1, 2]], dtype=np.uint32)
-    return MeshTopology(points, triangles, levels=2, thickness=1.0)
+    points = np.array(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        dtype=np.float64,
+    )
+    cells = np.array([[0, 1, 2, 3]], dtype=np.uint32)
+    return VolumeTopology.fromTetrahedra(points, cells)
 
 
 def launch_smoke_medium():
     topology = launch_smoke_topology()
     return GainMedium(topology).withPhysicalProperties(
         betaVolume=backendFlat(np.array([0.0], dtype=np.float64)),
-        betaCells=backendFlat(np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64)),
+        betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
         claddingCellTypes=np.array([0], dtype=np.uint32),
         refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
         reflectivities=backendFlat(np.array([0.0, 0.0], dtype=np.float32)),
@@ -172,6 +196,7 @@ def launch_smoke_phi_ase(*, parallel_mode="single"):
         minSampleRange=0,
         maxSampleRange=0,
         rngSeed=1234,
+        propagationMode="backward",
     )
 
 
@@ -191,8 +216,9 @@ def _file_suffix_for_tests():
 
 
 def asymmetric_mesh():
-    medium = asymmetric_medium()
-    topology = medium.topology
+    points = np.column_stack((MESH_FIELD_VALUES["points"][:5], MESH_FIELD_VALUES["points"][5:]))
+    triangles = MESH_FIELD_VALUES["connectivity"].reshape((3, 3), order="F")
+    topology = MeshTopology(points, triangles, levels=6, thickness=0.375)
     derived = topology._topology()
     return SimpleNamespace(
         numberOfPoints=topology.numberOfPoints,
@@ -208,27 +234,27 @@ def asymmetric_mesh():
         triangleNormalsX=derived["triangleNormalsX"],
         triangleNormalsY=derived["triangleNormalsY"],
         triangleSurfaces=derived["triangleSurfaces"],
-        betaVolume=medium.get("betaVolume").value,
-        betaCells=medium.get("betaCells").value,
-        claddingCellTypes=medium.get("claddingCellTypes").value,
-        refractiveIndices=medium.get("refractiveIndices").value,
-        reflectivities=medium.get("reflectivities").value,
+        betaVolume=MESH_FIELD_VALUES["betaVolume"],
+        betaCells=MESH_FIELD_VALUES["pointBeta"],
+        claddingCellTypes=MESH_FIELD_VALUES["claddingCellType"],
+        refractiveIndices=MESH_FIELD_VALUES["refractiveIndex"],
+        reflectivities=MESH_FIELD_VALUES["reflectivity"],
     )
 
 
 def _field_context():
-    topology = asymmetric_topology()
+    mesh = asymmetric_mesh()
     return SimpleNamespace(
-        numberOfPoints=topology.numberOfPoints,
-        numberOfTriangles=topology.numberOfTriangles,
-        numberOfLevels=int(topology.levels),
+        numberOfPoints=mesh.numberOfPoints,
+        numberOfTriangles=mesh.numberOfTriangles,
+        numberOfLevels=mesh.numberOfLevels,
     )
 
 
 def _transport_scalar_record_values():
     return {
-        "beta_volume": MESH_FIELD_VALUES["betaVolume"],
-        "point_beta": MESH_FIELD_VALUES["pointBeta"],
+        "beta_volume": VOLUME_BETA,
+        "point_beta": VOLUME_POINT_BETA,
         "cladding_cell_type": MESH_FIELD_VALUES["claddingCellType"],
         "refractive_index": MESH_FIELD_VALUES["refractiveIndex"],
         "reflectivity": MESH_FIELD_VALUES["reflectivity"],
@@ -1116,81 +1142,73 @@ def test_inputSeriesWritesContract(contract_input):
     assert series.get_attribute("haseTransportVersion") == HASE_TRANSPORT_VERSION
     iteration = series.iterations[0]
 
-    assert iteration.get_attribute("number_of_points") == 5
-    assert iteration.get_attribute("number_of_cells") == 3
-    assert iteration.get_attribute("number_of_levels") == 6
-    assert iteration.get_attribute("thickness") == pytest.approx(0.375)
+    topology = asymmetric_topology()
+    explicit_context = transport._explicit_topology_context(topology)
+    assert iteration.get_attribute("number_of_points") == topology.numberOfPoints
+    assert iteration.get_attribute("number_of_cells") == topology.numberOfCells
+    assert iteration.get_attribute("number_of_levels") == 1
+    assert iteration.get_attribute("thickness") == pytest.approx(0.0)
     assert iteration.get_attribute("n_tot") == pytest.approx(7.5)
     assert iteration.get_attribute("crystal_t_fluo") == pytest.approx(1.75)
     assert iteration.get_attribute("spectral_resolution") == 3
     assert iteration.get_attribute("rng_seed") == 1234
+    assert iteration.get_attribute("propagation_mode") == "backward"
 
-    canonical_context = transport._canonical_topology_context(asymmetric_topology())
     points = iteration.meshes["core_points"]
     assert points.get_attribute("haseTransportVersion") == HASE_TRANSPORT_VERSION
     assert points.get_attribute("haseEntity") == "coordinate_mesh_point"
     assert _attribute_list(points.get_attribute("haseAxes")) == ["coordinate", "mesh_point"]
-    assert _attribute_list(points.get_attribute("hasePrimitiveShape")) == [3, 30]
+    assert _attribute_list(points.get_attribute("hasePrimitiveShape")) == [3, topology.numberOfPoints]
     assert points.get_attribute("haseUnit") == "m"
     assert points.unit_dimension[io.Unit_Dimension.L] == 1.0
-    components = transport._canonical_point_components(asymmetric_topology())
-    np.testing.assert_array_equal(_read_component(series, points["x"]), components["x"])
-    np.testing.assert_array_equal(_read_component(series, points["y"]), components["y"])
-    np.testing.assert_array_equal(_read_component(series, points["z"]), components["z"])
+    np.testing.assert_array_equal(_read_component(series, points["x"]), topology.points[:, 0])
+    np.testing.assert_array_equal(_read_component(series, points["y"]), topology.points[:, 1])
+    np.testing.assert_array_equal(_read_component(series, points["z"]), topology.points[:, 2])
     series.flush()
 
     canonical_scalars = {
-        "cells_connectivity": (transport.CANONICAL_CONNECTIVITY_SPEC, transport._canonical_cell_connectivity(asymmetric_topology())),
-        "cells_offsets": (
-            transport.CANONICAL_OFFSETS_SPEC,
-            np.arange(canonical_context.numberOfPrisms + 1, dtype=np.uint32) * np.uint32(6),
+        "cells_connectivity": (transport.CANONICAL_CONNECTIVITY_SPEC, topology.cellsConnectivityFlat()),
+        "cells_offsets": (transport.CANONICAL_OFFSETS_SPEC, topology.cellsOffsets()),
+        "cells_types": (transport.CANONICAL_CELL_TYPES_SPEC, topology.cellTypes),
+        "cell_face_offsets": (
+            transport.EXPLICIT_CELL_FACE_OFFSETS_SPEC,
+            np.arange(topology.numberOfCells + 1, dtype=np.uint32) * np.uint32(topology.numberOfFacesPerCell),
         ),
-        "cells_types": (
-            transport.CANONICAL_CELL_TYPES_SPEC,
-            np.full(canonical_context.numberOfPrisms, 13, dtype=np.uint32),
-        ),
+        "cell_faces": (transport.EXPLICIT_CELL_FACES_SPEC, topology.facePointIndices.reshape(-1)),
+        "cell_neighbor_cells": (transport.EXPLICIT_CELL_NEIGHBORS_SPEC, topology.neighborCells.reshape(-1)),
+        "cell_neighbor_local_faces": (transport.EXPLICIT_CELL_NEIGHBOR_FACES_SPEC, topology.neighborLocalFaces.reshape(-1)),
+        "cell_face_boundaries": (transport.EXPLICIT_FACE_BOUNDARIES_SPEC, topology.faceBoundaries.reshape(-1)),
+        "cell_domains": (transport.EXPLICIT_CELL_DOMAINS_SPEC, topology.cellDomains),
     }
     for record_name, (spec, expected) in canonical_scalars.items():
         record = iteration.meshes["core_" + record_name]
         values = _read_scalar(series, iteration, "core_" + record_name)
         np.testing.assert_array_equal(values, expected.astype(spec.dtypeObject, copy=False))
-        _assert_hase_metadata(record, spec, canonical_context)
+        _assert_hase_metadata(record, spec, explicit_context)
 
-    for removed_record in [
-        "core_vertices",
-        "core_connectivity",
-        "core_neighbors",
-        "core_forbidden_edges",
-        "core_normal_points",
-        "core_cell_center",
-        "core_cell_normal_x",
-        "core_cell_normal_y",
-        "core_surface",
-    ]:
-        assert removed_record not in iteration.meshes
+    sample_points = iteration.meshes["core_sample_points"]
+    np.testing.assert_array_equal(_read_component(series, sample_points["x"]), topology.samplePoints[:, 0])
+    np.testing.assert_array_equal(_read_component(series, sample_points["y"]), topology.samplePoints[:, 1])
+    np.testing.assert_array_equal(_read_component(series, sample_points["z"]), topology.samplePoints[:, 2])
 
-    present_specs = {
-        name: spec_name
-        for name, spec_name in SCALAR_RECORD_SPECS.items()
-        if name not in {
-            "connectivity",
-            "neighbors",
-            "forbidden_edges",
-            "normal_points",
-            "cell_normal_x",
-            "cell_normal_y",
-            "surface",
-        }
+    dynamic_specs = {
+        "beta_volume": (transport.EXPLICIT_BETA_VOLUME_SPEC, VOLUME_BETA),
+        "point_beta": (transport.EXPLICIT_POINT_BETA_SPEC, VOLUME_POINT_BETA),
+        "cladding_cell_type": (fieldSpec("claddingCellType"), MESH_FIELD_VALUES["claddingCellType"]),
+        "refractive_index": (fieldSpec("refractiveIndex"), MESH_FIELD_VALUES["refractiveIndex"]),
+        "reflectivity": (fieldSpec("reflectivity"), MESH_FIELD_VALUES["reflectivity"]),
+        "lambda_absorption": (fieldSpec("lambdaAbsorption"), SPECTRAL_FIELD_VALUES["lambdaAbsorption"]),
+        "lambda_emission": (fieldSpec("lambdaEmission"), SPECTRAL_FIELD_VALUES["lambdaEmission"]),
+        "sigma_absorption": (fieldSpec("sigmaAbsorption"), SPECTRAL_FIELD_VALUES["sigmaAbsorption"]),
+        "sigma_emission": (fieldSpec("sigmaEmission"), SPECTRAL_FIELD_VALUES["sigmaEmission"]),
     }
-    for record_name, spec_name in present_specs.items():
-        spec = fieldSpec(spec_name)
-        context = _context_for_spec(spec_name)
+    for record_name, (spec, expected) in dynamic_specs.items():
+        context = spectralContext(expected) if record_name in {"lambda_absorption", "lambda_emission", "sigma_absorption", "sigma_emission"} else explicit_context
         record = iteration.meshes["core_" + record_name]
         values = _read_scalar(series, iteration, "core_" + record_name)
-        expected = _transport_scalar_record_values()[record_name].astype(spec.dtypeObject, copy=False)
         assert values.shape == (expected.size,)
         assert values.dtype == spec.dtypeObject
-        np.testing.assert_array_equal(values, expected)
+        np.testing.assert_array_equal(values, expected.astype(spec.dtypeObject, copy=False))
         _assert_hase_metadata(record, spec, context)
 
     series.close()
@@ -1487,7 +1505,7 @@ def _backend_execution_command_prefix(build_dir):
 
 
 def _assert_launch_smoke_result(result):
-    expected_size = launch_smoke_topology().numberOfPoints * launch_smoke_topology().levels
+    expected_size = launch_smoke_topology().numberOfSamplePoints
     assert result.phiAse.shape == (expected_size,)
     assert result.mse.shape == (expected_size,)
     assert result.totalRays.shape == (expected_size,)
@@ -1600,25 +1618,15 @@ def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
 
     temperature_dimension = unitDimension.tFluo
 
-    class ThermalPrism(PrismSchema):
-        temperature = PrimitiveFieldSpec(
-            "temperature",
-            "custom_temperature",
-            np.float64,
-            unit="K",
-            unitDimension=temperature_dimension,
-            backendRequired=False,
-        )
-
-    values = np.array(
-        [
-            [300.0, 301.0, 302.0, 303.0, 304.0],
-            [310.0, 311.0, 312.0, 313.0, 314.0],
-            [320.0, 321.0, 322.0, 323.0, 324.0],
-        ],
-        dtype=np.float64,
+    values = np.array([300.0, 310.0, 320.0], dtype=np.float64)
+    medium = asymmetric_medium().defineField(
+        "temperature",
+        entity="cell",
+        values=values,
+        unit="K",
+        unitDimension=temperature_dimension,
+        backendRequired=False,
     )
-    medium = asymmetric_medium().withPrimitiveSchema(ThermalPrism, temperature=values)
     assert next(iter(medium.getPrisms())).temperature == pytest.approx(300.0)
     output = tmp_path / ("custom" + _file_suffix_for_tests())
 
@@ -1629,13 +1637,13 @@ def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
     series = io.Series(str(output), io.Access.read_only)
     iteration = series.iterations[0]
     record = iteration.meshes["custom_temperature"]
-    np.testing.assert_array_equal(_read_scalar(series, iteration, "custom_temperature"), values.reshape(-1, order="F"))
+    np.testing.assert_array_equal(_read_scalar(series, iteration, "custom_temperature"), values)
     assert record.get_attribute("haseTransportVersion") == HASE_TRANSPORT_VERSION
-    assert record.get_attribute("haseEntity") == "cell_layer"
-    assert _attribute_list(record.get_attribute("haseAxes")) == ["cell", "layer"]
-    assert record.get_attribute("haseAxesString") == "cell,layer"
+    assert record.get_attribute("haseEntity") == "cell"
+    assert _attribute_list(record.get_attribute("haseAxes")) == ["cell"]
+    assert record.get_attribute("haseAxesString") == "cell"
     assert record.get_attribute("haseLayoutOrder") == "backendFlat"
-    assert _attribute_list(record.get_attribute("hasePrimitiveShape")) == [3, 5]
+    assert _attribute_list(record.get_attribute("hasePrimitiveShape")) == [3]
     assert record.get_attribute("haseStatic") is True
     assert record.get_attribute("haseDynamic") is False
     assert record.get_attribute("haseBackendRequired") is False

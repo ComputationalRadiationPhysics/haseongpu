@@ -820,9 +820,7 @@ namespace hase::openpmd
         validateComputeSettings(iteration);
 
         validateUnchangedAttribute<unsigned>(iteration, field::numberOfPoints, simulation.mesh.numberOfPoints);
-        validateUnchangedAttribute<unsigned>(iteration, field::numberOfCells, simulation.mesh.numberOfTriangles);
-        validateUnchangedAttribute<unsigned>(iteration, field::numberOfLevels, simulation.mesh.numberOfLevels);
-        validateUnchangedAttribute<float>(iteration, field::thickness, simulation.mesh.thickness);
+        validateUnchangedAttribute<unsigned>(iteration, field::numberOfCells, simulation.mesh.numberOfCells);
         validateUnchangedAttribute<float>(iteration, field::nTot, simulation.mesh.nTot);
         validateUnchangedAttribute<float>(iteration, field::crystalTFluo, simulation.mesh.crystalTFluo);
         validateUnchangedAttribute<unsigned>(iteration, field::claddingNumber, simulation.mesh.claddingNumber);

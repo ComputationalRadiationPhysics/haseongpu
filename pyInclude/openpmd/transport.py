@@ -738,7 +738,10 @@ def _resetComponent(record, component_name, data, axis_labels, unit_dimension, u
 def _explicit_topology_context(topology):
     return SimpleNamespace(
         numberOfMeshPoints=topology.numberOfPoints,
+        numberOfPoints=topology.numberOfPoints,
         numberOfCells=topology.numberOfCells,
+        numberOfTriangles=topology.numberOfCells,
+        numberOfLevels=1,
         numberOfFacesPerCell=topology.numberOfFacesPerCell,
         numberOfCellVertices=4,
         numberOfSamplePoints=topology.numberOfSamplePoints,

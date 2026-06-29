@@ -447,6 +447,14 @@ namespace hase::core
         std::vector<double> betaVolumePrefix;
         std::vector<double> cellCenters;
         std::vector<double> samplePoints;
+        // Compatibility aliases for legacy parser validation and downstream code
+        // that still inspects the old extruded-triangle HostMesh fields.
+        std::vector<unsigned> trianglePointIndices;
+        std::vector<int> triangleNeighbors;
+        std::vector<int> forbiddenEdge;
+        std::vector<unsigned> triangleNormalPoint;
+        std::vector<double> triangleCenterX;
+        std::vector<double> triangleCenterY;
         float nTot = 0.0f;
         float crystalTFluo = 0.0f;
         unsigned claddingNumber = 1u;
@@ -455,6 +463,9 @@ namespace hase::core
         unsigned numberOfPrisms = 0u;
         unsigned numberOfPoints = 0u;
         unsigned numberOfSamples = 0u;
+        unsigned numberOfTriangles = 0u;
+        unsigned numberOfLevels = 1u;
+        float thickness = 0.0f;
         unsigned numberOfFacesPerCell = tet4FaceCount;
         unsigned numberOfCellVertices = tet4VertexCount;
         bool resultAtVolumes = false;
@@ -504,7 +515,19 @@ namespace hase::core
             , numberOfPrisms(numberOfCells)
             , numberOfPoints(static_cast<unsigned>(this->points.size() / 3u))
             , numberOfSamples(static_cast<unsigned>(this->samplePoints.size() / 3u))
+            , numberOfTriangles(numberOfCells)
         {
+            trianglePointIndices = this->cellPointIndices;
+            triangleNeighbors = this->cellNeighborCells;
+            forbiddenEdge = this->cellFaceBoundaries;
+            triangleNormalPoint.assign(this->cellFaces.begin(), this->cellFaces.end());
+            triangleCenterX.reserve(numberOfCells);
+            triangleCenterY.reserve(numberOfCells);
+            for(unsigned cell = 0u; cell < numberOfCells; ++cell)
+            {
+                triangleCenterX.push_back(this->cellCenters.at(cell));
+                triangleCenterY.push_back(this->cellCenters.at(cell + numberOfCells));
+            }
             calcCellVolumePrefix();
         }
 
