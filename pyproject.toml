@@ -37,6 +37,7 @@ dependencies=[
     "vtk",
     "matplotlib",
     "pyyaml",
+    "openpmd-api",
 ]
 
 [project.optional-dependencies]
@@ -79,8 +80,6 @@ if hasattr(HASEonGPU_Bindings, "HostMesh"):
 build-type = "Release"
 [tool.scikit-build.cmake.define]
 HASE_ENABLE_PYTHON = "ON"
-HASE_USE_SYSTEM_OPENPMD = "OFF"
-HASE_OPENPMD_BUILD_PYTHON_BINDINGS = "ON"
 HASE_BUILD_RELEASE = "ON"
 HASE_NATIVE_OPTIMIZATIONS = "OFF"
 CMAKE_INTERPROCEDURAL_OPTIMIZATION = "OFF"

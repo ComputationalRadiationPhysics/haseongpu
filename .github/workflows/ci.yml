@@ -69,6 +69,7 @@ jobs:
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
+        -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
         -DDISABLE_MPI=ON
         -DHASE_OPENPMD_BACKEND=${{ matrix.config.openpmd_backend }}
 
