@@ -14,12 +14,33 @@
 #include <kernels/forward/accumulation.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <ctime>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
 namespace hase::core
 {
+    [[nodiscard]] inline double calcForwardStandardError(
+        double const scoreSum,
+        double const scoreSquareSum,
+        unsigned const rayCount,
+        double const totalVolume,
+        double const volumeSize)
+    {
+        if(rayCount < 2u || volumeSize <= 0.0 || totalVolume <= 0.0 || !std::isfinite(scoreSum)
+           || !std::isfinite(scoreSquareSum))
+        {
+            return std::numeric_limits<double>::max();
+        }
+
+        double const n = static_cast<double>(rayCount);
+        double const varianceOfMean = (scoreSquareSum - scoreSum * scoreSum / n) / (n * (n - 1.0));
+        double const volumeScale = totalVolume / volumeSize;
+        return std::sqrt(std::max(0.0, varianceOfMean)) * volumeScale;
+    }
+
     template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
     float calcForwardPhiAse(
         hase::alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
@@ -47,12 +68,14 @@ namespace hase::core
         double const totalVolume = hostMesh.cellVolumePrefix.empty() ? 0.0 : hostMesh.cellVolumePrefix.back();
 
         auto dPhiAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
+        auto dPhiSquareAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
         auto dVolumeRayVisits = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
         auto dDroppedRays = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
         auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
         auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);
 
         alpaka::onHost::fill(queue, dPhiAccumulator, double{0}, alpaka::Vec{volumeCount});
+        alpaka::onHost::fill(queue, dPhiSquareAccumulator, double{0}, alpaka::Vec{volumeCount});
         alpaka::onHost::fill(queue, dVolumeRayVisits, 0u, alpaka::Vec{volumeCount});
         alpaka::onHost::fill(queue, dDroppedRays, 0u, alpaka::Vec{volumeCount});
         alpaka::onHost::wait(queue);
@@ -70,6 +93,7 @@ namespace hase::core
                 experiment.forwardRayLength,
                 totalVolume,
                 dPhiAccumulator,
+                dPhiSquareAccumulator,
                 dVolumeRayVisits,
                 dDroppedRays,
                 dSigmaA,
@@ -78,9 +102,11 @@ namespace hase::core
                 threadLocalStridingRNG});
 
         auto hPhiAccumulator = alpaka::onHost::allocHostLike(dPhiAccumulator);
+        auto hPhiSquareAccumulator = alpaka::onHost::allocHostLike(dPhiSquareAccumulator);
         auto hVolumeRayVisits = alpaka::onHost::allocHostLike(dVolumeRayVisits);
         auto hDroppedRays = alpaka::onHost::allocHostLike(dDroppedRays);
         alpaka::onHost::memcpy(queue, hPhiAccumulator, dPhiAccumulator);
+        alpaka::onHost::memcpy(queue, hPhiSquareAccumulator, dPhiSquareAccumulator);
         alpaka::onHost::memcpy(queue, hVolumeRayVisits, dVolumeRayVisits);
         alpaka::onHost::memcpy(queue, hDroppedRays, dDroppedRays);
         alpaka::onHost::wait(queue);
@@ -92,6 +118,7 @@ namespace hase::core
             std::vector<double>(volumeCount, 0.0),
             std::vector<unsigned>(volumeCount, 0u));
         auto* phiData = alpaka::onHost::data(hPhiAccumulator);
+        auto* phiSquareData = alpaka::onHost::data(hPhiSquareAccumulator);
         auto* visitsData = alpaka::onHost::data(hVolumeRayVisits);
         auto* droppedData = alpaka::onHost::data(hDroppedRays);
         for(unsigned volume = 0u; volume < volumeCount; ++volume)
@@ -104,10 +131,18 @@ namespace hase::core
             {
                 double const estimate = phiData[volume] * totalVolume / (static_cast<double>(rayCount) * volumeSize);
                 result.phiAse.at(volume) = static_cast<float>(estimate);
+                result.mse.at(volume) = droppedData[volume] == 0u
+                                           ? calcForwardStandardError(
+                                                 phiData[volume],
+                                                 phiSquareData[volume],
+                                                 rayCount,
+                                                 totalVolume,
+                                                 volumeSize)
+                                           : std::numeric_limits<double>::max();
             }
             else
             {
-                result.mse.at(volume) = experiment.mseThreshold;
+                result.mse.at(volume) = std::numeric_limits<double>::max();
             }
         }
 
