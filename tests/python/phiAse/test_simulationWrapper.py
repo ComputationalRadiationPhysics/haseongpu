@@ -72,12 +72,20 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
         str(phiAseTestConfigPath),
         "--min-rays-per-sample",
         "32",
+        "--openpmd-backend",
+        "adios-sst",
     ])
 
     fromArgs = PhiASE.fromArgs(args)
 
     assert fromArgs.minRaysPerSample == 32
     assert fromArgs.maxRaysPerSample == 10000
+    assert fromArgs.openpmdBackend == "adios-sst"
+
+
+def testPhiAseLoadsOpenPmdBackendFromConfig():
+    assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
+    assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
 
 
 def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
@@ -137,6 +145,33 @@ def testPhiAseRunUsesProvidedOpenPmdSession(
     ).run(gainMedium=smallGainMedium, openpmdSession=openpmdSession)
 
     assert captured["openpmdSession"] is openpmdSession
+
+
+def testPhiAseRunForwardsConfiguredOpenPmdBackend(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+):
+    captured = {}
+
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        captured["transport"] = kwargs.get("transport")
+        captured["openpmdSession"] = kwargs.get("openpmdSession")
+        return DummyResult()
+
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+
+    PhiASE(
+        {
+            "compute": {
+                "backend": "Host_Cpu_CpuSerial",
+                "openpmd_backend": "hdf5",
+            }
+        },
+        spectralProperties=crossSections,
+    ).run(gainMedium=smallGainMedium)
+
+    assert captured == {"transport": "hdf5", "openpmdSession": None}
 
 
 def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
@@ -207,6 +242,7 @@ def testSimulationRunStepsKeepsPersistentOpenPmdSessionUntilIntervalCompletes(mo
     openpmdSession = object()
     simulation = object.__new__(simulation_module.Simulation)
     simulation.phiASE = SimpleNamespace(
+        openpmdBackend=None,
         openStream=lambda: events.append(("openStream",)) or openpmdSession,
         closeStream=lambda: events.append(("closeStream",)),
     )
@@ -236,10 +272,12 @@ def testSimulationRunStepsDefaultsToPersistentOpenPmdSessionForStreamingBackend(
     openpmdSession = object()
     simulation = object.__new__(simulation_module.Simulation)
     simulation.phiASE = SimpleNamespace(
-        openStream=lambda: events.append(("openStream",)) or openpmdSession,
+        openpmdBackend="adios-sst",
+        openStream=lambda **kwargs: events.append(("openStream", kwargs)) or openpmdSession,
         closeStream=lambda: events.append(("closeStream",)),
     )
     simulation._openpmdSession = None
+    captured = {}
 
     def fakeStep(self, *, openpmdSession=None):
         events.append(("step", openpmdSession))
@@ -247,17 +285,18 @@ def testSimulationRunStepsDefaultsToPersistentOpenPmdSessionForStreamingBackend(
     monkeypatch.setattr(
         simulation_module.transport,
         "_backend_spec",
-        lambda: SimpleNamespace(streaming=True),
+        lambda backend=None: captured.update({"backend": backend}) or SimpleNamespace(streaming=True),
     )
     monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
 
     simulation_module.Simulation.runSteps(simulation, 1)
 
     assert events == [
-        ("openStream",),
+        ("openStream", {}),
         ("step", openpmdSession),
         ("closeStream",),
     ]
+    assert captured["backend"] == "adios-sst"
 
 
 def testPhiAseNPerNodeLoadsFromArgsAndConfig():

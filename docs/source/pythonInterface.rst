@@ -368,6 +368,7 @@ backend, MPI, and output settings should stay in a small run configuration.
 
    compute:
      backend: Host_Cpu_CpuSerial
+     openpmd_backend: adios
      parallel_mode: single
      numDevices: 1
      write_vtk: false  # must remain false for the openPMD transport
@@ -392,7 +393,9 @@ Overrides are applied after reading the file, so they are the right place for
 objects that cannot be represented by the YAML settings, such as
 ``spectralProperties``.  Keys can be written in the Python attribute style
 (``minRaysPerSample``) or in common snake-case style
-(``min_rays_per_sample``).  The same settings may be placed at the YAML top
+(``min_rays_per_sample``).  ``backend`` selects the Alpaka compute backend,
+while ``openpmd_backend`` selects the openPMD storage or streaming backend
+(``adios``, ``adios-sst``, or ``hdf5``).  The same settings may be placed at the YAML top
 level or grouped under ``phiASE``, ``phi_ase``, ``experiment``, or ``compute``.
 
 The YAML file configures ``PhiASE`` only.  Geometry, gain-medium arrays,

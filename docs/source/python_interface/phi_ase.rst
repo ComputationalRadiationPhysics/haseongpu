@@ -119,12 +119,14 @@ openPMD Transport Options
 -------------------------
 
 The openPMD storage backend is selected separately from ``PhiASE.backend``.
-Use the ``HASE_OPENPMD_BACKEND`` environment variable for normal ``PhiASE``
-runs, or call ``pyInclude.openpmd.transport.runPhiASE(..., transport=...)``
-for explicit helper-driven runs. Accepted values are ``adios``, ``hdf5``,
-and ``adios-sst``. Prefer ``adios`` or ``hdf5`` for local tests; SST requires
-concurrent producer/consumer execution and can wait if only one side is
-started.
+Set ``PhiASE.openpmdBackend`` in Python, use ``openpmd_backend`` in YAML, pass
+``--openpmd-backend`` through the command-line helper, or use the
+``HASE_OPENPMD_BACKEND`` environment variable for process-wide defaults.
+Lower-level helper calls also accept
+``pyInclude.openpmd.transport.runPhiASE(..., transport=...)``. Accepted values
+are ``adios``, ``hdf5``, and ``adios-sst``. Prefer ``adios`` or ``hdf5`` for
+local tests; SST requires concurrent producer/consumer execution and can wait
+if only one side is started.
 
 For repeated or streaming use, the transport can keep a session open and write
 only dynamic fields after the first iteration. See :doc:`../openpmdTransport`
@@ -135,9 +137,9 @@ Configuration Helpers
 ---------------------
 
 ``PhiASE`` can read settings from a dictionary or YAML file.  This is intended
-for run-control values: sampling, convergence, reflection flags, backend
-selection, MPI launcher settings, optional sample ranges, and the disabled
-``writeVtk`` compatibility key.
+for run-control values: sampling, convergence, reflection flags, Alpaka compute
+backend selection, openPMD storage backend selection, MPI launcher settings,
+optional sample ranges, and the disabled ``writeVtk`` compatibility key.
 Objects such as ``GainMedium``, ``SpectralDecomposition``, and pump solvers are
 still passed from Python.
 
