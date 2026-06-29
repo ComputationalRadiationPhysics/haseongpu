@@ -354,6 +354,42 @@ namespace
         return std::vector<T>(chunk.get(), chunk.get() + elementCount(extent));
     }
 
+    void validateNonNegativeFinite(std::string const& name, std::vector<double> const& values)
+    {
+        for(std::size_t index = 0u; index < values.size(); ++index)
+        {
+            double const value = values[index];
+            if(!std::isfinite(value) || value < 0.0)
+            {
+                validationError(name, "values must be finite and non-negative; invalid value at flat index "
+                                          + std::to_string(index));
+            }
+        }
+    }
+
+    std::vector<double> loadBetaVolume(
+        io::Series& series,
+        io::Iteration& iteration,
+        std::string const& name,
+        io::Extent const& expectedExtent,
+        std::vector<std::string> const& axes,
+        std::vector<unsigned long long> const& primitiveShape,
+        bool dynamic,
+        bool backendRequired)
+    {
+        auto values = loadScalar<double>(
+            series,
+            iteration,
+            name,
+            expectedExtent,
+            axes,
+            primitiveShape,
+            dynamic,
+            backendRequired);
+        validateNonNegativeFinite(name, values);
+        return values;
+    }
+
     template<typename T>
     std::vector<T> loadComponent(
         io::Series& series,
@@ -942,7 +978,7 @@ namespace hase::openpmd
             std::move(points),
             std::move(samplePoints),
             std::move(cellCenters),
-            loadScalar<double>(
+            loadBetaVolume(
                 series,
                 iteration,
                 prefix + "beta_volume",
@@ -1128,7 +1164,7 @@ namespace hase::openpmd
         std::string const prefix = m_meshGroup + "_";
         auto const numberOfCells = simulation.mesh.numberOfCells;
         auto const numberOfSamples = simulation.mesh.numberOfSamples;
-        simulation.mesh.betaVolume = loadScalar<double>(
+        simulation.mesh.betaVolume = loadBetaVolume(
             series,
             iteration,
             prefix + "beta_volume",

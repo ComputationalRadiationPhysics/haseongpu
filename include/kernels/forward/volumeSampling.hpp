@@ -48,6 +48,34 @@ namespace hase::kernels::forward
         return lower < mesh.numberOfCells ? lower : mesh.numberOfCells - 1u;
     }
 
+    [[nodiscard]] ALPAKA_FN_ACC unsigned sampleVolumeByBetaVolume(
+        hase::core::DeviceMeshView const& mesh,
+        double const betaVolumeTotal,
+        alpaka::rand::engine::Philox4x32x10& rndEngine)
+    {
+        if(mesh.numberOfCells == 0u || betaVolumeTotal <= 0.0 || mesh.betaVolumePrefix.size() != mesh.numberOfCells)
+        {
+            return sampleVolumeByVolume(mesh, mesh.cellVolumePrefix.empty() ? 0.0 : mesh.cellVolumePrefix.back(), rndEngine);
+        }
+
+        double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * betaVolumeTotal;
+        unsigned lower = 0u;
+        unsigned upper = mesh.numberOfCells;
+        while(lower < upper)
+        {
+            unsigned const middle = lower + (upper - lower) / 2u;
+            if(target < mesh.betaVolumePrefix[middle])
+            {
+                upper = middle;
+            }
+            else
+            {
+                lower = middle + 1u;
+            }
+        }
+        return lower < mesh.numberOfCells ? lower : mesh.numberOfCells - 1u;
+    }
+
     [[nodiscard]] ALPAKA_FN_ACC hase::core::Point samplePointInVolume(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
