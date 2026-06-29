@@ -49,6 +49,7 @@ Optional software and tools:
 * ``OpenMPI >= 4.0``
 * MATLAB or Octave
 * ``ParaView`` for visualization of ``.vtk`` output
+* ``matplotlib`` for the optional plotting helper in :doc:`scripts`
 
 Hardware requirements:
 
@@ -125,6 +126,7 @@ A typical HASEonGPU setup consists of the following steps:
 #. Decide which interface to use
 #. Follow installation steps provided on the page of the chosen interface
 #. Verify the setup with one of the provided interface-specific examples
+#. Inspect generated VTK output directly or with the helper scripts
 #. Use HASEonGPU in the target workflow
 
 Next Step

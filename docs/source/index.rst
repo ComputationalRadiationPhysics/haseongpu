@@ -34,6 +34,7 @@ Contents
    theoryAndModel
    backendSelection
    compilation
+   scripts
    windows
    binaryInterface
    mpi

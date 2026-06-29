@@ -40,6 +40,23 @@ pump is active for every step passed to ``runSteps``.  This is different from
 ``PumpProperties.pumpSubsteps``, which only controls the internal time
 resolution of the legacy pump integration inside one pumped simulation step.
 
+Seed the first step with pump only:
+
+.. code-block:: python
+
+   simulation = Simulation(
+       gainMedium=medium,
+       pump=pump,
+       phiASE=phi_ase,
+       timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
+       timeStep=2e-5,
+       prePump=True,
+   )
+
+``prePump=True`` skips the ASE backend during the first outer step only.  The
+pump and fluorescence terms still run, so the first stored state can seed
+``betaCells`` before ASE depletion starts on the following steps.
+
 Run until a target time:
 
 .. code-block:: python
@@ -69,10 +86,11 @@ Each call to ``step()`` performs:
 3. Time integration of the beta derivative :math:`d\beta/dt`.  The selected
    time-integration solver may evaluate this derivative more than once.
 4. During each derivative evaluation, ``Simulation`` updates ``betaVolume``,
-   calls ``phiASE.run(...)`` when ASE is enabled, computes the pump rate through
-   the configured pump solver, and combines pump, ASE, and fluorescence decay.
-   Higher-order solvers can therefore call the ASE backend more than once per
-   outer ``step()``.
+   calls ``phiASE.run(...)`` when ASE is enabled for the current step, computes
+   the pump rate through the configured pump solver, and combines pump, ASE,
+   and fluorescence decay.  Higher-order solvers can therefore call the ASE
+   backend more than once per outer ``step()`` unless they explicitly freeze
+   ``phiAse``.
 5. Clipping of updated beta values to ``[0, 1]``.
 6. Final ``betaVolume`` update from ``betaCells``.
 7. Latest-state update and ``onStep`` callbacks.
