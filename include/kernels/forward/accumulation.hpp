@@ -25,6 +25,7 @@ namespace hase::kernels::forward
             double const forwardRayLength,
             double const totalVolume,
             alpaka::concepts::IMdSpan auto phiAccumulator,
+            alpaka::concepts::IMdSpan auto phiSquareAccumulator,
             alpaka::concepts::IMdSpan auto volumeRayVisits,
             alpaka::concepts::IMdSpan auto droppedRays,
             alpaka::concepts::IMdSpan auto const sigmaA,
@@ -56,6 +57,7 @@ namespace hase::kernels::forward
                     sigmaA[sigmaIndex],
                     sigmaE[sigmaIndex],
                     phiAccumulator,
+                    phiSquareAccumulator,
                     volumeRayVisits,
                     droppedRays);
             }
@@ -72,6 +74,7 @@ namespace hase::kernels::forward
             double const sigmaA,
             double const sigmaE,
             alpaka::concepts::IMdSpan auto phiAccumulator,
+            alpaka::concepts::IMdSpan auto phiSquareAccumulator,
             alpaka::concepts::IMdSpan auto volumeRayVisits,
             alpaka::concepts::IMdSpan auto droppedRays) const
         {
@@ -89,6 +92,7 @@ namespace hase::kernels::forward
                 if(alpaka::math::isfinite(contribution))
                 {
                     alpaka::onAcc::atomicAdd(acc, &phiAccumulator[tet], contribution);
+                    alpaka::onAcc::atomicAdd(acc, &phiSquareAccumulator[tet], contribution * contribution);
                     alpaka::onAcc::atomicAdd(acc, &volumeRayVisits[tet], 1u);
                 }
                 else
