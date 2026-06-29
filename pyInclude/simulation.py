@@ -58,6 +58,8 @@ class PhiASE:
 
     backend: str = None
     """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
+    openpmdBackend: str | None = None
+    """openPMD storage backend name: ``adios``, ``adios-sst``, or ``hdf5``."""
     parallelMode: str = "single"
     """Execution mode: direct binding ``single`` or MPI launcher ``mpi``."""
     numDevices: int = 1
@@ -121,6 +123,7 @@ class PhiASE:
         parser.add_argument("--repetitions", type=int, default=None)
         parser.add_argument("--adaptive-steps", type=int, default=None)
         parser.add_argument("--backend", default=None)
+        parser.add_argument("--openpmd-backend", default=None)
         parser.add_argument("--parallel-mode", default=None)
         parser.add_argument("--max-gpus", type=int, default=None)
         parser.add_argument("--n-per-node", type=int, default=None)
@@ -139,6 +142,7 @@ class PhiASE:
             "repetitions": "repetitions",
             "adaptive_steps": "adaptiveSteps",
             "backend": "backend",
+            "openpmd_backend": "openpmdBackend",
             "parallel_mode": "parallelMode",
             "max_gpus": "numDevices",
             "n_per_node": "nPerNode",
@@ -180,6 +184,7 @@ class PhiASE:
             "mse_threshold": "mseThreshold",
             "adaptive_steps": "adaptiveSteps",
             "use_reflections": "useReflections",
+            "openpmd_backend": "openpmdBackend",
             "parallel_mode": "parallelMode",
             "max_gpus": "numDevices",
             "n_per_node": "nPerNode",
@@ -190,8 +195,9 @@ class PhiASE:
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "repetitions",
-            "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
-            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
+            "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
+            "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
+            "minSampleRange", "maxSampleRange", "rngSeed",
         }
         for section in sections:
             for name, value in section.items():
@@ -224,6 +230,8 @@ class PhiASE:
     def openStream(self, **kwargs):
         """Open a persistent openPMD transport session owned by this ``PhiASE``."""
         if self._openpmdSession is None:
+            if self.openpmdBackend is not None and "transport" not in kwargs:
+                kwargs["transport"] = self.openpmdBackend
             self._openpmdSession = transport.openStream(**kwargs)
         return self._openpmdSession
 
@@ -257,6 +265,7 @@ class PhiASE:
             self,
             medium,
             cross_sections,
+            transport=self.openpmdBackend,
             openpmdSession=openpmdSession,
         )
         return self
@@ -464,7 +473,7 @@ class Simulation:
 
     def _withOpenPmdSession(self, openpmdSession):
         if openpmdSession is None:
-            if transport._backend_spec().streaming:
+            if transport._backend_spec(self.phiASE.openpmdBackend).streaming:
                 return self.phiASE.openStream(), True
             return None, False
         if openpmdSession == "interval":

@@ -30,7 +30,19 @@ Accepted transport backend names are:
    ``.sst`` ADIOS2 SST streaming series. Use this backend only when a producer
    and consumer are intended to run concurrently.
 
-Select the default from Python with ``HASE_OPENPMD_BACKEND``:
+Select the backend on ``PhiASE`` in Python or YAML:
+
+.. code-block:: python
+
+   phi_ase = PhiASE(..., openpmdBackend="adios")
+
+.. code-block:: yaml
+
+   compute:
+     backend: Host_Cpu_CpuSerial       # Alpaka compute backend
+     openpmd_backend: adios-sst       # openPMD storage/streaming backend
+
+For a process-wide default, use ``HASE_OPENPMD_BACKEND``:
 
 .. code-block:: bash
 
@@ -54,7 +66,7 @@ back into each run:
 
 .. code-block:: python
 
-   phi_ase = PhiASE(...)
+   phi_ase = PhiASE(..., openpmdBackend="adios-sst")
 
    openpmdSession = phi_ase.openStream()
    try:

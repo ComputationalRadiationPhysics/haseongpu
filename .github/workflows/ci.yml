@@ -320,6 +320,7 @@ jobs:
           cd "$example_output_dir"
           python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
             --backend Host_Cpu_CpuSerial \
+            --openpmd-backend "$HASE_OPENPMD_BACKEND" \
             --timeSteps 1 \
             --pumpSteps 1 \
             --vtk-output-dir "$example_output_dir" \
