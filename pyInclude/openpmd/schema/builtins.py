@@ -68,9 +68,6 @@ class PointSchema(PrimitiveSchemaDefinition):
         unit="m",
         unitDimension=unitDimension.position,
     )
-    pointBeta = PrimitiveFieldSpec(
-        "pointBeta", np.float64, axes=("point", "level"), unitDimension=unitDimension.pointBeta, dynamic=True
-    )
     phiAse = PrimitiveFieldSpec(
         "phiAse",
         np.float32,

@@ -16,7 +16,6 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
-#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -31,6 +30,55 @@ namespace hase::core
             return beta * alpaka::pCast<double>(volume);
         }
     };
+
+    struct ForwardPhiAseRawResult
+    {
+        std::vector<double> scoreSum;
+        std::vector<double> scoreSquareSum;
+        std::vector<unsigned> totalRays;
+        std::vector<unsigned> droppedRays;
+        unsigned rayCount = 0u;
+    };
+
+    [[nodiscard]] inline ForwardPhiAseRawResult makeForwardRawResult(unsigned const volumeCount)
+    {
+        return ForwardPhiAseRawResult{
+            std::vector<double>(volumeCount, 0.0),
+            std::vector<double>(volumeCount, 0.0),
+            std::vector<unsigned>(volumeCount, 0u),
+            std::vector<unsigned>(volumeCount, 0u),
+            0u};
+    }
+
+    [[nodiscard]] inline double calcForwardBetaVolumeTotal(HostMesh const& hostMesh)
+    {
+        double total = 0.0;
+        unsigned const count
+            = std::min(static_cast<unsigned>(hostMesh.betaVolume.size()), static_cast<unsigned>(hostMesh.cellVolumes.size()));
+        for(unsigned volume = 0u; volume < count; ++volume)
+        {
+            total += hostMesh.betaVolume.at(volume) * static_cast<double>(hostMesh.cellVolumes.at(volume));
+        }
+        return total;
+    }
+
+    inline void mergeForwardRawResult(ForwardPhiAseRawResult& target, ForwardPhiAseRawResult const& source)
+    {
+        if(target.scoreSum.empty())
+        {
+            target = source;
+            return;
+        }
+
+        target.rayCount += source.rayCount;
+        for(unsigned volume = 0u; volume < target.scoreSum.size(); ++volume)
+        {
+            target.scoreSum.at(volume) += source.scoreSum.at(volume);
+            target.scoreSquareSum.at(volume) += source.scoreSquareSum.at(volume);
+            target.totalRays.at(volume) += source.totalRays.at(volume);
+            target.droppedRays.at(volume) += source.droppedRays.at(volume);
+        }
+    }
 
     [[nodiscard]] inline double calcForwardStandardError(
         double const scoreSum,
@@ -52,13 +100,14 @@ namespace hase::core
     }
 
     template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
-    float calcForwardPhiAse(
-        hase::alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
+    float calcForwardPhiAseRaw(
+        alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
         ExperimentParameters const& experiment,
         HostMesh const& hostMesh,
         DeviceMeshContainer<T_Device> const& meshContainer,
-        Result& result,
+        ForwardPhiAseRawResult& result,
         float& runtime,
+        unsigned rayCount,
         unsigned threadLocalStridingRNG)
     {
         if(experiment.useReflections)
@@ -74,22 +123,15 @@ namespace hase::core
         auto queue = devBundle.device.makeQueue();
         DeviceMeshView mesh = meshContainer.toView();
         unsigned const volumeCount = mesh.numberOfCells;
-        unsigned const rayCount = experiment.resolvedForwardRayCount();
+        double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
 
-        double betaVolumeTotal = 0.0;
-        auto hBetaVolumeTotalView = makeView(alpaka::api::host, &betaVolumeTotal, alpaka::Vec{1u});
-        auto dBetaVolumeTotal = hase::alpakaUtils::toDevice(queue, hBetaVolumeTotalView);
-        alpaka::onHost::transformReduce(
-            queue,
-            devBundle.executor,
-            double{0},
-            dBetaVolumeTotal,
-            std::plus{},
-            BetaVolumeContribution{},
-            meshContainer.betaVolume,
-            meshContainer.cellVolumes);
-        alpaka::onHost::memcpy(queue, hBetaVolumeTotalView, dBetaVolumeTotal);
-        alpaka::onHost::wait(queue);
+        result = makeForwardRawResult(volumeCount);
+        result.rayCount = rayCount;
+        if(rayCount == 0u)
+        {
+            runtime = difftime(time(0), starttime);
+            return runtime;
+        }
 
         auto dPhiAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
         auto dPhiSquareAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
@@ -125,53 +167,79 @@ namespace hase::core
                 static_cast<unsigned>(experiment.sigmaA.size()),
                 threadLocalStridingRNG});
 
-        auto hPhiAccumulator = alpaka::onHost::allocHostLike(dPhiAccumulator);
-        auto hPhiSquareAccumulator = alpaka::onHost::allocHostLike(dPhiSquareAccumulator);
-        auto hVolumeRayVisits = alpaka::onHost::allocHostLike(dVolumeRayVisits);
-        auto hDroppedRays = alpaka::onHost::allocHostLike(dDroppedRays);
-        alpaka::onHost::memcpy(queue, hPhiAccumulator, dPhiAccumulator);
-        alpaka::onHost::memcpy(queue, hPhiSquareAccumulator, dPhiSquareAccumulator);
-        alpaka::onHost::memcpy(queue, hVolumeRayVisits, dVolumeRayVisits);
-        alpaka::onHost::memcpy(queue, hDroppedRays, dDroppedRays);
         alpaka::onHost::wait(queue);
 
+        alpaka::onHost::memcpy(queue, result.scoreSum, dPhiAccumulator);
+        alpaka::onHost::memcpy(queue, result.scoreSquareSum, dPhiSquareAccumulator);
+        alpaka::onHost::memcpy(queue, result.totalRays, dVolumeRayVisits);
+        alpaka::onHost::memcpy(queue, result.droppedRays, dDroppedRays);
+        alpaka::onHost::wait(queue);
+
+        runtime = difftime(time(0), starttime);
+        return runtime;
+    }
+
+    inline void finalizeForwardPhiAse(
+        ExperimentParameters const& experiment,
+        HostMesh const& hostMesh,
+        ForwardPhiAseRawResult const& rawResult,
+        Result& result)
+    {
+        unsigned const volumeCount = static_cast<unsigned>(rawResult.scoreSum.size());
+        double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
+
         result = Result(
-            std::vector<float>(volumeCount, 0.0f),
-            std::vector<double>(volumeCount, 0.0),
-            std::vector<unsigned>(volumeCount, 0u),
-            std::vector<double>(volumeCount, 0.0),
-            std::vector<unsigned>(volumeCount, 0u));
-        auto* phiData = alpaka::onHost::data(hPhiAccumulator);
-        auto* phiSquareData = alpaka::onHost::data(hPhiSquareAccumulator);
-        auto* visitsData = alpaka::onHost::data(hVolumeRayVisits);
-        auto* droppedData = alpaka::onHost::data(hDroppedRays);
+            std::vector(volumeCount, 0.0f),
+            std::vector(volumeCount, 0.0),
+            rawResult.totalRays,
+            std::vector(volumeCount, 0.0),
+            rawResult.droppedRays);
         for(unsigned volume = 0u; volume < volumeCount; ++volume)
         {
-            unsigned const visits = visitsData[volume];
-            result.totalRays.at(volume) = visits;
-            result.droppedRays.at(volume) = droppedData[volume];
             double const volumeSize = hostMesh.cellVolumes.at(volume);
-            if(volumeSize > 0.0 && rayCount > 0u)
+            double const scoreSum = rawResult.scoreSum.at(volume);
+            if(volumeSize > 0.0 && rawResult.rayCount > 0u)
             {
-                double const estimate
-                    = phiData[volume] * betaVolumeTotal / (static_cast<double>(rayCount) * volumeSize);
+                double const estimate = scoreSum * betaVolumeTotal / (static_cast<double>(rawResult.rayCount) * volumeSize);
                 result.phiAse.at(volume) = static_cast<float>(estimate);
-                result.mse.at(volume) = droppedData[volume] == 0u
+                result.mse.at(volume) = result.droppedRays[volume] == 0u
                                            ? calcForwardStandardError(
-                                                 phiData[volume],
-                                                 phiSquareData[volume],
-                                                 rayCount,
+                                                 scoreSum,
+                                                 rawResult.scoreSquareSum.at(volume),
+                                                 rawResult.rayCount,
                                                  betaVolumeTotal,
                                                  volumeSize)
                                            : std::numeric_limits<double>::max();
             }
             else
             {
+                result.phiAse.at(volume) = 0.0f;
                 result.mse.at(volume) = std::numeric_limits<double>::max();
             }
         }
+    }
 
-        runtime = difftime(time(0), starttime);
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    float calcForwardPhiAse(
+        alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
+        ExperimentParameters const& experiment,
+        HostMesh const& hostMesh,
+        DeviceMeshContainer<T_Device> const& meshContainer,
+        Result& result,
+        float& runtime,
+        unsigned threadLocalStridingRNG)
+    {
+        ForwardPhiAseRawResult rawResult;
+        calcForwardPhiAseRaw(
+            devBundle,
+            experiment,
+            hostMesh,
+            meshContainer,
+            rawResult,
+            runtime,
+            experiment.resolvedForwardRayCount(),
+            threadLocalStridingRNG);
+        finalizeForwardPhiAse(experiment, hostMesh, rawResult, result);
         return runtime;
     }
 } // namespace hase::core

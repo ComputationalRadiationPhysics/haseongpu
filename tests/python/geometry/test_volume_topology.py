@@ -181,7 +181,6 @@ def testExplicitOpenPmdTopologySpecsUseTet4Shapes():
     assert transport.CANONICAL_CONNECTIVITY_SPEC.expectedShape(context) == (1, 4)
     assert transport.EXPLICIT_CELL_FACES_SPEC.expectedShape(context) == (1, 4, 3)
     assert transport.EXPLICIT_CELL_NEIGHBORS_SPEC.expectedShape(context) == (1, 4)
-    assert transport.EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context) == (3, 1)
     np.testing.assert_array_equal(topology.cellsOffsets(), np.array([0, 4], dtype=np.uint32))
     assert topology.faceConnectivityFlat().shape == (12,)
 
@@ -210,14 +209,13 @@ def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
     iteration = series.iterations[0]
     try:
         assert "core_points" in iteration.meshes
-        assert "core_sample_points" in iteration.meshes
+        assert "core_sample_points" not in iteration.meshes
         assert "core_cell_faces" in iteration.meshes
         assert "core_cell_neighbor_cells" in iteration.meshes
         assert "core_cell_neighbor_local_faces" in iteration.meshes
         assert "core_cell_face_boundaries" in iteration.meshes
         assert "core_cell_domains" in iteration.meshes
         assert iteration.meshes["core_points"].get_attribute("geometryParameters") == "topology=explicit_tet4_volume"
-        assert iteration.meshes["core_sample_points"].get_attribute("geometryParameters") == "topology=explicit_tet4_volume"
         np.testing.assert_array_equal(_readOpenPmdScalar(series, iteration, "core_cell_faces"), topology.facePointIndices.reshape(-1))
         np.testing.assert_array_equal(_readOpenPmdScalar(series, iteration, "core_cell_neighbor_cells"), topology.neighborCells.reshape(-1))
         np.testing.assert_array_equal(_readOpenPmdScalar(series, iteration, "core_cell_face_boundaries"), topology.faceBoundaries.reshape(-1))

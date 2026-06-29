@@ -47,10 +47,8 @@ def laserPumpCladdingSpectralProperties():
 def loadLaserPumpCladdingTet4Medium(materialPath):
     """Load a Tet4 laserPumpCladding state for PhiASE-only runs.
 
-    Converted legacy VTK fixtures store ``betaCells`` on the VTK points.  The
-    Tet4 importer uses those points as explicit ASE sample points, so backward
-    PhiASE results keep the same sample count as the legacy wedge input while
-    the volume transport uses tetrahedral cells.
+    Converted legacy VTK fixtures store both point and cell pump data.  The
+    forward openPMD backend writes PhiASE results on tetrahedral cells.
     """
     return GainMedium.fromVtk(materialPath)
 
@@ -257,7 +255,8 @@ def main(argv=None):
     if args.phiase_only:
         if args.tet4_input is None:
             parser.error("--phiase-only requires --tet4-input")
-        aseOverrides.setdefault("propagationMode", "backward")
+        aseOverrides.setdefault("propagationMode", "forward")
+        aseOverrides.setdefault("forwardRayLength", 1.0)
         result = runTet4PhiAseInput(
             args.tet4_input,
             args.phi_ase_config,

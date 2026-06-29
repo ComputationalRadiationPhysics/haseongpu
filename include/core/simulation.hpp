@@ -217,68 +217,27 @@ namespace hase::core
                 std::vector runtimes(maxDevices, 0.f);
                 unsigned usedGPUs = 0;
                 RuntimeTopology topology;
-                std::vector computes(maxDevices, compute);
-                hase::utils::ProgressBar bar;
-                if(experiment.isForwardPropagation())
+                if(!experiment.isForwardPropagation())
                 {
-                    if(compute.parallelMode == ParallelMode::MPI)
-                    {
-                        throw std::runtime_error("Forward volume propagation does not support MPI mode yet.");
-                    }
-                    alpakaUtils::DevBundle devBundle{meshes.front().m_device, exec};
-                    unsigned const rngSeed = baseRngSeed(compute);
-                    calcForwardPhiAse(devBundle, experiment, hostMesh, meshes.front(), result, runtime, rngSeed);
-                    usedGPUs = 1u;
-                    topology = RuntimeTopology{};
-                    topology.activeNodes = 1u;
-                    topology.activeRanks = 1u;
-                    topology.avgActiveRanksPerNode = 1.0;
-                    topology.minActiveRanksPerNode = 1u;
-                    topology.maxActiveRanksPerNode = 1u;
-                    topology.activeGpus = usedGPUs;
-                    topology.avgGpusPerRank = static_cast<double>(usedGPUs);
-                    topology.avgGpusPerNode = static_cast<double>(usedGPUs);
-                    topology.minGpusPerNode = usedGPUs;
-                    topology.maxGpusPerNode = usedGPUs;
+                    throw std::runtime_error("Only forward volume propagation is supported by the openPMD backend.");
                 }
-                else if(compute.parallelMode == ParallelMode::SINGLE)
+
+                ForwardPhiAseRawResult rawResult;
+                if(compute.parallelMode == ParallelMode::SINGLE)
                 {
-                    unsigned const samplesPerNode = compute.maxSampleRange - compute.minSampleRange + 1u;
-
-                    unsigned const activeDevices = std::min(maxDevices, samplesPerNode);
-                    unsigned const samplesPerGpu = samplesPerNode / activeDevices;
-                    unsigned const remainder = samplesPerNode % activeDevices;
-                    for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-                    {
-                        auto& device_i = compute.devices.at(deviceIndex);
-
-                        // last device does the remaining work
-                        unsigned const workingSampleCount
-                            = deviceIndex + 1u == activeDevices ? samplesPerGpu + remainder : samplesPerGpu;
-
-                        unsigned const beginOffset = deviceIndex * samplesPerGpu;
-
-                        unsigned const minSampleIdx = compute.minSampleRange + beginOffset;
-                        unsigned const maxSampleIdx = minSampleIdx + workingSampleCount - 1u;
-                        alpakaUtils::DevBundle devBundle{meshes[device_i].m_device, exec};
-                        computes[device_i].gpu_i = compute.devices.at(device_i);
-                        unsigned const baseSeed = baseRngSeed(compute);
-                        unsigned const rngSeed = random::seedForWorker(baseSeed, 0u, deviceIndex);
-                        calcPhiAseThreaded(
-                            devBundle,
-                            experiment,
-                            computes[device_i],
-                            hostMesh,
-                            meshes[device_i],
-                            result,
-                            minSampleIdx,
-                            maxSampleIdx,
-                            rngSeed,
-                            runtimes.at(device_i),
-                            bar);
-                    }
-
-                    joinAll();
+                    unsigned const rayCount = experiment.resolvedForwardRayCount();
+                    unsigned const activeDevices = std::min(maxDevices, rayCount);
+                    rawResult = calcForwardPhiAseOnDevices(
+                        exec,
+                        experiment,
+                        hostMesh,
+                        meshes,
+                        0u,
+                        activeDevices,
+                        rayCount,
+                        baseRngSeed(compute),
+                        0u,
+                        runtimes);
                     usedGPUs = activeDevices;
                     topology = RuntimeTopology{};
                     topology.activeNodes = 1u;
@@ -293,17 +252,16 @@ namespace hase::core
                     topology.maxGpusPerNode = usedGPUs;
                     runtime = *std::ranges::max_element(runtimes);
                 }
-
                 else if(compute.parallelMode == ParallelMode::MPI)
                 {
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
-                    usedGPUs = hase::core::calcPhiAseMPI(
+                    usedGPUs = hase::core::calcForwardPhiAseMPI(
                         exec,
                         experiment,
                         compute,
                         hostMesh,
                         meshes,
-                        result,
+                        rawResult,
                         topology,
                         runtime);
 #else
@@ -327,6 +285,7 @@ namespace hase::core
                 {
                     return 0;
                 }
+                finalizeForwardPhiAse(experiment, hostMesh, rawResult, result);
 
                 dout(V_INFO) << "Active nodes             : " << topology.activeNodes << std::endl;
                 dout(V_INFO) << "Active ranks             : " << topology.activeRanks << std::endl;
@@ -339,46 +298,23 @@ namespace hase::core
                              << " avg (min=" << topology.minGpusPerNode << ", max=" << topology.maxGpusPerNode << ")"
                              << std::endl;
 
-                if(experiment.isForwardPropagation())
+                for(unsigned volume = 0u; volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
+                    ++volume)
                 {
-                    for(unsigned volume = 0u; volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
-                        ++volume)
-                    {
-                        result.phiAse.at(volume) *= (hostMesh.nTot / hostMesh.crystalTFluo);
-                        result.dndtAse.at(volume) = calcVolumeDndtAse(
-                            hostMesh,
-                            experiment.maxSigmaA,
-                            experiment.maxSigmaE,
-                            result.phiAse.at(volume),
-                            volume);
-                    }
-                }
-                else
-                {
-                    for(unsigned sample_i = compute.minSampleRange;
-                        sample_i < meshes[0].numberOfSamples && sample_i <= compute.maxSampleRange;
-                        ++sample_i)
-                    {
-                        result.phiAse.at(sample_i) *= (hostMesh.nTot / hostMesh.crystalTFluo);
-                        result.dndtAse.at(sample_i) = calcDndtAse(
-                            hostMesh,
-                            experiment.maxSigmaA,
-                            experiment.maxSigmaE,
-                            result.phiAse.at(sample_i),
-                            sample_i);
-                        if(sample_i <= 10)
-                            dout(V_DEBUG) << " Dndt ASE[ " << sample_i << " ]: " << result.dndtAse.at(sample_i) << " "
-                                          << result.mse.at(sample_i) << std::endl;
-                    }
+                    result.phiAse.at(volume) *= (hostMesh.nTot / hostMesh.crystalTFluo);
+                    result.dndtAse.at(volume) = calcVolumeDndtAse(
+                        hostMesh,
+                        experiment.maxSigmaA,
+                        experiment.maxSigmaE,
+                        result.phiAse.at(volume),
+                        volume);
                 }
                 /***************************************************************************
                  * PRINT SOLUTION
                  **************************************************************************/
                 if(verbosity & V_DEBUG)
                 {
-                    unsigned const debugResultSize = experiment.isForwardPropagation()
-                                                       ? static_cast<unsigned>(result.phiAse.size())
-                                                       : meshes[0].numberOfSamples;
+                    unsigned const debugResultSize = static_cast<unsigned>(result.phiAse.size());
                     for(unsigned sample_i = 0; sample_i < debugResultSize; ++sample_i)
                     {
                         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " "

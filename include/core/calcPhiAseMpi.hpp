@@ -30,7 +30,6 @@
 #pragma once
 
 #ifndef DISABLE_MPI
-#    include <core/calcPhiAse.hpp>
 #    include <core/calcPhiAseThreaded.hpp>
 #    include <core/logging.hpp>
 #    include <core/mesh.hpp>
@@ -53,19 +52,19 @@ namespace hase::core
 {
 
     /***
-     * Performs ASE computation in MPI mode by statically partitioning the global
-     * sample range across all MPI ranks. Each rank (including the HEAD-Node) computes its assigned subset
-     * locally, and the partial results are gathered on the head node after all
-     * ranks have finished.
+     * Performs forward ASE computation in MPI mode by statically partitioning
+     * the global ray histories across active MPI ranks. Each rank computes its
+     * assigned rays locally across its assigned devices, and raw accumulators
+     * are reduced on the head node before normalization.
      */
     template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
-    float calcPhiAseMPI(
+    float calcForwardPhiAseMPI(
         T_Exec exec,
         ExperimentParameters const& experiment,
         ComputeParameters const& compute,
         HostMesh const& hostMesh,
         std::vector<DeviceMeshContainer<T_Device>> const& meshes,
-        Result& result,
+        ForwardPhiAseRawResult& result,
         RuntimeTopology& topology,
         float& maxRankRuntime)
     {
@@ -130,8 +129,8 @@ namespace hase::core
             MPI_Comm_size(activeComm, &activeSize);
         }
 
-        int const firstSample = static_cast<int>(compute.minSampleRange);
-        int const sampleCount = static_cast<int>(compute.maxSampleRange - compute.minSampleRange + 1);
+        int const firstSample = 0;
+        int const sampleCount = static_cast<int>(experiment.resolvedForwardRayCount());
 
         int const base = activeSize > 0 ? sampleCount / activeSize : 0;
         int const rem = activeSize > 0 ? sampleCount % activeSize : 0;
@@ -248,7 +247,7 @@ namespace hase::core
                 char const* nodeName = allProcessorNames.data() + static_cast<std::size_t>(r) * processorName.size();
 
                 dout(V_INFO) << "  rank " << worldRank << " node " << nodeName << " local " << nodeRank << "/"
-                             << ranksOnNode << ": samples ";
+                             << ranksOnNode << ": rays ";
                 if(samples > 0)
                 {
                     dout(V_INFO | V_NOLABEL)
@@ -285,109 +284,70 @@ namespace hase::core
         }
 
         auto const& mesh = meshes.at(static_cast<std::size_t>(firstDevice));
-        int const totalSamples = static_cast<int>(mesh.numberOfSamples);
-
+        int const totalSamples = sampleCount;
         float runtime = 0.0f;
+        ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells);
 
         if(localCount > 0)
         {
-            unsigned const activeDevices
-                = std::min(static_cast<unsigned>(assignedDeviceCount), static_cast<unsigned>(localCount));
-            unsigned const samplesPerDevice = static_cast<unsigned>(localCount) / activeDevices;
-            unsigned const sampleRemainder = static_cast<unsigned>(localCount) % activeDevices;
-
             std::vector<float> deviceRuntimes(meshes.size(), 0.0f);
-            std::vector<ComputeParameters> rankComputes(meshes.size(), compute);
-            hase::utils::ProgressBar bar;
-
-            for(unsigned localDeviceIndex = 0; localDeviceIndex < activeDevices; ++localDeviceIndex)
-            {
-                unsigned const deviceIndex = static_cast<unsigned>(firstDevice) + localDeviceIndex;
-                unsigned const workingSampleCount
-                    = localDeviceIndex + 1u == activeDevices ? samplesPerDevice + sampleRemainder : samplesPerDevice;
-                unsigned const minSampleIdx = static_cast<unsigned>(localBegin) + localDeviceIndex * samplesPerDevice;
-                unsigned const maxSampleIdx = minSampleIdx + workingSampleCount - 1u;
-
-                rankComputes.at(deviceIndex).gpu_i = compute.devices.at(deviceIndex);
-                hase::alpakaUtils::DevBundle devBundle{meshes.at(deviceIndex).m_device, exec};
-                unsigned const rngSeed
-                    = hase::random::seedForWorker(baseSeed, static_cast<unsigned>(rank), deviceIndex);
-                calcPhiAseThreaded(
-                    devBundle,
-                    experiment,
-                    rankComputes.at(deviceIndex),
-                    hostMesh,
-                    meshes.at(deviceIndex),
-                    result,
-                    minSampleIdx,
-                    maxSampleIdx,
-                    rngSeed,
-                    deviceRuntimes.at(deviceIndex),
-                    bar);
-            }
-
-            joinAll();
+            localResult = calcForwardPhiAseOnDevices(
+                exec,
+                experiment,
+                hostMesh,
+                meshes,
+                static_cast<unsigned>(firstDevice),
+                static_cast<unsigned>(assignedDeviceCount),
+                static_cast<unsigned>(localCount),
+                baseSeed,
+                static_cast<unsigned>(rank),
+                deviceRuntimes);
             runtime = *std::ranges::max_element(deviceRuntimes);
         }
 
-        std::vector<int> recvCounts;
-        std::vector<int> displs;
-
         if(activeRank == HEAD_NODE)
         {
-            recvCounts.resize(activeSize);
-            displs.resize(activeSize);
-
-            for(int r = 0; r < activeSize; ++r)
-            {
-                int rBegin = firstSample + r * base + std::min(r, rem);
-                int rCount = base + (r < rem ? 1 : 0);
-                recvCounts[r] = rCount;
-                displs[r] = rBegin;
-            }
+            result = makeForwardRawResult(mesh.numberOfCells);
         }
-
-        MPI_Gatherv(
-            localCount > 0 ? result.phiAse.data() + localBegin : nullptr,
-            localCount,
-            MPI_FLOAT,
-            activeRank == HEAD_NODE ? result.phiAse.data() : nullptr,
-            activeRank == HEAD_NODE ? recvCounts.data() : nullptr,
-            activeRank == HEAD_NODE ? displs.data() : nullptr,
-            MPI_FLOAT,
+        int const volumeCount = static_cast<int>(mesh.numberOfCells);
+        MPI_Reduce(
+            localResult.scoreSum.data(),
+            activeRank == HEAD_NODE ? result.scoreSum.data() : nullptr,
+            volumeCount,
+            MPI_DOUBLE,
+            MPI_SUM,
             HEAD_NODE,
             activeComm);
-
-        MPI_Gatherv(
-            localCount > 0 ? result.mse.data() + localBegin : nullptr,
-            localCount,
+        MPI_Reduce(
+            localResult.scoreSquareSum.data(),
+            activeRank == HEAD_NODE ? result.scoreSquareSum.data() : nullptr,
+            volumeCount,
             MPI_DOUBLE,
-            activeRank == HEAD_NODE ? result.mse.data() : nullptr,
-            activeRank == HEAD_NODE ? recvCounts.data() : nullptr,
-            activeRank == HEAD_NODE ? displs.data() : nullptr,
-            MPI_DOUBLE,
+            MPI_SUM,
             HEAD_NODE,
             activeComm);
-
-        MPI_Gatherv(
-            localCount > 0 ? result.totalRays.data() + localBegin : nullptr,
-            localCount,
-            MPI_UNSIGNED,
+        MPI_Reduce(
+            localResult.totalRays.data(),
             activeRank == HEAD_NODE ? result.totalRays.data() : nullptr,
-            activeRank == HEAD_NODE ? recvCounts.data() : nullptr,
-            activeRank == HEAD_NODE ? displs.data() : nullptr,
+            volumeCount,
             MPI_UNSIGNED,
+            MPI_SUM,
             HEAD_NODE,
             activeComm);
-
-        MPI_Gatherv(
-            localCount > 0 ? result.droppedRays.data() + localBegin : nullptr,
-            localCount,
-            MPI_UNSIGNED,
+        MPI_Reduce(
+            localResult.droppedRays.data(),
             activeRank == HEAD_NODE ? result.droppedRays.data() : nullptr,
-            activeRank == HEAD_NODE ? recvCounts.data() : nullptr,
-            activeRank == HEAD_NODE ? displs.data() : nullptr,
+            volumeCount,
             MPI_UNSIGNED,
+            MPI_SUM,
+            HEAD_NODE,
+            activeComm);
+        MPI_Reduce(
+            &localResult.rayCount,
+            activeRank == HEAD_NODE ? &result.rayCount : nullptr,
+            1,
+            MPI_UNSIGNED,
+            MPI_SUM,
             HEAD_NODE,
             activeComm);
 

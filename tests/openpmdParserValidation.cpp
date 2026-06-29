@@ -137,7 +137,6 @@ namespace
         std::string const& name,
         std::function<void(io::Series&, io::Iteration&)> mutate = {},
         bool betaVolumeAsFloat = false,
-        bool pointBetaTransposed = false,
         bool betaVolumeBadExtent = false)
     {
         auto path = testPath(name);
@@ -216,30 +215,6 @@ namespace
         else
         {
             writeScalar<double>(series, iteration, "core_beta_volume", {0.1}, {"cell", "layer"}, {1u, 1u}, true);
-        }
-        if(pointBetaTransposed)
-        {
-            auto record = iteration.meshes["core_point_beta"];
-            setMetadata(record, {"point", "level"}, {3u, 2u}, true);
-            auto& component = record[io::MeshRecordComponent::SCALAR];
-            std::vector<double> values{0.1, 0.4, 0.2, 0.5, 0.3, 0.6};
-            io::Extent extent{2u, 3u};
-            component.setUnitSI(1.0);
-            component.setPosition(std::vector<double>{0.0, 0.0});
-            component.resetDataset({io::determineDatatype<double>(), extent});
-            component.storeChunk(values, io::Offset{0u, 0u}, extent);
-            series.flush();
-        }
-        else
-        {
-            writeScalar<double>(
-                series,
-                iteration,
-                "core_point_beta",
-                {0.1, 0.2, 0.3, 0.4, 0.5, 0.6},
-                {"point", "level"},
-                {3u, 2u},
-                true);
         }
         writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u}, {"cell"}, {1u});
         writeScalar<float>(series, iteration, "core_refractive_index", {1.5f, 1.0f, 1.5f, 1.0f}, {"interface"}, {4u});
@@ -360,14 +335,6 @@ namespace
         writeScalar<unsigned>(series, first, "core_cells_offsets", {0u, 6u}, {"cell_offset"}, {2u}, false, false);
         writeScalar<unsigned>(series, first, "core_cells_types", {13u}, {"cell"}, {1u}, false, false);
         writeScalar<double>(series, first, "core_beta_volume", {0.1}, {"cell", "layer"}, {1u, 1u}, true);
-        writeScalar<double>(
-            series,
-            first,
-            "core_point_beta",
-            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6},
-            {"point", "level"},
-            {3u, 2u},
-            true);
         writeScalar<unsigned>(series, first, "core_cladding_cell_type", {0u}, {"cell"}, {1u});
         writeScalar<float>(series, first, "core_refractive_index", {1.5f, 1.0f, 1.5f, 1.0f}, {"interface"}, {4u});
         writeScalar<float>(series, first, "core_reflectivity", {0.1f, 0.2f}, {"cell", "interface"}, {1u, 2u});
@@ -387,14 +354,6 @@ namespace
         second.setTimeUnitSI(1.0);
         second.setAttribute("haseStaticUpdate", false);
         writeScalar<double>(series, second, "core_beta_volume", {0.9}, {"cell", "layer"}, {1u, 1u}, true);
-        writeScalar<double>(
-            series,
-            second,
-            "core_point_beta",
-            {1.1, 1.2, 1.3, 1.4, 1.5, 1.6},
-            {"point", "level"},
-            {3u, 2u},
-            true);
         if(mutateSecond)
         {
             mutateSecond(series, second);
@@ -531,15 +490,6 @@ namespace
             {"cell", "layer"},
             {numberOfCells, numberOfLevels - 1u},
             true);
-        writeScalar<double>(
-            series,
-            iteration,
-            "core_point_beta",
-            {100.0, 110.0, 120.0, 130.0, 140.0, 101.0, 111.0, 121.0, 131.0, 141.0, 102.0, 112.0, 122.0, 132.0, 142.0,
-             103.0, 113.0, 123.0, 133.0, 143.0, 104.0, 114.0, 124.0, 134.0, 144.0, 105.0, 115.0, 125.0, 135.0, 145.0},
-            {"point", "level"},
-            {numberOfPoints, numberOfLevels},
-            true);
         writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u, 2u, 1u}, {"cell"}, {numberOfCells});
         writeScalar<float>(
             series,
@@ -663,17 +613,9 @@ TEST_CASE("openPMD parser rejects malformed fields before HostMesh construction"
 {
     SECTION("extent")
     {
-        auto const path = writeParserInput("bad_extent", {}, false, false, true);
+        auto const path = writeParserInput("bad_extent", {}, false, true);
         auto const error = parserError(path);
         REQUIRE(error.find("openPMD validation error for 'core_beta_volume'") != std::string::npos);
-        REQUIRE(error.find("extent mismatch") != std::string::npos);
-    }
-
-    SECTION("accidental transpose extent with matching element count")
-    {
-        auto const path = writeParserInput("bad_transpose_extent", {}, false, true);
-        auto const error = parserError(path);
-        REQUIRE(error.find("openPMD validation error for 'core_point_beta'") != std::string::npos);
         REQUIRE(error.find("extent mismatch") != std::string::npos);
     }
 
@@ -780,12 +722,12 @@ TEST_CASE("openPMD parser processAll reuses cached topology for dynamic-only ite
             if(calls == 1u)
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.1});
-                REQUIRE(context.mesh.betaCells == std::vector<double>{0.1, 0.2, 0.3, 0.4, 0.5, 0.6});
+                REQUIRE(context.mesh.betaCells.empty());
             }
             else
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.9});
-                REQUIRE(context.mesh.betaCells == std::vector<double>{1.1, 1.2, 1.3, 1.4, 1.5, 1.6});
+                REQUIRE(context.mesh.betaCells.empty());
             }
             context.result.phiAse = std::vector<float>(6u, static_cast<float>(calls));
         });
@@ -910,27 +852,16 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
     hase::openpmd::Parser parser{input, output};
     auto context = parser.read();
 
-    REQUIRE(context.mesh.numberOfTriangles == 3u);
-    REQUIRE(context.mesh.numberOfLevels == 6u);
+    REQUIRE(context.mesh.numberOfCells == 3u);
+    REQUIRE(context.mesh.numberOfLevels == 1u);
     REQUIRE(context.mesh.numberOfPoints == 5u);
-    REQUIRE(context.mesh.thickness == 0.375f);
-    REQUIRE(context.mesh.trianglePointIndices == std::vector<unsigned>{0u, 2u, 0u, 1u, 3u, 2u, 2u, 4u, 4u});
-    REQUIRE(context.mesh.triangleNeighbors == std::vector<int>{-1, -1, 0, -1, -1, 1, 2, 2, -1});
-    REQUIRE(context.mesh.forbiddenEdge == std::vector<int>{-1, -1, 2, -1, -1, 2, 0, 1, -1});
-    REQUIRE(context.mesh.triangleNormalPoint == std::vector<unsigned>{0u, 2u, 0u, 1u, 3u, 2u, 2u, 4u, 4u});
-    REQUIRE(context.mesh.points == std::vector<double>{0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75});
-    requireNear(
-        context.mesh.triangleCenterX,
-        std::vector<double>{0.58333333333333337, 0.58333333333333337, -0.16666666666666666});
-    requireNear(context.mesh.triangleCenterY, std::vector<double>{0.25, 2.5, 1.66666666666666674});
+    REQUIRE(context.mesh.resultAtVolumes);
+    REQUIRE(context.mesh.cellPointIndices == std::vector<unsigned>{0u, 1u, 2u, 3u, 0u, 2u, 3u, 4u, 1u, 2u, 3u, 4u});
     REQUIRE(
-        context.mesh.betaVolume
-        == std::vector<
-            double>{0.11, 0.21, 0.31, 0.12, 0.22, 0.32, 0.13, 0.23, 0.33, 0.14, 0.24, 0.34, 0.15, 0.25, 0.35});
-    REQUIRE(context.mesh.betaCells == std::vector<double>{100.0, 110.0, 120.0, 130.0, 140.0, 101.0, 111.0, 121.0,
-                                                          131.0, 141.0, 102.0, 112.0, 122.0, 132.0, 142.0, 103.0,
-                                                          113.0, 123.0, 133.0, 143.0, 104.0, 114.0, 124.0, 134.0,
-                                                          144.0, 105.0, 115.0, 125.0, 135.0, 145.0});
+        context.mesh.points
+        == std::vector<double>{0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75, 0.0, 0.0, 0.0, 1.0, 1.0});
+    REQUIRE(context.mesh.betaVolume == std::vector<double>{0.11, 0.21, 0.31});
+    REQUIRE(context.mesh.betaCells.empty());
     REQUIRE(context.mesh.claddingCellTypes == std::vector<unsigned>{0u, 2u, 1u});
     REQUIRE(context.mesh.refractiveIndices == std::vector<float>{1.80f, 1.20f, 1.65f, 1.05f});
     REQUIRE(context.mesh.reflectivities == std::vector<float>{0.01f, 0.03f, 0.05f, 0.02f, 0.04f, 0.06f});
@@ -944,11 +875,11 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
     REQUIRE(context.compute.maxSampleRange == 0u);
     REQUIRE(context.compute.rngSeed == 1234u);
 
-    std::vector<float> phiAse(30u);
-    std::vector<double> mse(30u);
-    std::vector<unsigned> totalRays(30u);
-    std::vector<double> dndtAse(30u);
-    for(unsigned i = 0; i < 30u; ++i)
+    std::vector<float> phiAse(3u);
+    std::vector<double> mse(3u);
+    std::vector<unsigned> totalRays(3u);
+    std::vector<double> dndtAse(3u);
+    for(unsigned i = 0; i < 3u; ++i)
     {
         phiAse[i] = 0.5f + static_cast<float>(i);
         mse[i] = 1000.0 + static_cast<double>(i);

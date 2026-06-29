@@ -1518,19 +1518,6 @@ class GainMedium:
                     dynamic=True,
                 ),
             )
-            yield OpenPmdScalarField(
-                "pointBeta",
-                _flat(self.get("betaCells").value, None, np.float64, "betaCells"),
-                context,
-                spec=FieldSpec(
-                    "pointBeta",
-                    "point_beta",
-                    ("sample_point",),
-                    np.float64,
-                    lambda ctx: (ctx.numberOfSamplePoints,),
-                    dynamic=True,
-                ),
-            )
             yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
             yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
             yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
@@ -1538,7 +1525,6 @@ class GainMedium:
                 yield OpenPmdScalarField(field.spec.name, field.value, context, prefix="", spec=field.spec)
             return
         yield OpenPmdScalarField("betaVolume", _flat(self.get("betaVolume").value, topology.levels - 1, np.float64, "betaVolume"), context)
-        yield OpenPmdScalarField("pointBeta", _flat(self.get("betaCells").value, topology.levels, np.float64, "betaCells"), context)
         yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
         yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
         yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
