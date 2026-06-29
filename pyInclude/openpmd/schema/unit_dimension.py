@@ -69,7 +69,6 @@ unitDimension = SimpleNamespace(
     refractiveIndex=DIMENSIONLESS,
     reflectivity=DIMENSIONLESS,
     betaVolume=DIMENSIONLESS,
-    pointBeta=DIMENSIONLESS,
     phiAse=PHOTON_FLUX,
     mse=DIMENSIONLESS,
     totalRays=DIMENSIONLESS,

@@ -109,19 +109,21 @@ def testLaserPumpCladdingTet4InputLoadsLegacyPointSamples(laserPumpCladdingRefer
 
 
 @pytest.mark.integration
-def testLaserPumpCladdingTet4MeanPhiMatchesUpstreamReference(laserPumpCladdingReference):
+def testLaserPumpCladdingTet4ForwardMeanPhiMatchesReferenceData(laserPumpCladdingReference):
     if os.environ.get("HASE_RUN_LASERPUMP_REFERENCE") != "1":
-        pytest.skip("set HASE_RUN_LASERPUMP_REFERENCE=1 to run the full OMP PhiASE reference comparison")
+        pytest.skip("set HASE_RUN_LASERPUMP_REFERENCE=1 to run the full PhiASE reference comparison")
 
     backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", "Host_Cpu_CpuOmpBlocks")
     tolerance = float(os.environ.get("HASE_LASERPUMP_REFERENCE_RTOL", "0.35"))
+    forwardRayLength = float(os.environ.get("HASE_LASERPUMP_REFERENCE_FORWARD_RAY_LENGTH", "1.0"))
     observed = []
     expected = []
     for step in laserPumpCladdingReference["steps"]:
         result = laserPumpCladding.runTet4PhiAseInput(
             repoRoot / step["tet4Vtk"],
             backend=backend,
-            propagationMode="backward",
+            propagationMode="forward",
+            forwardRayLength=forwardRayLength,
             useReflections=False,
             rngSeed=laserPumpCladdingReference.get("rngSeed", 12345),
         )

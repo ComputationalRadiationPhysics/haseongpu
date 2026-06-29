@@ -451,16 +451,16 @@ namespace
         auto const actual = attribute<T>(iteration, name);
         if(actual != expected)
         {
-            validationError(
-                "dynamic iteration/" + name,
-                "non-dynamic attribute changed after iteration 0; dynamic-only iterations may update only "
-                "core_beta_volume and core_point_beta");
+                validationError(
+                    "dynamic iteration/" + name,
+                    "non-dynamic attribute changed after iteration 0; dynamic-only iterations may update only "
+                    "core_beta_volume");
         }
     }
 
     bool isAllowedDynamicMesh(std::string const& name, std::string const& prefix)
     {
-        return name == prefix + "beta_volume" || name == prefix + "point_beta";
+        return name == prefix + "beta_volume";
     }
 
     std::string entityFromAxes(std::vector<std::string> const& axes)
@@ -494,7 +494,7 @@ namespace
         hase::core::HostMesh const& mesh,
         hase::core::ExperimentParameters const& experiment)
     {
-        auto const resultSize = experiment.isForwardPropagation() ? mesh.numberOfCells : mesh.numberOfSamples;
+        auto const resultSize = mesh.numberOfCells;
         result = hase::core::Result(
             std::vector<float>(resultSize, 0.0f),
             std::vector<double>(resultSize, 100000.0),
@@ -805,7 +805,7 @@ namespace hase::openpmd
                 validationError(
                     name,
                     "non-dynamic mesh record present after iteration 0; dynamic-only iterations may update only "
-                    "core_beta_volume and core_point_beta");
+                    "core_beta_volume");
             }
         }
 
@@ -813,8 +813,7 @@ namespace hase::openpmd
         {
             validationError(
                 "dynamic iteration/haseStaticUpdate",
-                "static updates after iteration 0 are not supported; dynamic-only iterations may update only "
-                "core_beta_volume and core_point_beta");
+                "static updates after iteration 0 are not supported; dynamic-only iterations may update only core_beta_volume");
         }
 
         validateComputeSettings(iteration);
@@ -858,15 +857,13 @@ namespace hase::openpmd
         auto const numberOfPoints = attribute<unsigned>(iteration, field::numberOfPoints);
         auto const numberOfCells = attribute<unsigned>(iteration, field::numberOfCells);
         auto const propagationMode = attributeOr<std::string>(iteration, field::propagationMode, std::string{"forward"});
-        if(propagationMode != "forward" && propagationMode != "backward")
+        if(propagationMode != "forward")
         {
-            validationError("propagation_mode", "expected 'forward' or 'backward'");
+            validationError("propagation_mode", "only 'forward' is supported");
         }
-        bool const forwardMode = propagationMode == "forward";
         if(!iteration.meshes.contains(prefix + "points") || !iteration.meshes.contains(prefix + "cell_faces")
            || !iteration.meshes.contains(prefix + "cell_neighbor_cells")
-           || !iteration.meshes.contains(prefix + "cell_neighbor_local_faces")
-           || (!forwardMode && !iteration.meshes.contains(prefix + "sample_points")))
+           || !iteration.meshes.contains(prefix + "cell_neighbor_local_faces"))
         {
             validationError("explicit topology", "backend requires explicit 3D unstructured cell records");
         }
@@ -918,20 +915,7 @@ namespace hase::openpmd
 
         auto cellVolumes = deriveCellVolumes(points, connectivity, numberOfPoints, numberOfCells);
         auto cellCenters = deriveCellCenters(points, connectivity, numberOfPoints, numberOfCells);
-        unsigned const numberOfSamples = forwardMode ? numberOfCells : componentExtent(iteration, prefix + "sample_points", "x");
-        std::vector<double> samplePoints;
-        if(forwardMode)
-        {
-            samplePoints = cellCenters;
-        }
-        else
-        {
-            samplePoints = concatenate(
-                concatenate(
-                    loadComponent<double>(series, iteration, prefix + "sample_points", "x", io::Extent{numberOfSamples}),
-                    loadComponent<double>(series, iteration, prefix + "sample_points", "y", io::Extent{numberOfSamples})),
-                loadComponent<double>(series, iteration, prefix + "sample_points", "z", io::Extent{numberOfSamples}));
-        }
+        auto samplePoints = cellCenters;
 
         core::HostMesh mesh(
             std::move(connectivity),
@@ -985,17 +969,7 @@ namespace hase::openpmd
                 {numberOfCells},
                 true,
                 true),
-            forwardMode
-                ? std::vector<double>{}
-                : loadScalar<double>(
-                    series,
-                    iteration,
-                    prefix + "point_beta",
-                    io::Extent{numberOfSamples},
-                    {"sample_point"},
-                    {numberOfSamples},
-                    true,
-                    true),
+            std::vector<double>{},
             loadScalar<unsigned>(
                 series,
                 iteration,
@@ -1081,23 +1055,20 @@ namespace hase::openpmd
         experiment.propagationMode = propagationMode;
         experiment.forwardRayCount
             = attributeOr<unsigned>(iteration, field::forwardRayCount, experiment.maxRaysPerSample);
-        if(forwardMode)
+        if(!iteration.containsAttribute(field::forwardRayLength))
         {
-            if(!iteration.containsAttribute(field::forwardRayLength))
-            {
-                validationError("forward_ray_length", "required when propagation_mode is 'forward'");
-            }
-            experiment.forwardRayLength = attribute<double>(iteration, field::forwardRayLength);
-            if(experiment.forwardRayLength <= 0.0)
-            {
-                validationError("forward_ray_length", "must be positive");
-            }
-            if(experiment.useReflections)
-            {
-                validationError(
-                    "use_reflections",
-                    "forward propagation terminates at surfaces and does not support reflections");
-            }
+            validationError("forward_ray_length", "required when propagation_mode is 'forward'");
+        }
+        experiment.forwardRayLength = attribute<double>(iteration, field::forwardRayLength);
+        if(experiment.forwardRayLength <= 0.0)
+        {
+            validationError("forward_ray_length", "must be positive");
+        }
+        if(experiment.useReflections)
+        {
+            validationError(
+                "use_reflections",
+                "forward propagation terminates at surfaces and does not support reflections");
         }
         experiment.maxSigmaA = attributeOr<double>(iteration, field::maxSigmaAbsorption, experiment.maxSigmaA);
         experiment.maxSigmaE = attributeOr<double>(iteration, field::maxSigmaEmission, experiment.maxSigmaE);
@@ -1117,7 +1088,7 @@ namespace hase::openpmd
             attributeOr<unsigned>(
                 iteration,
                 field::maxSampleRange,
-                (forwardMode ? numberOfCells : numberOfSamples) - 1u),
+                numberOfCells - 1u),
             attributeOr<unsigned>(iteration, field::rngSeed, core::ComputeParameters::unspecifiedRngSeed));
 
         core::SimulationRunControl run;
@@ -1146,7 +1117,7 @@ namespace hase::openpmd
         run.pump.temporaryFluorescence = attributeOr<double>(iteration, field::pumpTemporaryFluorescence, 0.0);
 
         mesh.calcTotalReflectionAngles();
-        mesh.resultAtVolumes = forwardMode;
+        mesh.resultAtVolumes = true;
 
         core::Result result;
         initializeResultForMesh(result, mesh, experiment);
@@ -1161,7 +1132,6 @@ namespace hase::openpmd
     {
         std::string const prefix = m_meshGroup + "_";
         auto const numberOfCells = simulation.mesh.numberOfCells;
-        auto const numberOfSamples = simulation.mesh.numberOfSamples;
         simulation.mesh.betaVolume = loadBetaVolume(
             series,
             iteration,
@@ -1171,18 +1141,6 @@ namespace hase::openpmd
             {numberOfCells},
             true,
             true);
-        if(simulation.experiment.isBackwardPropagation())
-        {
-            simulation.mesh.betaCells = loadScalar<double>(
-                series,
-                iteration,
-                prefix + "point_beta",
-                io::Extent{numberOfSamples},
-                {"sample_point"},
-                {numberOfSamples},
-                true,
-                true);
-        }
         initializeResultForMesh(simulation.result, simulation.mesh, simulation.experiment);
         iteration.close();
     }
@@ -1546,7 +1504,7 @@ namespace hase::openpmd
                     validationError(
                         "dynamic iteration",
                         "static topology updates after iteration 0 are not supported; dynamic-only iterations may "
-                        "update only core_beta_volume and core_point_beta");
+                        "update only core_beta_volume");
                 }
                 validateDynamicOnlyIteration(iteration, *simulation);
                 updateDynamicIteration(inputSeries, iteration, *simulation);

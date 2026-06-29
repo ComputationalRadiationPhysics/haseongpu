@@ -45,7 +45,7 @@ namespace hase::kernels::forward
                 double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
-                unsigned const sigmaIndex = hase::kernels::GenRndSigmas{}(lambdaResolution, rndEngine);
+                unsigned const sigmaIndex = GenRndSigmas{}(lambdaResolution, rndEngine);
                 walkRay(
                     acc,
                     mesh,

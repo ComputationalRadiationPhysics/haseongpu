@@ -63,9 +63,9 @@ class PhiASE:
     """Optional medium stored for direct ``run()`` calls."""
 
     propagationMode: str = "forward"
-    """ASE propagation mode: ``forward`` by default, or ``backward`` for regression runs."""
+    """ASE propagation mode; only ``forward`` is supported."""
     minRaysPerSample: int = 100000
-    """Minimum Monte Carlo rays launched for each beta sample in backward mode."""
+    """Minimum Monte Carlo rays retained for legacy configuration compatibility."""
     maxRaysPerSample: int = 100000
     """Maximum rays per sample allowed during adaptive refinement."""
     forwardRayCount: int | None = None
@@ -146,7 +146,7 @@ class PhiASE:
         parser.add_argument("--phi-ase-config", default=None, help="YAML file with PhiASE compute/experiment settings")
         parser.add_argument("--min-rays-per-sample", type=int, default=None)
         parser.add_argument("--max-rays-per-sample", type=int, default=None)
-        parser.add_argument("--propagation-mode", choices=("forward", "backward"), default=None)
+        parser.add_argument("--propagation-mode", choices=("forward",), default=None)
         parser.add_argument("--forward-ray-count", type=int, default=None)
         parser.add_argument("--forward-ray-length", type=float, default=None)
         parser.add_argument("--mse-threshold", type=float, default=None)
@@ -247,6 +247,8 @@ class PhiASE:
         return self
 
     def openPmdAttributes(self, *, numberOfSamples):
+        if str(self.propagationMode).strip().lower() != "forward":
+            raise ValueError("PhiASE.propagationMode must be 'forward'")
         min_sample = 0 if self.minSampleRange is None else int(self.minSampleRange)
         max_sample = int(numberOfSamples) - 1 if self.maxSampleRange is None else int(self.maxSampleRange)
         attributes = {

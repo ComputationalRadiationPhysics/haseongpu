@@ -29,45 +29,31 @@
 
 #pragma once
 
-#include <core/calcPhiAse.hpp>
+#include <core/calcForwardPhiAse.hpp>
 #include <core/mesh.hpp>
 #include <core/types.hpp>
+#include <random/random.hpp>
 #include <utils/progressbar.hpp>
 
+#include <algorithm>
 #include <exception>
 #include <mutex>
 #include <thread>
 #include <vector>
 
 /**
- * @brief Wrapper for calcPhiAse on pthread base.
+ * @brief Wrapper for forward PhiASE accumulation on pthread base.
  *        This function will spawn a thread for
- *        each function call and start calcPhiAse.
+ *        each function call and start calcForwardPhiAseRaw.
  *
- * @param minRaysPerSample Lower bound for raysPerSample
- *                         in case of adaptive sampling.
- * @param maxRaysPerSample Uppper boud for raysPerSample
- *                         in case of adaptive sampling.
- * @param maxRepetitions   Number of Repetitions will
- *                         be done, when not reaching mse threshold
  * @param dMesh            Explicit 3D cell mesh in device memory.
  * @param hMesh            Same as dMesh, but located in host memory.
  * @param sigmaA           Vector with Absorption values
  * @param sigmaE           Vector with Emission values
- * @param mseThreshold     Threshold for adaptive and repetitive sampling.
- *                         Not reaching this threshold leads to recomputations.
- * @param useReflections   Whether reflective boundary propagation is requested.
- * @param phiAse           Reference to phiAse result (one value for every sample point).
- * @param mse              Reference to mse result (one value for every sample point).
- * @param totalRays        Reference to numberOfRays simulated per sample point.
+ * @param result           Reference to raw forward accumulators.
  * @param gpu_i            Number of device that should be used.
- * @param minSample_i      Smallest Index of sample point to calculate.
- * @param maxSample_i      Biggest Index of sample point to calculate.
+ * @param rayCount         Number of forward ray histories assigned to this thread.
  * @param runtime          Reference to the needed runtime.
- *
- * @deprecated will be completly replaced by mpi
- *             or should be replaced by c++11 threads
- * @return     threadId
  */
 namespace hase::core
 {
@@ -76,49 +62,41 @@ namespace hase::core
     static std::vector<std::exception_ptr> threadExceptions;
     static std::mutex threadExceptionsMutex;
 
+    void joinAll();
+
     template<alpaka::onHost::concepts::Device T_Device>
-    void calcPhiAseThreaded(
+    void calcForwardPhiAseThreaded(
         auto& devBundle,
         ExperimentParameters const& experiment,
-        ComputeParameters const& compute,
         HostMesh const& hostMesh,
         DeviceMeshContainer<T_Device> const& mesh,
-        Result& result,
-        unsigned const minSample_i,
-        unsigned const maxSample_i,
+        ForwardPhiAseRawResult& result,
+        unsigned const rayCount,
         unsigned rngSeed,
-        float& runtime,
-        hase::utils::ProgressBar& bar)
+        float& runtime)
     {
-        bar.reset();
         threadIds.emplace_back(
             std::thread(
                 [&experiment,
-                 &compute,
                  &hostMesh,
                  &mesh,
                  &result,
-                 minSample_i,
-                 maxSample_i,
                  &runtime,
-                 &bar,
                  devBundle,
+                 rayCount,
                  rngSeed]() mutable
                 {
                     try
                     {
-                        calcPhiAse(
+                        calcForwardPhiAseRaw(
                             devBundle,
                             experiment,
-                            compute,
                             hostMesh,
                             mesh,
                             result,
-                            minSample_i,
-                            maxSample_i,
                             runtime,
-                            rngSeed,
-                            bar);
+                            rayCount,
+                            rngSeed);
                     }
                     catch(...)
                     {
@@ -126,6 +104,58 @@ namespace hase::core
                         threadExceptions.emplace_back(std::current_exception());
                     }
                 }));
+    }
+
+    template<typename T_Exec, alpaka::onHost::concepts::Device T_Device>
+    ForwardPhiAseRawResult calcForwardPhiAseOnDevices(
+        T_Exec exec,
+        ExperimentParameters const& experiment,
+        HostMesh const& hostMesh,
+        std::vector<DeviceMeshContainer<T_Device>> const& meshes,
+        unsigned const firstDevice,
+        unsigned const assignedDeviceCount,
+        unsigned const rayCount,
+        unsigned const baseSeed,
+        unsigned const rank,
+        std::vector<float>& runtimes)
+    {
+        unsigned const volumeCount = hostMesh.numberOfCells;
+        ForwardPhiAseRawResult combined = makeForwardRawResult(volumeCount);
+        combined.rayCount = rayCount;
+        if(rayCount == 0u || assignedDeviceCount == 0u)
+        {
+            return combined;
+        }
+
+        unsigned const activeDevices = std::min(assignedDeviceCount, rayCount);
+        unsigned const raysPerDevice = rayCount / activeDevices;
+        unsigned const remainder = rayCount % activeDevices;
+        std::vector<ForwardPhiAseRawResult> partials(activeDevices, makeForwardRawResult(volumeCount));
+
+        for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
+        {
+            unsigned const deviceIndex = firstDevice + localDeviceIndex;
+            unsigned const localRayCount
+                = localDeviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
+            hase::alpakaUtils::DevBundle devBundle{meshes.at(deviceIndex).m_device, exec};
+            unsigned const rngSeed = hase::random::seedForWorker(baseSeed, rank, deviceIndex);
+            calcForwardPhiAseThreaded(
+                devBundle,
+                experiment,
+                hostMesh,
+                meshes.at(deviceIndex),
+                partials.at(localDeviceIndex),
+                localRayCount,
+                rngSeed,
+                runtimes.at(deviceIndex));
+        }
+
+        joinAll();
+        for(auto const& partial : partials)
+        {
+            mergeForwardRawResult(combined, partial);
+        }
+        return combined;
     }
 
     /**

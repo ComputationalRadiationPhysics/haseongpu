@@ -257,11 +257,6 @@ namespace hase::core
             return propagationMode == "forward";
         }
 
-        [[nodiscard]] bool isBackwardPropagation() const
-        {
-            return propagationMode == "backward";
-        }
-
         [[nodiscard]] unsigned resolvedForwardRayCount() const
         {
             return forwardRayCount == 0u ? maxRaysPerSample : forwardRayCount;
