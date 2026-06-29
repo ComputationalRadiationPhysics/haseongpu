@@ -1,5 +1,11 @@
 # Changelog
 
+## HASEonGPU 2.0.1
+
+Patch release for the 2.0 series with pump-workflow fixes, Python API
+refinements, restored VTK pump-rate output, and updated package and publication
+metadata.
+
 ## HASEonGPU 2.0 ⸻ alpaka3
 
 This release ports HASEonGPU to **alpaka 3**, introduces a more generic Python

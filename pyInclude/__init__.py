@@ -8,7 +8,7 @@
 
 import HASEonGPU_Bindings
 
-__version__ = "2.0"
+__version__ = "2.0.1"
 
 from .alpakaUtils import AlpakaBackends
 from .calcPhiASE import calcPhiASE
