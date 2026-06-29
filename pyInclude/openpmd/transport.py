@@ -359,7 +359,10 @@ def _io():
     except ImportError as exc:
         raise ImportError(
             "The openPMD transport requires an openpmd_api Python module matching "
-            "the CMake-built calcPhiASE/openPMD stack."
+            "the calcPhiASE/openPMD C++ stack. Install openpmd-api in this Python "
+            "environment with the same backend/MPI options as the openPMD C++ "
+            "package found by CMake, or build HASEonGPU with "
+            "HASE_BUILD_OPENPMD_FROM_SOURCE=ON."
         ) from exc
     return io
 
@@ -410,6 +413,10 @@ def _configured_openpmd_python_paths():
         yield _openpmd_python_package_parent(Path(configured))
 
 
+def _using_external_openpmd():
+    return bool(getattr(_binding_config(), "HASE_USE_SYSTEM_OPENPMD", False))
+
+
 def _candidate_python_paths(executable: Path):
     yield from _env_openpmd_python_paths()
 
@@ -441,10 +448,12 @@ def _unique_existing_directories(paths):
 def _prefer_matching_openpmd_api(executable: Path):
     candidates = list(_unique_existing_directories(_candidate_python_paths(executable)))
     if not candidates:
+        if _using_external_openpmd():
+            return
         raise RuntimeError(
             "The openPMD transport requires the CMake-selected openpmd_api Python "
             "module matching calcPhiASE. Rebuild with "
-            "HASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON, set "
+            "HASE_BUILD_OPENPMD_FROM_SOURCE=ON and HASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON, set "
             "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory>, or set "
             "HASE_OPENPMD_PYTHONPATH at runtime."
         )

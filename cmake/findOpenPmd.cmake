@@ -1,5 +1,50 @@
 include_guard(GLOBAL)
 
+set(HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION
+    "Fetch and build the pinned openPMD-api C++ library and Python bindings instead of using an externally installed openPMD-api package."
+)
+option(
+    HASE_BUILD_OPENPMD_FROM_SOURCE
+    "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
+    OFF
+)
+if(DEFINED CACHE{HASE_USE_SYSTEM_OPENPMD})
+    set(HASE_LEGACY_USE_SYSTEM_OPENPMD "${HASE_USE_SYSTEM_OPENPMD}")
+    message(
+        DEPRECATION
+        "HASE_USE_SYSTEM_OPENPMD is deprecated. Use "
+        "HASE_BUILD_OPENPMD_FROM_SOURCE instead. "
+        "HASE_USE_SYSTEM_OPENPMD=ON maps to "
+        "HASE_BUILD_OPENPMD_FROM_SOURCE=OFF; "
+        "HASE_USE_SYSTEM_OPENPMD=OFF maps to "
+        "HASE_BUILD_OPENPMD_FROM_SOURCE=ON."
+    )
+    unset(HASE_USE_SYSTEM_OPENPMD CACHE)
+    if(HASE_LEGACY_USE_SYSTEM_OPENPMD)
+        set(HASE_BUILD_OPENPMD_FROM_SOURCE
+            OFF
+            CACHE BOOL
+            "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
+            FORCE
+        )
+    else()
+        set(HASE_BUILD_OPENPMD_FROM_SOURCE
+            ON
+            CACHE BOOL
+            "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
+            FORCE
+        )
+    endif()
+endif()
+if(HASE_BUILD_OPENPMD_FROM_SOURCE)
+    set(HASE_USE_SYSTEM_OPENPMD OFF)
+    if(NOT DEFINED CACHE{HASE_OPENPMD_BACKEND})
+        set(HASE_OPENPMD_BACKEND_DEFAULT "adios-sst")
+    endif()
+else()
+    set(HASE_USE_SYSTEM_OPENPMD ON)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/OpenPmdBackend.cmake")
 
 set(HASE_OPENPMD_GIT_REPOSITORY "https://github.com/openPMD/openPMD-api.git")
@@ -22,27 +67,36 @@ option(
 option(
     HASE_OPENPMD_BUILD_PYTHON_BINDINGS
     "Build openPMD-api Python bindings as part of the HASE CMake build"
-    ON
+    ${HASE_BUILD_OPENPMD_FROM_SOURCE}
 )
 set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
     ""
     CACHE PATH
     "Directory containing the openpmd_api Python package matching openPMD::openPMD"
 )
-option(
-    HASE_USE_SYSTEM_OPENPMD
-    "Use an externally installed openPMD-api package instead of fetching/building the pinned bundled openPMD-api."
-    OFF
-)
+if(NOT HASE_BUILD_OPENPMD_FROM_SOURCE)
+    message(STATUS "Using external openPMD-api for the HASE openPMD transport")
+    find_package(openPMD CONFIG QUIET)
 
-if(HASE_USE_SYSTEM_OPENPMD)
-    message(STATUS "Using system openPMD-api for the HASE openPMD transport")
-    find_package(openPMD CONFIG REQUIRED)
+    if(NOT openPMD_FOUND)
+        message(
+            FATAL_ERROR
+            "HASEonGPU now expects an external openPMD-api C++ package by default, "
+            "but CMake could not find openPMD. Install openPMD-api with the "
+            "same backends needed by HASE_OPENPMD_BACKEND='${HASE_OPENPMD_BACKEND}', "
+            "then point CMake to it with openPMD_DIR or CMAKE_PREFIX_PATH. "
+            "To use the old bundled source-build path instead, configure with "
+            "-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON."
+        )
+    endif()
 
     if(NOT TARGET openPMD::openPMD)
         message(
             FATAL_ERROR
-            "System openPMD package did not provide openPMD::openPMD"
+            "The external openPMD package did not provide openPMD::openPMD. "
+            "Use an openPMD-api CMake installation that exports openPMD::openPMD, "
+            "or configure with -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON to use the "
+            "bundled source-build path."
         )
     endif()
 
@@ -54,7 +108,9 @@ if(HASE_USE_SYSTEM_OPENPMD)
         message(
             FATAL_ERROR
             "HASE_OPENPMD_BACKEND='${HASE_OPENPMD_BACKEND}' requires HDF5, "
-            "but the selected system openPMD package was built without HDF5."
+            "but the selected external openPMD package was built without HDF5. "
+            "Install/rebuild openPMD-api with HDF5 support, choose a different "
+            "HASE_OPENPMD_BACKEND, or use -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON."
         )
     endif()
 
@@ -66,7 +122,10 @@ if(HASE_USE_SYSTEM_OPENPMD)
         message(
             FATAL_ERROR
             "HASE_OPENPMD_BACKEND='${HASE_OPENPMD_BACKEND}' requires ADIOS2, "
-            "but the selected system openPMD package was built without ADIOS2."
+            "but the selected external openPMD package was built without ADIOS2. "
+            "Install/rebuild openPMD-api with ADIOS2 support, choose "
+            "HASE_OPENPMD_BACKEND='hdf5', or use "
+            "-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON."
         )
     endif()
 
@@ -74,14 +133,17 @@ if(HASE_USE_SYSTEM_OPENPMD)
         message(
             FATAL_ERROR
             "HASE_OPENPMD_BACKEND='${HASE_OPENPMD_BACKEND}' requires ADIOS2 SST, "
-            "but the ADIOS2 package used by system openPMD was built without SST."
+            "but the ADIOS2 package used by external openPMD was built without SST. "
+            "Install/rebuild ADIOS2/openPMD-api with SST support, choose "
+            "HASE_OPENPMD_BACKEND='adios' or 'hdf5', or use "
+            "-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON."
         )
     endif()
 
     if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
         message(
             STATUS
-            "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with HASE_USE_SYSTEM_OPENPMD=ON; "
+            "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with the default external openPMD contract; "
             "the Python openpmd_api module must come from the same external installation."
         )
     endif()
@@ -93,49 +155,29 @@ if(HASE_USE_SYSTEM_OPENPMD)
     )
 
     if(HASE_ENABLE_PYTHON)
-        if(NOT HASE_OPENPMD_PYTHON_PACKAGE_DIR)
-            find_package(Python COMPONENTS Interpreter QUIET)
-            if(Python_Interpreter_FOUND)
-                execute_process(
-                    COMMAND
-                        "${Python_EXECUTABLE}" -c
-                        "import pathlib, openpmd_api; print(pathlib.Path(openpmd_api.__file__).resolve().parent.parent)"
-                    RESULT_VARIABLE HASE_OPENPMD_PYTHON_PROBE_RESULT
-                    OUTPUT_VARIABLE HASE_OPENPMD_PYTHON_PROBE_OUTPUT
-                    ERROR_VARIABLE HASE_OPENPMD_PYTHON_PROBE_ERROR
-                    OUTPUT_STRIP_TRAILING_WHITESPACE
-                )
-                if(HASE_OPENPMD_PYTHON_PROBE_RESULT EQUAL 0)
-                    set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
-                        "${HASE_OPENPMD_PYTHON_PROBE_OUTPUT}"
-                        CACHE PATH
-                        "Directory containing the openpmd_api Python package matching openPMD::openPMD"
-                        FORCE
-                    )
-                endif()
-            endif()
-        endif()
-
         if(HASE_OPENPMD_PYTHON_PACKAGE_DIR)
             if(NOT EXISTS "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}/openpmd_api")
                 message(
                     FATAL_ERROR
                     "HASE_OPENPMD_PYTHON_PACKAGE_DIR='${HASE_OPENPMD_PYTHON_PACKAGE_DIR}' "
                     "does not contain an openpmd_api Python package. Set this cache variable "
-                    "to the site-packages directory from the same system openPMD-api installation "
+                    "to the site-packages directory from the same external openPMD-api installation "
                     "as openPMD::openPMD."
                 )
             endif()
             message(
                 STATUS
-                "HASE system openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
+                "HASE external openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
             )
         else()
             message(
-                FATAL_ERROR
-                "HASE_ENABLE_PYTHON=ON with HASE_USE_SYSTEM_OPENPMD=ON requires the matching "
-                "openpmd_api Python package. Install/import it in the CMake Python environment or "
-                "set -DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory containing openpmd_api>."
+                STATUS
+                "HASE_ENABLE_PYTHON=ON with the external openPMD contract will use "
+                "the runtime Python environment's openpmd_api package. It must match "
+                "the external openPMD::openPMD C++ provider and support "
+                "HASE_OPENPMD_BACKEND='${HASE_OPENPMD_BACKEND}'. Set "
+                "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory containing openpmd_api> "
+                "only when you need HASEonGPU to prefer a specific provider path."
             )
         endif()
     endif()
