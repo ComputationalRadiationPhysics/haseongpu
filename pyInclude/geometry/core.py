@@ -122,18 +122,25 @@ def _normalize_custom_entity(entity):
 
 
 def _shape_for_custom_entity(topology, axes, values=None):
+    explicit_volume = hasattr(topology, "cellPointIndices")
     if axes == ("point",):
         return (topology.numberOfPoints,)
     if axes == ("cell",):
-        return (topology.numberOfTriangles,)
+        return (topology.numberOfCells if explicit_volume else topology.numberOfTriangles,)
     if axes == ("cell", "layer"):
+        if explicit_volume:
+            return (topology.numberOfCells,)
         topology._require_levels()
         return (topology.numberOfTriangles, topology.levels - 1)
     if axes == ("point", "level"):
+        if explicit_volume:
+            return (topology.numberOfSamplePoints,)
         topology._require_levels()
         return (topology.numberOfPoints, topology.levels)
-    if axes == ("cell", "local_vertex") or axes == ("cell", "local_side"):
-        return (topology.numberOfTriangles, 3)
+    if axes == ("cell", "local_vertex"):
+        return (topology.numberOfCells, 4) if explicit_volume else (topology.numberOfTriangles, 3)
+    if axes == ("cell", "local_side"):
+        return (topology.numberOfCells, topology.numberOfFacesPerCell) if explicit_volume else (topology.numberOfTriangles, 3)
     if axes == ("interface",):
         return (4,)
     if axes == ("wavelength",):
@@ -956,13 +963,24 @@ class MeshTopology:
 
     @classmethod
     def fromVtk(cls, filename, *, numberOfLevels=None, thickness=None):
-        """MeshTopology VTK import is no longer supported for runtime geometry."""
-        raise NotImplementedError("MeshTopology VTK import was removed; use VolumeTopology.fromVtk for Tet4 volumes")
+        """Import a legacy VTK wedge mesh as ``MeshTopology``."""
+        topology = topologyFromVtk(filename, cls)
+        if numberOfLevels is not None:
+            topology.numberOfLevels(numberOfLevels)
+        if thickness is not None:
+            topology.withThickness(thickness)
+        return topology
 
     @classmethod
     def fromFile(cls, filename, format=None, numberOfLevels=None, thickness=None):
-        """MeshTopology file import is no longer supported for runtime geometry."""
-        raise NotImplementedError("MeshTopology file import was removed; use VolumeTopology.fromFile for Tet4 volumes")
+        """Import legacy planar topology files supported by ``MeshTopology``."""
+        path = Path(filename)
+        mesh_format = (format or path.suffix.lstrip(".")).lower()
+        if mesh_format in {"vtk"}:
+            return cls.fromVtk(path, numberOfLevels=numberOfLevels, thickness=thickness)
+        if mesh_format in {"msh", "gmsh"}:
+            return cls.fromGmsh(path, numberOfLevels=numberOfLevels, thickness=thickness)
+        raise NotImplementedError(f"MeshTopology file format '{mesh_format}' is not supported; use VolumeTopology.fromFile for Tet4 volumes")
 
     def numberOfLevels(self, levels):
         """Set the number of z sample planes and return ``self``."""
@@ -1149,6 +1167,7 @@ class GainMedium:
             cls,
             numberOfLevels=numberOfLevels,
             thickness=thickness,
+            legacyTopologyCls=MeshTopology,
         )
 
     @classmethod

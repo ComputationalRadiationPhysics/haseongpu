@@ -154,6 +154,60 @@ def _tet4TopologyFromUnstructuredGrid(path):
     return points, np.asarray(cells, dtype=np.uint32), cellTypes, physical
 
 
+def _legacyTopologyFromUnstructuredGrid(path):
+    points3d, cells, cellTypes, pointData, cellData, fields = _parseVtk(path)
+    if cellTypes is not None and not np.all(np.asarray(cellTypes) == 13):
+        raise ValueError("only VTK wedge cells (cell type 13) are supported")
+
+    zValues = np.unique(points3d[:, 2])
+    zValues.sort()
+    levels = int(zValues.size)
+    if levels < 2:
+        raise ValueError("VTK topology requires at least two z levels")
+    thickness = float(zValues[1] - zValues[0])
+
+    xy = points3d[:, :2]
+    if points3d.shape[0] % levels != 0:
+        raise ValueError("VTK point count must be divisible by the number of z levels")
+    pointsPerLevel = points3d.shape[0] // levels
+    points2d = xy[:pointsPerLevel]
+
+    cellsPerLayer = len(cells) // (levels - 1)
+    triangles = np.empty((cellsPerLayer, 3), dtype=np.uint32)
+    for cellIndex, cell in enumerate(cells[:cellsPerLayer]):
+        if len(cell) != 6:
+            raise ValueError("only six-node wedge cells are supported")
+        triangles[cellIndex, :] = np.asarray(cell[:3], dtype=np.uint32) % np.uint32(pointsPerLevel)
+
+    physical = {}
+    physical.update(pointData)
+    physical.update(cellData)
+    for name in (
+        "claddingCellTypes",
+        "refractiveIndices",
+        "reflectivities",
+        "nTot",
+        "crystalTFluo",
+        "claddingNumber",
+        "claddingAbsorption",
+    ):
+        if name in fields:
+            physical[name] = fields[name]
+
+    return points2d, triangles, levels, thickness, physical
+
+
+def legacyTopologyFromVtk(path, topologyCls):
+    points, triangles, levels, thickness, _ = _legacyTopologyFromUnstructuredGrid(path)
+    return topologyCls(
+        points=points,
+        trianglePointIndices=triangles,
+        levels=levels,
+        thickness=thickness,
+        metadata={"source": str(path), "format": "vtk"},
+    )
+
+
 def volumeTopologyFromVtk(path, topologyCls):
     """Create a Tet4 ``VolumeTopology`` from an ASCII VTK unstructured grid."""
     points, cells, cellTypes, physical = _tet4TopologyFromUnstructuredGrid(path)
@@ -174,50 +228,145 @@ def volumeTopologyFromVtk(path, topologyCls):
 
 
 def topologyFromVtk(path, topologyCls):
-    """Create a Tet4 volume topology from VTK."""
-    return volumeTopologyFromVtk(path, topologyCls)
+    """Create a topology from ASCII VTK Tet4 or legacy wedge cells."""
+    _, _, cellTypes, _, _, _ = _parseVtk(path)
+    cellTypes = np.asarray(cellTypes, dtype=np.uint32) if cellTypes is not None else None
+    if cellTypes is not None and np.all(cellTypes == 10):
+        return volumeTopologyFromVtk(path, topologyCls)
+    return legacyTopologyFromVtk(path, topologyCls)
 
 
-def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, thickness=None):
-    """Load Tet4 topology plus material arrays from a VTK file."""
-    if numberOfLevels is not None or thickness is not None:
-        raise ValueError("Tet4 VTK gain-medium import does not use numberOfLevels or thickness")
-    points, cells, cellTypes, physical = _tet4TopologyFromUnstructuredGrid(path)
-    topology = topologyCls(
-        points=points,
-        cellPointIndices=cells,
-        cellTypes=cellTypes,
-        cellDomains=(
-            None
-            if physical.get("cellDomains") is None
-            else np.asarray(physical["cellDomains"], dtype=np.int32).reshape(cells.shape[0])
-        ),
-        faceBoundaries=(
-            None
-            if physical.get("faceBoundaries") is None
-            else np.asarray(physical["faceBoundaries"], dtype=np.int32).reshape((cells.shape[0], 4))
-        ),
-        metadata={"source": str(path), "format": "vtk"},
-    )
-    beta_cells = physical.get("betaCells")
-    if beta_cells is not None and np.asarray(beta_cells).size == points.shape[0]:
-        topology.samplePoints = np.asarray(points, dtype=np.float64)
+def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, thickness=None, legacyTopologyCls=None):
+    """Load topology plus material arrays from Tet4 or legacy wedge VTK."""
+    _, _, cellTypes, _, _, _ = _parseVtk(path)
+    cellTypesArray = np.asarray(cellTypes, dtype=np.uint32) if cellTypes is not None else None
+    if cellTypesArray is not None and np.all(cellTypesArray == 10):
+        if numberOfLevels is not None or thickness is not None:
+            raise ValueError("Tet4 VTK gain-medium import does not use numberOfLevels or thickness")
+        points, cells, cellTypes, physical = _tet4TopologyFromUnstructuredGrid(path)
+        topology = topologyCls(
+            points=points,
+            cellPointIndices=cells,
+            cellTypes=cellTypes,
+            cellDomains=(
+                None
+                if physical.get("cellDomains") is None
+                else np.asarray(physical["cellDomains"], dtype=np.int32).reshape(cells.shape[0])
+            ),
+            faceBoundaries=(
+                None
+                if physical.get("faceBoundaries") is None
+                else np.asarray(physical["faceBoundaries"], dtype=np.int32).reshape((cells.shape[0], 4))
+            ),
+            metadata={"source": str(path), "format": "vtk"},
+        )
+        beta_cells = physical.get("betaCells")
+        if beta_cells is not None and np.asarray(beta_cells).size == points.shape[0]:
+            topology.samplePoints = np.asarray(points, dtype=np.float64)
+        medium = gainMediumCls(topology=topology)
+        for name, value in physical.items():
+            if name in {"cellDomains", "faceBoundaries"}:
+                continue
+            try:
+                medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
+            except KeyError:
+                continue
+        return medium
+
+    if legacyTopologyCls is None:
+        legacyTopologyCls = topologyCls
+    topology = legacyTopologyFromVtk(path, legacyTopologyCls)
+    if numberOfLevels is not None:
+        topology.numberOfLevels(numberOfLevels)
+    if thickness is not None:
+        topology.withThickness(thickness)
+    _, _, _, _, physical = _legacyTopologyFromUnstructuredGrid(path)
     medium = gainMediumCls(topology=topology)
     for name, value in physical.items():
-        if name in {"cellDomains", "faceBoundaries"}:
-            continue
-        try:
-            medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
-        except KeyError:
-            continue
+        medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
     return medium
 
 
+def _writeLegacyGainMediumVtk(path, gainMedium):
+    """Write a legacy ``MeshTopology`` gain medium as VTK wedge cells."""
+    topology = gainMedium.topology
+    topology._require_levels()
+    topology._require_thickness()
+
+    points = np.asarray(topology.points, dtype=np.float64)
+    triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
+    levels = int(topology.levels)
+    zValues = topology.levelCoordinates()
+    pointCount = topology.numberOfPoints * levels
+    cellCount = topology.numberOfTriangles * (levels - 1)
+
+    fieldArrays = {
+        "claddingCellTypes": gainMedium.get("claddingCellTypes").value,
+        "refractiveIndices": gainMedium.get("refractiveIndices").value,
+        "reflectivities": gainMedium.get("reflectivities").value,
+        "nTot": np.asarray([gainMedium.get("nTot").value], dtype=np.float64),
+        "crystalTFluo": np.asarray([gainMedium.get("crystalTFluo").value], dtype=np.float64),
+        "claddingNumber": np.asarray([gainMedium.get("claddingNumber").value], dtype=np.uint32),
+        "claddingAbsorption": np.asarray([gainMedium.get("claddingAbsorption").value], dtype=np.float64),
+    }
+    pointArrays = {"betaCells": gainMedium.get("betaCells").value}
+    cellArrays = {"betaVolume": gainMedium.get("betaVolume").value}
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("# vtk DataFile Version 2.0\n")
+        handle.write("HASEonGPU gain medium input\n")
+        handle.write("ASCII\n")
+        handle.write("DATASET UNSTRUCTURED_GRID\n")
+        handle.write(f"POINTS {pointCount} double\n")
+        for z in zValues:
+            for x, y in points:
+                handle.write(f"{x:.17g} {y:.17g} {z:.17g}\n")
+
+        handle.write(f"CELLS {cellCount} {cellCount * 7}\n")
+        for level in range(levels - 1):
+            lower = level * topology.numberOfPoints
+            upper = (level + 1) * topology.numberOfPoints
+            for tri in triangles:
+                ids = [int(vertex) for vertex in tri]
+                handle.write(
+                    "6 "
+                    f"{ids[0] + lower} {ids[1] + lower} {ids[2] + lower} "
+                    f"{ids[0] + upper} {ids[1] + upper} {ids[2] + upper}\n"
+                )
+
+        handle.write(f"CELL_TYPES {cellCount}\n")
+        for _ in range(cellCount):
+            handle.write("13\n")
+
+        handle.write(f"FIELD HASEonGPU {len(fieldArrays)}\n")
+        for name, values in fieldArrays.items():
+            arr = np.asarray(values).reshape(-1, order="F")
+            handle.write(f"{name} 1 {arr.size} {_dtypeName(arr)}\n")
+            handle.write(" ".join(str(value) for value in arr.tolist()) + "\n")
+
+        for section, arrays, count in (
+            ("POINT_DATA", pointArrays, pointCount),
+            ("CELL_DATA", cellArrays, cellCount),
+        ):
+            handle.write(f"{section} {count}\n")
+            for name, values in arrays.items():
+                arr = np.asarray(values, dtype=np.float64).reshape(-1, order="F")
+                if arr.size != count:
+                    raise ValueError(f"{name} has {arr.size} values, expected {count}")
+                handle.write(f"SCALARS {name} double 1\n")
+                handle.write("LOOKUP_TABLE default\n")
+                for value in arr:
+                    handle.write(f"{float(value):.17g}\n")
+    return path
+
+
 def writeGainMediumVtk(path, gainMedium):
-    """Write a Tet4 ``GainMedium`` as an ASCII VTK unstructured grid."""
+    """Write a ``GainMedium`` as ASCII VTK Tet4 or legacy wedge cells."""
     topology = gainMedium.topology
     if not hasattr(topology, "cellPointIndices"):
-        raise TypeError("writeGainMediumVtk requires a Tet4 VolumeTopology")
+        return _writeLegacyGainMediumVtk(path, gainMedium)
 
     points = np.asarray(topology.points, dtype=np.float64)
     cells = np.asarray(topology.cellPointIndices, dtype=np.uint32)
