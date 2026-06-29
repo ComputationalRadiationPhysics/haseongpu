@@ -605,6 +605,46 @@ def testFrozenPhiAseRungeKutta4RunsAseBackendOncePerStep(
     assert state.phiAse.shape == (smallTopology.numberOfPoints, smallTopology.levels)
 
 
+def testSimulationPrePumpSkipsAseBackendForInitialStepOnly(
+    smallTopology,
+    pumpProperties,
+    makeFakePhiAse,
+):
+    class ConstantPumpSolver:
+        def step(self, input, pump):
+            return np.asarray(input["betaCell"], dtype=np.float64) + 1.0e-6
+
+    pumpProperties.customProperties["solver"] = ConstantPumpSolver()
+    phiAse = makeFakePhiAse(smallTopology)
+    calls = []
+
+    def run(*args, **kwargs):
+        calls.append(np.asarray(kwargs["gainMedium"].get("betaCells").value).copy())
+        return phiAse
+
+    phiAse.run = run
+    simulation = Simulation(
+        gainMedium=_mediumLikeSmallTopology(smallTopology),
+        pump=pumpProperties,
+        phiASE=phiAse,
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
+        timeStep=1e-5,
+        enableAse=True,
+        prePump=True,
+    )
+
+    first = simulation.step()
+    second = simulation.step()
+
+    assert simulation.enableAse is True
+    assert first.aseResult is None
+    assert np.allclose(first.phiAse, 0.0)
+    assert np.allclose(first.dndtAse, 0.0)
+    assert second.aseResult is not None
+    assert len(calls) == 1
+    assert np.any(calls[0] > 0.0)
+
+
 def testFrozenPhiAseRungeKutta4SkipsAseBackendWhenDisabled(
     smallTopology,
     pumpProperties,
