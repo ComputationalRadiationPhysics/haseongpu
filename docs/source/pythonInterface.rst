@@ -344,6 +344,11 @@ integration resolution inside one pumped outer step.  For a time-based run use
 ``simulation.runUntil(endTime=1e-3)`` or set ``endTime`` in the constructor and
 call ``simulation.runUntil()``.
 
+Set ``prePump=True`` on ``Simulation`` to run the first outer step without ASE.
+This keeps pump and fluorescence active, then enables ASE normally from the
+second step onward.  The option is useful when a run should seed ``betaCells``
+before the first expensive ASE transport solve.
+
 Passing PhiASE Settings from YAML
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
