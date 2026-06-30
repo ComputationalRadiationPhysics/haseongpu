@@ -92,8 +92,8 @@ def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
         reflectivities=np.zeros((2, topology.numberOfTriangles), dtype=np.float32),
-        nTot=2.76e20,
-        crystalTFluo=9.5e-4,
+        nTot=2 * 1.388e20,
+        crystalTFluo=9.41e-4,
         claddingNumber=1,
         claddingAbsorption=cladAbsorption,
     )
@@ -132,7 +132,7 @@ def runExample(
         backReflection=True,
         reflectivity=1.0,
     )
-    absorption=5.5
+    absorption=5.5 # constant absoption coefficient
     medium = laserPumpCladdingMedium(
         numberOfLevels=numberOfLevels,
         thickness=thickness,
@@ -162,7 +162,6 @@ def runExample(
         timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
         timeStep=2e-5, #20 μs
         crossSections=spectralProperties,
-        constants=Constants(c=3e8, h=6.626e-34), ## these constants match legacy skript values
         enableAse=enableAse,
         prePump=prePump,
     )
