@@ -65,3 +65,25 @@ def test_python_backend_summary_reports_supported_runtime_backends():
         "adios-sst",
         "hdf5",
     ]
+
+
+def test_default_cmake_generator_prefers_ninja(monkeypatch, tmp_path):
+    preflight = _load_preflight_module()
+    ninja = tmp_path / "ninja"
+    ninja.touch()
+    ninja.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.delenv("CMAKE_GENERATOR", raising=False)
+
+    assert preflight._default_cmake_generator() == "Ninja"
+
+
+def test_default_cmake_generator_respects_cmake_generator_env(monkeypatch, tmp_path):
+    preflight = _load_preflight_module()
+    ninja = tmp_path / "ninja"
+    ninja.touch()
+    ninja.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("CMAKE_GENERATOR", "Unix Makefiles")
+
+    assert preflight._default_cmake_generator() is None
