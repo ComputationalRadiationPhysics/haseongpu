@@ -1511,6 +1511,72 @@ def _simulation_run_control(simulation, *, steps, pumpSteps):
     return control
 
 
+def _write_simulation_input(input_path, spec, simulation, run_control):
+    with OpenPmdInputSeries(input_path, backend=spec.name) as writer:
+        writer.write(
+            simulation.phiASE,
+            simulation.gainMedium,
+            simulation.crossSections,
+            iteration_index=0,
+            include_static=True,
+            runControl=run_control,
+        )
+
+
+def _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control):
+    """Run compiled simulation while a Python receiver thread drains snapshots."""
+    result_queue = queue.Queue(maxsize=1)
+
+    def read_output():
+        try:
+            result_queue.put((True, read_simulation_output(output_path)))
+        except BaseException as exc:
+            result_queue.put((False, exc))
+
+    proc = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    reader = threading.Thread(
+        target=read_output,
+        name="HASE compiled simulation snapshot receiver",
+        daemon=True,
+    )
+    reader.start()
+
+    input_error = None
+    try:
+        _write_simulation_input(input_path, spec, simulation, run_control)
+    except BaseException as exc:
+        input_error = exc
+        if proc.poll() is None:
+            proc.kill()
+
+    stdout, stderr = proc.communicate()
+    _forward_backend_logging(stdout=stdout, stderr=stderr)
+
+    timeout = _streaming_thread_join_timeout()
+    reader.join(timeout=timeout)
+    if reader.is_alive():
+        raise RuntimeError(f"openPMD simulation snapshot receiver thread did not stop within {timeout:g} seconds")
+
+    if input_error is not None:
+        raise RuntimeError("openPMD simulation input writer failed") from input_error
+    if proc.returncode != 0:
+        detail = _backend_failure_detail(stdout=stdout, stderr=stderr)
+        raise RuntimeError(f"calcPhiASE failed with return code {proc.returncode}{detail}")
+
+    try:
+        ok, payload = result_queue.get_nowait()
+    except queue.Empty as exc:
+        raise RuntimeError("openPMD simulation snapshot receiver stopped without returning snapshots") from exc
+    if not ok:
+        raise payload
+    return payload
+
+
 def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_prefix=None, workspace_dir=None):
     """Run the full time-stepped Simulation in the compiled C++/alpaka backend."""
     steps = int(steps)
@@ -1534,16 +1600,6 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
         input_path = tmp_path / f"{stem}-input{spec.suffix}"
         output_path = tmp_path / f"{stem}-output{spec.suffix}"
 
-        with OpenPmdInputSeries(input_path, backend=spec.name) as writer:
-            writer.write(
-                simulation.phiASE,
-                simulation.gainMedium,
-                simulation.crossSections,
-                iteration_index=0,
-                include_static=True,
-                runControl=run_control,
-            )
-
         command = [
             *(command_prefix or []),
             str(executable),
@@ -1551,6 +1607,11 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
             f"--output-path={output_path}",
             "--run-simulation",
         ]
+
+        if spec.streaming:
+            return _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control)
+
+        _write_simulation_input(input_path, spec, simulation, run_control)
         completed = subprocess.run(command, check=False, text=True, capture_output=True)
         _forward_backend_logging(stdout=completed.stdout, stderr=completed.stderr)
         if completed.returncode != 0:

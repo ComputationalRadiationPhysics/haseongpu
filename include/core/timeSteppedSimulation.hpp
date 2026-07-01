@@ -97,7 +97,8 @@ namespace hase::core
         using T_Queue = ALPAKA_TYPEOF(std::declval<T_Device>().makeQueue(alpaka::queueKind::blocking));
         using T_DoubleBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::size_t{1}));
         using T_FloatBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<float>(std::declval<T_Device&>(), std::size_t{1}));
-        using T_UnsignedBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
+        using T_UnsignedBuffer
+            = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
 
     public:
         CompiledSimulationRunner(
@@ -130,8 +131,14 @@ namespace hase::core
             , m_k2(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_k3(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_k4(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_pumpForward(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
-            , m_pumpBackward(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
+            , m_pumpForward(
+                  alpaka::onHost::alloc<double>(
+                      device,
+                      static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
+            , m_pumpBackward(
+                  alpaka::onHost::alloc<double>(
+                      device,
+                      static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
         {
             hase::kernels::enqueueBuildActivePointMask(m_devBundle, m_queue, m_mesh, m_activeMask);
             alpaka::onHost::wait(m_queue);
@@ -159,7 +166,8 @@ namespace hase::core
             m_hostMesh.betaVolume = detail::copyToVector(m_queue, m_betaVolume);
             initializeResult();
 
-            int const result = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
+            int const result
+                = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
             if(result != 0)
             {
                 throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
@@ -268,7 +276,8 @@ namespace hase::core
         void stepImplicitEuler(bool pumpEnabled)
         {
             alpaka::onHost::memcpy(m_queue, m_stage, m_beta);
-            for(unsigned iteration = 0u; iteration < std::max(1u, m_run.timeIntegration.implicitIterations); ++iteration)
+            for(unsigned iteration = 0u; iteration < std::max(1u, m_run.timeIntegration.implicitIterations);
+                ++iteration)
             {
                 evaluateDerivative(m_stage, pumpEnabled);
                 enqueueAddScaled(m_beta, m_derivative, m_betaNext, m_run.timeStep);
@@ -306,7 +315,9 @@ namespace hase::core
                 m_devBundle.device,
                 m_devBundle.executor,
                 alpaka::Vec{m_mesh.numberOfSamples});
-            m_queue.enqueue(frameSpec, alpaka::KernelBundle{hase::kernels::AddScaled{scale}, m_mesh, base, slope, out});
+            m_queue.enqueue(
+                frameSpec,
+                alpaka::KernelBundle{hase::kernels::AddScaled{scale}, m_mesh, base, slope, out});
             alpaka::onHost::wait(m_queue);
         }
 

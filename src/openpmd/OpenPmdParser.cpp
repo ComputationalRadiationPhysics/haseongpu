@@ -1,8 +1,7 @@
+#include <core/timeSteppedSimulation.hpp>
 #include <openPMD/openPMD.hpp>
 #include <openpmd/OpenPmdParser.hpp>
 #include <openpmd/SimulationSnapshotWriter.hpp>
-
-#include <core/timeSteppedSimulation.hpp>
 
 #include <algorithm>
 #include <array>
@@ -799,11 +798,13 @@ namespace
             {
                 for(unsigned vertex = 0u; vertex < 3u; ++vertex)
                 {
-                    connectivity.push_back(mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + lower);
+                    connectivity.push_back(
+                        mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + lower);
                 }
                 for(unsigned vertex = 0u; vertex < 3u; ++vertex)
                 {
-                    connectivity.push_back(mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + upper);
+                    connectivity.push_back(
+                        mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + upper);
                 }
             }
         }
@@ -1113,12 +1114,12 @@ namespace hase::openpmd
         run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
         run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
         run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
-        run.timeIntegration.method =
-            attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
+        run.timeIntegration.method
+            = attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
         run.timeIntegration.implicitIterations = attributeOr<unsigned>(iteration, field::implicitIterations, 8u);
         run.timeIntegration.implicitTolerance = attributeOr<double>(iteration, field::implicitTolerance, 1.0e-10);
-        run.pump.routine =
-            attributeOr<std::string>(iteration, field::pumpRoutine, core::PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL);
+        run.pump.routine
+            = attributeOr<std::string>(iteration, field::pumpRoutine, core::PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL);
         run.pump.intensity = attributeOr<double>(iteration, field::pumpIntensity, 0.0);
         run.pump.wavelength = attributeOr<double>(iteration, field::pumpWavelength, 0.0);
         run.pump.radiusX = attributeOr<double>(iteration, field::pumpRadiusX, 0.0);
@@ -1276,9 +1277,33 @@ namespace hase::openpmd
                 }
             }
             auto pointsRecordName = prefix + "points";
-            writeComponent(iteration, pointsRecordName, "x", x, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
-            writeComponent(iteration, pointsRecordName, "y", y, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
-            writeComponent(iteration, pointsRecordName, "z", z, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeComponent(
+                iteration,
+                pointsRecordName,
+                "x",
+                x,
+                {"mesh_point"},
+                "m",
+                1.0,
+                {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeComponent(
+                iteration,
+                pointsRecordName,
+                "y",
+                y,
+                {"mesh_point"},
+                "m",
+                1.0,
+                {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeComponent(
+                iteration,
+                pointsRecordName,
+                "z",
+                z,
+                {"mesh_point"},
+                "m",
+                1.0,
+                {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
             auto pointsRecord = iteration.meshes[pointsRecordName];
             pointsRecord.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
             pointsRecord.setAttribute("haseEntity", std::string{"coordinate_mesh_point"});
@@ -1303,7 +1328,13 @@ namespace hase::openpmd
             {
                 offsets.at(i) = i * 6u;
             }
-            writeFlatScalar<unsigned>(iteration, prefix + "cells_offsets", offsets, {"cell_offset"}, {numberOfPrisms + 1u}, false);
+            writeFlatScalar<unsigned>(
+                iteration,
+                prefix + "cells_offsets",
+                offsets,
+                {"cell_offset"},
+                {numberOfPrisms + 1u},
+                false);
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cells_types",
@@ -1319,7 +1350,13 @@ namespace hase::openpmd
                 {"cell"},
                 {snapshot.mesh.numberOfTriangles},
                 false);
-            writeFlatScalar<float>(iteration, prefix + "refractive_index", snapshot.mesh.refractiveIndices, {"interface"}, {4u}, false);
+            writeFlatScalar<float>(
+                iteration,
+                prefix + "refractive_index",
+                snapshot.mesh.refractiveIndices,
+                {"interface"},
+                {4u},
+                false);
             writeFlatScalar<float>(
                 iteration,
                 prefix + "reflectivity",
@@ -1501,7 +1538,11 @@ namespace hase::openpmd
         {
             auto const outputStream = m_outputPath.string();
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
-            series = std::make_unique<io::Series>(outputStream, io::Access::CREATE_LINEAR, MPI_COMM_SELF, seriesConfig(outputStream));
+            series = std::make_unique<io::Series>(
+                outputStream,
+                io::Access::CREATE_LINEAR,
+                MPI_COMM_SELF,
+                seriesConfig(outputStream));
 #else
             series = std::make_unique<io::Series>(outputStream, io::Access::CREATE_LINEAR, seriesConfig(outputStream));
 #endif
@@ -1513,7 +1554,12 @@ namespace hase::openpmd
             [&](core::SimulationSnapshot const& snapshot)
             {
                 bool const includeStatic = snapshot.step == 1u;
-                writeSimulationSnapshotIteration(*series, snapshot.step - 1u, snapshot, simulation.experiment, includeStatic);
+                writeSimulationSnapshotIteration(
+                    *series,
+                    snapshot.step - 1u,
+                    snapshot,
+                    simulation.experiment,
+                    includeStatic);
                 series->flush();
             }};
 

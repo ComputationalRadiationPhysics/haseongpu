@@ -48,7 +48,11 @@ namespace hase::kernels
         }
     };
 
-    void enqueueBuildActivePointMask(auto& devBundle, hase::concepts::Queue auto const& queue, auto const& mesh, auto& activeMask)
+    void enqueueBuildActivePointMask(
+        auto& devBundle,
+        hase::concepts::Queue auto const& queue,
+        auto const& mesh,
+        auto& activeMask)
     {
         alpaka::onHost::fill(queue, activeMask, 0u);
         auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
