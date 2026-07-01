@@ -16,7 +16,6 @@ import numpy as np
 from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
 from .openpmd import transport
-from .pumping import Constants
 from .timeIntegration import TimeIntegrationSolver
 
 
@@ -319,52 +318,33 @@ class PhiASE:
 
 
 
-class LegacyGridDataBetaVolumeMapper:
-    """Map point-centered ``betaCells`` to prism-centered ``betaVolume``."""
+class ConnectivityAverageBetaVolumeMapper:
+    """Map point-centered ``betaCells`` to prism beta by vertex averaging.
 
-    def __init__(self, method="linear"):
-        """Create a mapper using a scipy ``griddata`` interpolation method.
-
-        The mapper samples point-level beta values at prism centers so ASE can
-        use one representative excited-state fraction per wedge volume.
-        """
-        self.method = method
+    This matches the C++/Alpaka prism-beta kernel: each prism value is the
+    arithmetic mean of the three triangle vertices on the lower and upper
+    z-levels.
+    """
 
     def map(self, medium):
         """Return prism-centered ``betaVolume`` for the supplied medium."""
-        try:
-            from scipy.interpolate import griddata
-        except ImportError as exc:
-            raise ImportError("LegacyGridDataBetaVolumeMapper requires scipy") from exc
-
         topology = medium.topology
-        derived = topology._topology()
         beta_cells = np.asarray(medium.get("betaCells").value, dtype=np.float64).reshape(
             (topology.numberOfPoints, topology.levels),
             order="F",
         )
-
-        x_1 = topology.points[:, 0]
-        y_1 = topology.points[:, 1]
-        x_2 = topology.points[:, 0]
-        y_2 = topology.points[:, 1]
-        x = np.concatenate((x_1, x_2))
-        y = np.concatenate((y_1, y_2))
-        z_1 = np.zeros(x_1.shape[0])
-        z_2 = np.zeros(x_2.shape[0]) + topology.thickness
-        z = np.concatenate((z_1, z_2))
-
-        xi = np.asarray(derived["triangleCenterX"], dtype=np.float64)
-        yi = np.asarray(derived["triangleCenterY"], dtype=np.float64)
-        zi = np.zeros(xi.shape) + topology.thickness / 2.0
-
-        beta_volume = np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
+        triangles = np.asarray(topology.trianglePointIndices, dtype=np.int64)
+        if triangles.shape[0] != topology.numberOfTriangles:
+            triangles = triangles.reshape((topology.numberOfTriangles, 3), order="F")
+        beta_volume = np.empty((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
         for level in range(topology.levels - 1):
-            values = np.concatenate((beta_cells[:, level], beta_cells[:, level + 1]))
-            beta_volume[:, level] = griddata((x, y, z), values, (xi, yi, zi), method=self.method)
-            z = z + topology.thickness
-            zi = zi + topology.thickness
+            lower = beta_cells[triangles, level]
+            upper = beta_cells[triangles, level + 1]
+            beta_volume[:, level] = (lower.sum(axis=1) + upper.sum(axis=1)) / 6.0
         return beta_volume
+
+
+LegacyGridDataBetaVolumeMapper = ConnectivityAverageBetaVolumeMapper
 
 
 @dataclass
@@ -399,12 +379,13 @@ class TimeStepState:
 
 @dataclass
 class Simulation:
-    """High-level pump, ASE, fluorescence, and time-integration loop.
+    """High-level Python wrapper for compiled C++/Alpaka simulation runs.
 
-    Register ``onInit`` or ``beforeStep`` callbacks when a function needs the
-    live ``Simulation`` object and may inspect or mutate it. Register
-    ``onStep`` callbacks when a function needs the completed ``TimeStepState``
-    snapshot produced by each step.
+    Python sends the initial setup to the compiled backend and receives
+    ``TimeStepState`` snapshots after completed steps. Register ``onInit`` for
+    one-time Python setup before launch and ``onStep`` for snapshot consumers.
+    ``beforeStep`` is retained only to report that per-step Python mutation is
+    unsupported by compiled runs.
     """
 
     gainMedium: GainMedium
@@ -413,19 +394,14 @@ class Simulation:
     """Pump model that adds population to ``betaCells``."""
     phiASE: PhiASE
     """ASE configuration and execution handle."""
-    timeIntegrationSolver: TimeIntegrationSolver
-    """Solver object that advances ``betaCells`` using ``d beta / dt``."""
+    timeIntegrationSolver: TimeIntegrationSolver | str
+    """Compiled integrator name or descriptor with a ``name`` attribute."""
     timeStep: float
     """Physical time increment per step, in seconds."""
     crossSections: CrossSectionData | None = None
     """Shared spectra used by pump and ASE when not set on either object."""
     endTime: float | None = None
     """Optional target physical time for ``runUntil()``."""
-    constants: Constants = field(default_factory=Constants)
-    """Physical constants used by the pump integrator."""
-    updateTerminalLevel: bool = True
-    """Whether the last z-level beta values are advanced by the solver."""
-
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
     _initialized: bool = field(default=False, init=False, repr=False)
@@ -437,8 +413,8 @@ class Simulation:
     def __post_init__(self):
         if self.timeIntegrationSolver is None:
             raise ValueError("Simulation requires a timeIntegrationSolver")
-        if not isinstance(self.timeIntegrationSolver, str) and not hasattr(self.timeIntegrationSolver, "step"):
-            raise ValueError("Simulation requires a timeIntegrationSolver with a step(rhs, betaCells, time, timeStep) method")
+        if not isinstance(self.timeIntegrationSolver, str) and not hasattr(self.timeIntegrationSolver, "name"):
+            raise ValueError("Simulation requires a compiled time integrator name or descriptor with a .name attribute")
         if self.timeStep <= 0.0:
             raise ValueError("timeStep must be positive")
         if self.crossSections is None:
@@ -494,16 +470,11 @@ class Simulation:
         return self
 
     def beforeStep(self, callback, *args, **kwargs):
-        """Register a pre-step callback.
+        """Register an unsupported legacy pre-step callback.
 
-        The callback signature is ``callback(simulation, *args, **kwargs)``.
-        ``Simulation`` supplies the live simulation object as the first
-        argument, then appends the user arguments passed to ``beforeStep``. The
-        hook runs before every step, after one-time ``onInit`` callbacks.
-
-        Use this hook for controlled changes that must happen before derivative
-        evaluation, such as time-dependent pump settings. Callback return values
-        are ignored. The method returns ``self`` for chaining.
+        Compiled simulations cannot call Python between C++-owned steps. The
+        registration is stored so ``runSteps`` can raise a clear error instead
+        of silently ignoring the callback.
         """
         self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
@@ -619,7 +590,7 @@ class Simulation:
             callback(self, *args, **kwargs)
 
     def _updateBetaVolumeFromCells(self):
-        beta_volume = LegacyGridDataBetaVolumeMapper().map(self.gainMedium)
+        beta_volume = ConnectivityAverageBetaVolumeMapper().map(self.gainMedium)
         self.gainMedium.get("betaVolume").value = beta_volume
 
 

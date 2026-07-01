@@ -113,26 +113,17 @@ resolution.
 Pump
 ^^^^
 
-``PumpProperties`` stores beam/spectrum inputs, the pump solver, and optional
-custom solver parameters.
+``PumpProperties`` describes the physical pump sent to the compiled simulation:
+intensity, wavelength, cross sections, transverse radii, super-Gaussian
+exponent, and optional reflected pass. The backend implements the pump; a
+custom Python pump solver is not supported.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: pump-properties
    :end-before: # docs:end: pump-properties
 
-A custom solver needs a ``step(input, pump)`` method that receives the current
-``betaCell`` array and returns an updated array of the same shape:
-
-.. literalinclude:: ../../example/minimalExampleNewInterface.py
-   :language: python
-   :start-after: # docs:start: custom-pump-solver
-   :end-before: # docs:end: custom-pump-solver
-
-For physical pumping, use a built-in solver such as
-``OneDimensionalZTraversal`` with a ``PumpRadiationProfile``.  If no solver is
-supplied, ``Simulation`` uses ``BetaIntegrationGaussianSolver``.  Details are in
-:doc:`python_interface/pump_properties`.
+See :doc:`python_interface/pump_properties` for parameters and the model.
 
 PhiASE
 ^^^^^^
@@ -161,30 +152,19 @@ storage/streaming backend such as ``adios-sst``.  See
 Simulation
 ^^^^^^^^^^
 
-``Simulation`` combines material state, pump, ASE, and time integration:
+``Simulation`` sends the setup to the C++/Alpaka backend, which owns the pump,
+ASE, and time-integration loop. Python receives one ``TimeStepState`` snapshot
+per completed step and invokes ``onStep`` callbacks for each snapshot.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: simulation
    :end-before: # docs:end: simulation
 
-Each step applies callbacks, evaluates pump and ASE contributions as required
-by the selected time-integration solver, clips beta to ``[0, 1]``, updates
-``betaVolume``, stores the latest ``TimeStepState``, and runs ``onStep``
-callbacks.
-
-Useful run methods are:
-
-.. code-block:: python
-
-   simulation.runSteps(3)
-   simulation.runSteps(150, pumpSteps=50)
-   simulation.runUntil(endTime=1e-3)
-
-``pumpSteps`` limits pump action to the first outer simulation steps while ASE
-and fluorescence continue.  ``prePump=True`` on ``Simulation`` runs the first
-outer step without ASE so the pump can seed ``betaCells`` before the first ASE
-solve.
+Use ``runSteps(150, pumpSteps=50)`` to pump only the first 50 outer steps, or
+``runUntil(endTime=1e-3)`` for a time target. ``pumpSubsteps`` instead controls
+the internal resolution of one pumped step. ``onInit`` is available before the
+backend launch; per-step Python mutation through ``beforeStep`` is unsupported.
 
 YAML Compute Settings
 ^^^^^^^^^^^^^^^^^^^^^

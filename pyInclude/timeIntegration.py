@@ -4,188 +4,64 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Time-integration solvers for the point-level beta population arrays."""
+"""Compiled time-integration descriptors for C++/Alpaka simulation runs."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 
-
-@dataclass(frozen=True)
-class TimeDerivative:
-    """Derivative evaluation produced during one time-integration stage.
-
-    ``Simulation`` builds this object from pump gain, ASE depletion, and
-    fluorescence decay. Custom solvers receive it from their ``rhs`` callback
-    while trying candidate ``betaCells`` values.
-    """
-
-    betaCells: np.ndarray
-    """Point-level excited-state fraction used for this RHS evaluation."""
-    dndtPump: np.ndarray
-    """Pump source contribution to ``d beta / dt`` in ``1 / s``."""
-    dndtAse: np.ndarray
-    """ASE depletion contribution to ``d beta / dt`` in ``1 / s``."""
-    derivative: np.ndarray
-    """Total ``d beta / dt`` advanced by the time solver."""
-    tau: float
-    """Fluorescence lifetime used for spontaneous decay, in seconds."""
-    phiAse: np.ndarray | None = None
-    r"""ASE flux :math:`\Phi_i` from the derivative evaluation, if available."""
-    aseResult: object | None = None
-    """Raw lower-level ASE result object, if available."""
-
-
-@dataclass(frozen=True)
-class TimeIntegrationResult:
-    """Return object from ``TimeIntegrationSolver.step(...)``."""
-
-    betaCells: np.ndarray
-    """Updated point-level beta array proposed by the solver."""
-    evaluation: TimeDerivative
-    """Derivative evaluation to expose in the resulting ``TimeStepState``."""
-
-
+@dataclass
 class TimeIntegrationSolver:
-    """Base protocol for custom beta time-integration solvers.
+    """Descriptor naming a compiled beta time integrator.
 
-    Implement ``step(rhs, betaCells, time, timeStep)``. ``rhs`` is a callable
-    that accepts ``(betaCells, time)`` and returns a ``TimeDerivative``. Higher
-    order solvers may call ``rhs`` several times for one public simulation step.
+    Python no longer performs time-step algorithms. ``Simulation`` serializes
+    this descriptor to openPMD run-control attributes and the C++/Alpaka backend
+    executes the selected integrator.
     """
 
-    name = "base"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        """Return a ``TimeIntegrationResult`` for one physical time step.
-
-        ``time`` and ``timeStep`` are in seconds. ``betaCells`` has the same
-        shape as ``GainMedium.get("betaCells").expectedShape``.
-        """
-        raise NotImplementedError
+    name: str
 
 
 class ExplicitEuler(TimeIntegrationSolver):
-    """First-order explicit Euler beta update using one RHS evaluation."""
+    """First-order explicit Euler compiled integrator descriptor."""
 
-    name = "explicit-euler"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        evaluation = rhs(betaCells, time)
-        return TimeIntegrationResult(betaCells + timeStep * evaluation.derivative, evaluation)
+    def __init__(self):
+        super().__init__("explicit-euler")
 
 
 class Heun(TimeIntegrationSolver):
-    """Second-order predictor-corrector beta update using two RHS evaluations."""
+    """Second-order predictor-corrector compiled integrator descriptor."""
 
-    name = "heun"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        first = rhs(betaCells, time)
-        second = rhs(betaCells + timeStep * first.derivative, time + timeStep)
-        updated = betaCells + 0.5 * timeStep * (first.derivative + second.derivative)
-        return TimeIntegrationResult(updated, second)
+    def __init__(self):
+        super().__init__("heun")
 
 
 class Midpoint(TimeIntegrationSolver):
-    """Second-order midpoint beta update using a half-step RHS evaluation."""
+    """Second-order midpoint compiled integrator descriptor."""
 
-    name = "midpoint"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        first = rhs(betaCells, time)
-        middle = rhs(betaCells + 0.5 * timeStep * first.derivative, time + 0.5 * timeStep)
-        return TimeIntegrationResult(betaCells + timeStep * middle.derivative, middle)
+    def __init__(self):
+        super().__init__("midpoint")
 
 
 class RungeKutta4(TimeIntegrationSolver):
-    """Classical fourth-order Runge-Kutta beta update using four RHS evaluations."""
+    """Classical fourth-order Runge-Kutta compiled integrator descriptor."""
 
-    name = "runge-kutta-4"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        k1 = rhs(betaCells, time)
-        k2 = rhs(betaCells + 0.5 * timeStep * k1.derivative, time + 0.5 * timeStep)
-        k3 = rhs(betaCells + 0.5 * timeStep * k2.derivative, time + 0.5 * timeStep)
-        k4 = rhs(betaCells + timeStep * k3.derivative, time + timeStep)
-        updated = betaCells + (timeStep / 6.0) * (
-            k1.derivative + 2.0 * k2.derivative + 2.0 * k3.derivative + k4.derivative
-        )
-        return TimeIntegrationResult(updated, k4)
-
-
-class FrozenPhiAseRungeKutta4(TimeIntegrationSolver):
-    """Fourth-order beta update with one frozen ASE transport solve per step.
-
-    ``Simulation`` computes the ASE flux once from the step-start beta field
-    and reuses that fixed ``phiAse`` in all RK4 stages. Pump and local ASE
-    coupling terms are still re-evaluated for each trial beta value. This
-    reduces expensive ASE backend calls, but it is not identical to full RK4 of
-    the coupled beta/ASE-transport system.
-    """
-
-    name = "frozen-phi-ase-runge-kutta-4"
-
-    def stepSimulation(self, simulation, betaCells, time, timeStep):
-        """Advance one ``Simulation`` step while freezing the ASE flux."""
-        phi_ase, ase_result = simulation._runPhiAseForBeta(betaCells)
-        k1 = simulation._timeDerivativeWithFrozenPhiAse(betaCells, time, phi_ase, ase_result)
-        k2 = simulation._timeDerivativeWithFrozenPhiAse(
-            betaCells + 0.5 * timeStep * k1.derivative,
-            time + 0.5 * timeStep,
-            phi_ase,
-            ase_result,
-        )
-        k3 = simulation._timeDerivativeWithFrozenPhiAse(
-            betaCells + 0.5 * timeStep * k2.derivative,
-            time + 0.5 * timeStep,
-            phi_ase,
-            ase_result,
-        )
-        k4 = simulation._timeDerivativeWithFrozenPhiAse(
-            betaCells + timeStep * k3.derivative,
-            time + timeStep,
-            phi_ase,
-            ase_result,
-        )
-        updated = betaCells + (timeStep / 6.0) * (
-            k1.derivative + 2.0 * k2.derivative + 2.0 * k3.derivative + k4.derivative
-        )
-        return TimeIntegrationResult(updated, k4)
+    def __init__(self):
+        super().__init__("runge-kutta-4")
 
 
 class ImplicitEuler(TimeIntegrationSolver):
-    """Fixed-point implicit Euler beta update for stiff beta dynamics."""
-
-    name = "implicit-euler"
+    """Fixed-iteration implicit Euler compiled integrator descriptor."""
 
     def __init__(self, iterations=8, tolerance=1e-10):
-        """Set maximum fixed-point iterations and infinity-norm tolerance."""
+        super().__init__("implicit-euler")
         self.iterations = int(iterations)
         self.tolerance = float(tolerance)
 
-    def step(self, rhs, betaCells, time, timeStep):
-        guess = np.asarray(betaCells, dtype=np.float64).copy()
-        evaluation = rhs(guess, time + timeStep)
-        for _ in range(max(self.iterations, 1)):
-            previous = guess
-            evaluation = rhs(guess, time + timeStep)
-            guess = betaCells + timeStep * evaluation.derivative
-            if np.linalg.norm(guess - previous, ord=np.inf) <= self.tolerance:
-                break
-        return TimeIntegrationResult(guess, evaluation)
-
 
 class ExponentialEuler(TimeIntegrationSolver):
-    """Euler source update with analytical fluorescence decay over ``timeStep``."""
+    """Compiled exponential Euler descriptor with analytical fluorescence decay."""
 
-    name = "exponential-euler"
-
-    def step(self, rhs, betaCells, time, timeStep):
-        evaluation = rhs(betaCells, time)
-        decay = np.exp(-timeStep / evaluation.tau)
-        source = evaluation.dndtPump - evaluation.dndtAse
-        updated = evaluation.tau * source * (1.0 - decay) + betaCells * decay
-        return TimeIntegrationResult(updated, evaluation)
+    def __init__(self):
+        super().__init__("exponential-euler")

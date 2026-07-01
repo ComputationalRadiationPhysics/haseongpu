@@ -36,14 +36,6 @@ def printState(state):
 
 def writeVtkState(state, outputFile):
     vtkWedge(outputFile, state)
-# docs:start: custom-pump-solver
-class MyPumpSolver:
-    def step(self, input, pump):
-        beta = input["betaCell"]
-        mycustom = pump.getProperty("myCustomVar")
-        pump.withProperty("myCustomVar",mycustom+1)
-        return np.ones_like(beta) - beta
-# docs:end: custom-pump-solver
 
 def main():
     # docs:start: topology
@@ -103,11 +95,10 @@ def main():
         intensity=16e3, # [W/cm^2]
         pumpSubsteps=100,
         wavelength=940e-9, # [m]
-        solver=MyPumpSolver(),
         radiusX=1.5,
         radiusY=1.5,
-        superGaussianOrder=40,
-        myCustomVar=6
+        exponent=40,
+        backReflection=True,
     )
     # docs:end: pump-properties
 
