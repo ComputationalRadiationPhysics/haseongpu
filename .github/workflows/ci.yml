@@ -30,49 +30,69 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
-          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", openpmd_backend: "adios" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
-          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "hdf5" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios-sst" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
-          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04", openpmd_backend: "hdf5" }
-          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04", openpmd_backend: "adios" }
-          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "adios-sst" }
-          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04", openpmd_backend: "adios" }
-          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04", openpmd_backend: "hdf5" }
-          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04", openpmd_backend: "adios" }
-          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04", openpmd_backend: "adios-sst" }
-          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "adios" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", openpmd_backend: "hdf5" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4", openpmd_backend: "adios-sst" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4", openpmd_backend: "adios" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2", openpmd_backend: "hdf5" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0", openpmd_backend: "adios" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1", openpmd_backend: "adios-sst" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", openpmd_backend: "adios" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
+          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "2", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "4", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "3", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04", mpi: "on", mpi_ranks: "4", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "4", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
 
     env:
       DEBIAN_FRONTEND: noninteractive
       OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
       HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
       BUILD_DIR: build/ci
-      HASE_CMAKE_ARGS: >-
+      HASE_MPI: ${{ matrix.config.mpi }}
+      HASE_MPI_TEST_RANKS: ${{ matrix.config.mpi_ranks || '' }}
+      HASE_CMAKE_ARGS_BASE: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
-        -DDISABLE_MPI=ON
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure MPI matrix settings
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mpi_cmake_arg="-DDISABLE_MPI=ON"
+          if [[ "$HASE_MPI" == "on" ]]; then
+            mpi_cmake_arg="-DDISABLE_MPI=OFF"
+            echo "OMPI_ALLOW_RUN_AS_ROOT=1" >> "$GITHUB_ENV"
+            echo "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> "$GITHUB_ENV"
+            echo "HASE_MPIEXEC_EXTRA_ARGS=--oversubscribe" >> "$GITHUB_ENV"
+          fi
+
+          {
+            echo "HASE_CMAKE_ARGS<<EOF"
+            echo "$HASE_CMAKE_ARGS_BASE $mpi_cmake_arg"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         shell: bash
@@ -107,6 +127,10 @@ jobs:
 
           if [[ "${{ matrix.config.tbb || 'off' }}" == "on" ]]; then
             apt-get install -y --no-install-recommends libtbb-dev
+          fi
+
+          if [[ "$HASE_MPI" == "on" ]]; then
+            apt-get install -y --no-install-recommends openmpi-bin libopenmpi-dev
           fi
 
           if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
