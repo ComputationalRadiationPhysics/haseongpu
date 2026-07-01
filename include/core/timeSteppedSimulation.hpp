@@ -13,8 +13,14 @@
 #include <alpakaUtils/memory.hpp>
 #include <alpakaUtils/utils.hpp>
 #include <core/simulation.hpp>
+#include <core/simulationRunControl.hpp>
+#include <core/simulationSnapshot.hpp>
 #include <core/types.hpp>
-#include <kernels/simulationKernels.hpp>
+#include <kernels/activePointMasks.hpp>
+#include <kernels/derivativeComposition.hpp>
+#include <kernels/oneDimensionalPump.hpp>
+#include <kernels/pointBetaMapping.hpp>
+#include <kernels/timeIntegrationUpdateKernels.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -56,7 +62,7 @@ namespace hase::core
             return experiment.sigmaA.at(std::min(index, experiment.sigmaA.size() - 1u));
         }
 
-        void validateRunParameters(SimulationRunParameters const& run)
+        void validateRunParameters(SimulationRunControl const& run)
         {
             if(run.timeStep <= 0.0)
             {
@@ -86,7 +92,7 @@ namespace hase::core
     } // namespace detail
 
     template<typename T_Device, typename T_Executor>
-    class TimeSteppedSimulationRunner
+    class CompiledSimulationRunner
     {
         using T_Queue = ALPAKA_TYPEOF(std::declval<T_Device>().makeQueue(alpaka::queueKind::blocking));
         using T_DoubleBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::size_t{1}));
@@ -94,12 +100,12 @@ namespace hase::core
         using T_UnsignedBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
 
     public:
-        TimeSteppedSimulationRunner(
+        CompiledSimulationRunner(
             T_Device& device,
             T_Executor const& executor,
             ExperimentParameters& experiment,
             ComputeParameters& compute,
-            SimulationRunParameters const& run,
+            SimulationRunControl const& run,
             HostMesh& hostMesh)
             : m_device(device)
             , m_queue(device.makeQueue(alpaka::queueKind::blocking))
@@ -131,12 +137,12 @@ namespace hase::core
             alpaka::onHost::wait(m_queue);
         }
 
-        void run(std::function<void(SimulationStepSnapshot const&)> const& callback)
+        void run(std::function<void(SimulationSnapshot const&)> const& callback)
         {
             for(unsigned step = 0u; step < m_run.numberOfSteps; ++step)
             {
                 bool const pumpEnabled = step < m_run.pumpSteps;
-                stepOnce(pumpEnabled);
+                advanceOneStep(pumpEnabled);
                 callback(makeSnapshot(step + 1u));
                 alpaka::onHost::memcpy(m_queue, m_beta, m_betaNext);
                 alpaka::onHost::wait(m_queue);
@@ -144,7 +150,7 @@ namespace hase::core
         }
 
     private:
-        void evaluate(auto& beta, bool pumpEnabled)
+        void evaluateDerivative(auto& beta, bool pumpEnabled)
         {
             hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, beta, m_betaVolume);
             alpaka::onHost::wait(m_queue);
@@ -192,27 +198,27 @@ namespace hase::core
             alpaka::onHost::wait(m_queue);
         }
 
-        void stepOnce(bool pumpEnabled)
+        void advanceOneStep(bool pumpEnabled)
         {
             auto const& method = m_run.timeIntegration.method;
             if(method == TimeIntegrator::EXPLICIT_EULER)
             {
-                evaluate(m_beta, pumpEnabled);
+                evaluateDerivative(m_beta, pumpEnabled);
                 enqueueAddScaled(m_beta, m_derivative, m_betaNext, m_run.timeStep);
             }
             else if(method == TimeIntegrator::HEUN)
             {
-                evaluate(m_beta, pumpEnabled);
+                evaluateDerivative(m_beta, pumpEnabled);
                 alpaka::onHost::memcpy(m_queue, m_k1, m_derivative);
                 enqueueAddScaled(m_beta, m_k1, m_stage, m_run.timeStep);
-                evaluate(m_stage, pumpEnabled);
+                evaluateDerivative(m_stage, pumpEnabled);
                 enqueueHeun(m_beta, m_k1, m_derivative, m_betaNext);
             }
             else if(method == TimeIntegrator::MIDPOINT)
             {
-                evaluate(m_beta, pumpEnabled);
+                evaluateDerivative(m_beta, pumpEnabled);
                 enqueueAddScaled(m_beta, m_derivative, m_stage, 0.5 * m_run.timeStep);
-                evaluate(m_stage, pumpEnabled);
+                evaluateDerivative(m_stage, pumpEnabled);
                 enqueueAddScaled(m_beta, m_derivative, m_betaNext, m_run.timeStep);
             }
             else if(method == TimeIntegrator::RUNGE_KUTTA_4)
@@ -225,7 +231,7 @@ namespace hase::core
             }
             else if(method == TimeIntegrator::EXPONENTIAL_EULER)
             {
-                evaluate(m_beta, pumpEnabled);
+                evaluateDerivative(m_beta, pumpEnabled);
                 enqueueExponentialEuler();
             }
             else
@@ -242,19 +248,19 @@ namespace hase::core
 
         void stepRungeKutta4(bool pumpEnabled)
         {
-            evaluate(m_beta, pumpEnabled);
+            evaluateDerivative(m_beta, pumpEnabled);
             alpaka::onHost::memcpy(m_queue, m_k1, m_derivative);
             enqueueAddScaled(m_beta, m_k1, m_stage, 0.5 * m_run.timeStep);
 
-            evaluate(m_stage, pumpEnabled);
+            evaluateDerivative(m_stage, pumpEnabled);
             alpaka::onHost::memcpy(m_queue, m_k2, m_derivative);
             enqueueAddScaled(m_beta, m_k2, m_stage, 0.5 * m_run.timeStep);
 
-            evaluate(m_stage, pumpEnabled);
+            evaluateDerivative(m_stage, pumpEnabled);
             alpaka::onHost::memcpy(m_queue, m_k3, m_derivative);
             enqueueAddScaled(m_beta, m_k3, m_stage, m_run.timeStep);
 
-            evaluate(m_stage, pumpEnabled);
+            evaluateDerivative(m_stage, pumpEnabled);
             alpaka::onHost::memcpy(m_queue, m_k4, m_derivative);
             enqueueRungeKutta4();
         }
@@ -264,7 +270,7 @@ namespace hase::core
             alpaka::onHost::memcpy(m_queue, m_stage, m_beta);
             for(unsigned iteration = 0u; iteration < std::max(1u, m_run.timeIntegration.implicitIterations); ++iteration)
             {
-                evaluate(m_stage, pumpEnabled);
+                evaluateDerivative(m_stage, pumpEnabled);
                 enqueueAddScaled(m_beta, m_derivative, m_betaNext, m_run.timeStep);
                 alpaka::onHost::memcpy(m_queue, m_stage, m_betaNext);
             }
@@ -280,12 +286,12 @@ namespace hase::core
                 std::vector<double>(numberOfSamples, 0.0));
         }
 
-        SimulationStepSnapshot makeSnapshot(unsigned step)
+        SimulationSnapshot makeSnapshot(unsigned step)
         {
             auto dndtPump = detail::copyToVector(m_queue, m_dndtPump);
             auto dndtAse = detail::copyToVector(m_queue, m_dndtAse);
             m_lastAseResult.dndtAse = dndtAse;
-            return SimulationStepSnapshot{
+            return SimulationSnapshot{
                 step,
                 static_cast<double>(step) * m_run.timeStep,
                 m_hostMesh,
@@ -371,7 +377,7 @@ namespace hase::core
         hase::alpakaUtils::DevBundle<T_Device, T_Executor> m_devBundle;
         ExperimentParameters& m_experiment;
         ComputeParameters& m_compute;
-        SimulationRunParameters const& m_run;
+        SimulationRunControl const& m_run;
         HostMesh& m_hostMesh;
         DeviceMeshContainer<T_Device> m_meshContainer;
         DeviceMeshView m_mesh;
@@ -398,9 +404,9 @@ namespace hase::core
     inline int startTimeSteppedSimulation(
         ExperimentParameters& experiment,
         ComputeParameters& compute,
-        SimulationRunParameters const& run,
+        SimulationRunControl const& run,
         HostMesh& hostMesh,
-        std::function<void(SimulationStepSnapshot const&)> const& callback)
+        std::function<void(SimulationSnapshot const&)> const& callback)
     {
         detail::validateRunParameters(run);
         auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
@@ -421,7 +427,7 @@ namespace hase::core
                     return 0;
                 }
                 oneDidRun = true;
-                TimeSteppedSimulationRunner runner{device, exec, experiment, compute, run, hostMesh};
+                CompiledSimulationRunner runner{device, exec, experiment, compute, run, hostMesh};
                 runner.run(callback);
                 return 0;
             },

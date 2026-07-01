@@ -44,14 +44,6 @@ def writeVtkState(state, outputFile):
     vtkWedge(outputFile, state)
 
 
-class MyPumpSolver:
-    def step(self, input, pump):
-        beta = input["betaCell"]
-        mycustom = pump.getProperty("myCustomVar")
-        pump.withProperty("myCustomVar", mycustom + 1)
-        return np.ones_like(beta) - beta
-
-
 def cylindrical_core_cladding_surfaces(core_radius, cladding_radius, *, mesh_size):
     geo = gmsh.model.geo
     center = geo.addPoint(0.0, 0.0, 0.0, mesh_size)
@@ -129,7 +121,6 @@ def main():
             intensity=16e3,  # [W/cm^2]
             pumpSubsteps=100,
             wavelength=940e-9,  # [m]
-            solver=MyPumpSolver(),
             radiusX=1.5,
             radiusY=1.5,
             superGaussianOrder=40,

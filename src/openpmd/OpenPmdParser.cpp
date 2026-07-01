@@ -1,24 +1,21 @@
 #include <openPMD/openPMD.hpp>
 #include <openpmd/OpenPmdParser.hpp>
+#include <openpmd/SimulationSnapshotWriter.hpp>
 
 #include <core/timeSteppedSimulation.hpp>
 
 #include <algorithm>
 #include <array>
-#include <condition_variable>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <numeric>
 #include <optional>
-#include <queue>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1112,7 +1109,7 @@ namespace hase::openpmd
             attributeOr<unsigned>(iteration, field::maxSampleRange, numberOfSamples - 1u),
             attributeOr<unsigned>(iteration, field::rngSeed, core::ComputeParameters::unspecifiedRngSeed));
 
-        core::SimulationRunParameters run;
+        core::SimulationRunControl run;
         run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
         run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
         run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
@@ -1243,7 +1240,7 @@ namespace hase::openpmd
     void Parser::writeSimulationSnapshotIteration(
         io::Series& series,
         std::uint64_t iterationIndex,
-        core::SimulationStepSnapshot const& snapshot,
+        core::SimulationSnapshot const& snapshot,
         core::ExperimentParameters const& experiment,
         bool includeStatic)
     {
@@ -1497,66 +1494,28 @@ namespace hase::openpmd
     void Parser::runTimeSteppedSimulation()
     {
         auto simulation = read();
-        std::exception_ptr writerError;
-        std::mutex mutex;
-        std::condition_variable ready;
-        std::queue<std::optional<core::SimulationStepSnapshot>> pending;
         bool const writesOutput = isHeadRank();
 
-        std::thread writer;
+        std::unique_ptr<io::Series> series;
         if(writesOutput)
         {
-            writer = std::thread(
-                [&]
-                {
-                    try
-                    {
-                        auto const outputStream = m_outputPath.string();
+            auto const outputStream = m_outputPath.string();
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
-                        io::Series series(outputStream, io::Access::CREATE_LINEAR, MPI_COMM_SELF, seriesConfig(outputStream));
+            series = std::make_unique<io::Series>(outputStream, io::Access::CREATE_LINEAR, MPI_COMM_SELF, seriesConfig(outputStream));
 #else
-                        io::Series series(outputStream, io::Access::CREATE_LINEAR, seriesConfig(outputStream));
+            series = std::make_unique<io::Series>(outputStream, io::Access::CREATE_LINEAR, seriesConfig(outputStream));
 #endif
-                        series.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
-
-                        while(true)
-                        {
-                            std::optional<core::SimulationStepSnapshot> item;
-                            {
-                                std::unique_lock lock{mutex};
-                                ready.wait(lock, [&] { return !pending.empty(); });
-                                item = std::move(pending.front());
-                                pending.pop();
-                            }
-                            if(!item)
-                            {
-                                break;
-                            }
-                            bool const includeStatic = item->step == 1u;
-                            writeSimulationSnapshotIteration(series, item->step - 1u, *item, simulation.experiment, includeStatic);
-                            series.flush();
-                        }
-                        series.close();
-                    }
-                    catch(...)
-                    {
-                        writerError = std::current_exception();
-                    }
-                });
+            series->setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
         }
 
-        auto enqueueSnapshot = [&](core::SimulationStepSnapshot const& snapshot)
-        {
-            if(!writesOutput)
+        AsyncSimulationSnapshotWriter snapshotWriter{
+            writesOutput,
+            [&](core::SimulationSnapshot const& snapshot)
             {
-                return;
-            }
-            {
-                std::scoped_lock lock{mutex};
-                pending.push(snapshot);
-            }
-            ready.notify_one();
-        };
+                bool const includeStatic = snapshot.step == 1u;
+                writeSimulationSnapshotIteration(*series, snapshot.step - 1u, snapshot, simulation.experiment, includeStatic);
+                series->flush();
+            }};
 
         std::exception_ptr simulationError;
         int result = 0;
@@ -1567,21 +1526,17 @@ namespace hase::openpmd
                 simulation.compute,
                 simulation.run,
                 simulation.mesh,
-                enqueueSnapshot);
+                [&](core::SimulationSnapshot const& snapshot) { snapshotWriter.enqueue(snapshot); });
         }
         catch(...)
         {
             simulationError = std::current_exception();
         }
 
-        if(writesOutput)
+        snapshotWriter.finish();
+        if(series)
         {
-            {
-                std::scoped_lock lock{mutex};
-                pending.push(std::nullopt);
-            }
-            ready.notify_one();
-            writer.join();
+            series->close();
         }
         if(simulationError)
         {
@@ -1590,10 +1545,6 @@ namespace hase::openpmd
         if(result != 0)
         {
             throw std::runtime_error("time-stepped simulation failed with return code " + std::to_string(result));
-        }
-        if(writerError)
-        {
-            std::rethrow_exception(writerError);
         }
     }
 

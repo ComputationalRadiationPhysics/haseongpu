@@ -1,6 +1,8 @@
 #pragma once
 
 #include <core/mesh.hpp>
+#include <core/simulationContext.hpp>
+#include <core/simulationSnapshot.hpp>
 #include <core/types.hpp>
 
 #include <cstdint>
@@ -55,7 +57,7 @@ namespace hase::openpmd
         void writeSimulationSnapshotIteration(
             openPMD::Series& series,
             std::uint64_t iterationIndex,
-            core::SimulationStepSnapshot const& snapshot,
+            core::SimulationSnapshot const& snapshot,
             core::ExperimentParameters const& experiment,
             bool includeStatic);
 

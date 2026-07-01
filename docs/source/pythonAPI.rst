@@ -1,10 +1,9 @@
 Python API Reference
 ====================
 
-This page is generated from the Python objects exposed by ``HASEonGPU``.  It is
-the reference page for signatures, class members, functions, and direct object
-lookup.  For workflow-oriented explanations and complete simulation examples,
-start with the :doc:`Python Interface Guide <pythonInterface>`.
+This page is generated from the public Python objects exposed by ``HASEonGPU``.
+It is a reference for signatures and members. For the user workflow and a
+complete example, start with the :doc:`Python Interface Guide <pythonInterface>`.
 
 Public API
 ----------
@@ -24,8 +23,8 @@ Geometry and gain media
    GainMediumGeometry
    Gmsh
 
-Spectra, pump, and ASE configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Spectra, pump, and ASE
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated
@@ -34,7 +33,6 @@ Spectra, pump, and ASE configuration
    CrossSectionData
    LaserProperties
    SpectralDecomposition
-   PumpRadiationProfile
    PumpProperties
    PhiASE
 
@@ -48,32 +46,21 @@ Simulation and time integration
    Simulation
    TimeStepState
    TimeSteppedSimulation
-   TimeDerivative
-   TimeIntegrationResult
-   TimeIntegrationSolver
    ExplicitEuler
    ExponentialEuler
-   FrozenPhiAseRungeKutta4
    Heun
    ImplicitEuler
    Midpoint
    RungeKutta4
+   TimeIntegrationSolver
 
-Pump solvers, field helpers, and utilities
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Utilities and transport schemas
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated
    :nosignatures:
 
-   BetaInt3PumpSolver
-   BetaIntegrationSolver
-   BetaIntegrationGaussianSolver
-   OneDimensionalZTraversal
-   oneDimensionalZTraversalPumpRate
-   Constants
-   LegacyGridDataBetaVolumeMapper
-   calcGainFromState
    AlpakaBackends
    BaseSchema
    PointSchema
@@ -81,6 +68,7 @@ Pump solvers, field helpers, and utilities
    PrismSchema
    PrimitiveFieldSpec
    backendFlat
+   calcGainFromState
    vtkWedge
    writeGainMediumVtk
    writeParaviewState
@@ -88,14 +76,3 @@ Pump solvers, field helpers, and utilities
 The ``unitDimension`` namespace is exported from ``HASEonGPU`` and contains
 predefined openPMD unit-dimension tuples for HASE transport variables and common
 dimensions.
-
-Compatibility helpers
-^^^^^^^^^^^^^^^^^^^^^
-
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-
-   beta_int3Main
-   integrateLaserPump
-   runLaserPumpStep
