@@ -965,8 +965,13 @@ def test_openpmd_api_preference_rejects_missing_cmake_selected_module(monkeypatc
     active = tmp_path / "site-packages" / "openpmd_api" / "__init__.py"
     monkeypatch.setitem(transport.sys.modules, "openpmd_api", SimpleNamespace(__file__=str(active)))
     monkeypatch.setattr(transport, "_candidate_python_paths", lambda executable: iter([tmp_path / "missing"]))
+    monkeypatch.setattr(
+        transport,
+        "_binding_config",
+        lambda: SimpleNamespace(HASE_USE_SYSTEM_OPENPMD=False),
+    )
 
-    with pytest.raises(RuntimeError, match="CMake-selected openpmd_api"):
+    with pytest.raises(RuntimeError, match=r"compatible with the openPMD C\+\+ provider"):
         transport._prefer_matching_openpmd_api(Path("calcPhiASE"))
 
 

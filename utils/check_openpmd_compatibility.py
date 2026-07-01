@@ -7,6 +7,7 @@ import argparse
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,14 @@ BACKEND_EXTENSIONS = {
     "hdf5": "h5",
 }
 HASE_SOURCE_BUILD_BACKENDS = ("adios-sst", "adios", "hdf5")
+
+
+def _default_cmake_generator() -> str | None:
+    if "CMAKE_GENERATOR" in os.environ:
+        return None
+    if shutil.which("ninja"):
+        return "Ninja"
+    return None
 
 
 def _parse_args() -> argparse.Namespace:
@@ -46,6 +55,14 @@ def _parse_args() -> argparse.Namespace:
         "--cmake",
         default="cmake",
         help="CMake executable.",
+    )
+    parser.add_argument(
+        "--cmake-generator",
+        default=_default_cmake_generator(),
+        help=(
+            "CMake generator for the provider probe. Defaults to Ninja when "
+            "ninja is available and CMAKE_GENERATOR is unset."
+        ),
     )
     return parser.parse_args()
 
@@ -132,6 +149,8 @@ def _cmake_probe(args: argparse.Namespace, errors: list[str]) -> dict[str, str]:
         )
 
         command = [args.cmake, "-S", str(source), "-B", str(build)]
+        if args.cmake_generator:
+            command.extend(["-G", args.cmake_generator])
         if args.cmake_prefix_path:
             command.append(f"-DCMAKE_PREFIX_PATH={args.cmake_prefix_path}")
         if args.openpmd_dir:
