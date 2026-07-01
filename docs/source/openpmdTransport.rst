@@ -122,14 +122,13 @@ If the matching Python package is not on the normal Python path, set
 ``openpmd_api``. Do not use it to mix unrelated frontend and backend openPMD
 builds.
 
-To use the self-contained path where HASEonGPU fetches and builds openPMD,
-configure with ``-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON``. In that mode HASEonGPU
-enables ADIOS2, ADIOS2 SST, and HDF5 for the CMake build. The HASE wheel does
-not vendor the resulting openPMD runtime libraries or generated
-``openpmd_api`` bindings; the target runtime environment must still provide
-compatible openPMD libraries and Python bindings. As an explicit runtime escape
-hatch, ``HASE_OPENPMD_PYTHONPATH`` may be set to a matching package directory
-before importing HASEonGPU.
+Provider installation details, including the difference between external
+openPMD-api providers and ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON``, are documented
+in :doc:`compilation`. The HASE wheel does not vendor openPMD runtime libraries
+or generated ``openpmd_api`` bindings; the target runtime environment must
+provide compatible openPMD libraries and Python bindings. As an explicit
+runtime escape hatch, ``HASE_OPENPMD_PYTHONPATH`` may be set to a matching
+package directory before importing HASEonGPU.
 
 openPMD Record Layout
 ---------------------

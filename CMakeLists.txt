@@ -420,8 +420,69 @@ set(HASE_BUILD_TREE_RPATH
 )
 set(HASE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib")
 set(HASE_INSTALL_LIB_RPATH "$ORIGIN")
+set(HASE_OPENPMD_RUNTIME_RPATH
+    ""
+    CACHE STRING
+    "Additional runtime search paths for a non-vendored openPMD-api provider"
+)
 
 include(cmake/findOpenPmd.cmake)
+set(HASE_OPENPMD_PROVIDER_RPATH ${HASE_OPENPMD_RUNTIME_RPATH})
+function(hase_append_openpmd_rpath_from_target target)
+    if(NOT TARGET ${target})
+        return()
+    endif()
+
+    get_target_property(HASE_OPENPMD_PROVIDER_TARGET_TYPE ${target} TYPE)
+    if(HASE_OPENPMD_PROVIDER_TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
+        return()
+    endif()
+
+    get_target_property(HASE_OPENPMD_PROVIDER_IMPORTED ${target} IMPORTED)
+    if(HASE_OPENPMD_PROVIDER_IMPORTED)
+        foreach(
+            HASE_OPENPMD_PROVIDER_LOCATION_PROPERTY
+            IN
+            ITEMS
+                IMPORTED_LOCATION
+                IMPORTED_LOCATION_RELEASE
+                IMPORTED_LOCATION_RELWITHDEBINFO
+                IMPORTED_LOCATION_MINSIZEREL
+                IMPORTED_LOCATION_DEBUG
+        )
+            get_target_property(
+                HASE_OPENPMD_PROVIDER_LOCATION
+                ${target}
+                ${HASE_OPENPMD_PROVIDER_LOCATION_PROPERTY}
+            )
+            if(HASE_OPENPMD_PROVIDER_LOCATION)
+                get_filename_component(
+                    HASE_OPENPMD_PROVIDER_LOCATION_DIR
+                    "${HASE_OPENPMD_PROVIDER_LOCATION}"
+                    DIRECTORY
+                )
+                list(
+                    APPEND
+                    HASE_OPENPMD_PROVIDER_RPATH
+                    "${HASE_OPENPMD_PROVIDER_LOCATION_DIR}"
+                )
+            endif()
+        endforeach()
+    else()
+        list(APPEND HASE_OPENPMD_PROVIDER_RPATH "$<TARGET_FILE_DIR:${target}>")
+    endif()
+    set(HASE_OPENPMD_PROVIDER_RPATH
+        "${HASE_OPENPMD_PROVIDER_RPATH}"
+        PARENT_SCOPE
+    )
+endfunction()
+
+hase_append_openpmd_rpath_from_target(openPMD::openPMD)
+hase_append_openpmd_rpath_from_target(openPMD)
+if(HASE_OPENPMD_PROVIDER_RPATH)
+    list(REMOVE_DUPLICATES HASE_OPENPMD_PROVIDER_RPATH)
+    list(APPEND HASE_INSTALL_RPATH ${HASE_OPENPMD_PROVIDER_RPATH})
+endif()
 foreach(HASE_BUILD_RPATH_TARGET IN ITEMS openPMD hdf5-shared)
     if(TARGET ${HASE_BUILD_RPATH_TARGET})
         list(
