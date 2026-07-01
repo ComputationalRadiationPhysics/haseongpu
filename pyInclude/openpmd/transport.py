@@ -158,10 +158,11 @@ OPENPMD_BACKENDS = {
     "adios-sst": _BackendSpec("adios-sst", ".sst", SST_CONFIG, streaming=True),
     "hdf5": _BackendSpec("hdf5", ".h5", HDF5_CONFIG),
 }
+DEFAULT_OPENPMD_BACKEND = "adios-sst"
 
 
 def _normalize_backend(backend=None):
-    value = backend if backend is not None else os.environ.get("HASE_OPENPMD_BACKEND", "adios")
+    value = backend if backend is not None else DEFAULT_OPENPMD_BACKEND
     normalized = str(value).strip().lower()
     if normalized not in OPENPMD_BACKENDS:
         allowed = ", ".join(sorted(OPENPMD_BACKENDS))
@@ -451,9 +452,9 @@ def _prefer_matching_openpmd_api(executable: Path):
         if _using_external_openpmd():
             return
         raise RuntimeError(
-            "The openPMD transport requires the CMake-selected openpmd_api Python "
-            "module matching calcPhiASE. Rebuild with "
-            "HASE_BUILD_OPENPMD_FROM_SOURCE=ON and HASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON, set "
+            "The openPMD transport requires an openpmd_api Python module "
+            "compatible with the openPMD C++ provider used by calcPhiASE. "
+            "Install/load a matching provider, set "
             "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory>, or set "
             "HASE_OPENPMD_PYTHONPATH at runtime."
         )

@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 
 repoRoot = Path(__file__).resolve().parents[3]
@@ -53,12 +52,6 @@ class _FakePhiASE:
         result = Result()
         result.phiAse = np.ones(int(np.prod(self._shape)), dtype=np.float64)
         return result
-
-
-@pytest.fixture(autouse=True)
-def _use_file_openpmd_backend(monkeypatch):
-    monkeypatch.setenv("HASE_OPENPMD_BACKEND", "adios")
-
 
 def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, smallGainMedium):
     monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _NoPumpSolver())

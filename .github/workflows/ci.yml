@@ -31,7 +31,7 @@ jobs:
       matrix:
         config:
           - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "hdf5" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst", openpmd_provider: "external" }
           - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
           - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
           - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", openpmd_backend: "adios" }
@@ -63,15 +63,14 @@ jobs:
 
     env:
       DEBIAN_FRONTEND: noninteractive
-      HASE_OPENPMD_BACKEND: ${{ matrix.config.openpmd_backend }}
+      OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
       HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
+      OPENPMD_PROVIDER: ${{ matrix.config.openpmd_provider || 'bundled' }}
       BUILD_DIR: build/ci
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
-        -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
         -DDISABLE_MPI=ON
-        -DHASE_OPENPMD_BACKEND=${{ matrix.config.openpmd_backend }}
 
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +110,7 @@ jobs:
             apt-get install -y --no-install-recommends libtbb-dev
           fi
 
-          if [[ "$HASE_OPENPMD_BACKEND" == "hdf5" ]]; then
+          if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
             apt-get install -y --no-install-recommends libhdf5-dev
           fi
 
@@ -202,6 +201,41 @@ jobs:
           fi
 
 
+      - name: Build external openPMD provider
+        if: ${{ env.OPENPMD_PROVIDER == 'external' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          openpmd_src=/tmp/hase-external-openpmd-src
+          openpmd_build=/tmp/hase-external-openpmd-build
+          openpmd_prefix="$GITHUB_WORKSPACE/.openpmd-prefix"
+          git clone --depth 1 --branch 0.17.0 \
+            https://github.com/openPMD/openPMD-api.git \
+            "$openpmd_src"
+          cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
+            -DBUILD_TESTING=OFF \
+            -DopenPMD_BUILD_EXAMPLES=OFF \
+            -DopenPMD_USE_MPI=OFF \
+            -DopenPMD_USE_ADIOS2=ON \
+            -DopenPMD_USE_HDF5=ON \
+            -DopenPMD_USE_PYTHON=OFF \
+            -DADIOS2_USE_SST=ON
+          cmake --build "$openpmd_build" --target install --parallel "$(nproc)"
+          python -m pip install "openpmd-api==0.17.0"
+          echo "CMAKE_PREFIX_PATH=$openpmd_prefix:${CMAKE_PREFIX_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+      - name: Check external openPMD provider
+        if: ${{ env.OPENPMD_PROVIDER == 'external' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python utils/check_openpmd_compatibility.py \
+            --backend "$OPENPMD_RUNTIME_BACKEND" \
+            --cmake-prefix-path "$CMAKE_PREFIX_PATH"
+
       - name: Configure
         shell: bash
         run: |
@@ -209,6 +243,11 @@ jobs:
           cmake_args=(
             $HASE_CMAKE_ARGS
           )
+          if [[ "$OPENPMD_PROVIDER" == "external" ]]; then
+            cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF)
+          else
+            cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON)
+          fi
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
             cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
             cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
@@ -246,6 +285,11 @@ jobs:
             -DBUILD_TESTING=OFF
             -DHASE_TESTING=OFF
           )
+          if [[ "$OPENPMD_PROVIDER" == "external" ]]; then
+            pip_cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF)
+          else
+            pip_cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON)
+          fi
 
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
             pip_cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
@@ -321,7 +365,7 @@ jobs:
           cd "$example_output_dir"
           python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
             --backend Host_Cpu_CpuSerial \
-            --openpmd-backend "$HASE_OPENPMD_BACKEND" \
+            --openpmd-backend "$OPENPMD_RUNTIME_BACKEND" \
             --timeSteps 1 \
             --pumpSteps 1 \
             --vtk-output-dir "$example_output_dir" \
