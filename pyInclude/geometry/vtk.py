@@ -12,6 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
+from ..openpmd import backendFlat
+
 
 _VTK_TO_DTYPE = {
     "float": np.float64,
@@ -185,7 +187,7 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
     _, _, _, _, physical = _topologyFromUnstructuredGrid(path)
     medium = gainMediumCls(topology=topology)
     for name, value in physical.items():
-        medium.set(name, value)
+        medium.set(name, backendFlat(value) if np.asarray(value).ndim == 1 else value)
     return medium
 
 

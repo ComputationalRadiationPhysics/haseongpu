@@ -30,51 +30,69 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
-          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0" }
-          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on" }
-          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04" }
-          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04" }
-          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04" }
-          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", simd: "EMULATION", hwloc: "no" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4" }
-          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4" }
-          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0" }
-          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2" }
-          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", simd: "EMULATION", hwloc: "no" }
+          - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "2", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "17", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "4", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "21", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "3", tbb: "on", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.5", hip: "no", container: "nvidia/cuda:12.5.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "12.6", hip: "no", container: "nvidia/cuda:12.6.3-devel-ubuntu24.04", mpi: "on", mpi_ranks: "4", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: nvcc, version: "", cuda: "12.9", hip: "no", container: "nvidia/cuda:12.9.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.0", hip: "no", container: "nvidia/cuda:13.0.0-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: nvcc, version: "", cuda: "13.1", hip: "no", container: "nvidia/cuda:13.1.0-devel-ubuntu24.04", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: nvcc, version: "", cuda: "13.2", hip: "no", container: "nvidia/cuda:13.2.0-devel-ubuntu24.04", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "20", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "21", cuda: "12.8", hip: "no", container: "nvidia/cuda:12.8.1-devel-ubuntu24.04", mpi: "on", mpi_ranks: "4", simd: "EMULATION", hwloc: "no", openpmd_backend: "adios" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.2.4", container: "rocm/dev-ubuntu-24.04:6.2.4", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "18", cuda: "no", hip: "6.3.4", container: "rocm/dev-ubuntu-24.04:6.3.4", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
+          - { compiler: clang, version: "19", cuda: "no", hip: "6.4.2", container: "rocm/dev-ubuntu-24.04:6.4.2", mpi: "off", openpmd_backend: "hdf5" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.0", container: "rocm/dev-ubuntu-24.04:7.0", mpi: "on", mpi_ranks: "2", openpmd_backend: "adios" }
+          - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1", mpi: "off", openpmd_backend: "adios-sst" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
+          - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
 
     env:
-      BUILD_DIR: build/ci
       DEBIAN_FRONTEND: noninteractive
-      HASE_CMAKE_ARGS: >-
+      OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
+      HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
+      BUILD_DIR: build/ci
+      HASE_MPI: ${{ matrix.config.mpi }}
+      HASE_MPI_TEST_RANKS: ${{ matrix.config.mpi_ranks || '' }}
+      HASE_CMAKE_ARGS_BASE: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
-        -DDISABLE_MPI=ON
-        -DHASE_BUILD_RELEASE=ON
-        -DHASE_BUILD_PhiAse=ON
-        -DHASE_ENABLE_PYTHON=ON
-        -DCMAKE_CUDA_ARCHITECTURES=80
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure MPI matrix settings
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mpi_cmake_arg="-DDISABLE_MPI=ON"
+          if [[ "$HASE_MPI" == "on" ]]; then
+            mpi_cmake_arg="-DDISABLE_MPI=OFF"
+            echo "OMPI_ALLOW_RUN_AS_ROOT=1" >> "$GITHUB_ENV"
+            echo "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> "$GITHUB_ENV"
+            echo "HASE_MPIEXEC_EXTRA_ARGS=--oversubscribe" >> "$GITHUB_ENV"
+          fi
+
+          {
+            echo "HASE_CMAKE_ARGS<<EOF"
+            echo "$HASE_CMAKE_ARGS_BASE $mpi_cmake_arg"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         shell: bash
@@ -111,6 +129,14 @@ jobs:
             apt-get install -y --no-install-recommends libtbb-dev
           fi
 
+          if [[ "$HASE_MPI" == "on" ]]; then
+            apt-get install -y --no-install-recommends openmpi-bin libopenmpi-dev
+          fi
+
+          if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
+            apt-get install -y --no-install-recommends libhdf5-dev
+          fi
+
           if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
             apt-get install -y --no-install-recommends \
               "gcc-${{ matrix.config.version }}" \
@@ -134,8 +160,7 @@ jobs:
           set -euxo pipefail
           python3 -m venv .venv
           . .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -r requirements.txt
+          python -m pip install --upgrade pip
           echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
           echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
 
@@ -198,12 +223,14 @@ jobs:
             printf 'LD_LIBRARY_PATH=%s:%s\n' "$(IFS=:; echo "${runtime_paths[*]}")" "$current_ld_library_path" >> "$GITHUB_ENV"
           fi
 
+
       - name: Configure
         shell: bash
         run: |
           set -euxo pipefail
           cmake_args=(
             $HASE_CMAKE_ARGS
+            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
           )
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
             cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
@@ -241,6 +268,7 @@ jobs:
             $HASE_CMAKE_ARGS
             -DBUILD_TESTING=OFF
             -DHASE_TESTING=OFF
+            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
           )
 
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
@@ -262,7 +290,7 @@ jobs:
             )
           fi
 
-          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install --no-build-isolation .
+          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install ".[test]"
 
       - name: Debug Python install
         shell: bash
@@ -288,6 +316,14 @@ jobs:
                   print("contents matching HASE* in", pp)
                   print(list(pp.glob("HASE*")))
 
+          # The workflow checkout is on sys.path when Python starts in the
+          # repository root. Import from outside the checkout so this debug
+          # step validates the wheel installed above, not the source-tree
+          # fallback package.
+          import os
+          os.chdir("/tmp")
+          sys.path[0] = ""
+
           import HASEonGPU
           print("HASEonGPU imported from:", HASEonGPU.__file__)
           PY
@@ -300,6 +336,23 @@ jobs:
           cd /tmp
           python hase_bindings_smoketest.py
 
+      - name: Run laserPumpCladding example from installed package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          example_output_dir=/tmp/hase-laser-pump-cladding
+          mkdir -p "$example_output_dir"
+          cd "$example_output_dir"
+          python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
+            --backend Host_Cpu_CpuSerial \
+            --openpmd-backend "$OPENPMD_RUNTIME_BACKEND" \
+            --timeSteps 1 \
+            --pumpSteps 1 \
+            --vtk-output-dir "$example_output_dir" \
+            --min-sample-range 0 \
+            --max-sample-range 100 \
+            --rng-seed 5489
+
       - name: Run CTest
         shell: bash
         run: |
@@ -311,3 +364,159 @@ jobs:
         run: |
           set -euxo pipefail
           pytest tests
+
+  openpmd-provider-smoke:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      OPENPMD_BACKENDS: adios adios-sst hdf5
+      OPENPMD_PROVIDER_VERSIONS: 0.17.0 0.17.1
+      HASE_OPENPMD_TEST_BACKENDS: adios,adios-sst,hdf5
+      HASE_CMAKE_ARGS: >-
+        -DBUILD_TESTING=ON
+        -DHASE_TESTING=ON
+        -DDISABLE_MPI=ON
+        -DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            g++-13 \
+            gcc-13 \
+            libglu1 \
+            libhdf5-dev \
+            libhwloc-dev \
+            libomp-dev \
+            ninja-build \
+            pkg-config \
+            python3 \
+            python3-dev \
+            python3-pip \
+            python3-venv \
+            wget
+
+          if ! command -v cmake >/dev/null 2>&1; then
+            apt-get install -y --no-install-recommends cmake
+          fi
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
+          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
+
+      - name: Select compiler
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "CC=$(command -v gcc-13)" >> "$GITHUB_ENV"
+          echo "CXX=$(command -v g++-13)" >> "$GITHUB_ENV"
+
+      - name: Run external openPMD provider smoke matrix
+        shell: bash
+        run: |
+          set -euxo pipefail
+          adios2_src="/tmp/hase-external-adios2-src"
+          adios2_build="/tmp/hase-external-adios2-build"
+          adios2_prefix="$GITHUB_WORKSPACE/.adios2-prefix"
+
+          rm -rf "$adios2_src" "$adios2_build" "$adios2_prefix"
+          git clone --depth 1 --branch v2.12.1 \
+            https://github.com/ornladios/ADIOS2.git \
+            "$adios2_src"
+          cmake -S "$adios2_src" -B "$adios2_build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$adios2_prefix" \
+            -DADIOS2_USE_MPI=OFF \
+            -DADIOS2_USE_Fortran=OFF \
+            -DADIOS2_USE_Python=OFF \
+            -DADIOS2_USE_SST=ON \
+            -DADIOS2_USE_HDF5=OFF \
+            -DADIOS2_BUILD_EXAMPLES=OFF \
+            -DADIOS2_BUILD_TESTING=OFF \
+            -DADIOS2_INSTALL_GENERATE_CONFIG=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$adios2_build" --target install --parallel "$(nproc)"
+
+          run_backend_smoke() {
+            local openpmd_version="$1"
+            local openpmd_prefix="$2"
+            local backend="$3"
+            local example_output_dir
+
+            python "$GITHUB_WORKSPACE/utils/check_openpmd_compatibility.py" \
+              --backend "$backend" \
+              --cmake-prefix-path "$openpmd_prefix;$adios2_prefix"
+
+            example_output_dir="/tmp/hase-laser-pump-cladding-openpmd-${openpmd_version}-${backend}"
+            mkdir -p "$example_output_dir"
+            (
+              cd "$example_output_dir"
+              python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
+                --backend Host_Cpu_CpuSerial \
+                --openpmd-backend "$backend" \
+                --timeSteps 1 \
+                --pumpSteps 1 \
+                --vtk-output-dir "$example_output_dir" \
+                --min-sample-range 0 \
+                --max-sample-range 100 \
+                --rng-seed 5489
+            )
+          }
+
+          for openpmd_version in $OPENPMD_PROVIDER_VERSIONS; do
+            openpmd_src="/tmp/hase-external-openpmd-src-$openpmd_version"
+            openpmd_build="/tmp/hase-external-openpmd-build-$openpmd_version"
+            openpmd_prefix="$GITHUB_WORKSPACE/.openpmd-prefix/$openpmd_version"
+
+            rm -rf "$openpmd_src" "$openpmd_build" "$openpmd_prefix" build
+            git clone --depth 1 --branch "$openpmd_version" \
+              https://github.com/openPMD/openPMD-api.git \
+              "$openpmd_src"
+            cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
+              -DCMAKE_PREFIX_PATH="$adios2_prefix" \
+              -DBUILD_TESTING=OFF \
+              -DopenPMD_BUILD_EXAMPLES=OFF \
+              -DopenPMD_USE_MPI=OFF \
+              -DopenPMD_USE_ADIOS2=ON \
+              -DopenPMD_USE_HDF5=ON \
+              -DopenPMD_USE_PYTHON=OFF \
+              -DADIOS2_USE_SST=ON
+            cmake --build "$openpmd_build" --target install --parallel "$(nproc)"
+
+            python -m pip uninstall -y HASEonGPU openpmd-api || true
+            python -m pip install "openpmd-api==$openpmd_version"
+            CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix;$adios2_prefix -DHASE_OPENPMD_RUNTIME_RPATH=$openpmd_prefix/lib;$openpmd_prefix/lib64;$adios2_prefix/lib;$adios2_prefix/lib64 -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
+              python -m pip install ".[test]"
+
+            cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
+            (
+              cd /tmp
+              python hase_bindings_smoketest.py
+            )
+
+            for backend in $OPENPMD_BACKENDS; do
+              run_backend_smoke "$openpmd_version" "$openpmd_prefix" "$backend"
+            done
+
+            pytest tests/python/openpmd/test_openpmd_preflight.py tests/python/openpmd/test_transport.py
+          done

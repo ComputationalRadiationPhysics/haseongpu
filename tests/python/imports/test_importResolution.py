@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -49,7 +50,8 @@ def testRepoRootImportFallsBackToInstalledBindingsWithoutBuildTree(tmp_path):
         "from pathlib import Path\n"
         "import HASEonGPU\n"
         "import HASEonGPU_Bindings\n"
-        "from HASEonGPU import ExperimentParameters, Result\n"
+        "from HASEonGPU import Result\n"
+        "from HASEonGPU_Bindings import ExperimentParameters\n"
         "payload = {\n"
         "    'module': str(Path(HASEonGPU.__file__).resolve()),\n"
         "    'binding_paths': [str(Path(p).resolve()) for p in HASEonGPU_Bindings.__path__],\n"
@@ -64,9 +66,17 @@ def testRepoRootImportFallsBackToInstalledBindingsWithoutBuildTree(tmp_path):
         sys.executable,
         str(runner),
     ]
+    installedParents = {
+        str(path.parent)
+        for path in installedBindings
+    }
+    env = os.environ.copy()
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONPATH"] = os.pathsep.join(sorted(installedParents))
     completed = subprocess.run(
         command,
         cwd=checkout,
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

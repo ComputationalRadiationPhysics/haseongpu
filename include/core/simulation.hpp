@@ -27,10 +27,8 @@
 #include <core/logging.hpp>
 #include <core/mesh.hpp>
 #include <core/types.hpp>
-#include <parse/parser.hpp> /* Backend, ParallelMode */
 #include <random/random.hpp>
 #include <utils/ray_histogram.hpp>
-#include <utils/writeMatlabOutput.hpp>
 #include <utils/writeToVtk.hpp>
 #if !defined(DISABLE_MPI) && defined(MPI_FOUND)
 #    include <core/calcPhiAseMpi.hpp>
@@ -157,8 +155,11 @@ namespace hase::core
 
                 auto devSelector = alpaka::onHost::makeDeviceSelector(deviceSpec);
 
-                // this code block is not executed if deviceCount is zero
                 std::size_t deviceCount = devSelector.getDeviceCount();
+                if(deviceCount == 0u)
+                {
+                    return 0;
+                }
                 compute.devices = std::vector<unsigned>(deviceCount);
                 std::iota(compute.devices.begin(), compute.devices.end(), 0u);
                 compute.gpu_i = compute.devices.front();
@@ -332,20 +333,6 @@ namespace hase::core
                     }
                 }
 
-                if constexpr(MATLAB)
-                {
-                    /***************************************************************************
-                     * WRITE MATLAB OUTPUT
-                     **************************************************************************/
-                    // output folder has to be the same as TMP_FOLDER in the calling MatLab script
-                    hase::utils::writeMatlabOutput(
-                        compute.outputPath,
-                        result.phiAse,
-                        result.totalRays,
-                        result.mse,
-                        meshes[0].numberOfSamples,
-                        meshes[0].numberOfLevels);
-                }
                 /***************************************************************************
                  * WRITE VTK FILES
                  **************************************************************************/
@@ -502,10 +489,5 @@ namespace hase::core
         return i || !oneDidRun;
     }
 
-    int pythonEntry(ExperimentParameters experiment, ComputeParameters compute, Result& result, HostMesh host_mesh)
-    {
-        hase::parse::pythonParse(experiment, compute, host_mesh, result);
-        return startSimulation<false>(experiment, compute, result, host_mesh);
-    }
 
 } // namespace hase::core

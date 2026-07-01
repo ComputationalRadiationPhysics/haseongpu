@@ -145,7 +145,7 @@ Use ``GainMedium`` property metadata for array shapes:
    medium = topology.asGainMedium()
    medium.get("betaCells").expectedShape       # (numberOfPoints, levels)
    medium.get("betaVolume").expectedShape      # (numberOfTriangles, levels - 1)
-   medium.get("reflectivities").expectedShape  # (2, numberOfTriangles)
+   medium.get("reflectivities").expectedShape  # (numberOfTriangles, 2)
 
 Index Utilities
 ---------------

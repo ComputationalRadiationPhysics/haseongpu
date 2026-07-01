@@ -11,7 +11,7 @@ import numpy as np
 
 
 repoRoot = Path(__file__).resolve().parents[3]
-exampleDir = repoRoot / "example" / "python_example"
+exampleDir = repoRoot / "example"
 sys.path.insert(0, str(exampleDir))
 import laserPumpCladding  # noqa: E402
 
@@ -37,10 +37,14 @@ class _FakePhiASE:
         self.spectralProperties = spectralProperties
         self.laserProperties = None
         self.backend = overrides.get("backend", "FakeBackend")
+        self.openpmdBackend = overrides.get(
+            "openpmdBackend",
+            overrides.get("openpmd_backend", "adios"),
+        )
         self._shape = None
         self.runInputs = []
 
-    def run(self, gainMedium=None, crossSections=None):
+    def run(self, gainMedium=None, crossSections=None, **kwargs):
         self._shape = gainMedium.get("betaCells").expectedShape
         self.runInputs.append(np.asarray(gainMedium.get("betaCells").value, dtype=np.float64).copy())
         return self
@@ -52,7 +56,6 @@ class _FakePhiASE:
         result = Result()
         result.phiAse = np.ones(int(np.prod(self._shape)), dtype=np.float64)
         return result
-
 
 def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, smallGainMedium):
     monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _NoPumpSolver())

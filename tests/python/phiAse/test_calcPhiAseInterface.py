@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from HASEonGPU import AlpakaBackends, calcPhiASE
+from HASEonGPU import AlpakaBackends
+from pyInclude import calcPhiASE
 import numpy as np
 import copy
 import importlib

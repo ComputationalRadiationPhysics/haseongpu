@@ -12,6 +12,17 @@ __version__ = "2.0.1"
 
 from .alpakaUtils import AlpakaBackends
 from .calcPhiASE import calcPhiASE
+from .openpmd import (
+    BaseGroup,
+    BaseSchema,
+    GroupFieldSpec,
+    PointSchema,
+    PrimitiveFieldSpec,
+    PrismSchema,
+    TriangleSchema,
+    backendFlat,
+    unitDimension,
+)
 from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, writeGainMediumVtk
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition, PumpRadiationProfile
 from .pumping import (
@@ -33,6 +44,7 @@ from .simulation import (
     TimeSteppedSimulation,
 )
 from .gainMap import calcGainFromState
+from .structures import Result as TransportResult
 from .vtkWedge import vtkWedge
 from .timeIntegration import (
     ExplicitEuler,
@@ -46,4 +58,5 @@ from .timeIntegration import (
     TimeIntegrationResult,
     TimeIntegrationSolver,
 )
-Mesh=HASEonGPU_Bindings.HostMesh
+
+Mesh = HASEonGPU_Bindings.HostMesh

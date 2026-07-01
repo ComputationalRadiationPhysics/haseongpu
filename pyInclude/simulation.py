@@ -11,60 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import HASEonGPU_Bindings.HASEonGPU as HASEonGPU_Bindings
 import numpy as np
 
-from .geometry import GainMedium, _flat
+from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
-from . import mpiLauncher
+from .openpmd import transport
 from .pumping import BetaIntegrationGaussianSolver, Constants
-from .rng import defaultBackendRngSeed
 from .timeIntegration import TimeDerivative, TimeIntegrationSolver
 
-
-def _constructHostMesh(gainMedium):
-    """Build the pybind host mesh from a ``GainMedium``.
-
-    Arrays are flattened in Fortran order because the lower-level C++/legacy
-    interfaces index beta first by transverse sample and then by z level.
-    """
-    topology = gainMedium.topology
-    topology._require_levels()
-    if topology.thickness is None:
-        raise ValueError("topology thickness is required before running a simulation")
-
-    derived = topology._topology()
-    beta_volume = gainMedium.get("betaVolume").value
-    beta_cells = gainMedium.get("betaCells").value
-    cladding = gainMedium.get("claddingCellTypes").value
-    refractive = gainMedium.get("refractiveIndices").value
-    reflective = gainMedium.get("reflectivities").value
-
-    return HASEonGPU_Bindings.HostMesh(
-        _flat(topology.trianglePointIndices, 3, np.uint32, "trianglePointIndices"),
-        topology.numberOfTriangles,
-        int(topology.levels),
-        topology.numberOfPoints,
-        float(topology.thickness),
-        _flat(topology.points, 2, np.float64, "points"),
-        derived["triangleCenterX"],
-        derived["triangleCenterY"],
-        derived["triangleNormalPoint"],
-        derived["triangleNormalsX"],
-        derived["triangleNormalsY"],
-        derived["forbiddenEdge"],
-        derived["triangleNeighbors"],
-        derived["triangleSurfaces"],
-        _flat(beta_volume, topology.levels - 1, np.float64, "betaVolume"),
-        _flat(beta_cells, topology.levels, np.float64, "betaCells"),
-        _flat(cladding, None, np.uint32, "claddingCellTypes"),
-        _flat(refractive, None, np.float32, "refractiveIndices"),
-        _flat(reflective, None, np.float32, "reflectivities"),
-        float(gainMedium.get("nTot").value),
-        float(gainMedium.get("crystalTFluo").value),
-        int(gainMedium.get("claddingNumber").value),
-        float(gainMedium.get("claddingAbsorption").value),
-    )
 
 
 @dataclass
@@ -104,6 +58,8 @@ class PhiASE:
 
     backend: str = None
     """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
+    openpmdBackend: str | None = "adios-sst"
+    """openPMD storage backend name: ``adios-sst``, ``adios``, or ``hdf5``."""
     parallelMode: str = "single"
     """Execution mode: direct binding ``single`` or MPI launcher ``mpi``."""
     numDevices: int = 1
@@ -121,10 +77,8 @@ class PhiASE:
     rngSeed: int | None = None
     """Optional RNG seed for reproducible Monte Carlo sampling."""
 
-    _experiment: object | None = field(default=None, init=False, repr=False)
-    _compute: object | None = field(default=None, init=False, repr=False)
-    _hostMesh: object | None = field(default=None, init=False, repr=False)
     _result: object | None = field(default=None, init=False, repr=False)
+    _openpmdSession: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         if isinstance(self.config, (str, Path)):
@@ -169,6 +123,7 @@ class PhiASE:
         parser.add_argument("--repetitions", type=int, default=None)
         parser.add_argument("--adaptive-steps", type=int, default=None)
         parser.add_argument("--backend", default=None)
+        parser.add_argument("--openpmd-backend", default=None)
         parser.add_argument("--parallel-mode", default=None)
         parser.add_argument("--max-gpus", type=int, default=None)
         parser.add_argument("--n-per-node", type=int, default=None)
@@ -187,6 +142,7 @@ class PhiASE:
             "repetitions": "repetitions",
             "adaptive_steps": "adaptiveSteps",
             "backend": "backend",
+            "openpmd_backend": "openpmdBackend",
             "parallel_mode": "parallelMode",
             "max_gpus": "numDevices",
             "n_per_node": "nPerNode",
@@ -228,6 +184,7 @@ class PhiASE:
             "mse_threshold": "mseThreshold",
             "adaptive_steps": "adaptiveSteps",
             "use_reflections": "useReflections",
+            "openpmd_backend": "openpmdBackend",
             "parallel_mode": "parallelMode",
             "max_gpus": "numDevices",
             "n_per_node": "nPerNode",
@@ -238,8 +195,9 @@ class PhiASE:
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "repetitions",
-            "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
-            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
+            "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
+            "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
+            "minSampleRange", "maxSampleRange", "rngSeed",
         }
         for section in sections:
             for name, value in section.items():
@@ -248,7 +206,42 @@ class PhiASE:
                     setattr(self, attr, value)
         return self
 
-    def run(self, gainMedium=None, crossSections=None):
+    def openPmdAttributes(self, *, numberOfSamples):
+        min_sample = 0 if self.minSampleRange is None else int(self.minSampleRange)
+        max_sample = int(numberOfSamples) - 1 if self.maxSampleRange is None else int(self.maxSampleRange)
+        attributes = {
+            "minRaysPerSample": self.minRaysPerSample,
+            "maxRaysPerSample": self.maxRaysPerSample,
+            "mseThreshold": self.mseThreshold,
+            "repetitions": self.repetitions,
+            "adaptiveSteps": self.adaptiveSteps,
+            "useReflections": self.useReflections,
+            "monochromatic": self.monochromatic,
+            "backend": "gpu" if self.backend is None else self.backend,
+            "maxGpus": self.numDevices,
+            "parallelMode": self.parallelMode,
+            "minSampleRange": min_sample,
+            "maxSampleRange": max_sample,
+        }
+        if self.rngSeed is not None:
+            attributes["rngSeed"] = int(self.rngSeed)
+        return attributes
+
+    def openStream(self, **kwargs):
+        """Open a persistent openPMD transport session owned by this ``PhiASE``."""
+        if self._openpmdSession is None:
+            if self.openpmdBackend is not None and "transport" not in kwargs:
+                kwargs["transport"] = self.openpmdBackend
+            self._openpmdSession = transport.openStream(**kwargs)
+        return self._openpmdSession
+
+    def closeStream(self):
+        """Close this ``PhiASE`` object's persistent openPMD transport session."""
+        session = self._openpmdSession
+        self._openpmdSession = None
+        return transport.closeStream(session)
+
+    def run(self, gainMedium=None, crossSections=None, *, openpmdSession=None):
         """Run ASE for the supplied or configured ``GainMedium``.
 
         Returns ``self``. Use ``getResults()`` afterwards to access the raw
@@ -263,48 +256,17 @@ class PhiASE:
         if cross_sections is None:
             raise ValueError("PhiASE.run requires crossSections")
 
-        self._hostMesh = _constructHostMesh(medium)
-        laser_properties = LaserProperties(crossSections=cross_sections)
-        laser = laser_properties.toDict()
+        if openpmdSession == "persistent":
+            openpmdSession = self.openStream()
+        elif openpmdSession == "interval":
+            openpmdSession = None
 
-        self._experiment = HASEonGPU_Bindings.ExperimentParameters(
-            minRaysPerSample=int(self.minRaysPerSample),
-            maxRaysPerSample=int(self.maxRaysPerSample),
-            lambdaA=laser["l_abs"],
-            lambdaE=laser["l_ems"],
-            sigmaA=laser["s_abs"],
-            sigmaE=laser["s_ems"],
-            maxSigmaA=laser_properties.maxSigmaA,
-            maxSigmaE=laser_properties.maxSigmaE,
-            mseThreshold=float(self.mseThreshold),
-            useReflections=bool(self.useReflections),
-            spectral=int(laser["l_res"]),
-            monochromatic=bool(self.monochromatic),
-        )
-
-        effective_rng_seed = int(self.rngSeed) if self.rngSeed is not None else defaultBackendRngSeed()
-        self._compute = HASEonGPU_Bindings.ComputeParameters(
-            maxRepetitions=int(self.repetitions),
-            adaptiveSteps=int(self.adaptiveSteps),
-            numDevices=int(self.numDevices),
-            backend=str(self.backend),
-            parallelMode=str(self.parallelMode),
-            writeVtk=bool(self.writeVtk),
-            devices=list(self.devices),
-            rngSeed=effective_rng_seed,
-        )
-        if (self.minSampleRange is None) != (self.maxSampleRange is None):
-            raise ValueError("minSampleRange and maxSampleRange must be set together")
-        if self.minSampleRange is not None:
-            self._compute.minSampleRange = int(self.minSampleRange)
-            self._compute.maxSampleRange = int(self.maxSampleRange)
-
-        if str(self.parallelMode).lower() == "mpi":
-            self._result = mpiLauncher.runPhiaseMPI(self, medium, laser, laser_properties)
-            return self
-
-        self._result = HASEonGPU_Bindings.calcPhiASE(
-            self._experiment, self._compute, self._hostMesh
+        self._result = transport.runPhiASE(
+            self,
+            medium,
+            cross_sections,
+            transport=self.openpmdBackend,
+            openpmdSession=openpmdSession,
         )
         return self
 
@@ -314,20 +276,6 @@ class PhiASE:
             raise RuntimeError("simulation has not been run yet")
         return self._result
 
-    @property
-    def experimentParameters(self):
-        """Low-level experiment parameters built for the last ``run(...)``."""
-        return self._experiment
-
-    @property
-    def computeParameters(self):
-        """Low-level compute parameters built for the last ``run(...)``."""
-        return self._compute
-
-    @property
-    def hostMesh(self):
-        """Low-level host mesh built from the last ``GainMedium`` input."""
-        return self._hostMesh
 
 
 class LegacyGridDataBetaVolumeMapper:
@@ -447,6 +395,7 @@ class Simulation:
     _callbacks: list = field(default_factory=list, init=False, repr=False)
     _lastState: TimeStepState | None = field(default=None, init=False, repr=False)
     _pumpEnabled: bool = field(default=True, init=False, repr=False)
+    _openpmdSession: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         has_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "step")
@@ -522,16 +471,35 @@ class Simulation:
         self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
 
-    def runUntil(self, endtime=None, endTime=None):
+    def _withOpenPmdSession(self, openpmdSession):
+        if openpmdSession is None:
+            if transport._backend_spec(self.phiASE.openpmdBackend).streaming:
+                return self.phiASE.openStream(), True
+            return None, False
+        if openpmdSession == "interval":
+            return None, False
+        if openpmdSession == "persistent":
+            return self.phiASE.openStream(), True
+        return openpmdSession, False
+
+    def runUntil(self, endtime=None, endTime=None, *, openpmdSession=None):
         """Advance steps until the configured or supplied end time is reached."""
         target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
         if target is None:
             raise ValueError("runUntil requires endtime or an endTime configured on construction")
-        while self._time < float(target) - 0.5 * self.timeStep:
-            self.step()
+        session, close_session = self._withOpenPmdSession(openpmdSession)
+        previous_session = self._openpmdSession
+        self._openpmdSession = session
+        try:
+            while self._time < float(target) - 0.5 * self.timeStep:
+                self.step(openpmdSession=session)
+        finally:
+            self._openpmdSession = previous_session
+            if close_session:
+                self.phiASE.closeStream()
         return self
 
-    def runSteps(self, steps, pumpSteps=None):
+    def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
         """Run exactly ``steps`` calls to ``step()`` and return ``self``.
 
         ``pumpSteps`` optionally limits the pump contribution to the first
@@ -542,51 +510,61 @@ class Simulation:
         internal pump integration resolution inside one pumped simulation step.
         """
         steps = int(steps)
-        if pumpSteps is None:
+        session, close_session = self._withOpenPmdSession(openpmdSession)
+        previous_session = self._openpmdSession
+        self._openpmdSession = session
+        if pumpSteps is None and hasattr(self, "pump"):
             pumpSteps = self.pump.getProperty("pumpSteps")
-        if pumpSteps is None:
-            for _ in range(steps):
-                self.step()
-            return self
-
-        pumpSteps = int(pumpSteps)
-        if pumpSteps < 0:
-            raise ValueError("pumpSteps must be non-negative")
-
         previousPumpEnabled = self._pumpEnabled
         try:
-            for index in range(steps):
-                self._pumpEnabled = index < pumpSteps
-                self.step()
+            if pumpSteps is None:
+                for _ in range(steps):
+                    self.step(openpmdSession=session)
+            else:
+                pumpSteps = int(pumpSteps)
+                if pumpSteps < 0:
+                    raise ValueError("pumpSteps must be non-negative")
+                for index in range(steps):
+                    self._pumpEnabled = index < pumpSteps
+                    self.step(openpmdSession=session)
         finally:
+            self._openpmdSession = previous_session
             self._pumpEnabled = previousPumpEnabled
+            if close_session:
+                self.phiASE.closeStream()
         return self
 
-    def step(self):
+    def step(self, *, openpmdSession=None):
         """Advance one time step and return the completed ``TimeStepState``."""
-        self._runInitCallbacks()
-        for callback, args, kwargs in self._beforeStepCallbacks:
-            callback(self, *args, **kwargs)
+        previous_session = self._openpmdSession
+        if openpmdSession is not None:
+            self._openpmdSession = openpmdSession
+        try:
+            self._runInitCallbacks()
+            for callback, args, kwargs in self._beforeStepCallbacks:
+                callback(self, *args, **kwargs)
 
-        beta_cells = np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(
-            self.gainMedium.get("betaCells").expectedShape,
-            order="F",
-        )
+            beta_cells = np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(
+                self.gainMedium.get("betaCells").expectedShape,
+                order="F",
+            )
 
-        if hasattr(self.timeIntegrationSolver, "stepSimulation"):
-            integration_result = self.timeIntegrationSolver.stepSimulation(
-                self,
-                beta_cells.copy(),
-                self._time,
-                self.timeStep,
-            )
-        else:
-            integration_result = self.timeIntegrationSolver.step(
-                self._timeDerivative,
-                beta_cells.copy(),
-                self._time,
-                self.timeStep,
-            )
+            if hasattr(self.timeIntegrationSolver, "stepSimulation"):
+                integration_result = self.timeIntegrationSolver.stepSimulation(
+                    self,
+                    beta_cells.copy(),
+                    self._time,
+                    self.timeStep,
+                )
+            else:
+                integration_result = self.timeIntegrationSolver.step(
+                    self._timeDerivative,
+                    beta_cells.copy(),
+                    self._time,
+                    self.timeStep,
+                )
+        finally:
+            self._openpmdSession = previous_session
         updated_beta = integration_result.betaCells
         derivative = integration_result.evaluation
 
@@ -700,7 +678,11 @@ class Simulation:
         if not self._aseEnabledForCurrentStep():
             return np.zeros_like(beta_cells, dtype=np.float64), None
 
-        self.phiASE.run(gainMedium=self.gainMedium, crossSections=self.crossSections)
+        self.phiASE.run(
+            gainMedium=self.gainMedium,
+            crossSections=self.crossSections,
+            openpmdSession=self._openpmdSession,
+        )
         ase_result = self.phiASE.getResults()
         phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
         return phi_ase.copy(), ase_result

@@ -25,7 +25,6 @@ from HASEonGPU import (
     oneDimensionalZTraversalPumpRate,
 )
 
-
 def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
     smallGainMedium,
     smallTopology,

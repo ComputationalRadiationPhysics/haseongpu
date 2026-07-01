@@ -30,8 +30,7 @@ namespace hase::utils
 {
 
     /**
-     * @brief write input data in a 3D-matrix which can be parsed by matlab with reshape
-     *        (see calcPhiASE.m)
+     * @brief write input data in a 3D-matrix format compatible with reshape-style post-processing
      *
      * @param data the data to write into the matrix (as 1D vector)
      *        layout of the vector: (2D matrix for z==0 in row-major order), (... for z==1 in row-major order) , ...

@@ -12,8 +12,7 @@ HASEonGPU supports multiple usage paths:
 
 * :doc:`Python Interface Guide <pythonInterface>` for workflow-oriented Python usage
 * :doc:`Binary Interface <binaryInterface>` for command-line execution
-* :doc:`MATLAB Interface <MATLABInterface>` for integration into existing
-  MATLAB or Octave workflows
+* :doc:`openPMD Transport <openpmdTransport>` for the Python-to-C++ transport contract
 
 Repository Setup
 ----------------
@@ -32,7 +31,8 @@ Required software:
 
 * ``cmake``
 * ``ninja``
-* ``Python >= 3.11`` with ``pip``
+* ``Python >= 3.10`` with ``pip``
+* openPMD-api C++ package with the backends used by HASEonGPU
 * A C++20-capable compiler, tested with:
 
   * ``gcc >= 12``
@@ -47,7 +47,6 @@ Optional backend/runtime dependencies:
 Optional software and tools:
 
 * ``OpenMPI >= 4.0``
-* MATLAB or Octave
 * ``ParaView`` for visualization of ``.vtk`` output
 * ``matplotlib`` for the optional plotting helper in :doc:`scripts`
 
@@ -60,7 +59,7 @@ Hardware requirements:
 Additional Notes
 ----------------
 
-For Windows-specific installation notes [deprecated], see :doc:`windows`.
+For Windows-specific limitations, see :doc:`windows`.
 
 Compilation Notes
 -----------------
@@ -75,16 +74,146 @@ Recommended Python Source Install
 ---------------------------------
 
 For performance-sensitive Python use, install from source so the C++ backend is
-compiled on the target machine:
+compiled on the target machine. The default workflow uses a PyPI
+``openpmd-api`` Python wheel and a local external openPMD-api C++ prefix that
+CMake can find.
+
+1. Create and activate a Python environment:
 
 .. code-block:: bash
 
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python3 -m pip install -U pip
+
+2. Provide openPMD-api for both Python and CMake.
+
+For Conda environments, use the same environment for Python and CMake:
+
+.. code-block:: bash
+
+   conda install -c conda-forge openpmd-api
+   python3 utils/check_openpmd_compatibility.py \
+     --backend adios-sst \
+     --cmake-prefix-path "$CONDA_PREFIX"
+
+For Spack or module-provided openPMD installations, load the provider first and
+use its prefix. The Python interpreter and every ``openpmd_api`` entry on
+``PYTHONPATH`` must use the same Python ABI; for example, do not run Python
+3.14 with a module path that injects ``lib/python3.11/site-packages``.
+
+.. code-block:: bash
+
+   spack load openpmd-api
+   python3 -c "import sys; print(sys.version); print(sys.path)"
+   python3 utils/check_openpmd_compatibility.py \
+     --backend adios-sst \
+     --cmake-prefix-path "$OPENPMD_API_ROOT"
+
+Manual external source builds need one extra dependency step. Build or install
+ADIOS2 before configuring openPMD-api when the provider must support ``adios``
+or ``adios-sst``, and include the ADIOS2 prefix in openPMD-api's
+``CMAKE_PREFIX_PATH``. For ADIOS2 source installs used as an openPMD provider
+dependency, pass ``-DADIOS2_INSTALL_GENERATE_CONFIG=OFF`` unless you need the
+legacy ``adios2-config`` shell helper; HASEonGPU and openPMD-api use ADIOS2's
+CMake package config. openPMD-api 0.17.x does not fetch ADIOS2 through
+``openPMD_SUPERBUILD``; that option only covers openPMD helper dependencies.
+After installing openPMD-api, install the matching Python package in the active
+environment and point CMake to the C++ install prefix.
+
+.. code-block:: bash
+
+   python3 -m pip install openpmd-api
+   python3 utils/check_openpmd_compatibility.py \
+     --backend adios-sst \
+     --cmake-prefix-path /path/to/openpmd/prefix
+
+3. Install HASEonGPU:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix -DHASE_NATIVE_OPTIMIZATIONS=ON" \
+     python3 -m pip install .
+
+Use ``$CONDA_PREFIX`` or ``$OPENPMD_API_ROOT`` in place of
+``/path/to/openpmd/prefix`` for the Conda or Spack/module paths above.
 
 This builds and installs a release-mode backend with host-specific CPU tuning.
-Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when
-building redistributable wheels or binaries for unknown CPUs. See
-:doc:`compilation` for the full CMake option reference.
+Use ``HASE_NATIVE_OPTIMIZATIONS=OFF`` only when building redistributable wheels
+or binaries for unknown CPUs. See :doc:`compilation` for the full CMake option
+reference.
+
+4. Select the runtime openPMD backend from Python or YAML when needed:
+
+.. code-block:: python
+
+   phi_ase = PhiASE(..., openpmdBackend="adios-sst")
+
+.. code-block:: yaml
+
+   compute:
+     openpmd_backend: adios-sst
+
+Bundled Build Provider
+^^^^^^^^^^^^^^^^^^^^^^
+
+If no compatible external C++ provider is available during the HASE build, use
+the FetchContent source-build provider:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" python3 -m pip install .
+
+This path is the only HASE install mode that uses FetchContent to build ADIOS2
+before configuring openPMD-api. It builds the pinned openPMD-api provider with
+ADIOS2, ADIOS2 SST, and HDF5 support for the HASE CMake build.
+
+The HASE wheel does not vendor the resulting ADIOS2/openPMD runtime libraries
+or generated ``openpmd_api`` Python bindings. The target runtime environment
+must still provide compatible openPMD shared libraries and a compatible Python
+``openpmd_api`` package; HASE records provider library directories through
+RPATH rather than copying provider libraries into the wheel.
+
+For redistributable wheels, prefer a normal external provider and make the
+runtime dependency explicit in the deployment environment.
+
+Optional Provider Notes
+^^^^^^^^^^^^^^^^^^^^^^^
+
+If you already have a matching external openPMD-api installation, install the
+Python package in the active environment and point CMake to the C++ provider:
+
+.. code-block:: bash
+
+   python3 -m pip install openpmd-api
+   python3 utils/check_openpmd_compatibility.py \
+     --backend adios-sst \
+     --cmake-prefix-path /path/to/openpmd/prefix
+   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python3 -m pip install .
+
+Troubleshooting openPMD Discovery
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If CMake cannot find ``openPMD::openPMD``, pass either the installation prefix
+or the exact config directory:
+
+.. code-block:: bash
+
+   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python3 -m pip install .
+   CMAKE_ARGS="-DopenPMD_DIR=/path/to/openPMDConfig.cmake-directory" python3 -m pip install .
+
+If ``utils/check_openpmd_compatibility.py`` reports missing backend support,
+use one of these paths:
+
+* provide a Python ``openpmd_api`` package and CMake prefix that support the
+  runtime backend you want, then select that backend in Python or YAML; for a
+  manual external openPMD-api source build, install ADIOS2 first when selecting
+  ``adios`` or ``adios-sst``
+* use ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON`` to build the bundled provider with
+  all built-in HASE openPMD backends
+
+Choose the same MPI setting for the Python and C++ providers. With bundled
+openPMD, HASEonGPU derives openPMD MPI support from ``DISABLE_MPI``.
 
 Choose an Interface
 -------------------
@@ -105,16 +234,7 @@ Binary Interface
 The binary interface is useful for running HASEonGPU directly from the command
 line or as an entry point for constructing a custom API call.
 
-Continue with :doc:`Binary Interface <binaryInterface>`.
-
-MATLAB Interface
-^^^^^^^^^^^^^^^^
-
-The MATLAB-compatible interface is mainly intended for existing MATLAB or Octave
-workflows. For new workflows, the Python interface is usually the better
-choice.
-
-Continue with :doc:`MATLAB Interface <MATLABInterface>`.
+Continue with :doc:`Binary Interface <binaryInterface>`. For the openPMD record layout and transport backends used by both Python and the binary, see :doc:`openPMD Transport <openpmdTransport>`.
 
 Typical Workflow
 ----------------

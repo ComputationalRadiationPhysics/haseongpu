@@ -7,13 +7,10 @@
 
 import argparse
 
-import HASEonGPU_Bindings.HASEonGPU as HASEonGPU_Bindings
-from HASEonGPU import PhiASE
+from types import SimpleNamespace
+
+from pyInclude import PhiASE
 import pyInclude.simulation as simulation_module
-
-
-UNSPECIFIED_SAMPLE_RANGE = 2**32 - 1
-
 
 class DummyResult:
     phiAse = [1.0]
@@ -22,7 +19,7 @@ class DummyResult:
     dndtAse = [0.0]
 
 
-def testSimulationRunBuildsBindingInputsAndStoresResults(
+def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -30,13 +27,14 @@ def testSimulationRunBuildsBindingInputsAndStoresResults(
 ):
     captured = {}
 
-    def fakeCalcPhiAse(experiment, compute, hostMesh):
-        captured["experiment"] = experiment
-        captured["compute"] = compute
-        captured["host_mesh"] = hostMesh
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        captured["phi_ase"] = phiAse
+        captured["gain_medium"] = gainMedium
+        captured["spectral_properties"] = spectralProperties
+        captured["openpmd_session"] = kwargs.get("openpmdSession")
         return DummyResult()
 
-    monkeypatch.setattr(HASEonGPU_Bindings, "calcPhiASE", fakeCalcPhiAse)
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
 
     phiAse = PhiASE.fromYaml(
         phiAseTestConfigPath,
@@ -50,13 +48,13 @@ def testSimulationRunBuildsBindingInputsAndStoresResults(
     ).run(gainMedium=smallGainMedium)
 
     assert isinstance(phiAse.getResults(), DummyResult)
-    assert captured["host_mesh"].numberOfTriangles == 2
-    assert captured["host_mesh"].numberOfLevels == 3
-    assert captured["compute"].minSampleRange == UNSPECIFIED_SAMPLE_RANGE
-    assert captured["compute"].maxSampleRange == UNSPECIFIED_SAMPLE_RANGE
-    assert captured["experiment"].minRaysPerSample == 1000
-    assert captured["experiment"].useReflections is False
-    assert captured["compute"].rngSeed == 1234
+    assert captured["phi_ase"] is phiAse
+    assert captured["gain_medium"] is smallGainMedium
+    assert captured["spectral_properties"] is crossSections
+    assert captured["openpmd_session"] is None
+    assert captured["phi_ase"].minRaysPerSample == 1000
+    assert captured["phi_ase"].useReflections is False
+    assert captured["phi_ase"].rngSeed == 1234
 
 
 def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
@@ -74,15 +72,24 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
         str(phiAseTestConfigPath),
         "--min-rays-per-sample",
         "32",
+        "--openpmd-backend",
+        "adios-sst",
     ])
 
     fromArgs = PhiASE.fromArgs(args)
 
     assert fromArgs.minRaysPerSample == 32
     assert fromArgs.maxRaysPerSample == 10000
+    assert fromArgs.openpmdBackend == "adios-sst"
 
 
-def testPhiAseMpiRunUsesLauncherWithoutBinding(
+def testPhiAseLoadsOpenPmdBackendFromConfig():
+    assert PhiASE().openpmdBackend == "adios-sst"
+    assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
+    assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
+
+
+def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -90,19 +97,16 @@ def testPhiAseMpiRunUsesLauncherWithoutBinding(
 ):
     captured = {}
 
-    def failBinding(*args, **kwargs):
-        raise AssertionError("binding path must not run for parallelMode='mpi'")
-
-    def fakeMpiRun(phiAse, gainMedium, laser, laserProperties):
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
         captured["nPerNode"] = phiAse.nPerNode
         captured["numDevices"] = phiAse.numDevices
+        captured["parallelMode"] = phiAse.parallelMode
         captured["gain_medium"] = gainMedium
-        captured["laser"] = laser
-        captured["max_sigma_e"] = laserProperties.maxSigmaE
+        captured["spectral_properties"] = spectralProperties
+        captured["openpmd_session"] = kwargs.get("openpmdSession")
         return DummyResult()
 
-    monkeypatch.setattr(HASEonGPU_Bindings, "calcPhiASE", failBinding)
-    monkeypatch.setattr(simulation_module.mpiLauncher, "runPhiaseMPI", fakeMpiRun)
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
 
     phiAse = PhiASE.fromYaml(
         phiAseTestConfigPath,
@@ -115,9 +119,185 @@ def testPhiAseMpiRunUsesLauncherWithoutBinding(
     assert isinstance(phiAse.getResults(), DummyResult)
     assert captured["nPerNode"] == 2
     assert captured["numDevices"] == 4
+    assert captured["parallelMode"] == "mpi"
     assert captured["gain_medium"] is smallGainMedium
-    assert captured["laser"]["l_res"] == 1
-    assert captured["max_sigma_e"] == crossSections.crossSectionEmission[0]
+    assert captured["spectral_properties"] is crossSections
+    assert captured["openpmd_session"] is None
+
+
+def testPhiAseRunUsesProvidedOpenPmdSession(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+    phiAseTestConfigPath,
+):
+    captured = {}
+    openpmdSession = object()
+
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        captured["openpmdSession"] = kwargs.get("openpmdSession")
+        return DummyResult()
+
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+
+    PhiASE.fromYaml(
+        phiAseTestConfigPath,
+        spectralProperties=crossSections,
+    ).run(gainMedium=smallGainMedium, openpmdSession=openpmdSession)
+
+    assert captured["openpmdSession"] is openpmdSession
+
+
+def testPhiAseRunForwardsConfiguredOpenPmdBackend(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+):
+    captured = {}
+
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        captured["transport"] = kwargs.get("transport")
+        captured["openpmdSession"] = kwargs.get("openpmdSession")
+        return DummyResult()
+
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+
+    PhiASE(
+        {
+            "compute": {
+                "backend": "Host_Cpu_CpuSerial",
+                "openpmd_backend": "hdf5",
+            }
+        },
+        spectralProperties=crossSections,
+    ).run(gainMedium=smallGainMedium)
+
+    assert captured == {"transport": "hdf5", "openpmdSession": None}
+
+
+def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+    phiAseTestConfigPath,
+):
+    events = []
+    openpmdSession = object()
+
+    def fakeOpenStream(**kwargs):
+        events.append(("openStream", kwargs))
+        return openpmdSession
+
+    def fakeCloseStream(session):
+        events.append(("closeStream", session))
+
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        events.append(("run", kwargs.get("openpmdSession")))
+        return DummyResult()
+
+    monkeypatch.setattr(simulation_module.transport, "openStream", fakeOpenStream)
+    monkeypatch.setattr(simulation_module.transport, "closeStream", fakeCloseStream)
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+
+    phiAse = PhiASE.fromYaml(
+        phiAseTestConfigPath,
+        spectralProperties=crossSections,
+    )
+    assert phiAse.openStream(transport="adios-sst") is openpmdSession
+    phiAse.run(gainMedium=smallGainMedium, openpmdSession="persistent")
+    phiAse.run(gainMedium=smallGainMedium, openpmdSession="persistent")
+    phiAse.closeStream()
+
+    assert events == [
+        ("openStream", {"transport": "adios-sst"}),
+        ("run", openpmdSession),
+        ("run", openpmdSession),
+        ("closeStream", openpmdSession),
+    ]
+
+
+def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+    phiAseTestConfigPath,
+):
+    captured = {}
+
+    def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
+        captured["openpmdSession"] = kwargs.get("openpmdSession")
+        return DummyResult()
+
+    monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+
+    PhiASE.fromYaml(
+        phiAseTestConfigPath,
+        spectralProperties=crossSections,
+    ).run(gainMedium=smallGainMedium, openpmdSession="interval")
+
+    assert captured["openpmdSession"] is None
+
+
+def testSimulationRunStepsKeepsPersistentOpenPmdSessionUntilIntervalCompletes(monkeypatch):
+    events = []
+    openpmdSession = object()
+    simulation = object.__new__(simulation_module.Simulation)
+    simulation.phiASE = SimpleNamespace(
+        openpmdBackend=None,
+        openStream=lambda: events.append(("openStream",)) or openpmdSession,
+        closeStream=lambda: events.append(("closeStream",)),
+    )
+    simulation._openpmdSession = None
+
+    def fakeStep(self, *, openpmdSession=None):
+        events.append(("step", openpmdSession))
+
+    monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
+
+    simulation_module.Simulation.runSteps(
+        simulation,
+        2,
+        openpmdSession="persistent",
+    )
+
+    assert events == [
+        ("openStream",),
+        ("step", openpmdSession),
+        ("step", openpmdSession),
+        ("closeStream",),
+    ]
+
+
+def testSimulationRunStepsDefaultsToPersistentOpenPmdSessionForStreamingBackend(monkeypatch):
+    events = []
+    openpmdSession = object()
+    simulation = object.__new__(simulation_module.Simulation)
+    simulation.phiASE = SimpleNamespace(
+        openpmdBackend="adios-sst",
+        openStream=lambda **kwargs: events.append(("openStream", kwargs)) or openpmdSession,
+        closeStream=lambda: events.append(("closeStream",)),
+    )
+    simulation._openpmdSession = None
+    captured = {}
+
+    def fakeStep(self, *, openpmdSession=None):
+        events.append(("step", openpmdSession))
+
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "_backend_spec",
+        lambda backend=None: captured.update({"backend": backend}) or SimpleNamespace(streaming=True),
+    )
+    monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
+
+    simulation_module.Simulation.runSteps(simulation, 1)
+
+    assert events == [
+        ("openStream", {}),
+        ("step", openpmdSession),
+        ("closeStream",),
+    ]
+    assert captured["backend"] == "adios-sst"
 
 
 def testPhiAseNPerNodeLoadsFromArgsAndConfig():

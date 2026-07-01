@@ -1,7 +1,6 @@
 [build-system]
 requires = [
     "scikit-build-core>=0.10",
-    "pybind11>=3.0",
     "packaging>=23"
 ]
 
@@ -38,6 +37,7 @@ dependencies=[
     "vtk",
     "matplotlib",
     "pyyaml",
+    "openpmd-api",
 ]
 
 [project.optional-dependencies]
@@ -69,7 +69,11 @@ __version__ = "2.0.1"
 import HASEonGPU_Bindings
 from HASEonGPU_Bindings import *
 from pyInclude import *
-del HASEonGPU_Bindings.HostMesh
+for _name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh", "calcPhiASE"):
+    globals().pop(_name, None)
+del _name
+if hasattr(HASEonGPU_Bindings, "HostMesh"):
+    del HASEonGPU_Bindings.HostMesh
 """
 
 [tool.scikit-build.cmake]
@@ -79,11 +83,10 @@ HASE_ENABLE_PYTHON = "ON"
 HASE_BUILD_RELEASE = "ON"
 CMAKE_INTERPROCEDURAL_OPTIMIZATION = "OFF"
 CMAKE_BUILD_RPATH_USE_ORIGIN = "ON"
-CMAKE_INSTALL_RPATH = "$ORIGIN"
+CMAKE_INSTALL_RPATH = "$ORIGIN;$ORIGIN/../lib"
 CMAKE_INSTALL_RPATH_USE_LINK_PATH = "ON"
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 markers = [
     "integration: tests that invoke external binaries or full example scripts",
 ]

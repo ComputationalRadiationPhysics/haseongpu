@@ -163,12 +163,12 @@ namespace hase::benchmark
 #    define BENCH(kernel, ...)                                                                                        \
         ::hase::benchmark::ScopedEvent HASE_BENCHMARK_CONCAT(haseBenchmarkScope_, __LINE__)(                          \
             #kernel,                                                                                                  \
-            HASE_BENCHMARK_STRINGIFY(__VA_ARGS__));
+            HASE_BENCHMARK_STRINGIFY(__VA_ARGS__))
 #    define Bench(...) BENCH(__VA_ARGS__)
 #    define BENCH_SYNC(queue, kernel, ...)                                                                            \
         ::hase::benchmark::ScopedSyncEvent HASE_BENCHMARK_CONCAT(                                                     \
             haseBenchmarkSyncScope_,                                                                                  \
-            __LINE__)(queue, #kernel, HASE_BENCHMARK_STRINGIFY(__VA_ARGS__));
+            __LINE__)(queue, #kernel, HASE_BENCHMARK_STRINGIFY(__VA_ARGS__))
 #    define BenchSync(...) BENCH_SYNC(__VA_ARGS__)
 #else
 #    define BENCH(...) static_cast<void>(0);
