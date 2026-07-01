@@ -31,7 +31,7 @@ jobs:
       matrix:
         config:
           - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios" }
-          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst", openpmd_provider: "external" }
+          - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
           - { compiler: gcc, version: "13", cuda: "no", hip: "no", container: "ubuntu:24.04", tbb: "on", openpmd_backend: "adios" }
           - { compiler: gcc, version: "14", cuda: "no", hip: "no", container: "ubuntu:24.04", openpmd_backend: "adios-sst" }
           - { compiler: gcc, version: "15", cuda: "no", hip: "no", container: "gcc:15.1.0", openpmd_backend: "adios" }
@@ -65,7 +65,6 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
       OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
       HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
-      OPENPMD_PROVIDER: ${{ matrix.config.openpmd_provider || 'bundled' }}
       BUILD_DIR: build/ci
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
@@ -201,53 +200,14 @@ jobs:
           fi
 
 
-      - name: Build external openPMD provider
-        if: ${{ env.OPENPMD_PROVIDER == 'external' }}
-        shell: bash
-        run: |
-          set -euxo pipefail
-          openpmd_src=/tmp/hase-external-openpmd-src
-          openpmd_build=/tmp/hase-external-openpmd-build
-          openpmd_prefix="$GITHUB_WORKSPACE/.openpmd-prefix"
-          git clone --depth 1 --branch 0.17.0 \
-            https://github.com/openPMD/openPMD-api.git \
-            "$openpmd_src"
-          cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
-            -DBUILD_TESTING=OFF \
-            -DopenPMD_BUILD_EXAMPLES=OFF \
-            -DopenPMD_USE_MPI=OFF \
-            -DopenPMD_USE_ADIOS2=ON \
-            -DopenPMD_USE_HDF5=ON \
-            -DopenPMD_USE_PYTHON=OFF \
-            -DADIOS2_USE_SST=ON
-          cmake --build "$openpmd_build" --target install --parallel "$(nproc)"
-          python -m pip install "openpmd-api==0.17.0"
-          echo "CMAKE_PREFIX_PATH=$openpmd_prefix:${CMAKE_PREFIX_PATH:-}" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
-      - name: Check external openPMD provider
-        if: ${{ env.OPENPMD_PROVIDER == 'external' }}
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python utils/check_openpmd_compatibility.py \
-            --backend "$OPENPMD_RUNTIME_BACKEND" \
-            --cmake-prefix-path "$CMAKE_PREFIX_PATH"
-
       - name: Configure
         shell: bash
         run: |
           set -euxo pipefail
           cmake_args=(
             $HASE_CMAKE_ARGS
+            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
           )
-          if [[ "$OPENPMD_PROVIDER" == "external" ]]; then
-            cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF)
-          else
-            cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON)
-          fi
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
             cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
             cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
@@ -284,12 +244,8 @@ jobs:
             $HASE_CMAKE_ARGS
             -DBUILD_TESTING=OFF
             -DHASE_TESTING=OFF
+            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
           )
-          if [[ "$OPENPMD_PROVIDER" == "external" ]]; then
-            pip_cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF)
-          else
-            pip_cmake_args+=(-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON)
-          fi
 
           if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
             pip_cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
@@ -384,3 +340,141 @@ jobs:
         run: |
           set -euxo pipefail
           pytest tests
+
+  openpmd-provider-smoke:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      OPENPMD_BACKENDS: adios adios-sst hdf5
+      OPENPMD_PROVIDER_VERSIONS: 0.17.0 0.17.1
+      HASE_OPENPMD_TEST_BACKENDS: adios,adios-sst,hdf5
+      HASE_CMAKE_ARGS: >-
+        -DBUILD_TESTING=ON
+        -DHASE_TESTING=ON
+        -DDISABLE_MPI=ON
+        -DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            g++-13 \
+            gcc-13 \
+            libglu1 \
+            libhdf5-dev \
+            libhwloc-dev \
+            libomp-dev \
+            ninja-build \
+            pkg-config \
+            python3 \
+            python3-dev \
+            python3-pip \
+            python3-venv \
+            wget
+
+          if ! command -v cmake >/dev/null 2>&1; then
+            apt-get install -y --no-install-recommends cmake
+          fi
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
+          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
+
+      - name: Select compiler
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "CC=$(command -v gcc-13)" >> "$GITHUB_ENV"
+          echo "CXX=$(command -v g++-13)" >> "$GITHUB_ENV"
+
+      - name: Run external openPMD provider smoke matrix
+        shell: bash
+        run: |
+          set -euxo pipefail
+          run_backend_smoke() {
+            local openpmd_version="$1"
+            local openpmd_prefix="$2"
+            local backend="$3"
+            local example_output_dir
+
+            python "$GITHUB_WORKSPACE/utils/check_openpmd_compatibility.py" \
+              --backend "$backend" \
+              --cmake-prefix-path "$openpmd_prefix"
+
+            example_output_dir="/tmp/hase-laser-pump-cladding-openpmd-${openpmd_version}-${backend}"
+            mkdir -p "$example_output_dir"
+            (
+              cd "$example_output_dir"
+              python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
+                --backend Host_Cpu_CpuSerial \
+                --openpmd-backend "$backend" \
+                --timeSteps 1 \
+                --pumpSteps 1 \
+                --vtk-output-dir "$example_output_dir" \
+                --min-sample-range 0 \
+                --max-sample-range 100 \
+                --rng-seed 5489
+            )
+          }
+
+          for openpmd_version in $OPENPMD_PROVIDER_VERSIONS; do
+            openpmd_src="/tmp/hase-external-openpmd-src-$openpmd_version"
+            openpmd_build="/tmp/hase-external-openpmd-build-$openpmd_version"
+            openpmd_prefix="$GITHUB_WORKSPACE/.openpmd-prefix/$openpmd_version"
+
+            rm -rf "$openpmd_src" "$openpmd_build" "$openpmd_prefix" build
+            git clone --depth 1 --branch "$openpmd_version" \
+              https://github.com/openPMD/openPMD-api.git \
+              "$openpmd_src"
+            cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
+              -DBUILD_TESTING=OFF \
+              -DopenPMD_BUILD_EXAMPLES=OFF \
+              -DopenPMD_USE_MPI=OFF \
+              -DopenPMD_USE_ADIOS2=ON \
+              -DopenPMD_USE_HDF5=ON \
+              -DopenPMD_USE_PYTHON=OFF \
+              -DADIOS2_USE_SST=ON
+            cmake --build "$openpmd_build" --target install --parallel "$(nproc)"
+
+            python -m pip uninstall -y HASEonGPU openpmd-api || true
+            python -m pip install "openpmd-api==$openpmd_version"
+            CMAKE_PREFIX_PATH="$openpmd_prefix" \
+            LD_LIBRARY_PATH="$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}" \
+            CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
+              python -m pip install ".[test]"
+
+            cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
+            (
+              cd /tmp
+              python hase_bindings_smoketest.py
+            )
+
+            export CMAKE_PREFIX_PATH="$openpmd_prefix"
+            export LD_LIBRARY_PATH="$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}"
+
+            for backend in $OPENPMD_BACKENDS; do
+              run_backend_smoke "$openpmd_version" "$openpmd_prefix" "$backend"
+            done
+
+            pytest tests/python/openpmd/test_openpmd_preflight.py tests/python/openpmd/test_transport.py
+          done

@@ -217,10 +217,13 @@ Python and CMake providers, and the built-in HASE source-build backend set
 (``adios-sst`` by default, plus ``adios`` and ``hdf5``).
 
 The CI matrix keeps most jobs on the bundled source-build provider and includes
-a dedicated Ubuntu job that builds and installs an external openPMD-api prefix,
-then runs HASE against that external provider with ``adios-sst``. This keeps
-external-versus-bundled provider selection covered without multiplying every
-compiler and accelerator combination.
+a dedicated Ubuntu job that runs an ordered external-provider smoke matrix in a
+single container. For each pinned openPMD-api version, it builds and installs a
+C++ prefix, installs the matching Python package, installs HASEonGPU against
+that prefix, and then checks ``adios``, ``adios-sst``, and ``hdf5`` smoke
+scenarios. The current pinned external versions are ``0.17.0`` and ``0.17.1``.
+This keeps external-versus-bundled provider selection covered without
+multiplying every compiler and accelerator combination.
 
 ``HASE_BUILD_OPENPMD_FROM_SOURCE``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
