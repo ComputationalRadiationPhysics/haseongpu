@@ -12,8 +12,6 @@ from pathlib import Path
 
 import numpy as np
 
-from pyInclude import FrozenPhiAseRungeKutta4
-
 scriptDir = Path(__file__).resolve().parent
 repoRoot = scriptDir.parents[1]
 buildPythonRoot = repoRoot / "build" / "python"
@@ -23,10 +21,10 @@ sys.path.insert(0, str(repoRoot))
 if buildPythonRoot.is_dir():
     sys.path.insert(0, str(buildPythonRoot))
 
+from pyInclude import FrozenPhiAseRungeKutta4  # noqa: E402
 from HASEonGPU import (  # noqa: E402
     OneDimensionalZTraversal,
     calcGainFromState,
-    Constants,
     CrossSectionData,
     GainMedium,
     MeshTopology,
@@ -34,7 +32,6 @@ from HASEonGPU import (  # noqa: E402
     PumpProperties,
     Simulation,
     PumpRadiationProfile,
-    RungeKutta4,
     vtkWedge,
 )
 def printState(state):
