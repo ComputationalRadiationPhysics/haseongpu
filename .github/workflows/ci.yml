@@ -409,6 +409,28 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          adios2_src="/tmp/hase-external-adios2-src"
+          adios2_build="/tmp/hase-external-adios2-build"
+          adios2_prefix="$GITHUB_WORKSPACE/.adios2-prefix"
+
+          rm -rf "$adios2_src" "$adios2_build" "$adios2_prefix"
+          git clone --depth 1 --branch v2.12.1 \
+            https://github.com/ornladios/ADIOS2.git \
+            "$adios2_src"
+          cmake -S "$adios2_src" -B "$adios2_build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$adios2_prefix" \
+            -DADIOS2_USE_MPI=OFF \
+            -DADIOS2_USE_Fortran=OFF \
+            -DADIOS2_USE_Python=OFF \
+            -DADIOS2_USE_SST=ON \
+            -DADIOS2_USE_HDF5=OFF \
+            -DADIOS2_BUILD_EXAMPLES=OFF \
+            -DADIOS2_BUILD_TESTING=OFF \
+            -DADIOS2_INSTALL_GENERATE_CONFIG=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build "$adios2_build" --target install --parallel "$(nproc)"
+
           run_backend_smoke() {
             local openpmd_version="$1"
             local openpmd_prefix="$2"
@@ -417,7 +439,7 @@ jobs:
 
             python "$GITHUB_WORKSPACE/utils/check_openpmd_compatibility.py" \
               --backend "$backend" \
-              --cmake-prefix-path "$openpmd_prefix"
+              --cmake-prefix-path "$openpmd_prefix;$adios2_prefix"
 
             example_output_dir="/tmp/hase-laser-pump-cladding-openpmd-${openpmd_version}-${backend}"
             mkdir -p "$example_output_dir"
@@ -447,6 +469,7 @@ jobs:
             cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
+              -DCMAKE_PREFIX_PATH="$adios2_prefix" \
               -DBUILD_TESTING=OFF \
               -DopenPMD_BUILD_EXAMPLES=OFF \
               -DopenPMD_USE_MPI=OFF \
@@ -458,9 +481,7 @@ jobs:
 
             python -m pip uninstall -y HASEonGPU openpmd-api || true
             python -m pip install "openpmd-api==$openpmd_version"
-            CMAKE_PREFIX_PATH="$openpmd_prefix" \
-            LD_LIBRARY_PATH="$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}" \
-            CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
+            CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix;$adios2_prefix -DHASE_OPENPMD_RUNTIME_RPATH=$openpmd_prefix/lib;$openpmd_prefix/lib64;$adios2_prefix/lib;$adios2_prefix/lib64 -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
               python -m pip install ".[test]"
 
             cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
@@ -468,9 +489,6 @@ jobs:
               cd /tmp
               python hase_bindings_smoketest.py
             )
-
-            export CMAKE_PREFIX_PATH="$openpmd_prefix"
-            export LD_LIBRARY_PATH="$openpmd_prefix/lib:$openpmd_prefix/lib64:${LD_LIBRARY_PATH:-}"
 
             for backend in $OPENPMD_BACKENDS; do
               run_backend_smoke "$openpmd_version" "$openpmd_prefix" "$backend"
