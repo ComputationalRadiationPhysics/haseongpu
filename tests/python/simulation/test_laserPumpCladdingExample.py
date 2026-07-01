@@ -37,6 +37,10 @@ class _FakePhiASE:
         self.spectralProperties = spectralProperties
         self.laserProperties = None
         self.backend = overrides.get("backend", "FakeBackend")
+        self.openpmdBackend = overrides.get(
+            "openpmdBackend",
+            overrides.get("openpmd_backend", "adios"),
+        )
         self._shape = None
         self.runInputs = []
 
