@@ -26,11 +26,10 @@ if(HASE_FORWARD_LOGGING)
 else()
     set(HASE_FORWARD_LOGGING_PY False)
 endif()
-if(HASE_USE_SYSTEM_OPENPMD)
-    set(HASE_USE_SYSTEM_OPENPMD_PY True)
-else()
-    set(HASE_USE_SYSTEM_OPENPMD_PY False)
-endif()
+# HASE wheels do not vendor openPMD-api runtime libraries or Python bindings.
+# Even when CMake fetches openPMD-api for the build, the installed package uses
+# the runtime environment's openpmd_api module and dynamic libraries.
+set(HASE_USE_SYSTEM_OPENPMD_PY True)
 string(
     REPLACE
     "\\"
@@ -105,29 +104,6 @@ install(
     FILES "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
     DESTINATION HASEonGPU_Bindings
 )
-if(HASE_OPENPMD_PYTHON_PACKAGE_DIR AND NOT HASE_USE_SYSTEM_OPENPMD)
-    install(
-        DIRECTORY "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}/openpmd_api"
-        DESTINATION .
-        PATTERN "*.so" EXCLUDE
-        PATTERN "*.pyd" EXCLUDE
-        PATTERN "__pycache__" EXCLUDE
-    )
-    if(TARGET openPMD.py)
-        install(TARGETS openPMD.py LIBRARY DESTINATION openpmd_api)
-    endif()
-endif()
-if(NOT HASE_USE_SYSTEM_OPENPMD)
-    install(TARGETS openPMD LIBRARY DESTINATION lib)
-    if(TARGET hdf5-shared)
-        install(
-            TARGETS hdf5-shared
-            LIBRARY DESTINATION lib
-            RUNTIME DESTINATION lib
-            ARCHIVE DESTINATION lib
-        )
-    endif()
-endif()
 install(FILES HASEonGPU.py DESTINATION .)
 install(
     DIRECTORY HASEonGPU_Bindings

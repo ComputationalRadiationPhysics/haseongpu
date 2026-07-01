@@ -32,29 +32,30 @@ The full project documentation is available at [https://haseongpu.readthedocs.io
 Installation Notes
 ------------------
 
-HASEonGPU uses openPMD as the Python-to-C++ transport. By default, a source
-install expects an external openPMD-api C++ package discoverable by CMake
-(`openPMD::openPMD`) and a matching Python `openpmd_api` package in the active
-Python environment:
+HASEonGPU uses openPMD as the Python-to-C++ transport. Provide an openPMD-api
+installation that supplies both the Python `openpmd_api` module and the CMake
+`openPMD::openPMD` package:
 
 ```bash
-python3 -m pip install openpmd-api
-CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python3 -m pip install .
+conda install -c conda-forge openpmd-api
+python3 utils/check_openpmd_compatibility.py --backend adios-sst --cmake-prefix-path "$CONDA_PREFIX"
+CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$CONDA_PREFIX" python3 -m pip install .
 ```
 
-The C++ and Python openPMD providers must be built with the same required
-backends, for example ADIOS2 for `adios`/`adios-sst` or HDF5 for `hdf5`. See the
-[openPMD-api installation guide](https://openpmd-api.readthedocs.io/en/latest/install/install.html)
-for Spack, Conda, pip, and source-install options. For ADIOS2-capable installs,
-use provider options such as `spack install openpmd-api +python +adios2` or
-`openPMD_CMAKE_openPMD_USE_ADIOS2=ON python3 -m pip install --no-binary openpmd-api openpmd-api`.
+The default runtime openPMD backend is `adios-sst`. Select `adios` or `hdf5`
+from Python/YAML only when the Python and C++ openPMD providers support that
+backend. Spack, system modules, or manual external openPMD installs can also be
+used by passing `CMAKE_PREFIX_PATH` or `openPMD_DIR`.
 
 If no matching external openPMD installation is available, HASEonGPU can use the
-legacy self-contained source-build path:
+FetchContent source-build path:
 
 ```bash
 CMAKE_ARGS="-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" python3 -m pip install .
 ```
+
+That path builds openPMD-api for the HASE CMake build, but the HASE wheel does
+not vendor openPMD runtime libraries or generated `openpmd_api` bindings.
 
 Citation
 --------

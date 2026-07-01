@@ -58,8 +58,8 @@ class PhiASE:
 
     backend: str = None
     """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
-    openpmdBackend: str | None = None
-    """openPMD storage backend name: ``adios``, ``adios-sst``, or ``hdf5``."""
+    openpmdBackend: str | None = "adios-sst"
+    """openPMD storage backend name: ``adios-sst``, ``adios``, or ``hdf5``."""
     parallelMode: str = "single"
     """Execution mode: direct binding ``single`` or MPI launcher ``mpi``."""
     numDevices: int = 1

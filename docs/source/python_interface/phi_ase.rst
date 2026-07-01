@@ -119,14 +119,11 @@ openPMD Transport Options
 -------------------------
 
 The openPMD storage backend is selected separately from ``PhiASE.backend``.
-Set ``PhiASE.openpmdBackend`` in Python, use ``openpmd_backend`` in YAML, pass
-``--openpmd-backend`` through the command-line helper, or use the
-``HASE_OPENPMD_BACKEND`` environment variable for process-wide defaults.
-Lower-level helper calls also accept
-``pyInclude.openpmd.transport.runPhiASE(..., transport=...)``. Accepted values
-are ``adios``, ``hdf5``, and ``adios-sst``. Prefer ``adios`` or ``hdf5`` for
-local tests; SST requires concurrent producer/consumer execution and can wait
-if only one side is started.
+The default is ``adios-sst``. Set ``PhiASE.openpmdBackend`` in Python, use
+``openpmd_backend`` in YAML, or pass ``--openpmd-backend`` through the
+command-line helper to choose a different runtime backend. Lower-level helper
+calls also accept ``pyInclude.openpmd.transport.runPhiASE(..., transport=...)``.
+Accepted values are ``adios-sst``, ``adios``, and ``hdf5``.
 
 For repeated or streaming use, the transport can keep a session open and write
 only dynamic fields after the first iteration. See :doc:`../openpmdTransport`
