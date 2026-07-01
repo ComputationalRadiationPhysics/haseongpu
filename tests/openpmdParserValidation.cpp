@@ -1,4 +1,7 @@
 #include <catch2/catch_approx.hpp>
+#ifdef HASE_OPENPMD_PARSER_VALIDATION_CUSTOM_MAIN
+#    include <catch2/catch_session.hpp>
+#endif
 #include <catch2/catch_test_macros.hpp>
 #include <openPMD/openPMD.hpp>
 #include <openpmd/OpenPmdParser.hpp>
@@ -930,3 +933,29 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
 
     parser.writeResult(hase::core::Result{phiAse, mse, totalRays, dndtAse}, context.mesh);
 }
+
+#ifdef HASE_OPENPMD_PARSER_VALIDATION_CUSTOM_MAIN
+int main(int argc, char* argv[])
+{
+#    if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+    int mpiInitialized = 0;
+    MPI_Initialized(&mpiInitialized);
+    if(!mpiInitialized)
+    {
+        MPI_Init(&argc, &argv);
+    }
+
+    int const result = Catch::Session().run(argc, argv);
+
+    int mpiFinalized = 0;
+    MPI_Finalized(&mpiFinalized);
+    if(!mpiFinalized)
+    {
+        MPI_Finalize();
+    }
+    return result;
+#    else
+    return Catch::Session().run(argc, argv);
+#    endif
+}
+#endif

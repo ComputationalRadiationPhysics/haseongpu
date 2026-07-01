@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -1374,6 +1375,36 @@ def _assert_mpi_mode_rejected_by_non_mpi_build(tmp_path, executable):
     assert completed.returncode != 0
 
 
+def _matrix_mpi_rank_count():
+    value = os.environ.get("HASE_MPI_TEST_RANKS", "").strip()
+    if not value:
+        pytest.skip("HASE_MPI_TEST_RANKS is not configured for this CI row")
+    if "," in value:
+        pytest.fail("HASE_MPI_TEST_RANKS must contain exactly one rank count per CI row")
+    try:
+        ranks = int(value)
+    except ValueError:
+        pytest.fail(f"HASE_MPI_TEST_RANKS must be an integer, got {value!r}")
+    if ranks < 1 or ranks > 4:
+        pytest.fail(f"HASE_MPI_TEST_RANKS must be between 1 and 4, got {ranks}")
+    return ranks
+
+
+def _mpiexec_command_prefix(ranks):
+    return ["mpiexec", *shlex.split(os.environ.get("HASE_MPIEXEC_EXTRA_ARGS", "")), "-n", str(ranks)]
+
+
+def _assert_launch_smoke_result(result):
+    expected_size = launch_smoke_topology().numberOfPoints * launch_smoke_topology().levels
+    assert result.phiAse.shape == (expected_size,)
+    assert result.mse.shape == (expected_size,)
+    assert result.totalRays.shape == (expected_size,)
+    assert result.dndtAse.shape == (expected_size,)
+    assert np.all(np.isfinite(result.phiAse))
+    assert np.all(np.isfinite(result.mse))
+    assert np.all(result.totalRays >= 0)
+
+
 def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
     _require_openpmd_transport_io()
     executable, build_dir = _openpmd_calc_phi_ase()
@@ -1397,14 +1428,7 @@ def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
     result = transport.read_result(output_path)
-    expected_size = launch_smoke_topology().numberOfPoints * launch_smoke_topology().levels
-    assert result.phiAse.shape == (expected_size,)
-    assert result.mse.shape == (expected_size,)
-    assert result.totalRays.shape == (expected_size,)
-    assert result.dndtAse.shape == (expected_size,)
-    assert np.all(np.isfinite(result.phiAse))
-    assert np.all(np.isfinite(result.mse))
-    assert np.all(result.totalRays >= 0)
+    _assert_launch_smoke_result(result)
 
     io = _io()
     series = io.Series(str(input_path), io.Access.read_only)
@@ -1425,14 +1449,7 @@ def test_python_api_launches_configured_openpmd_backend_once(monkeypatch, openpm
     phi_ase.run(gainMedium=launch_smoke_medium(), crossSections=launch_smoke_cross_sections())
     result = phi_ase.getResults()
 
-    expected_size = launch_smoke_topology().numberOfPoints * launch_smoke_topology().levels
-    assert result.phiAse.shape == (expected_size,)
-    assert result.mse.shape == (expected_size,)
-    assert result.totalRays.shape == (expected_size,)
-    assert result.dndtAse.shape == (expected_size,)
-    assert np.all(np.isfinite(result.phiAse))
-    assert np.all(np.isfinite(result.mse))
-    assert np.all(result.totalRays >= 0)
+    _assert_launch_smoke_result(result)
 
 
 @pytest.mark.integration
@@ -1443,6 +1460,30 @@ def test_calc_phi_ase_single_openpmd_round_trip(tmp_path):
 @pytest.mark.integration
 def test_calc_phi_ase_mpi_openpmd_round_trip_when_mpi_enabled(tmp_path):
     _round_trip_calc_phi_ase(tmp_path, "mpi")
+
+
+@pytest.mark.integration
+def test_calc_phi_ase_mpi_openpmd_round_trip_with_matrix_rank(monkeypatch, tmp_path):
+    _require_openpmd_transport_io()
+    ranks = _matrix_mpi_rank_count()
+    executable, build_dir = _openpmd_calc_phi_ase()
+    if not _mpi_enabled(build_dir):
+        pytest.fail("HASE_MPI_TEST_RANKS is configured, but calcPhiASE was not built with MPI")
+
+    monkeypatch.setenv("HASE_CALCPHIASE", str(executable))
+    phi_ase = launch_smoke_phi_ase()
+    phi_ase.parallelMode = "mpi"
+
+    result = transport.runPhiASE(
+        phi_ase,
+        launch_smoke_medium(),
+        launch_smoke_cross_sections(),
+        transport=_file_backend_for_tests(),
+        command_prefix=_mpiexec_command_prefix(ranks),
+        workspace_dir=tmp_path,
+    )
+
+    _assert_launch_smoke_result(result)
 
 
 def test_openpmd_input_series_preserves_custom_fields(tmp_path):
