@@ -110,9 +110,16 @@ use its prefix. The Python interpreter and every ``openpmd_api`` entry on
      --backend adios-sst \
      --cmake-prefix-path "$OPENPMD_API_ROOT"
 
-For a manually installed source build of openPMD-api, install the matching
-Python package in the active environment and point CMake to the C++ install
-prefix:
+Manual external source builds need one extra dependency step. Build or install
+ADIOS2 before configuring openPMD-api when the provider must support ``adios``
+or ``adios-sst``, and include the ADIOS2 prefix in openPMD-api's
+``CMAKE_PREFIX_PATH``. For ADIOS2 source installs used as an openPMD provider
+dependency, pass ``-DADIOS2_INSTALL_GENERATE_CONFIG=OFF`` unless you need the
+legacy ``adios2-config`` shell helper; HASEonGPU and openPMD-api use ADIOS2's
+CMake package config. openPMD-api 0.17.x does not fetch ADIOS2 through
+``openPMD_SUPERBUILD``; that option only covers openPMD helper dependencies.
+After installing openPMD-api, install the matching Python package in the active
+environment and point CMake to the C++ install prefix.
 
 .. code-block:: bash
 
@@ -157,11 +164,15 @@ the FetchContent source-build provider:
 
    CMAKE_ARGS="-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" python3 -m pip install .
 
-This path fetches and builds the pinned openPMD-api provider with ADIOS2,
-ADIOS2 SST, and HDF5 support for the HASE CMake build. The HASE wheel does not
-vendor the resulting openPMD runtime libraries or generated ``openpmd_api``
-Python bindings. The target runtime environment must still provide compatible
-openPMD shared libraries and a compatible Python ``openpmd_api`` package.
+This path is the only HASE install mode that uses FetchContent to build ADIOS2
+before configuring openPMD-api. It builds the pinned openPMD-api provider with
+ADIOS2, ADIOS2 SST, and HDF5 support for the HASE CMake build.
+
+The HASE wheel does not vendor the resulting ADIOS2/openPMD runtime libraries
+or generated ``openpmd_api`` Python bindings. The target runtime environment
+must still provide compatible openPMD shared libraries and a compatible Python
+``openpmd_api`` package; HASE records provider library directories through
+RPATH rather than copying provider libraries into the wheel.
 
 For redistributable wheels, prefer a normal external provider and make the
 runtime dependency explicit in the deployment environment.
@@ -195,7 +206,9 @@ If ``utils/check_openpmd_compatibility.py`` reports missing backend support,
 use one of these paths:
 
 * provide a Python ``openpmd_api`` package and CMake prefix that support the
-  runtime backend you want, then select that backend in Python or YAML
+  runtime backend you want, then select that backend in Python or YAML; for a
+  manual external openPMD-api source build, install ADIOS2 first when selecting
+  ``adios`` or ``adios-sst``
 * use ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON`` to build the bundled provider with
   all built-in HASE openPMD backends
 
