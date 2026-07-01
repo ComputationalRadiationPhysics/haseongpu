@@ -33,6 +33,7 @@ namespace hase::openpmd
         [[nodiscard]] core::SimulationContext read();
         void writeResult(core::Result const& result, core::HostMesh const& mesh);
         void processAll(std::function<void(core::SimulationContext&)> process);
+        void runTimeSteppedSimulation();
 
     private:
         [[nodiscard]] bool isHeadRank() const;
@@ -51,6 +52,12 @@ namespace hase::openpmd
             std::uint64_t iterationIndex,
             core::Result const& result,
             core::HostMesh const& mesh);
+        void writeSimulationSnapshotIteration(
+            openPMD::Series& series,
+            std::uint64_t iterationIndex,
+            core::SimulationStepSnapshot const& snapshot,
+            core::ExperimentParameters const& experiment,
+            bool includeStatic);
 
         std::filesystem::path m_inputPath;
         std::filesystem::path m_outputPath;

@@ -21,12 +21,83 @@ from HASEonGPU import (
     Heun,
     ImplicitEuler,
     Midpoint,
+    PhiASE,
     PumpProperties,
     RungeKutta4,
     Simulation,
     PumpRadiationProfile,
     oneDimensionalZTraversalPumpRate,
 )
+from pyInclude.openpmd import transport
+
+
+def testCompiledSimulationDelegatesRunStepsToCppTransport(
+    monkeypatch,
+    smallGainMedium,
+    smallTopology,
+    pumpProperties,
+    crossSections,
+):
+    captured = {}
+
+    def fake_run_simulation(simulation, *, steps, pumpSteps=None, transport=None):
+        captured["simulation"] = simulation
+        captured["steps"] = steps
+        captured["pumpSteps"] = pumpSteps
+        captured["transport"] = transport
+        return [
+            SimpleNamespace(
+                step=1,
+                time=simulation.timeStep,
+                betaCells=np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.25),
+                betaVolume=np.full((smallTopology.numberOfTriangles, smallTopology.levels - 1), 0.125),
+                phiAse=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+                dndtAse=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+                dndtPump=np.ones((smallTopology.numberOfPoints, smallTopology.levels)),
+                aseResult=object(),
+            )
+        ]
+
+    monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)
+    phi_ase = PhiASE(spectralProperties=crossSections, openpmdBackend="adios")
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=phi_ase,
+        timeIntegrationSolver="heun",
+        timeStep=1e-5,
+    )
+
+    simulation.runSteps(1, pumpSteps=0)
+
+    state = simulation.getLastState()
+    assert captured == {
+        "simulation": simulation,
+        "steps": 1,
+        "pumpSteps": 0,
+        "transport": "adios",
+    }
+    assert state.step == 1
+    assert np.allclose(state.betaCells, 0.25)
+    assert np.allclose(simulation.gainMedium.get("betaCells").value, 0.25)
+
+
+def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=PhiASE(spectralProperties=crossSections),
+        timeIntegrationSolver="explicit-euler",
+        timeStep=1e-5,
+    ).beforeStep(lambda simulation: None)
+
+    with pytest.raises(ValueError, match="beforeStep"):
+        simulation.runSteps(1)
+
 
 
 class _FakePhiAse:
