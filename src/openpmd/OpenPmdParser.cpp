@@ -1,17 +1,24 @@
 #include <openPMD/openPMD.hpp>
 #include <openpmd/OpenPmdParser.hpp>
 
+#include <core/timeSteppedSimulation.hpp>
+
 #include <algorithm>
 #include <array>
+#include <condition_variable>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <optional>
+#include <queue>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -47,6 +54,26 @@ namespace
         constexpr char const* rngSeed = "rng_seed";
         constexpr char const* writeVtk = "write_vtk";
         constexpr char const* devices = "devices";
+        constexpr char const* timeStep = "time_step";
+        constexpr char const* numberOfSteps = "number_of_steps";
+        constexpr char const* pumpSteps = "pump_steps";
+        constexpr char const* timeIntegrator = "time_integrator";
+        constexpr char const* implicitIterations = "implicit_iterations";
+        constexpr char const* implicitTolerance = "implicit_tolerance";
+        constexpr char const* pumpRoutine = "pump_routine";
+        constexpr char const* pumpIntensity = "pump_intensity";
+        constexpr char const* pumpWavelength = "pump_wavelength";
+        constexpr char const* pumpRadiusX = "pump_radius_x";
+        constexpr char const* pumpRadiusY = "pump_radius_y";
+        constexpr char const* pumpExponent = "pump_exponent";
+        constexpr char const* pumpDuration = "pump_duration";
+        constexpr char const* pumpSubsteps = "pump_substeps";
+        constexpr char const* pumpSigmaAbsorption = "pump_sigma_absorption";
+        constexpr char const* pumpSigmaEmission = "pump_sigma_emission";
+        constexpr char const* pumpBackReflection = "pump_back_reflection";
+        constexpr char const* pumpReflectivity = "pump_reflectivity";
+        constexpr char const* pumpExtraction = "pump_extraction";
+        constexpr char const* pumpTemporaryFluorescence = "pump_temporary_fluorescence";
     } // namespace field
 
     constexpr char const* OPENPMD_SST_CONFIG = R"(
@@ -112,6 +139,20 @@ namespace
     }
 
     std::string entityFromAxes(std::vector<std::string> const& axes);
+
+    std::string joinAxes(std::vector<std::string> const& axes)
+    {
+        std::string joined;
+        for(auto const& axis : axes)
+        {
+            if(!joined.empty())
+            {
+                joined += ",";
+            }
+            joined += axis;
+        }
+        return joined;
+    }
 
     template<typename T>
     std::string vectorString(std::vector<T> const& values)
@@ -646,7 +687,7 @@ namespace
     void writeScalar(
         io::Iteration& iteration,
         std::string const& name,
-        std::vector<T>& values,
+        std::vector<T> const& values,
         io::Extent const& extent,
         std::vector<std::string> const& axisLabels,
         std::string const& unit = "1",
@@ -676,7 +717,100 @@ namespace
         component.setUnitSI(unitSI);
         component.setPosition(std::vector<double>(extent.size(), 0.0));
         component.resetDataset({io::determineDatatype<T>(), extent});
-        component.storeChunk(values, io::Offset(extent.size(), 0u), extent);
+        component.storeChunk(const_cast<std::vector<T>&>(values), io::Offset(extent.size(), 0u), extent);
+    }
+
+    template<typename T>
+    void writeFlatScalar(
+        io::Iteration& iteration,
+        std::string const& name,
+        std::vector<T> const& values,
+        std::vector<std::string> const& axes,
+        std::vector<unsigned long long> const& primitiveShape,
+        bool dynamic,
+        std::string const& unit = "1",
+        double unitSI = 1.0,
+        std::array<double, 7> unitDimension = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
+    {
+        auto record = iteration.meshes[name];
+        record.setAttribute("geometry", "other");
+        record.setAttribute("geometryParameters", "topology=unstructured_triangular_prism");
+        record.setAttribute("dataOrder", "C");
+        record.setAxisLabels(std::vector<std::string>{"flatIndex"});
+        record.setAttribute("haseAxisLabelsString", std::string{"flatIndex"});
+        record.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
+        record.setAttribute("haseEntity", entityFromAxes(axes));
+        record.setAttribute("haseAxes", axes);
+        record.setAttribute("haseAxesString", joinAxes(axes));
+        record.setAttribute("haseLayoutOrder", std::string{"backendFlat"});
+        record.setAttribute("hasePrimitiveShape", primitiveShape);
+        record.setAttribute("haseStatic", !dynamic);
+        record.setAttribute("haseDynamic", dynamic);
+        record.setAttribute("haseBackendRequired", true);
+        record.setAttribute("haseUnit", unit);
+        record.setGridSpacing(std::vector<double>{1.0});
+        record.setGridGlobalOffset(std::vector<double>{0.0});
+        record.setGridUnitSI(1.0);
+        record.setUnitDimension(unitDimension);
+
+        auto& component = record[io::MeshRecordComponent::SCALAR];
+        component.setUnitSI(unitSI);
+        component.setPosition(std::vector<double>{0.0});
+        component.resetDataset({io::determineDatatype<T>(), io::Extent{values.size()}});
+        component.storeChunk(const_cast<std::vector<T>&>(values), io::Offset{0u}, io::Extent{values.size()});
+    }
+
+    template<typename T>
+    void writeComponent(
+        io::Iteration& iteration,
+        std::string const& name,
+        std::string const& componentName,
+        std::vector<T> const& values,
+        std::vector<std::string> const& axisLabels,
+        std::string const& unit = "1",
+        double unitSI = 1.0,
+        std::array<double, 7> unitDimension = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})
+    {
+        auto record = iteration.meshes[name];
+        record.setAttribute("geometry", "other");
+        record.setAttribute("geometryParameters", "topology=unstructured_triangular_prism");
+        record.setAttribute("dataOrder", "C");
+        record.setAxisLabels(axisLabels);
+        record.setAttribute("haseAxisLabelsString", joinAxes(axisLabels));
+        record.setGridSpacing(std::vector<double>(axisLabels.size(), 1.0));
+        record.setGridGlobalOffset(std::vector<double>(axisLabels.size(), 0.0));
+        record.setGridUnitSI(1.0);
+        record.setUnitDimension(unitDimension);
+        record.setAttribute("haseUnit", unit);
+
+        auto& component = record[componentName];
+        component.setUnitSI(unitSI);
+        component.setPosition(std::vector<double>(axisLabels.size(), 0.0));
+        component.resetDataset({io::determineDatatype<T>(), io::Extent{values.size()}});
+        component.storeChunk(const_cast<std::vector<T>&>(values), io::Offset{0u}, io::Extent{values.size()});
+    }
+
+    std::vector<unsigned> canonicalConnectivity(hase::core::HostMesh const& mesh)
+    {
+        std::vector<unsigned> connectivity;
+        connectivity.reserve(mesh.numberOfTriangles * (mesh.numberOfLevels - 1u) * 6u);
+        for(unsigned level = 0u; level + 1u < mesh.numberOfLevels; ++level)
+        {
+            unsigned const lower = level * mesh.numberOfPoints;
+            unsigned const upper = (level + 1u) * mesh.numberOfPoints;
+            for(unsigned triangle = 0u; triangle < mesh.numberOfTriangles; ++triangle)
+            {
+                for(unsigned vertex = 0u; vertex < 3u; ++vertex)
+                {
+                    connectivity.push_back(mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + lower);
+                }
+                for(unsigned vertex = 0u; vertex < 3u; ++vertex)
+                {
+                    connectivity.push_back(mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + upper);
+                }
+            }
+        }
+        return connectivity;
     }
 } // namespace
 
@@ -978,12 +1112,36 @@ namespace hase::openpmd
             attributeOr<unsigned>(iteration, field::maxSampleRange, numberOfSamples - 1u),
             attributeOr<unsigned>(iteration, field::rngSeed, core::ComputeParameters::unspecifiedRngSeed));
 
+        core::SimulationRunParameters run;
+        run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
+        run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
+        run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
+        run.timeIntegration.method =
+            attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
+        run.timeIntegration.implicitIterations = attributeOr<unsigned>(iteration, field::implicitIterations, 8u);
+        run.timeIntegration.implicitTolerance = attributeOr<double>(iteration, field::implicitTolerance, 1.0e-10);
+        run.pump.routine =
+            attributeOr<std::string>(iteration, field::pumpRoutine, core::PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL);
+        run.pump.intensity = attributeOr<double>(iteration, field::pumpIntensity, 0.0);
+        run.pump.wavelength = attributeOr<double>(iteration, field::pumpWavelength, 0.0);
+        run.pump.radiusX = attributeOr<double>(iteration, field::pumpRadiusX, 0.0);
+        run.pump.radiusY = attributeOr<double>(iteration, field::pumpRadiusY, run.pump.radiusX);
+        run.pump.exponent = attributeOr<double>(iteration, field::pumpExponent, 40.0);
+        run.pump.duration = attributeOr<double>(iteration, field::pumpDuration, run.timeStep);
+        run.pump.substeps = attributeOr<unsigned>(iteration, field::pumpSubsteps, 100u);
+        run.pump.sigmaAbsorption = attributeOr<double>(iteration, field::pumpSigmaAbsorption, experiment.maxSigmaA);
+        run.pump.sigmaEmission = attributeOr<double>(iteration, field::pumpSigmaEmission, experiment.maxSigmaE);
+        run.pump.backReflection = attributeOr<bool>(iteration, field::pumpBackReflection, true);
+        run.pump.reflectivity = attributeOr<double>(iteration, field::pumpReflectivity, 1.0);
+        run.pump.extraction = attributeOr<bool>(iteration, field::pumpExtraction, false);
+        run.pump.temporaryFluorescence = attributeOr<double>(iteration, field::pumpTemporaryFluorescence, 0.0);
+
         mesh.calcTotalReflectionAngles();
 
         core::Result result;
         initializeResultForMesh(result, mesh);
         iteration.close();
-        return {std::move(experiment), std::move(compute), std::move(mesh), std::move(result)};
+        return {std::move(experiment), std::move(compute), std::move(mesh), std::move(result), std::move(run)};
     }
 
     void Parser::updateDynamicIteration(
@@ -1082,6 +1240,193 @@ namespace hase::openpmd
         iteration.close();
     }
 
+    void Parser::writeSimulationSnapshotIteration(
+        io::Series& series,
+        std::uint64_t iterationIndex,
+        core::SimulationStepSnapshot const& snapshot,
+        core::ExperimentParameters const& experiment,
+        bool includeStatic)
+    {
+        auto iterations = series.writeIterations();
+        auto iteration = iterations[iterationIndex];
+        iteration.setTime(snapshot.time);
+        iteration.setDt(snapshot.time == 0.0 ? 0.0 : snapshot.time / static_cast<double>(snapshot.step));
+        iteration.setTimeUnitSI(1.0);
+        iteration.setAttribute("haseStaticUpdate", includeStatic);
+        iteration.setAttribute("step_index", snapshot.step);
+        iteration.setAttribute("time", snapshot.time);
+        iteration.setAttribute(field::numberOfPoints, snapshot.mesh.numberOfPoints);
+        iteration.setAttribute(field::numberOfCells, snapshot.mesh.numberOfTriangles);
+        iteration.setAttribute(field::numberOfLevels, snapshot.mesh.numberOfLevels);
+
+        std::string const prefix = m_meshGroup + "_";
+        if(includeStatic)
+        {
+            auto const numberOfMeshPoints = snapshot.mesh.numberOfPoints * snapshot.mesh.numberOfLevels;
+            auto const numberOfPrisms = snapshot.mesh.numberOfTriangles * (snapshot.mesh.numberOfLevels - 1u);
+
+            std::vector<double> x(numberOfMeshPoints);
+            std::vector<double> y(numberOfMeshPoints);
+            std::vector<double> z(numberOfMeshPoints);
+            for(unsigned level = 0u; level < snapshot.mesh.numberOfLevels; ++level)
+            {
+                for(unsigned point = 0u; point < snapshot.mesh.numberOfPoints; ++point)
+                {
+                    unsigned const sample = point + level * snapshot.mesh.numberOfPoints;
+                    x.at(sample) = snapshot.mesh.points.at(point);
+                    y.at(sample) = snapshot.mesh.points.at(point + snapshot.mesh.numberOfPoints);
+                    z.at(sample) = static_cast<double>(level) * snapshot.mesh.thickness;
+                }
+            }
+            auto pointsRecordName = prefix + "points";
+            writeComponent(iteration, pointsRecordName, "x", x, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeComponent(iteration, pointsRecordName, "y", y, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeComponent(iteration, pointsRecordName, "z", z, {"mesh_point"}, "m", 1.0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            auto pointsRecord = iteration.meshes[pointsRecordName];
+            pointsRecord.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
+            pointsRecord.setAttribute("haseEntity", std::string{"coordinate_mesh_point"});
+            pointsRecord.setAttribute("haseAxes", std::vector<std::string>{"coordinate", "mesh_point"});
+            pointsRecord.setAttribute("haseAxesString", std::string{"coordinate,mesh_point"});
+            pointsRecord.setAttribute("haseLayoutOrder", std::string{"component"});
+            pointsRecord.setAttribute("hasePrimitiveShape", std::vector<unsigned long long>{3u, numberOfMeshPoints});
+            pointsRecord.setAttribute("haseStatic", true);
+            pointsRecord.setAttribute("haseDynamic", false);
+            pointsRecord.setAttribute("haseBackendRequired", false);
+
+            auto connectivity = canonicalConnectivity(snapshot.mesh);
+            writeFlatScalar<unsigned>(
+                iteration,
+                prefix + "cells_connectivity",
+                connectivity,
+                {"cell", "local_vertex"},
+                {numberOfPrisms, 6u},
+                false);
+            std::vector<unsigned> offsets(numberOfPrisms + 1u);
+            for(unsigned i = 0u; i < offsets.size(); ++i)
+            {
+                offsets.at(i) = i * 6u;
+            }
+            writeFlatScalar<unsigned>(iteration, prefix + "cells_offsets", offsets, {"cell_offset"}, {numberOfPrisms + 1u}, false);
+            writeFlatScalar<unsigned>(
+                iteration,
+                prefix + "cells_types",
+                std::vector<unsigned>(numberOfPrisms, 13u),
+                {"cell"},
+                {numberOfPrisms},
+                false);
+
+            writeFlatScalar<unsigned>(
+                iteration,
+                prefix + "cladding_cell_type",
+                snapshot.mesh.claddingCellTypes,
+                {"cell"},
+                {snapshot.mesh.numberOfTriangles},
+                false);
+            writeFlatScalar<float>(iteration, prefix + "refractive_index", snapshot.mesh.refractiveIndices, {"interface"}, {4u}, false);
+            writeFlatScalar<float>(
+                iteration,
+                prefix + "reflectivity",
+                snapshot.mesh.reflectivities,
+                {"cell", "interface"},
+                {snapshot.mesh.numberOfTriangles, 2u},
+                false);
+            writeFlatScalar<double>(
+                iteration,
+                prefix + "lambda_absorption",
+                experiment.lambdaA,
+                {"wavelength"},
+                {experiment.spectral},
+                false,
+                "m");
+            writeFlatScalar<double>(
+                iteration,
+                prefix + "lambda_emission",
+                experiment.lambdaE,
+                {"wavelength"},
+                {experiment.spectral},
+                false,
+                "m");
+            writeFlatScalar<double>(
+                iteration,
+                prefix + "sigma_absorption",
+                experiment.sigmaA,
+                {"wavelength"},
+                {experiment.spectral},
+                false,
+                "cm^2",
+                1.0e-4,
+                {-4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+            writeFlatScalar<double>(
+                iteration,
+                prefix + "sigma_emission",
+                experiment.sigmaE,
+                {"wavelength"},
+                {experiment.spectral},
+                false,
+                "cm^2",
+                1.0e-4,
+                {-4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+        }
+
+        writeFlatScalar<double>(
+            iteration,
+            prefix + "point_beta",
+            snapshot.mesh.betaCells,
+            {"point", "level"},
+            {snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            true);
+        writeFlatScalar<double>(
+            iteration,
+            prefix + "beta_volume",
+            snapshot.mesh.betaVolume,
+            {"cell", "layer"},
+            {snapshot.mesh.numberOfTriangles, snapshot.mesh.numberOfLevels - 1u},
+            true);
+
+        std::string const resultPrefix = prefix + "result_";
+        writeScalar(
+            iteration,
+            resultPrefix + "phi_ase",
+            snapshot.aseResult.phiAse,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"},
+            "cm^-2 s^-1",
+            1.0e4,
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            resultPrefix + "mse",
+            snapshot.aseResult.mse,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"});
+        writeScalar(
+            iteration,
+            resultPrefix + "total_rays",
+            snapshot.aseResult.totalRays,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"},
+            "count");
+        writeScalar(
+            iteration,
+            resultPrefix + "dndt_ase",
+            snapshot.dndtAse,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"},
+            "s^-1",
+            1.0,
+            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            prefix + "result_dndt_pump",
+            snapshot.dndtPump,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"},
+            "s^-1",
+            1.0,
+            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        iteration.close();
+    }
+
     void Parser::processAll(std::function<void(core::SimulationContext&)> process)
     {
         auto const inputStream = m_inputPath.string();
@@ -1146,6 +1491,109 @@ namespace hase::openpmd
         if(outputSeries)
         {
             outputSeries->close();
+        }
+    }
+
+    void Parser::runTimeSteppedSimulation()
+    {
+        auto simulation = read();
+        std::exception_ptr writerError;
+        std::mutex mutex;
+        std::condition_variable ready;
+        std::queue<std::optional<core::SimulationStepSnapshot>> pending;
+        bool const writesOutput = isHeadRank();
+
+        std::thread writer;
+        if(writesOutput)
+        {
+            writer = std::thread(
+                [&]
+                {
+                    try
+                    {
+                        auto const outputStream = m_outputPath.string();
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+                        io::Series series(outputStream, io::Access::CREATE_LINEAR, MPI_COMM_SELF, seriesConfig(outputStream));
+#else
+                        io::Series series(outputStream, io::Access::CREATE_LINEAR, seriesConfig(outputStream));
+#endif
+                        series.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
+
+                        while(true)
+                        {
+                            std::optional<core::SimulationStepSnapshot> item;
+                            {
+                                std::unique_lock lock{mutex};
+                                ready.wait(lock, [&] { return !pending.empty(); });
+                                item = std::move(pending.front());
+                                pending.pop();
+                            }
+                            if(!item)
+                            {
+                                break;
+                            }
+                            bool const includeStatic = item->step == 1u;
+                            writeSimulationSnapshotIteration(series, item->step - 1u, *item, simulation.experiment, includeStatic);
+                            series.flush();
+                        }
+                        series.close();
+                    }
+                    catch(...)
+                    {
+                        writerError = std::current_exception();
+                    }
+                });
+        }
+
+        auto enqueueSnapshot = [&](core::SimulationStepSnapshot const& snapshot)
+        {
+            if(!writesOutput)
+            {
+                return;
+            }
+            {
+                std::scoped_lock lock{mutex};
+                pending.push(snapshot);
+            }
+            ready.notify_one();
+        };
+
+        std::exception_ptr simulationError;
+        int result = 0;
+        try
+        {
+            result = core::startTimeSteppedSimulation(
+                simulation.experiment,
+                simulation.compute,
+                simulation.run,
+                simulation.mesh,
+                enqueueSnapshot);
+        }
+        catch(...)
+        {
+            simulationError = std::current_exception();
+        }
+
+        if(writesOutput)
+        {
+            {
+                std::scoped_lock lock{mutex};
+                pending.push(std::nullopt);
+            }
+            ready.notify_one();
+            writer.join();
+        }
+        if(simulationError)
+        {
+            std::rethrow_exception(simulationError);
+        }
+        if(result != 0)
+        {
+            throw std::runtime_error("time-stepped simulation failed with return code " + std::to_string(result));
+        }
+        if(writerError)
+        {
+            std::rethrow_exception(writerError);
         }
     }
 

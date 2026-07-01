@@ -133,7 +133,7 @@ namespace hase::core
      * @brief Wait for all threads to finish
      *
      */
-    void joinAll()
+    inline void joinAll()
     {
         for(auto& t : threadIds)
         {

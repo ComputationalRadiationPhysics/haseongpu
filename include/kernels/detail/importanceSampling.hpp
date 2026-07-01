@@ -32,7 +32,7 @@
 namespace hase::kernels
 {
 
-    ALPAKA_FN_HOST_ACC void assertMeshPropagationInputs(
+    inline ALPAKA_FN_HOST_ACC void assertMeshPropagationInputs(
         core::DeviceMeshView const& mesh,
         unsigned prism,
         unsigned sample_i)

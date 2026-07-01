@@ -1635,3 +1635,59 @@ def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
     assert record.get_attribute("haseUnit") == "K"
     _assert_base_openpmd_scalar_metadata(record, axis_labels=["flatIndex"], unit_dimension=temperature_dimension)
     series.close()
+
+
+def test_simulation_run_control_serializes_compiled_solver_metadata():
+    class Pump:
+        solver = None
+        intensity = 16e3
+        wavelength = 940e-9
+        radiusX = 1.5
+        radiusY = 1.25
+        exponent = 40
+        pumpSubsteps = 12
+        backReflection = False
+        reflectivity = 0.75
+        extraction = True
+        temporaryFluorescence = 1.0e-3
+
+        def toDict(self, *, timeFrame):
+            assert timeFrame == 2.0e-6
+            return {"s_abs": np.array([1.0e-22]), "s_ems": np.array([2.0e-22])}
+
+        def getProperty(self, name):
+            assert name == "pumpSteps"
+            return 4
+
+        def activeDuration(self, time_step):
+            assert time_step == 2.0e-6
+            return 3.0e-6
+
+    simulation = SimpleNamespace(
+        pump=Pump(),
+        timeStep=2.0e-6,
+        timeIntegrationSolver=SimpleNamespace(name="implicit-euler", iterations=5, tolerance=1.0e-7),
+    )
+
+    control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+
+    assert control["time_step"] == 2.0e-6
+    assert control["number_of_steps"] == 7
+    assert control["pump_steps"] == 4
+    assert control["time_integrator"] == "implicit-euler"
+    assert control["implicit_iterations"] == 5
+    assert control["implicit_tolerance"] == 1.0e-7
+    assert control["pump_routine"] == "one-dimensional-z-traversal"
+    assert control["pump_duration"] == 3.0e-6
+    assert control["pump_substeps"] == 12
+    assert control["pump_sigma_absorption"] == 1.0e-22
+    assert control["pump_sigma_emission"] == 2.0e-22
+    assert control["pump_back_reflection"] is False
+    assert control["pump_extraction"] is True
+
+
+def test_simulation_run_control_rejects_custom_python_pump_solver():
+    simulation = SimpleNamespace(pump=SimpleNamespace(solver=object()))
+
+    with pytest.raises(ValueError, match="custom Python pump solvers"):
+        transport._simulation_run_control(simulation, steps=1, pumpSteps=None)

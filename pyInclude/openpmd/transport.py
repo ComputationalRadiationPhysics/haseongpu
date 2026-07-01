@@ -770,7 +770,7 @@ def _open_input_series(path, *, backend=None):
     return series
 
 
-def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSections, *, include_static=True):
+def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSections, *, include_static=True, runControl=None):
     iteration = series.snapshots()[int(iteration_index)]
     iteration.time = 0.0
     iteration.dt = 1.0
@@ -778,6 +778,10 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
 
     for field in _attributeFields(phiAse, gainMedium, crossSections):
         iteration.set_attribute(field.name, field.value)
+    if runControl:
+        for name, value in runControl.items():
+            if value is not None:
+                iteration.set_attribute(name, value)
 
     if include_static:
         iteration.set_attribute("haseStaticUpdate", True)
@@ -810,12 +814,20 @@ class OpenPmdInputSeries:
         self.close()
         return False
 
-    def write(self, phiAse, gainMedium, crossSections, *, iteration_index=None, include_static=None):
+    def write(self, phiAse, gainMedium, crossSections, *, iteration_index=None, include_static=None, runControl=None):
         if self._series is None:
             raise RuntimeError("OpenPmdInputSeries must be used as a context manager before writing")
         index = self._next_iteration if iteration_index is None else int(iteration_index)
         write_static = (index == 0) if include_static is None else bool(include_static)
-        _write_input_iteration(self._series, index, phiAse, gainMedium, crossSections, include_static=write_static)
+        _write_input_iteration(
+            self._series,
+            index,
+            phiAse,
+            gainMedium,
+            crossSections,
+            include_static=write_static,
+            runControl=runControl,
+        )
         self._series.flush()
         self._next_iteration = max(self._next_iteration, index + 1)
         return index
@@ -884,6 +896,66 @@ def read_result(path, *, expected_iteration_index=0) -> Result:
         return result
     series.close()
     raise RuntimeError(f"No result iteration was available in {path}")
+
+
+def _read_optional_scalar(series, iteration, name, dtype, default_size=None):
+    if name not in iteration.meshes:
+        if default_size is None:
+            return None
+        return np.zeros(default_size, dtype=dtype)
+    return _loadScalar(series, iteration, name, dtype)
+
+
+def _has_attribute(obj, name):
+    if hasattr(obj, "contains_attribute"):
+        return obj.contains_attribute(name)
+    try:
+        obj.get_attribute(name)
+        return True
+    except Exception:
+        return False
+
+
+def read_simulation_output(path):
+    """Read C++ time-stepped simulation snapshots from an openPMD output series."""
+    path = Path(path)
+    series = _io().Series(str(path), _access("read_linear"), _series_config(path))
+    states = []
+    for fallback_index, iteration in enumerate(series.read_iterations()):
+        iteration_index = _iteration_index(iteration, fallback_index)
+        number_of_points = int(iteration.get_attribute("number_of_points"))
+        number_of_levels = int(iteration.get_attribute("number_of_levels"))
+        number_of_cells = int(iteration.get_attribute("number_of_cells"))
+        point_count = number_of_points * number_of_levels
+        prism_count = number_of_cells * (number_of_levels - 1)
+        states.append(SimpleNamespace(
+            iterationIndex=iteration_index,
+            step=int(iteration.get_attribute("step_index")) if _has_attribute(iteration, "step_index") else iteration_index + 1,
+            time=float(iteration.get_attribute("time")) if _has_attribute(iteration, "time") else float(iteration.time),
+            betaCells=_loadScalar(series, iteration, "core_point_beta", np.float64).reshape((number_of_points, number_of_levels), order="F"),
+            betaVolume=_loadScalar(series, iteration, "core_beta_volume", np.float64).reshape((number_of_cells, number_of_levels - 1), order="F"),
+            phiAse=_loadScalar(series, iteration, "core_result_phi_ase", np.float32).reshape((number_of_points, number_of_levels), order="C"),
+            dndtAse=_loadScalar(series, iteration, "core_result_dndt_ase", np.float64).reshape((number_of_points, number_of_levels), order="C"),
+            dndtPump=_read_optional_scalar(
+                series,
+                iteration,
+                "core_result_dndt_pump",
+                np.float64,
+                point_count,
+            ).reshape((number_of_points, number_of_levels), order="C"),
+            aseResult=Result(
+                phiAse=_read_optional_scalar(series, iteration, "core_result_phi_ase", np.float32, point_count),
+                mse=_read_optional_scalar(series, iteration, "core_result_mse", np.float64, point_count),
+                totalRays=_read_optional_scalar(series, iteration, "core_result_total_rays", np.uint32, point_count),
+                dndtAse=_read_optional_scalar(series, iteration, "core_result_dndt_ase", np.float64, point_count),
+            ),
+            staticUpdate=bool(iteration.get_attribute("haseStaticUpdate")) if _has_attribute(iteration, "haseStaticUpdate") else iteration_index == 0,
+        ))
+        iteration.close()
+    series.close()
+    if not states:
+        raise RuntimeError(f"No simulation iterations were available in {path}")
+    return states
 
 
 class OpenPmdPhiAseSession:
@@ -1373,6 +1445,118 @@ def runPhiASE(
         watchdog_interval=watchdog_interval,
         openpmdSession=openpmdSession,
     )
+
+
+_TIME_INTEGRATORS = {
+    "explicit-euler",
+    "heun",
+    "midpoint",
+    "runge-kutta-4",
+    "implicit-euler",
+    "exponential-euler",
+}
+
+
+def _time_integrator_name(solver):
+    if isinstance(solver, str):
+        name = solver
+    else:
+        name = getattr(solver, "name", None)
+    if name not in _TIME_INTEGRATORS:
+        raise ValueError(
+            "compiled Simulation supports time integrators: "
+            + ", ".join(sorted(_TIME_INTEGRATORS))
+        )
+    return name
+
+
+def _simulation_run_control(simulation, *, steps, pumpSteps):
+    pump = simulation.pump
+    if pump.solver is not None:
+        raise ValueError(
+            "compiled Simulation does not support custom Python pump solvers; "
+            "configure the built-in one-dimensional-z-traversal pump instead"
+        )
+    pump_dict = pump.toDict(timeFrame=simulation.timeStep)
+    if pumpSteps is None:
+        pumpSteps = pump.getProperty("pumpSteps")
+    pump_steps_value = (2**32 - 1) if pumpSteps is None else int(pumpSteps)
+    if pump_steps_value < 0:
+        raise ValueError("pumpSteps must be non-negative")
+    solver = simulation.timeIntegrationSolver
+    control = {
+        "time_step": float(simulation.timeStep),
+        "number_of_steps": int(steps),
+        "pump_steps": pump_steps_value,
+        "time_integrator": _time_integrator_name(solver),
+        "pump_routine": "one-dimensional-z-traversal",
+        "pump_intensity": float(pump.intensity),
+        "pump_wavelength": float(pump.wavelength),
+        "pump_radius_x": float(pump.radiusX),
+        "pump_radius_y": float(pump.radiusY),
+        "pump_exponent": float(pump.exponent),
+        "pump_duration": float(pump.activeDuration(simulation.timeStep)),
+        "pump_substeps": int(pump.pumpSubsteps),
+        "pump_sigma_absorption": float(np.asarray(pump_dict["s_abs"], dtype=np.float64).reshape(-1)[0]),
+        "pump_sigma_emission": float(np.asarray(pump_dict["s_ems"], dtype=np.float64).reshape(-1)[0]),
+        "pump_back_reflection": bool(pump.backReflection),
+        "pump_reflectivity": float(pump.reflectivity),
+        "pump_extraction": bool(pump.extraction),
+        "pump_temporary_fluorescence": 0.0 if pump.temporaryFluorescence is None else float(pump.temporaryFluorescence),
+    }
+    if hasattr(solver, "iterations"):
+        control["implicit_iterations"] = int(solver.iterations)
+    if hasattr(solver, "tolerance"):
+        control["implicit_tolerance"] = float(solver.tolerance)
+    return control
+
+
+def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_prefix=None, workspace_dir=None):
+    """Run the full time-stepped Simulation in the compiled C++/alpaka backend."""
+    steps = int(steps)
+    if steps <= 0:
+        raise ValueError("steps must be positive")
+    spec = _backend_spec(transport)
+    _ensure_backend_available(spec.name)
+    executable = findCalcPhiAse()
+    run_control = _simulation_run_control(simulation, steps=steps, pumpSteps=pumpSteps)
+
+    artifact_root = _artifact_root()
+    workspace_context = (
+        tempfile.TemporaryDirectory(prefix="hase-openpmd-simulation-", dir=workspace_dir)
+        if artifact_root is None
+        else contextlib.nullcontext(artifact_root)
+    )
+    with workspace_context as tmp:
+        tmp_path = Path(tmp)
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        stem = _artifact_run_id() if artifact_root is not None else "simulation"
+        input_path = tmp_path / f"{stem}-input{spec.suffix}"
+        output_path = tmp_path / f"{stem}-output{spec.suffix}"
+
+        with OpenPmdInputSeries(input_path, backend=spec.name) as writer:
+            writer.write(
+                simulation.phiASE,
+                simulation.gainMedium,
+                simulation.crossSections,
+                iteration_index=0,
+                include_static=True,
+                runControl=run_control,
+            )
+
+        command = [
+            *(command_prefix or []),
+            str(executable),
+            f"--input-path={input_path}",
+            f"--output-path={output_path}",
+            "--run-simulation",
+        ]
+        completed = subprocess.run(command, check=False, text=True, capture_output=True)
+        _forward_backend_logging(stdout=completed.stdout, stderr=completed.stderr)
+        if completed.returncode != 0:
+            detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
+            raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")
+        return read_simulation_output(output_path)
 
 
 def openStream(*, transport=None, command_prefix=None, workspace_dir=None, watchdog_interval=None):

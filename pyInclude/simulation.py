@@ -439,10 +439,13 @@ class Simulation:
     _openpmdSession: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
-        has_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "step")
-        has_simulation_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "stepSimulation")
-        if not has_step and not has_simulation_step:
-            raise ValueError("Simulation requires a timeIntegrationSolver with step(...) or stepSimulation(...)")
+        if self.timeIntegrationSolver is None:
+            raise ValueError("Simulation requires a timeIntegrationSolver")
+        if not isinstance(self.timeIntegrationSolver, str):
+            has_step = hasattr(self.timeIntegrationSolver, "step")
+            has_simulation_step = hasattr(self.timeIntegrationSolver, "stepSimulation")
+            if not has_step and not has_simulation_step:
+                raise ValueError("Simulation requires a timeIntegrationSolver with step(...) or stepSimulation(...)")
         if self.timeStep <= 0.0:
             raise ValueError("timeStep must be positive")
         if self.crossSections is None:
@@ -529,16 +532,11 @@ class Simulation:
         target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
         if target is None:
             raise ValueError("runUntil requires endtime or an endTime configured on construction")
-        session, close_session = self._withOpenPmdSession(openpmdSession)
-        previous_session = self._openpmdSession
-        self._openpmdSession = session
-        try:
-            while self._time < float(target) - 0.5 * self.timeStep:
-                self.step(openpmdSession=session)
-        finally:
-            self._openpmdSession = previous_session
-            if close_session:
-                self.phiASE.closeStream()
+        steps = 0
+        while self._time + steps * self.timeStep < float(target) - 0.5 * self.timeStep:
+            steps += 1
+        if steps:
+            self.runSteps(steps, openpmdSession=openpmdSession)
         return self
 
     def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
@@ -551,6 +549,62 @@ class Simulation:
         behavior. ``PumpProperties.pumpSubsteps`` is separate: it controls the
         internal pump integration resolution inside one pumped simulation step.
         """
+        if not self._usesCompiledBackend():
+            return self._runStepsLegacy(steps, pumpSteps=pumpSteps, openpmdSession=openpmdSession)
+        if openpmdSession not in (None, "interval"):
+            raise ValueError("compiled Simulation owns its C++ openPMD lifetime; openpmdSession is no longer supported")
+        steps = int(steps)
+        if steps <= 0:
+            raise ValueError("steps must be positive")
+        if self._beforeStepCallbacks:
+            raise ValueError("compiled Simulation does not support Python beforeStep callbacks during C++-owned steps")
+        self._runInitCallbacks()
+        if pumpSteps is None and hasattr(self, "pump"):
+            pumpSteps = self.pump.getProperty("pumpSteps")
+        if pumpSteps is not None and int(pumpSteps) < 0:
+            raise ValueError("pumpSteps must be non-negative")
+
+        previous_step = self._step
+        previous_time = self._time
+        states = transport.runSimulation(
+            self,
+            steps=steps,
+            pumpSteps=pumpSteps,
+            transport=self.phiASE.openpmdBackend,
+        )
+        for raw_state in states:
+            state = TimeStepState(
+                step=previous_step + int(raw_state.step),
+                time=previous_time + float(raw_state.time),
+                betaCells=np.asarray(raw_state.betaCells, dtype=np.float64).copy(),
+                betaVolume=np.asarray(raw_state.betaVolume, dtype=np.float64).copy(),
+                phiAse=np.asarray(raw_state.phiAse, dtype=np.float64).copy(),
+                dndtAse=np.asarray(raw_state.dndtAse, dtype=np.float64).copy(),
+                dndtPump=np.asarray(raw_state.dndtPump, dtype=np.float64).copy(),
+                aseResult=raw_state.aseResult,
+                topology=self.gainMedium.topology,
+            )
+            self.gainMedium.get("betaCells").value = state.betaCells
+            self.gainMedium.get("betaVolume").value = state.betaVolume
+            self._lastState = state
+            self._step = state.step
+            self._time = state.time
+            for callback, args, kwargs in self._callbacks:
+                callback(state, *args, **kwargs)
+        return self
+
+    def step(self, *, openpmdSession=None):
+        """Advance one time step and return the completed ``TimeStepState``."""
+        if not self._usesCompiledBackend():
+            return self._legacyPythonStep(openpmdSession=openpmdSession)
+        return self.runSteps(1, openpmdSession=openpmdSession).getLastState()
+
+    def _usesCompiledBackend(self):
+        if not isinstance(self.phiASE, PhiASE):
+            return False
+        return "run" not in vars(self.phiASE) and "getResults" not in vars(self.phiASE)
+
+    def _runStepsLegacy(self, steps, pumpSteps=None, *, openpmdSession=None):
         steps = int(steps)
         session, close_session = self._withOpenPmdSession(openpmdSession)
         previous_session = self._openpmdSession
@@ -576,8 +630,8 @@ class Simulation:
                 self.phiASE.closeStream()
         return self
 
-    def step(self, *, openpmdSession=None):
-        """Advance one time step and return the completed ``TimeStepState``."""
+    def _legacyPythonStep(self, *, openpmdSession=None):
+        """Legacy Python-side step implementation retained for focused internal tests."""
         previous_session = self._openpmdSession
         if openpmdSession is not None:
             self._openpmdSession = openpmdSession
