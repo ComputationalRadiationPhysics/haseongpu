@@ -267,5 +267,4 @@ namespace hase::core
     };
 
 
-
 } // namespace hase::core

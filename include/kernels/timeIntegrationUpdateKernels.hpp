@@ -22,8 +22,12 @@ namespace hase::kernels
     {
         double scale = 1.0;
 
-        ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto base, auto slope, auto out)
-            const
+        ALPAKA_FN_ACC void operator()(
+            auto const& acc,
+            hase::core::DeviceMeshView const mesh,
+            auto base,
+            auto slope,
+            auto out) const
         {
             for(auto [sample] : alpaka::onAcc::makeIdxMap(
                     acc,
@@ -76,7 +80,8 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfSamples}))
             {
-                out[sample] = base[sample] + (timeStep / 6.0) * (k1[sample] + 2.0 * k2[sample] + 2.0 * k3[sample] + k4[sample]);
+                out[sample] = base[sample]
+                              + (timeStep / 6.0) * (k1[sample] + 2.0 * k2[sample] + 2.0 * k3[sample] + k4[sample]);
             }
         }
     };

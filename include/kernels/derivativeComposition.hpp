@@ -46,7 +46,8 @@ namespace hase::kernels
                 double const beta = betaCells[sample];
                 double const pumpTerm = pumpEnabled ? (pumpedBeta[sample] - beta) / pumpDuration : 0.0;
                 double const gainPerDensity = beta * (sigmaEmission + sigmaAbsorption) - sigmaAbsorption;
-                double const aseTerm = activeMask[point] != 0u ? gainPerDensity * static_cast<double>(phiAse[sample]) : 0.0;
+                double const aseTerm
+                    = activeMask[point] != 0u ? gainPerDensity * static_cast<double>(phiAse[sample]) : 0.0;
 
                 dndtPump[sample] = pumpTerm;
                 dndtAse[sample] = aseTerm;

@@ -129,6 +129,9 @@ one-dimensional pump parameters. The C++ backend writes one output iteration
 per completed step. Each snapshot contains the dynamic beta fields plus the ASE
 results and ``core_result_dndt_pump``; its first snapshot also contains the
 static topology, material, and spectral records.
+For streaming backends, a dedicated receiver drains snapshots while the backend
+runs, so slow Python ``onStep`` work (such as file output) does not prevent the
+backend from completing its output stream.
 
 Iteration Updates
 -----------------

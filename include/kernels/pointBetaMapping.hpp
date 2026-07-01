@@ -20,7 +20,11 @@ namespace hase::kernels
 {
     struct MapPointBetaToPrismBeta
     {
-        ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto betaCells, auto betaVolume) const
+        ALPAKA_FN_ACC void operator()(
+            auto const& acc,
+            hase::core::DeviceMeshView const mesh,
+            auto betaCells,
+            auto betaVolume) const
         {
             for(auto [prism] : alpaka::onAcc::makeIdxMap(
                     acc,

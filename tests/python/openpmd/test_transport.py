@@ -1,6 +1,7 @@
 import os
 import shlex
 import subprocess
+import threading
 import sys
 import textwrap
 import time
@@ -1214,7 +1215,15 @@ def _parser_validation_binary():
     configured = os.environ.get("HASE_OPENPMD_PARSER_VALIDATION")
     for helper in _parser_validation_candidates():
         if helper.is_file() and os.access(helper, os.X_OK):
-            return helper
+            resolved = helper.resolve()
+            source_mtime = max(
+                (Path(__file__).resolve().parents[3] / "tests" / "openpmdParserValidation.cpp").stat().st_mtime,
+                (Path(__file__).resolve().parents[3] / "src" / "openpmd" / "OpenPmdParser.cpp").stat().st_mtime,
+            )
+            if resolved.stat().st_mtime >= source_mtime:
+                return resolved
+            if configured:
+                pytest.fail(f"configured HASE_OPENPMD_PARSER_VALIDATION is stale: {configured}")
     if configured:
         pytest.fail(f"configured HASE_OPENPMD_PARSER_VALIDATION is not executable: {configured}")
     pytest.skip("no openPMD parser validation binary found; build tests_openpmdParserValidation or set HASE_OPENPMD_PARSER_VALIDATION")
@@ -1691,3 +1700,59 @@ def test_simulation_run_control_rejects_custom_python_pump_solver():
 
     with pytest.raises(ValueError, match="custom Python pump solvers"):
         transport._simulation_run_control(simulation, steps=1, pumpSteps=None)
+
+
+def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypatch, tmp_path):
+    events = []
+    receiver_started = threading.Event()
+    release_receiver = threading.Event()
+
+    class FakeProcess:
+        returncode = 0
+
+        def __init__(self, command, **kwargs):
+            events.append(("popen", tuple(command), kwargs.get("text")))
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            events.append(("kill",))
+
+        def communicate(self):
+            events.append(("communicate",))
+            release_receiver.set()
+            return "", ""
+
+    def fake_read_simulation_output(path):
+        events.append(("read-start", threading.current_thread().name, Path(path).name))
+        receiver_started.set()
+        assert release_receiver.wait(timeout=2.0)
+        events.append(("read-end",))
+        return [SimpleNamespace(step=1)]
+
+    def fake_write_input(input_path, spec, simulation, run_control):
+        assert receiver_started.wait(timeout=2.0)
+        events.append(("write-input", Path(input_path).name, spec.name, run_control["number_of_steps"]))
+
+    monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
+    monkeypatch.setattr(transport, "_write_simulation_input", fake_write_input)
+
+    spec = SimpleNamespace(name="adios-sst")
+    states = transport._run_streaming_simulation(
+        ["calcPhiASE", "--run-simulation"],
+        tmp_path / "input.sst",
+        tmp_path / "output.sst",
+        spec,
+        SimpleNamespace(),
+        {"number_of_steps": 1},
+    )
+
+    assert states[0].step == 1
+    event_names = [event[0] for event in events]
+    assert event_names.index("read-start") < event_names.index("write-input")
+    assert event_names.index("write-input") < event_names.index("communicate")
+    assert event_names.index("communicate") < event_names.index("read-end")
+    read_event = next(event for event in events if event[0] == "read-start")
+    assert read_event[1] == "HASE compiled simulation snapshot receiver"
