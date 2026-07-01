@@ -173,7 +173,7 @@ def launch_smoke_phi_ase():
 
 
 def _file_backend_for_tests():
-    backend = os.environ.get("HASE_OPENPMD_BACKEND", "adios").strip().lower()
+    backend = os.environ.get("HASE_OPENPMD_TEST_BACKEND", "adios").strip().lower()
     if backend in {"hdf5", "adios"}:
         return backend
     return "adios"
@@ -424,6 +424,7 @@ def test_layout_helpers_define_exact_backend_flat_contract():
 
 
 def test_openpmd_backend_names_map_to_expected_suffixes_and_configs(monkeypatch):
+    assert transport._backend_spec().name == "adios-sst"
     assert transport._backend_spec("adios").suffix == ".bp"
     assert transport._backend_spec("adios").config == {"backend": "adios2"}
     assert transport._backend_spec("adios-sst").suffix == ".sst"
@@ -433,13 +434,11 @@ def test_openpmd_backend_names_map_to_expected_suffixes_and_configs(monkeypatch)
     assert transport._backend_spec("adios-sst").streaming is True
     assert transport._backend_spec("hdf5").config == {"backend": "hdf5"}
 
-    monkeypatch.setenv("HASE_OPENPMD_BACKEND", "hdf5")
-    assert transport._backend_spec().name == "hdf5"
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "hdf5")
     assert _file_backend_for_tests() == "hdf5"
-    monkeypatch.setenv("HASE_OPENPMD_BACKEND", "adios")
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "adios")
     assert _file_backend_for_tests() == "adios"
-    monkeypatch.setenv("HASE_OPENPMD_BACKEND", "adios-sst")
-    assert transport._backend_spec().name == "adios-sst"
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "adios-sst")
     assert _file_backend_for_tests() == "adios"
 
     for backend in ("bp", "unsupported"):
@@ -1222,8 +1221,7 @@ def _openpmd_backend_values():
     raw = os.environ.get("HASE_OPENPMD_TEST_BACKENDS")
     if raw:
         return [backend.strip() for backend in raw.split(",") if backend.strip()]
-    backend = os.environ.get("HASE_OPENPMD_BACKEND")
-    return [backend] if backend else ["adios"]
+    return ["adios"]
 
 
 def _cache_value(cache_path, name):
@@ -1313,9 +1311,9 @@ def _openpmd_calc_phi_ase():
 
 @pytest.mark.integration
 def testAdiosSstWatchdogEmitsFiveAliveBeatsFromNormalSession(monkeypatch):
-    selectedBackend = os.environ.get("HASE_OPENPMD_BACKEND", "adios").strip().lower()
-    if selectedBackend != "adios-sst":
-        pytest.skip("watchdog beat test only runs for HASE_OPENPMD_BACKEND=adios-sst")
+    configuredBackends = _openpmd_backend_values()
+    if "adios-sst" not in configuredBackends:
+        pytest.skip("watchdog beat test only runs when HASE_OPENPMD_TEST_BACKENDS includes adios-sst")
 
     io = _io()
     if "sst" not in getattr(io, "file_extensions", []):
@@ -1417,8 +1415,8 @@ def test_python_api_launches_configured_openpmd_backend_once(monkeypatch, openpm
     _require_openpmd_transport_io()
     executable, _ = _openpmd_calc_phi_ase()
     monkeypatch.setenv("HASE_CALCPHIASE", str(executable))
-    monkeypatch.setenv("HASE_OPENPMD_BACKEND", openpmd_backend)
     phi_ase = launch_smoke_phi_ase()
+    phi_ase.openpmdBackend = openpmd_backend
     phi_ase.run(gainMedium=launch_smoke_medium(), crossSections=launch_smoke_cross_sections())
     result = phi_ase.getResults()
 

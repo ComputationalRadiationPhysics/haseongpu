@@ -84,6 +84,7 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
 
 
 def testPhiAseLoadsOpenPmdBackendFromConfig():
+    assert PhiASE().openpmdBackend == "adios-sst"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
     assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
 

@@ -27,26 +27,19 @@ Accepted transport backend names are:
    ``.h5`` series. Requires an openPMD-api build with HDF5 support.
 
 ``adios-sst``
-   ``.sst`` ADIOS2 SST streaming series. Use this backend only when a producer
-   and consumer are intended to run concurrently.
+   ``.sst`` ADIOS2 SST streaming series. This is the default runtime backend.
 
 Select the backend on ``PhiASE`` in Python or YAML:
 
 .. code-block:: python
 
-   phi_ase = PhiASE(..., openpmdBackend="adios")
+   phi_ase = PhiASE(..., openpmdBackend="adios-sst")
 
 .. code-block:: yaml
 
    compute:
      backend: Host_Cpu_CpuSerial       # Alpaka compute backend
      openpmd_backend: adios-sst       # openPMD storage/streaming backend
-
-For a process-wide default, use ``HASE_OPENPMD_BACKEND``:
-
-.. code-block:: bash
-
-   HASE_OPENPMD_BACKEND=adios python3 my_simulation.py
 
 For direct helper calls, pass ``transport=``:
 
@@ -58,7 +51,7 @@ For direct helper calls, pass ``transport=``:
        phi_ase,
        medium,
        spectra,
-       transport="adios",
+       transport="adios-sst",
    )
 
 For repeated calls over a streaming backend, keep one session open and pass it
@@ -90,26 +83,30 @@ persistent stream automatically for ``adios-sst``. Pass
 ``openpmdSession="interval"`` to force one-shot open/write/read/close behavior,
 or pass an existing session object to share caller-managed ownership.
 
-The CMake build also has ``HASE_OPENPMD_BACKEND``. That option selects which
-openPMD dependencies and default file extension are built into the C++ test and
-binary configuration. Runtime Python selection still requires the matching
-openPMD-api Python module and backend support to be available.
-
 The Python transport requires the frontend ``openpmd_api`` module and the
-compiled ``calcPhiASE`` reader to use the same openPMD-api provider. By
+compiled ``calcPhiASE`` reader to use compatible openPMD-api providers. By
 default, HASEonGPU uses an external C++ ``openPMD::openPMD`` package found by
 CMake and the ``openpmd_api`` module installed in the active Python
-environment. Both sides must have the same backend support, for example ADIOS2
-for ``adios``/``adios-sst`` or HDF5 for ``hdf5``.
+environment. Both sides must support the runtime backend selected by Python or
+YAML, for example ADIOS2 SST for ``adios-sst`` or HDF5 for ``hdf5``.
 
-For a pip editable install with an external provider, install or load the
-matching openPMD C++ package first and make the Python module available in the
-same environment:
+For a Conda-provided openPMD stack, validate the same prefix before installing
+HASEonGPU:
 
 .. code-block:: bash
 
-   python -m pip install openpmd-api
-   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix" python -m pip install -e .
+   conda install -c conda-forge openpmd-api
+   python3 utils/check_openpmd_compatibility.py \
+     --backend adios-sst \
+     --cmake-prefix-path "$CONDA_PREFIX"
+   CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$CONDA_PREFIX" python3 -m pip install .
+
+Spack, modules, or manual source installs follow the same pattern: point
+``CMAKE_PREFIX_PATH`` or ``openPMD_DIR`` at the provider and run the
+compatibility check against the same prefix. For module-based environments,
+check that the loaded ``openpmd_api`` package path matches the active Python
+version; a Python 3.11 site-packages path can shadow a Python 3.14 wheel and
+make the import fail before HASEonGPU starts.
 
 For a source-tree CMake build with Python enabled, point CMake at the same C++
 provider:
@@ -125,12 +122,14 @@ If the matching Python package is not on the normal Python path, set
 ``openpmd_api``. Do not use it to mix unrelated frontend and backend openPMD
 builds.
 
-To use the old self-contained path where HASEonGPU fetches and builds openPMD,
+To use the self-contained path where HASEonGPU fetches and builds openPMD,
 configure with ``-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON``. In that mode HASEonGPU
-builds the matching Python bindings and installs the resulting openPMD runtime
-libraries into the HASE package. As an explicit runtime escape hatch,
-``HASE_OPENPMD_PYTHONPATH`` may be set to the matching package directory before
-importing HASEonGPU.
+enables ADIOS2, ADIOS2 SST, and HDF5 for the CMake build. The HASE wheel does
+not vendor the resulting openPMD runtime libraries or generated
+``openpmd_api`` bindings; the target runtime environment must still provide
+compatible openPMD libraries and Python bindings. As an explicit runtime escape
+hatch, ``HASE_OPENPMD_PYTHONPATH`` may be set to a matching package directory
+before importing HASEonGPU.
 
 openPMD Record Layout
 ---------------------
