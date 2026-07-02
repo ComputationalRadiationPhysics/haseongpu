@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .alpakaUtils import AlpakaBackends
 from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
 from .openpmd import transport

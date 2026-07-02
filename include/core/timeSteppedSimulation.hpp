@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <functional>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -204,14 +205,8 @@ namespace hase::core
                     m_pumpBackward);
             }
 
-            DerivativeBuffers derivativeBuffers{
-                beta,
-                m_pumpedBeta,
-                m_phiAse,
-                m_activeMask,
-                m_dndtPump,
-                m_dndtAse,
-                m_derivative};
+            DerivativeBuffers
+                derivativeBuffers{beta, m_pumpedBeta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
 
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
@@ -487,6 +482,18 @@ namespace hase::core
             },
             backends);
 
-        return oneDidRun ? 0 : 1;
+        if(!oneDidRun)
+        {
+            std::ostringstream message;
+            message << "Backend '" << compute.backend
+                    << "' did not match any available backend with an available device. Available backends:";
+            for(auto const& element : backendList())
+            {
+                message << "\n  " << element;
+            }
+            throw std::runtime_error(message.str());
+        }
+
+        return 0;
     }
 } // namespace hase::core

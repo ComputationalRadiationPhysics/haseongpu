@@ -54,6 +54,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(HASE_FETCHCONTENT_EXCLUDE_FROM_ALL)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.28")
+    list(APPEND HASE_FETCHCONTENT_EXCLUDE_FROM_ALL EXCLUDE_FROM_ALL)
+endif()
+
+macro(hase_fetchcontent_make_available name)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.28")
+        FetchContent_MakeAvailable(${name})
+    else()
+        FetchContent_GetProperties(${name})
+        string(TOLOWER "${name}" HASE_FETCHCONTENT_LOWER_NAME)
+        if(NOT ${HASE_FETCHCONTENT_LOWER_NAME}_POPULATED)
+            FetchContent_Populate(${name})
+            add_subdirectory(
+                "${${HASE_FETCHCONTENT_LOWER_NAME}_SOURCE_DIR}"
+                "${${HASE_FETCHCONTENT_LOWER_NAME}_BINARY_DIR}"
+                EXCLUDE_FROM_ALL
+            )
+        endif()
+    endif()
+endmacro()
 
 # dependencies
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
@@ -675,6 +698,7 @@ target_include_directories(
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Benchmark>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 set_target_properties(
@@ -865,7 +889,7 @@ set_target_properties(
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
-target_link_libraries(hase PUBLIC hase::core)
+target_link_libraries(hase PUBLIC hase_core)
 if(HASE_BENCHMARK)
     target_sources(
         hase
@@ -891,6 +915,7 @@ set_target_properties(
         INSTALL_RPATH "${HASE_INSTALL_RPATH}"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
+target_compile_definitions(calcPhiASE PRIVATE ${HASE_OPENPMD_PROBE_DEFINES})
 target_link_libraries(calcPhiASE PRIVATE hase::hase)
 foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
     if(TARGET ${HASE_ADIOS2_RUNTIME_MODULE})
@@ -898,6 +923,70 @@ foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
     endif()
 endforeach()
 alpaka_finalize(calcPhiASE)
+
+if(MPI_FOUND)
+    set(HASE_CONFIG_REQUIRES_MPI TRUE)
+else()
+    set(HASE_CONFIG_REQUIRES_MPI FALSE)
+endif()
+
+set(HASE_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/HASEonGPU")
+set(HASE_INSTALL_CMAKE_PACKAGE OFF)
+if(HASE_USE_SYSTEM_ALPAKA AND NOT HASE_BUILD_OPENPMD_FROM_SOURCE)
+    set(HASE_INSTALL_CMAKE_PACKAGE ON)
+else()
+    message(
+        STATUS
+        "HASE CMake package export requires system alpaka and system openPMD providers; "
+        "installing headers, libraries, and executables without HASEonGPUConfig.cmake."
+    )
+endif()
+
+if(HASE_INSTALL_CMAKE_PACKAGE)
+    install(
+        TARGETS hase_core hase calcPhiASE HaseAlpakaBackendNames
+        EXPORT HASEonGPUTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+else()
+    install(
+        TARGETS hase hase_core calcPhiASE HaseAlpakaBackendNames
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+endif()
+install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+if(HASE_INSTALL_CMAKE_PACKAGE)
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HASEonGPUConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfig.cmake"
+        INSTALL_DESTINATION "${HASE_CMAKE_INSTALL_DIR}"
+    )
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfigVersion.cmake"
+        VERSION "${PROJECT_VERSION}"
+        COMPATIBILITY SameMajorVersion
+    )
+    install(
+        FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/HASEonGPUConfigVersion.cmake"
+        DESTINATION "${HASE_CMAKE_INSTALL_DIR}"
+    )
+    install(
+        EXPORT HASEonGPUTargets
+        NAMESPACE hase::
+        DESTINATION "${HASE_CMAKE_INSTALL_DIR}"
+    )
+endif()
 
 if(HASE_ENABLE_PYTHON)
     include(cmake/pythonRuntime.cmake)
