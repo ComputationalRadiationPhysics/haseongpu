@@ -1607,6 +1607,8 @@ class GainMedium:
 
     @property
     def numberOfPoints(self):
+        if hasattr(self.topology, "cellPointIndices"):
+            return int(getattr(self.topology, "structuredNumberOfPoints", self.topology.numberOfSamplePoints))
         return self.topology.numberOfPoints
 
     @property
@@ -1619,7 +1621,7 @@ class GainMedium:
     def numberOfLevels(self):
         """Number of z sample planes in the attached topology."""
         if hasattr(self.topology, "cellPointIndices"):
-            return 1
+            return int(getattr(self.topology, "structuredNumberOfLevels", 1))
         self.topology._require_levels()
         return int(self.topology.levels)
 
