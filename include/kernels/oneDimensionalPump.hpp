@@ -61,8 +61,8 @@ namespace hase::kernels
                     betaAfter[point + level * mesh.numberOfPoints] = betaBefore[point + level * mesh.numberOfPoints];
                 }
 
-                double const x = mesh.points[point];
-                double const y = mesh.points[point + mesh.numberOfPoints];
+                double const x = mesh.samplePoints[point];
+                double const y = mesh.samplePoints[point + mesh.numberOfSamples];
                 double const rx = alpaka::math::max(pump.radiusX, 1.0e-300);
                 double const ry = alpaka::math::max(pump.radiusY, 1.0e-300);
                 double const radius = alpaka::math::sqrt((x * x) / (ry * ry) + (y * y) / (rx * rx));

@@ -28,13 +28,10 @@ def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
     medium = laserPumpCladding.laserPumpCladdingMedium()
 
     assert medium.get("reflectivities").expectedShape == (
-        medium.topology.numberOfTriangles,
+        medium.topology.numberOfCells,
         2,
     )
-    assert medium.getTriangles()["reflectivities"].shape == (
-        medium.topology.numberOfTriangles,
-        2,
-    )
+    assert medium.get("reflectivities").value.size == medium.topology.numberOfCells * 2
 
 
 @pytest.fixture

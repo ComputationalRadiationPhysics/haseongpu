@@ -14,7 +14,7 @@
 
 namespace hase::kernels::forward
 {
-    [[nodiscard]] ALPAKA_FN_ACC hase::core::Point advance(
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point advance(
         hase::core::Point const point,
         hase::core::Point const direction,
         double const length)
@@ -22,7 +22,7 @@ namespace hase::kernels::forward
         return point + direction * length;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC bool pointInTriangle(
+    [[nodiscard]] inline ALPAKA_FN_ACC bool pointInTriangle(
         hase::core::Point const point,
         hase::core::Point const a,
         hase::core::Point const b,
@@ -48,7 +48,7 @@ namespace hase::kernels::forward
         return u >= -tolerance && v >= -tolerance && (u + v) <= 1.0 + tolerance;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC bool pointInFace(
+    [[nodiscard]] inline ALPAKA_FN_ACC bool pointInFace(
         hase::core::Point const point,
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
@@ -68,7 +68,7 @@ namespace hase::kernels::forward
             mesh.getPoint(static_cast<unsigned>(p2)));
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC double faceIntersectionLength(
+    [[nodiscard]] inline ALPAKA_FN_ACC double faceIntersectionLength(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         unsigned const localFace,
@@ -102,7 +102,7 @@ namespace hase::kernels::forward
         return pointInFace(advance(origin, direction, length), mesh, tet, localFace) ? length : 0.0;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC int nextFaceIntersection(
+    [[nodiscard]] inline ALPAKA_FN_ACC int nextFaceIntersection(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         hase::core::Point const origin,
@@ -127,7 +127,7 @@ namespace hase::kernels::forward
         return nextFace;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC double localGainCoefficient(
+    [[nodiscard]] inline ALPAKA_FN_ACC double localGainCoefficient(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         double const sigmaA,
@@ -141,7 +141,7 @@ namespace hase::kernels::forward
         return static_cast<double>(mesh.nTot) * gainPerDensity;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC double localSegmentGain(
+    [[nodiscard]] inline ALPAKA_FN_ACC double localSegmentGain(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         double const length,
@@ -151,7 +151,7 @@ namespace hase::kernels::forward
         return alpaka::math::exp(localGainCoefficient(mesh, tet, sigmaA, sigmaE) * length);
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC double localSegmentTrackLengthIntegral(
+    [[nodiscard]] inline ALPAKA_FN_ACC double localSegmentTrackLengthIntegral(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         double const length,
@@ -167,7 +167,7 @@ namespace hase::kernels::forward
         return (alpaka::math::exp(gainLength) - 1.0) / gainCoefficient;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC double segmentCenterWeight(
+    [[nodiscard]] inline ALPAKA_FN_ACC double segmentCenterWeight(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         hase::core::Point const midpoint)

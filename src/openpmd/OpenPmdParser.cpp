@@ -26,6 +26,8 @@ namespace
     {
         constexpr char const* numberOfPoints = "number_of_points";
         constexpr char const* numberOfCells = "number_of_cells";
+        constexpr char const* numberOfLevels = "number_of_levels";
+        constexpr char const* thickness = "thickness";
         constexpr char const* nTot = "n_tot";
         constexpr char const* crystalTFluo = "crystal_t_fluo";
         constexpr char const* claddingNumber = "cladding_number";
@@ -853,6 +855,8 @@ namespace hase::openpmd
 
         auto const numberOfPoints = attribute<unsigned>(iteration, field::numberOfPoints);
         auto const numberOfCells = attribute<unsigned>(iteration, field::numberOfCells);
+        auto const numberOfLevels = attributeOr<unsigned>(iteration, field::numberOfLevels, 1u);
+        auto const thickness = attributeOr<float>(iteration, field::thickness, 0.0f);
         auto const propagationMode
             = attributeOr<std::string>(iteration, field::propagationMode, std::string{"forward"});
         if(propagationMode != "forward")
@@ -866,11 +870,12 @@ namespace hase::openpmd
             validationError("explicit topology", "backend requires explicit 3D unstructured cell records");
         }
 
+        auto const numberOfMeshPoints = componentExtent(iteration, prefix + "points", "x");
         std::vector<double> points = concatenate(
             concatenate(
-                loadComponent<double>(series, iteration, prefix + "points", "x", io::Extent{numberOfPoints}),
-                loadComponent<double>(series, iteration, prefix + "points", "y", io::Extent{numberOfPoints})),
-            loadComponent<double>(series, iteration, prefix + "points", "z", io::Extent{numberOfPoints}));
+                loadComponent<double>(series, iteration, prefix + "points", "x", io::Extent{numberOfMeshPoints}),
+                loadComponent<double>(series, iteration, prefix + "points", "y", io::Extent{numberOfMeshPoints})),
+            loadComponent<double>(series, iteration, prefix + "points", "z", io::Extent{numberOfMeshPoints}));
 
         auto connectivity = loadScalar<unsigned>(
             series,
@@ -911,9 +916,21 @@ namespace hase::openpmd
             validationError("explicit topology", "cell offsets do not match Tet4 connectivity");
         }
 
-        auto cellVolumes = deriveCellVolumes(points, connectivity, numberOfPoints, numberOfCells);
-        auto cellCenters = deriveCellCenters(points, connectivity, numberOfPoints, numberOfCells);
-        auto samplePoints = cellCenters;
+        auto cellVolumes = deriveCellVolumes(points, connectivity, numberOfMeshPoints, numberOfCells);
+        auto cellCenters = deriveCellCenters(points, connectivity, numberOfMeshPoints, numberOfCells);
+        bool const samplePointsAreMeshPoints = numberOfPoints * numberOfLevels == numberOfMeshPoints;
+        auto samplePoints = samplePointsAreMeshPoints ? points : cellCenters;
+        auto betaCells = iteration.meshes.contains(prefix + "point_beta")
+                             ? loadScalar<double>(
+                                   series,
+                                   iteration,
+                                   prefix + "point_beta",
+                                   io::Extent{numberOfPoints * numberOfLevels},
+                                   {"point", "level"},
+                                   {numberOfPoints, numberOfLevels},
+                                   true,
+                                   true)
+                             : std::vector<double>(numberOfPoints * numberOfLevels, 0.0);
 
         core::HostMesh mesh(
             std::move(connectivity),
@@ -967,7 +984,7 @@ namespace hase::openpmd
                 {numberOfCells},
                 true,
                 true),
-            std::vector<double>{},
+            std::move(betaCells),
             loadScalar<unsigned>(
                 series,
                 iteration,
@@ -998,7 +1015,11 @@ namespace hase::openpmd
             attribute<float>(iteration, field::nTot),
             attribute<float>(iteration, field::crystalTFluo),
             attribute<unsigned>(iteration, field::claddingNumber),
-            attribute<double>(iteration, field::claddingAbsorption));
+            attribute<double>(iteration, field::claddingAbsorption),
+            numberOfPoints,
+            numberOfLevels,
+            thickness,
+            samplePointsAreMeshPoints);
 
         core::ExperimentParameters experiment(
             attribute<unsigned>(iteration, field::minRaysPerSample),
@@ -1251,21 +1272,17 @@ namespace hase::openpmd
         std::string const prefix = m_meshGroup + "_";
         if(includeStatic)
         {
-            auto const numberOfMeshPoints = snapshot.mesh.numberOfPoints * snapshot.mesh.numberOfLevels;
-            auto const numberOfPrisms = snapshot.mesh.numberOfTriangles * (snapshot.mesh.numberOfLevels - 1u);
+            auto const numberOfMeshPoints = snapshot.mesh.numberOfMeshPoints;
+            auto const numberOfCells = snapshot.mesh.numberOfCells;
 
             std::vector<double> x(numberOfMeshPoints);
             std::vector<double> y(numberOfMeshPoints);
             std::vector<double> z(numberOfMeshPoints);
-            for(unsigned level = 0u; level < snapshot.mesh.numberOfLevels; ++level)
+            for(unsigned point = 0u; point < numberOfMeshPoints; ++point)
             {
-                for(unsigned point = 0u; point < snapshot.mesh.numberOfPoints; ++point)
-                {
-                    unsigned const sample = point + level * snapshot.mesh.numberOfPoints;
-                    x.at(sample) = snapshot.mesh.points.at(point);
-                    y.at(sample) = snapshot.mesh.points.at(point + snapshot.mesh.numberOfPoints);
-                    z.at(sample) = static_cast<double>(level) * snapshot.mesh.thickness;
-                }
+                x.at(point) = snapshot.mesh.points.at(point);
+                y.at(point) = snapshot.mesh.points.at(point + numberOfMeshPoints);
+                z.at(point) = snapshot.mesh.points.at(point + 2u * numberOfMeshPoints);
             }
             auto pointsRecordName = prefix + "points";
             writeComponent(
@@ -1306,32 +1323,31 @@ namespace hase::openpmd
             pointsRecord.setAttribute("haseDynamic", false);
             pointsRecord.setAttribute("haseBackendRequired", false);
 
-            auto connectivity = canonicalConnectivity(snapshot.mesh);
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cells_connectivity",
-                connectivity,
+                snapshot.mesh.cellPointIndices,
                 {"cell", "local_vertex"},
-                {numberOfPrisms, 6u},
+                {numberOfCells, core::tet4VertexCount},
                 false);
-            std::vector<unsigned> offsets(numberOfPrisms + 1u);
+            std::vector<unsigned> offsets(numberOfCells + 1u);
             for(unsigned i = 0u; i < offsets.size(); ++i)
             {
-                offsets.at(i) = i * 6u;
+                offsets.at(i) = i * core::tet4VertexCount;
             }
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cells_offsets",
                 offsets,
                 {"cell_offset"},
-                {numberOfPrisms + 1u},
+                {numberOfCells + 1u},
                 false);
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cells_types",
-                std::vector<unsigned>(numberOfPrisms, 13u),
+                std::vector<unsigned>(numberOfCells, core::vtkTetraCellType),
                 {"cell"},
-                {numberOfPrisms},
+                {numberOfCells},
                 false);
 
             writeFlatScalar<unsigned>(
@@ -1339,7 +1355,7 @@ namespace hase::openpmd
                 prefix + "cladding_cell_type",
                 snapshot.mesh.claddingCellTypes,
                 {"cell"},
-                {snapshot.mesh.numberOfTriangles},
+                {numberOfCells},
                 false);
             writeFlatScalar<float>(
                 iteration,
@@ -1353,7 +1369,7 @@ namespace hase::openpmd
                 prefix + "reflectivity",
                 snapshot.mesh.reflectivities,
                 {"cell", "interface"},
-                {snapshot.mesh.numberOfTriangles, 2u},
+                {numberOfCells, 2u},
                 false);
             writeFlatScalar<double>(
                 iteration,
@@ -1404,8 +1420,8 @@ namespace hase::openpmd
             iteration,
             prefix + "beta_volume",
             snapshot.mesh.betaVolume,
-            {"cell", "layer"},
-            {snapshot.mesh.numberOfTriangles, snapshot.mesh.numberOfLevels - 1u},
+            {"cell"},
+            {snapshot.mesh.numberOfCells},
             true);
 
         std::string const resultPrefix = prefix + "result_";

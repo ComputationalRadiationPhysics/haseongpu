@@ -189,6 +189,21 @@ class VolumeTopology:
         return int(self.samplePoints.shape[0])
 
     @property
+    def structuredNumberOfPoints(self):
+        structured = self.metadata.get("structured", {}) if isinstance(self.metadata, dict) else {}
+        return int(structured.get("numberOfPoints", self.numberOfSamplePoints))
+
+    @property
+    def structuredNumberOfLevels(self):
+        structured = self.metadata.get("structured", {}) if isinstance(self.metadata, dict) else {}
+        return int(structured.get("numberOfLevels", 1))
+
+    @property
+    def structuredThickness(self):
+        structured = self.metadata.get("structured", {}) if isinstance(self.metadata, dict) else {}
+        return float(structured.get("thickness", 0.0))
+
+    @property
     def numberOfPrisms(self):
         return self.numberOfCells
 
@@ -197,8 +212,8 @@ class VolumeTopology:
         return {
             "numberOfPoints": int(context.numberOfPoints),
             "numberOfTriangles": int(getattr(context, "numberOfCells", self.numberOfCells)),
-            "numberOfLevels": 1,
-            "thickness": 0.0,
+            "numberOfLevels": int(getattr(context, "numberOfLevels", self.structuredNumberOfLevels)),
+            "thickness": float(getattr(context, "thickness", self.structuredThickness)),
         }
 
     def cellsConnectivityFlat(self):

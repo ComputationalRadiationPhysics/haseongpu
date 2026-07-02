@@ -19,7 +19,7 @@ namespace hase::kernels::forward
 {
     using BarycentricTet4 = std::array<double, 4u>;
 
-    [[nodiscard]] ALPAKA_FN_HOST_ACC double signedTetVolume6(
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC double signedTetVolume6(
         hase::core::Point const a,
         hase::core::Point const b,
         hase::core::Point const c,
@@ -28,7 +28,7 @@ namespace hase::kernels::forward
         return hase::core::dot(hase::core::cross(b - a, c - a), d - a);
     }
 
-    [[nodiscard]] ALPAKA_FN_HOST_ACC BarycentricTet4 barycentricCoordinates(
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC BarycentricTet4 barycentricCoordinates(
         hase::core::Point const point,
         hase::core::Point const a,
         hase::core::Point const b,
@@ -49,7 +49,7 @@ namespace hase::kernels::forward
             signedTetVolume6(a, b, c, point) * invDenominator};
     }
 
-    [[nodiscard]] ALPAKA_FN_HOST_ACC BarycentricTet4 barycentricCoordinates(
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC BarycentricTet4 barycentricCoordinates(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         hase::core::Point const point)
@@ -62,7 +62,7 @@ namespace hase::kernels::forward
             mesh.getCellPoint(tet, 3u));
     }
 
-    [[nodiscard]] ALPAKA_FN_HOST_ACC double centerProximityWeight(BarycentricTet4 const& barycentric)
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC double centerProximityWeight(BarycentricTet4 const& barycentric)
     {
         double distanceSquared = 0.0;
         for(double const coordinate : barycentric)

@@ -27,23 +27,7 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfPoints}))
             {
-                unsigned active = 0u;
-                for(unsigned triangle = 0u; triangle < mesh.numberOfTriangles && active == 0u; ++triangle)
-                {
-                    if(mesh.claddingCellTypes[triangle] == mesh.claddingNumber)
-                    {
-                        continue;
-                    }
-
-                    for(unsigned vertex = 0u; vertex < 3u; ++vertex)
-                    {
-                        if(mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] == point)
-                        {
-                            active = 1u;
-                        }
-                    }
-                }
-                activeMask[point] = active;
+                activeMask[point] = 1u;
             }
         }
     };
@@ -58,7 +42,7 @@ namespace hase::kernels
         auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
             devBundle.device,
             devBundle.executor,
-            alpaka::Vec{mesh.numberOfTriangles});
+            alpaka::Vec{mesh.numberOfPoints});
         queue.enqueue(frameSpec, alpaka::KernelBundle{BuildActivePointMask{}, mesh, activeMask});
     }
 
