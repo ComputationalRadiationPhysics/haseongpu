@@ -405,16 +405,8 @@ namespace
         {
             return {};
         }
-        return loadScalar<T>(
-            series,
-            iteration,
-            name,
-            expectedExtent,
-            axes,
-            primitiveShape,
-            dynamic,
-            backendRequired,
-            unit);
+        return loadScalar<
+            T>(series, iteration, name, expectedExtent, axes, primitiveShape, dynamic, backendRequired, unit);
     }
 
     unsigned surfaceDomainCount(std::vector<int> const& cellFaceBoundaries)

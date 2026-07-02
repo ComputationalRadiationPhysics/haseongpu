@@ -599,7 +599,7 @@ namespace hase::core
             , numberOfMeshPoints(static_cast<unsigned>(this->points.size() / 3u))
             , numberOfPoints(
                   structuredNumberOfPoints == 0u ? static_cast<unsigned>(this->samplePoints.size() / 3u)
-                                                  : structuredNumberOfPoints)
+                                                 : structuredNumberOfPoints)
             , numberOfSamples(static_cast<unsigned>(this->samplePoints.size() / 3u))
             , numberOfTriangles(numberOfCells)
             , numberOfLevels(structuredNumberOfLevels == 0u ? 1u : structuredNumberOfLevels)

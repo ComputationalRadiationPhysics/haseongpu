@@ -140,6 +140,15 @@ namespace hase::core
         auto dDroppedRays = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
         auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
         auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);
+        auto accumulationSpans = hase::kernels::forward::ForwardAccumulationSpans{
+            dPhiAccumulator,
+            dPhiSquareAccumulator,
+            dVolumeRayVisits,
+            dDroppedRays};
+        auto spectrumSpans = hase::kernels::forward::ForwardSpectrumSpans{
+            dSigmaA,
+            dSigmaE,
+            static_cast<unsigned>(experiment.sigmaA.size())};
 
         alpaka::onHost::fill(queue, dPhiAccumulator, double{0}, alpaka::Vec{volumeCount});
         alpaka::onHost::fill(queue, dPhiSquareAccumulator, double{0}, alpaka::Vec{volumeCount});
@@ -161,13 +170,8 @@ namespace hase::core
                     rayCount,
                     experiment.forwardRayLength,
                     betaVolumeTotal,
-                    dPhiAccumulator,
-                    dPhiSquareAccumulator,
-                    dVolumeRayVisits,
-                    dDroppedRays,
-                    dSigmaA,
-                    dSigmaE,
-                    static_cast<unsigned>(experiment.sigmaA.size()),
+                    accumulationSpans,
+                    spectrumSpans,
                     threadLocalStridingRNG});
             alpaka::onHost::wait(queue);
         }
@@ -189,8 +193,27 @@ namespace hase::core
             auto sigmaIndicesB = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
             auto totalWeightA = alpaka::onHost::alloc<double>(devBundle.device, 1u);
             auto totalWeightB = alpaka::onHost::alloc<double>(devBundle.device, 1u);
+            auto reservoirSpansA = hase::kernels::forward::SurfaceReservoirSpans{
+                countsA,
+                dirXA,
+                dirYA,
+                dirZA,
+                weightsA,
+                sigmaIndicesA,
+                totalWeightA,
+                experiment.surfaceReservoirSize};
+            auto reservoirSpansB = hase::kernels::forward::SurfaceReservoirSpans{
+                countsB,
+                dirXB,
+                dirYB,
+                dirZB,
+                weightsB,
+                sigmaIndicesB,
+                totalWeightB,
+                experiment.surfaceReservoirSize};
 
-            auto clearReservoir = [&](auto& counts, auto& totalWeight) {
+            auto clearReservoir = [&](auto& counts, auto& totalWeight)
+            {
                 alpaka::onHost::fill(queue, counts, 0u, alpaka::Vec{faceCount});
                 alpaka::onHost::fill(queue, totalWeight, 0.0, alpaka::Vec{1u});
             };
@@ -211,21 +234,9 @@ namespace hase::core
                     rayCount,
                     experiment.forwardRayLength,
                     betaVolumeTotal,
-                    dPhiAccumulator,
-                    dPhiSquareAccumulator,
-                    dVolumeRayVisits,
-                    dDroppedRays,
-                    countsA,
-                    dirXA,
-                    dirYA,
-                    dirZA,
-                    weightsA,
-                    sigmaIndicesA,
-                    totalWeightA,
-                    experiment.surfaceReservoirSize,
-                    dSigmaA,
-                    dSigmaE,
-                    static_cast<unsigned>(experiment.sigmaA.size()),
+                    accumulationSpans,
+                    reservoirSpansA,
+                    spectrumSpans,
                     threadLocalStridingRNG});
             alpaka::onHost::wait(queue);
 
@@ -256,26 +267,10 @@ namespace hase::core
                             mesh,
                             reservoirSlots,
                             experiment.forwardRayLength,
-                            dPhiAccumulator,
-                            dPhiSquareAccumulator,
-                            dVolumeRayVisits,
-                            dDroppedRays,
-                            countsA,
-                            dirXA,
-                            dirYA,
-                            dirZA,
-                            weightsA,
-                            sigmaIndicesA,
-                            countsB,
-                            dirXB,
-                            dirYB,
-                            dirZB,
-                            weightsB,
-                            sigmaIndicesB,
-                            totalWeightB,
-                            experiment.surfaceReservoirSize,
-                            dSigmaA,
-                            dSigmaE});
+                            accumulationSpans,
+                            reservoirSpansA,
+                            reservoirSpansB,
+                            spectrumSpans});
                 }
                 else
                 {
@@ -288,26 +283,10 @@ namespace hase::core
                             mesh,
                             reservoirSlots,
                             experiment.forwardRayLength,
-                            dPhiAccumulator,
-                            dPhiSquareAccumulator,
-                            dVolumeRayVisits,
-                            dDroppedRays,
-                            countsB,
-                            dirXB,
-                            dirYB,
-                            dirZB,
-                            weightsB,
-                            sigmaIndicesB,
-                            countsA,
-                            dirXA,
-                            dirYA,
-                            dirZA,
-                            weightsA,
-                            sigmaIndicesA,
-                            totalWeightA,
-                            experiment.surfaceReservoirSize,
-                            dSigmaA,
-                            dSigmaE});
+                            accumulationSpans,
+                            reservoirSpansB,
+                            reservoirSpansA,
+                            spectrumSpans});
                 }
                 alpaka::onHost::wait(queue);
                 inputA = !inputA;

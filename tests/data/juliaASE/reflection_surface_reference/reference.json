@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "description": "Single-Tet4 forward reflection surface regression reference. Reference values are stored as JuliaASE fixture data and consumed by HASE CI without importing JuliaASE.",
+  "meshFile": "single_reflective_tet4.msh",
+  "seed": 12345,
+  "timeStep": 0.05,
+  "points": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "cells": [
+    [
+      0,
+      1,
+      2,
+      3
+    ]
+  ],
+  "faceBoundaries": [
+    [
+      11,
+      -1,
+      -1,
+      -1
+    ]
+  ],
+  "initialBetaVolume": [
+    0.18
+  ],
+  "betaCells": [
+    0.0
+  ],
+  "claddingCellTypes": [
+    0
+  ],
+  "surfaceOptics": {
+    "surfaceReflectivity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.65
+    ],
+    "surfaceRefractiveIndexInside": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.5
+    ],
+    "surfaceRefractiveIndexOutside": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "legacyOpticsFallback": {
+    "refractiveIndices": [
+      1.5,
+      1.0,
+      1.5,
+      1.0
+    ],
+    "reflectivities": [
+      0.0,
+      0.0
+    ]
+  },
+  "material": {
+    "nTot": 1.0,
+    "crystalTFluo": 1.0,
+    "claddingNumber": 99,
+    "claddingAbsorption": 0.0
+  },
+  "crossSections": {
+    "wavelengthsAbsorption": [
+      9.4e-07
+    ],
+    "crossSectionAbsorption": [
+      0.01
+    ],
+    "wavelengthsEmission": [
+      1.03e-06
+    ],
+    "crossSectionEmission": [
+      0.02
+    ],
+    "resolution": 1
+  },
+  "phiAse": [
+    0.020381582900881767
+  ],
+  "dndtAse": [
+    -9.375528134405615e-05
+  ],
+  "finalBetaVolume": [
+    0.1800046877640672
+  ],
+  "reflectedPassWeightFractions": [
+    0.0
+  ],
+  "rayCount": 4096,
+  "forwardRayLength": 2.0,
+  "reflectionMaxIterations": 4,
+  "reflectionTolerance": 1e-05,
+  "surfaceReservoirSize": 64,
+  "tolerances": {
+    "phiAseRtol": 5e-05,
+    "phiAseAtol": 2e-07,
+    "betaVolumeRtol": 1e-07,
+    "betaVolumeAtol": 2e-07
+  }
+}
