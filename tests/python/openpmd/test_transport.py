@@ -1646,6 +1646,57 @@ def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
     series.close()
 
 
+def _write_minimal_snapshot_scalar(iteration, name, values):
+    io = _io()
+    data = np.asarray(values)
+    component = iteration.meshes[name][io.Mesh_Record_Component.SCALAR]
+    component.reset_dataset(io.Dataset(data.dtype, data.shape))
+    component.store_chunk(data)
+
+
+def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
+    output = tmp_path / ("simulation-output" + _file_suffix_for_tests())
+    io = _io()
+    series = io.Series(str(output), transport._access("create_linear"), transport._series_config(output))
+    iteration = series.snapshots()[0]
+    number_of_points = 2
+    number_of_levels = 3
+    number_of_cells = 1
+    point_level_shape = (number_of_points, number_of_levels)
+    sample_flat = np.array([10.0 * level + point for level in range(number_of_levels) for point in range(number_of_points)])
+    cell_layer_flat = np.array([100.0 + level for level in range(number_of_levels - 1)])
+
+    iteration.set_attribute("number_of_points", number_of_points)
+    iteration.set_attribute("number_of_levels", number_of_levels)
+    iteration.set_attribute("number_of_cells", number_of_cells)
+    iteration.set_attribute("step_index", 1)
+    iteration.set_attribute("time", 0.25)
+    iteration.set_attribute("haseStaticUpdate", True)
+    iteration.time = 0.25
+
+    _write_minimal_snapshot_scalar(iteration, "core_point_beta", sample_flat.astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_beta_volume", cell_layer_flat.astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_phi_ase", sample_flat.astype(np.float32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_mse", (sample_flat + 1000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_total_rays", np.arange(sample_flat.size, dtype=np.uint32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_ase", (sample_flat + 2000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_pump", (sample_flat + 3000.0).astype(np.float64))
+    iteration.close()
+    series.close()
+
+    state = transport.read_simulation_output(output)[0]
+
+    expected = sample_flat.reshape(point_level_shape, order="F")
+    np.testing.assert_array_equal(state.betaCells, expected)
+    np.testing.assert_array_equal(state.phiAse, expected.astype(np.float32))
+    np.testing.assert_array_equal(state.dndtAse, expected + 2000.0)
+    np.testing.assert_array_equal(state.dndtPump, expected + 3000.0)
+    np.testing.assert_array_equal(
+        state.betaVolume,
+        cell_layer_flat.reshape((number_of_cells, number_of_levels - 1), order="F"),
+    )
+
+
 def test_simulation_run_control_serializes_compiled_solver_metadata():
     class Pump:
         solver = None

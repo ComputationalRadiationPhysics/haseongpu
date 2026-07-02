@@ -934,15 +934,15 @@ def read_simulation_output(path):
             time=float(iteration.get_attribute("time")) if _has_attribute(iteration, "time") else float(iteration.time),
             betaCells=_loadScalar(series, iteration, "core_point_beta", np.float64).reshape((number_of_points, number_of_levels), order="F"),
             betaVolume=_loadScalar(series, iteration, "core_beta_volume", np.float64).reshape((number_of_cells, number_of_levels - 1), order="F"),
-            phiAse=_loadScalar(series, iteration, "core_result_phi_ase", np.float32).reshape((number_of_points, number_of_levels), order="C"),
-            dndtAse=_loadScalar(series, iteration, "core_result_dndt_ase", np.float64).reshape((number_of_points, number_of_levels), order="C"),
+            phiAse=_loadScalar(series, iteration, "core_result_phi_ase", np.float32).reshape((number_of_points, number_of_levels), order="F"),
+            dndtAse=_loadScalar(series, iteration, "core_result_dndt_ase", np.float64).reshape((number_of_points, number_of_levels), order="F"),
             dndtPump=_read_optional_scalar(
                 series,
                 iteration,
                 "core_result_dndt_pump",
                 np.float64,
                 point_count,
-            ).reshape((number_of_points, number_of_levels), order="C"),
+            ).reshape((number_of_points, number_of_levels), order="F"),
             aseResult=Result(
                 phiAse=_read_optional_scalar(series, iteration, "core_result_phi_ase", np.float32, point_count),
                 mse=_read_optional_scalar(series, iteration, "core_result_mse", np.float64, point_count),

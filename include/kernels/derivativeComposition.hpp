@@ -19,8 +19,7 @@
 namespace hase::kernels
 {
     template<typename T>
-    concept ComposeDerivativeBufferHandle = requires(T buffers)
-    {
+    concept ComposeDerivativeBufferHandle = requires(T buffers) {
         buffers.betaCells;
         buffers.pumpedBeta;
         buffers.phiAse;

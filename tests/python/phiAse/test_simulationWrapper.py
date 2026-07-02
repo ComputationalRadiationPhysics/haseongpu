@@ -84,6 +84,14 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     assert fromArgs.openpmdBackend == "adios-sst"
 
 
+def testPhiAseDefaultBackendSerializesAvailableAlpakaBackend():
+    phiAse = PhiASE()
+    backend = phiAse.openPmdAttributes(numberOfSamples=1)["backend"]
+
+    assert backend != "gpu"
+    assert backend in simulation_module.AlpakaBackends.all()
+
+
 def testPhiAseLoadsOpenPmdBackendFromConfig():
     assert PhiASE().openpmdBackend == "auto"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
