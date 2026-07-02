@@ -95,6 +95,12 @@ copies the helper library into the Python runtime package.
 Runtime backend selection
 -------------------------
 
+If you are unsure which names to use, run ``hase-configure``. It lists the
+Alpaka compute backends available in the installed build, recommends a CPU host
+backend for first validation, and explains how CUDA/HIP choices relate to
+build-time Alpaka options. The same guide keeps this compute-backend choice
+separate from the openPMD storage backend.
+
 At runtime, the ``backend`` setting in the Python interface, or the equivalent
 openPMD transport metadata consumed by the command-line binary, selects which
 of the compiled backends should be used for the simulation.

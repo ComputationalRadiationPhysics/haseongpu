@@ -70,6 +70,72 @@ For example, when using the Python interface, the C++ backend is built under
 the hood during installation. For details on manual compilation, see
 :doc:`compilation`.
 
+Guided Setup
+------------
+
+For a first installation, use the guided configurator instead of guessing the
+openPMD provider, transport backend, MPI mode, and Alpaka backend names. From a
+source checkout run:
+
+.. code-block:: bash
+
+   python3 utils/configure_hase.py
+
+After installation the same helper is available as:
+
+.. code-block:: bash
+
+   hase-configure
+
+The first guide question only chooses between the bundled source-build provider
+and an external openPMD-api provider. For an external provider, pass the
+openPMD CMake prefix or ``openPMD_DIR`` and let the helper validate the active
+Python ``openpmd_api`` module against that C++ provider. If the external
+openPMD-api was built with ADIOS2 support and CMake cannot find ADIOS2
+transitively, the guide can add an ADIOS2 prefix or ``ADIOS2_DIR`` hint.
+HASEonGPU does not install a matching external-provider Python ``openpmd_api``
+module for you; install/load one from the same provider family.
+
+For the bundled provider, the guide asks separately how to handle ADIOS2:
+fetch/build pinned ADIOS2, build an HDF5-only provider without ADIOS2, or use a
+system ADIOS2 installation. By default it also builds matching openPMD Python
+bindings and records their build-tree ``site-packages`` path in the installed
+HASE configuration. Those bindings are not copied into the HASE wheel, but
+HASE can use them from outside the source checkout as long as the build-tree
+provider path remains available. Fetching the bundled dependencies is the
+easiest starting point, but it can take noticeably longer than using already
+installed providers.
+
+After the openPMD setup, the guide points out the optional MPI path
+(``parallel_mode: mpi`` and ``n_per_node``) and explains that Python and C++
+openPMD providers must use compatible MPI settings. It then lists installed
+Alpaka compute backends when the backend-name helper is available. Use a CPU
+host backend for first validation; CUDA and HIP backends require matching
+hardware, compiler/toolkit setup, and Alpaka build options.
+
+The command writes a small PhiASE YAML run-control file under
+``config/hase-phiase.yaml`` by default and prints a ready-to-run install snippet
+using ``HASE_CONFIGURE_CMAKE_ARGS`` and ``CMAKE_ARGS``. At the
+end of an interactive run it asks whether to install immediately; the default
+answer is yes. Answering no keeps the generated files and repeats the exact
+install command to run later. If pip reports an externally managed Python
+environment, prefer a virtual environment. If you intentionally install into
+that environment anyway, launch the guide with ``--break-system-packages`` so
+the printed command and optional install add pip's ``--break-system-packages``
+flag; the guide does not prompt for this option interactively.
+The native-optimization prompt defaults to on for local performance. It enables host-specific CPU tuning,
+so turn it off for redistributable wheels or unknown CPUs. The final guidance
+says where the configuration file is present and that it can be modified,
+lists the supported ``openpmd_backend`` values for the selected provider,
+summarizes MPI keys, and explains that if no GPU alpaka backend is listed,
+alpaka probably did not find a usable GPU toolchain/backend or matching device.
+It points CUDA users to ``CUDACXX`` or ``nvcc``/CUDA toolkit paths and HIP
+users to ``HIPCXX``,
+``hipcc``, or ``ROCM_PATH``. Pass the YAML to ``PhiASE.fromYaml(...)`` and keep
+physics objects such as geometry, spectra, and pump settings in Python. The
+laser-pump cladding examples use the same ``config/hase-phiase.yaml`` path;
+running ``hase-configure`` overwrites that file with the selected setup.
+
 Recommended Python Source Install
 ---------------------------------
 

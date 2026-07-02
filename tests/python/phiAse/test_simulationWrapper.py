@@ -310,3 +310,25 @@ def testPhiAseNPerNodeLoadsFromArgsAndConfig():
 
     fromArgs = PhiASE.fromArgs(args)
     assert fromArgs.nPerNode == 5
+
+
+def testPhiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
+    monkeypatch.setattr(simulation_module, "_preferredDefaultBackend", lambda: "Host_Cpu_CpuSerial")
+
+    attributes = PhiASE().openPmdAttributes(numberOfSamples=1)
+
+    assert attributes["backend"] == "Host_Cpu_CpuSerial"
+
+
+def testPhiAseDefaultBackendFailureMentionsConfigure(monkeypatch):
+    def fail():
+        raise RuntimeError("Run `hase-configure` to generate a matching backend/openPMD setup.")
+
+    monkeypatch.setattr(simulation_module, "_preferredDefaultBackend", fail)
+
+    try:
+        PhiASE().openPmdAttributes(numberOfSamples=1)
+    except RuntimeError as exc:
+        assert "hase-configure" in str(exc)
+    else:
+        raise AssertionError("expected default backend resolution to fail")

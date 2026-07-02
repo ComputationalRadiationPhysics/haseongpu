@@ -14,7 +14,7 @@ import numpy as np
 from _source_tree_import import ensure_hase_importable
 
 scriptDir = Path(__file__).resolve().parent
-defaultPhiAseConfigPath = scriptDir / "config/phiASE.yaml"
+defaultPhiAseConfigPath = scriptDir.parent / "config/hase-phiase.yaml"
 
 ensure_hase_importable()
 
@@ -185,7 +185,12 @@ def main(argv=None):
             "there are no internal pump substeps."
         ),
     )
-    parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
+    parser.add_argument(
+        "--phi-ase-config",
+        type=Path,
+        default=defaultPhiAseConfigPath,
+        help="PhiASE run-control YAML. Defaults to config/hase-phiase.yaml.",
+    )
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--disable-ase", action="store_true", help="Skip PhiASE backend runs and use zero ASE depletion")
     parser.add_argument(
