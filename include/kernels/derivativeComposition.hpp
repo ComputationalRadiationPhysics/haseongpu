@@ -18,6 +18,18 @@
 
 namespace hase::kernels
 {
+    template<typename T>
+    concept ComposeDerivativeBufferHandle = requires(T buffers)
+    {
+        buffers.betaCells;
+        buffers.pumpedBeta;
+        buffers.phiAse;
+        buffers.activeMask;
+        buffers.dndtPump;
+        buffers.dndtAse;
+        buffers.derivative;
+    };
+
     struct ComposeDerivative
     {
         double sigmaAbsorption = 0.0;
@@ -65,13 +77,7 @@ namespace hase::kernels
         double tau,
         double pumpDuration,
         bool pumpEnabled,
-        auto& betaCells,
-        auto& pumpedBeta,
-        auto& phiAse,
-        auto& activeMask,
-        auto& dndtPump,
-        auto& dndtAse,
-        auto& derivative)
+        ComposeDerivativeBufferHandle auto& buffers)
     {
         auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
             devBundle.device,
@@ -82,13 +88,13 @@ namespace hase::kernels
             alpaka::KernelBundle{
                 ComposeDerivative{sigmaAbsorption, sigmaEmission, tau, pumpDuration, pumpEnabled},
                 mesh,
-                betaCells,
-                pumpedBeta,
-                phiAse,
-                activeMask,
-                dndtPump,
-                dndtAse,
-                derivative});
+                buffers.betaCells,
+                buffers.pumpedBeta,
+                buffers.phiAse,
+                buffers.activeMask,
+                buffers.dndtPump,
+                buffers.dndtAse,
+                buffers.derivative});
     }
 
 } // namespace hase::kernels
