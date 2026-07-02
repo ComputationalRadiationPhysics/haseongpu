@@ -128,11 +128,6 @@ option(
     "Generate/install the HASEonGPU Python frontend and runtime metadata"
     ON
 )
-option(
-    HASE_INSTALL_CPP_INTERFACE
-    "Install the public HASEonGPU C++ headers, library, executable, and helper"
-    ON
-)
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
 option(HASE_CUDA_SHOW_REGISTER "Show kernel registers and create PTX" OFF)
 option(
