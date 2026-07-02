@@ -60,10 +60,13 @@ def calcGainFromState(
     topology = getattr(state, "topology", None)
     if topology is None:
         raise ValueError("calcGainFromState requires a state with topology")
-    topology._require_levels()
+    if hasattr(topology, "cellPointIndices"):
+        expected_shape = (int(getattr(topology, "structuredNumberOfPoints", topology.numberOfSamplePoints)), int(getattr(topology, "structuredNumberOfLevels", 1)))
+    else:
+        topology._require_levels()
+        expected_shape = (int(topology.numberOfPoints), int(topology.levels))
 
     beta_cells = np.asarray(state.betaCells, dtype=np.float64)
-    expected_shape = (int(topology.numberOfPoints), int(topology.levels))
     if beta_cells.shape != expected_shape:
         if beta_cells.size != expected_shape[0] * expected_shape[1]:
             raise ValueError(f"state.betaCells must have shape {expected_shape}, got {beta_cells.shape}")

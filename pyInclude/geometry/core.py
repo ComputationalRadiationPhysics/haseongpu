@@ -1286,10 +1286,11 @@ class GainMedium:
                 "GainMediumFieldContext",
                 (),
                 {
-                    "numberOfPoints": self.topology.numberOfPoints,
+                    "numberOfMeshPoints": self.topology.numberOfPoints,
+                    "numberOfPoints": int(getattr(self.topology, "structuredNumberOfPoints", self.topology.numberOfSamplePoints)),
                     "numberOfTriangles": self.topology.numberOfCells,
                     "numberOfCells": self.topology.numberOfCells,
-                    "numberOfLevels": 1,
+                    "numberOfLevels": int(getattr(self.topology, "structuredNumberOfLevels", 1)),
                     "numberOfSamplePoints": self.topology.numberOfSamplePoints,
                 },
             )()
@@ -1505,6 +1506,19 @@ class GainMedium:
         context = self._fieldContext() if context is None else context
         topology = self.topology
         if hasattr(topology, "cellPointIndices"):
+            yield OpenPmdScalarField(
+                "betaCells",
+                _flat(self.get("betaCells").value, None, np.float64, "betaCells"),
+                context,
+                spec=FieldSpec(
+                    "betaCells",
+                    "point_beta",
+                    ("point", "level"),
+                    np.float64,
+                    lambda ctx: (ctx.numberOfPoints, ctx.numberOfLevels),
+                    dynamic=True,
+                ),
+            )
             yield OpenPmdScalarField(
                 "betaVolume",
                 _flat(self.get("betaVolume").value, None, np.float64, "betaVolume"),

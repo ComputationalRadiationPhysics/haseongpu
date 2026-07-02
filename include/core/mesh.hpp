@@ -172,13 +172,17 @@ namespace hase::core
         unsigned numberOfSamples;
         unsigned numberOfFacesPerCell;
         unsigned numberOfCellVertices;
+        unsigned numberOfMeshPoints;
+        unsigned numberOfLevels;
+        float thickness;
+        bool samplePointsAreMeshPoints;
 
         [[nodiscard]] ALPAKA_FN_ACC Point getPoint(unsigned pointIndex) const
         {
             return Point{
                 points[pointIndex],
-                points[pointIndex + numberOfPoints],
-                points[pointIndex + 2u * numberOfPoints]};
+                points[pointIndex + numberOfMeshPoints],
+                points[pointIndex + 2u * numberOfMeshPoints]};
         }
 
         [[nodiscard]] ALPAKA_FN_ACC Point getCellPoint(unsigned cell, unsigned localVertex) const
@@ -290,6 +294,10 @@ namespace hase::core
             unsigned numberOfSamples,
             unsigned numberOfFacesPerCell,
             unsigned numberOfCellVertices,
+            unsigned numberOfMeshPoints,
+            unsigned numberOfLevels,
+            float thickness,
+            bool samplePointsAreMeshPoints,
             std::vector<double> points,
             std::vector<double> betaVolume,
             std::vector<double> betaCells,
@@ -338,6 +346,10 @@ namespace hase::core
             , numberOfSamples(numberOfSamples)
             , numberOfFacesPerCell(numberOfFacesPerCell)
             , numberOfCellVertices(numberOfCellVertices)
+            , numberOfMeshPoints(numberOfMeshPoints)
+            , numberOfLevels(numberOfLevels)
+            , thickness(thickness)
+            , samplePointsAreMeshPoints(samplePointsAreMeshPoints)
         {
         }
 
@@ -375,7 +387,11 @@ namespace hase::core
                 numberOfPoints,
                 numberOfSamples,
                 numberOfFacesPerCell,
-                numberOfCellVertices};
+                numberOfCellVertices,
+                numberOfMeshPoints,
+                numberOfLevels,
+                thickness,
+                samplePointsAreMeshPoints};
         }
 
         T_Device m_device;
@@ -418,6 +434,10 @@ namespace hase::core
         unsigned numberOfSamples;
         unsigned numberOfFacesPerCell;
         unsigned numberOfCellVertices;
+        unsigned numberOfMeshPoints;
+        unsigned numberOfLevels;
+        float thickness;
+        bool samplePointsAreMeshPoints;
     };
 
     class HostMesh
@@ -455,6 +475,7 @@ namespace hase::core
         double claddingAbsorption = 0.0;
         unsigned numberOfCells = 0u;
         unsigned numberOfPrisms = 0u;
+        unsigned numberOfMeshPoints = 0u;
         unsigned numberOfPoints = 0u;
         unsigned numberOfSamples = 0u;
         unsigned numberOfTriangles = 0u;
@@ -462,6 +483,7 @@ namespace hase::core
         float thickness = 0.0f;
         unsigned numberOfFacesPerCell = tet4FaceCount;
         unsigned numberOfCellVertices = tet4VertexCount;
+        bool samplePointsAreMeshPoints = false;
         bool resultAtVolumes = false;
 
         HostMesh() = default;
@@ -485,7 +507,11 @@ namespace hase::core
             float nTot,
             float crystalTFluo,
             unsigned claddingNumber,
-            double claddingAbsorption)
+            double claddingAbsorption,
+            unsigned structuredNumberOfPoints = 0u,
+            unsigned structuredNumberOfLevels = 1u,
+            float structuredThickness = 0.0f,
+            bool samplePointsAreMeshPoints = false)
             : points(std::move(points))
             , betaVolume(std::move(betaVolume))
             , betaCells(std::move(betaCells))
@@ -507,9 +533,15 @@ namespace hase::core
             , claddingAbsorption(claddingAbsorption)
             , numberOfCells(static_cast<unsigned>(this->cellTypes.size()))
             , numberOfPrisms(numberOfCells)
-            , numberOfPoints(static_cast<unsigned>(this->points.size() / 3u))
+            , numberOfMeshPoints(static_cast<unsigned>(this->points.size() / 3u))
+            , numberOfPoints(
+                  structuredNumberOfPoints == 0u ? static_cast<unsigned>(this->samplePoints.size() / 3u)
+                                                  : structuredNumberOfPoints)
             , numberOfSamples(static_cast<unsigned>(this->samplePoints.size() / 3u))
             , numberOfTriangles(numberOfCells)
+            , numberOfLevels(structuredNumberOfLevels == 0u ? 1u : structuredNumberOfLevels)
+            , thickness(structuredThickness)
+            , samplePointsAreMeshPoints(samplePointsAreMeshPoints)
         {
             trianglePointIndices = this->cellPointIndices;
             triangleNeighbors = this->cellNeighborCells;
@@ -565,6 +597,10 @@ namespace hase::core
                 numberOfSamples,
                 numberOfFacesPerCell,
                 numberOfCellVertices,
+                numberOfMeshPoints,
+                numberOfLevels,
+                thickness,
+                samplePointsAreMeshPoints,
                 points,
                 betaVolume,
                 betaCells,

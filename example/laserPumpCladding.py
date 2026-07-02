@@ -25,6 +25,8 @@ from HASEonGPU import (  # noqa: E402
     FrozenPhiAseRungeKutta4,
     GainMedium,
     MeshTopology,
+    VolumeTopology,
+    backendFlat,
     PhiASE,
     PumpProperties,
     Simulation,
@@ -81,6 +83,50 @@ def printState(state):
     )
 
 
+def _writeScalarArray(handle, name, values, count):
+    arr = np.asarray(values).reshape(-1, order="F")
+    if arr.size != count:
+        raise ValueError(f"{name} has {arr.size} values, expected {count}")
+    handle.write(f"SCALARS {name} double 1\n")
+    handle.write("LOOKUP_TABLE default\n")
+    for value in arr:
+        handle.write(f"{float(value):.17g}\n")
+
+
+def _writeTet4StateVtk(path, state, fields):
+    topology = state.topology
+    points = np.asarray(topology.points, dtype=np.float64)
+    cells = np.asarray(topology.cellPointIndices, dtype=np.uint32)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    point_count = points.shape[0]
+    cell_count = cells.shape[0]
+    point_fields = {name: value for name, value in fields.items() if np.asarray(value).size == point_count}
+    cell_fields = {name: value for name, value in fields.items() if np.asarray(value).size == cell_count}
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("# vtk DataFile Version 2.0\n")
+        handle.write("HASEonGPU laserPumpCladding Tet4 state\n")
+        handle.write("ASCII\n")
+        handle.write("DATASET UNSTRUCTURED_GRID\n")
+        handle.write(f"POINTS {point_count} double\n")
+        for x, y, z in points:
+            handle.write(f"{x:.17g} {y:.17g} {z:.17g}\n")
+        handle.write(f"CELLS {cell_count} {cell_count * 5}\n")
+        for cell in cells:
+            handle.write("4 " + " ".join(str(int(vertex)) for vertex in cell) + "\n")
+        handle.write(f"CELL_TYPES {cell_count}\n")
+        handle.write(("10\n" * cell_count))
+        if point_fields:
+            handle.write(f"POINT_DATA {point_count}\n")
+            for name, values in point_fields.items():
+                _writeScalarArray(handle, name, values, point_count)
+        if cell_fields:
+            handle.write(f"CELL_DATA {cell_count}\n")
+            for name, values in cell_fields.items():
+                _writeScalarArray(handle, name, values, cell_count)
+    return path
+
+
 def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossSections=None, nTot=None):
     if state.phiAse is None:
         raise ValueError("VTK export requires state.phiAse")
@@ -89,38 +135,84 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
     if nTot is None:
         raise ValueError("VTK export requires nTot for gain")
 
-    return vtkWedge(
-        Path(vtkOutputDir) / f'laserPumpCladding_{state.step:03d}.vtk',
-        state,
-        fields={
-            "betaCells": state.betaCells,
-            "phiASE": state.phiAse,
-            "dndtAse": state.dndtAse,
-            "dndtPump": state.dndtPump,
-            "cladAbs": state.phiAse * np.float64(claddingAbsorption),
-            "localGain": calcGainFromState(state, crossSections, nTot),
+    fields = {
+        "betaCells": state.betaCells,
+        "betaVolume": state.betaVolume,
+        "phiASE": state.phiAse,
+        "dndtAse": state.dndtAse,
+        "dndtPump": state.dndtPump,
+        "cladAbs": state.phiAse * np.float64(claddingAbsorption),
+        "localGain": calcGainFromState(state, crossSections, nTot),
+    }
+    path = Path(vtkOutputDir) / f"laserPumpCladding_{state.step:03d}.vtk"
+    if hasattr(state.topology, "cellPointIndices"):
+        return _writeTet4StateVtk(path, state, fields)
+    return vtkWedge(path, state, fields=fields)
+
+
+def _legacyWedgeToTet4Topology(topology):
+    topology._require_levels()
+    topology._require_thickness()
+    base_points = np.asarray(topology.points, dtype=np.float64)
+    triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
+    levels = int(topology.levels)
+    points = np.empty((topology.numberOfPoints * levels, 3), dtype=np.float64)
+    for level, z in enumerate(topology.levelCoordinates()):
+        start = level * topology.numberOfPoints
+        stop = start + topology.numberOfPoints
+        points[start:stop, :2] = base_points
+        points[start:stop, 2] = z
+
+    split = np.asarray([[0, 1, 2, 3], [1, 4, 2, 3], [2, 4, 5, 3]], dtype=np.uint32)
+    cells = np.empty((topology.numberOfTriangles * (levels - 1) * 3, 4), dtype=np.uint32)
+    out = 0
+    for level in range(levels - 1):
+        lower = level * topology.numberOfPoints
+        upper = (level + 1) * topology.numberOfPoints
+        for tri in triangles:
+            wedge = np.asarray(
+                [tri[0] + lower, tri[1] + lower, tri[2] + lower, tri[0] + upper, tri[1] + upper, tri[2] + upper],
+                dtype=np.uint32,
+            )
+            cells[out:out + 3] = wedge[split]
+            out += 3
+
+    volume = VolumeTopology.fromTetrahedra(
+        points,
+        cells,
+        metadata={
+            "source": topology.metadata.get("source", "legacy wedge"),
+            "format": "legacy-wedge-to-tet4",
+            "structured": {
+                "numberOfPoints": topology.numberOfPoints,
+                "numberOfLevels": levels,
+                "thickness": float(topology.thickness),
+            },
         },
     )
+    volume.samplePoints = points
+    return volume
 
 
 def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5.5):
     materialPath = scriptDir / "data" / "pt.vtk"
-    topology = MeshTopology.fromVtk(materialPath)
+    legacyTopology = MeshTopology.fromVtk(materialPath)
 
-    if numberOfLevels is not None and topology.levels != numberOfLevels:
+    if numberOfLevels is not None and legacyTopology.levels != numberOfLevels:
         raise ValueError(
-            f"{materialPath} contains {topology.levels} levels, expected {numberOfLevels}"
+            f"{materialPath} contains {legacyTopology.levels} levels, expected {numberOfLevels}"
         )
-    if thickness is not None and not np.isclose(topology.thickness, thickness):
+    if thickness is not None and not np.isclose(legacyTopology.thickness, thickness):
         raise ValueError(
-            f"{materialPath} has thickness {topology.thickness}, expected {thickness}"
+            f"{materialPath} has thickness {legacyTopology.thickness}, expected {thickness}"
         )
+    topology = _legacyWedgeToTet4Topology(legacyTopology)
     return GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=np.zeros((topology.numberOfPoints, topology.levels), dtype=np.float64),
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
-        claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
+        betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
+        betaVolume=backendFlat(np.zeros(topology.numberOfCells, dtype=np.float64)),
+        claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
-        reflectivities=np.zeros((topology.numberOfTriangles, 2), dtype=np.float32),
+        reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),
         nTot=2 * 1.388e20,
         crystalTFluo=9.41e-4,
         claddingNumber=1,
@@ -158,6 +250,7 @@ def runExample(
         cladAbsorption=absorption
     )
 
+    AseOverride.setdefault("forwardRayLength", 1.0)
     phiAse = PhiASE.fromYaml(
         phiAseConfigPath,
         spectralProperties=spectralProperties,
@@ -242,6 +335,11 @@ def main(argv=None):
     parser.add_argument("--min-sample-range", type=int, default=None)
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
+    parser.add_argument(
+        "--disable-reflections",
+        action="store_true",
+        help="Disable ASE surface reflections; required by the current forward Tet4 backend.",
+    )
     args = parser.parse_args(argv)
 
     aseOverrides = {}
@@ -251,6 +349,8 @@ def main(argv=None):
         aseOverrides["maxSampleRange"] = args.max_sample_range
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
+    if args.disable_reflections:
+        aseOverrides["useReflections"] = False
 
     if args.phiase_only:
         if args.tet4_input is None:

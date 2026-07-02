@@ -31,17 +31,19 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfPrisms}))
             {
-                unsigned const level = prism / mesh.numberOfTriangles;
-                unsigned const triangle = prism - level * mesh.numberOfTriangles;
+                if(!mesh.samplePointsAreMeshPoints)
+                {
+                    betaVolume[prism] = betaCells[prism];
+                    continue;
+                }
 
                 double sum = 0.0;
-                for(unsigned vertex = 0u; vertex < 3u; ++vertex)
+                for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
                 {
-                    unsigned const point = mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles];
-                    sum += betaCells[point + level * mesh.numberOfPoints];
-                    sum += betaCells[point + (level + 1u) * mesh.numberOfPoints];
+                    unsigned const point = mesh.cellPointIndices[prism * mesh.numberOfCellVertices + vertex];
+                    sum += betaCells[point];
                 }
-                betaVolume[prism] = sum / 6.0;
+                betaVolume[prism] = sum / static_cast<double>(mesh.numberOfCellVertices);
             }
         }
     };

@@ -16,7 +16,7 @@ import numpy as np
 from .alpakaUtils import AlpakaBackends
 from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
-from .openpmd import transport
+from .openpmd import backendFlat, transport
 from .timeIntegration import TimeIntegrationSolver
 
 
@@ -561,8 +561,12 @@ class Simulation:
                 aseResult=raw_state.aseResult,
                 topology=self.gainMedium.topology,
             )
-            self.gainMedium.get("betaCells").value = state.betaCells
-            self.gainMedium.get("betaVolume").value = state.betaVolume
+            if hasattr(self.gainMedium.topology, "cellPointIndices"):
+                self.gainMedium.get("betaCells").value = backendFlat(state.betaCells.reshape(-1, order="F"))
+                self.gainMedium.get("betaVolume").value = backendFlat(state.betaVolume.reshape(-1, order="F"))
+            else:
+                self.gainMedium.get("betaCells").value = state.betaCells
+                self.gainMedium.get("betaVolume").value = state.betaVolume
             self._lastState = state
             self._step = state.step
             self._time = state.time

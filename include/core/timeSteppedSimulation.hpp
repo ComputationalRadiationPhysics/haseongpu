@@ -52,6 +52,40 @@ namespace hase::core
             alpaka::onHost::wait(queue);
         }
 
+        std::vector<float> mapVolumePhiToSamples(HostMesh const& mesh, std::vector<float> const& volumePhi)
+        {
+            if(volumePhi.size() == mesh.numberOfSamples)
+            {
+                return volumePhi;
+            }
+            std::vector<float> samplePhi(mesh.numberOfSamples, 0.0f);
+            if(volumePhi.size() != mesh.numberOfCells || !mesh.samplePointsAreMeshPoints)
+            {
+                return samplePhi;
+            }
+            std::vector<unsigned> counts(mesh.numberOfSamples, 0u);
+            for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
+            {
+                for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
+                {
+                    unsigned const sample = mesh.cellPointIndices.at(cell * mesh.numberOfCellVertices + localVertex);
+                    if(sample < mesh.numberOfSamples)
+                    {
+                        samplePhi.at(sample) += volumePhi.at(cell);
+                        ++counts.at(sample);
+                    }
+                }
+            }
+            for(unsigned sample = 0u; sample < mesh.numberOfSamples; ++sample)
+            {
+                if(counts.at(sample) > 0u)
+                {
+                    samplePhi.at(sample) /= static_cast<float>(counts.at(sample));
+                }
+            }
+            return samplePhi;
+        }
+
         double absorptionAtEmissionPeak(ExperimentParameters const& experiment)
         {
             if(experiment.sigmaA.empty() || experiment.sigmaE.empty())
@@ -189,6 +223,10 @@ namespace hase::core
                         throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
                     }
                 }
+                m_lastAseResult.phiAse = detail::mapVolumePhiToSamples(m_hostMesh, m_lastAseResult.phiAse);
+                m_lastAseResult.mse.assign(m_hostMesh.numberOfSamples, 0.0);
+                m_lastAseResult.totalRays.assign(m_hostMesh.numberOfSamples, 0u);
+                m_lastAseResult.droppedRays.assign(m_hostMesh.numberOfSamples, 0u);
                 detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
             }
 

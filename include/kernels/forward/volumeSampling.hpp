@@ -11,7 +11,7 @@
 
 namespace hase::kernels::forward
 {
-    [[nodiscard]] ALPAKA_FN_ACC unsigned sampleVolumeByVolume(
+    [[nodiscard]] inline ALPAKA_FN_ACC unsigned sampleVolumeByVolume(
         hase::core::DeviceMeshView const& mesh,
         double const totalVolume,
         alpaka::rand::engine::Philox4x32x10& rndEngine)
@@ -48,7 +48,7 @@ namespace hase::kernels::forward
         return lower < mesh.numberOfCells ? lower : mesh.numberOfCells - 1u;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC unsigned sampleVolumeByBetaVolume(
+    [[nodiscard]] inline ALPAKA_FN_ACC unsigned sampleVolumeByBetaVolume(
         hase::core::DeviceMeshView const& mesh,
         double const betaVolumeTotal,
         alpaka::rand::engine::Philox4x32x10& rndEngine)
@@ -79,7 +79,7 @@ namespace hase::kernels::forward
         return lower < mesh.numberOfCells ? lower : mesh.numberOfCells - 1u;
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC hase::core::Point samplePointInVolume(
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point samplePointInVolume(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         alpaka::rand::engine::Philox4x32x10& rndEngine)
@@ -92,7 +92,7 @@ namespace hase::kernels::forward
             rndEngine);
     }
 
-    [[nodiscard]] ALPAKA_FN_ACC hase::core::Point sampleIsotropicDirection(
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point sampleIsotropicDirection(
         alpaka::rand::engine::Philox4x32x10& rndEngine)
     {
         constexpr double pi = 3.14159265358979323846;
