@@ -79,7 +79,13 @@ class PhiASE:
     adaptiveSteps: int = 4
     """Number of ray-count increases between min and max rays."""
     useReflections: bool = False
-    """Whether surface reflectivities affect propagation; unsupported for forward mode."""
+    """Whether surface reflectivities affect forward propagation."""
+    reflectionMaxIterations: int = 8
+    """Maximum reflected-source passes after the direct volume-source pass."""
+    reflectionTolerance: float = 1e-4
+    """Stop reflected passes when their source-weight fraction is below this value."""
+    surfaceReservoirSize: int = 32
+    """Maximum reflected source records retained per physical boundary face."""
     monochromatic: bool = False
     """Use only the first spectral samples instead of wavelength integration."""
 
@@ -150,6 +156,9 @@ class PhiASE:
         parser.add_argument("--forward-ray-count", type=int, default=None)
         parser.add_argument("--forward-ray-length", type=float, default=None)
         parser.add_argument("--mse-threshold", type=float, default=None)
+        parser.add_argument("--reflection-max-iterations", type=int, default=None)
+        parser.add_argument("--reflection-tolerance", type=float, default=None)
+        parser.add_argument("--surface-reservoir-size", type=int, default=None)
         parser.add_argument("--repetitions", type=int, default=None)
         parser.add_argument("--adaptive-steps", type=int, default=None)
         parser.add_argument("--backend", default=None)
@@ -172,6 +181,9 @@ class PhiASE:
             "forward_ray_count": "forwardRayCount",
             "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
+            "reflection_max_iterations": "reflectionMaxIterations",
+            "reflection_tolerance": "reflectionTolerance",
+            "surface_reservoir_size": "surfaceReservoirSize",
             "repetitions": "repetitions",
             "adaptive_steps": "adaptiveSteps",
             "backend": "backend",
@@ -218,6 +230,9 @@ class PhiASE:
             "forward_ray_count": "forwardRayCount",
             "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
+            "reflection_max_iterations": "reflectionMaxIterations",
+            "reflection_tolerance": "reflectionTolerance",
+            "surface_reservoir_size": "surfaceReservoirSize",
             "adaptive_steps": "adaptiveSteps",
             "use_reflections": "useReflections",
             "openpmd_backend": "openpmdBackend",
@@ -231,10 +246,12 @@ class PhiASE:
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "propagationMode", "forwardRayCount",
-            "forwardRayLength", "mseThreshold", "repetitions",
+            "forwardRayLength", "mseThreshold", "reflectionMaxIterations", "reflectionTolerance",
+            "surfaceReservoirSize", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
             "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
-            "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "repetitions",
+            "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "reflectionMaxIterations",
+            "reflectionTolerance", "surfaceReservoirSize", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
             "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
             "minSampleRange", "maxSampleRange", "rngSeed",
@@ -257,6 +274,9 @@ class PhiASE:
             "propagationMode": self.propagationMode,
             "forwardRayCount": self.maxRaysPerSample if self.forwardRayCount is None else self.forwardRayCount,
             "mseThreshold": self.mseThreshold,
+            "reflectionMaxIterations": self.reflectionMaxIterations,
+            "reflectionTolerance": self.reflectionTolerance,
+            "surfaceReservoirSize": self.surfaceReservoirSize,
             "repetitions": self.repetitions,
             "adaptiveSteps": self.adaptiveSteps,
             "useReflections": self.useReflections,

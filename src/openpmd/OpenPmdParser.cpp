@@ -39,6 +39,9 @@ namespace
         constexpr char const* forwardRayLength = "forward_ray_length";
         constexpr char const* mseThreshold = "mse_threshold";
         constexpr char const* useReflections = "use_reflections";
+        constexpr char const* reflectionMaxIterations = "reflection_max_iterations";
+        constexpr char const* reflectionTolerance = "reflection_tolerance";
+        constexpr char const* surfaceReservoirSize = "surface_reservoir_size";
         constexpr char const* spectralResolution = "spectral_resolution";
         constexpr char const* monochromatic = "monochromatic";
         constexpr char const* maxSigmaAbsorption = "max_sigma_absorption";
@@ -384,6 +387,44 @@ namespace
             double>(series, iteration, name, expectedExtent, axes, primitiveShape, dynamic, backendRequired);
         validateNonNegativeFinite(name, values);
         return values;
+    }
+
+    template<typename T>
+    std::vector<T> loadOptionalScalar(
+        io::Series& series,
+        io::Iteration& iteration,
+        std::string const& name,
+        io::Extent const& expectedExtent,
+        std::vector<std::string> const& axes,
+        std::vector<unsigned long long> const& primitiveShape,
+        bool dynamic,
+        bool backendRequired,
+        std::string const& unit = "1")
+    {
+        if(!iteration.meshes.contains(name))
+        {
+            return {};
+        }
+        return loadScalar<T>(
+            series,
+            iteration,
+            name,
+            expectedExtent,
+            axes,
+            primitiveShape,
+            dynamic,
+            backendRequired,
+            unit);
+    }
+
+    unsigned surfaceDomainCount(std::vector<int> const& cellFaceBoundaries)
+    {
+        int maxSurfaceId = 0;
+        for(int const boundary : cellFaceBoundaries)
+        {
+            maxSurfaceId = std::max(maxSurfaceId, boundary);
+        }
+        return static_cast<unsigned>(maxSurfaceId + 1);
     }
 
     template<typename T>
@@ -834,6 +875,18 @@ namespace hase::openpmd
             simulation.experiment.maxRaysPerSample);
         validateUnchangedAttribute<double>(iteration, field::mseThreshold, simulation.experiment.mseThreshold);
         validateUnchangedAttribute<bool>(iteration, field::useReflections, simulation.experiment.useReflections);
+        validateUnchangedAttribute<unsigned>(
+            iteration,
+            field::reflectionMaxIterations,
+            simulation.experiment.reflectionMaxIterations);
+        validateUnchangedAttribute<double>(
+            iteration,
+            field::reflectionTolerance,
+            simulation.experiment.reflectionTolerance);
+        validateUnchangedAttribute<unsigned>(
+            iteration,
+            field::surfaceReservoirSize,
+            simulation.experiment.surfaceReservoirSize);
         validateUnchangedAttribute<unsigned>(iteration, field::spectralResolution, simulation.experiment.spectral);
         validateUnchangedAttribute<bool>(iteration, field::monochromatic, simulation.experiment.monochromatic);
         validateUnchangedAttribute<double>(iteration, field::maxSigmaAbsorption, simulation.experiment.maxSigmaA);
@@ -918,6 +971,16 @@ namespace hase::openpmd
 
         auto cellVolumes = deriveCellVolumes(points, connectivity, numberOfMeshPoints, numberOfCells);
         auto cellCenters = deriveCellCenters(points, connectivity, numberOfMeshPoints, numberOfCells);
+        auto cellFaceBoundaries = loadScalar<int>(
+            series,
+            iteration,
+            prefix + "cell_face_boundaries",
+            io::Extent{numberOfCells * core::tet4FaceCount},
+            {"cell", "local_face"},
+            {numberOfCells, core::tet4FaceCount},
+            false,
+            false);
+        unsigned const numberOfSurfaceDomains = surfaceDomainCount(cellFaceBoundaries);
         bool const samplePointsAreMeshPoints = numberOfPoints * numberOfLevels == numberOfMeshPoints;
         auto samplePoints = samplePointsAreMeshPoints ? points : cellCenters;
         auto betaCells = iteration.meshes.contains(prefix + "point_beta")
@@ -962,15 +1025,7 @@ namespace hase::openpmd
                 {numberOfCells, core::tet4FaceCount},
                 false,
                 false),
-            loadScalar<int>(
-                series,
-                iteration,
-                prefix + "cell_face_boundaries",
-                io::Extent{numberOfCells * core::tet4FaceCount},
-                {"cell", "local_face"},
-                {numberOfCells, core::tet4FaceCount},
-                false,
-                false),
+            std::move(cellFaceBoundaries),
             std::move(cellVolumes),
             std::move(points),
             std::move(samplePoints),
@@ -1012,6 +1067,33 @@ namespace hase::openpmd
                 {numberOfCells, 2u},
                 false,
                 true),
+            loadOptionalScalar<float>(
+                series,
+                iteration,
+                prefix + "surface_reflectivity",
+                io::Extent{numberOfSurfaceDomains},
+                {"surface"},
+                {numberOfSurfaceDomains},
+                false,
+                false),
+            loadOptionalScalar<float>(
+                series,
+                iteration,
+                prefix + "surface_refractive_index_inside",
+                io::Extent{numberOfSurfaceDomains},
+                {"surface"},
+                {numberOfSurfaceDomains},
+                false,
+                false),
+            loadOptionalScalar<float>(
+                series,
+                iteration,
+                prefix + "surface_refractive_index_outside",
+                io::Extent{numberOfSurfaceDomains},
+                {"surface"},
+                {numberOfSurfaceDomains},
+                false,
+                false),
             attribute<float>(iteration, field::nTot),
             attribute<float>(iteration, field::crystalTFluo),
             attribute<unsigned>(iteration, field::claddingNumber),
@@ -1083,11 +1165,12 @@ namespace hase::openpmd
         {
             validationError("forward_ray_length", "must be positive");
         }
-        if(experiment.useReflections)
+        experiment.reflectionMaxIterations = attributeOr<unsigned>(iteration, field::reflectionMaxIterations, 8u);
+        experiment.reflectionTolerance = attributeOr<double>(iteration, field::reflectionTolerance, 1.0e-4);
+        experiment.surfaceReservoirSize = attributeOr<unsigned>(iteration, field::surfaceReservoirSize, 32u);
+        if(experiment.reflectionTolerance < 0.0)
         {
-            validationError(
-                "use_reflections",
-                "forward propagation terminates at surfaces and does not support reflections");
+            validationError("reflection_tolerance", "must be non-negative");
         }
         experiment.maxSigmaA = attributeOr<double>(iteration, field::maxSigmaAbsorption, experiment.maxSigmaA);
         experiment.maxSigmaE = attributeOr<double>(iteration, field::maxSigmaEmission, experiment.maxSigmaE);
