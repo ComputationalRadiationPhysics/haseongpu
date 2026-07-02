@@ -41,6 +41,7 @@ namespace hase::core
         static inline std::string const HEUN = "heun";
         static inline std::string const MIDPOINT = "midpoint";
         static inline std::string const RUNGE_KUTTA_4 = "runge-kutta-4";
+        static inline std::string const FROZEN_PHI_ASE_RUNGE_KUTTA_4 = "frozen-phi-ase-runge-kutta-4";
         static inline std::string const IMPLICIT_EULER = "implicit-euler";
         static inline std::string const EXPONENTIAL_EULER = "exponential-euler";
     };
@@ -56,6 +57,7 @@ namespace hase::core
     {
         double timeStep = 0.0;
         unsigned numberOfSteps = 0u;
+        bool enableAse = true;
         unsigned pumpSteps = std::numeric_limits<unsigned>::max();
         TimeIntegrationParameters timeIntegration;
         PumpParameters pump;

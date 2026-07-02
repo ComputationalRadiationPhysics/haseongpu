@@ -45,15 +45,15 @@ Compiled Pump Model
 -------------------
 
 The ``one-dimensional-z-traversal`` routine evaluates the inlet profile at
-each transverse point, propagates it through the z levels using the current
-excited-state fraction, and updates beta over ``pumpSubsteps`` internal
-intervals. With ``backReflection=True``, a second pass starts at the far end
-with intensity scaled by ``reflectivity``. ``extraction=True`` suppresses the
-inlet pump.
+each transverse point and propagates it through the z levels using the current
+excited-state fraction. It exposes the resulting local pump rate to the compiled
+time integrator. With ``backReflection=True``, a second pass starts at the far
+end with intensity scaled by ``reflectivity``. ``extraction=True`` suppresses
+the inlet pump.
 
 ``pumpSteps`` limits the number of *outer* simulation steps that receive pump
-energy; set it on the object or pass it to ``Simulation.runSteps``. It is not
-``pumpSubsteps``, which only controls resolution within one pumped step.
+energy; set it on the object or pass it to ``Simulation.runSteps``. The retained
+``pumpSubsteps`` setting does not count outer simulation steps.
 
 Limits and Utilities
 --------------------

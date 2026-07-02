@@ -473,7 +473,7 @@ class PumpProperties:
     wavelength: float | None
     r"""Pump wavelength :math:`\lambda`; required for monochromatic data."""
     pumpSubsteps: int
-    """Number of time samples used by the built-in pump integrator."""
+    """Reserved substep count for pump routines that perform inner integration."""
     customProperties: dict
     """Extensible store for beam shape, reflection, spectra, and solver handles."""
 

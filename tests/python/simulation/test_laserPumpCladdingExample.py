@@ -42,7 +42,15 @@ def fakeCompiledSnapshots(monkeypatch):
     calls = []
 
     def fake_run_simulation(simulation, *, steps, pumpSteps=None, transport=None):
-        calls.append({"steps": steps, "pumpSteps": pumpSteps, "transport": transport, "phiASE": simulation.phiASE})
+        calls.append(
+            {
+                "simulation": simulation,
+                "steps": steps,
+                "pumpSteps": pumpSteps,
+                "transport": transport,
+                "phiASE": simulation.phiASE,
+            }
+        )
         point_shape = simulation.gainMedium.get("betaCells").expectedShape
         volume_shape = simulation.gainMedium.get("betaVolume").expectedShape
         states = []
@@ -104,3 +112,46 @@ def testLaserPumpCladdingExampleWiresOpenPmdBackend(
     assert fakeCompiledSnapshots[-1]["transport"] == "hdf5"
     assert fakeCompiledSnapshots[-1]["phiASE"].openpmdBackend == "hdf5"
     assert np.allclose(state.dndtPump, 0.0)
+
+
+def testLaserPumpCladdingExampleCanDisableAse(
+    monkeypatch,
+    tmp_path,
+    smallGainMedium,
+    fakeCompiledSnapshots,
+):
+    monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
+
+    state = laserPumpCladding.runExample(
+        timeSlices=1,
+        pumpSteps=1,
+        vtkOutputDir=tmp_path,
+        enableASE=False,
+    )
+
+    assert state.step == 1
+    assert fakeCompiledSnapshots[-1]["simulation"].enableASE is False
+
+
+def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_example(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaCells=np.zeros((2, 3)))
+
+    monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
+
+    laserPumpCladding.main(
+        [
+            "--disable-ase",
+            "--timeSteps",
+            "1",
+            "--pumpSteps",
+            "1",
+            "--vtk-output-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert calls[-1]["kwargs"]["enableASE"] is False

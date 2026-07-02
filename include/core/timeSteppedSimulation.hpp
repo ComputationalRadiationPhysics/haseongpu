@@ -157,23 +157,29 @@ namespace hase::core
         }
 
     private:
-        void evaluateDerivative(auto& beta, bool pumpEnabled)
+        void evaluateDerivative(auto& beta, bool pumpEnabled, bool refreshAse = true)
         {
             hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, beta, m_betaVolume);
             alpaka::onHost::wait(m_queue);
 
             m_hostMesh.betaCells = detail::copyToVector(m_queue, beta);
             m_hostMesh.betaVolume = detail::copyToVector(m_queue, m_betaVolume);
-            initializeResult();
-
-            int const result
-                = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
-            if(result != 0)
+            if(refreshAse)
             {
-                throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
+                initializeResult(m_run.enableAse ? 100000.0 : 0.0);
+
+                if(m_run.enableAse)
+                {
+                    int const result
+                        = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
+                    if(result != 0)
+                    {
+                        throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
+                    }
+                }
+                detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
             }
 
-            detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
             if(pumpEnabled)
             {
                 hase::kernels::enqueueOneDimensionalPump(
@@ -233,6 +239,10 @@ namespace hase::core
             {
                 stepRungeKutta4(pumpEnabled);
             }
+            else if(method == TimeIntegrator::FROZEN_PHI_ASE_RUNGE_KUTTA_4)
+            {
+                stepFrozenPhiAseRungeKutta4(pumpEnabled);
+            }
             else if(method == TimeIntegrator::IMPLICIT_EULER)
             {
                 stepImplicitEuler(pumpEnabled);
@@ -273,6 +283,25 @@ namespace hase::core
             enqueueRungeKutta4();
         }
 
+        void stepFrozenPhiAseRungeKutta4(bool pumpEnabled)
+        {
+            evaluateDerivative(m_beta, pumpEnabled, true);
+            alpaka::onHost::memcpy(m_queue, m_k1, m_derivative);
+            enqueueAddScaled(m_beta, m_k1, m_stage, 0.5 * m_run.timeStep);
+
+            evaluateDerivative(m_stage, pumpEnabled, false);
+            alpaka::onHost::memcpy(m_queue, m_k2, m_derivative);
+            enqueueAddScaled(m_beta, m_k2, m_stage, 0.5 * m_run.timeStep);
+
+            evaluateDerivative(m_stage, pumpEnabled, false);
+            alpaka::onHost::memcpy(m_queue, m_k3, m_derivative);
+            enqueueAddScaled(m_beta, m_k3, m_stage, m_run.timeStep);
+
+            evaluateDerivative(m_stage, pumpEnabled, false);
+            alpaka::onHost::memcpy(m_queue, m_k4, m_derivative);
+            enqueueRungeKutta4();
+        }
+
         void stepImplicitEuler(bool pumpEnabled)
         {
             alpaka::onHost::memcpy(m_queue, m_stage, m_beta);
@@ -285,12 +314,12 @@ namespace hase::core
             }
         }
 
-        void initializeResult()
+        void initializeResult(double mseValue)
         {
             auto const numberOfSamples = m_hostMesh.numberOfPoints * m_hostMesh.numberOfLevels;
             m_lastAseResult = Result(
                 std::vector<float>(numberOfSamples, 0.0f),
-                std::vector<double>(numberOfSamples, 100000.0),
+                std::vector<double>(numberOfSamples, mseValue),
                 std::vector<unsigned>(numberOfSamples, 0u),
                 std::vector<double>(numberOfSamples, 0.0));
         }

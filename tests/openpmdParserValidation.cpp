@@ -632,6 +632,31 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     REQUIRE(context.compute.writeVtk == false);
     REQUIRE(context.compute.devices.empty());
     REQUIRE(context.compute.rngSeed == 1234u);
+    REQUIRE(context.run.enableAse == true);
+    REQUIRE(context.run.timeIntegration.method == "explicit-euler");
+}
+
+TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[openpmd][parser]")
+{
+    auto const path = writeParserInput(
+        "run_control",
+        [](io::Series& series, io::Iteration& iteration)
+        {
+            (void) series;
+            iteration.setAttribute("time_step", 2.0e-5);
+            iteration.setAttribute("number_of_steps", 100u);
+            iteration.setAttribute("enable_ase", false);
+            iteration.setAttribute("pump_steps", 50u);
+            iteration.setAttribute("time_integrator", std::string{"frozen-phi-ase-runge-kutta-4"});
+        });
+    hase::openpmd::Parser parser{path, testPath("run-control-output")};
+    auto context = parser.read();
+
+    REQUIRE(context.run.timeStep == Catch::Approx(2.0e-5));
+    REQUIRE(context.run.numberOfSteps == 100u);
+    REQUIRE(context.run.enableAse == false);
+    REQUIRE(context.run.pumpSteps == 50u);
+    REQUIRE(context.run.timeIntegration.method == "frozen-phi-ase-runge-kutta-4");
 }
 
 TEST_CASE("openPMD parser rejects malformed fields before HostMesh construction", "[openpmd][parser]")

@@ -1682,6 +1682,7 @@ def test_simulation_run_control_serializes_compiled_solver_metadata():
 
     assert control["time_step"] == 2.0e-6
     assert control["number_of_steps"] == 7
+    assert control["enable_ase"] is True
     assert control["pump_steps"] == 4
     assert control["time_integrator"] == "implicit-euler"
     assert control["implicit_iterations"] == 5
@@ -1693,6 +1694,14 @@ def test_simulation_run_control_serializes_compiled_solver_metadata():
     assert control["pump_sigma_emission"] == 2.0e-22
     assert control["pump_back_reflection"] is False
     assert control["pump_extraction"] is True
+
+    simulation.enableASE = False
+    disabled_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+    assert disabled_control["enable_ase"] is False
+
+    simulation.timeIntegrationSolver = SimpleNamespace(name="frozen-phi-ase-runge-kutta-4")
+    frozen_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+    assert frozen_control["time_integrator"] == "frozen-phi-ase-runge-kutta-4"
 
 
 def test_simulation_run_control_rejects_custom_python_pump_solver():

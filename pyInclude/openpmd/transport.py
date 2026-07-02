@@ -1452,6 +1452,7 @@ _TIME_INTEGRATORS = {
     "heun",
     "midpoint",
     "runge-kutta-4",
+    "frozen-phi-ase-runge-kutta-4",
     "implicit-euler",
     "exponential-euler",
 }
@@ -1487,6 +1488,7 @@ def _simulation_run_control(simulation, *, steps, pumpSteps):
     control = {
         "time_step": float(simulation.timeStep),
         "number_of_steps": int(steps),
+        "enable_ase": bool(getattr(simulation, "enableASE", True)),
         "pump_steps": pump_steps_value,
         "time_integrator": _time_integrator_name(solver),
         "pump_routine": "one-dimensional-z-traversal",
