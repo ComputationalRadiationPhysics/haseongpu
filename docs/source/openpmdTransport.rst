@@ -124,9 +124,10 @@ Compiled Simulation Snapshots
 -----------------------------
 
 A compiled ``Simulation`` input additionally stores run control as iteration
-attributes: the time step, number of steps, pump-step limit, integrator, and
+attributes: the time step, number of steps, pump-step limit, ASE switch, integrator, and
 one-dimensional pump parameters. The C++ backend writes one output iteration
-per completed step. Each snapshot contains the dynamic beta fields plus the ASE
+per completed step. The integrator can also be
+``frozen-phi-ase-runge-kutta-4``. Each snapshot contains the dynamic beta fields plus the ASE
 results and ``core_result_dndt_pump``; its first snapshot also contains the
 static topology, material, and spectral records.
 For streaming backends, a dedicated receiver drains snapshots while the backend

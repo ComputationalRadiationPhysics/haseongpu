@@ -51,6 +51,13 @@ class RungeKutta4(TimeIntegrationSolver):
         super().__init__("runge-kutta-4")
 
 
+class FrozenPhiAseRungeKutta4(TimeIntegrationSolver):
+    """Compiled RK4 variant that reuses one ASE flux evaluation per step."""
+
+    def __init__(self):
+        super().__init__("frozen-phi-ase-runge-kutta-4")
+
+
 class ImplicitEuler(TimeIntegrationSolver):
     """Fixed-iteration implicit Euler compiled integrator descriptor."""
 

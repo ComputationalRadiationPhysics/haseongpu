@@ -22,7 +22,7 @@ ensure_hase_importable()
 from HASEonGPU import (  # noqa: E402
     calcGainFromState,
     CrossSectionData,
-    ExponentialEuler,
+    FrozenPhiAseRungeKutta4,
     GainMedium,
     MeshTopology,
     PhiASE,
@@ -82,8 +82,8 @@ def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
         reflectivities=np.zeros((topology.numberOfTriangles, 2), dtype=np.float32),
-        nTot = 2.76e20,
-        crystalTFluo = 9.5e-4,
+        nTot = 2 * 1.388e20,
+        crystalTFluo = 9.41e-4,
         claddingNumber = 1,
         claddingAbsorption=cladAbsorption,
     )
@@ -98,6 +98,7 @@ def runExample(
     vtkOutputDir=scriptDir,
     openPmdOutputDir=None,
     openpmdBackend="UseConfig",
+    enableASE=True,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -155,9 +156,10 @@ def runExample(
         gainMedium=medium,
         pump=pumpProperties,
         phiASE=phiAse,
-        timeIntegrationSolver=ExponentialEuler(),
+        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
         timeStep=2e-5,
         crossSections=spectralProperties,
+        enableASE=enableASE,
     )
     simulation.onStep(printState)
     simulation.onStep(
@@ -198,6 +200,11 @@ def main(argv=None):
     )
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
+    parser.add_argument(
+        "--disable-ase",
+        action="store_true",
+        help="Disable ASE depletion during the time-stepped pump simulation.",
+    )
     parser.add_argument("--min-sample-range", type=int, default=None)
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
@@ -219,6 +226,7 @@ def main(argv=None):
         vtkOutputDir=args.vtk_output_dir,
         openPmdOutputDir=args.openpmd_output_dir,
         openpmdBackend=args.openpmd_backend,
+        enableASE=not args.disable_ase,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")

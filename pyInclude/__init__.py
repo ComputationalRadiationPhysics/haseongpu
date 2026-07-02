@@ -42,6 +42,7 @@ from .vtkWedge import vtkWedge
 from .timeIntegration import (
     ExplicitEuler,
     ExponentialEuler,
+    FrozenPhiAseRungeKutta4,
     Heun,
     ImplicitEuler,
     Midpoint,

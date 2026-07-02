@@ -40,7 +40,6 @@ namespace hase::kernels
         OneDimensionalPumpKernelParameters pump;
         double nTot = 0.0;
         double crystalLength = 0.0;
-        double tauFluorescence = 0.0;
         double speedOfLight = 299792458.0;
         double planckConstant = 6.62607015e-34;
 
@@ -70,61 +69,54 @@ namespace hase::kernels
                 double const inlet
                     = pump.extraction ? 0.0
                                       : pump.intensity * alpaka::math::exp(-alpaka::math::pow(radius, pump.exponent));
-                double const timeStep = pump.duration / static_cast<double>(pump.substeps - 1u);
                 double const crystalStep = crystalLength / static_cast<double>(mesh.numberOfLevels - 1u);
                 double const invPhotonEnergy = pump.wavelength / (planckConstant * speedOfLight);
-                double const invTau = 1.0 / tauFluorescence;
 
-                for(unsigned substep = 0u; substep < pump.substeps; ++substep)
+                auto const offset = point * mesh.numberOfLevels;
+                pumpForward[offset] = inlet;
+                for(unsigned level = 0u; level + 1u < mesh.numberOfLevels; ++level)
                 {
-                    auto const offset = point * mesh.numberOfLevels;
-                    pumpForward[offset] = inlet;
-                    for(unsigned level = 0u; level + 1u < mesh.numberOfLevels; ++level)
+                    double const betaA = betaBefore[point + level * mesh.numberOfPoints];
+                    double const betaB = betaBefore[point + (level + 1u) * mesh.numberOfPoints];
+                    double const betaAverage = 0.5 * (betaA + betaB);
+                    double const exponent
+                        = -(pump.sigmaAbsorption - betaAverage * (pump.sigmaAbsorption + pump.sigmaEmission)) * nTot
+                          * crystalStep;
+                    pumpForward[offset + level + 1u] = pumpForward[offset + level] * alpaka::math::exp(exponent);
+                }
+
+                if(pump.backReflection)
+                {
+                    pumpBackward[offset + mesh.numberOfLevels - 1u]
+                        = pumpForward[offset + mesh.numberOfLevels - 1u] * pump.reflectivity;
+                    for(unsigned reverse = mesh.numberOfLevels - 1u; reverse > 0u; --reverse)
                     {
-                        double const betaA = betaAfter[point + level * mesh.numberOfPoints];
-                        double const betaB = betaAfter[point + (level + 1u) * mesh.numberOfPoints];
+                        unsigned const level = reverse - 1u;
+                        double const betaA = betaBefore[point + level * mesh.numberOfPoints];
+                        double const betaB = betaBefore[point + (level + 1u) * mesh.numberOfPoints];
                         double const betaAverage = 0.5 * (betaA + betaB);
                         double const exponent
                             = -(pump.sigmaAbsorption - betaAverage * (pump.sigmaAbsorption + pump.sigmaEmission))
                               * nTot * crystalStep;
-                        pumpForward[offset + level + 1u] = pumpForward[offset + level] * alpaka::math::exp(exponent);
+                        pumpBackward[offset + level] = pumpBackward[offset + level + 1u] * alpaka::math::exp(exponent);
                     }
-
-                    if(pump.backReflection)
-                    {
-                        pumpBackward[offset + mesh.numberOfLevels - 1u]
-                            = pumpForward[offset + mesh.numberOfLevels - 1u] * pump.reflectivity;
-                        for(unsigned reverse = mesh.numberOfLevels - 1u; reverse > 0u; --reverse)
-                        {
-                            unsigned const level = reverse - 1u;
-                            double const betaA = betaAfter[point + level * mesh.numberOfPoints];
-                            double const betaB = betaAfter[point + (level + 1u) * mesh.numberOfPoints];
-                            double const betaAverage = 0.5 * (betaA + betaB);
-                            double const exponent
-                                = -(pump.sigmaAbsorption - betaAverage * (pump.sigmaAbsorption + pump.sigmaEmission))
-                                  * nTot * crystalStep;
-                            pumpBackward[offset + level]
-                                = pumpBackward[offset + level + 1u] * alpaka::math::exp(exponent);
-                        }
-                    }
-                    else
-                    {
-                        for(unsigned level = 0u; level < mesh.numberOfLevels; ++level)
-                        {
-                            pumpBackward[offset + level] = 0.0;
-                        }
-                    }
-
+                }
+                else
+                {
                     for(unsigned level = 0u; level < mesh.numberOfLevels; ++level)
                     {
-                        double const localPump = pumpForward[offset + level] + pumpBackward[offset + level];
-                        double const a1 = pump.sigmaAbsorption * localPump * invPhotonEnergy;
-                        double const c1
-                            = (pump.sigmaAbsorption + pump.sigmaEmission) * localPump * invPhotonEnergy + invTau;
-                        double const decay = alpaka::math::exp(-c1 * timeStep);
-                        unsigned const sample = point + level * mesh.numberOfPoints;
-                        betaAfter[sample] = (a1 / c1) * (1.0 - decay) + betaAfter[sample] * decay;
+                        pumpBackward[offset + level] = 0.0;
                     }
+                }
+
+                for(unsigned level = 0u; level < mesh.numberOfLevels; ++level)
+                {
+                    double const localPump = pumpForward[offset + level] + pumpBackward[offset + level];
+                    unsigned const sample = point + level * mesh.numberOfPoints;
+                    double const beta = betaBefore[sample];
+                    double const pumpRate = (pump.sigmaAbsorption - beta * (pump.sigmaAbsorption + pump.sigmaEmission))
+                                            * localPump * invPhotonEnergy;
+                    betaAfter[sample] = beta + pump.duration * pumpRate;
                 }
             }
         }
@@ -162,9 +154,7 @@ namespace hase::kernels
                         pump.backReflection,
                         pump.extraction},
                     static_cast<double>(mesh.nTot),
-                    static_cast<double>(mesh.thickness) * static_cast<double>(mesh.numberOfLevels - 1u),
-                    pump.temporaryFluorescence > 0.0 ? pump.temporaryFluorescence
-                                                     : static_cast<double>(mesh.crystalTFluo)},
+                    static_cast<double>(mesh.thickness) * static_cast<double>(mesh.numberOfLevels - 1u)},
                 mesh,
                 betaBefore,
                 betaAfter,

@@ -402,6 +402,8 @@ class Simulation:
     """Shared spectra used by pump and ASE when not set on either object."""
     endTime: float | None = None
     """Optional target physical time for ``runUntil()``."""
+    enableASE: bool = True
+    """Whether compiled time-stepped runs include ASE depletion."""
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
     _initialized: bool = field(default=False, init=False, repr=False)

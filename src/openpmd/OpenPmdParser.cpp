@@ -52,6 +52,7 @@ namespace
         constexpr char const* devices = "devices";
         constexpr char const* timeStep = "time_step";
         constexpr char const* numberOfSteps = "number_of_steps";
+        constexpr char const* enableAse = "enable_ase";
         constexpr char const* pumpSteps = "pump_steps";
         constexpr char const* timeIntegrator = "time_integrator";
         constexpr char const* implicitIterations = "implicit_iterations";
@@ -1113,6 +1114,7 @@ namespace hase::openpmd
         core::SimulationRunControl run;
         run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
         run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
+        run.enableAse = attributeOr<bool>(iteration, field::enableAse, true);
         run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
         run.timeIntegration.method
             = attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
