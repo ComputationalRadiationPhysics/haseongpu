@@ -19,8 +19,9 @@ TEST_CASE("forward PhiASE standard error includes zero-score histories", "[forwa
     double const varianceOfMean = (sumSquares - sum * sum / rayCount) / (rayCount * (rayCount - 1u));
     double const expected = std::sqrt(varianceOfMean) * (totalVolume / cellVolume);
 
-    CHECK(hase::core::calcForwardStandardError(sum, sumSquares, rayCount, totalVolume, cellVolume)
-          == Catch::Approx(expected));
+    CHECK(
+        hase::core::calcForwardStandardError(sum, sumSquares, rayCount, totalVolume, cellVolume)
+        == Catch::Approx(expected));
 }
 
 TEST_CASE("forward PhiASE standard error rejects invalid sample sizes and geometry", "[forward][mse]")
@@ -28,13 +29,9 @@ TEST_CASE("forward PhiASE standard error rejects invalid sample sizes and geomet
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 1u, 1.0, 1.0) == std::numeric_limits<double>::max());
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 2u, 0.0, 1.0) == 0.0);
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 2u, 1.0, 0.0) == std::numeric_limits<double>::max());
-    CHECK(hase::core::calcForwardStandardError(
-              std::numeric_limits<double>::infinity(),
-              1.0,
-              2u,
-              1.0,
-              1.0)
-          == std::numeric_limits<double>::max());
+    CHECK(
+        hase::core::calcForwardStandardError(std::numeric_limits<double>::infinity(), 1.0, 2u, 1.0, 1.0)
+        == std::numeric_limits<double>::max());
 }
 
 TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[forward][mse]")

@@ -8,9 +8,9 @@
 #pragma once
 
 #include <core/mesh.hpp>
+#include <kernels/calcSampleGainSum.hpp>
 #include <kernels/forward/rayWalk.hpp>
 #include <kernels/forward/volumeSampling.hpp>
-#include <kernels/calcSampleGainSum.hpp>
 
 #include <cassert>
 
@@ -123,7 +123,8 @@ namespace hase::kernels::forward
             }
         }
 
-        [[nodiscard]] ALPAKA_FN_HOST_ACC double forwardLengthScale(double const remaining, double const segmentLength) const
+        [[nodiscard]] ALPAKA_FN_HOST_ACC double forwardLengthScale(double const remaining, double const segmentLength)
+            const
         {
             return alpaka::math::max(remaining, segmentLength);
         }

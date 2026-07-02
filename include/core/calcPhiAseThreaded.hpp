@@ -77,14 +77,7 @@ namespace hase::core
     {
         threadIds.emplace_back(
             std::thread(
-                [&experiment,
-                 &hostMesh,
-                 &mesh,
-                 &result,
-                 &runtime,
-                 devBundle,
-                 rayCount,
-                 rngSeed]() mutable
+                [&experiment, &hostMesh, &mesh, &result, &runtime, devBundle, rayCount, rngSeed]() mutable
                 {
                     try
                     {
