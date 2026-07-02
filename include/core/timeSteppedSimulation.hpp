@@ -157,6 +157,17 @@ namespace hase::core
         }
 
     private:
+        struct DerivativeBuffers
+        {
+            T_DoubleBuffer& betaCells;
+            T_DoubleBuffer& pumpedBeta;
+            T_FloatBuffer& phiAse;
+            T_UnsignedBuffer& activeMask;
+            T_DoubleBuffer& dndtPump;
+            T_DoubleBuffer& dndtAse;
+            T_DoubleBuffer& derivative;
+        };
+
         void evaluateDerivative(auto& beta, bool pumpEnabled, bool refreshAse = true)
         {
             hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, beta, m_betaVolume);
@@ -193,6 +204,15 @@ namespace hase::core
                     m_pumpBackward);
             }
 
+            DerivativeBuffers derivativeBuffers{
+                beta,
+                m_pumpedBeta,
+                m_phiAse,
+                m_activeMask,
+                m_dndtPump,
+                m_dndtAse,
+                m_derivative};
+
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
                 m_queue,
@@ -202,13 +222,7 @@ namespace hase::core
                 std::max(static_cast<double>(m_hostMesh.crystalTFluo), std::numeric_limits<double>::min()),
                 m_run.pump.duration,
                 pumpEnabled,
-                beta,
-                m_pumpedBeta,
-                m_phiAse,
-                m_activeMask,
-                m_dndtPump,
-                m_dndtAse,
-                m_derivative);
+                derivativeBuffers);
             alpaka::onHost::wait(m_queue);
         }
 
