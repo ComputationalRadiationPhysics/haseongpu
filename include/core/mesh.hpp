@@ -149,6 +149,9 @@ namespace hase::core
         std::span<unsigned const> claddingCellTypes;
         std::span<float const> refractiveIndices;
         std::span<float const> reflectivities;
+        std::span<float const> surfaceReflectivities;
+        std::span<float const> surfaceRefractiveIndexInside;
+        std::span<float const> surfaceRefractiveIndexOutside;
         std::span<float const> totalReflectionAngles;
         std::span<unsigned const> cellPointIndices;
         std::span<unsigned const> cellTypes;
@@ -275,6 +278,39 @@ namespace hase::core
         {
             return static_cast<double>(cellVolumes[cell]);
         }
+
+        [[nodiscard]] ALPAKA_FN_ACC float getSurfaceReflectivity(unsigned cell, unsigned localFace) const
+        {
+            int const surfaceId = cellFaceBoundaries[cell * numberOfFacesPerCell + localFace];
+            if(surfaceId > 0 && static_cast<unsigned>(surfaceId) < surfaceReflectivities.size())
+            {
+                return surfaceReflectivities[static_cast<unsigned>(surfaceId)];
+            }
+            unsigned const legacyIndex = cell * 2u + (localFace % 2u);
+            return legacyIndex < reflectivities.size() ? reflectivities[legacyIndex] : 0.0f;
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC float getSurfaceRefractiveIndexInside(unsigned cell, unsigned localFace) const
+        {
+            int const surfaceId = cellFaceBoundaries[cell * numberOfFacesPerCell + localFace];
+            if(surfaceId > 0 && static_cast<unsigned>(surfaceId) < surfaceRefractiveIndexInside.size())
+            {
+                return surfaceRefractiveIndexInside[static_cast<unsigned>(surfaceId)];
+            }
+            unsigned const legacyIndex = 2u * (localFace % 2u);
+            return legacyIndex < refractiveIndices.size() ? refractiveIndices[legacyIndex] : 1.0f;
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC float getSurfaceRefractiveIndexOutside(unsigned cell, unsigned localFace) const
+        {
+            int const surfaceId = cellFaceBoundaries[cell * numberOfFacesPerCell + localFace];
+            if(surfaceId > 0 && static_cast<unsigned>(surfaceId) < surfaceRefractiveIndexOutside.size())
+            {
+                return surfaceRefractiveIndexOutside[static_cast<unsigned>(surfaceId)];
+            }
+            unsigned const legacyIndex = 2u * (localFace % 2u) + 1u;
+            return legacyIndex < refractiveIndices.size() ? refractiveIndices[legacyIndex] : 1.0f;
+        }
     };
 
     template<alpaka::onHost::concepts::Device T_Device>
@@ -304,6 +340,9 @@ namespace hase::core
             std::vector<unsigned> claddingCellTypes,
             std::vector<float> refractiveIndices,
             std::vector<float> reflectivities,
+            std::vector<float> surfaceReflectivities,
+            std::vector<float> surfaceRefractiveIndexInside,
+            std::vector<float> surfaceRefractiveIndexOutside,
             std::vector<float> totalReflectionAngles,
             std::vector<unsigned> cellPointIndices,
             std::vector<unsigned> cellTypes,
@@ -324,6 +363,9 @@ namespace hase::core
             , claddingCellTypes(hase::alpakaUtils::toDevice(m_queue, claddingCellTypes))
             , refractiveIndices(hase::alpakaUtils::toDevice(m_queue, refractiveIndices))
             , reflectivities(hase::alpakaUtils::toDevice(m_queue, reflectivities))
+            , surfaceReflectivities(hase::alpakaUtils::toDevice(m_queue, surfaceReflectivities))
+            , surfaceRefractiveIndexInside(hase::alpakaUtils::toDevice(m_queue, surfaceRefractiveIndexInside))
+            , surfaceRefractiveIndexOutside(hase::alpakaUtils::toDevice(m_queue, surfaceRefractiveIndexOutside))
             , totalReflectionAngles(hase::alpakaUtils::toDevice(m_queue, totalReflectionAngles))
             , cellPointIndices(hase::alpakaUtils::toDevice(m_queue, cellPointIndices))
             , cellTypes(hase::alpakaUtils::toDevice(m_queue, cellTypes))
@@ -362,6 +404,15 @@ namespace hase::core
                 std::span<unsigned const>(claddingCellTypes.data(), claddingCellTypes.getMdSpan().getExtents().x()),
                 std::span<float const>(refractiveIndices.data(), refractiveIndices.getMdSpan().getExtents().x()),
                 std::span<float const>(reflectivities.data(), reflectivities.getMdSpan().getExtents().x()),
+                std::span<float const>(
+                    surfaceReflectivities.data(),
+                    surfaceReflectivities.getMdSpan().getExtents().x()),
+                std::span<float const>(
+                    surfaceRefractiveIndexInside.data(),
+                    surfaceRefractiveIndexInside.getMdSpan().getExtents().x()),
+                std::span<float const>(
+                    surfaceRefractiveIndexOutside.data(),
+                    surfaceRefractiveIndexOutside.getMdSpan().getExtents().x()),
                 std::span<float const>(
                     totalReflectionAngles.data(),
                     totalReflectionAngles.getMdSpan().getExtents().x()),
@@ -411,6 +462,9 @@ namespace hase::core
         T_Buffer<unsigned> claddingCellTypes;
         T_Buffer<float> refractiveIndices;
         T_Buffer<float> reflectivities;
+        T_Buffer<float> surfaceReflectivities;
+        T_Buffer<float> surfaceRefractiveIndexInside;
+        T_Buffer<float> surfaceRefractiveIndexOutside;
         T_Buffer<float> totalReflectionAngles;
         T_Buffer<unsigned> cellPointIndices;
         T_Buffer<unsigned> cellTypes;
@@ -449,6 +503,9 @@ namespace hase::core
         std::vector<unsigned> claddingCellTypes;
         std::vector<float> refractiveIndices;
         std::vector<float> reflectivities;
+        std::vector<float> surfaceReflectivities;
+        std::vector<float> surfaceRefractiveIndexInside;
+        std::vector<float> surfaceRefractiveIndexOutside;
         std::vector<float> totalReflectionAngles;
         std::vector<unsigned> cellPointIndices;
         std::vector<unsigned> cellTypes;
@@ -504,6 +561,9 @@ namespace hase::core
             std::vector<unsigned> claddingCellTypes,
             std::vector<float> refractiveIndices,
             std::vector<float> reflectivities,
+            std::vector<float> surfaceReflectivities,
+            std::vector<float> surfaceRefractiveIndexInside,
+            std::vector<float> surfaceRefractiveIndexOutside,
             float nTot,
             float crystalTFluo,
             unsigned claddingNumber,
@@ -518,6 +578,9 @@ namespace hase::core
             , claddingCellTypes(std::move(claddingCellTypes))
             , refractiveIndices(std::move(refractiveIndices))
             , reflectivities(std::move(reflectivities))
+            , surfaceReflectivities(std::move(surfaceReflectivities))
+            , surfaceRefractiveIndexInside(std::move(surfaceRefractiveIndexInside))
+            , surfaceRefractiveIndexOutside(std::move(surfaceRefractiveIndexOutside))
             , cellPointIndices(std::move(cellPointIndices))
             , cellTypes(std::move(cellTypes))
             , cellFaces(std::move(cellFaces))
@@ -607,6 +670,9 @@ namespace hase::core
                 claddingCellTypes,
                 refractiveIndices,
                 reflectivities,
+                surfaceReflectivities,
+                surfaceRefractiveIndexInside,
+                surfaceRefractiveIndexOutside,
                 totalReflectionAngles,
                  cellPointIndices,
                  cellTypes,

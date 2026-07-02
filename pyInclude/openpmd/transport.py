@@ -426,6 +426,7 @@ def _fieldContext(gainMedium):
             numberOfLevels=number_of_levels,
             thickness=float(getattr(topology, "structuredThickness", 0.0)),
             numberOfSamplePoints=topology.numberOfSamplePoints,
+            numberOfSurfaceDomains=int(np.max(topology.faceBoundaries[topology.faceBoundaries > 0]) + 1) if np.any(topology.faceBoundaries > 0) else 0,
         )
     raise TypeError("PhiASE openPMD transport requires a Tet4 VolumeTopology")
 
@@ -751,6 +752,7 @@ def _explicit_topology_context(topology):
         numberOfFacesPerCell=topology.numberOfFacesPerCell,
         numberOfCellVertices=4,
         numberOfSamplePoints=topology.numberOfSamplePoints,
+        numberOfSurfaceDomains=int(np.max(topology.faceBoundaries[topology.faceBoundaries > 0]) + 1) if np.any(topology.faceBoundaries > 0) else 0,
     )
 
 

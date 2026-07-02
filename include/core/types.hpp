@@ -277,6 +277,9 @@ namespace hase::core
         bool useReflections;
         bool monochromatic = false;
         unsigned spectral;
+        unsigned reflectionMaxIterations = 8u;
+        double reflectionTolerance = 1.0e-4;
+        unsigned surfaceReservoirSize = 32u;
     };
 
 

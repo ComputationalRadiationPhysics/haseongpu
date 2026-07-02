@@ -43,6 +43,10 @@ def _shapeInterface(context):
 
 
 def _shapeSurface(context):
+    return (getattr(context, "numberOfSurfaceDomains", 0),)
+
+
+def _shapeCellInterface(context):
     return (context.numberOfTriangles, 2)
 
 
@@ -64,7 +68,8 @@ _SHAPES_BY_AXES = {
     ("cell", "layer"): _shapeCellLayer,
     ("point", "level"): _shapePointLevel,
     ("interface",): _shapeInterface,
-    ("cell", "interface"): _shapeSurface,
+    ("cell", "interface"): _shapeCellInterface,
+    ("surface",): _shapeSurface,
     ("wavelength",): _shapeWavelength,
 }
 

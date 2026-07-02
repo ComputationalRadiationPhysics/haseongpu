@@ -270,3 +270,42 @@ def test_defineFieldValidatesSpec():
     medium.defineField("temperature", entity="prism", values=backendFlat(flat), unit="K", dynamic=True)
     assert medium.customFields["temperature"].dynamic is True
     np.testing.assert_array_equal(medium.getPrisms()["temperature"].reshape(-1, order="F"), flat)
+
+def test_volume_surface_optics_are_indexed_by_physical_surface_id():
+    import numpy as np
+    from pyInclude.geometry import GainMedium, VolumeTopology
+
+    points = np.array(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        dtype=np.float64,
+    )
+    cells = np.array([[0, 1, 2, 3]], dtype=np.uint32)
+    topology = VolumeTopology.fromTetrahedra(points, cells, faceBoundaries=np.array([[7, -1, -1, -1]], dtype=np.int32))
+    medium = GainMedium(topology).withPhysicalProperties(
+        surfaceReflectivity=np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.65], dtype=np.float32),
+        surfaceRefractiveIndexInside=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5], dtype=np.float32),
+        surfaceRefractiveIndexOutside=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+    )
+
+    assert medium.get("surfaceReflectivity").expectedShape == (8,)
+    assert medium.get("surface_reflectivity").value[7] == np.float32(0.65)
+    names = {field.name for field in medium.openPmdFields()}
+    assert {"surfaceReflectivity", "surfaceRefractiveIndexInside", "surfaceRefractiveIndexOutside"} <= names
+
+
+def test_phi_ase_reflection_controls_are_openpmd_attributes():
+    from pyInclude.simulation import PhiASE
+
+    phi = PhiASE(
+        useReflections=True,
+        reflectionMaxIterations=3,
+        reflectionTolerance=2.5e-3,
+        surfaceReservoirSize=5,
+        forwardRayLength=1.0,
+    )
+    attributes = phi.openPmdAttributes(numberOfSamples=4)
+
+    assert attributes["useReflections"] is True
+    assert attributes["reflectionMaxIterations"] == 3
+    assert attributes["reflectionTolerance"] == 2.5e-3
+    assert attributes["surfaceReservoirSize"] == 5

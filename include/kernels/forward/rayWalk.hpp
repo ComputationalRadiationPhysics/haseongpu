@@ -68,6 +68,65 @@ namespace hase::kernels::forward
             mesh.getPoint(static_cast<unsigned>(p2)));
     }
 
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point normalize(hase::core::Point const value)
+    {
+        double const length = value.euclidLength();
+        if(length <= std::numeric_limits<double>::epsilon())
+        {
+            return hase::core::Point{0.0, 0.0, 0.0};
+        }
+        return value * (1.0 / length);
+    }
+
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point faceCentroid(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        unsigned const localFace)
+    {
+        hase::core::Point sum{0.0, 0.0, 0.0};
+        for(unsigned localVertex = 0u; localVertex < hase::core::tet4FaceWidth; ++localVertex)
+        {
+            int const point = mesh.getCellFacePoint(tet, localFace, localVertex);
+            if(point < 0)
+            {
+                return sum;
+            }
+            sum = sum + mesh.getPoint(static_cast<unsigned>(point));
+        }
+        return sum * (1.0 / static_cast<double>(hase::core::tet4FaceWidth));
+    }
+
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point outwardFaceNormal(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        unsigned const localFace)
+    {
+        int const p0 = mesh.getCellFacePoint(tet, localFace, 0u);
+        int const p1 = mesh.getCellFacePoint(tet, localFace, 1u);
+        int const p2 = mesh.getCellFacePoint(tet, localFace, 2u);
+        if(p0 < 0 || p1 < 0 || p2 < 0)
+        {
+            return hase::core::Point{0.0, 0.0, 0.0};
+        }
+        hase::core::Point const a = mesh.getPoint(static_cast<unsigned>(p0));
+        hase::core::Point const b = mesh.getPoint(static_cast<unsigned>(p1));
+        hase::core::Point const c = mesh.getPoint(static_cast<unsigned>(p2));
+        hase::core::Point normal = normalize(hase::core::cross(b - a, c - a));
+        hase::core::Point const centroid = (a + b + c) * (1.0 / 3.0);
+        if(hase::core::dot(normal, mesh.getCellCenterPoint(tet) - centroid) > 0.0)
+        {
+            normal = normal * -1.0;
+        }
+        return normal;
+    }
+
+    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point reflectedDirection(
+        hase::core::Point const direction,
+        hase::core::Point const outwardNormal)
+    {
+        return normalize(direction - outwardNormal * (2.0 * hase::core::dot(direction, outwardNormal)));
+    }
+
     [[nodiscard]] inline ALPAKA_FN_ACC double faceIntersectionLength(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,

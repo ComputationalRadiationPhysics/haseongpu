@@ -37,6 +37,9 @@ SIMULATION_ATTRIBUTE_SPECS = (
     ExtensionAttributeSpec("repetitions", "repetitions", "int", unit="count", unitDimension=unitDimension.repetitions),
     ExtensionAttributeSpec("adaptiveSteps", "adaptive_steps", "int", unit="count", unitDimension=unitDimension.adaptiveSteps),
     ExtensionAttributeSpec("useReflections", "use_reflections", "bool", unitDimension=unitDimension.useReflections),
+    ExtensionAttributeSpec("reflectionMaxIterations", "reflection_max_iterations", "int", unit="count", unitDimension=unitDimension.reflectionMaxIterations),
+    ExtensionAttributeSpec("reflectionTolerance", "reflection_tolerance", "float", unitDimension=unitDimension.reflectionTolerance),
+    ExtensionAttributeSpec("surfaceReservoirSize", "surface_reservoir_size", "int", unit="count", unitDimension=unitDimension.surfaceReservoirSize),
     ExtensionAttributeSpec("spectralResolution", "spectral_resolution", "int", unit="count", unitDimension=unitDimension.spectralResolution),
     ExtensionAttributeSpec("monochromatic", "monochromatic", "bool", unitDimension=unitDimension.monochromatic),
     ExtensionAttributeSpec(
@@ -118,6 +121,9 @@ class TriangleSchema(PrimitiveSchemaDefinition):
     claddingGroup = PrimitiveFieldSpec("claddingGroup", np.uint32, axes=("cell",), unitDimension=unitDimension.claddingGroup)
     refractiveIndex = PrimitiveFieldSpec("refractiveIndex", np.float32, axes=("interface",), unitDimension=unitDimension.refractiveIndex)
     reflectivity = PrimitiveFieldSpec("reflectivity", np.float32, axes=("cell", "interface"), unitDimension=unitDimension.reflectivity)
+    surfaceReflectivity = PrimitiveFieldSpec("surfaceReflectivity", "surface_reflectivity", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceReflectivity, backendRequired=False)
+    surfaceRefractiveIndexInside = PrimitiveFieldSpec("surfaceRefractiveIndexInside", "surface_refractive_index_inside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexInside, backendRequired=False)
+    surfaceRefractiveIndexOutside = PrimitiveFieldSpec("surfaceRefractiveIndexOutside", "surface_refractive_index_outside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexOutside, backendRequired=False)
 
 
 class PrismSchema(PrimitiveSchemaDefinition):

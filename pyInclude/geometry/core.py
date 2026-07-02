@@ -469,6 +469,29 @@ def _shape_refractive(_):
     return (4,)
 
 
+def _surface_domain_count(topology):
+    boundaries = getattr(topology, "faceBoundaries", None)
+    if boundaries is None:
+        return 0
+    positive = np.asarray(boundaries, dtype=np.int64)
+    positive = positive[positive > 0]
+    if positive.size == 0:
+        return 0
+    return int(positive.max()) + 1
+
+
+def _shape_surface_domains(topology):
+    return (_surface_domain_count(topology),)
+
+
+def _default_surface_reflectivity(topology):
+    return np.zeros(_surface_domain_count(topology), dtype=np.float32)
+
+
+def _default_surface_refractive_index(topology):
+    return np.ones(_surface_domain_count(topology), dtype=np.float32)
+
+
 def _shape_scalar(_):
     return ()
 
@@ -546,6 +569,27 @@ PHYSICAL_PROPERTY_SPECS = {
         ),
         default=_default_reflectivities,
     ),
+    "surfaceReflectivity": PhysicalPropertySpec(
+        name="surfaceReflectivity",
+        dtype=np.float32,
+        shape=_shape_surface_domains,
+        description="Reflectivity indexed by gmsh physical surface id; index 0 is unused.",
+        default=_default_surface_reflectivity,
+    ),
+    "surfaceRefractiveIndexInside": PhysicalPropertySpec(
+        name="surfaceRefractiveIndexInside",
+        dtype=np.float32,
+        shape=_shape_surface_domains,
+        description="Interior refractive index indexed by gmsh physical surface id; index 0 is unused.",
+        default=_default_surface_refractive_index,
+    ),
+    "surfaceRefractiveIndexOutside": PhysicalPropertySpec(
+        name="surfaceRefractiveIndexOutside",
+        dtype=np.float32,
+        shape=_shape_surface_domains,
+        description="Exterior refractive index indexed by gmsh physical surface id; index 0 is unused.",
+        default=_default_surface_refractive_index,
+    ),
     "nTot": PhysicalPropertySpec(
         name="nTot",
         dtype=np.float64,
@@ -581,6 +625,10 @@ PHYSICAL_PROPERTY_SPECS = {
 PROPERTY_ALIASES = {
     "refractiveIndicies": "refractiveIndices",
     "refractive_indices": "refractiveIndices",
+    "surfaceReflectivities": "surfaceReflectivity",
+    "surface_reflectivity": "surfaceReflectivity",
+    "surface_refractive_index_inside": "surfaceRefractiveIndexInside",
+    "surface_refractive_index_outside": "surfaceRefractiveIndexOutside",
     "cladding_cell_types": "claddingCellTypes",
     "cladding_absorption": "claddingAbsorption",
     "cladding_number": "claddingNumber",
@@ -1535,6 +1583,10 @@ class GainMedium:
             yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
             yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
             yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
+            if self.get("surfaceReflectivity").expectedShape[0] > 0:
+                yield OpenPmdScalarField("surfaceReflectivity", _flat(self.get("surfaceReflectivity").value, None, np.float32, "surfaceReflectivity"), context)
+                yield OpenPmdScalarField("surfaceRefractiveIndexInside", _flat(self.get("surfaceRefractiveIndexInside").value, None, np.float32, "surfaceRefractiveIndexInside"), context)
+                yield OpenPmdScalarField("surfaceRefractiveIndexOutside", _flat(self.get("surfaceRefractiveIndexOutside").value, None, np.float32, "surfaceRefractiveIndexOutside"), context)
             for field in self.customFields.values():
                 yield OpenPmdScalarField(field.spec.name, field.value, context, prefix="", spec=field.spec)
             return
