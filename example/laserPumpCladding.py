@@ -24,7 +24,6 @@ from HASEonGPU import (  # noqa: E402
     CrossSectionData,
     FrozenPhiAseRungeKutta4,
     GainMedium,
-    MeshTopology,
     VolumeTopology,
     backendFlat,
     PhiASE,
@@ -150,63 +149,19 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
     return vtkWedge(path, state, fields=fields)
 
 
-def _legacyWedgeToTet4Topology(topology):
-    topology._require_levels()
-    topology._require_thickness()
-    base_points = np.asarray(topology.points, dtype=np.float64)
-    triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
-    levels = int(topology.levels)
-    points = np.empty((topology.numberOfPoints * levels, 3), dtype=np.float64)
-    for level, z in enumerate(topology.levelCoordinates()):
-        start = level * topology.numberOfPoints
-        stop = start + topology.numberOfPoints
-        points[start:stop, :2] = base_points
-        points[start:stop, 2] = z
-
-    split = np.asarray([[0, 1, 2, 3], [1, 4, 2, 3], [2, 4, 5, 3]], dtype=np.uint32)
-    cells = np.empty((topology.numberOfTriangles * (levels - 1) * 3, 4), dtype=np.uint32)
-    out = 0
-    for level in range(levels - 1):
-        lower = level * topology.numberOfPoints
-        upper = (level + 1) * topology.numberOfPoints
-        for tri in triangles:
-            wedge = np.asarray(
-                [tri[0] + lower, tri[1] + lower, tri[2] + lower, tri[0] + upper, tri[1] + upper, tri[2] + upper],
-                dtype=np.uint32,
-            )
-            cells[out:out + 3] = wedge[split]
-            out += 3
-
-    volume = VolumeTopology.fromTetrahedra(
-        points,
-        cells,
-        metadata={
-            "source": topology.metadata.get("source", "legacy wedge"),
-            "format": "legacy-wedge-to-tet4",
-            "structured": {
-                "numberOfPoints": topology.numberOfPoints,
-                "numberOfLevels": levels,
-                "thickness": float(topology.thickness),
-            },
-        },
-    )
-    volume.samplePoints = points
-    return volume
-
 
 def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5.5):
     materialPath = scriptDir / "data" / "pt.vtk"
-    legacyTopology = MeshTopology.fromVtk(materialPath)
+    topology = VolumeTopology.fromVtk(materialPath)
 
-    if numberOfLevels is not None and legacyTopology.levels != numberOfLevels:
+    if numberOfLevels is not None and topology.structuredNumberOfLevels != numberOfLevels:
         raise ValueError(
-            f"{materialPath} contains {legacyTopology.levels} levels, expected {numberOfLevels}"
+            f"{materialPath} contains {topology.structuredNumberOfLevels} levels, expected {numberOfLevels}"
         )
-    if thickness is not None and not np.isclose(legacyTopology.thickness, thickness):
+    if thickness is not None and not np.isclose(topology.structuredThickness, thickness):
         raise ValueError(
-            f"{materialPath} has thickness {legacyTopology.thickness}, expected {thickness}"
+            f"{materialPath} has thickness {topology.structuredThickness}, expected {thickness}"
         )
-    topology = _legacyWedgeToTet4Topology(legacyTopology)
     return GainMedium(topology=topology).withPhysicalProperties(
         betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
         betaVolume=backendFlat(np.zeros(topology.numberOfCells, dtype=np.float64)),

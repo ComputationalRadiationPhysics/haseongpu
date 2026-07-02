@@ -51,7 +51,7 @@ def test_meshTopologyCanBeLoadedFromVtk(tmp_path, smallGainMedium):
 
 def test_bundledExampleVtkFixturesExposeFrontendFields():
     fixtures = {
-        "pt.vtk": (421, 812, 10),
+        "pt.vtk": (421, 21924, 10),
         "cuboid.vtk": (321, 600, 10),
         "cylindrical.vtk": (421, 812, 10),
     }
@@ -63,7 +63,8 @@ def test_bundledExampleVtkFixturesExposeFrontendFields():
         assert medium.numberOfTriangles == triangles
         assert medium.numberOfLevels == levels
         assert np.asarray(medium.get("betaCells").value).size == points * levels
-        assert np.asarray(medium.get("betaVolume").value).size == triangles * (levels - 1)
+        expected_volume_size = triangles if hasattr(medium.topology, "cellPointIndices") else triangles * (levels - 1)
+        assert np.asarray(medium.get("betaVolume").value).size == expected_volume_size
         assert np.asarray(medium.get("claddingCellTypes").value).shape == (triangles,)
         assert np.asarray(medium.get("refractiveIndices").value).shape == (4,)
         assert np.asarray(medium.get("reflectivities").value).size == triangles * 2
