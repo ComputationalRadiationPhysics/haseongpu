@@ -52,8 +52,46 @@ else()
     set(HASE_USE_SYSTEM_OPENPMD ON)
 endif()
 
-set(HASE_OPENPMD_FILE_EXTENSION "sst")
-set(HASE_OPENPMD_TEST_FILE_EXTENSION "bp")
+option(
+    HASE_OPENPMD_USE_ADIOS2
+    "Enable ADIOS2 support in the HASE source-build openPMD provider"
+    ON
+)
+option(
+    HASE_OPENPMD_USE_HDF5
+    "Enable HDF5 support in the HASE source-build openPMD provider"
+    ON
+)
+option(
+    HASE_OPENPMD_USE_SST
+    "Enable ADIOS2 SST support in the HASE source-build openPMD provider"
+    ON
+)
+option(
+    HASE_OPENPMD_FETCH_ADIOS2
+    "Fetch and build pinned ADIOS2 for the HASE source-build openPMD provider"
+    ON
+)
+
+if(HASE_OPENPMD_USE_SST AND NOT HASE_OPENPMD_USE_ADIOS2)
+    message(
+        FATAL_ERROR
+        "HASE_OPENPMD_USE_SST requires HASE_OPENPMD_USE_ADIOS2=ON"
+    )
+endif()
+if(NOT HASE_OPENPMD_USE_ADIOS2 AND NOT HASE_OPENPMD_USE_HDF5)
+    message(
+        FATAL_ERROR
+        "Enable at least one openPMD backend: HASE_OPENPMD_USE_ADIOS2 or HASE_OPENPMD_USE_HDF5"
+    )
+endif()
+if(HASE_OPENPMD_USE_ADIOS2)
+    set(HASE_OPENPMD_FILE_EXTENSION "sst")
+    set(HASE_OPENPMD_TEST_FILE_EXTENSION "bp")
+else()
+    set(HASE_OPENPMD_FILE_EXTENSION "h5")
+    set(HASE_OPENPMD_TEST_FILE_EXTENSION "h5")
+endif()
 
 set(HASE_OPENPMD_GIT_REPOSITORY "https://github.com/openPMD/openPMD-api.git")
 set(HASE_OPENPMD_GIT_TAG "0.17.0")
@@ -155,10 +193,6 @@ endif()
 message(STATUS "Fetching pinned openPMD-api for the HASE openPMD transport")
 
 include(FetchContent)
-
-set(HASE_OPENPMD_USE_ADIOS2 ON)
-set(HASE_OPENPMD_USE_HDF5 ON)
-set(HASE_OPENPMD_USE_SST ON)
 
 if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_SUPERBUILD)
     message(STATUS "Fetching pinned HDF5 for the HASE openPMD transport")
@@ -285,7 +319,7 @@ if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_SUPERBUILD)
     list(PREPEND CMAKE_MODULE_PATH "${HASE_INTERNAL_FIND_MODULE_DIR}")
 endif()
 
-if(HASE_OPENPMD_USE_ADIOS2)
+if(HASE_OPENPMD_USE_ADIOS2 AND HASE_OPENPMD_FETCH_ADIOS2)
     message(STATUS "Fetching pinned ADIOS2 for the HASE openPMD transport")
     set(ADIOS2_USE_Fortran
         OFF
@@ -407,6 +441,22 @@ if(HASE_OPENPMD_USE_ADIOS2)
             FORCE
         )
     endif()
+elseif(HASE_OPENPMD_USE_ADIOS2)
+    message(STATUS "Using system ADIOS2 for the HASE openPMD transport")
+    find_package(ADIOS2 CONFIG REQUIRED)
+    if(HASE_OPENPMD_USE_SST)
+        if(DEFINED ADIOS2_HAVE_SST AND NOT ADIOS2_HAVE_SST)
+            message(
+                FATAL_ERROR
+                "HASE_OPENPMD_USE_SST=ON requires an ADIOS2 provider built with SST support"
+            )
+        elseif(NOT DEFINED ADIOS2_HAVE_SST)
+            message(
+                STATUS
+                "ADIOS2 provider did not expose ADIOS2_HAVE_SST; SST support cannot be confirmed at configure time"
+            )
+        endif()
+    endif()
 endif()
 
 set(openPMD_USE_ADIOS2
@@ -525,4 +575,16 @@ if(TARGET openPMD.py)
             INSTALL_RPATH_USE_LINK_PATH ON
     )
     add_custom_target(hase_openpmd_python DEPENDS openPMD.py)
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND openPMD_PYTHON_OUTPUT_DIRECTORY)
+        set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
+            "${openPMD_PYTHON_OUTPUT_DIRECTORY}"
+            CACHE PATH
+            "Directory containing the openpmd_api Python package matching openPMD::openPMD"
+            FORCE
+        )
+        message(
+            STATUS
+            "HASE built openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
+        )
+    endif()
 endif()

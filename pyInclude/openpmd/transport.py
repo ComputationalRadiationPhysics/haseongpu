@@ -159,6 +159,7 @@ OPENPMD_BACKENDS = {
     "hdf5": _BackendSpec("hdf5", ".h5", HDF5_CONFIG),
 }
 DEFAULT_OPENPMD_BACKEND = "adios-sst"
+HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
 
 
 def _normalize_backend(backend=None):
@@ -166,7 +167,7 @@ def _normalize_backend(backend=None):
     normalized = str(value).strip().lower()
     if normalized not in OPENPMD_BACKENDS:
         allowed = ", ".join(sorted(OPENPMD_BACKENDS))
-        raise ValueError(f"unsupported openPMD backend '{value}'; expected one of: {allowed}")
+        raise ValueError(f"unsupported openPMD backend '{value}'; expected one of: {allowed}. {HASE_CONFIGURE_HINT}")
     return normalized
 
 
@@ -363,7 +364,7 @@ def _io():
             "the calcPhiASE/openPMD C++ stack. Install openpmd-api in this Python "
             "environment with the same backend/MPI options as the openPMD C++ "
             "package found by CMake, or build HASEonGPU with "
-            "HASE_BUILD_OPENPMD_FROM_SOURCE=ON."
+            "HASE_BUILD_OPENPMD_FROM_SOURCE=ON. " + HASE_CONFIGURE_HINT
         ) from exc
     return io
 
@@ -377,19 +378,19 @@ def _ensure_backend_available(backend):
     if spec.name == "hdf5":
         if not variants.get("hdf5", False):
             raise RuntimeError(
-                "openPMD backend 'hdf5' requires openPMD-api built with HDF5 support"
+                "openPMD backend 'hdf5' requires openPMD-api built with HDF5 support. " + HASE_CONFIGURE_HINT
             )
     else:
         if not variants.get("adios2", False):
             raise RuntimeError(
-                f"openPMD backend '{spec.name}' requires openPMD-api built with ADIOS2 support"
+                f"openPMD backend '{spec.name}' requires openPMD-api built with ADIOS2 support. {HASE_CONFIGURE_HINT}"
             )
 
     extension = spec.suffix.lstrip(".")
     if extension not in extensions:
         raise RuntimeError(
             f"openPMD backend '{spec.name}' requires file extension '{extension}' "
-            f"but this openPMD-api build reports: {sorted(extensions)}"
+            f"but this openPMD-api build reports: {sorted(extensions)}. {HASE_CONFIGURE_HINT}"
         )
 
 
@@ -456,7 +457,7 @@ def _prefer_matching_openpmd_api(executable: Path):
             "compatible with the openPMD C++ provider used by calcPhiASE. "
             "Install/load a matching provider, set "
             "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory>, or set "
-            "HASE_OPENPMD_PYTHONPATH at runtime."
+            "HASE_OPENPMD_PYTHONPATH at runtime. " + HASE_CONFIGURE_HINT
         )
     if "openpmd_api" in sys.modules:
         active = Path(getattr(sys.modules["openpmd_api"], "__file__", "")).resolve()
@@ -470,7 +471,7 @@ def _prefer_matching_openpmd_api(executable: Path):
             "The openPMD transport requires the Python writer and C++ reader to use the same "
             "openPMD-api build/provider. Restart Python with the CMake-selected "
             "openpmd_api package first on PYTHONPATH, e.g. "
-            f"PYTHONPATH={candidates[0]}:$PYTHONPATH"
+            f"PYTHONPATH={candidates[0]}:$PYTHONPATH. {HASE_CONFIGURE_HINT}"
         )
 
     for candidate in candidates:
@@ -722,7 +723,7 @@ def findCalcPhiAse():
 
     raise FileNotFoundError(
         "Could not find an openPMD calcPhiASE binary in the installed package or HASE build tree. "
-        "Build the Python package or set HASE_CALCPHIASE."
+        "Build the Python package or set HASE_CALCPHIASE. " + HASE_CONFIGURE_HINT
     )
 
 

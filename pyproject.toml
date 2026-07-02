@@ -52,6 +52,9 @@ dev = [
     "pytest",
 ]
 
+[project.scripts]
+hase-configure = "pyInclude.config:main"
+
 [project.urls]
 Documentation = "https://haseongpu.readthedocs.io/en/latest/"
 Repository = "https://github.com/computationalradiationphysics/haseongpu"

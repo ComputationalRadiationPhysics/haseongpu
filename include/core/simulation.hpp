@@ -483,6 +483,7 @@ namespace hase::core
             {
                 std::cout << element << "\n";
             }
+            std::cout << "Run hase-configure to generate a matching backend/openPMD setup." << std::endl;
             std::cout << "\n------------------------------------------------------------------------------\n"
                       << std::endl;
         }

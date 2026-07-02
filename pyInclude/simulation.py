@@ -20,6 +20,27 @@ from .pumping import BetaIntegrationGaussianSolver, Constants
 from .timeIntegration import TimeDerivative, TimeIntegrationSolver
 
 
+HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
+
+
+def _preferredDefaultBackend():
+    try:
+        from .alpakaUtils import AlpakaBackends
+
+        backends = AlpakaBackends.all()
+    except Exception as exc:
+        raise RuntimeError(
+            "PhiASE.backend is not set and HASEonGPU could not query installed Alpaka "
+            f"backends. {HASE_CONFIGURE_HINT}"
+        ) from exc
+    if not backends:
+        raise RuntimeError(f"PhiASE.backend is not set and no Alpaka backend is available. {HASE_CONFIGURE_HINT}")
+    for marker in ("Host_Cpu_CpuSerial", "CpuSerial"):
+        for backend in backends:
+            if marker in backend:
+                return backend
+    return backends[0]
+
 
 @dataclass
 class PhiASE:
@@ -217,7 +238,7 @@ class PhiASE:
             "adaptiveSteps": self.adaptiveSteps,
             "useReflections": self.useReflections,
             "monochromatic": self.monochromatic,
-            "backend": "gpu" if self.backend is None else self.backend,
+            "backend": _preferredDefaultBackend() if self.backend is None else self.backend,
             "maxGpus": self.numDevices,
             "parallelMode": self.parallelMode,
             "minSampleRange": min_sample,

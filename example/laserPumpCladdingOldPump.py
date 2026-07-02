@@ -16,7 +16,7 @@ import numpy as np
 scriptDir = Path(__file__).resolve().parent
 repoRoot = scriptDir.parents[1]
 buildPythonRoot = repoRoot / "build" / "python"
-defaultPhiAseConfigPath = scriptDir / "config/phiASE.yaml"
+defaultPhiAseConfigPath = scriptDir.parent / "config/hase-phiase.yaml"
 
 sys.path.insert(0, str(repoRoot))
 if buildPythonRoot.is_dir():
@@ -210,7 +210,12 @@ def main(argv=None):
             "integration resolution."
         ),
     )
-    parser.add_argument("--phi-ase-config", type=Path, default=defaultPhiAseConfigPath)
+    parser.add_argument(
+        "--phi-ase-config",
+        type=Path,
+        default=defaultPhiAseConfigPath,
+        help="PhiASE run-control YAML. Defaults to config/hase-phiase.yaml.",
+    )
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     args = parser.parse_args(argv)
 
