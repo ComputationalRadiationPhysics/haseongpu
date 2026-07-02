@@ -53,8 +53,9 @@ namespace hase::core
     [[nodiscard]] inline double calcForwardBetaVolumeTotal(HostMesh const& hostMesh)
     {
         double total = 0.0;
-        unsigned const count
-            = std::min(static_cast<unsigned>(hostMesh.betaVolume.size()), static_cast<unsigned>(hostMesh.cellVolumes.size()));
+        unsigned const count = std::min(
+            static_cast<unsigned>(hostMesh.betaVolume.size()),
+            static_cast<unsigned>(hostMesh.cellVolumes.size()));
         for(unsigned volume = 0u; volume < count; ++volume)
         {
             total += hostMesh.betaVolume.at(volume) * static_cast<double>(hostMesh.cellVolumes.at(volume));
@@ -200,16 +201,16 @@ namespace hase::core
             double const scoreSum = rawResult.scoreSum.at(volume);
             if(volumeSize > 0.0 && rawResult.rayCount > 0u)
             {
-                double const estimate = scoreSum * betaVolumeTotal / (static_cast<double>(rawResult.rayCount) * volumeSize);
+                double const estimate
+                    = scoreSum * betaVolumeTotal / (static_cast<double>(rawResult.rayCount) * volumeSize);
                 result.phiAse.at(volume) = static_cast<float>(estimate);
-                result.mse.at(volume) = result.droppedRays[volume] == 0u
-                                           ? calcForwardStandardError(
-                                                 scoreSum,
-                                                 rawResult.scoreSquareSum.at(volume),
-                                                 rawResult.rayCount,
-                                                 betaVolumeTotal,
-                                                 volumeSize)
-                                           : std::numeric_limits<double>::max();
+                result.mse.at(volume) = result.droppedRays[volume] == 0u ? calcForwardStandardError(
+                                                                               scoreSum,
+                                                                               rawResult.scoreSquareSum.at(volume),
+                                                                               rawResult.rayCount,
+                                                                               betaVolumeTotal,
+                                                                               volumeSize)
+                                                                         : std::numeric_limits<double>::max();
             }
             else
             {

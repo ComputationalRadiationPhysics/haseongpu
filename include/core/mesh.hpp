@@ -211,11 +211,8 @@ namespace hase::core
             return claddingCellTypes[cell];
         }
 
-        [[nodiscard]] ALPAKA_FN_ACC double tetraVolume(
-            Point const a,
-            Point const b,
-            Point const c,
-            Point const d) const
+        [[nodiscard]] ALPAKA_FN_ACC double tetraVolume(Point const a, Point const b, Point const c, Point const d)
+            const
         {
             return alpaka::math::abs(dot(cross(b - a, c - a), d - a)) / 6.0;
         }
@@ -267,10 +264,7 @@ namespace hase::core
 
         [[nodiscard]] ALPAKA_FN_ACC Point getCellCenterPoint(unsigned cell) const
         {
-            return Point{
-                cellCenters[cell],
-                cellCenters[cell + numberOfCells],
-                cellCenters[cell + 2u * numberOfCells]};
+            return Point{cellCenters[cell], cellCenters[cell + numberOfCells], cellCenters[cell + 2u * numberOfCells]};
         }
 
         [[nodiscard]] ALPAKA_FN_ACC double getCellVolume(unsigned cell) const
@@ -551,9 +545,8 @@ namespace hase::core
             std::vector<float> angles(refractiveIndices.size() / 2u, 0.0f);
             for(unsigned i = 0; i + 1u < refractiveIndices.size(); i += 2u)
             {
-                angles.at(i / 2u)
-                    = 180.0f / static_cast<float>(M_PI)
-                      * alpaka::math::asin(refractiveIndices.at(i + 1u) / refractiveIndices.at(i));
+                angles.at(i / 2u) = 180.0f / static_cast<float>(M_PI)
+                                    * alpaka::math::asin(refractiveIndices.at(i + 1u) / refractiveIndices.at(i));
             }
             totalReflectionAngles = std::move(angles);
         }

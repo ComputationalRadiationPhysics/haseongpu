@@ -30,7 +30,7 @@ namespace hase::kernels::forward
             return index < mesh.numberOfCells ? index : mesh.numberOfCells - 1u;
         }
 
-        double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * totalVolume;
+        double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) *totalVolume;
         unsigned lower = 0u;
         unsigned upper = mesh.numberOfCells;
         while(lower < upper)
@@ -55,10 +55,13 @@ namespace hase::kernels::forward
     {
         if(mesh.numberOfCells == 0u || betaVolumeTotal <= 0.0 || mesh.betaVolumePrefix.size() != mesh.numberOfCells)
         {
-            return sampleVolumeByVolume(mesh, mesh.cellVolumePrefix.empty() ? 0.0 : mesh.cellVolumePrefix.back(), rndEngine);
+            return sampleVolumeByVolume(
+                mesh,
+                mesh.cellVolumePrefix.empty() ? 0.0 : mesh.cellVolumePrefix.back(),
+                rndEngine);
         }
 
-        double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * betaVolumeTotal;
+        double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) *betaVolumeTotal;
         unsigned lower = 0u;
         unsigned upper = mesh.numberOfCells;
         while(lower < upper)
@@ -93,7 +96,7 @@ namespace hase::kernels::forward
         alpaka::rand::engine::Philox4x32x10& rndEngine)
     {
         constexpr double pi = 3.14159265358979323846;
-        double const z = 2.0 * alpaka::rand::distribution::UniformReal<double>{}(rndEngine) - 1.0;
+        double const z = 2.0 * alpaka::rand::distribution::UniformReal<double>{}(rndEngine) -1.0;
         double const phi = 2.0 * pi * alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
         double const radius = alpaka::math::sqrt(alpaka::math::max(0.0, 1.0 - z * z));
         return hase::core::Point{radius * alpaka::math::cos(phi), radius * alpaka::math::sin(phi), z};

@@ -69,7 +69,8 @@ namespace hase::utils
                     << mesh.points.at(point + 2u * mesh.numberOfPoints) << std::endl;
         }
 
-        vtkFile << "CELLS " << mesh.numberOfCells << " " << mesh.numberOfCells * (hase::core::tet4VertexCount + 1u) << std::endl;
+        vtkFile << "CELLS " << mesh.numberOfCells << " " << mesh.numberOfCells * (hase::core::tet4VertexCount + 1u)
+                << std::endl;
         for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
         {
             vtkFile << hase::core::tet4VertexCount;

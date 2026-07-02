@@ -8,6 +8,7 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
+
 #include <core/geometry.hpp>
 
 #include <array>
