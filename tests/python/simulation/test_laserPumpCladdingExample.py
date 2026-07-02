@@ -26,12 +26,17 @@ def _vtkScalarNames(path):
 
 def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
     medium = laserPumpCladding.laserPumpCladdingMedium()
+    if hasattr(medium.topology, "numberOfCells"):
+        cell_count = medium.topology.numberOfCells
+    else:
+        cell_count = medium.topology.numberOfTriangles
 
     assert medium.get("reflectivities").expectedShape == (
-        medium.topology.numberOfCells,
+        cell_count,
         2,
     )
-    assert medium.get("reflectivities").value.size == medium.topology.numberOfCells * 2
+    reflectivities = medium.get("reflectivities").value.reshape((cell_count, 2), order="F")
+    assert reflectivities.shape == (cell_count, 2)
 
 
 @pytest.fixture
