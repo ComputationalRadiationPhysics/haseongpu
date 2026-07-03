@@ -273,7 +273,7 @@ PYBIND11_MODULE(HASEonGPU, m)
                     if(rc != 0)
                     {
                         throw std::runtime_error(
-                            "hase::core::pythonEntry failed with return code " + std::to_string(rc));
+                            "hase::core::startSimulation failed with return code " + std::to_string(rc));
                     }
                     return result;
                 });

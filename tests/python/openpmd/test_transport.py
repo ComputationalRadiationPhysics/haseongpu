@@ -1312,7 +1312,7 @@ def _openpmd_calc_phi_ase():
             return executable.resolve(), _build_dir_for_executable(executable)
     if configured:
         pytest.fail(f"configured openPMD calcPhiASE is missing, not executable, or stale: {configured}")
-    pytest.skip("no current openPMD calcPhiASE binary found; build HASE_BUILD_PhiAse with src/openpmd_main.cpp or set HASE_CALCPHIASE")
+    pytest.skip("no current openPMD calcPhiASE binary found; build calcPhiASE from src/openpmd_main.cpp or set HASE_CALCPHIASE")
 
 
 @pytest.mark.integration

@@ -21,6 +21,19 @@ def _vtkScalarNames(path):
     return {tokens[index + 1] for index, token in enumerate(tokens) if token.upper() == "SCALARS"}
 
 
+def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
+    medium = laserPumpCladding.laserPumpCladdingMedium()
+
+    assert medium.get("reflectivities").expectedShape == (
+        medium.topology.numberOfTriangles,
+        2,
+    )
+    assert medium.getTriangles()["reflectivities"].shape == (
+        medium.topology.numberOfTriangles,
+        2,
+    )
+
+
 class _NoPumpSolver:
     def step(self, input, pump):
         return np.asarray(input["betaCell"], dtype=np.float64).copy()

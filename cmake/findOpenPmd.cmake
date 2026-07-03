@@ -85,8 +85,11 @@ if(NOT HASE_OPENPMD_USE_ADIOS2 AND NOT HASE_OPENPMD_USE_HDF5)
         "Enable at least one openPMD backend: HASE_OPENPMD_USE_ADIOS2 or HASE_OPENPMD_USE_HDF5"
     )
 endif()
-if(HASE_OPENPMD_USE_ADIOS2)
+if(HASE_OPENPMD_USE_ADIOS2 AND HASE_OPENPMD_USE_SST)
     set(HASE_OPENPMD_FILE_EXTENSION "sst")
+    set(HASE_OPENPMD_TEST_FILE_EXTENSION "bp")
+elseif(HASE_OPENPMD_USE_ADIOS2)
+    set(HASE_OPENPMD_FILE_EXTENSION "bp")
     set(HASE_OPENPMD_TEST_FILE_EXTENSION "bp")
 else()
     set(HASE_OPENPMD_FILE_EXTENSION "h5")
@@ -281,6 +284,15 @@ if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_SUPERBUILD)
         GIT_TAG "${HASE_HDF5_GIT_TAG}"
     )
     FetchContent_MakeAvailable(HDF5)
+    if(NOT DEFINED HDF5_VERSION OR "${HDF5_VERSION}" STREQUAL "")
+        string(REGEX REPLACE "^hdf5_" "" HDF5_VERSION "${HASE_HDF5_GIT_TAG}")
+        set(HDF5_VERSION
+            "${HDF5_VERSION}"
+            CACHE STRING
+            "HDF5 version provided by the HASE FetchContent build"
+            FORCE
+        )
+    endif()
 
     set(HASE_INTERNAL_HDF5_INCLUDE_DIRS
         "${hdf5_SOURCE_DIR}/src"
@@ -299,7 +311,7 @@ if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_SUPERBUILD)
         "endif()\n"
         "set(HDF5_FOUND TRUE)\n"
         "set(HDF5_C_FOUND TRUE)\n"
-        "set(HDF5_VERSION \"1.14.6\")\n"
+        "set(HDF5_VERSION \"${HDF5_VERSION}\")\n"
         "set(HDF5_LIBRARIES hdf5-shared)\n"
         "set(HDF5_C_LIBRARIES hdf5-shared)\n"
         "set(HDF5_INCLUDE_DIRS \"${HASE_INTERNAL_HDF5_INCLUDE_DIRS}\")\n"

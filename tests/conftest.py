@@ -174,7 +174,7 @@ def smallGainMedium(smallTopology):
         betaCells=np.zeros((4, 3)),
         claddingCellTypes=np.zeros(2, dtype=np.uint32),
         refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((2, 2)),
+        reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
         nTot=2.76e20,
         crystalTFluo=9.5e-4,
         claddingNumber=1,

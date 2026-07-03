@@ -8,8 +8,9 @@ use one or more devices from the node on which that rank is running.
 Dependencies and Build Configuration
 ------------------------------------
 
-MPI execution requires an MPI implementation (``OpenMPI >= 4.0``) and an HASEonGPU build with MPI
-support enabled.  The CMake option ``DISABLE_MPI`` controls this at build time:
+MPI execution requires an MPI C++ implementation discoverable by CMake and an
+HASEonGPU build with MPI support enabled.  The CMake option ``DISABLE_MPI``
+controls this at build time:
 
 ``DISABLE_MPI=AUTO``
    Tries to find MPI.  If MPI cannot be found, the build continues without MPI
@@ -21,9 +22,10 @@ support enabled.  The CMake option ``DISABLE_MPI`` controls this at build time:
 ``DISABLE_MPI=ON``
    Builds without MPI support.
 
-An MPI-enabled build links against the MPI C++ target found by CMake.  A
-runtime started from openPMD metadata with ``parallelMode = mpi`` exits with an
-error if the binary was built without MPI support.
+An MPI-enabled build links against the ``MPI::MPI_CXX`` target found by
+``find_package(MPI COMPONENTS CXX)``.  A runtime started from openPMD metadata
+with ``parallelMode = mpi`` exits with an error if the binary was built without
+MPI support.
 
 Execution Model
 ---------------

@@ -113,8 +113,9 @@ def testGainMediumOwnsPhysicalProperties():
 def testTopLevelFrontendDoesNotExposeLegacyBackendAdapters():
     import HASEonGPU
 
-    for name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh", "calcPhiASE"):
+    for name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh"):
         assert not hasattr(HASEonGPU, name)
+    assert hasattr(HASEonGPU, "calcPhiASE")
 
 
 def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
