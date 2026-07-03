@@ -9,7 +9,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "HASEonGPU"
-version = "2.0.1"
+version = "2.0.2"
 description = "Python frontend and compiled C++ backend for HASEonGPU ASE simulations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -65,7 +65,7 @@ wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
 [[tool.scikit-build.generate]]
 path = "HASEonGPU.py"
 template = """
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 import HASEonGPU_Bindings
 from HASEonGPU_Bindings import *
 from pyInclude import *
