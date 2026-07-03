@@ -230,7 +230,7 @@ namespace hase::kernels::forward
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
                 unsigned const sigmaIndex = GenRndSigmas{}(spectrum.lambdaResolution, rndEngine);
-                walkRay(
+                walkVolumeSeededForwardRay(
                     acc,
                     mesh,
                     tet,
@@ -244,7 +244,7 @@ namespace hase::kernels::forward
             }
         }
 
-        ALPAKA_FN_HOST_ACC void walkRay(
+        ALPAKA_FN_HOST_ACC void walkVolumeSeededForwardRay(
             auto const& acc,
             hase::core::DeviceMeshView const& mesh,
             unsigned tet,
@@ -252,8 +252,8 @@ namespace hase::kernels::forward
             hase::core::Point const direction,
             double remaining,
             double const sourceWeight,
-            double const sigmaA,
-            double const sigmaE,
+            double const sigmaAbsorption,
+            double const sigmaEmission,
             auto accumulation) const
         {
             int forbiddenFace = -1;
@@ -264,9 +264,10 @@ namespace hase::kernels::forward
                 assert(tet < mesh.numberOfCells);
                 double segmentLength = remaining;
                 int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
-                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
+                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
                 double contribution = sourceWeight * accumulatedGain;
-                contribution *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaA, sigmaE);
+                contribution
+                    *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
                 if(alpaka::math::isfinite(contribution))
                 {
                     alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
@@ -375,7 +376,7 @@ namespace hase::kernels::forward
             reservoir.sigmaIndices[index] = sigmaIndex;
         }
 
-        ALPAKA_FN_HOST_ACC void walkRay(
+        ALPAKA_FN_HOST_ACC void walkVolumeSeededForwardRay(
             auto const& acc,
             hase::core::DeviceMeshView const& mesh,
             unsigned tet,
@@ -383,8 +384,8 @@ namespace hase::kernels::forward
             hase::core::Point const direction,
             double remaining,
             double const sourceWeight,
-            double const sigmaA,
-            double const sigmaE,
+            double const sigmaAbsorption,
+            double const sigmaEmission,
             unsigned const sigmaIndex,
             auto accumulation,
             auto reservoir) const
@@ -396,9 +397,79 @@ namespace hase::kernels::forward
                 assert(tet < mesh.numberOfCells);
                 double segmentLength = remaining;
                 int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
-                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaA, sigmaE);
+                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
                 double contribution = sourceWeight * accumulatedGain;
-                contribution *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaA, sigmaE);
+                contribution
+                    *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
+                if(alpaka::math::isfinite(contribution))
+                {
+                    alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
+                    alpaka::onAcc::atomicAdd(acc, &accumulation.phiSquare[tet], contribution * contribution);
+                    alpaka::onAcc::atomicAdd(acc, &accumulation.volumeRayVisits[tet], 1u);
+                }
+                else
+                {
+                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
+                }
+
+                accumulatedGain *= segmentGain;
+                origin = advance(origin, direction, segmentLength);
+                remaining -= segmentLength;
+                if(nextFace < 0)
+                {
+                    break;
+                }
+                int const neighbor = mesh.getCellNeighbor(tet, static_cast<unsigned>(nextFace));
+                if(neighbor < 0)
+                {
+                    depositReflection(
+                        acc,
+                        mesh,
+                        tet,
+                        static_cast<unsigned>(nextFace),
+                        direction,
+                        sourceWeight * accumulatedGain,
+                        sigmaIndex,
+                        reservoir);
+                    break;
+                }
+                forbiddenFace = mesh.getCellNeighborLocalFace(tet, static_cast<unsigned>(nextFace));
+                tet = static_cast<unsigned>(neighbor);
+                constexpr double nudgeFactor = 64.0 * std::numeric_limits<double>::epsilon();
+                double const nudge = nudgeFactor * alpaka::math::max(remaining, segmentLength);
+                if(nudge > 0.0 && remaining > nudge)
+                {
+                    origin = advance(origin, direction, nudge);
+                    remaining -= nudge;
+                }
+            }
+        }
+
+        ALPAKA_FN_HOST_ACC void walkSurfaceSeededForwardRay(
+            auto const& acc,
+            hase::core::DeviceMeshView const& mesh,
+            unsigned tet,
+            hase::core::Point origin,
+            hase::core::Point const direction,
+            double remaining,
+            double const sourceWeight,
+            double const sigmaAbsorption,
+            double const sigmaEmission,
+            unsigned const sigmaIndex,
+            auto accumulation,
+            auto reservoir) const
+        {
+            int forbiddenFace = -1;
+            double accumulatedGain = 1.0;
+            while(remaining > SMALL)
+            {
+                assert(tet < mesh.numberOfCells);
+                double segmentLength = remaining;
+                int const nextFace = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace, segmentLength);
+                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
+                double contribution = sourceWeight * accumulatedGain;
+                contribution
+                    *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
                 if(alpaka::math::isfinite(contribution))
                 {
                     alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
@@ -467,7 +538,7 @@ namespace hase::kernels::forward
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
                 unsigned const sampledSigmaIndex = GenRndSigmas{}(spectrum.lambdaResolution, rndEngine);
-                walkRay(
+                walkVolumeSeededForwardRay(
                     acc,
                     mesh,
                     tet,
@@ -522,7 +593,7 @@ namespace hase::kernels::forward
                 double const nudge = 64.0 * std::numeric_limits<double>::epsilon() * forwardRayLength;
                 origin = advance(origin, direction, alpaka::math::max(nudge, 1.0e-12));
                 unsigned const sigmaIndex = inReservoir.sigmaIndices[slotIndex];
-                walker.walkRay(
+                walker.walkSurfaceSeededForwardRay(
                     acc,
                     mesh,
                     tet,
