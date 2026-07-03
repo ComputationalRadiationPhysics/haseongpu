@@ -373,8 +373,10 @@ jobs:
         run: |
           set -euxo pipefail
           cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
+          cp tests/python/imports/hase_frontend_smoketest.py /tmp/hase_frontend_smoketest.py
           cd /tmp
           python hase_runtime_smoketest.py
+          python hase_frontend_smoketest.py
 
       - name: Run laserPumpCladding example from installed package
         shell: bash
@@ -537,9 +539,11 @@ jobs:
               python -m pip install ".[test]"
 
             cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
+            cp tests/python/imports/hase_frontend_smoketest.py /tmp/hase_frontend_smoketest.py
             (
               cd /tmp
               python hase_runtime_smoketest.py
+              python hase_frontend_smoketest.py
             )
 
             mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
