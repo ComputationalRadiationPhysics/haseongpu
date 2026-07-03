@@ -1,5 +1,11 @@
 # Changelog
 
+## HASEonGPU 2.0.2
+
+Patch release for the 2.0 series with a Julia 1D SSG regression check for
+disabled-ASE laser-pump cladding output, synchronized release metadata, and
+CodeRabbit review configuration.
+
 ## HASEonGPU 2.0.1
 
 Patch release for the 2.0 series with pump-workflow fixes, Python API
