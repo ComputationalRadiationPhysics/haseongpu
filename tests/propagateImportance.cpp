@@ -26,34 +26,59 @@ using TestApis
     = std::decay_t<decltype(alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
 
 constexpr unsigned propagationBatchSize = 32u;
-constexpr unsigned propagationResultWidth = 3u;
+constexpr unsigned propagationResultWidth = 2u;
 
-hase::core::HostMesh constructDummyMesh(double betaVolume, float topReflectivity = 1.0f)
+hase::core::HostMesh constructDummyMesh(double betaVolume)
 {
     hase::core::HostMesh mesh;
-    mesh.numberOfTriangles = 1;
-    mesh.numberOfLevels = 2;
-    mesh.numberOfPoints = 3;
+    mesh.numberOfCells = 2u;
+    mesh.numberOfPrisms = mesh.numberOfCells;
+    mesh.numberOfMeshPoints = 5u;
+    mesh.numberOfPoints = 1u;
+    mesh.numberOfSamples = 1u;
+    mesh.numberOfTriangles = mesh.numberOfCells;
+    mesh.numberOfLevels = 1u;
+    mesh.numberOfFacesPerCell = hase::core::tet4FaceCount;
+    mesh.numberOfCellVertices = hase::core::tet4VertexCount;
     mesh.thickness = 1.0f;
-    mesh.points = {0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
-    mesh.triangleCenterX = {1.0 / 3.0};
-    mesh.triangleCenterY = {1.0 / 3.0};
-    mesh.trianglePointIndices = {0u, 1u, 2u};
-    mesh.triangleNormalPoint = {0u, 1u, 2u};
-    mesh.triangleNormalsX = {0.0, 1.0, -1.0};
-    mesh.triangleNormalsY = {-1.0, 1.0, 0.0};
-    mesh.forbiddenEdge = {-1, -1, -1};
-    mesh.triangleNeighbors = {-1, -1, -1};
-    mesh.triangleSurfaces = {0.5f};
-    mesh.betaVolume = {betaVolume};
+    mesh.points = {
+        1.0 / 3.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0 / 3.0,
+        1.0 / 3.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0 / 3.0,
+        0.0,
+        0.5,
+        0.5,
+        0.5,
+        1.0,
+    };
+    mesh.samplePoints = {1.0 / 3.0, 1.0 / 3.0, 0.25};
+    mesh.cellCenters = {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 0.375, 0.625};
+    mesh.cellPointIndices = {0u, 1u, 2u, 3u, 4u, 1u, 2u, 3u};
+    mesh.cellTypes = {hase::core::vtkTetraCellType, hase::core::vtkTetraCellType};
+    mesh.cellFaces = {
+        0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3, 4, 1, 2, 4, 2, 3, 4, 3, 1, 1, 3, 2,
+    };
+    mesh.cellNeighborCells = {-1, -1, -1, 1, -1, -1, -1, 0};
+    mesh.cellNeighborLocalFaces = {-1, -1, -1, 3, -1, -1, -1, 3};
+    mesh.cellFaceBoundaries = {-1, -1, -1, 0, -1, -1, -1, 0};
+    mesh.cellVolumes = {1.0f / 6.0f, 1.0f / 6.0f};
+    mesh.betaVolume = {betaVolume, betaVolume};
     mesh.betaCells = {betaVolume};
-    mesh.claddingCellTypes = {0u};
+    mesh.claddingCellTypes = {0u, 0u};
     mesh.refractiveIndices = {1.5f, 1.0f, 1.5f, 1.0f};
-    mesh.reflectivities = {1.0f, topReflectivity};
+    mesh.reflectivities = {1.0f, 1.0f};
     mesh.nTot = 1.0f;
     mesh.crystalTFluo = 1.0f;
     mesh.claddingNumber = 99u;
     mesh.claddingAbsorption = 0.0;
+    mesh.calcCellVolumePrefix();
     mesh.calcTotalReflectionAngles();
     return mesh;
 }
@@ -69,14 +94,12 @@ struct PropagationKernel
                 alpaka::IdxRange{propagationBatchSize}))
         {
             unsigned level = 0u;
-            unsigned triangle = 0u;
             double const zStart = 0.05 + 0.01 * static_cast<double>(id);
             hase::core::Ray ray{{1.0 / 3.0, 1.0 / 3.0, zStart}, {0.0, 0.0, 0.4}, 0.4f};
 
             auto const offset = id * propagationResultWidth;
-            result[offset] = hase::kernels::propagateRay(ray, &level, &triangle, mesh, 0.0, 0.0);
+            result[offset] = hase::kernels::propagateRay(ray, &level, mesh, 0.0, 0.0);
             result[offset + 1u] = static_cast<double>(level);
-            result[offset + 2u] = static_cast<double>(triangle);
         }
     }
 };
@@ -114,14 +137,13 @@ struct ReflectionKernel
         {
             double const z = 0.1 + 0.01 * static_cast<double>(id);
             hase::core::Point startPoint{1.0 / 3.0, 1.0 / 3.0, z};
-            hase::core::Point endPoint{1.0 / 3.0, 1.0 / 3.0, z};
+            hase::core::Point endPoint{1.0 / 3.0, 1.0 / 3.0, z + 0.2};
 
             result[id] = hase::kernels::propagateRayWithReflection(
                 startPoint,
                 endPoint,
-                1u,
-                hase::core::TOP_REFLECTION,
                 0u,
+                hase::core::TOP_REFLECTION,
                 0u,
                 mesh,
                 0.0,
@@ -203,12 +225,13 @@ TEMPLATE_LIST_TEST_CASE("propagateRay preserves neutral gain inside a prism", ""
         CAPTURE(id);
         REQUIRE(std::isfinite(result[offset]));
         CHECK(result[offset] == Catch::Approx(1.0));
-        CHECK(result[offset + 1u] == Catch::Approx(0.0));
-        CHECK(result[offset + 2u] == Catch::Approx(0.0));
+        double const zStart = 0.05 + 0.01 * static_cast<double>(id);
+        double const expectedCell = zStart + 0.4 >= 0.5 ? 1.0 : 0.0;
+        CHECK(result[offset + 1u] == Catch::Approx(expectedCell));
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("legacy top reflections use the final physical z plane", "", TestApis)
+TEMPLATE_LIST_TEST_CASE("hase::kernels::propagateRayWithReflection preserves no-reflection gain", "", TestApis)
 {
     auto cfg = TestType::makeDict();
     auto deviceSpec = cfg[alpaka::object::deviceSpec];
@@ -223,45 +246,14 @@ TEMPLATE_LIST_TEST_CASE("legacy top reflections use the final physical z plane",
 
     auto device = devSelector.makeDevice(0);
     auto mesh = constructDummyMesh(0.0);
-    auto const result = runReflectionPlaneKernel(mesh, device, exec);
+    auto const gain = runReflectionKernel(mesh, device, exec);
 
-    REQUIRE(result.size() == 2u);
-    CHECK(result[0] == Catch::Approx(0.0));
-    // Two planes at z=0 and z=1 form one physical layer, not a second
-    // virtual layer at z=2.
-    CHECK(result[1] == Catch::Approx(1.0));
-    CHECK(mesh.getMaxReflections(hase::core::TOP_REFLECTION) == 2u);
-}
-
-TEMPLATE_LIST_TEST_CASE("hase::kernels::propagateRayWithReflection responds to surface reflectivity", "", TestApis)
-{
-    auto cfg = TestType::makeDict();
-    auto deviceSpec = cfg[alpaka::object::deviceSpec];
-    auto exec = cfg[alpaka::object::exec];
-
-    auto devSelector = alpaka::onHost::makeDeviceSelector(deviceSpec);
-    if(!devSelector.isAvailable())
-    {
-        std::cout << "No device available for " << deviceSpec.getName() << std::endl;
-        return;
-    }
-
-    auto device = devSelector.makeDevice(0);
-    auto opaqueMesh = constructDummyMesh(0.0, 0.0f);
-    auto reflectiveMesh = constructDummyMesh(0.0, 1.0f);
-
-    auto const opaqueGain = runReflectionKernel(opaqueMesh, device, exec);
-    auto const reflectiveGain = runReflectionKernel(reflectiveMesh, device, exec);
-
-    REQUIRE(opaqueGain.size() == propagationBatchSize);
-    REQUIRE(reflectiveGain.size() == propagationBatchSize);
+    REQUIRE(gain.size() == propagationBatchSize);
     for(unsigned id = 0u; id < propagationBatchSize; ++id)
     {
         CAPTURE(id);
-        REQUIRE(std::isfinite(opaqueGain[id]));
-        REQUIRE(std::isfinite(reflectiveGain[id]));
-        CHECK(opaqueGain[id] == Catch::Approx(0.0));
-        CHECK(reflectiveGain[id] > opaqueGain[id]);
+        REQUIRE(std::isfinite(gain[id]));
+        CHECK(gain[id] == Catch::Approx(25.0));
     }
 }
 
@@ -314,7 +306,12 @@ TEMPLATE_LIST_TEST_CASE(
     auto hostPreImportance = alpaka::onHost::allocHostLike(preImportance);
     alpaka::onHost::memcpy(queue, hostPreImportance, preImportance);
     alpaka::onHost::wait(queue);
-    double const sumPhi = alpaka::onHost::data(hostPreImportance)[0];
+    auto const* preImportanceData = alpaka::onHost::data(hostPreImportance);
+    double sumPhi = 0.0;
+    for(unsigned i = 0u; i < reflectionSlices * deviceMesh.numberOfPrisms; ++i)
+    {
+        sumPhi += preImportanceData[i];
+    }
 
     unsigned rngStride = 0u;
     unsigned const distributedRays = hase::kernels::importanceSamplingDistribution(
@@ -338,9 +335,19 @@ TEMPLATE_LIST_TEST_CASE(
     REQUIRE(std::isfinite(sumPhi));
     REQUIRE(sumPhi > 0.0);
     CHECK(distributedRays == raysPerSample);
-    CHECK(alpaka::onHost::data(hostRaysPerPrism)[0] == raysPerSample);
-    CHECK(std::isfinite(alpaka::onHost::data(hostImportance)[0]));
-    CHECK(alpaka::onHost::data(hostImportance)[0] > 0.0);
+    auto const* raysPerPrismData = alpaka::onHost::data(hostRaysPerPrism);
+    auto const* importanceData = alpaka::onHost::data(hostImportance);
+    unsigned distributedRayCount = 0u;
+    unsigned cellsWithRays = 0u;
+    for(unsigned i = 0u; i < reflectionSlices * deviceMesh.numberOfPrisms; ++i)
+    {
+        distributedRayCount += raysPerPrismData[i];
+        cellsWithRays += raysPerPrismData[i] > 0u ? 1u : 0u;
+        CHECK(std::isfinite(importanceData[i]));
+        CHECK(importanceData[i] > 0.0);
+    }
+    CHECK(distributedRayCount == raysPerSample);
+    CHECK(cellsWithRays > 0u);
 }
 
 TEMPLATE_LIST_TEST_CASE("importance sampling distribution skips zero total pre-importance", "", TestApis)
