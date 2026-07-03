@@ -80,7 +80,7 @@ def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5
         betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
-        reflectivities=np.zeros((2, topology.numberOfTriangles), dtype=np.float32),
+        reflectivities=np.zeros((topology.numberOfTriangles, 2), dtype=np.float32),
         nTot=2 * 1.388e20,
         crystalTFluo=9.41e-4,
         claddingNumber=1,

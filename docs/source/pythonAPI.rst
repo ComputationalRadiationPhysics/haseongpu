@@ -80,6 +80,7 @@ Pump solvers, field helpers, and utilities
    TriangleSchema
    PrismSchema
    PrimitiveFieldSpec
+   unitDimension
    backendFlat
    vtkWedge
    writeGainMediumVtk

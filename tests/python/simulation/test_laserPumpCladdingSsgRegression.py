@@ -15,7 +15,7 @@ import pytest
 
 
 repoRoot = Path(__file__).resolve().parents[3]
-exampleScript = repoRoot / "example" / "python_example" / "laserPumpCladding.py"
+exampleScript = repoRoot / "example" / "laserPumpCladding.py"
 plotSsgScript = repoRoot / "scripts" / "plot_ssg.py"
 juliaReferencePath = repoRoot / "tests" / "data" / "julia1D.csv"
 TIME_STEP_S = 2.0e-5

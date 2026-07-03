@@ -66,14 +66,6 @@ The following CMake variables control important build options.
   * ``OFF``: require MPI support; configuration fails if MPI is missing
   * ``ON``: disable MPI support
 
-``HASE_BUILD_PhiAse``
-^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Builds the standalone ``calcPhiASE`` command-line executable.  Disable this
-  only when a build needs the libraries or Python package but not the binary.
-
 ``HASE_USE_SYSTEM_ALPAKA``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -217,7 +209,9 @@ them for redistributable wheels.
 The CMake build selects the openPMD provider, not the storage backend used by a
 simulation. Runtime backend selection belongs to Python or YAML through
 ``PhiASE.openpmdBackend`` or ``openpmd_backend``. The default runtime backend is
-``adios-sst``; accepted values are ``adios-sst``, ``adios``, and ``hdf5``.
+``adios-sst`` when the selected provider supports ADIOS2 SST. Bundled
+HDF5-only configurations use ``hdf5`` instead. Accepted values are
+``adios-sst``, ``adios``, and ``hdf5`` when the provider supports them.
 
 Provider modes are separate from runtime backend selection:
 

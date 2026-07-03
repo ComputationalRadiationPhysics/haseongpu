@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install pre-commit
         run: |
@@ -28,6 +30,7 @@ jobs:
 
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         config:
           - { compiler: gcc, version: "12", cuda: "no", hip: "no", container: "ubuntu:24.04", mpi: "on", mpi_ranks: "1", openpmd_backend: "adios" }
@@ -74,6 +77,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configure MPI matrix settings
         shell: bash
@@ -341,17 +346,9 @@ jobs:
         run: |
           set -euxo pipefail
           example_output_dir=/tmp/hase-laser-pump-cladding
-          mkdir -p "$example_output_dir"
-          cd "$example_output_dir"
-          python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
-            --backend Host_Cpu_CpuSerial \
-            --openpmd-backend "$OPENPMD_RUNTIME_BACKEND" \
-            --timeSteps 1 \
-            --pumpSteps 1 \
-            --vtk-output-dir "$example_output_dir" \
-            --min-sample-range 0 \
-            --max-sample-range 100 \
-            --rng-seed 5489
+          python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
+            "$OPENPMD_RUNTIME_BACKEND" \
+            "$example_output_dir"
 
       - name: Run CTest
         shell: bash
@@ -383,6 +380,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         shell: bash
@@ -466,19 +465,9 @@ jobs:
               --cmake-prefix-path "$openpmd_prefix;$adios2_prefix"
 
             example_output_dir="/tmp/hase-laser-pump-cladding-openpmd-${openpmd_version}-${backend}"
-            mkdir -p "$example_output_dir"
-            (
-              cd "$example_output_dir"
-              python "$GITHUB_WORKSPACE/example/laserPumpCladding.py" \
-                --backend Host_Cpu_CpuSerial \
-                --openpmd-backend "$backend" \
-                --timeSteps 1 \
-                --pumpSteps 1 \
-                --vtk-output-dir "$example_output_dir" \
-                --min-sample-range 0 \
-                --max-sample-range 100 \
-                --rng-seed 5489
-            )
+            python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
+              "$backend" \
+              "$example_output_dir"
           }
 
           for openpmd_version in $OPENPMD_PROVIDER_VERSIONS; do
