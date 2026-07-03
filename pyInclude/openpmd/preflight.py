@@ -52,6 +52,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Directory containing openPMDConfig.cmake, passed to openPMD_DIR.",
     )
     parser.add_argument(
+        "--adios2-dir",
+        default=None,
+        help="Directory containing ADIOS2Config.cmake, passed to ADIOS2_DIR.",
+    )
+    parser.add_argument(
+        "--hdf5-dir",
+        default=None,
+        help="Directory containing HDF5Config.cmake, passed to HDF5_DIR.",
+    )
+    parser.add_argument(
         "--cmake",
         default="cmake",
         help="CMake executable.",
@@ -155,6 +165,10 @@ def _cmake_probe(args: argparse.Namespace, errors: list[str]) -> dict[str, str]:
             command.append(f"-DCMAKE_PREFIX_PATH={args.cmake_prefix_path}")
         if args.openpmd_dir:
             command.append(f"-DopenPMD_DIR={args.openpmd_dir}")
+        if getattr(args, "adios2_dir", None):
+            command.append(f"-DADIOS2_DIR={args.adios2_dir}")
+        if getattr(args, "hdf5_dir", None):
+            command.append(f"-DHDF5_DIR={args.hdf5_dir}")
 
         env = os.environ.copy()
         try:

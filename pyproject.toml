@@ -46,10 +46,12 @@ build = [
 ]
 test = [
     "pytest",
+    "pytest-cov",
 ]
 dev = [
     "scikit-build-core>=0.10",
     "pytest",
+    "pytest-cov",
 ]
 
 [project.scripts]
