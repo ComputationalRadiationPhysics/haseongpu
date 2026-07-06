@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.24)
+project(HaseHdf5Provider LANGUAGES C)
+
+include(FetchContent)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared provider libraries" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "Disable HDF5 tests" FORCE)
+set(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib" CACHE STRING "Provider install RPATH" FORCE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON CACHE BOOL "Use provider link path RPATH" FORCE)
+
+set(HASE_PROVIDER_USE_MPI @HASE_PROVIDER_USE_MPI@)
+if(HASE_PROVIDER_USE_MPI)
+    find_package(MPI COMPONENTS C REQUIRED)
+    set(HASE_PROVIDER_USE_MPI_VALUE ON)
+else()
+    set(HASE_PROVIDER_USE_MPI_VALUE OFF)
+endif()
+
+set(HDF5_BUILD_CPP_LIB OFF CACHE BOOL "Disable HDF5 C++ bindings" FORCE)
+set(HDF5_BUILD_FORTRAN OFF CACHE BOOL "Disable HDF5 Fortran bindings" FORCE)
+set(HDF5_BUILD_HL_LIB OFF CACHE BOOL "Disable HDF5 high-level library" FORCE)
+set(HDF5_BUILD_JAVA OFF CACHE BOOL "Disable HDF5 Java bindings" FORCE)
+set(HDF5_BUILD_TOOLS OFF CACHE BOOL "Disable HDF5 tools" FORCE)
+set(HDF5_BUILD_EXAMPLES OFF CACHE BOOL "Disable HDF5 examples" FORCE)
+set(HDF5_ENABLE_SZIP_SUPPORT OFF CACHE BOOL "Disable HDF5 SZIP" FORCE)
+set(HDF5_ENABLE_Z_LIB_SUPPORT OFF CACHE BOOL "Disable HDF5 zlib" FORCE)
+set(HDF5_ENABLE_PARALLEL ${HASE_PROVIDER_USE_MPI_VALUE} CACHE BOOL "Enable parallel HDF5 with MPI" FORCE)
+set(HDF5_INSTALL_CMAKE_DIR lib/cmake/hdf5 CACHE STRING "Install HDF5 CMake package below the provider prefix" FORCE)
+
+FetchContent_Declare(
+    HDF5
+    GIT_REPOSITORY "@HASE_HDF5_GIT_REPOSITORY@"
+    GIT_TAG "@HASE_HDF5_GIT_TAG@"
+)
+FetchContent_MakeAvailable(HDF5)
+
+if(NOT DEFINED HDF5_VERSION OR "${HDF5_VERSION}" STREQUAL "")
+    string(REGEX REPLACE "^hdf5_" "" HDF5_VERSION "@HASE_HDF5_GIT_TAG@")
+    set(HDF5_VERSION
+        "${HDF5_VERSION}"
+        CACHE STRING
+        "HDF5 version provided by the HASE bundled provider"
+        FORCE
+    )
+endif()

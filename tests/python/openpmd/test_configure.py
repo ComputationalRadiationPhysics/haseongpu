@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import yaml
 
 from pyInclude import PhiASE
@@ -6,9 +8,12 @@ from pyInclude.config import (
     BUNDLED_ADIOS2_FETCH,
     BUNDLED_ADIOS2_OFF,
     BUNDLED_ADIOS2_SYSTEM,
+    BUNDLED_HDF5_OFF,
+    BUNDLED_HDF5_SYSTEM,
+    MPI_MODE_ON,
     OPENPMD_ADIOS2_NO,
     PROVIDER_BUNDLED,
-    PROVIDER_EXTERNAL,
+    PROVIDER_SYSTEM,
     WizardSelection,
     alpaka_backend_guidance,
     bundled_supported_openpmd_backends,
@@ -41,9 +46,18 @@ def test_preferred_openpmd_backend_uses_priority_and_validates_request():
     assert preferred_openpmd_backend(["adios", "hdf5"], "hdf5") == "hdf5"
 
 
-def test_bundled_adios2_off_is_hdf5_only():
-    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_OFF) == ["hdf5"]
-    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH) == ["adios-sst", "adios", "hdf5"]
+def test_bundled_defaults_include_adios2_and_hdf5():
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH) == [
+        "adios-sst",
+        "adios",
+        "hdf5",
+    ]
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_SYSTEM) == [
+        "adios-sst",
+        "adios",
+        "hdf5",
+    ]
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_OFF, BUNDLED_HDF5_SYSTEM) == ["hdf5"]
 
 
 def test_preferred_compute_backend_uses_cpu_backend_for_first_validation():
@@ -51,7 +65,7 @@ def test_preferred_compute_backend_uses_cpu_backend_for_first_validation():
     assert preferred_compute_backend(["Cuda_Gpu_CudaRt"]) == "Cuda_Gpu_CudaRt"
 
 
-def test_bundled_fetch_install_command_mentions_source_build_and_long_compile_note():
+def test_bundled_fetch_install_command_mentions_source_build():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -61,8 +75,12 @@ def test_bundled_fetch_install_command_mentions_source_build_and_long_compile_no
 
     command = install_command(selection)
 
-    assert "-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON" in command
+    assert "-DHASE_OPENPMD_PROVIDER=bundled" in command
     assert "-DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON" in command
+    assert "-DHASE_OPENPMD_USE_ADIOS2=ON" in command
+    assert "-DHASE_OPENPMD_FETCH_ADIOS2=ON" in command
+    assert "-DHASE_OPENPMD_USE_HDF5=ON" in command
+    assert "-DHASE_OPENPMD_FETCH_HDF5=ON" in command
 
 
 def test_bundled_install_command_can_skip_openpmd_python_bindings():
@@ -77,18 +95,35 @@ def test_bundled_install_command_can_skip_openpmd_python_bindings():
     assert "-DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON" not in install_command(selection)
 
 
-def test_bundled_hdf5_only_install_command_disables_adios2():
+def test_bundled_hdf5_only_install_command_uses_system_hdf5():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="hdf5",
         compute_backend="Host_Cpu_CpuSerial",
         bundled_adios2=BUNDLED_ADIOS2_OFF,
+        bundled_hdf5=BUNDLED_HDF5_SYSTEM,
     )
 
     command = install_command(selection)
 
     assert "-DHASE_OPENPMD_USE_ADIOS2=OFF" in command
+    assert "-DHASE_OPENPMD_USE_SST=OFF" in command
     assert "-DHASE_OPENPMD_USE_HDF5=ON" in command
+    assert "-DHASE_OPENPMD_FETCH_HDF5=OFF" in command
+
+
+def test_bundled_adios_only_install_command_disables_hdf5():
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios",
+        compute_backend="Host_Cpu_CpuSerial",
+        bundled_hdf5=BUNDLED_HDF5_OFF,
+    )
+
+    command = install_command(selection)
+
+    assert "-DHASE_OPENPMD_USE_HDF5=OFF" in command
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_OFF) == ["adios-sst", "adios"]
 
 
 def test_bundled_system_adios2_install_command_carries_adios2_paths():
@@ -108,9 +143,27 @@ def test_bundled_system_adios2_install_command_carries_adios2_paths():
     assert "-DADIOS2_DIR=/opt/adios2/lib/cmake/adios2" in command
 
 
-def test_external_openpmd_with_adios2_install_command_carries_provider_paths():
+def test_bundled_system_hdf5_install_command_carries_hdf5_paths():
     selection = WizardSelection(
-        provider=PROVIDER_EXTERNAL,
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="hdf5",
+        compute_backend="Host_Cpu_CpuSerial",
+        bundled_adios2=BUNDLED_ADIOS2_OFF,
+        bundled_hdf5=BUNDLED_HDF5_SYSTEM,
+        hdf5_prefix="/opt/hdf5",
+        hdf5_dir="/opt/hdf5/lib/cmake/hdf5",
+    )
+
+    command = install_command(selection)
+
+    assert "-DHASE_OPENPMD_FETCH_HDF5=OFF" in command
+    assert "-DCMAKE_PREFIX_PATH=/opt/hdf5" in command
+    assert "-DHDF5_DIR=/opt/hdf5/lib/cmake/hdf5" in command
+
+
+def test_system_openpmd_with_adios2_install_command_carries_provider_paths():
+    selection = WizardSelection(
+        provider=PROVIDER_SYSTEM,
         openpmd_backend="adios-sst",
         compute_backend="Host_Cpu_CpuSerial",
         cmake_prefix_path="/opt/openpmd",
@@ -120,13 +173,25 @@ def test_external_openpmd_with_adios2_install_command_carries_provider_paths():
 
     command = install_command(selection)
 
+    assert "-DHASE_OPENPMD_PROVIDER=system" in command
     assert "-DCMAKE_PREFIX_PATH=/opt/adios2;/opt/openpmd" in command
     assert "-DADIOS2_DIR=/opt/adios2/lib/cmake/adios2" in command
 
 
+def test_install_command_can_enable_mpi_build_support():
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios-sst",
+        compute_backend="Host_Cpu_CpuSerial",
+        mpi_mode=MPI_MODE_ON,
+    )
+
+    assert "-DDISABLE_MPI=OFF" in install_command(selection)
+
+
 def test_provider_notes_include_new_guidance_shape():
     selection = WizardSelection(
-        provider=PROVIDER_EXTERNAL,
+        provider=PROVIDER_SYSTEM,
         openpmd_backend="hdf5",
         compute_backend="Host_Cpu_CpuSerial",
         openpmd_adios2=OPENPMD_ADIOS2_NO,
@@ -166,6 +231,7 @@ def test_install_command_uses_env_var_and_enables_native_optimizations_by_defaul
 
     assert 'HASE_CONFIGURE_CMAKE_ARGS="' in command
     assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install .' in command
+    assert "-DDISABLE_MPI=ON" in command
     assert "-DHASE_NATIVE_OPTIMIZATIONS=ON" in command
 
 
@@ -210,6 +276,43 @@ def test_main_writes_default_yaml_under_config(tmp_path, monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Wrote config/hase-phiase.yaml" in output
     assert "configuration file is present under config/hase-phiase.yaml" in output
+
+
+def test_auto_provider_falls_back_to_bundled_when_cmake_missing(monkeypatch, capsys):
+    monkeypatch.setattr(
+        configure_module,
+        "available_alpaka_backends",
+        lambda: (["Host_Cpu_CpuSerial"], None),
+    )
+
+    assert configure_module.main(["--yes", "--cmake", "/definitely/missing/cmake", "--output", "-"]) == 0
+
+    captured = capsys.readouterr()
+    assert "-DHASE_OPENPMD_PROVIDER=bundled" in captured.out
+    assert "auto provider falling back to bundled" in captured.err
+    assert "CMake executable '/definitely/missing/cmake' was not found" in captured.err
+
+
+def test_bundled_provider_template_sets_fetched_dependency_versions():
+    hdf5_template = Path("cmake/HaseHdf5Provider.cmake.in").read_text(encoding="utf-8")
+    adios2_template = Path("cmake/HaseAdios2Provider.cmake.in").read_text(encoding="utf-8")
+
+    assert 'string(REGEX REPLACE "^v" "" ADIOS2_VERSION "@HASE_ADIOS2_GIT_TAG@")' in adios2_template
+    assert 'set(ADIOS2_VERSION' in adios2_template
+    assert 'string(REGEX REPLACE "^hdf5_" "" HDF5_VERSION "@HASE_HDF5_GIT_TAG@")' in hdf5_template
+    assert 'set(HDF5_VERSION' in hdf5_template
+
+
+def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
+    script = Path("cmake/findOpenPmd.cmake").read_text(encoding="utf-8")
+
+    hdf5_stage = "hase_openpmd_run_provider_stage(hdf5 HaseHdf5Provider.cmake.in)"
+    adios2_stage = "hase_openpmd_run_provider_stage(adios2 HaseAdios2Provider.cmake.in)"
+    openpmd_stage = "hase_openpmd_run_provider_stage(openpmd HaseOpenPmdProvider.cmake.in)"
+
+    assert "is not supported for the installable bundled openPMD provider" not in script
+    assert script.index(hdf5_stage) < script.index(openpmd_stage)
+    assert script.index(adios2_stage) < script.index(openpmd_stage)
 
 
 def test_interactive_install_prompt_defaults_to_yes(tmp_path, monkeypatch):

@@ -20,11 +20,18 @@ from .openpmd import preflight
 
 
 OPENPMD_BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
+PROVIDER_AUTO = "auto"
 PROVIDER_BUNDLED = "bundled"
-PROVIDER_EXTERNAL = "external"
+PROVIDER_SYSTEM = "system"
 BUNDLED_ADIOS2_FETCH = "fetch"
 BUNDLED_ADIOS2_OFF = "off"
 BUNDLED_ADIOS2_SYSTEM = "system"
+BUNDLED_HDF5_FETCH = "fetch"
+BUNDLED_HDF5_OFF = "off"
+BUNDLED_HDF5_SYSTEM = "system"
+MPI_MODE_AUTO = "auto"
+MPI_MODE_ON = "on"
+MPI_MODE_OFF = "off"
 OPENPMD_ADIOS2_AUTO = "auto"
 OPENPMD_ADIOS2_YES = "yes"
 OPENPMD_ADIOS2_NO = "no"
@@ -45,11 +52,15 @@ class WizardSelection:
     cmake_prefix_path: str | None = None
     openpmd_dir: str | None = None
     bundled_adios2: str = BUNDLED_ADIOS2_FETCH
+    bundled_hdf5: str = BUNDLED_HDF5_FETCH
     openpmd_adios2: str = OPENPMD_ADIOS2_AUTO
     bundled_python_bindings: bool = True
     native_optimizations: bool = True
+    mpi_mode: str = MPI_MODE_OFF
     adios2_prefix: str | None = None
     adios2_dir: str | None = None
+    hdf5_prefix: str | None = None
+    hdf5_dir: str | None = None
 
 
 def _csv(values):
@@ -65,8 +76,8 @@ def _clean_supported_backends(backends):
     return cleaned
 
 
-def _combined_cmake_prefix_path(openpmd_prefix=None, adios2_prefix=None):
-    entries = [entry for entry in (adios2_prefix, openpmd_prefix) if entry]
+def _combined_cmake_prefix_path(openpmd_prefix=None, adios2_prefix=None, hdf5_prefix=None):
+    entries = [entry for entry in (hdf5_prefix, adios2_prefix, openpmd_prefix) if entry]
     return ";".join(entries) if entries else None
 
 
@@ -95,11 +106,14 @@ def preferred_openpmd_backend(supported, requested=None):
     raise ValueError("no compatible openPMD runtime backend was confirmed")
 
 
-def bundled_supported_openpmd_backends(adios2_mode):
-    """Return source-build runtime backends implied by the bundled ADIOS2 choice."""
-    if adios2_mode == BUNDLED_ADIOS2_OFF:
-        return ["hdf5"]
-    return list(preflight.HASE_SOURCE_BUILD_BACKENDS)
+def bundled_supported_openpmd_backends(adios2_mode, hdf5_mode=BUNDLED_HDF5_FETCH):
+    """Return runtime backends implied by the HASE-managed provider choices."""
+    supported = []
+    if adios2_mode != BUNDLED_ADIOS2_OFF:
+        supported.extend(["adios-sst", "adios"])
+    if hdf5_mode != BUNDLED_HDF5_OFF:
+        supported.append("hdf5")
+    return [backend for backend in OPENPMD_BACKEND_PRIORITY if backend in supported]
 
 
 def available_alpaka_backends():
@@ -132,33 +146,55 @@ def cmake_args(selection: WizardSelection):
     """Return CMake arguments for the selected provider/install path."""
     args = []
     if selection.provider == PROVIDER_BUNDLED:
-        args.append("-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON")
+        args.append("-DHASE_OPENPMD_PROVIDER=bundled")
         if selection.bundled_python_bindings:
             args.append("-DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON")
         if selection.bundled_adios2 == BUNDLED_ADIOS2_OFF:
-            args.extend([
-                "-DHASE_OPENPMD_USE_ADIOS2=OFF",
-                "-DHASE_OPENPMD_USE_HDF5=ON",
-            ])
+            args.extend(["-DHASE_OPENPMD_USE_ADIOS2=OFF", "-DHASE_OPENPMD_USE_SST=OFF"])
+        elif selection.bundled_adios2 == BUNDLED_ADIOS2_FETCH:
+            args.extend(["-DHASE_OPENPMD_USE_ADIOS2=ON", "-DHASE_OPENPMD_FETCH_ADIOS2=ON"])
         elif selection.bundled_adios2 == BUNDLED_ADIOS2_SYSTEM:
-            args.extend([
-                "-DHASE_OPENPMD_USE_ADIOS2=ON",
-                "-DHASE_OPENPMD_FETCH_ADIOS2=OFF",
-            ])
-            prefix_path = _combined_cmake_prefix_path(adios2_prefix=selection.adios2_prefix)
-            if prefix_path:
-                args.append(f"-DCMAKE_PREFIX_PATH={prefix_path}")
-            if selection.adios2_dir:
-                args.append(f"-DADIOS2_DIR={selection.adios2_dir}")
+            args.extend(["-DHASE_OPENPMD_USE_ADIOS2=ON", "-DHASE_OPENPMD_FETCH_ADIOS2=OFF"])
+        if selection.bundled_hdf5 == BUNDLED_HDF5_OFF:
+            args.append("-DHASE_OPENPMD_USE_HDF5=OFF")
+        elif selection.bundled_hdf5 == BUNDLED_HDF5_FETCH:
+            args.extend(["-DHASE_OPENPMD_USE_HDF5=ON", "-DHASE_OPENPMD_FETCH_HDF5=ON"])
+        elif selection.bundled_hdf5 == BUNDLED_HDF5_SYSTEM:
+            args.extend(["-DHASE_OPENPMD_USE_HDF5=ON", "-DHASE_OPENPMD_FETCH_HDF5=OFF"])
+        prefix_path = _combined_cmake_prefix_path(
+            adios2_prefix=selection.adios2_prefix,
+            hdf5_prefix=selection.hdf5_prefix,
+        )
+        if prefix_path:
+            args.append(f"-DCMAKE_PREFIX_PATH={prefix_path}")
+        if selection.adios2_dir:
+            args.append(f"-DADIOS2_DIR={selection.adios2_dir}")
+        if selection.hdf5_dir:
+            args.append(f"-DHDF5_DIR={selection.hdf5_dir}")
+    elif selection.provider == PROVIDER_AUTO:
+        args.append("-DHASE_OPENPMD_PROVIDER=auto")
     else:
-        prefix_path = _combined_cmake_prefix_path(selection.cmake_prefix_path, selection.adios2_prefix)
+        args.append("-DHASE_OPENPMD_PROVIDER=system")
+        prefix_path = _combined_cmake_prefix_path(
+            selection.cmake_prefix_path,
+            selection.adios2_prefix,
+            selection.hdf5_prefix,
+        )
         if prefix_path:
             args.append(f"-DCMAKE_PREFIX_PATH={prefix_path}")
         if selection.openpmd_dir:
             args.append(f"-DopenPMD_DIR={selection.openpmd_dir}")
         if selection.adios2_dir:
             args.append(f"-DADIOS2_DIR={selection.adios2_dir}")
+        if selection.hdf5_dir:
+            args.append(f"-DHDF5_DIR={selection.hdf5_dir}")
 
+    disable_mpi = {
+        MPI_MODE_ON: "OFF",
+        MPI_MODE_OFF: "ON",
+        MPI_MODE_AUTO: "AUTO",
+    }[selection.mpi_mode]
+    args.append(f"-DDISABLE_MPI={disable_mpi}")
     args.append(f"-DHASE_NATIVE_OPTIMIZATIONS={'ON' if selection.native_optimizations else 'OFF'}")
     return args
 
@@ -276,9 +312,23 @@ def guidance_items(selection: WizardSelection, yaml_path, *, alpaka_backends=(),
             "and compute.parallel_mode / compute.n_per_node for MPI runs."
         )
     supported = _csv(list(selection.supported_openpmd_backends) or [selection.openpmd_backend])
+    if selection.mpi_mode == MPI_MODE_ON:
+        mpi_text = "MPI build support is enabled (-DDISABLE_MPI=OFF)."
+    elif selection.mpi_mode == MPI_MODE_AUTO:
+        mpi_text = "MPI build support is auto-detected (-DDISABLE_MPI=AUTO)."
+    else:
+        mpi_text = "MPI build support is disabled (-DDISABLE_MPI=ON)."
+    provider_text = (
+        "Bundled provider installs openPMD/ADIOS2/HDF5 into a build-local CMake prefix "
+        "and reuses it on later installs when dependency settings are unchanged."
+        if selection.provider == PROVIDER_BUNDLED
+        else "System provider uses an existing openPMD-api C++ installation."
+    )
     return [
         yaml_text,
         f"Supported openpmd_backends for this choice: {supported}.",
+        mpi_text,
+        provider_text,
         "Switch YAML parallel_mode to mpi and set n_per_node when running multi-rank jobs.",
         alpaka_backend_guidance(selection, alpaka_backends=alpaka_backends, alpaka_error=alpaka_error),
     ]
@@ -303,15 +353,16 @@ def _ask_yes_no(prompt, default=False):
 
 def _interactive_provider():
     print("Choose an openPMD provider setup:")
-    print("  1) bundled   fetch/build openPMD with HASEonGPU")
-    print("  2) external  use an existing openPMD-api C++ provider")
+    print("  1) auto      use an existing provider if detected, otherwise build a bundled provider")
+    print("  2) bundled   fetch/build/install openPMD dependencies with HASEonGPU")
+    print("  3) system    use an existing openPMD-api C++ provider")
     choice = _ask("Provider choice", "1")
-    return {"1": PROVIDER_BUNDLED, "2": PROVIDER_EXTERNAL}.get(str(choice).strip(), choice)
+    return {"1": PROVIDER_AUTO, "2": PROVIDER_BUNDLED, "3": PROVIDER_SYSTEM}.get(str(choice).strip(), choice)
 
 
 def _interactive_bundled_adios2():
     print("Choose ADIOS2 handling for the bundled openPMD provider:")
-    print("  1) fetch   fetch/build pinned ADIOS2; enables adios-sst/adios/hdf5")
+    print("  1) fetch   fetch/build pinned ADIOS2; enables adios-sst/adios")
     print("  2) off     do not use ADIOS2; hdf5-only")
     print("  3) system  use an existing ADIOS2 installation")
     choice = _ask("Bundled ADIOS2 choice", "1")
@@ -322,10 +373,23 @@ def _interactive_bundled_adios2():
     }.get(str(choice).strip(), choice)
 
 
+def _interactive_bundled_hdf5():
+    print("Choose HDF5 handling for the bundled openPMD provider:")
+    print("  1) fetch   fetch/build pinned HDF5")
+    print("  2) off     do not use HDF5; ADIOS2-only")
+    print("  3) system  use an existing HDF5 installation")
+    choice = _ask("Bundled HDF5 choice", "1")
+    return {
+        "1": BUNDLED_HDF5_FETCH,
+        "2": BUNDLED_HDF5_OFF,
+        "3": BUNDLED_HDF5_SYSTEM,
+    }.get(str(choice).strip(), choice)
+
+
 def _probe_external(args, *, backend=None):
     probe_args = SimpleNamespace(
         backend=backend or args.openpmd_backend or "adios-sst",
-        cmake_prefix_path=_combined_cmake_prefix_path(args.cmake_prefix_path, args.adios2_prefix),
+        cmake_prefix_path=_combined_cmake_prefix_path(args.cmake_prefix_path, args.adios2_prefix, args.hdf5_prefix),
         openpmd_dir=args.openpmd_dir,
         cmake=args.cmake,
         cmake_generator=args.cmake_generator,
@@ -338,12 +402,12 @@ def _probe_external(args, *, backend=None):
     return probe_args, python_info, cmake_info, errors, warnings
 
 
-def _select_bundled_openpmd_backend(args, bundled_adios2):
-    supported = bundled_supported_openpmd_backends(bundled_adios2)
+def _select_bundled_openpmd_backend(args, bundled_adios2, bundled_hdf5):
+    supported = bundled_supported_openpmd_backends(bundled_adios2, bundled_hdf5)
     return preferred_openpmd_backend(supported, args.openpmd_backend)
 
 
-def _select_external_openpmd_backend(args, openpmd_adios2):
+def _external_openpmd_backend_result(args, openpmd_adios2):
     if openpmd_adios2 == OPENPMD_ADIOS2_NO:
         requested_backend = args.openpmd_backend or "hdf5"
     else:
@@ -359,26 +423,72 @@ def _select_external_openpmd_backend(args, openpmd_adios2):
         probe_args.backend = selected_backend
         preflight._check_python_backend(python_info, selected_backend, errors)
         preflight._check_cmake_backend(cmake_info, selected_backend, errors, warnings)
+    return probe_args, selected_backend, tuple(supported), (python_info, cmake_info, warnings), errors, warnings
+
+
+def _select_external_openpmd_backend(args, openpmd_adios2):
+    probe_args, selected_backend, supported, probe_report, errors, warnings = _external_openpmd_backend_result(
+        args,
+        openpmd_adios2,
+    )
+    python_info, cmake_info, _probe_warnings = probe_report
     preflight.print_report(probe_args, python_info, cmake_info, errors, warnings)
     if errors:
         raise RuntimeError("openPMD provider preflight failed; see errors above")
-    return selected_backend, tuple(supported), (python_info, cmake_info, warnings)
+    return selected_backend, supported, probe_report
+
+
+def _try_external_openpmd_backend(args, openpmd_adios2):
+    try:
+        _probe_args, selected_backend, supported, probe_report, errors, _warnings = _external_openpmd_backend_result(
+            args,
+            openpmd_adios2,
+        )
+    except ValueError as exc:
+        return None, f"system openPMD provider does not support the requested backend: {exc}"
+    if errors:
+        return None, "system openPMD provider probe failed: " + "; ".join(errors)
+    return (selected_backend, supported, probe_report), None
 
 
 def _build_selection(args):
     provider = args.provider
-    if provider == "auto":
-        provider = _interactive_provider() if args.interactive else PROVIDER_BUNDLED
+    if provider == PROVIDER_AUTO and args.interactive:
+        provider = _interactive_provider()
 
     cmake_prefix_path = args.cmake_prefix_path
     openpmd_dir = args.openpmd_dir
     adios2_prefix = args.adios2_prefix
     adios2_dir = args.adios2_dir
+    hdf5_prefix = args.hdf5_prefix
+    hdf5_dir = args.hdf5_dir
     bundled_adios2 = args.bundled_adios2
+    bundled_hdf5 = args.bundled_hdf5
     openpmd_adios2 = args.openpmd_adios2
     bundled_python_bindings = not args.no_bundled_python_bindings
     native_optimizations = args.native_optimizations == "on"
+    mpi_mode = args.mpi
     probe_report = None
+
+    if provider == PROVIDER_AUTO:
+        probe_args = argparse.Namespace(**vars(args))
+        probe_args.cmake_prefix_path = cmake_prefix_path
+        probe_args.openpmd_dir = openpmd_dir
+        probe_args.adios2_prefix = adios2_prefix
+        probe_args.adios2_dir = adios2_dir
+        probe_args.hdf5_prefix = hdf5_prefix
+        probe_args.hdf5_dir = hdf5_dir
+        external_result, fallback_reason = _try_external_openpmd_backend(probe_args, openpmd_adios2)
+        if external_result is None:
+            print(
+                "hase-configure: auto provider falling back to bundled because "
+                f"{fallback_reason}",
+                file=sys.stderr,
+            )
+            provider = PROVIDER_BUNDLED
+        else:
+            provider = PROVIDER_SYSTEM
+            selected_openpmd_backend, supported_openpmd_backends, probe_report = external_result
 
     if provider == PROVIDER_BUNDLED:
         if args.interactive:
@@ -386,13 +496,17 @@ def _build_selection(args):
             if bundled_adios2 == BUNDLED_ADIOS2_SYSTEM:
                 adios2_prefix = _ask("ADIOS2 prefix for CMAKE_PREFIX_PATH (optional)", adios2_prefix or "") or None
                 adios2_dir = _ask("ADIOS2_DIR CMake config directory (optional)", adios2_dir or "") or None
+            bundled_hdf5 = _interactive_bundled_hdf5()
+            if bundled_hdf5 == BUNDLED_HDF5_SYSTEM:
+                hdf5_prefix = _ask("HDF5 prefix for CMAKE_PREFIX_PATH (optional)", hdf5_prefix or "") or None
+                hdf5_dir = _ask("HDF5_DIR CMake config directory (optional)", hdf5_dir or "") or None
             bundled_python_bindings = _ask_yes_no(
                 "Build matching bundled openPMD Python bindings",
                 bundled_python_bindings,
             )
-        supported_openpmd_backends = tuple(bundled_supported_openpmd_backends(bundled_adios2))
-        selected_openpmd_backend = _select_bundled_openpmd_backend(args, bundled_adios2)
-    else:
+        supported_openpmd_backends = tuple(bundled_supported_openpmd_backends(bundled_adios2, bundled_hdf5))
+        selected_openpmd_backend = _select_bundled_openpmd_backend(args, bundled_adios2, bundled_hdf5)
+    elif provider == PROVIDER_SYSTEM and probe_report is None:
         if args.interactive:
             cmake_prefix_path = _ask("openPMD CMake prefix path", cmake_prefix_path or "") or None
             openpmd_dir = _ask("openPMD_DIR config directory (optional)", openpmd_dir or "") or None
@@ -406,6 +520,8 @@ def _build_selection(args):
         probe_args.openpmd_dir = openpmd_dir
         probe_args.adios2_prefix = adios2_prefix
         probe_args.adios2_dir = adios2_dir
+        probe_args.hdf5_prefix = hdf5_prefix
+        probe_args.hdf5_dir = hdf5_dir
         selected_openpmd_backend, supported_openpmd_backends, probe_report = _select_external_openpmd_backend(
             probe_args,
             openpmd_adios2,
@@ -440,10 +556,16 @@ def _build_selection(args):
         compute_backend = preferred_compute_backend(alpaka_backends, args.compute_backend)
 
     parallel_mode = args.parallel_mode
-    if args.interactive and _ask_yes_no("Use MPI for multi-rank runs now", parallel_mode == "mpi"):
+    if args.interactive and _ask_yes_no(
+        "Enable MPI support and use MPI for multi-rank runs now",
+        parallel_mode == "mpi" or mpi_mode == MPI_MODE_ON,
+    ):
         parallel_mode = "mpi"
+        mpi_mode = MPI_MODE_ON
     if parallel_mode not in {"single", "mpi"}:
         raise ValueError("parallel mode must be 'single' or 'mpi'")
+    if parallel_mode == "mpi" and mpi_mode == MPI_MODE_OFF:
+        mpi_mode = MPI_MODE_ON
 
     if args.interactive:
         native_optimizations = _ask_yes_no(
@@ -462,11 +584,15 @@ def _build_selection(args):
         cmake_prefix_path=cmake_prefix_path,
         openpmd_dir=openpmd_dir,
         bundled_adios2=bundled_adios2,
+        bundled_hdf5=bundled_hdf5,
         openpmd_adios2=openpmd_adios2,
         bundled_python_bindings=bundled_python_bindings,
         native_optimizations=native_optimizations,
+        mpi_mode=mpi_mode,
         adios2_prefix=adios2_prefix,
         adios2_dir=adios2_dir,
+        hdf5_prefix=hdf5_prefix,
+        hdf5_dir=hdf5_dir,
     )
     return selection, alpaka_backends, alpaka_error, probe_report
 
@@ -477,9 +603,9 @@ def _parse_args(argv=None):
     )
     parser.add_argument(
         "--provider",
-        choices=("auto", PROVIDER_BUNDLED, PROVIDER_EXTERNAL),
+        choices=(PROVIDER_AUTO, PROVIDER_BUNDLED, PROVIDER_SYSTEM),
         default="auto",
-        help="Provider setup to guide. Defaults to bundled in non-interactive mode.",
+        help="Provider setup to guide. Defaults to auto-detecting a system provider before bundled.",
     )
     parser.add_argument(
         "--bundled-adios2",
@@ -488,10 +614,16 @@ def _parse_args(argv=None):
         help="ADIOS2 handling when --provider bundled is selected.",
     )
     parser.add_argument(
+        "--bundled-hdf5",
+        choices=(BUNDLED_HDF5_FETCH, BUNDLED_HDF5_OFF, BUNDLED_HDF5_SYSTEM),
+        default=BUNDLED_HDF5_FETCH,
+        help="HDF5 handling when --provider bundled is selected. Defaults to fetching pinned HDF5.",
+    )
+    parser.add_argument(
         "--openpmd-adios2",
         choices=(OPENPMD_ADIOS2_AUTO, OPENPMD_ADIOS2_YES, OPENPMD_ADIOS2_NO),
         default=OPENPMD_ADIOS2_AUTO,
-        help="Whether an external openPMD provider was built with ADIOS2 support.",
+        help="Whether a system openPMD provider was built with ADIOS2 support.",
     )
     parser.add_argument(
         "--no-bundled-python-bindings",
@@ -501,6 +633,12 @@ def _parse_args(argv=None):
     parser.add_argument("--openpmd-backend", choices=OPENPMD_BACKEND_PRIORITY, default=None)
     parser.add_argument("--compute-backend", default=None)
     parser.add_argument("--parallel-mode", choices=("single", "mpi"), default="single")
+    parser.add_argument(
+        "--mpi",
+        choices=(MPI_MODE_AUTO, MPI_MODE_ON, MPI_MODE_OFF),
+        default=MPI_MODE_OFF,
+        help="MPI build support: on -> -DDISABLE_MPI=OFF, off -> ON, auto -> AUTO. Defaults to off.",
+    )
     parser.add_argument(
         "--native-optimizations",
         choices=("on", "off"),
@@ -513,6 +651,8 @@ def _parse_args(argv=None):
     parser.add_argument("--openpmd-dir", default=None)
     parser.add_argument("--adios2-prefix", default=None)
     parser.add_argument("--adios2-dir", default=None)
+    parser.add_argument("--hdf5-prefix", default=None)
+    parser.add_argument("--hdf5-dir", default=None)
     parser.add_argument("--cmake", default="cmake")
     parser.add_argument("--cmake-generator", default=preflight._default_cmake_generator())
     parser.add_argument(

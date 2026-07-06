@@ -157,18 +157,27 @@ def _cmake_probe(args: argparse.Namespace, errors: list[str]) -> dict[str, str]:
             command.append(f"-DopenPMD_DIR={args.openpmd_dir}")
 
         env = os.environ.copy()
-        result = subprocess.run(
-            command,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            env=env,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            errors.append(
+                f"CMake executable '{args.cmake}' was not found. Install/load CMake "
+                "or pass --cmake. In hase-configure auto mode this only disables "
+                "system-provider detection; bundled pip builds can still use "
+                "CMake from the isolated build environment."
+            )
+            return {"log": str(exc), "command": shlex.join(command)}
         if result.returncode != 0:
             errors.append(
                 "CMake cannot find a usable openPMD::openPMD provider. "
-                "Pass --cmake-prefix-path or --openpmd-dir for the external C++ installation."
+                "Pass --cmake-prefix-path or --openpmd-dir for the system C++ installation."
             )
             return {"log": result.stdout, "command": shlex.join(command)}
 
