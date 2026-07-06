@@ -1144,7 +1144,7 @@ def test_inputSeriesWritesContract(contract_input):
 
     topology = asymmetric_topology()
     explicit_context = transport._explicit_topology_context(topology)
-    assert iteration.get_attribute("number_of_points") == topology.numberOfPoints
+    assert iteration.get_attribute("number_of_points") == topology.numberOfSamplePoints
     assert iteration.get_attribute("number_of_cells") == topology.numberOfCells
     assert iteration.get_attribute("number_of_levels") == 1
     assert iteration.get_attribute("thickness") == pytest.approx(0.0)
