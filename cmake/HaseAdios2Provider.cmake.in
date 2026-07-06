@@ -1,0 +1,72 @@
+cmake_minimum_required(VERSION 3.24)
+project(HaseAdios2Provider LANGUAGES C CXX)
+
+include(FetchContent)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared provider libraries" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "Disable third-party provider tests" FORCE)
+set(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib" CACHE STRING "Provider install RPATH" FORCE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON CACHE BOOL "Use provider link path RPATH" FORCE)
+
+set(HASE_PROVIDER_USE_SST @HASE_OPENPMD_USE_SST@)
+set(HASE_PROVIDER_USE_MPI @HASE_PROVIDER_USE_MPI@)
+if(HASE_PROVIDER_USE_MPI)
+    find_package(MPI COMPONENTS C CXX REQUIRED)
+    set(HASE_PROVIDER_USE_MPI_VALUE ON)
+else()
+    set(HASE_PROVIDER_USE_MPI_VALUE OFF)
+endif()
+
+set(ADIOS2_USE_Fortran OFF CACHE BOOL "Disable ADIOS2 Fortran" FORCE)
+set(ADIOS2_USE_Python OFF CACHE BOOL "Disable ADIOS2 Python" FORCE)
+set(ADIOS2_BUILD_EXAMPLES OFF CACHE BOOL "Disable ADIOS2 examples" FORCE)
+set(ADIOS2_BUILD_TESTING OFF CACHE BOOL "Disable ADIOS2 tests" FORCE)
+set(ADIOS2_INSTALL_GENERATE_CONFIG ON CACHE BOOL "Generate ADIOS2 CMake config" FORCE)
+set(ADIOS2_USE_MPI ${HASE_PROVIDER_USE_MPI_VALUE} CACHE BOOL "Enable ADIOS2 MPI" FORCE)
+set(ADIOS2_USE_SST ${HASE_PROVIDER_USE_SST} CACHE STRING "Enable ADIOS2 SST" FORCE)
+foreach(
+    HASE_ADIOS2_DISABLED_OPTION
+    IN
+    ITEMS
+        BZip2
+        Blosc2
+        Campaign
+        Catalyst
+        DAOS
+        DataMan
+        DataSpaces
+        Endian_Reverse
+        HDF5
+        HDF5_VOL
+        IME
+        LIBPRESSIO
+        MGARD
+        MHS
+        PNG
+        Profiling
+        SZ
+        Sodium
+        SysVShMem
+        UCX
+        ZFP
+        ZeroMQ
+)
+    set(ADIOS2_USE_${HASE_ADIOS2_DISABLED_OPTION} OFF CACHE STRING "Disable unused ADIOS2 support" FORCE)
+endforeach()
+FetchContent_Declare(
+    ADIOS2
+    GIT_REPOSITORY "@HASE_ADIOS2_GIT_REPOSITORY@"
+    GIT_TAG "@HASE_ADIOS2_GIT_TAG@"
+)
+FetchContent_MakeAvailable(ADIOS2)
+if(NOT DEFINED ADIOS2_VERSION OR "${ADIOS2_VERSION}" STREQUAL "")
+    string(REGEX REPLACE "^v" "" ADIOS2_VERSION "@HASE_ADIOS2_GIT_TAG@")
+    set(ADIOS2_VERSION
+        "${ADIOS2_VERSION}"
+        CACHE STRING
+        "ADIOS2 version provided by the HASE bundled provider"
+        FORCE
+    )
+endif()

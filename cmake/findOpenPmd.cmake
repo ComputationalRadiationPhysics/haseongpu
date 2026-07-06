@@ -1,41 +1,75 @@
 include_guard(GLOBAL)
 
-set(HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION
-    "Fetch and build the pinned openPMD-api C++ library and Python bindings instead of using an externally installed openPMD-api package."
+set(HASE_OPENPMD_PROVIDER_DESCRIPTION
+    "openPMD-api provider selection: auto, bundled, or system"
 )
-option(
-    HASE_BUILD_OPENPMD_FROM_SOURCE
-    "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
-    OFF
-)
-if(DEFINED CACHE{HASE_USE_SYSTEM_OPENPMD})
-    set(HASE_LEGACY_USE_SYSTEM_OPENPMD "${HASE_USE_SYSTEM_OPENPMD}")
-    message(
-        DEPRECATION
-        "HASE_USE_SYSTEM_OPENPMD is deprecated. Use "
-        "HASE_BUILD_OPENPMD_FROM_SOURCE instead. "
-        "HASE_USE_SYSTEM_OPENPMD=ON maps to "
-        "HASE_BUILD_OPENPMD_FROM_SOURCE=OFF; "
-        "HASE_USE_SYSTEM_OPENPMD=OFF maps to "
-        "HASE_BUILD_OPENPMD_FROM_SOURCE=ON."
+set(HASE_OPENPMD_PROVIDER_WAS_SET FALSE)
+if(DEFINED CACHE{HASE_OPENPMD_PROVIDER})
+    set(HASE_OPENPMD_PROVIDER_WAS_SET TRUE)
+else()
+    set(HASE_OPENPMD_PROVIDER
+        "auto"
+        CACHE STRING
+        "${HASE_OPENPMD_PROVIDER_DESCRIPTION}"
     )
-    unset(HASE_USE_SYSTEM_OPENPMD CACHE)
-    if(HASE_LEGACY_USE_SYSTEM_OPENPMD)
-        set(HASE_BUILD_OPENPMD_FROM_SOURCE
-            OFF
-            CACHE BOOL
-            "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
+endif()
+set_property(CACHE HASE_OPENPMD_PROVIDER PROPERTY STRINGS auto bundled system)
+
+if(NOT HASE_OPENPMD_PROVIDER_WAS_SET)
+    if(DEFINED CACHE{HASE_BUILD_OPENPMD_FROM_SOURCE})
+        message(
+            DEPRECATION
+            "HASE_BUILD_OPENPMD_FROM_SOURCE is deprecated. Use "
+            "HASE_OPENPMD_PROVIDER=bundled instead of ON, or "
+            "HASE_OPENPMD_PROVIDER=system instead of OFF."
+        )
+        if(HASE_BUILD_OPENPMD_FROM_SOURCE)
+            set(HASE_OPENPMD_PROVIDER "bundled")
+        else()
+            set(HASE_OPENPMD_PROVIDER "system")
+        endif()
+        set(HASE_OPENPMD_PROVIDER
+            "${HASE_OPENPMD_PROVIDER}"
+            CACHE STRING
+            "${HASE_OPENPMD_PROVIDER_DESCRIPTION}"
             FORCE
         )
-    else()
-        set(HASE_BUILD_OPENPMD_FROM_SOURCE
-            ON
-            CACHE BOOL
-            "${HASE_BUILD_OPENPMD_FROM_SOURCE_DESCRIPTION}"
+    elseif(DEFINED CACHE{HASE_USE_SYSTEM_OPENPMD})
+        message(
+            DEPRECATION
+            "HASE_USE_SYSTEM_OPENPMD is deprecated. Use "
+            "HASE_OPENPMD_PROVIDER=system instead of ON, or "
+            "HASE_OPENPMD_PROVIDER=bundled instead of OFF."
+        )
+        if(HASE_USE_SYSTEM_OPENPMD)
+            set(HASE_OPENPMD_PROVIDER "system")
+        else()
+            set(HASE_OPENPMD_PROVIDER "bundled")
+        endif()
+        set(HASE_OPENPMD_PROVIDER
+            "${HASE_OPENPMD_PROVIDER}"
+            CACHE STRING
+            "${HASE_OPENPMD_PROVIDER_DESCRIPTION}"
             FORCE
         )
     endif()
 endif()
+
+string(TOLOWER "${HASE_OPENPMD_PROVIDER}" HASE_OPENPMD_PROVIDER)
+if(NOT HASE_OPENPMD_PROVIDER MATCHES "^(auto|bundled|system)$")
+    message(
+        FATAL_ERROR
+        "Invalid HASE_OPENPMD_PROVIDER='${HASE_OPENPMD_PROVIDER}'. "
+        "Allowed values are: auto, bundled, system."
+    )
+endif()
+set(HASE_OPENPMD_PROVIDER
+    "${HASE_OPENPMD_PROVIDER}"
+    CACHE STRING
+    "${HASE_OPENPMD_PROVIDER_DESCRIPTION}"
+    FORCE
+)
+
 if(DEFINED CACHE{HASE_OPENPMD_BACKEND})
     message(
         DEPRECATION
@@ -46,38 +80,35 @@ if(DEFINED CACHE{HASE_OPENPMD_BACKEND})
     )
     unset(HASE_OPENPMD_BACKEND CACHE)
 endif()
-if(HASE_BUILD_OPENPMD_FROM_SOURCE)
-    set(HASE_USE_SYSTEM_OPENPMD OFF)
-else()
-    set(HASE_USE_SYSTEM_OPENPMD ON)
-endif()
 
 option(
     HASE_OPENPMD_USE_ADIOS2
-    "Enable ADIOS2 support in the HASE source-build openPMD provider"
+    "Enable ADIOS2 support in the HASE-managed openPMD provider"
     ON
 )
 option(
     HASE_OPENPMD_USE_HDF5
-    "Enable HDF5 support in the HASE source-build openPMD provider"
+    "Enable HDF5 support in the HASE-managed openPMD provider"
     ON
 )
 option(
     HASE_OPENPMD_USE_SST
-    "Enable ADIOS2 SST support in the HASE source-build openPMD provider"
+    "Enable ADIOS2 SST support in the HASE-managed openPMD provider"
     ON
 )
 option(
     HASE_OPENPMD_FETCH_ADIOS2
-    "Fetch and build pinned ADIOS2 for the HASE source-build openPMD provider"
+    "Fetch and build pinned ADIOS2 for the HASE-managed openPMD provider"
+    ON
+)
+option(
+    HASE_OPENPMD_FETCH_HDF5
+    "Fetch and build pinned HDF5 for the HASE-managed openPMD provider"
     ON
 )
 
 if(HASE_OPENPMD_USE_SST AND NOT HASE_OPENPMD_USE_ADIOS2)
-    message(
-        FATAL_ERROR
-        "HASE_OPENPMD_USE_SST requires HASE_OPENPMD_USE_ADIOS2=ON"
-    )
+    message(FATAL_ERROR "HASE_OPENPMD_USE_SST requires HASE_OPENPMD_USE_ADIOS2=ON")
 endif()
 if(NOT HASE_OPENPMD_USE_ADIOS2 AND NOT HASE_OPENPMD_USE_HDF5)
     message(
@@ -115,7 +146,7 @@ option(
 )
 option(
     HASE_OPENPMD_BUILD_PYTHON_BINDINGS
-    "Build openPMD-api Python bindings as part of the HASE CMake build tree"
+    "Build and install openPMD-api Python bindings with the HASE-managed provider"
     OFF
 )
 set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
@@ -123,480 +154,360 @@ set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
     CACHE PATH
     "Directory containing the openpmd_api Python package matching openPMD::openPMD"
 )
-if(NOT HASE_BUILD_OPENPMD_FROM_SOURCE)
-    message(STATUS "Using external openPMD-api for the HASE openPMD transport")
-    find_package(openPMD CONFIG QUIET)
+set(HASE_OPENPMD_BUNDLED_PREFIX
+    "${CMAKE_BINARY_DIR}/hase-openpmd-provider/install"
+    CACHE PATH
+    "Install prefix for the HASE-managed bundled openPMD-api provider"
+)
+set(HASE_OPENPMD_BUNDLED_BUILD_DIR
+    "${CMAKE_BINARY_DIR}/hase-openpmd-provider/build"
+    CACHE PATH
+    "Build directory for the HASE-managed bundled openPMD-api provider"
+)
+option(
+    HASE_OPENPMD_BUNDLED_REBUILD
+    "Force rebuilding the HASE-managed bundled openPMD-api provider"
+    OFF
+)
 
+function(hase_openpmd_validate_found provider_kind)
     if(NOT openPMD_FOUND)
-        message(
-            FATAL_ERROR
-            "HASEonGPU now expects an external openPMD-api C++ package by default, "
-            "but CMake could not find openPMD. Install or build an external "
-            "openPMD-api C++ package, then point CMake to it with openPMD_DIR "
-            "or CMAKE_PREFIX_PATH. To use the bundled source-build path instead, "
-            "configure with "
-            "-DHASE_BUILD_OPENPMD_FROM_SOURCE=ON."
-        )
+        message(FATAL_ERROR "Internal error: openPMD was not found for provider '${provider_kind}'.")
     endif()
-
     if(NOT TARGET openPMD::openPMD)
         message(
             FATAL_ERROR
-            "The external openPMD package did not provide openPMD::openPMD. "
-            "Use an openPMD-api CMake installation that exports openPMD::openPMD, "
-            "or configure with -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON to use the "
-            "bundled source-build path."
+            "The ${provider_kind} openPMD package did not provide openPMD::openPMD. "
+            "Use an openPMD-api CMake installation that exports openPMD::openPMD."
         )
     endif()
+endfunction()
 
-    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
+function(hase_openpmd_configure_python provider_kind)
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND "${provider_kind}" STREQUAL "system")
         message(
             STATUS
-            "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with the default external openPMD contract; "
-            "the Python openpmd_api module must come from the same external installation."
+            "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with HASE_OPENPMD_PROVIDER=system; "
+            "the Python openpmd_api module must come from the same system installation."
+        )
+        set(HASE_OPENPMD_BUILD_PYTHON_BINDINGS
+            OFF
+            CACHE BOOL
+            "Build and install openPMD-api Python bindings with the HASE-managed provider"
+            FORCE
         )
     endif()
-    set(HASE_OPENPMD_BUILD_PYTHON_BINDINGS
-        OFF
-        CACHE BOOL
-        "Build openPMD-api Python bindings as part of the HASE CMake build"
-        FORCE
+
+    if(NOT HASE_ENABLE_PYTHON)
+        return()
+    endif()
+
+    if(HASE_OPENPMD_PYTHON_PACKAGE_DIR)
+        if(NOT EXISTS "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}/openpmd_api")
+            message(
+                FATAL_ERROR
+                "HASE_OPENPMD_PYTHON_PACKAGE_DIR='${HASE_OPENPMD_PYTHON_PACKAGE_DIR}' "
+                "does not contain an openpmd_api Python package. Set this cache variable "
+                "to the site-packages directory from the same openPMD-api installation "
+                "as openPMD::openPMD."
+            )
+        endif()
+        message(
+            STATUS
+            "HASE ${provider_kind} openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
+        )
+    elseif("${provider_kind}" STREQUAL "system")
+        message(
+            STATUS
+            "HASE_ENABLE_PYTHON=ON with HASE_OPENPMD_PROVIDER=system will use "
+            "the runtime Python environment's openpmd_api package. It must match "
+            "the system openPMD::openPMD C++ provider and support the runtime "
+            "openPMD backend selected by Python or YAML. Set "
+            "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory containing openpmd_api> "
+            "only when you need HASEonGPU to prefer a specific provider path."
+        )
+    endif()
+endfunction()
+
+function(hase_openpmd_find_bundled_config out_var)
+    file(
+        GLOB_RECURSE
+        HASE_OPENPMD_BUNDLED_CONFIGS
+        LIST_DIRECTORIES
+            FALSE
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/openPMDConfig.cmake"
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/*/openPMDConfig.cmake"
+    )
+    list(SORT HASE_OPENPMD_BUNDLED_CONFIGS)
+    if(HASE_OPENPMD_BUNDLED_CONFIGS)
+        list(GET HASE_OPENPMD_BUNDLED_CONFIGS 0 HASE_OPENPMD_BUNDLED_CONFIG)
+        get_filename_component(HASE_OPENPMD_BUNDLED_CONFIG_DIR "${HASE_OPENPMD_BUNDLED_CONFIG}" DIRECTORY)
+        set(${out_var} "${HASE_OPENPMD_BUNDLED_CONFIG_DIR}" PARENT_SCOPE)
+    else()
+        set(${out_var} "" PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(hase_openpmd_find_bundled_python out_var)
+    file(
+        GLOB_RECURSE
+        HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
+        LIST_DIRECTORIES
+            FALSE
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/openpmd_api/__init__.py"
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/*/openpmd_api/__init__.py"
+    )
+    list(SORT HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
+    if(HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
+        list(GET HASE_OPENPMD_BUNDLED_PYTHON_MARKERS 0 HASE_OPENPMD_BUNDLED_PYTHON_MARKER)
+        get_filename_component(HASE_OPENPMD_BUNDLED_PACKAGE_DIR "${HASE_OPENPMD_BUNDLED_PYTHON_MARKER}" DIRECTORY)
+        get_filename_component(HASE_OPENPMD_BUNDLED_SITE_PACKAGES "${HASE_OPENPMD_BUNDLED_PACKAGE_DIR}" DIRECTORY)
+        set(${out_var} "${HASE_OPENPMD_BUNDLED_SITE_PACKAGES}" PARENT_SCOPE)
+    else()
+        set(${out_var} "" PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(hase_openpmd_provider_stamp out_var)
+    if(MPI_FOUND)
+        set(HASE_OPENPMD_PROVIDER_MPI ON)
+    else()
+        set(HASE_OPENPMD_PROVIDER_MPI OFF)
+    endif()
+    set(HASE_OPENPMD_PROVIDER_STAMP_CONTENT
+        "openPMD=${HASE_OPENPMD_GIT_REPOSITORY}@${HASE_OPENPMD_GIT_TAG}\n"
+        "ADIOS2=${HASE_ADIOS2_GIT_REPOSITORY}@${HASE_ADIOS2_GIT_TAG}\n"
+        "HDF5=${HASE_HDF5_GIT_REPOSITORY}@${HASE_HDF5_GIT_TAG}\n"
+        "USE_ADIOS2=${HASE_OPENPMD_USE_ADIOS2}\n"
+        "USE_HDF5=${HASE_OPENPMD_USE_HDF5}\n"
+        "USE_SST=${HASE_OPENPMD_USE_SST}\n"
+        "FETCH_ADIOS2=${HASE_OPENPMD_FETCH_ADIOS2}\n"
+        "FETCH_HDF5=${HASE_OPENPMD_FETCH_HDF5}\n"
+        "SUPERBUILD=${HASE_OPENPMD_SUPERBUILD}\n"
+        "PYTHON=${HASE_OPENPMD_BUILD_PYTHON_BINDINGS}\n"
+        "MPI=${HASE_OPENPMD_PROVIDER_MPI}\n"
+        "STAGING=separate-dependency-installs-v1\n"
+        "CMAKE=${CMAKE_VERSION}\n"
+        "C_COMPILER=${CMAKE_C_COMPILER}|${CMAKE_C_COMPILER_ID}|${CMAKE_C_COMPILER_VERSION}\n"
+        "CXX_COMPILER=${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_ID}|${CMAKE_CXX_COMPILER_VERSION}\n"
+    )
+    string(SHA256 HASE_OPENPMD_PROVIDER_STAMP_HASH "${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}")
+    set(${out_var} "${HASE_OPENPMD_PROVIDER_STAMP_HASH}\n${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}" PARENT_SCOPE)
+endfunction()
+
+
+function(hase_openpmd_run_provider_stage stage_name template_file)
+    set(HASE_OPENPMD_STAGE_SOURCE_DIR "${CMAKE_BINARY_DIR}/hase-openpmd-provider/src/${stage_name}")
+    set(HASE_OPENPMD_STAGE_BUILD_DIR "${HASE_OPENPMD_BUNDLED_BUILD_DIR}/${stage_name}")
+    file(MAKE_DIRECTORY "${HASE_OPENPMD_STAGE_SOURCE_DIR}")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/${template_file}"
+        "${HASE_OPENPMD_STAGE_SOURCE_DIR}/CMakeLists.txt"
+        @ONLY
     )
 
-    if(HASE_ENABLE_PYTHON)
-        if(HASE_OPENPMD_PYTHON_PACKAGE_DIR)
-            if(NOT EXISTS "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}/openpmd_api")
-                message(
-                    FATAL_ERROR
-                    "HASE_OPENPMD_PYTHON_PACKAGE_DIR='${HASE_OPENPMD_PYTHON_PACKAGE_DIR}' "
-                    "does not contain an openpmd_api Python package. Set this cache variable "
-                    "to the site-packages directory from the same external openPMD-api installation "
-                    "as openPMD::openPMD."
-                )
-            endif()
-            message(
-                STATUS
-                "HASE external openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
+    set(HASE_OPENPMD_STAGE_PREFIX_PATH "${HASE_OPENPMD_BUNDLED_PREFIX}")
+    if(CMAKE_PREFIX_PATH)
+        string(APPEND HASE_OPENPMD_STAGE_PREFIX_PATH ";${CMAKE_PREFIX_PATH}")
+    endif()
+
+    set(HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+        "${CMAKE_COMMAND}"
+        "-S"
+        "${HASE_OPENPMD_STAGE_SOURCE_DIR}"
+        "-B"
+        "${HASE_OPENPMD_STAGE_BUILD_DIR}"
+        "-DCMAKE_INSTALL_PREFIX=${HASE_OPENPMD_BUNDLED_PREFIX}"
+        "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        "-DCMAKE_PREFIX_PATH=${HASE_OPENPMD_STAGE_PREFIX_PATH}"
+    )
+    if(CMAKE_GENERATOR)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-G" "${CMAKE_GENERATOR}")
+    endif()
+    if(CMAKE_GENERATOR_PLATFORM)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-A" "${CMAKE_GENERATOR_PLATFORM}")
+    endif()
+    if(CMAKE_GENERATOR_TOOLSET)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-T" "${CMAKE_GENERATOR_TOOLSET}")
+    endif()
+    if(CMAKE_MAKE_PROGRAM)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}")
+    endif()
+    if(ADIOS2_DIR)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DADIOS2_DIR=${ADIOS2_DIR}")
+    endif()
+    if(HDF5_DIR)
+        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DHDF5_DIR=${HDF5_DIR}")
+    endif()
+
+    message(STATUS "Configuring HASE-managed bundled openPMD provider stage: ${stage_name}")
+    execute_process(
+        COMMAND ${HASE_OPENPMD_STAGE_CONFIGURE_COMMAND}
+        RESULT_VARIABLE HASE_OPENPMD_STAGE_CONFIGURE_RESULT
+    )
+    if(NOT HASE_OPENPMD_STAGE_CONFIGURE_RESULT EQUAL 0)
+        message(FATAL_ERROR "Configuring the HASE-managed openPMD provider stage '${stage_name}' failed")
+    endif()
+
+    set(HASE_OPENPMD_STAGE_BUILD_COMMAND
+        "${CMAKE_COMMAND}"
+        "--build"
+        "${HASE_OPENPMD_STAGE_BUILD_DIR}"
+        "--target"
+        "install"
+    )
+    if(CMAKE_BUILD_TYPE)
+        list(APPEND HASE_OPENPMD_STAGE_BUILD_COMMAND "--config" "${CMAKE_BUILD_TYPE}")
+    endif()
+    message(STATUS "Building/installing HASE-managed bundled openPMD provider stage: ${stage_name}")
+    execute_process(
+        COMMAND ${HASE_OPENPMD_STAGE_BUILD_COMMAND}
+        RESULT_VARIABLE HASE_OPENPMD_STAGE_BUILD_RESULT
+    )
+    if(NOT HASE_OPENPMD_STAGE_BUILD_RESULT EQUAL 0)
+        message(FATAL_ERROR "Building/installing the HASE-managed openPMD provider stage '${stage_name}' failed")
+    endif()
+endfunction()
+
+function(hase_openpmd_bootstrap_bundled_provider)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hase-openpmd-provider")
+    set(HASE_OPENPMD_BUNDLED_STAMP "${HASE_OPENPMD_BUNDLED_PREFIX}/hase-openpmd-provider.stamp")
+    hase_openpmd_provider_stamp(HASE_OPENPMD_EXPECTED_STAMP)
+    hase_openpmd_find_bundled_config(HASE_OPENPMD_EXISTING_CONFIG_DIR)
+
+    set(HASE_OPENPMD_REUSE_PROVIDER FALSE)
+    if(NOT HASE_OPENPMD_BUNDLED_REBUILD AND HASE_OPENPMD_EXISTING_CONFIG_DIR AND EXISTS "${HASE_OPENPMD_BUNDLED_STAMP}")
+        file(READ "${HASE_OPENPMD_BUNDLED_STAMP}" HASE_OPENPMD_EXISTING_STAMP)
+        if("${HASE_OPENPMD_EXISTING_STAMP}" STREQUAL "${HASE_OPENPMD_EXPECTED_STAMP}")
+            set(HASE_OPENPMD_REUSE_PROVIDER TRUE)
+        endif()
+    endif()
+
+    if(HASE_OPENPMD_REUSE_PROVIDER)
+        message(
+            STATUS
+            "Reusing HASE-managed bundled openPMD provider at ${HASE_OPENPMD_BUNDLED_PREFIX}"
+        )
+    else()
+        message(
+            STATUS
+            "Building HASE-managed bundled openPMD provider into ${HASE_OPENPMD_BUNDLED_PREFIX}"
+        )
+        file(REMOVE_RECURSE "${HASE_OPENPMD_BUNDLED_BUILD_DIR}")
+        file(REMOVE_RECURSE "${HASE_OPENPMD_BUNDLED_PREFIX}")
+
+        if(MPI_FOUND)
+            set(HASE_PROVIDER_USE_MPI ON)
+        else()
+            set(HASE_PROVIDER_USE_MPI OFF)
+        endif()
+
+        if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_FETCH_HDF5)
+            hase_openpmd_run_provider_stage(hdf5 HaseHdf5Provider.cmake.in)
+        endif()
+        if(HASE_OPENPMD_USE_ADIOS2 AND HASE_OPENPMD_FETCH_ADIOS2)
+            hase_openpmd_run_provider_stage(adios2 HaseAdios2Provider.cmake.in)
+        endif()
+        hase_openpmd_run_provider_stage(openpmd HaseOpenPmdProvider.cmake.in)
+
+        file(WRITE "${HASE_OPENPMD_BUNDLED_STAMP}" "${HASE_OPENPMD_EXPECTED_STAMP}")
+        hase_openpmd_find_bundled_config(HASE_OPENPMD_EXISTING_CONFIG_DIR)
+    endif()
+
+    if(NOT HASE_OPENPMD_EXISTING_CONFIG_DIR)
+        message(
+            FATAL_ERROR
+            "The HASE-managed bundled openPMD provider did not install openPMDConfig.cmake under "
+            "${HASE_OPENPMD_BUNDLED_PREFIX}."
+        )
+    endif()
+
+    set(openPMD_DIR
+        "${HASE_OPENPMD_EXISTING_CONFIG_DIR}"
+        CACHE PATH
+        "openPMD CMake config directory provided by the HASE-managed bundled provider"
+        FORCE
+    )
+    # Keep the bundled provider prefix visible after this function returns so
+    # openPMDConfig.cmake can resolve transitive find_dependency() calls such as
+    # ADIOS2 and HDF5 during the outer HASE find_package(openPMD).
+    set(CMAKE_PREFIX_PATH
+        "${HASE_OPENPMD_BUNDLED_PREFIX};${CMAKE_PREFIX_PATH}"
+        PARENT_SCOPE
+    )
+
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND NOT HASE_OPENPMD_PYTHON_PACKAGE_DIR)
+        hase_openpmd_find_bundled_python(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
+        if(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
+            set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
+                "${HASE_OPENPMD_BUNDLED_PYTHON_DIR}"
+                CACHE PATH
+                "Directory containing the openpmd_api Python package matching openPMD::openPMD"
+                FORCE
             )
         else()
             message(
-                STATUS
-                "HASE_ENABLE_PYTHON=ON with the external openPMD contract will use "
-                "the runtime Python environment's openpmd_api package. It must match "
-                "the external openPMD::openPMD C++ provider and support the "
-                "runtime openPMD backend selected by Python or YAML. Set "
-                "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory containing openpmd_api> "
-                "only when you need HASEonGPU to prefer a specific provider path."
+                WARNING
+                "HASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON, but no installed openpmd_api package "
+                "was found under ${HASE_OPENPMD_BUNDLED_PREFIX}. Runtime Python must provide "
+                "a matching openpmd_api module."
             )
         endif()
     endif()
-    return()
-endif()
+endfunction()
 
-message(STATUS "Fetching pinned openPMD-api for the HASE openPMD transport")
-
-include(FetchContent)
-
-if(HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_SUPERBUILD)
-    message(STATUS "Fetching pinned HDF5 for the HASE openPMD transport")
-    set(BUILD_SHARED_LIBS
-        ON
-        CACHE BOOL
-        "Build shared third-party libraries for the HASE openPMD transport"
-        FORCE
-    )
-    set(HDF5_BUILD_CPP_LIB
-        OFF
-        CACHE BOOL
-        "Disable HDF5 C++ bindings in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_BUILD_FORTRAN
-        OFF
-        CACHE BOOL
-        "Disable HDF5 Fortran bindings in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_BUILD_HL_LIB
-        OFF
-        CACHE BOOL
-        "Disable the HDF5 high-level library in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_BUILD_JAVA
-        OFF
-        CACHE BOOL
-        "Disable HDF5 Java bindings in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_BUILD_TOOLS
-        OFF
-        CACHE BOOL
-        "Disable HDF5 command-line tools in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_BUILD_EXAMPLES
-        OFF
-        CACHE BOOL
-        "Disable HDF5 examples in the HASE superbuild"
-        FORCE
-    )
-    set(HDF5_ENABLE_SZIP_SUPPORT
-        OFF
-        CACHE BOOL
-        "Disable optional SZIP support in the HASE HDF5 superbuild"
-        FORCE
-    )
-    set(HDF5_ENABLE_Z_LIB_SUPPORT
-        OFF
-        CACHE BOOL
-        "Disable optional zlib support in the HASE HDF5 superbuild"
-        FORCE
-    )
-    set(BUILD_TESTING
-        OFF
-        CACHE BOOL
-        "Disable third-party tests while configuring the HASE superbuild dependencies"
-        FORCE
-    )
-    if(MPI_FOUND)
-        find_package(MPI COMPONENTS C REQUIRED)
-        set(HDF5_ENABLE_PARALLEL
-            ON
-            CACHE BOOL
-            "Enable parallel HDF5 when HASE MPI is available"
-            FORCE
+set(HASE_OPENPMD_ACTUAL_PROVIDER "")
+if(HASE_OPENPMD_PROVIDER STREQUAL "system")
+    message(STATUS "Using system openPMD-api for the HASE openPMD transport")
+    find_package(openPMD CONFIG QUIET)
+    if(NOT openPMD_FOUND)
+        message(
+            FATAL_ERROR
+            "HASE_OPENPMD_PROVIDER=system requires an installed openPMD-api C++ package, "
+            "but CMake could not find openPMD. Point CMake to it with openPMD_DIR or "
+            "CMAKE_PREFIX_PATH, or use HASE_OPENPMD_PROVIDER=bundled."
         )
-        set(HASE_INTERNAL_HDF5_IS_PARALLEL TRUE)
+    endif()
+    hase_openpmd_validate_found("system")
+    set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
+elseif(HASE_OPENPMD_PROVIDER STREQUAL "auto")
+    message(STATUS "HASE_OPENPMD_PROVIDER=auto: probing for a system openPMD-api provider")
+    find_package(openPMD CONFIG QUIET)
+    if(openPMD_FOUND AND TARGET openPMD::openPMD)
+        message(STATUS "HASE_OPENPMD_PROVIDER=auto: using system openPMD-api provider")
+        set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
     else()
-        set(HDF5_ENABLE_PARALLEL
-            OFF
-            CACHE BOOL
-            "Disable parallel HDF5 when HASE MPI is unavailable"
-            FORCE
-        )
-        set(HASE_INTERNAL_HDF5_IS_PARALLEL FALSE)
+        message(STATUS "HASE_OPENPMD_PROVIDER=auto: no system provider found; using bundled provider")
+        hase_openpmd_bootstrap_bundled_provider()
+        find_package(openPMD CONFIG REQUIRED)
+        hase_openpmd_validate_found("bundled")
+        set(HASE_OPENPMD_ACTUAL_PROVIDER "bundled")
     endif()
-
-    FetchContent_Declare(
-        HDF5
-        GIT_REPOSITORY "${HASE_HDF5_GIT_REPOSITORY}"
-        GIT_TAG "${HASE_HDF5_GIT_TAG}"
-    )
-    FetchContent_MakeAvailable(HDF5)
-    if(NOT DEFINED HDF5_VERSION OR "${HDF5_VERSION}" STREQUAL "")
-        string(REGEX REPLACE "^hdf5_" "" HDF5_VERSION "${HASE_HDF5_GIT_TAG}")
-        set(HDF5_VERSION
-            "${HDF5_VERSION}"
-            CACHE STRING
-            "HDF5 version provided by the HASE FetchContent build"
-            FORCE
-        )
-    endif()
-
-    set(HASE_INTERNAL_HDF5_INCLUDE_DIRS
-        "${hdf5_SOURCE_DIR}/src"
-        "${hdf5_SOURCE_DIR}/src/H5FDsubfiling"
-        "${hdf5_BINARY_DIR}/src"
-    )
-    set(HASE_INTERNAL_FIND_MODULE_DIR
-        "${CMAKE_BINARY_DIR}/hase-cmake-overrides"
-    )
-    file(MAKE_DIRECTORY "${HASE_INTERNAL_FIND_MODULE_DIR}")
-    file(
-        WRITE
-        "${HASE_INTERNAL_FIND_MODULE_DIR}/FindHDF5.cmake"
-        "if(NOT TARGET hdf5-shared)\n"
-        "    message(FATAL_ERROR \"HASE internal HDF5 target hdf5-shared is not available\")\n"
-        "endif()\n"
-        "set(HDF5_FOUND TRUE)\n"
-        "set(HDF5_C_FOUND TRUE)\n"
-        "set(HDF5_VERSION \"${HDF5_VERSION}\")\n"
-        "set(HDF5_LIBRARIES hdf5-shared)\n"
-        "set(HDF5_C_LIBRARIES hdf5-shared)\n"
-        "set(HDF5_INCLUDE_DIRS \"${HASE_INTERNAL_HDF5_INCLUDE_DIRS}\")\n"
-        "set(HDF5_C_INCLUDE_DIRS \"${HASE_INTERNAL_HDF5_INCLUDE_DIRS}\")\n"
-        "set(HDF5_DEFINITIONS \"\")\n"
-        "set(HDF5_IS_PARALLEL ${HASE_INTERNAL_HDF5_IS_PARALLEL})\n"
-        "set(HDF5_ENABLE_PARALLEL ${HASE_INTERNAL_HDF5_IS_PARALLEL})\n"
-        "set(HDF5_PROVIDES_PARALLEL ${HASE_INTERNAL_HDF5_IS_PARALLEL})\n"
-        "foreach(component IN LISTS HDF5_FIND_COMPONENTS)\n"
-        "    if(component STREQUAL \"C\")\n"
-        "        set(HDF5_C_FOUND TRUE)\n"
-        "    else()\n"
-        "        set(HDF5_${component}_FOUND FALSE)\n"
-        "    endif()\n"
-        "endforeach()\n"
-    )
-    list(PREPEND CMAKE_MODULE_PATH "${HASE_INTERNAL_FIND_MODULE_DIR}")
+else()
+    hase_openpmd_bootstrap_bundled_provider()
+    find_package(openPMD CONFIG REQUIRED)
+    hase_openpmd_validate_found("bundled")
+    set(HASE_OPENPMD_ACTUAL_PROVIDER "bundled")
 endif()
 
-if(HASE_OPENPMD_USE_ADIOS2 AND HASE_OPENPMD_FETCH_ADIOS2)
-    message(STATUS "Fetching pinned ADIOS2 for the HASE openPMD transport")
-    set(ADIOS2_USE_Fortran
+if(HASE_OPENPMD_ACTUAL_PROVIDER STREQUAL "system")
+    set(HASE_USE_SYSTEM_OPENPMD TRUE)
+    set(HASE_BUILD_OPENPMD_FROM_SOURCE
         OFF
         CACHE BOOL
-        "Disable ADIOS2 Fortran bindings in the HASE superbuild"
-        FORCE
-    )
-    set(ADIOS2_USE_Python
-        OFF
-        CACHE BOOL
-        "Disable ADIOS2 Python bindings in the HASE superbuild"
-        FORCE
-    )
-    set(ADIOS2_BUILD_EXAMPLES
-        OFF
-        CACHE BOOL
-        "Disable ADIOS2 examples in the HASE superbuild"
-        FORCE
-    )
-    set(ADIOS2_BUILD_TESTING
-        OFF
-        CACHE BOOL
-        "Disable ADIOS2 tests in the HASE superbuild"
-        FORCE
-    )
-    set(BUILD_TESTING
-        OFF
-        CACHE BOOL
-        "Disable third-party tests while configuring the HASE superbuild dependencies"
-        FORCE
-    )
-    set(ADIOS2_INSTALL_GENERATE_CONFIG
-        OFF
-        CACHE BOOL
-        "Disable ADIOS2's install-time adios2-config helper generation in the HASE superbuild"
-        FORCE
-    )
-    set(ADIOS2_USE_SST
-        ${HASE_OPENPMD_USE_SST}
-        CACHE STRING
-        "Enable ADIOS2 SST for the HASE openPMD transport"
-        FORCE
-    )
-
-    # Keep the ADIOS2 superbuild narrow. HASE's openPMD transport uses ADIOS2
-    # ADIOS/SST-style openPMD series and does not need HDF5, compression plugins,
-    # remote/cloud transports, visualization hooks, or profiling infrastructure.
-    foreach(
-        HASE_ADIOS2_DISABLED_OPTION
-        IN
-        ITEMS
-            BZip2
-            Blosc2
-            Campaign
-            Catalyst
-            DAOS
-            DataMan
-            DataSpaces
-            Endian_Reverse
-            HDF5
-            HDF5_VOL
-            IME
-            LIBPRESSIO
-            MGARD
-            MHS
-            PNG
-            Profiling
-            SZ
-            Sodium
-            SysVShMem
-            UCX
-            ZFP
-            ZeroMQ
-    )
-        set(ADIOS2_USE_${HASE_ADIOS2_DISABLED_OPTION}
-            OFF
-            CACHE STRING
-            "Disable unused ADIOS2 ${HASE_ADIOS2_DISABLED_OPTION} support in the HASE superbuild"
-            FORCE
-        )
-    endforeach()
-    if(MPI_FOUND)
-        set(ADIOS2_USE_MPI
-            ON
-            CACHE BOOL
-            "Enable MPI in ADIOS2 when HASE MPI is available"
-            FORCE
-        )
-    else()
-        set(ADIOS2_USE_MPI
-            OFF
-            CACHE BOOL
-            "Disable MPI in ADIOS2 when HASE MPI is unavailable"
-            FORCE
-        )
-    endif()
-
-    FetchContent_Declare(
-        ADIOS2
-        GIT_REPOSITORY "${HASE_ADIOS2_GIT_REPOSITORY}"
-        GIT_TAG "${HASE_ADIOS2_GIT_TAG}"
-        OVERRIDE_FIND_PACKAGE
-    )
-    FetchContent_MakeAvailable(ADIOS2)
-    if(EXISTS "${ADIOS2_BINARY_DIR}/adios2-config.cmake")
-        set(ADIOS2_DIR
-            "${ADIOS2_BINARY_DIR}"
-            CACHE PATH
-            "ADIOS2 CMake config directory produced by the HASE FetchContent build"
-            FORCE
-        )
-    endif()
-    if(NOT DEFINED ADIOS2_VERSION OR "${ADIOS2_VERSION}" STREQUAL "")
-        string(REGEX REPLACE "^v" "" ADIOS2_VERSION "${HASE_ADIOS2_GIT_TAG}")
-        set(ADIOS2_VERSION
-            "${ADIOS2_VERSION}"
-            CACHE STRING
-            "ADIOS2 version provided by the HASE FetchContent build"
-            FORCE
-        )
-    endif()
-elseif(HASE_OPENPMD_USE_ADIOS2)
-    message(STATUS "Using system ADIOS2 for the HASE openPMD transport")
-    find_package(ADIOS2 CONFIG REQUIRED)
-    if(HASE_OPENPMD_USE_SST)
-        if(DEFINED ADIOS2_HAVE_SST AND NOT ADIOS2_HAVE_SST)
-            message(
-                FATAL_ERROR
-                "HASE_OPENPMD_USE_SST=ON requires an ADIOS2 provider built with SST support"
-            )
-        elseif(NOT DEFINED ADIOS2_HAVE_SST)
-            message(
-                STATUS
-                "ADIOS2 provider did not expose ADIOS2_HAVE_SST; SST support cannot be confirmed at configure time"
-            )
-        endif()
-    endif()
-endif()
-
-set(openPMD_USE_ADIOS2
-    ${HASE_OPENPMD_USE_ADIOS2}
-    CACHE STRING
-    "Enable ADIOS2 backend for the HASE openPMD transport"
-    FORCE
-)
-set(openPMD_USE_HDF5
-    ${HASE_OPENPMD_USE_HDF5}
-    CACHE STRING
-    "Enable HDF5 backend for the HASE openPMD transport"
-    FORCE
-)
-set(openPMD_HAVE_PKGCONFIG
-    OFF
-    CACHE BOOL
-    "Do not generate pkg-config metadata in the HASE superbuild"
-    FORCE
-)
-set(openPMD_USE_VERIFY
-    OFF
-    CACHE BOOL
-    "Disable openPMD internal VERIFY checks in the HASE superbuild"
-    FORCE
-)
-set(openPMD_SUPERBUILD
-    ${HASE_OPENPMD_SUPERBUILD}
-    CACHE BOOL
-    "Allow openPMD-api to fetch/build its bundled helper dependencies"
-    FORCE
-)
-foreach(HASE_OPENPMD_INTERNAL_DEP IN ITEMS CATCH JSON TOML11 PYBIND11)
-    set(openPMD_USE_INTERNAL_${HASE_OPENPMD_INTERNAL_DEP}
-        ${HASE_OPENPMD_SUPERBUILD}
-        CACHE BOOL
-        "Use openPMD-api bundled ${HASE_OPENPMD_INTERNAL_DEP} dependency"
-        FORCE
-    )
-endforeach()
-set(openPMD_USE_PYTHON
-    ${HASE_OPENPMD_BUILD_PYTHON_BINDINGS}
-    CACHE BOOL
-    "Build openPMD-api Python bindings from the HASE CMake build"
-    FORCE
-)
-set(openPMD_BUILD_TESTING
-    OFF
-    CACHE BOOL
-    "Disable openPMD-api tests in the HASE superbuild"
-    FORCE
-)
-set(openPMD_BUILD_EXAMPLES
-    OFF
-    CACHE BOOL
-    "Disable openPMD-api examples in the HASE superbuild"
-    FORCE
-)
-set(openPMD_BUILD_CLI_TOOLS
-    OFF
-    CACHE BOOL
-    "Disable openPMD-api CLI tools in the HASE superbuild"
-    FORCE
-)
-set(openPMD_INSTALL
-    OFF
-    CACHE BOOL
-    "Do not install openPMD-api from the HASE superbuild"
-    FORCE
-)
-if(MPI_FOUND)
-    set(openPMD_USE_MPI
-        ON
-        CACHE STRING
-        "Enable MPI in openPMD-api when HASE MPI is available"
+        "Deprecated compatibility alias; use HASE_OPENPMD_PROVIDER"
         FORCE
     )
 else()
-    set(openPMD_USE_MPI
-        OFF
-        CACHE STRING
-        "Disable MPI in openPMD-api when HASE MPI is unavailable"
+    set(HASE_USE_SYSTEM_OPENPMD FALSE)
+    set(HASE_BUILD_OPENPMD_FROM_SOURCE
+        ON
+        CACHE BOOL
+        "Deprecated compatibility alias; use HASE_OPENPMD_PROVIDER"
         FORCE
     )
 endif()
 
-FetchContent_Declare(
-    openPMD
-    GIT_REPOSITORY "${HASE_OPENPMD_GIT_REPOSITORY}"
-    GIT_TAG "${HASE_OPENPMD_GIT_TAG}"
-)
-FetchContent_MakeAvailable(openPMD)
-
-if(NOT TARGET openPMD::openPMD)
-    message(FATAL_ERROR "openPMD::openPMD target was not created")
-endif()
-
-if(TARGET openPMD)
-    set_target_properties(
-        openPMD
-        PROPERTIES INSTALL_RPATH "${HASE_INSTALL_LIB_RPATH}"
-    )
-endif()
-if(TARGET hdf5-shared)
-    set_target_properties(
-        hdf5-shared
-        PROPERTIES INSTALL_RPATH "${HASE_INSTALL_LIB_RPATH}"
-    )
-endif()
-
-if(TARGET openPMD.py)
-    set_target_properties(
-        openPMD.py
-        PROPERTIES
-            INSTALL_RPATH "${HASE_INSTALL_RPATH}"
-            INSTALL_RPATH_USE_LINK_PATH ON
-    )
-    add_custom_target(hase_openpmd_python DEPENDS openPMD.py)
-    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND openPMD_PYTHON_OUTPUT_DIRECTORY)
-        set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
-            "${openPMD_PYTHON_OUTPUT_DIRECTORY}"
-            CACHE PATH
-            "Directory containing the openpmd_api Python package matching openPMD::openPMD"
-            FORCE
-        )
-        message(
-            STATUS
-            "HASE built openPMD Python package directory: ${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
-        )
-    endif()
-endif()
+hase_openpmd_configure_python("${HASE_OPENPMD_ACTUAL_PROVIDER}")

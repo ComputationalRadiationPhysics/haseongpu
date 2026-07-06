@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _load_preflight_module():
@@ -87,3 +88,20 @@ def test_default_cmake_generator_respects_cmake_generator_env(monkeypatch, tmp_p
     monkeypatch.setenv("CMAKE_GENERATOR", "Unix Makefiles")
 
     assert preflight._default_cmake_generator() is None
+
+
+def test_cmake_probe_reports_missing_cmake_executable():
+    preflight = _load_preflight_module()
+    errors = []
+    info = preflight._cmake_probe(
+        SimpleNamespace(
+            cmake="/definitely/missing/cmake",
+            cmake_generator=None,
+            cmake_prefix_path=None,
+            openpmd_dir=None,
+        ),
+        errors,
+    )
+
+    assert "was not found" in "\n".join(errors)
+    assert "/definitely/missing/cmake" in info["command"]

@@ -197,10 +197,10 @@ openPMD Provider and Runtime Backend
 
 For a guided first-run setup, run ``python3 utils/configure_hase.py`` from a
 source checkout or ``hase-configure`` after installation. The helper first
-chooses bundled versus external openPMD, then asks only the follow-up questions
-that apply: external openPMD prefix and matching Python module, external
-ADIOS2 hints when the external provider was built with ADIOS2, or bundled
-ADIOS2 fetch/HDF5-only/system-ADIOS2 choices. It then emits matching CMake and
+chooses bundled versus system openPMD, then asks only the follow-up questions
+that apply: system openPMD prefix and matching Python module, system
+ADIOS2/HDF5 hints when needed, or bundled ADIOS2/HDF5 fetch/off/system
+choices. It then emits matching CMake and
 PhiASE YAML snippets under ``config/hase-phiase.yaml`` by default, asks
 whether to install immediately with yes as the default answer, and defaults
 native CPU optimizations to on for local performance, with a warning to disable
@@ -215,10 +215,10 @@ HDF5-only configurations use ``hdf5`` instead. Accepted values are
 
 Provider modes are separate from runtime backend selection:
 
-* External provider, ``HASE_BUILD_OPENPMD_FROM_SOURCE=OFF``: HASEonGPU uses an
+* System provider, ``HASE_OPENPMD_PROVIDER=system``: HASEonGPU uses an
   already installed C++ ``openPMD::openPMD`` package and a compatible Python
   ``openpmd_api`` module. This mode does not build ADIOS2. For source-built
-  external openPMD-api providers, install or build ADIOS2 first when the
+  system openPMD-api providers, install or build ADIOS2 first when the
   provider must support ``adios`` or ``adios-sst``, then expose it through
   openPMD-api's ``CMAKE_PREFIX_PATH`` or ``ADIOS2_DIR``. For ADIOS2 source
   installs used this way, pass ``-DADIOS2_INSTALL_GENERATE_CONFIG=OFF`` unless
@@ -226,42 +226,45 @@ Provider modes are separate from runtime backend selection:
   use ADIOS2's CMake package config. openPMD-api 0.17.x does not FetchContent
   ADIOS2 through ``openPMD_SUPERBUILD``; it only finds an existing ADIOS2
   package.
-* Bundled source provider, ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON``: HASEonGPU
-  uses FetchContent to build ADIOS2 before configuring the pinned openPMD-api
-  provider, then enables ADIOS2, ADIOS2 SST, and HDF5 support for the CMake
-  build.
+* Bundled provider, ``HASE_OPENPMD_PROVIDER=bundled``: HASEonGPU installs the
+  selected pinned dependencies into a build-local CMake prefix before
+  configuring the pinned openPMD-api provider against that prefix. This keeps
+  HDF5, ADIOS2, and openPMD-api reusable for later installs with matching
+  settings.
 
 Use ``utils/check_openpmd_compatibility.py`` before installing when in doubt.
 The preflight prints the selected backend, the backends confirmed by the active
 Python and CMake providers, and the built-in HASE source-build backend set
 (``adios-sst`` by default, plus ``adios`` and ``hdf5``).
 
-The CI matrix keeps most jobs on the bundled source-build provider and includes
-a dedicated Ubuntu job that runs an ordered external-provider smoke matrix in a
+The CI matrix keeps most jobs on the bundled provider and includes
+a dedicated Ubuntu job that runs an ordered system-provider smoke matrix in a
 single container. For each pinned openPMD-api version, it builds and
-installs the external provider prerequisites, builds an openPMD-api C++ prefix
+installs the system provider prerequisites, builds an openPMD-api C++ prefix
 against those prerequisites, installs the matching Python package, installs
 HASEonGPU against that prefix, and then checks ``adios``, ``adios-sst``, and
 ``hdf5`` smoke scenarios. The current pinned external versions are ``0.17.0``
 and ``0.17.1``.
-This keeps external-versus-bundled provider selection covered without
+This keeps system-versus-bundled provider selection covered without
 multiplying every compiler and accelerator combination.
 
-``HASE_BUILD_OPENPMD_FROM_SOURCE``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``HASE_OPENPMD_PROVIDER``
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Default: ``OFF``
+* Default: ``auto``
 * Description:
   Controls the openPMD install contract.
 
-  * ``OFF``: use an externally installed openPMD-api C++ package found through
+  * ``auto``: use a system openPMD-api C++ package when CMake can find one,
+    otherwise build a bundled provider.
+  * ``system``: use an installed openPMD-api C++ package found through
     ``find_package(openPMD CONFIG REQUIRED)``. The Python ``openpmd_api``
     package installed in the runtime environment must come from the same
     openPMD provider family and must support the runtime backend used by your
     workflow.
-  * ``ON``: use the FetchContent source-build provider. HASEonGPU builds ADIOS2
-    before configuring the pinned openPMD-api provider and enables ADIOS2,
-    ADIOS2 SST, and HDF5 support for the CMake build.
+  * ``bundled``: install the selected pinned ADIOS2 and/or HDF5 dependencies
+    into a build-local CMake prefix, then install pinned openPMD-api against
+    those installed packages.
 
 The HASE wheel does not vendor openPMD runtime libraries or generated
 ``openpmd_api`` bindings in either mode. The target runtime environment must
@@ -276,7 +279,7 @@ library directories.
 
 * Default: ``ON``
 * Description:
-  Applies to the bundled source-build provider. Enables ADIOS2-backed openPMD
+  Applies to the bundled provider. Enables ADIOS2-backed openPMD
   runtime backends. Disable this for an HDF5-only bundled provider.
 
 ``HASE_OPENPMD_USE_HDF5``
@@ -284,7 +287,7 @@ library directories.
 
 * Default: ``ON``
 * Description:
-  Applies to the bundled source-build provider. Enables HDF5 support in the
+  Applies to the bundled provider. Enables HDF5 support in the
   pinned openPMD-api provider. At least one of ``HASE_OPENPMD_USE_ADIOS2`` or
   ``HASE_OPENPMD_USE_HDF5`` must be enabled.
 
@@ -293,7 +296,7 @@ library directories.
 
 * Default: ``ON``
 * Description:
-  Applies to the bundled source-build provider when ADIOS2 support is enabled.
+  Applies to the bundled provider when ADIOS2 support is enabled.
   Enables ADIOS2 SST support for the ``adios-sst`` runtime backend.
 
 ``HASE_OPENPMD_FETCH_ADIOS2``
@@ -301,30 +304,39 @@ library directories.
 
 * Default: ``ON``
 * Description:
-  Applies to the bundled source-build provider when ADIOS2 support is enabled.
+  Applies to the bundled provider when ADIOS2 support is enabled.
   ``ON`` fetches and builds the pinned ADIOS2 dependency. ``OFF`` uses a
   system ADIOS2 package found through ``ADIOS2_DIR`` or ``CMAKE_PREFIX_PATH``.
+
+``HASE_OPENPMD_FETCH_HDF5``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Default: ``ON``
+* Description:
+  Applies to the bundled provider when HDF5 support is enabled. ``ON`` fetches
+  and builds the pinned HDF5 dependency. ``OFF`` uses a system HDF5 package
+  found through ``HDF5_DIR`` or ``CMAKE_PREFIX_PATH``.
 
 ``HASE_OPENPMD_SUPERBUILD``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Default: ``ON`` unless inherited from ``openPMD_SUPERBUILD``
 * Description:
-  Applies only when ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON``. Allows the pinned
+  Applies only when ``HASE_OPENPMD_PROVIDER=bundled``. Allows the pinned
   openPMD-api build to fetch or build its helper dependencies. This is not an
-  ADIOS2 install switch; HASE's source-build path uses FetchContent to build
-  ADIOS2 before openPMD-api is configured. Disable this only when the required
-  openPMD dependencies are provided externally.
+  ADIOS2 or HDF5 install switch; HASE's bundled path installs those
+  dependencies before openPMD-api is configured. Disable this only when the
+  required openPMD helper dependencies are provided externally.
 
 ``HASE_USE_SYSTEM_OPENPMD``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Default: deprecated
 * Description:
-  Deprecated compatibility alias. Use ``HASE_BUILD_OPENPMD_FROM_SOURCE``
-  instead. ``HASE_USE_SYSTEM_OPENPMD=ON`` maps to
-  ``HASE_BUILD_OPENPMD_FROM_SOURCE=OFF``; ``HASE_USE_SYSTEM_OPENPMD=OFF`` maps
-  to ``HASE_BUILD_OPENPMD_FROM_SOURCE=ON``.
+  Deprecated compatibility alias. Use ``HASE_OPENPMD_PROVIDER`` instead.
+  ``HASE_USE_SYSTEM_OPENPMD=ON`` maps to
+  ``HASE_OPENPMD_PROVIDER=system``; ``HASE_USE_SYSTEM_OPENPMD=OFF`` maps to
+  ``HASE_OPENPMD_PROVIDER=bundled``.
 
 ``HASE_OPENPMD_BUILD_PYTHON_BINDINGS``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -332,13 +344,13 @@ library directories.
 * Default: ``OFF``
 * Description:
   Builds openPMD-api Python bindings as part of the HASE CMake build tree when
-  using the bundled source-build provider. These bindings are not installed
+  using the bundled provider. These bindings are not installed
   into the HASE wheel. Instead, HASE records the generated build-tree
   ``site-packages`` directory in its runtime configuration so Python runs can
   load the matching ``openpmd_api`` module from that provider path. Keep the
   build tree available for that local install, or provide a separately
   installed matching ``openpmd_api`` through the runtime environment. This
-  option is ignored for the external-provider contract.
+  option is ignored for the system-provider contract.
 
 ``HASE_OPENPMD_PYTHON_PACKAGE_DIR``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -348,7 +360,7 @@ library directories.
   Directory containing the matching ``openpmd_api`` Python package. Normally
   leave this empty so the installed Python environment supplies
   ``openpmd_api``. Set it only when the runtime must prefer a specific
-  site-packages directory from the same external openPMD installation as
+  site-packages directory from the same system openPMD installation as
   ``openPMD::openPMD``.
 
 ``HASE_OPENPMD_RUNTIME_RPATH``
