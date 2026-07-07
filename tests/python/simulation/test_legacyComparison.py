@@ -28,7 +28,7 @@ alpakaBackends = AlpakaBackends.all()
 REGRESSION_RNG_SEED = 5489
 
 
-def _runExampleScript(workdir, phiAseConfigPath, backend, timeSlices, minSample_i, maxSample_i, rngSeed=None):
+def _runExampleScript(workdir, phiAseConfigPath, backend, openPmdBackend, timeSlices, minSample_i, maxSample_i, rngSeed=None):
     command = [
         sys.executable,
         str(exampleScript),
@@ -36,6 +36,8 @@ def _runExampleScript(workdir, phiAseConfigPath, backend, timeSlices, minSample_
         str(phiAseConfigPath),
         "--backend",
         str(backend),
+        "--openpmd-backend",
+        str(openPmdBackend),
         "--timeSteps",
         str(timeSlices),
         "--vtk-output-dir",
@@ -65,6 +67,7 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
     backend,
     tmp_path,
     legacyPhiAseConfigPath,
+    openPmdRuntimeBackend,
 ):
     minSample_i=0
     maxSample_i=100
@@ -73,6 +76,7 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
         tmp_path,
         legacyPhiAseConfigPath,
         backend,
+        openPmdRuntimeBackend,
         timeSlices,
         minSample_i,
         maxSample_i,
@@ -84,6 +88,7 @@ def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
         minSampleRange=minSample_i,
         maxSampleRange=maxSample_i,
         backend=backend,
+        openpmdBackend=openPmdRuntimeBackend,
         rngSeed=REGRESSION_RNG_SEED,
     )
     _, _, _, pointData, _, _ = _parseVtk(tmp_path / f"laserPumpCladding_{timeSlices:03d}.vtk")

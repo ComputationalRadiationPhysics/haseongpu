@@ -11,6 +11,7 @@ from pyInclude.config import (
     BUNDLED_HDF5_FETCH,
     BUNDLED_HDF5_OFF,
     BUNDLED_HDF5_SYSTEM,
+    MPI_MODE_OFF,
     MPI_MODE_ON,
     OPENPMD_ADIOS2_NO,
     PROVIDER_BUNDLED,
@@ -312,8 +313,20 @@ def test_bundled_provider_template_sets_fetched_dependency_versions():
     assert "HDF5_IS_PARALLEL" in openpmd_template
 
 
+def test_cmake_mpi_disable_uses_current_disable_mpi_choice():
+    cmake_lists = Path("CMakeLists.txt").read_text(encoding="utf-8")
+    provider_script = Path("cmake/findOpenPmd.cmake").read_text(encoding="utf-8")
+
+    assert "set(HASE_MPI_ENABLED OFF)" in cmake_lists
+    assert "elseif(DISABLE_MPI STREQUAL \"OFF\")\n    find_package(MPI COMPONENTS CXX REQUIRED)\n    set(HASE_MPI_ENABLED ON)" in cmake_lists
+    assert "if(HASE_MPI_ENABLED)\n    target_compile_definitions(hase_core INTERFACE MPI_FOUND)" in cmake_lists
+    assert "if(HASE_MPI_ENABLED)\n        set(HASE_OPENPMD_PROVIDER_MPI ON)" in provider_script
+    assert "if(HASE_MPI_ENABLED)\n            set(HASE_PROVIDER_USE_MPI ON)" in provider_script
+
+
 def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
     script = Path("cmake/findOpenPmd.cmake").read_text(encoding="utf-8")
+    normalized_script = " ".join(script.split())
 
     hdf5_stage = "hase_openpmd_run_provider_stage(hdf5 HaseHdf5Provider.cmake.in)"
     adios2_stage = "hase_openpmd_run_provider_stage(adios2 HaseAdios2Provider.cmake.in)"
@@ -321,10 +334,34 @@ def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
 
     assert "is not supported for the installable bundled openPMD provider" not in script
     assert "HASE_OPENPMD_USE_HDF5\n    \"Enable HDF5 support in the HASE-managed openPMD provider\"\n    OFF" in script
-    assert "stage_name STREQUAL \"openpmd\" AND HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_FETCH_HDF5" in script
+    assert "stage_name STREQUAL \"openpmd\" AND HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_FETCH_HDF5" in normalized_script
     assert "-DHDF5_DIR=${HASE_OPENPMD_BUNDLED_PREFIX}/lib/cmake/hdf5" in script
     assert script.index(hdf5_stage) < script.index(openpmd_stage)
     assert script.index(adios2_stage) < script.index(openpmd_stage)
+
+
+def test_hdf5_prompt_requires_hdf5_when_adios2_is_disabled(monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
+
+    choice = configure_module._interactive_bundled_hdf5(BUNDLED_ADIOS2_OFF)
+
+    output = capsys.readouterr().out
+    assert choice == BUNDLED_HDF5_FETCH
+    assert "  2) off     do not use HDF5" not in output
+    assert "  2) system  use an existing HDF5 installation" in output
+
+
+def test_interactive_mpi_no_disables_mpi_build(monkeypatch):
+    args = configure_module._parse_args(["--provider", PROVIDER_BUNDLED])
+    args.interactive = True
+    answers = iter(["", "", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr(configure_module, "available_alpaka_backends", lambda: ([], None))
+
+    selection, _alpaka_backends, _alpaka_error, _probe_report = configure_module._build_selection(args)
+
+    assert selection.mpi_mode == MPI_MODE_OFF
+    assert "-DDISABLE_MPI=ON" in install_command(selection)
 
 
 def test_interactive_install_prompt_defaults_to_yes(tmp_path, monkeypatch):

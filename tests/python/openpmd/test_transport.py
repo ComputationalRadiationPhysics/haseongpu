@@ -173,8 +173,24 @@ def launch_smoke_phi_ase():
     )
 
 
+def _configured_backend_for_tests():
+    for name in ("HASE_OPENPMD_TEST_BACKEND", "OPENPMD_RUNTIME_BACKEND"):
+        backend = os.environ.get(name, "").strip().lower()
+        if backend:
+            return backend
+
+    backends = [
+        backend.strip().lower()
+        for backend in os.environ.get("HASE_OPENPMD_TEST_BACKENDS", "").split(",")
+        if backend.strip()
+    ]
+    if len(backends) == 1:
+        return backends[0]
+    return "adios"
+
+
 def _file_backend_for_tests():
-    backend = os.environ.get("HASE_OPENPMD_TEST_BACKEND", "adios").strip().lower()
+    backend = _configured_backend_for_tests()
     if backend in {"hdf5", "adios"}:
         return backend
     return "adios"
@@ -1478,7 +1494,7 @@ def test_calc_phi_ase_mpi_openpmd_round_trip_with_matrix_rank(monkeypatch, tmp_p
         phi_ase,
         launch_smoke_medium(),
         launch_smoke_cross_sections(),
-        transport=_file_backend_for_tests(),
+        transport=_configured_backend_for_tests(),
         command_prefix=_mpiexec_command_prefix(ranks),
         workspace_dir=tmp_path,
     )
