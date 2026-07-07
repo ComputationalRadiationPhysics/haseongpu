@@ -138,13 +138,13 @@ namespace hase::kernels
         double hSumPhi,
         unsigned& threadLocalStridingRNG)
     {
-        alpaka::onHost::fill(queue, raysPerPrism, 0u);
+        alpaka::onHost::memset(queue, raysPerPrism, 0);
         unsigned hRaysDump = 0;
         auto hRaysDumpView = alpaka::makeView(alpaka::api::host, &hRaysDump, alpaka::Vec{1u});
         auto dRaysDump = alpakaUtils::toDevice(queue, hRaysDumpView);
         if(!std::isfinite(hSumPhi) || hSumPhi <= 0.0)
         {
-            alpaka::onHost::fill(queue, importance, 0.0);
+            alpaka::onHost::memset(queue, importance, 0);
             alpaka::onHost::wait(queue);
             return 0u;
         }
