@@ -8,6 +8,7 @@ from pyInclude.config import (
     BUNDLED_ADIOS2_FETCH,
     BUNDLED_ADIOS2_OFF,
     BUNDLED_ADIOS2_SYSTEM,
+    BUNDLED_HDF5_FETCH,
     BUNDLED_HDF5_OFF,
     BUNDLED_HDF5_SYSTEM,
     MPI_MODE_ON,
@@ -46,8 +47,12 @@ def test_preferred_openpmd_backend_uses_priority_and_validates_request():
     assert preferred_openpmd_backend(["adios", "hdf5"], "hdf5") == "hdf5"
 
 
-def test_bundled_defaults_include_adios2_and_hdf5():
+def test_bundled_defaults_are_adios2_only():
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH) == [
+        "adios-sst",
+        "adios",
+    ]
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_FETCH) == [
         "adios-sst",
         "adios",
         "hdf5",
@@ -71,6 +76,7 @@ def test_bundled_fetch_install_command_mentions_source_build():
         openpmd_backend="adios-sst",
         compute_backend="Host_Cpu_CpuSerial",
         bundled_adios2=BUNDLED_ADIOS2_FETCH,
+        bundled_hdf5=BUNDLED_HDF5_FETCH,
     )
 
     command = install_command(selection)
@@ -220,7 +226,7 @@ def test_alpaka_guidance_explains_missing_gpu_backends():
     assert "To get AMD/HIP backends" in guidance
 
 
-def test_install_command_uses_env_var_and_enables_native_optimizations_by_default():
+def test_install_command_uses_env_var_and_safe_defaults():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -230,9 +236,9 @@ def test_install_command_uses_env_var_and_enables_native_optimizations_by_defaul
     command = install_command(selection)
 
     assert 'HASE_CONFIGURE_CMAKE_ARGS="' in command
-    assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install .' in command
-    assert "-DDISABLE_MPI=ON" in command
-    assert "-DHASE_NATIVE_OPTIMIZATIONS=ON" in command
+    assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install -v .' in command
+    assert "-DDISABLE_MPI=AUTO" in command
+    assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in command
 
 
 def test_install_command_can_pass_break_system_packages():
@@ -244,7 +250,7 @@ def test_install_command_can_pass_break_system_packages():
 
     command = install_command(selection, break_system_packages=True)
 
-    assert "python3 -m pip install --break-system-packages ." in command
+    assert "python3 -m pip install -v --break-system-packages ." in command
 
 
 def test_install_command_can_disable_native_optimizations():
@@ -344,7 +350,84 @@ def test_interactive_install_prompt_defaults_to_yes(tmp_path, monkeypatch):
     monkeypatch.setattr(configure_module, "run_install", fake_run_install)
 
     assert configure_module.main(["--break-system-packages"]) == 17
-    assert seen == {"break_system_packages": True}
+    assert seen == {"break_system_packages": True, "use_ccache": False}
+
+
+def test_install_command_can_enable_ccache_launchers():
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios-sst",
+        compute_backend="Host_Cpu_CpuSerial",
+    )
+
+    command = install_command(selection, use_ccache=True)
+
+    assert "-DCMAKE_C_COMPILER_LAUNCHER=ccache" in command
+    assert "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache" in command
+    assert "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache" in command
+
+
+def test_reinstall_fails_without_previous_build(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+
+    assert configure_module.main(["--reinstall"]) == 1
+
+    assert "--reinstall requires a previous HASE CMake configure/install" in capsys.readouterr().err
+
+
+def test_reinstall_uses_previous_cmake_cache(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cache_dir = tmp_path / "build" / "cp-test"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "CMakeCache.txt").write_text(
+        "HASE_OPENPMD_PROVIDER:STRING=bundled\n"
+        "HASE_OPENPMD_USE_HDF5:BOOL=OFF\n"
+        "DISABLE_MPI:STRING=AUTO\n"
+        "HASE_NATIVE_OPTIMIZATIONS:BOOL=OFF\n",
+        encoding="utf-8",
+    )
+    seen = {}
+
+    def fake_run(cmake_arg_list, **kwargs):
+        seen["cmake_arg_list"] = cmake_arg_list
+        seen.update(kwargs)
+        return 13
+
+    monkeypatch.setattr(configure_module, "_run_install_with_cmake_args", fake_run)
+
+    assert configure_module.main(["--reinstall"]) == 13
+    assert seen["cmake_arg_list"] == [
+        "-DHASE_OPENPMD_PROVIDER=bundled",
+        "-DHASE_OPENPMD_USE_HDF5=OFF",
+        "-DDISABLE_MPI=AUTO",
+        "-DHASE_NATIVE_OPTIMIZATIONS=OFF",
+    ]
+    assert seen["record_state"] is True
+
+
+def test_autoinstall_uses_defaults_and_runs_install(tmp_path, monkeypatch):
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios-sst",
+        compute_backend="Host_Cpu_CpuSerial",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        configure_module,
+        "_build_selection",
+        lambda args: (selection, [], None, None),
+    )
+    seen = {}
+
+    def fake_run_install(selected, **kwargs):
+        seen["selected"] = selected
+        seen.update(kwargs)
+        return 19
+
+    monkeypatch.setattr(configure_module, "run_install", fake_run_install)
+
+    assert configure_module.main(["--autoinstall"]) == 19
+    assert seen == {"selected": selection, "break_system_packages": False, "use_ccache": False}
 
 
 def test_generated_yaml_loads_as_phi_ase_config():
