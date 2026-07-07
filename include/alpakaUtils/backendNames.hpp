@@ -28,11 +28,12 @@ namespace hase::alpakaUtils
         auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
         std::vector<std::string> names;
         alpaka::onHost::executeForEachIfHasDevice(
-            [&](auto const& backend)
+            [&](auto const& backend) -> int
             {
                 auto devSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
                 auto sampleDevice = devSelector.makeDevice(0);
                 names.emplace_back(getNameForBackend(backend, sampleDevice));
+                return 0;
             },
             backends);
         return names;

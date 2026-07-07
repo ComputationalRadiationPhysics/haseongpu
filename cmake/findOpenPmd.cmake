@@ -108,7 +108,10 @@ option(
 )
 
 if(HASE_OPENPMD_USE_SST AND NOT HASE_OPENPMD_USE_ADIOS2)
-    message(FATAL_ERROR "HASE_OPENPMD_USE_SST requires HASE_OPENPMD_USE_ADIOS2=ON")
+    message(
+        FATAL_ERROR
+        "HASE_OPENPMD_USE_SST requires HASE_OPENPMD_USE_ADIOS2=ON"
+    )
 endif()
 if(NOT HASE_OPENPMD_USE_ADIOS2 AND NOT HASE_OPENPMD_USE_HDF5)
     message(
@@ -172,7 +175,10 @@ option(
 
 function(hase_openpmd_validate_found provider_kind)
     if(NOT openPMD_FOUND)
-        message(FATAL_ERROR "Internal error: openPMD was not found for provider '${provider_kind}'.")
+        message(
+            FATAL_ERROR
+            "Internal error: openPMD was not found for provider '${provider_kind}'."
+        )
     endif()
     if(NOT TARGET openPMD::openPMD)
         message(
@@ -184,7 +190,10 @@ function(hase_openpmd_validate_found provider_kind)
 endfunction()
 
 function(hase_openpmd_configure_python provider_kind)
-    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND "${provider_kind}" STREQUAL "system")
+    if(
+        HASE_OPENPMD_BUILD_PYTHON_BINDINGS
+        AND "${provider_kind}" STREQUAL "system"
+    )
         message(
             STATUS
             "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with HASE_OPENPMD_PROVIDER=system; "
@@ -231,17 +240,19 @@ endfunction()
 
 function(hase_openpmd_find_bundled_config out_var)
     file(
-        GLOB_RECURSE
-        HASE_OPENPMD_BUNDLED_CONFIGS
-        LIST_DIRECTORIES
-            FALSE
+        GLOB_RECURSE HASE_OPENPMD_BUNDLED_CONFIGS
+        LIST_DIRECTORIES FALSE
         "${HASE_OPENPMD_BUNDLED_PREFIX}/openPMDConfig.cmake"
         "${HASE_OPENPMD_BUNDLED_PREFIX}/*/openPMDConfig.cmake"
     )
     list(SORT HASE_OPENPMD_BUNDLED_CONFIGS)
     if(HASE_OPENPMD_BUNDLED_CONFIGS)
         list(GET HASE_OPENPMD_BUNDLED_CONFIGS 0 HASE_OPENPMD_BUNDLED_CONFIG)
-        get_filename_component(HASE_OPENPMD_BUNDLED_CONFIG_DIR "${HASE_OPENPMD_BUNDLED_CONFIG}" DIRECTORY)
+        get_filename_component(
+            HASE_OPENPMD_BUNDLED_CONFIG_DIR
+            "${HASE_OPENPMD_BUNDLED_CONFIG}"
+            DIRECTORY
+        )
         set(${out_var} "${HASE_OPENPMD_BUNDLED_CONFIG_DIR}" PARENT_SCOPE)
     else()
         set(${out_var} "" PARENT_SCOPE)
@@ -250,18 +261,29 @@ endfunction()
 
 function(hase_openpmd_find_bundled_python out_var)
     file(
-        GLOB_RECURSE
-        HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
-        LIST_DIRECTORIES
-            FALSE
+        GLOB_RECURSE HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
+        LIST_DIRECTORIES FALSE
         "${HASE_OPENPMD_BUNDLED_PREFIX}/openpmd_api/__init__.py"
         "${HASE_OPENPMD_BUNDLED_PREFIX}/*/openpmd_api/__init__.py"
     )
     list(SORT HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
     if(HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
-        list(GET HASE_OPENPMD_BUNDLED_PYTHON_MARKERS 0 HASE_OPENPMD_BUNDLED_PYTHON_MARKER)
-        get_filename_component(HASE_OPENPMD_BUNDLED_PACKAGE_DIR "${HASE_OPENPMD_BUNDLED_PYTHON_MARKER}" DIRECTORY)
-        get_filename_component(HASE_OPENPMD_BUNDLED_SITE_PACKAGES "${HASE_OPENPMD_BUNDLED_PACKAGE_DIR}" DIRECTORY)
+        list(
+            GET
+            HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
+            0
+            HASE_OPENPMD_BUNDLED_PYTHON_MARKER
+        )
+        get_filename_component(
+            HASE_OPENPMD_BUNDLED_PACKAGE_DIR
+            "${HASE_OPENPMD_BUNDLED_PYTHON_MARKER}"
+            DIRECTORY
+        )
+        get_filename_component(
+            HASE_OPENPMD_BUNDLED_SITE_PACKAGES
+            "${HASE_OPENPMD_BUNDLED_PACKAGE_DIR}"
+            DIRECTORY
+        )
         set(${out_var} "${HASE_OPENPMD_BUNDLED_SITE_PACKAGES}" PARENT_SCOPE)
     else()
         set(${out_var} "" PARENT_SCOPE)
@@ -291,14 +313,24 @@ function(hase_openpmd_provider_stamp out_var)
         "C_COMPILER=${CMAKE_C_COMPILER}|${CMAKE_C_COMPILER_ID}|${CMAKE_C_COMPILER_VERSION}\n"
         "CXX_COMPILER=${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_ID}|${CMAKE_CXX_COMPILER_VERSION}\n"
     )
-    string(SHA256 HASE_OPENPMD_PROVIDER_STAMP_HASH "${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}")
-    set(${out_var} "${HASE_OPENPMD_PROVIDER_STAMP_HASH}\n${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}" PARENT_SCOPE)
+    string(
+        SHA256
+        HASE_OPENPMD_PROVIDER_STAMP_HASH
+        "${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}"
+    )
+    set(${out_var}
+        "${HASE_OPENPMD_PROVIDER_STAMP_HASH}\n${HASE_OPENPMD_PROVIDER_STAMP_CONTENT}"
+        PARENT_SCOPE
+    )
 endfunction()
 
-
 function(hase_openpmd_run_provider_stage stage_name template_file)
-    set(HASE_OPENPMD_STAGE_SOURCE_DIR "${CMAKE_BINARY_DIR}/hase-openpmd-provider/src/${stage_name}")
-    set(HASE_OPENPMD_STAGE_BUILD_DIR "${HASE_OPENPMD_BUNDLED_BUILD_DIR}/${stage_name}")
+    set(HASE_OPENPMD_STAGE_SOURCE_DIR
+        "${CMAKE_BINARY_DIR}/hase-openpmd-provider/src/${stage_name}"
+    )
+    set(HASE_OPENPMD_STAGE_BUILD_DIR
+        "${HASE_OPENPMD_BUNDLED_BUILD_DIR}/${stage_name}"
+    )
     file(MAKE_DIRECTORY "${HASE_OPENPMD_STAGE_SOURCE_DIR}")
     configure_file(
         "${CMAKE_CURRENT_LIST_DIR}/${template_file}"
@@ -324,31 +356,64 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
         "-DCMAKE_PREFIX_PATH=${HASE_OPENPMD_STAGE_PREFIX_PATH}"
     )
     if(CMAKE_GENERATOR)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-G" "${CMAKE_GENERATOR}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-G"
+            "${CMAKE_GENERATOR}"
+        )
     endif()
     if(CMAKE_GENERATOR_PLATFORM)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-A" "${CMAKE_GENERATOR_PLATFORM}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-A"
+            "${CMAKE_GENERATOR_PLATFORM}"
+        )
     endif()
     if(CMAKE_GENERATOR_TOOLSET)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-T" "${CMAKE_GENERATOR_TOOLSET}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-T"
+            "${CMAKE_GENERATOR_TOOLSET}"
+        )
     endif()
     if(CMAKE_MAKE_PROGRAM)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+        )
     endif()
     if(ADIOS2_DIR)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DADIOS2_DIR=${ADIOS2_DIR}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-DADIOS2_DIR=${ADIOS2_DIR}"
+        )
     endif()
     if(HDF5_DIR)
-        list(APPEND HASE_OPENPMD_STAGE_CONFIGURE_COMMAND "-DHDF5_DIR=${HDF5_DIR}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-DHDF5_DIR=${HDF5_DIR}"
+        )
     endif()
 
-    message(STATUS "Configuring HASE-managed bundled openPMD provider stage: ${stage_name}")
+    message(
+        STATUS
+        "Configuring HASE-managed bundled openPMD provider stage: ${stage_name}"
+    )
     execute_process(
         COMMAND ${HASE_OPENPMD_STAGE_CONFIGURE_COMMAND}
         RESULT_VARIABLE HASE_OPENPMD_STAGE_CONFIGURE_RESULT
     )
     if(NOT HASE_OPENPMD_STAGE_CONFIGURE_RESULT EQUAL 0)
-        message(FATAL_ERROR "Configuring the HASE-managed openPMD provider stage '${stage_name}' failed")
+        message(
+            FATAL_ERROR
+            "Configuring the HASE-managed openPMD provider stage '${stage_name}' failed"
+        )
     endif()
 
     set(HASE_OPENPMD_STAGE_BUILD_COMMAND
@@ -359,28 +424,49 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
         "install"
     )
     if(CMAKE_BUILD_TYPE)
-        list(APPEND HASE_OPENPMD_STAGE_BUILD_COMMAND "--config" "${CMAKE_BUILD_TYPE}")
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_BUILD_COMMAND
+            "--config"
+            "${CMAKE_BUILD_TYPE}"
+        )
     endif()
-    message(STATUS "Building/installing HASE-managed bundled openPMD provider stage: ${stage_name}")
+    message(
+        STATUS
+        "Building/installing HASE-managed bundled openPMD provider stage: ${stage_name}"
+    )
     execute_process(
         COMMAND ${HASE_OPENPMD_STAGE_BUILD_COMMAND}
         RESULT_VARIABLE HASE_OPENPMD_STAGE_BUILD_RESULT
     )
     if(NOT HASE_OPENPMD_STAGE_BUILD_RESULT EQUAL 0)
-        message(FATAL_ERROR "Building/installing the HASE-managed openPMD provider stage '${stage_name}' failed")
+        message(
+            FATAL_ERROR
+            "Building/installing the HASE-managed openPMD provider stage '${stage_name}' failed"
+        )
     endif()
 endfunction()
 
 function(hase_openpmd_bootstrap_bundled_provider)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hase-openpmd-provider")
-    set(HASE_OPENPMD_BUNDLED_STAMP "${HASE_OPENPMD_BUNDLED_PREFIX}/hase-openpmd-provider.stamp")
+    set(HASE_OPENPMD_BUNDLED_STAMP
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/hase-openpmd-provider.stamp"
+    )
     hase_openpmd_provider_stamp(HASE_OPENPMD_EXPECTED_STAMP)
     hase_openpmd_find_bundled_config(HASE_OPENPMD_EXISTING_CONFIG_DIR)
 
     set(HASE_OPENPMD_REUSE_PROVIDER FALSE)
-    if(NOT HASE_OPENPMD_BUNDLED_REBUILD AND HASE_OPENPMD_EXISTING_CONFIG_DIR AND EXISTS "${HASE_OPENPMD_BUNDLED_STAMP}")
+    if(
+        NOT HASE_OPENPMD_BUNDLED_REBUILD
+        AND HASE_OPENPMD_EXISTING_CONFIG_DIR
+        AND EXISTS "${HASE_OPENPMD_BUNDLED_STAMP}"
+    )
         file(READ "${HASE_OPENPMD_BUNDLED_STAMP}" HASE_OPENPMD_EXISTING_STAMP)
-        if("${HASE_OPENPMD_EXISTING_STAMP}" STREQUAL "${HASE_OPENPMD_EXPECTED_STAMP}")
+        if(
+            "${HASE_OPENPMD_EXISTING_STAMP}"
+                STREQUAL
+                "${HASE_OPENPMD_EXPECTED_STAMP}"
+        )
             set(HASE_OPENPMD_REUSE_PROVIDER TRUE)
         endif()
     endif()
@@ -412,7 +498,11 @@ function(hase_openpmd_bootstrap_bundled_provider)
         endif()
         hase_openpmd_run_provider_stage(openpmd HaseOpenPmdProvider.cmake.in)
 
-        file(WRITE "${HASE_OPENPMD_BUNDLED_STAMP}" "${HASE_OPENPMD_EXPECTED_STAMP}")
+        file(
+            WRITE
+            "${HASE_OPENPMD_BUNDLED_STAMP}"
+            "${HASE_OPENPMD_EXPECTED_STAMP}"
+        )
         hase_openpmd_find_bundled_config(HASE_OPENPMD_EXISTING_CONFIG_DIR)
     endif()
 
@@ -438,7 +528,10 @@ function(hase_openpmd_bootstrap_bundled_provider)
         PARENT_SCOPE
     )
 
-    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS AND NOT HASE_OPENPMD_PYTHON_PACKAGE_DIR)
+    if(
+        HASE_OPENPMD_BUILD_PYTHON_BINDINGS
+        AND NOT HASE_OPENPMD_PYTHON_PACKAGE_DIR
+    )
         hase_openpmd_find_bundled_python(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
         if(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
             set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
@@ -473,13 +566,22 @@ if(HASE_OPENPMD_PROVIDER STREQUAL "system")
     hase_openpmd_validate_found("system")
     set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
 elseif(HASE_OPENPMD_PROVIDER STREQUAL "auto")
-    message(STATUS "HASE_OPENPMD_PROVIDER=auto: probing for a system openPMD-api provider")
+    message(
+        STATUS
+        "HASE_OPENPMD_PROVIDER=auto: probing for a system openPMD-api provider"
+    )
     find_package(openPMD CONFIG QUIET)
     if(openPMD_FOUND AND TARGET openPMD::openPMD)
-        message(STATUS "HASE_OPENPMD_PROVIDER=auto: using system openPMD-api provider")
+        message(
+            STATUS
+            "HASE_OPENPMD_PROVIDER=auto: using system openPMD-api provider"
+        )
         set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
     else()
-        message(STATUS "HASE_OPENPMD_PROVIDER=auto: no system provider found; using bundled provider")
+        message(
+            STATUS
+            "HASE_OPENPMD_PROVIDER=auto: no system provider found; using bundled provider"
+        )
         hase_openpmd_bootstrap_bundled_provider()
         find_package(openPMD CONFIG REQUIRED)
         hase_openpmd_validate_found("bundled")

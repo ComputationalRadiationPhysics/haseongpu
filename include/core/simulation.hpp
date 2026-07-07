@@ -82,11 +82,12 @@ namespace hase::core
         auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
         std::vector<std::string> list;
         alpaka::onHost::executeForEachIfHasDevice(
-            [&](auto const& backend)
+            [&](auto const& backend) -> int
             {
                 auto devSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
                 auto sampleDevice = devSelector.makeDevice(0);
                 list.emplace_back(getNameForBackend(backend, sampleDevice));
+                return 0;
             },
             backends);
         return list;
@@ -148,7 +149,7 @@ namespace hase::core
         auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
         bool oneDidRun = false;
         auto i = alpaka::onHost::executeForEachIfHasDevice(
-            [&](auto const& backend)
+            [&](auto const& backend) -> int
             {
                 auto deviceSpec = backend[alpaka::object::deviceSpec];
                 auto exec = backend[alpaka::object::exec];
