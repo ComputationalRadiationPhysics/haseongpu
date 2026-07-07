@@ -25,6 +25,13 @@ namespace
 #endif
 
     constexpr char const* HASE_TRANSPORT_VERSION = "0.1";
+    constexpr unsigned VTK_TETRA = 10u;
+    constexpr unsigned TET4_VERTEX_COUNT = 4u;
+    constexpr unsigned TET4_FACE_COUNT = 4u;
+    constexpr unsigned TET4_FACE_WIDTH = 3u;
+    constexpr int BOUND_STOP = -1;
+    constexpr std::array<std::array<unsigned, TET4_FACE_WIDTH>, TET4_FACE_COUNT> TET4_FACE_VERTICES{
+        {{0u, 2u, 1u}, {0u, 1u, 3u}, {1u, 2u, 3u}, {2u, 0u, 3u}}};
 
     std::filesystem::path testPath(std::string const& name)
     {
@@ -67,7 +74,7 @@ namespace
         std::vector<std::string> const& axisLabels = {"flatIndex"})
     {
         record.setAttribute("geometry", "other");
-        record.setAttribute("geometryParameters", "topology=unstructured_triangular_prism");
+        record.setAttribute("geometryParameters", "topology=explicit_tet4_volume");
         record.setAttribute("dataOrder", "C");
         record.setAxisLabels(axisLabels);
         record.setAttribute("haseTransportVersion", std::string{HASE_TRANSPORT_VERSION});
@@ -119,6 +126,7 @@ namespace
     {
         auto record = iteration.meshes[recordName];
         record.setAttribute("geometry", "other");
+        record.setAttribute("geometryParameters", "topology=explicit_tet4_volume");
         record.setAttribute("dataOrder", "C");
         record.setAxisLabels(axisLabels);
         record.setGridSpacing(std::vector<double>(axisLabels.size(), 1.0));
@@ -131,6 +139,116 @@ namespace
         component.resetDataset({io::determineDatatype<T>(), extent});
         component.storeChunk(values, io::Offset{0u}, extent);
         series.flush();
+    }
+
+    std::vector<int> tet4FaceConnectivity(std::vector<unsigned> const& connectivity)
+    {
+        std::vector<int> faces;
+        auto const numberOfCells = static_cast<unsigned>(connectivity.size() / TET4_VERTEX_COUNT);
+        faces.reserve(numberOfCells * TET4_FACE_COUNT * TET4_FACE_WIDTH);
+        for(unsigned cell = 0u; cell < numberOfCells; ++cell)
+        {
+            for(auto const& face : TET4_FACE_VERTICES)
+            {
+                for(auto localVertex : face)
+                {
+                    faces.push_back(static_cast<int>(connectivity.at(cell * TET4_VERTEX_COUNT + localVertex)));
+                }
+            }
+        }
+        return faces;
+    }
+
+    void writeTet4StaticTopology(
+        io::Series& series,
+        io::Iteration& iteration,
+        std::vector<double> const& pointsX,
+        std::vector<double> const& pointsY,
+        std::vector<double> const& pointsZ,
+        std::vector<unsigned> const& connectivity)
+    {
+        auto const numberOfMeshPoints = static_cast<unsigned>(pointsX.size());
+        auto const numberOfCells = static_cast<unsigned>(connectivity.size() / TET4_VERTEX_COUNT);
+        writeComponent<double>(series, iteration, "core_points", "x", pointsX, {"mesh_point"});
+        writeComponent<double>(series, iteration, "core_points", "y", pointsY, {"mesh_point"});
+        writeComponent<double>(series, iteration, "core_points", "z", pointsZ, {"mesh_point"});
+        setMetadata(
+            iteration.meshes["core_points"],
+            {"coordinate", "mesh_point"},
+            {3u, numberOfMeshPoints},
+            false,
+            false,
+            "m",
+            {"mesh_point"});
+
+        std::vector<unsigned> offsets(numberOfCells + 1u);
+        for(unsigned cell = 0u; cell <= numberOfCells; ++cell)
+        {
+            offsets.at(cell) = TET4_VERTEX_COUNT * cell;
+        }
+        writeScalar<unsigned>(
+            series,
+            iteration,
+            "core_cells_connectivity",
+            connectivity,
+            {"cell", "local_vertex"},
+            {numberOfCells, TET4_VERTEX_COUNT},
+            false,
+            false);
+        writeScalar<unsigned>(
+            series,
+            iteration,
+            "core_cells_offsets",
+            offsets,
+            {"cell_offset"},
+            {numberOfCells + 1u},
+            false,
+            false);
+        writeScalar<unsigned>(
+            series,
+            iteration,
+            "core_cells_types",
+            std::vector<unsigned>(numberOfCells, VTK_TETRA),
+            {"cell"},
+            {numberOfCells},
+            false,
+            false);
+        writeScalar<int>(
+            series,
+            iteration,
+            "core_cell_faces",
+            tet4FaceConnectivity(connectivity),
+            {"cell", "local_face", "local_vertex"},
+            {numberOfCells, TET4_FACE_COUNT, TET4_FACE_WIDTH},
+            false,
+            false);
+        writeScalar<int>(
+            series,
+            iteration,
+            "core_cell_neighbor_cells",
+            std::vector<int>(numberOfCells * TET4_FACE_COUNT, -1),
+            {"cell", "local_face"},
+            {numberOfCells, TET4_FACE_COUNT},
+            false,
+            false);
+        writeScalar<int>(
+            series,
+            iteration,
+            "core_cell_neighbor_local_faces",
+            std::vector<int>(numberOfCells * TET4_FACE_COUNT, -1),
+            {"cell", "local_face"},
+            {numberOfCells, TET4_FACE_COUNT},
+            false,
+            false);
+        writeScalar<int>(
+            series,
+            iteration,
+            "core_cell_face_boundaries",
+            std::vector<int>(numberOfCells * TET4_FACE_COUNT, BOUND_STOP),
+            {"cell", "local_face"},
+            {numberOfCells, TET4_FACE_COUNT},
+            false,
+            false);
     }
 
     std::filesystem::path writeParserInput(
@@ -147,10 +265,10 @@ namespace
         iteration.setDt(1.0);
         iteration.setTimeUnitSI(1.0);
 
-        iteration.setAttribute("number_of_points", 3u);
+        iteration.setAttribute("number_of_points", 4u);
         iteration.setAttribute("number_of_cells", 1u);
-        iteration.setAttribute("number_of_levels", 2u);
-        iteration.setAttribute("thickness", 0.25f);
+        iteration.setAttribute("number_of_levels", 1u);
+        iteration.setAttribute("thickness", 0.0f);
         iteration.setAttribute("n_tot", 5.0f);
         iteration.setAttribute("crystal_t_fluo", 1.25f);
         iteration.setAttribute("cladding_number", 7u);
@@ -167,54 +285,30 @@ namespace
         iteration.setAttribute("max_sample_range", 5u);
         iteration.setAttribute("rng_seed", 1234u);
         iteration.setAttribute("use_reflections", true);
+        iteration.setAttribute("forward_ray_length", 1.0);
         iteration.setAttribute("spectral_resolution", 2u);
         iteration.setAttribute("monochromatic", false);
         iteration.setAttribute("max_sigma_absorption", 0.02);
         iteration.setAttribute("max_sigma_emission", 0.04);
 
-        writeComponent<double>(series, iteration, "core_vertices", "x", {0.0, 1.0, 0.0}, {"point"});
-        writeComponent<double>(series, iteration, "core_vertices", "y", {0.0, 0.0, 1.0}, {"point"});
-        setMetadata(iteration.meshes["core_vertices"], {"coordinate", "point"}, {2u, 3u}, false, true, "m", {"point"});
-        writeComponent<double>(series, iteration, "core_cell_center", "x", {1.0 / 3.0}, {"cell"});
-        writeComponent<double>(series, iteration, "core_cell_center", "y", {1.0 / 3.0}, {"cell"});
-        setMetadata(iteration.meshes["core_cell_center"], {"cell"}, {1u}, false, true, "m", {"cell"});
-
-        writeScalar<unsigned>(
+        writeTet4StaticTopology(
             series,
             iteration,
-            "core_connectivity",
-            {0u, 1u, 2u},
-            {"cell", "local_vertex"},
-            {1u, 3u});
-        writeScalar<int>(series, iteration, "core_neighbors", {-1, -1, -1}, {"cell", "local_side"}, {1u, 3u});
-        writeScalar<int>(series, iteration, "core_forbidden_edges", {-1, -1, -1}, {"cell", "local_side"}, {1u, 3u});
-        writeScalar<unsigned>(series, iteration, "core_normal_points", {0u, 1u, 2u}, {"cell", "local_side"}, {1u, 3u});
-        writeScalar<double>(
-            series,
-            iteration,
-            "core_cell_normal_x",
-            {0.0, 1.0, -1.0},
-            {"cell", "local_side"},
-            {1u, 3u});
-        writeScalar<double>(
-            series,
-            iteration,
-            "core_cell_normal_y",
-            {-1.0, 1.0, 0.0},
-            {"cell", "local_side"},
-            {1u, 3u});
-        writeScalar<float>(series, iteration, "core_surface", {0.5f}, {"cell"}, {1u}, false, true, "m^2");
+            {0.0, 1.0, 0.0, 0.0},
+            {0.0, 0.0, 1.0, 0.0},
+            {0.0, 0.0, 0.0, 1.0},
+            {0u, 1u, 2u, 3u});
         if(betaVolumeAsFloat)
         {
-            writeScalar<float>(series, iteration, "core_beta_volume", {0.1f}, {"cell", "layer"}, {1u, 1u}, true);
+            writeScalar<float>(series, iteration, "core_beta_volume", {0.1f}, {"cell"}, {1u}, true);
         }
         else if(betaVolumeBadExtent)
         {
-            writeScalar<double>(series, iteration, "core_beta_volume", {0.1, 0.2}, {"cell", "layer"}, {1u, 1u}, true);
+            writeScalar<double>(series, iteration, "core_beta_volume", {0.1, 0.2}, {"cell"}, {1u}, true);
         }
         else
         {
-            writeScalar<double>(series, iteration, "core_beta_volume", {0.1}, {"cell", "layer"}, {1u, 1u}, true);
+            writeScalar<double>(series, iteration, "core_beta_volume", {0.1}, {"cell"}, {1u}, true);
         }
         writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u}, {"cell"}, {1u});
         writeScalar<float>(series, iteration, "core_refractive_index", {1.5f, 1.0f, 1.5f, 1.0f}, {"interface"}, {4u});
@@ -283,10 +377,10 @@ namespace
             iteration.setTime(0.0);
             iteration.setDt(1.0);
             iteration.setTimeUnitSI(1.0);
-            iteration.setAttribute("number_of_points", 3u);
+            iteration.setAttribute("number_of_points", 4u);
             iteration.setAttribute("number_of_cells", 1u);
-            iteration.setAttribute("number_of_levels", 2u);
-            iteration.setAttribute("thickness", 0.25f);
+            iteration.setAttribute("number_of_levels", 1u);
+            iteration.setAttribute("thickness", 0.0f);
             iteration.setAttribute("n_tot", 5.0f);
             iteration.setAttribute("crystal_t_fluo", 1.25f);
             iteration.setAttribute("cladding_number", 7u);
@@ -303,6 +397,7 @@ namespace
             iteration.setAttribute("max_sample_range", 5u);
             iteration.setAttribute("rng_seed", 1234u);
             iteration.setAttribute("use_reflections", true);
+            iteration.setAttribute("forward_ray_length", 1.0);
             iteration.setAttribute("spectral_resolution", 2u);
             iteration.setAttribute("monochromatic", false);
             iteration.setAttribute("max_sigma_absorption", 0.02);
@@ -312,29 +407,14 @@ namespace
         auto first = series.snapshots()[0];
         setCommonAttributes(first);
         first.setAttribute("haseStaticUpdate", true);
-        writeComponent<double>(series, first, "core_points", "x", {0.0, 1.0, 0.0, 0.0, 1.0, 0.0}, {"mesh_point"});
-        writeComponent<double>(series, first, "core_points", "y", {0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, {"mesh_point"});
-        writeComponent<double>(series, first, "core_points", "z", {0.0, 0.0, 0.0, 0.25, 0.25, 0.25}, {"mesh_point"});
-        setMetadata(
-            first.meshes["core_points"],
-            {"coordinate", "mesh_point"},
-            {3u, 6u},
-            false,
-            false,
-            "m",
-            {"mesh_point"});
-        writeScalar<unsigned>(
+        writeTet4StaticTopology(
             series,
             first,
-            "core_cells_connectivity",
-            {0u, 1u, 2u, 3u, 4u, 5u},
-            {"cell", "local_vertex"},
-            {1u, 6u},
-            false,
-            false);
-        writeScalar<unsigned>(series, first, "core_cells_offsets", {0u, 6u}, {"cell_offset"}, {2u}, false, false);
-        writeScalar<unsigned>(series, first, "core_cells_types", {13u}, {"cell"}, {1u}, false, false);
-        writeScalar<double>(series, first, "core_beta_volume", {0.1}, {"cell", "layer"}, {1u, 1u}, true);
+            {0.0, 1.0, 0.0, 0.0},
+            {0.0, 0.0, 1.0, 0.0},
+            {0.0, 0.0, 0.0, 1.0},
+            {0u, 1u, 2u, 3u});
+        writeScalar<double>(series, first, "core_beta_volume", {0.1}, {"cell"}, {1u}, true);
         writeScalar<unsigned>(series, first, "core_cladding_cell_type", {0u}, {"cell"}, {1u});
         writeScalar<float>(series, first, "core_refractive_index", {1.5f, 1.0f, 1.5f, 1.0f}, {"interface"}, {4u});
         writeScalar<float>(series, first, "core_reflectivity", {0.1f, 0.2f}, {"cell", "interface"}, {1u, 2u});
@@ -353,7 +433,7 @@ namespace
         second.setDt(1.0);
         second.setTimeUnitSI(1.0);
         second.setAttribute("haseStaticUpdate", false);
-        writeScalar<double>(series, second, "core_beta_volume", {0.9}, {"cell", "layer"}, {1u, 1u}, true);
+        writeScalar<double>(series, second, "core_beta_volume", {0.9}, {"cell"}, {1u}, true);
         if(mutateSecond)
         {
             mutateSecond(series, second);
@@ -375,16 +455,15 @@ namespace
 
         constexpr unsigned numberOfPoints = 5u;
         constexpr unsigned numberOfCells = 3u;
-        constexpr unsigned numberOfLevels = 6u;
-        constexpr unsigned numberOfPrisms = numberOfCells * (numberOfLevels - 1u);
+        constexpr unsigned numberOfLevels = 1u;
         std::array<double, numberOfPoints> const x{0.0, 1.5, 0.25, 2.25, -0.75};
         std::array<double, numberOfPoints> const y{0.0, -0.5, 1.25, 2.5, 3.75};
-        std::array<std::array<unsigned, 3>, numberOfCells> const triangles{{{0u, 1u, 2u}, {2u, 3u, 4u}, {0u, 2u, 4u}}};
+        std::array<double, numberOfPoints> const z{0.0, 0.0, 0.0, 1.0, 1.0};
 
         iteration.setAttribute("number_of_points", numberOfPoints);
         iteration.setAttribute("number_of_cells", numberOfCells);
         iteration.setAttribute("number_of_levels", numberOfLevels);
-        iteration.setAttribute("thickness", 0.375f);
+        iteration.setAttribute("thickness", 0.0f);
         iteration.setAttribute("n_tot", 7.5f);
         iteration.setAttribute("crystal_t_fluo", 1.75f);
         iteration.setAttribute("cladding_number", 3u);
@@ -401,94 +480,27 @@ namespace
         iteration.setAttribute("max_sample_range", 0u);
         iteration.setAttribute("rng_seed", 1234u);
         iteration.setAttribute("use_reflections", true);
+        iteration.setAttribute("forward_ray_length", 1.0);
         iteration.setAttribute("spectral_resolution", 3u);
         iteration.setAttribute("monochromatic", false);
         iteration.setAttribute("max_sigma_absorption", 0.040);
         iteration.setAttribute("max_sigma_emission", 0.050);
 
-        std::vector<double> pointsX;
-        std::vector<double> pointsY;
-        std::vector<double> pointsZ;
-        pointsX.reserve(numberOfPoints * numberOfLevels);
-        pointsY.reserve(numberOfPoints * numberOfLevels);
-        pointsZ.reserve(numberOfPoints * numberOfLevels);
-        for(unsigned level = 0u; level < numberOfLevels; ++level)
-        {
-            for(unsigned point = 0u; point < numberOfPoints; ++point)
-            {
-                pointsX.push_back(x.at(point));
-                pointsY.push_back(y.at(point));
-                pointsZ.push_back(0.375 * static_cast<double>(level));
-            }
-        }
-        writeComponent<double>(series, iteration, "core_points", "x", pointsX, {"mesh_point"});
-        writeComponent<double>(series, iteration, "core_points", "y", pointsY, {"mesh_point"});
-        writeComponent<double>(series, iteration, "core_points", "z", pointsZ, {"mesh_point"});
-        setMetadata(
-            iteration.meshes["core_points"],
-            {"coordinate", "mesh_point"},
-            {3u, numberOfPoints * numberOfLevels},
-            false,
-            false,
-            "m",
-            {"mesh_point"});
-
-        std::vector<unsigned> connectivity;
-        connectivity.reserve(6u * numberOfPrisms);
-        for(unsigned level = 0u; level + 1u < numberOfLevels; ++level)
-        {
-            auto const lower = level * numberOfPoints;
-            auto const upper = (level + 1u) * numberOfPoints;
-            for(auto const& triangle : triangles)
-            {
-                connectivity.push_back(triangle.at(0u) + lower);
-                connectivity.push_back(triangle.at(1u) + lower);
-                connectivity.push_back(triangle.at(2u) + lower);
-                connectivity.push_back(triangle.at(0u) + upper);
-                connectivity.push_back(triangle.at(1u) + upper);
-                connectivity.push_back(triangle.at(2u) + upper);
-            }
-        }
-        std::vector<unsigned> offsets(numberOfPrisms + 1u);
-        for(unsigned prism = 0u; prism <= numberOfPrisms; ++prism)
-        {
-            offsets.at(prism) = 6u * prism;
-        }
-        writeScalar<unsigned>(
+        writeTet4StaticTopology(
             series,
             iteration,
-            "core_cells_connectivity",
-            connectivity,
-            {"cell", "local_vertex"},
-            {numberOfPrisms, 6u},
-            false,
-            false);
-        writeScalar<unsigned>(
-            series,
-            iteration,
-            "core_cells_offsets",
-            offsets,
-            {"cell_offset"},
-            {numberOfPrisms + 1u},
-            false,
-            false);
-        writeScalar<unsigned>(
-            series,
-            iteration,
-            "core_cells_types",
-            std::vector<unsigned>(numberOfPrisms, 13u),
-            {"cell"},
-            {numberOfPrisms},
-            false,
-            false);
+            std::vector<double>(x.begin(), x.end()),
+            std::vector<double>(y.begin(), y.end()),
+            std::vector<double>(z.begin(), z.end()),
+            {0u, 1u, 2u, 3u, 0u, 2u, 3u, 4u, 1u, 2u, 3u, 4u});
 
         writeScalar<double>(
             series,
             iteration,
             "core_beta_volume",
-            {0.11, 0.21, 0.31, 0.12, 0.22, 0.32, 0.13, 0.23, 0.33, 0.14, 0.24, 0.34, 0.15, 0.25, 0.35},
-            {"cell", "layer"},
-            {numberOfCells, numberOfLevels - 1u},
+            {0.11, 0.21, 0.31},
+            {"cell"},
+            {numberOfCells},
             true);
         writeScalar<unsigned>(series, iteration, "core_cladding_cell_type", {0u, 2u, 1u}, {"cell"}, {numberOfCells});
         writeScalar<float>(
@@ -572,11 +584,11 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     hase::openpmd::Parser parser{path, testPath("valid-output")};
     auto context = parser.read();
 
-    REQUIRE(context.mesh.numberOfPoints == 3u);
+    REQUIRE(context.mesh.numberOfPoints == 4u);
     REQUIRE(context.mesh.numberOfTriangles == 1u);
-    REQUIRE(context.mesh.numberOfLevels == 2u);
-    REQUIRE(context.mesh.trianglePointIndices == std::vector<unsigned>{0u, 1u, 2u});
-    REQUIRE(context.mesh.betaCells.size() == 6u);
+    REQUIRE(context.mesh.numberOfLevels == 1u);
+    REQUIRE(context.mesh.cellPointIndices == std::vector<unsigned>{0u, 1u, 2u, 3u});
+    REQUIRE(context.mesh.betaCells.size() == 4u);
     REQUIRE(context.experiment.spectral == 2u);
     REQUIRE(context.compute.maxRepetitions == 3u);
     REQUIRE(context.compute.writeVtk == false);
@@ -634,10 +646,10 @@ TEST_CASE("openPMD parser rejects malformed fields before HostMesh construction"
             [](io::Series& series, io::Iteration& iteration)
             {
                 (void) series;
-                iteration.meshes["core_connectivity"].setAttribute("haseTransportVersion", std::string{"999"});
+                iteration.meshes["core_cells_connectivity"].setAttribute("haseTransportVersion", std::string{"999"});
             });
         auto const error = parserError(path);
-        REQUIRE(error.find("openPMD validation error for 'core_connectivity'") != std::string::npos);
+        REQUIRE(error.find("openPMD validation error for 'core_cells_connectivity'") != std::string::npos);
         REQUIRE(error.find("haseTransportVersion") != std::string::npos);
     }
 
@@ -681,7 +693,7 @@ TEST_CASE("openPMD parser processAll consumes stream until producer close", "[op
         [&calls](hase::core::SimulationContext& context)
         {
             ++calls;
-            context.result.phiAse = std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+            context.result.phiAse = std::vector<float>{1.0f};
         });
 
     REQUIRE(calls == 1u);
@@ -692,14 +704,14 @@ TEST_CASE("openPMD parser processAll consumes stream until producer close", "[op
     {
         ++outputIterations;
         REQUIRE(iteration.iterationIndex == 0u);
-        REQUIRE(iteration.getAttribute("number_of_points").get<unsigned>() == 3u);
-        REQUIRE(iteration.getAttribute("number_of_levels").get<unsigned>() == 2u);
+        REQUIRE(iteration.getAttribute("number_of_points").get<unsigned>() == 4u);
+        REQUIRE(iteration.getAttribute("number_of_levels").get<unsigned>() == 1u);
 
         auto component = iteration.meshes["core_result_phi_ase"][io::MeshRecordComponent::SCALAR];
         auto chunk = component.loadChunk<float>();
         series.flush();
-        std::vector<float> phiAse(chunk.get(), chunk.get() + 6u);
-        REQUIRE(phiAse == std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f});
+        std::vector<float> phiAse(chunk.get(), chunk.get() + 1u);
+        REQUIRE(phiAse == std::vector<float>{1.0f});
         iteration.close();
     }
     series.close();
@@ -718,18 +730,18 @@ TEST_CASE("openPMD parser processAll reuses cached topology for dynamic-only ite
         [&calls](hase::core::SimulationContext& context)
         {
             ++calls;
-            REQUIRE(context.mesh.trianglePointIndices == std::vector<unsigned>{0u, 1u, 2u});
+            REQUIRE(context.mesh.cellPointIndices == std::vector<unsigned>{0u, 1u, 2u, 3u});
             if(calls == 1u)
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.1});
-                REQUIRE(context.mesh.betaCells.empty());
+                REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
             }
             else
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.9});
-                REQUIRE(context.mesh.betaCells.empty());
+                REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
             }
-            context.result.phiAse = std::vector<float>(6u, static_cast<float>(calls));
+            context.result.phiAse = std::vector<float>(1u, static_cast<float>(calls));
         });
 
     REQUIRE(calls == 2u);
@@ -745,8 +757,8 @@ TEST_CASE("openPMD parser processAll reuses cached topology for dynamic-only ite
         auto component = iteration.meshes["core_result_phi_ase"][io::MeshRecordComponent::SCALAR];
         auto chunk = component.loadChunk<float>();
         series.flush();
-        std::vector<float> phiAse(chunk.get(), chunk.get() + 6u);
-        REQUIRE(phiAse == std::vector<float>(6u, static_cast<float>(iterationIndex + 1u)));
+        std::vector<float> phiAse(chunk.get(), chunk.get() + 1u);
+        REQUIRE(phiAse == std::vector<float>(1u, static_cast<float>(iterationIndex + 1u)));
         iteration.close();
     }
     series.close();
@@ -861,7 +873,7 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
         context.mesh.points
         == std::vector<double>{0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75, 0.0, 0.0, 0.0, 1.0, 1.0});
     REQUIRE(context.mesh.betaVolume == std::vector<double>{0.11, 0.21, 0.31});
-    REQUIRE(context.mesh.betaCells.empty());
+    REQUIRE(context.mesh.betaCells == std::vector<double>(5u, 0.0));
     REQUIRE(context.mesh.claddingCellTypes == std::vector<unsigned>{0u, 2u, 1u});
     REQUIRE(context.mesh.refractiveIndices == std::vector<float>{1.80f, 1.20f, 1.65f, 1.05f});
     REQUIRE(context.mesh.reflectivities == std::vector<float>{0.01f, 0.03f, 0.05f, 0.02f, 0.04f, 0.06f});

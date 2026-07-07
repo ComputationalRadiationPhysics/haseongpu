@@ -1275,6 +1275,7 @@ namespace hase::openpmd
         iteration.setTimeUnitSI(1.0);
         iteration.setAttribute(field::numberOfPoints, mesh.numberOfPoints);
         iteration.setAttribute(field::numberOfCells, mesh.numberOfCells);
+        iteration.setAttribute(field::numberOfLevels, mesh.numberOfLevels);
 
         std::string const prefix = m_meshGroup + "_result_";
         auto phiAse = result.phiAse;
