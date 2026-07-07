@@ -147,10 +147,10 @@ if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
     if(NOT HASE_NVIDIA_SMI_RESULT EQUAL 0)
         message(
             STATUS
-            "No visible NVIDIA GPU found; falling back to CUDA architectures 70;80;90;100."
+            "No visible NVIDIA GPU found; falling back to CUDA architectures 70;75;80;86;89;90."
         )
         set(HASE_CUDA_ARCHITECTURES
-            "70;80;90;100"
+            "70;75;80;86;89;90"
             CACHE STRING
             "CUDA Architectures"
             FORCE
