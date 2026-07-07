@@ -138,6 +138,7 @@ if(NOT HASE_SELECT_BACKEND_ALPAKA)
 endif()
 
 if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
+    # probe nvidia-smi to check whether a gpu is found and "native" architecture will succeed
     execute_process(
         COMMAND nvidia-smi -L
         RESULT_VARIABLE HASE_NVIDIA_SMI_RESULT
@@ -145,16 +146,27 @@ if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
         ERROR_QUIET
     )
     if(NOT HASE_NVIDIA_SMI_RESULT EQUAL 0)
+        #in case the nvidia-smi probe fails HASEonGPU falls back to support a range of gpus starting from pascal (sm_60)
+        if(NOT DEFINED CUDAToolkit_VERSION)
+            find_package(CUDAToolkit QUIET)
+        endif()
+        if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
+            # CUDA 13 removed Maxwell/Pascal/Volta support, so do not target 50/60/70.
+            set(_hase_default_cuda_archs "75;80;90")
+        else()
+            set(_hase_default_cuda_archs "60;70;80;90")
+        endif()
         message(
             STATUS
-            "No visible NVIDIA GPU found; falling back to CUDA architectures 70;75;80;86;89;90."
+            "No visible NVIDIA GPU found; falling back to CUDA architectures ."
         )
         set(HASE_CUDA_ARCHITECTURES
-            "70;75;80;86;89;90"
+            ""
             CACHE STRING
             "CUDA Architectures"
             FORCE
         )
+        unset(_hase_default_cuda_archs)
     endif()
     unset(HASE_NVIDIA_SMI_RESULT)
 endif()
