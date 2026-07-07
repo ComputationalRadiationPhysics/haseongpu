@@ -288,11 +288,13 @@ library directories.
 ``HASE_OPENPMD_USE_HDF5``
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Default: ``ON``
+* Default: ``OFF``
 * Description:
   Applies to the bundled provider. Enables HDF5 support in the
   pinned openPMD-api provider. At least one of ``HASE_OPENPMD_USE_ADIOS2`` or
-  ``HASE_OPENPMD_USE_HDF5`` must be enabled.
+  ``HASE_OPENPMD_USE_HDF5`` must be enabled. MPI-enabled HDF5 provider builds
+  require a parallel HDF5 installation unless ``HASE_OPENPMD_FETCH_HDF5=ON``
+  is set to build the pinned HDF5 provider.
 
 ``HASE_OPENPMD_USE_SST``
 ^^^^^^^^^^^^^^^^^^^^^^^^

@@ -89,7 +89,7 @@ option(
 option(
     HASE_OPENPMD_USE_HDF5
     "Enable HDF5 support in the HASE-managed openPMD provider"
-    ON
+    OFF
 )
 option(
     HASE_OPENPMD_USE_SST
@@ -393,7 +393,17 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
             "-DADIOS2_DIR=${ADIOS2_DIR}"
         )
     endif()
-    if(HDF5_DIR)
+    if(
+        stage_name STREQUAL "openpmd"
+        AND HASE_OPENPMD_USE_HDF5
+        AND HASE_OPENPMD_FETCH_HDF5
+    )
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-DHDF5_DIR=${HASE_OPENPMD_BUNDLED_PREFIX}/lib/cmake/hdf5"
+        )
+    elseif(HDF5_DIR)
         list(
             APPEND
             HASE_OPENPMD_STAGE_CONFIGURE_COMMAND

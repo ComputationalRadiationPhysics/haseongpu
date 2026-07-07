@@ -302,11 +302,14 @@ def test_auto_provider_falls_back_to_bundled_when_cmake_missing(monkeypatch, cap
 def test_bundled_provider_template_sets_fetched_dependency_versions():
     hdf5_template = Path("cmake/HaseHdf5Provider.cmake.in").read_text(encoding="utf-8")
     adios2_template = Path("cmake/HaseAdios2Provider.cmake.in").read_text(encoding="utf-8")
+    openpmd_template = Path("cmake/HaseOpenPmdProvider.cmake.in").read_text(encoding="utf-8")
 
     assert 'string(REGEX REPLACE "^v" "" ADIOS2_VERSION "@HASE_ADIOS2_GIT_TAG@")' in adios2_template
     assert 'set(ADIOS2_VERSION' in adios2_template
     assert 'string(REGEX REPLACE "^hdf5_" "" HDF5_VERSION "@HASE_HDF5_GIT_TAG@")' in hdf5_template
     assert 'set(HDF5_VERSION' in hdf5_template
+    assert "HDF5_PREFER_PARALLEL" in openpmd_template
+    assert "HDF5_IS_PARALLEL" in openpmd_template
 
 
 def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
@@ -317,6 +320,9 @@ def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
     openpmd_stage = "hase_openpmd_run_provider_stage(openpmd HaseOpenPmdProvider.cmake.in)"
 
     assert "is not supported for the installable bundled openPMD provider" not in script
+    assert "HASE_OPENPMD_USE_HDF5\n    \"Enable HDF5 support in the HASE-managed openPMD provider\"\n    OFF" in script
+    assert "stage_name STREQUAL \"openpmd\" AND HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_FETCH_HDF5" in script
+    assert "-DHDF5_DIR=${HASE_OPENPMD_BUNDLED_PREFIX}/lib/cmake/hdf5" in script
     assert script.index(hdf5_stage) < script.index(openpmd_stage)
     assert script.index(adios2_stage) < script.index(openpmd_stage)
 

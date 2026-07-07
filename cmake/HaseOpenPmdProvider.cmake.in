@@ -26,7 +26,17 @@ else()
 endif()
 
 if(HASE_PROVIDER_USE_HDF5)
+    set(HDF5_PREFER_PARALLEL ${HASE_PROVIDER_USE_MPI_VALUE})
     find_package(HDF5 COMPONENTS C REQUIRED)
+    if(HASE_PROVIDER_USE_MPI AND DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
+        message(
+            FATAL_ERROR
+            "HASE bundled openPMD provider was configured with MPI and HDF5, "
+            "but CMake found a serial HDF5 provider. Point HDF5_DIR or "
+            "CMAKE_PREFIX_PATH to a parallel HDF5 installation, or set "
+            "HASE_OPENPMD_FETCH_HDF5=ON to build the pinned HDF5 provider."
+        )
+    endif()
 endif()
 
 if(HASE_PROVIDER_USE_ADIOS2)
