@@ -128,13 +128,29 @@ sphereCases = [
     for g0Value in np.geomspace(5, 400, num=8)
     if 5.0 >= np.float64(radiusValue) * np.float64(g0Value / 100) >= 1.0 >= calcBetaFromGain(g0Value/ 100, nTot, sigmaA, sigmaE) >= 0.0
 ]
+if not sphereCases:
+    raise RuntimeError("analytical sphere center test generated no cases")
 
 
 sphereCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in sphereCases]
 alpakaBackends = AlpakaBackends.all()
+if not alpakaBackends:
+    raise RuntimeError("analytical sphere tests require at least one Alpaka backend")
+
+
+def _requireAvailableAlpakaBackend(backend):
+    if backend not in alpakaBackends:
+        available = ", ".join(alpakaBackends)
+        raise AssertionError(
+            f"requested Alpaka backend {backend!r} is not reported by "
+            f"libHaseAlpakaBackendNames; available backends: {available}"
+        )
+
+
 @pytest.mark.parametrize("backend", alpakaBackends)
 @pytest.mark.parametrize(("radius", "g0"), sphereCases, ids=sphereCaseIds)
-def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAseTestConfigPath):
+def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAseTestConfigPath, openPmdRuntimeBackend):
+    _requireAvailableAlpakaBackend(backend)
     xDim = radius * 2.0
     nTot = np.float64(1.38e20 * 1.0)
     sigmaA = np.float64(0.11e-20)
@@ -185,13 +201,9 @@ def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAse
         minSampleRange=centerSample,
         maxSampleRange=centerSample,
         monochromatic=True,
+        openpmdBackend=openPmdRuntimeBackend,
     )
-    try:
-        phiAse.run(gainMedium=medium)
-    except RuntimeError as exc:
-        if "return code 1" in str(exc):
-            pytest.skip(f"backend {backend} is not available in this build")
-        raise
+    phiAse.run(gainMedium=medium)
     result = phiAse.getResults()
     shape = medium.get("betaCells").expectedShape
     phiAseValues = np.array(result.phiAse, dtype=np.float64).reshape(shape, order="F")
@@ -223,12 +235,15 @@ diskCases = [
     for g0Value in range(10, 405, 10)
     if 1.0 >= calcBetaFromGain(g0Value / 100, nTot, sigmaA, sigmaE) >= 0.0 and (g0Value / 100) * radiusValue == 2.0
 ]
+if not diskCases:
+    raise RuntimeError("analytical sphere disk test generated no cases")
 
 diskCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in diskCases]
 @pytest.mark.parametrize(("radius", "g0"), diskCases, ids=diskCaseIds)
-def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath):
+def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath, openPmdRuntimeBackend):
     global expected
     backend=alpakaBackends[-1]
+    _requireAvailableAlpakaBackend(backend)
     xDim = radius * 2.0
     nTot = np.float64(1.38e20 * 1.0)
     sigmaA = np.float64(0.11e-20)
@@ -281,13 +296,9 @@ def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath
             minSampleRange=centerSample,
             maxSampleRange=centerSample,
             monochromatic=True,
+            openpmdBackend=openPmdRuntimeBackend,
         )
-        try:
-            phiAse.run(gainMedium=medium)
-        except RuntimeError as exc:
-            if "return code 1" in str(exc):
-                pytest.skip(f"backend {backend} is not available in this build")
-            raise
+        phiAse.run(gainMedium=medium)
         result = phiAse.getResults()
         shape = medium.get("betaCells").expectedShape
         phiAseValues = np.array(result.phiAse, dtype=np.float64).reshape(shape, order="F")

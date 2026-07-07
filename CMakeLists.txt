@@ -351,6 +351,7 @@ set_target_properties(
         CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
 
+set(HASE_MPI_ENABLED OFF)
 set(HASE_MPI_PROBE_ALLOWED ON)
 if(DISABLE_MPI STREQUAL "AUTO")
     find_program(HASE_MPI_CXX_WRAPPER NAMES mpicxx mpic++ mpiCC)
@@ -383,8 +384,8 @@ if(DISABLE_MPI STREQUAL "AUTO")
                     if(NOT EXISTS "${HASE_MPI_INCLUDE_DIR}")
                         message(
                             WARNING
-                            "MPI wrapper '${HASE_MPI_CXX_WRAPPER}' references missing include directory "
-                            "'${HASE_MPI_INCLUDE_DIR}'. MPI support will be disabled."
+                            "MPI wrapper ${HASE_MPI_CXX_WRAPPER} references missing include directory "
+                            "${HASE_MPI_INCLUDE_DIR}. MPI support will be disabled."
                         )
                         set(HASE_MPI_PROBE_ALLOWED OFF)
                     endif()
@@ -395,7 +396,9 @@ if(DISABLE_MPI STREQUAL "AUTO")
     if(HASE_MPI_PROBE_ALLOWED)
         find_package(MPI COMPONENTS CXX QUIET)
     endif()
-    if(NOT MPI_FOUND)
+    if(MPI_FOUND AND HASE_MPI_PROBE_ALLOWED)
+        set(HASE_MPI_ENABLED ON)
+    else()
         message(
             STATUS
             "MPI is not found on your system - compilation will proceed without MPI Support."
@@ -403,8 +406,9 @@ if(DISABLE_MPI STREQUAL "AUTO")
     endif()
 elseif(DISABLE_MPI STREQUAL "OFF")
     find_package(MPI COMPONENTS CXX REQUIRED)
+    set(HASE_MPI_ENABLED ON)
 endif()
-if(MPI_FOUND)
+if(HASE_MPI_ENABLED)
     target_compile_definitions(hase_core INTERFACE MPI_FOUND)
     target_link_libraries(hase_core INTERFACE MPI::MPI_CXX)
 else()

@@ -511,8 +511,16 @@ def _interactive_bundled_adios2():
     }.get(str(choice).strip(), choice)
 
 
-def _interactive_bundled_hdf5():
+def _interactive_bundled_hdf5(adios2_mode=BUNDLED_ADIOS2_FETCH):
     print("Choose HDF5 handling for the bundled openPMD provider:")
+    if adios2_mode == BUNDLED_ADIOS2_OFF:
+        print("  1) fetch   fetch/build pinned HDF5")
+        print("  2) system  use an existing HDF5 installation")
+        choice = _ask("Bundled HDF5 choice", "1")
+        return {
+            "1": BUNDLED_HDF5_FETCH,
+            "2": BUNDLED_HDF5_SYSTEM,
+        }.get(str(choice).strip(), choice)
     print("  1) fetch   fetch/build pinned HDF5")
     print("  2) off     do not use HDF5; ADIOS2-only")
     print("  3) system  use an existing HDF5 installation")
@@ -634,7 +642,7 @@ def _build_selection(args):
             if bundled_adios2 == BUNDLED_ADIOS2_SYSTEM:
                 adios2_prefix = _ask("ADIOS2 prefix for CMAKE_PREFIX_PATH (optional)", adios2_prefix or "") or None
                 adios2_dir = _ask("ADIOS2_DIR CMake config directory (optional)", adios2_dir or "") or None
-            bundled_hdf5 = _interactive_bundled_hdf5()
+            bundled_hdf5 = _interactive_bundled_hdf5(bundled_adios2)
             if bundled_hdf5 == BUNDLED_HDF5_SYSTEM:
                 hdf5_prefix = _ask("HDF5 prefix for CMAKE_PREFIX_PATH (optional)", hdf5_prefix or "") or None
                 hdf5_dir = _ask("HDF5_DIR CMake config directory (optional)", hdf5_dir or "") or None
@@ -694,12 +702,15 @@ def _build_selection(args):
         compute_backend = preferred_compute_backend(alpaka_backends, args.compute_backend)
 
     parallel_mode = args.parallel_mode
-    if args.interactive and _ask_yes_no(
-        "Enable MPI support and use MPI for multi-rank runs now",
-        parallel_mode == "mpi" or mpi_mode == MPI_MODE_ON,
-    ):
-        parallel_mode = "mpi"
-        mpi_mode = MPI_MODE_ON
+    if args.interactive:
+        if _ask_yes_no(
+            "Enable MPI support and use MPI for multi-rank runs now",
+            parallel_mode == "mpi" or mpi_mode == MPI_MODE_ON,
+        ):
+            parallel_mode = "mpi"
+            mpi_mode = MPI_MODE_ON
+        else:
+            mpi_mode = MPI_MODE_OFF
     if parallel_mode not in {"single", "mpi"}:
         raise ValueError("parallel mode must be 'single' or 'mpi'")
     if parallel_mode == "mpi" and mpi_mode == MPI_MODE_OFF:
