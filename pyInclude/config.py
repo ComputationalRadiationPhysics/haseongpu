@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -36,6 +38,30 @@ OPENPMD_ADIOS2_AUTO = "auto"
 OPENPMD_ADIOS2_YES = "yes"
 OPENPMD_ADIOS2_NO = "no"
 DEFAULT_PHI_ASE_CONFIG_PATH = Path("config") / "hase-phiase.yaml"
+LAST_INSTALL_STATE_PATH = Path("build") / "hase-configure-last-install.json"
+CCACHE_LAUNCHER_DEFINES = (
+    "CMAKE_C_COMPILER_LAUNCHER",
+    "CMAKE_CXX_COMPILER_LAUNCHER",
+    "CMAKE_CUDA_COMPILER_LAUNCHER",
+)
+REINSTALL_CACHE_DEFINES = (
+    "HASE_OPENPMD_PROVIDER",
+    "HASE_OPENPMD_USE_ADIOS2",
+    "HASE_OPENPMD_FETCH_ADIOS2",
+    "HASE_OPENPMD_USE_HDF5",
+    "HASE_OPENPMD_FETCH_HDF5",
+    "HASE_OPENPMD_USE_SST",
+    "HASE_OPENPMD_BUILD_PYTHON_BINDINGS",
+    "HASE_USE_SYSTEM_ALPAKA",
+    "HASE_CUDA_ARCHITECTURES",
+    "DISABLE_MPI",
+    "HASE_NATIVE_OPTIMIZATIONS",
+    "CMAKE_PREFIX_PATH",
+    "openPMD_DIR",
+    "ADIOS2_DIR",
+    "HDF5_DIR",
+    *CCACHE_LAUNCHER_DEFINES,
+)
 
 
 @dataclass(frozen=True)
@@ -52,11 +78,11 @@ class WizardSelection:
     cmake_prefix_path: str | None = None
     openpmd_dir: str | None = None
     bundled_adios2: str = BUNDLED_ADIOS2_FETCH
-    bundled_hdf5: str = BUNDLED_HDF5_FETCH
+    bundled_hdf5: str = BUNDLED_HDF5_OFF
     openpmd_adios2: str = OPENPMD_ADIOS2_AUTO
     bundled_python_bindings: bool = True
-    native_optimizations: bool = True
-    mpi_mode: str = MPI_MODE_OFF
+    native_optimizations: bool = False
+    mpi_mode: str = MPI_MODE_AUTO
     adios2_prefix: str | None = None
     adios2_dir: str | None = None
     hdf5_prefix: str | None = None
@@ -106,7 +132,7 @@ def preferred_openpmd_backend(supported, requested=None):
     raise ValueError("no compatible openPMD runtime backend was confirmed")
 
 
-def bundled_supported_openpmd_backends(adios2_mode, hdf5_mode=BUNDLED_HDF5_FETCH):
+def bundled_supported_openpmd_backends(adios2_mode, hdf5_mode=BUNDLED_HDF5_OFF):
     """Return runtime backends implied by the HASE-managed provider choices."""
     supported = []
     if adios2_mode != BUNDLED_ADIOS2_OFF:
@@ -142,7 +168,23 @@ def preferred_compute_backend(backends, requested=None):
     return "Host_Cpu_CpuSerial"
 
 
-def cmake_args(selection: WizardSelection):
+def _set_cmake_define(args, name, value):
+    prefix = f"-D{name}="
+    filtered = [arg for arg in args if not arg.startswith(prefix)]
+    filtered.append(f"{prefix}{value}")
+    return filtered
+
+
+def _apply_ccache_args(args, use_ccache=False):
+    if not use_ccache:
+        return list(args)
+    result = list(args)
+    for define in CCACHE_LAUNCHER_DEFINES:
+        result = _set_cmake_define(result, define, "ccache")
+    return result
+
+
+def cmake_args(selection: WizardSelection, *, use_ccache=False):
     """Return CMake arguments for the selected provider/install path."""
     args = []
     if selection.provider == PROVIDER_BUNDLED:
@@ -196,25 +238,28 @@ def cmake_args(selection: WizardSelection):
     }[selection.mpi_mode]
     args.append(f"-DDISABLE_MPI={disable_mpi}")
     args.append(f"-DHASE_NATIVE_OPTIMIZATIONS={'ON' if selection.native_optimizations else 'OFF'}")
-    return args
+    return _apply_ccache_args(args, use_ccache=use_ccache)
 
 
-def cmake_args_string(selection: WizardSelection):
+def _cmake_args_string(args):
+    return " ".join(args)
+
+
+def cmake_args_string(selection: WizardSelection, *, use_ccache=False):
     """Render CMake arguments for CMAKE_ARGS."""
-    return " ".join(cmake_args(selection))
+    return _cmake_args_string(cmake_args(selection, use_ccache=use_ccache))
 
 
 def _pip_install_args(*, break_system_packages=False):
-    args = ["-m", "pip", "install"]
+    args = ["-m", "pip", "install", "-v"]
     if break_system_packages:
         args.append("--break-system-packages")
     args.append(".")
     return args
 
 
-def install_command(selection: WizardSelection, *, break_system_packages=False):
-    """Render the recommended pip install command for the selected provider path."""
-    args = cmake_args_string(selection)
+def _install_command_from_cmake_args(cmake_arg_list, *, break_system_packages=False):
+    args = _cmake_args_string(cmake_arg_list)
     pip_args = " ".join(_pip_install_args(break_system_packages=break_system_packages))
     return (
         f'HASE_CONFIGURE_CMAKE_ARGS="{args}"\n'
@@ -222,16 +267,109 @@ def install_command(selection: WizardSelection, *, break_system_packages=False):
     )
 
 
-def run_install(selection: WizardSelection, *, break_system_packages=False):
-    """Run pip install with the selected CMake arguments."""
+def install_command(selection: WizardSelection, *, break_system_packages=False, use_ccache=False):
+    """Render the recommended pip install command for the selected provider path."""
+    return _install_command_from_cmake_args(
+        cmake_args(selection, use_ccache=use_ccache),
+        break_system_packages=break_system_packages,
+    )
+
+
+def _write_last_install_state(cmake_arg_list):
+    LAST_INSTALL_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LAST_INSTALL_STATE_PATH.write_text(
+        json.dumps({"version": 1, "cmake_args": list(cmake_arg_list)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _read_last_install_state():
+    if not LAST_INSTALL_STATE_PATH.is_file():
+        return None
+    state = json.loads(LAST_INSTALL_STATE_PATH.read_text(encoding="utf-8"))
+    cmake_arg_list = state.get("cmake_args")
+    if not isinstance(cmake_arg_list, list) or not all(isinstance(arg, str) for arg in cmake_arg_list):
+        raise RuntimeError(f"invalid reinstall state in {LAST_INSTALL_STATE_PATH}")
+    return cmake_arg_list
+
+
+def _latest_cmake_cache():
+    caches = [path for path in Path("build").glob("*/CMakeCache.txt") if path.is_file()]
+    if not caches:
+        return None
+    return max(caches, key=lambda path: path.stat().st_mtime)
+
+
+def _cmake_args_from_cache(cache_path):
+    values = {}
+    for line in cache_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line or line.startswith(("#", "//")) or "=" not in line:
+            continue
+        key_type, value = line.split("=", 1)
+        key = key_type.split(":", 1)[0]
+        if key in REINSTALL_CACHE_DEFINES and value and not value.endswith("-NOTFOUND"):
+            values[key] = value
+    return [f"-D{name}={values[name]}" for name in REINSTALL_CACHE_DEFINES if name in values]
+
+
+def previous_install_cmake_args():
+    """Return CMake arguments from the last script install or CMake cache."""
+    cmake_arg_list = _read_last_install_state()
+    if cmake_arg_list is not None:
+        return cmake_arg_list
+
+    cache_path = _latest_cmake_cache()
+    if cache_path is None:
+        raise RuntimeError(
+            "--reinstall requires a previous HASE CMake configure/install; "
+            "no build/*/CMakeCache.txt or hase-configure install state was found"
+        )
+    cmake_arg_list = _cmake_args_from_cache(cache_path)
+    if not cmake_arg_list:
+        raise RuntimeError(f"could not recover HASE install settings from {cache_path}")
+    return cmake_arg_list
+
+
+def _check_ccache_available(cmake_arg_list):
+    if any(arg in {f"-D{name}=ccache" for name in CCACHE_LAUNCHER_DEFINES} for arg in cmake_arg_list):
+        if shutil.which("ccache") is None:
+            raise RuntimeError("ccache compiler launcher was requested, but 'ccache' is not on PATH")
+
+
+def _run_install_with_cmake_args(cmake_arg_list, *, break_system_packages=False, record_state=False):
+    _check_ccache_available(cmake_arg_list)
     env = os.environ.copy()
-    env["HASE_CONFIGURE_CMAKE_ARGS"] = cmake_args_string(selection)
+    env["HASE_CONFIGURE_CMAKE_ARGS"] = _cmake_args_string(cmake_arg_list)
     env["CMAKE_ARGS"] = env["HASE_CONFIGURE_CMAKE_ARGS"]
-    return subprocess.run(
+    returncode = subprocess.run(
         [sys.executable, *_pip_install_args(break_system_packages=break_system_packages)],
         env=env,
         check=False,
     ).returncode
+    if record_state and returncode == 0:
+        _write_last_install_state(cmake_arg_list)
+    return returncode
+
+
+def run_install(selection: WizardSelection, *, break_system_packages=False, use_ccache=False):
+    """Run pip install with the selected CMake arguments."""
+    return _run_install_with_cmake_args(
+        cmake_args(selection, use_ccache=use_ccache),
+        break_system_packages=break_system_packages,
+        record_state=True,
+    )
+
+
+def run_reinstall(*, break_system_packages=False, use_ccache=False):
+    """Run pip install with settings from the previous HASE configure/install."""
+    cmake_arg_list = _apply_ccache_args(previous_install_cmake_args(), use_ccache=use_ccache)
+    print("Reinstall command:")
+    print(_install_command_from_cmake_args(cmake_arg_list, break_system_packages=break_system_packages))
+    return _run_install_with_cmake_args(
+        cmake_arg_list,
+        break_system_packages=break_system_packages,
+        record_state=True,
+    )
 
 
 def yaml_config(selection: WizardSelection):
@@ -378,7 +516,7 @@ def _interactive_bundled_hdf5():
     print("  1) fetch   fetch/build pinned HDF5")
     print("  2) off     do not use HDF5; ADIOS2-only")
     print("  3) system  use an existing HDF5 installation")
-    choice = _ask("Bundled HDF5 choice", "1")
+    choice = _ask("Bundled HDF5 choice", "2")
     return {
         "1": BUNDLED_HDF5_FETCH,
         "2": BUNDLED_HDF5_OFF,
@@ -570,7 +708,7 @@ def _build_selection(args):
     if args.interactive:
         native_optimizations = _ask_yes_no(
             "Enable native CPU optimizations? This tunes for this machine and is not suitable for redistributable wheels",
-            True,
+            False,
         )
 
     selection = WizardSelection(
@@ -616,8 +754,8 @@ def _parse_args(argv=None):
     parser.add_argument(
         "--bundled-hdf5",
         choices=(BUNDLED_HDF5_FETCH, BUNDLED_HDF5_OFF, BUNDLED_HDF5_SYSTEM),
-        default=BUNDLED_HDF5_FETCH,
-        help="HDF5 handling when --provider bundled is selected. Defaults to fetching pinned HDF5.",
+        default=BUNDLED_HDF5_OFF,
+        help="HDF5 handling when --provider bundled is selected. Defaults to off.",
     )
     parser.add_argument(
         "--openpmd-adios2",
@@ -636,14 +774,14 @@ def _parse_args(argv=None):
     parser.add_argument(
         "--mpi",
         choices=(MPI_MODE_AUTO, MPI_MODE_ON, MPI_MODE_OFF),
-        default=MPI_MODE_OFF,
-        help="MPI build support: on -> -DDISABLE_MPI=OFF, off -> ON, auto -> AUTO. Defaults to off.",
+        default=MPI_MODE_AUTO,
+        help="MPI build support: on -> -DDISABLE_MPI=OFF, off -> ON, auto -> AUTO. Defaults to auto.",
     )
     parser.add_argument(
         "--native-optimizations",
         choices=("on", "off"),
-        default="on",
-        help="Enable host-specific CPU tuning. Defaults to on for local performance; use off for redistributable wheels.",
+        default="off",
+        help="Enable host-specific CPU tuning. Defaults to off for redistributable wheels.",
     )
     parser.add_argument("--num-devices", type=int, default=1)
     parser.add_argument("--n-per-node", type=int, default=1)
@@ -663,6 +801,21 @@ def _parse_args(argv=None):
     parser.add_argument("--yes", action="store_true", help="Use defaults and do not prompt.")
     parser.add_argument("--install", action="store_true", help="Run pip install after writing configuration.")
     parser.add_argument(
+        "--autoinstall",
+        action="store_true",
+        help="Use all defaults non-interactively, write the YAML, and run pip install.",
+    )
+    parser.add_argument(
+        "--reinstall",
+        action="store_true",
+        help="Run pip install with the previous HASE CMake settings. Requires a previous configure/install.",
+    )
+    parser.add_argument(
+        "--use-ccache",
+        action="store_true",
+        help="Use ccache as C/C++/CUDA CMake compiler launcher for the install.",
+    )
+    parser.add_argument(
         "--break-system-packages",
         action="store_true",
         help=(
@@ -675,6 +828,19 @@ def _parse_args(argv=None):
 
 def main(argv=None):
     args = _parse_args(argv)
+    if args.autoinstall:
+        args.yes = True
+        args.install = True
+    if args.reinstall:
+        try:
+            return run_reinstall(
+                break_system_packages=args.break_system_packages,
+                use_ccache=args.use_ccache,
+            )
+        except Exception as exc:
+            print(f"hase-configure: error: {exc}", file=sys.stderr)
+            return 1
+
     args.interactive = (not args.yes) and sys.stdin.isatty()
     try:
         selection, alpaka_backends, alpaka_error, _probe_report = _build_selection(args)
@@ -684,7 +850,7 @@ def main(argv=None):
 
     config_text = yaml_config(selection)
     print("\nRecommended install command:")
-    print(install_command(selection, break_system_packages=args.break_system_packages))
+    print(install_command(selection, break_system_packages=args.break_system_packages, use_ccache=args.use_ccache))
 
     if alpaka_backends:
         print("\nCurrently available alpaka compute backends:")
@@ -713,10 +879,14 @@ def main(argv=None):
     if args.interactive and not install_now:
         install_now = _ask_yes_no("Install HASEonGPU now with these settings", True)
     if install_now:
-        return run_install(selection, break_system_packages=args.break_system_packages)
+        return run_install(
+            selection,
+            break_system_packages=args.break_system_packages,
+            use_ccache=args.use_ccache,
+        )
 
     print("\nInstall skipped. To install later, run:")
-    print(install_command(selection, break_system_packages=args.break_system_packages))
+    print(install_command(selection, break_system_packages=args.break_system_packages, use_ccache=args.use_ccache))
     return 0
 
 

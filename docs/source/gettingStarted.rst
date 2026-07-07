@@ -94,17 +94,19 @@ Python ``openpmd_api`` module against that C++ provider. If the external
 openPMD-api was built with ADIOS2 support and CMake cannot find ADIOS2
 transitively, the guide can add an ADIOS2 prefix or ``ADIOS2_DIR`` hint.
 HASEonGPU does not install a matching external-provider Python ``openpmd_api``
-module for you; install/load one from the same provider family.
+module for you; install/load one built for the same or a compatible
+openPMD-api version and backend set.
 
 For the bundled provider, the guide asks separately how to handle ADIOS2:
 fetch/build pinned ADIOS2, build an HDF5-only provider without ADIOS2, or use a
-system ADIOS2 installation. By default it also builds matching openPMD Python
-bindings and records their build-tree ``site-packages`` path in the installed
-HASE configuration. Those bindings are not copied into the HASE wheel, but
-HASE can use them from outside the source checkout as long as the build-tree
-provider path remains available. Fetching the bundled dependencies is the
-easiest starting point, but it can take noticeably longer than using already
-installed providers.
+system ADIOS2 installation. HDF5 is off by default for the bundled provider;
+enable it explicitly when the ``hdf5`` runtime backend is needed. By default
+it also builds matching openPMD Python bindings and records their build-tree
+``site-packages`` path in the installed HASE configuration. Those bindings
+are not copied into the HASE wheel, but HASE can use them from outside the
+source checkout as long as the build-tree provider path remains available.
+Fetching the bundled dependencies is the easiest starting point, but it can
+take noticeably longer than using already installed providers.
 
 After the openPMD setup, the guide points out the optional MPI path
 (``parallel_mode: mpi`` and ``n_per_node``) and explains that Python and C++
@@ -123,12 +125,17 @@ environment, prefer a virtual environment. If you intentionally install into
 that environment anyway, launch the guide with ``--break-system-packages`` so
 the printed command and optional install add pip's ``--break-system-packages``
 flag; the guide does not prompt for this option interactively.
-The native-optimization prompt defaults to on for local performance. It enables host-specific CPU tuning,
-so turn it off for redistributable wheels or unknown CPUs. The final guidance
-says where the configuration file is present and that it can be modified,
-lists the supported ``openpmd_backend`` values for the selected provider,
-summarizes MPI keys, and explains that if no GPU alpaka backend is listed,
-alpaka probably did not find a usable GPU toolchain/backend or matching device.
+Use ``--autoinstall`` to accept all defaults and install non-interactively.
+Use ``--use-ccache`` to add C/C++/CUDA ccache compiler launchers to the
+printed and executed install command. Use ``--reinstall`` to rerun pip with
+the previous HASE CMake settings; it fails if no prior script install state or
+CMake build cache exists.
+The native-optimization prompt defaults to off for redistributable wheels and
+unknown CPUs. Enable it only when tuning for the current machine. The final
+guidance says where the configuration file is present and that it can be
+modified, lists the supported ``openpmd_backend`` values for the selected
+provider, summarizes MPI keys, and explains that if no GPU alpaka backend is
+listed, alpaka probably did not find a usable GPU toolchain/backend or matching device.
 It points CUDA users to ``CUDACXX`` or ``nvcc``/CUDA toolkit paths and HIP
 users to ``HIPCXX``,
 ``hipcc``, or ``ROCM_PATH``. Pass the YAML to ``PhiASE.fromYaml(...)`` and keep

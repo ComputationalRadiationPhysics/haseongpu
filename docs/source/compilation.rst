@@ -203,8 +203,11 @@ ADIOS2/HDF5 hints when needed, or bundled ADIOS2/HDF5 fetch/off/system
 choices. It then emits matching CMake and
 PhiASE YAML snippets under ``config/hase-phiase.yaml`` by default, asks
 whether to install immediately with yes as the default answer, and defaults
-native CPU optimizations to on for local performance, with a warning to disable
-them for redistributable wheels.
+native CPU optimizations to off for redistributable wheels. Use
+``--autoinstall`` to accept all defaults and install non-interactively,
+``--use-ccache`` to add CMake compiler launchers for ccache, and
+``--reinstall`` to rerun pip with the previous HASE CMake settings from the
+last script install or build cache.
 
 The CMake build selects the openPMD provider, not the storage backend used by a
 simulation. Runtime backend selection belongs to Python or YAML through
@@ -259,8 +262,8 @@ multiplying every compiler and accelerator combination.
     otherwise build a bundled provider.
   * ``system``: use an installed openPMD-api C++ package found through
     ``find_package(openPMD CONFIG REQUIRED)``. The Python ``openpmd_api``
-    package installed in the runtime environment must come from the same
-    openPMD provider family and must support the runtime backend used by your
+    package installed in the runtime environment must match the C++
+    openPMD-api version and must support the same runtime backend used by your
     workflow.
   * ``bundled``: install the selected pinned ADIOS2 and/or HDF5 dependencies
     into a build-local CMake prefix, then install pinned openPMD-api against
