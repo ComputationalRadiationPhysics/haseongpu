@@ -23,6 +23,7 @@
 #include <utils/progressbar.hpp>
 
 #include <algorithm> /* std::max */
+#include <array> /* std::array */
 #include <chrono> /* steady_clock, time_point */
 #include <cmath> /* log10 */
 #include <fstream> /* std::ofstream */
@@ -35,47 +36,11 @@ namespace hase::utils
 
     void printWave(std::ostream& stream, unsigned tic, int progress, int length)
     {
+        std::array const symbols = {"ø", "¤", "º", "°", "`", "°", "°", "¤", "ø", ",", "¸", ","};
         for(int i = 0; i < progress; ++i)
         {
-            switch((tic + i) % 12)
-            {
-            case 0:
-                stream << "ø";
-                break;
-            case 1:
-                stream << "¤";
-                break;
-            case 2:
-                stream << "º";
-                break;
-            case 3:
-                stream << "°";
-                break;
-            case 4:
-                stream << "`";
-                break;
-            case 5:
-                stream << "°";
-                break;
-            case 6:
-                stream << "º";
-                break;
-            case 7:
-                stream << "¤";
-                break;
-            case 8:
-                stream << "ø";
-                break;
-            case 9:
-                stream << ",";
-                break;
-            case 10:
-                stream << "¸";
-                break;
-            case 11:
-                stream << ",";
-                break;
-            }
+            auto const charIdx = (tic + i) % symbols.size();
+            stream << symbols[charIdx];
         }
 
         for(int i = 0; i < length - progress; ++i)

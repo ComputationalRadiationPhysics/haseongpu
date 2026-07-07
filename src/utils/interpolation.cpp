@@ -26,49 +26,6 @@
 namespace hase::internal
 {
 
-    /**
-     * @brief Returns the index of an value in vector v,
-     *        that is smaller than t.
-     *
-     * @param v vector
-     * @param t bigger value
-     * @return index of smaller value
-     *         otherwise 0
-     *
-     */
-    unsigned getNextSmallerIndex(std::vector<double> v, double t)
-    {
-        unsigned index = 0;
-        for(unsigned i = 0; i < v.size(); ++i)
-        {
-            if(v.at(i) < t)
-                index = i;
-            else
-                break;
-        }
-        return index;
-    }
-
-    /**
-     * @brief Returns the index of an value in vector v,
-     *        that is bigger than t.
-     *
-     * @param v vector
-     * @param t smaller value
-     * @return index of smaller value
-     *         otherwise 0
-     *
-     */
-    unsigned getNextBiggerIndex(std::vector<double> v, double t)
-    {
-        for(unsigned i = 0; i < v.size(); ++i)
-        {
-            if(v.at(i) > t)
-                return i;
-        }
-        return 0;
-    }
-
     template<class T>
     bool isStrictlySorted(std::vector<T> const& v)
     {

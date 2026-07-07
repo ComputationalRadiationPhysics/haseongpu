@@ -180,7 +180,7 @@ namespace hase::core
         alpaka::onHost::memset(queue, dImportance, 0);
         alpaka::onHost::memset(queue, dPreImportance, 0);
         alpaka::onHost::memset(queue, dIndicesOfPrisms, 0);
-        alpaka::onHost::fill(queue, dRaysPerPrism, 0u);
+        alpaka::onHost::memset(queue, dRaysPerPrism, 0);
         // synchronize all previous operations
         alpaka::onHost::wait(queue);
         // Calculation for each sample point

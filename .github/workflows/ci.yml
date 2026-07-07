@@ -231,7 +231,7 @@ jobs:
           set -euxo pipefail
           cmake_args=(
             $HASE_CMAKE_ARGS
-            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
+            -DHASE_OPENPMD_PROVIDER=bundled
           )
           if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
             cmake_args+=(
@@ -380,10 +380,16 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          example_output_dir=/tmp/hase-laser-pump-cladding
-          python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
-            "$OPENPMD_RUNTIME_BACKEND" \
-            "$example_output_dir"
+          mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
+          python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py" --csv \
+            | sed 's/^/HASE_OPENPMD_TEST_BACKENDS=/' >> "$GITHUB_ENV"
+
+          for backend in "${openpmd_backends[@]}"; do
+            example_output_dir="/tmp/hase-laser-pump-cladding-${backend}"
+            python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
+              "$backend" \
+              "$example_output_dir"
+          done
 
       - name: Run CTest
         shell: bash
@@ -404,13 +410,12 @@ jobs:
 
     env:
       DEBIAN_FRONTEND: noninteractive
-      OPENPMD_BACKENDS: adios adios-sst hdf5
       OPENPMD_PROVIDER_VERSIONS: 0.17.0 0.17.1
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON
         -DDISABLE_MPI=ON
-        -DHASE_BUILD_OPENPMD_FROM_SOURCE=OFF
+        -DHASE_OPENPMD_PROVIDER=system
 
     steps:
       - uses: actions/checkout@v4
@@ -537,9 +542,13 @@ jobs:
               python hase_runtime_smoketest.py
             )
 
-            for backend in $OPENPMD_BACKENDS; do
+            mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
+            openpmd_backend_csv="$(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py" --csv)"
+
+            for backend in "${openpmd_backends[@]}"; do
               run_backend_smoke "$openpmd_version" "$openpmd_prefix" "$backend"
             done
 
-            pytest tests/python/openpmd/test_openpmd_preflight.py tests/python/openpmd/test_transport.py
+            HASE_OPENPMD_TEST_BACKENDS="$openpmd_backend_csv" \
+              pytest tests/python/openpmd/test_openpmd_preflight.py tests/python/openpmd/test_transport.py
           done
