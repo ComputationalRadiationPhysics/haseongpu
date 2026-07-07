@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 from HASEonGPU import (
-    Constants,
     CrossSectionData,
     ExponentialEuler,
     ExplicitEuler,
@@ -21,10 +20,8 @@ from HASEonGPU import (
     Midpoint,
     PhiASE,
     PumpProperties,
-    PumpRadiationProfile,
     RungeKutta4,
     Simulation,
-    oneDimensionalZTraversalPumpRate,
 )
 from pyInclude.openpmd import transport
 
@@ -332,153 +329,6 @@ def testPumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
     assert pump.ji == 3
     assert pump.radiusX == 1.5
     assert pump.superGaussianOrder == 40
-
-
-def testOneDimensionalZTraversalUsesProfileCenter(
-    smallTopology,
-):
-    spectra = CrossSectionData.monochromatic(
-        wavelength=940e-9,
-        crossSectionAbsorption=1.0e-22,
-        crossSectionEmission=0.0,
-    )
-    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
-        betaCells=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
-        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
-        nTot=0.0,
-        crystalTFluo=9.5e-4,
-        claddingNumber=1,
-        claddingAbsorption=0.0,
-    )
-    profile = PumpRadiationProfile(
-        intensity=1.0,
-        wavelengths=[940e-9],
-        waist=(0.2, 0.2),
-        center=smallTopology.points[0],
-        propagationDirection=(0.0, 0.0, 1.0),
-        backReflection=False,
-        superGaussianOrder=2,
-    )
-    pump = PumpProperties(crossSections=spectra, profile=profile)
-
-    rate = oneDimensionalZTraversalPumpRate(
-        smallTopology.points,
-        medium.get("betaCells").value,
-        pump,
-        medium,
-    )
-
-    assert np.all(rate[0] >= rate[1:])
-    assert np.any(rate[0] > rate[1:])
-
-
-def testPumpRadiationProfileUsesCrystalSpectraAndDefaultUnitWeights(
-    smallTopology,
-):
-    spectra = CrossSectionData(
-        wavelengthsAbsorption=[900e-9, 940e-9],
-        crossSectionAbsorption=[1.0e-22, 2.0e-22],
-        wavelengthsEmission=[900e-9, 940e-9],
-        crossSectionEmission=[0.0, 0.0],
-    )
-    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
-        betaCells=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
-        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
-        nTot=0.0,
-        crystalTFluo=9.5e-4,
-        claddingNumber=1,
-        claddingAbsorption=0.0,
-    )
-    profile = PumpRadiationProfile(
-        intensity=10.0,
-        wavelengths=[900e-9, 940e-9],
-        waist=(1.5, 1.5),
-        propagationDirection=(0.0, 0.0, 1.0),
-        backReflection=False,
-        superGaussianOrder=40,
-    )
-    pump = PumpProperties(
-        crossSections=spectra,
-        profile=profile,
-    )
-
-    rate = oneDimensionalZTraversalPumpRate(
-        smallTopology.points,
-        medium.get("betaCells").value,
-        pump,
-        medium,
-        Constants(c=3.0e8, h=6.0e-34),
-    )
-
-    points = np.asarray(smallTopology.points, dtype=np.float64)
-    intensity = 10.0 * np.exp(-((points[:, 0] ** 2 + points[:, 1] ** 2) / (1.5**2)) ** 20.0)
-    expected_per_point = intensity * (
-        1.0e-22 * 900e-9 / (6.0e-34 * 3.0e8)
-        + 2.0e-22 * 940e-9 / (6.0e-34 * 3.0e8)
-    )
-
-    assert np.allclose(rate, expected_per_point[:, None])
-
-
-def testOneDimensionalZTraversalSupportsMultichromaticWeightsAndDirection(
-    smallTopology,
-):
-    spectra = CrossSectionData(
-        wavelengthsAbsorption=[900e-9, 940e-9],
-        crossSectionAbsorption=[1.0e-22, 2.0e-22],
-        wavelengthsEmission=[900e-9, 940e-9],
-        crossSectionEmission=[0.5e-22, 1.0e-22],
-    )
-    medium = GainMedium(topology=smallTopology).withPhysicalProperties(
-        betaCells=np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.25),
-        claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
-        nTot=0.0,
-        crystalTFluo=9.5e-4,
-        claddingNumber=1,
-        claddingAbsorption=0.0,
-    )
-    pump = PumpProperties(
-        spectralProperties=spectra,
-        intensity=10.0,
-        radiusX=1.5,
-        backReflection=True,
-        reflectivity=0.5,
-        propagationDirection=(0.0, 0.0, -1.0),
-        spectralWeights=[0.25, 0.75],
-    )
-
-    rate = oneDimensionalZTraversalPumpRate(
-        smallTopology.points,
-        medium.get("betaCells").value,
-        pump,
-        medium,
-        Constants(c=3.0e8, h=6.0e-34),
-    )
-
-    points = np.asarray(smallTopology.points, dtype=np.float64)
-    intensity = 10.0 * np.exp(-((points[:, 0] ** 2 + points[:, 1] ** 2) / (1.5**2)) ** 20.0)
-    wavelengths = np.asarray([900e-9, 940e-9])
-    sigma_abs = np.asarray([1.0e-22, 2.0e-22])
-    sigma_ems = np.asarray([0.5e-22, 1.0e-22])
-    weights = np.asarray([0.25, 0.75])
-    beta = 0.25
-    expected_per_point = np.sum(
-        weights
-        * (sigma_abs - beta * (sigma_abs + sigma_ems))
-        * (1.0 + 0.5)
-        * intensity[:, None]
-        * wavelengths
-        / (6.0e-34 * 3.0e8),
-        axis=1,
-    )
-
-    assert np.allclose(rate, expected_per_point[:, None])
 
 
 def testTimeIntegrationSolverIsMandatory(

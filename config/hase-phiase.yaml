@@ -1,14 +1,7 @@
-experiment:
-  minRaysPerSample: 2000
-  maxRaysPerSample: 1000000
-  mseThreshold: 0.01087 # this is the volume weighting adjusted threshold (scaled the original 0.005 by thickness * mesh.surface )
-  adaptiveSteps: 8
-  useReflections: true
-
 compute:
-  repetitions: 1
-  backend: Host_Cpu_CpuSerial
+  backend: Host_Cpu_CpuOmpBlocks
   openpmd_backend: auto
-  parallelMode: single
-  numDevices: 4
-  nPerNode: 1
+  parallel_mode: single
+  numDevices: 1
+  n_per_node: 1
+  write_vtk: false
