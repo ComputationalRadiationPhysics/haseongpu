@@ -114,6 +114,17 @@ option(
 option(HASE_BENCHMARK "Enable scoped PhiASE benchmark CSV output" OFF)
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
+if(
+    DEFINED CMAKE_CUDA_ARCHITECTURES
+    AND HASE_CUDA_ARCHITECTURES STREQUAL "native"
+)
+    set(HASE_CUDA_ARCHITECTURES
+        "${CMAKE_CUDA_ARCHITECTURES}"
+        CACHE STRING
+        "CUDA Architectures"
+        FORCE
+    )
+endif()
 
 if(HASE_BUILD_RELEASE)
     message(
@@ -138,36 +149,43 @@ if(NOT HASE_SELECT_BACKEND_ALPAKA)
 endif()
 
 if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
-    # probe nvidia-smi to check whether a gpu is found and "native" architecture will succeed
+    # Probe nvidia-smi to check whether a GPU is visible and "native" can work.
     execute_process(
         COMMAND nvidia-smi -L
         RESULT_VARIABLE HASE_NVIDIA_SMI_RESULT
         OUTPUT_QUIET
         ERROR_QUIET
     )
+
     if(NOT HASE_NVIDIA_SMI_RESULT EQUAL 0)
-        #in case the nvidia-smi probe fails HASEonGPU falls back to support a range of gpus starting from pascal (sm_60)
+        # If no GPU is visible, fall back to a static architecture list.
         if(NOT DEFINED CUDAToolkit_VERSION)
             find_package(CUDAToolkit QUIET)
         endif()
+
         if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
-            # CUDA 13 removed Maxwell/Pascal/Volta support, so do not target 50/60/70.
+            # CUDA 13 removed Maxwell/Pascal/Volta support, so no 50/60/70.
             set(_hase_default_cuda_archs "75;80;90")
         else()
             set(_hase_default_cuda_archs "60;70;80;90")
         endif()
+
         message(
             STATUS
-            "No visible NVIDIA GPU found; falling back to CUDA architectures ."
+            "No visible NVIDIA GPU found; falling back to CUDA architectures "
+            "${_hase_default_cuda_archs}."
         )
+
         set(HASE_CUDA_ARCHITECTURES
-            ""
+            "${_hase_default_cuda_archs}"
             CACHE STRING
             "CUDA Architectures"
             FORCE
         )
+
         unset(_hase_default_cuda_archs)
     endif()
+
     unset(HASE_NVIDIA_SMI_RESULT)
 endif()
 
