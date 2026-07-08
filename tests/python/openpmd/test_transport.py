@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 import pyInclude.openpmd.transport as transport
+from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
 from pyInclude import AlpakaBackends
 from pyInclude.geometry import GainMedium, MeshTopology
 from pyInclude.laser import CrossSectionData
@@ -174,19 +175,7 @@ def launch_smoke_phi_ase():
 
 
 def _configured_backend_for_tests():
-    for name in ("HASE_OPENPMD_TEST_BACKEND", "OPENPMD_RUNTIME_BACKEND"):
-        backend = os.environ.get(name, "").strip().lower()
-        if backend:
-            return backend
-
-    backends = [
-        backend.strip().lower()
-        for backend in os.environ.get("HASE_OPENPMD_TEST_BACKENDS", "").split(",")
-        if backend.strip()
-    ]
-    if len(backends) == 1:
-        return backends[0]
-    return "adios"
+    return openpmd_runtime_backend()
 
 
 def _file_backend_for_tests():
@@ -451,16 +440,18 @@ def test_openpmd_backend_names_map_to_expected_suffixes_and_configs(monkeypatch)
     assert transport._backend_spec("adios-sst").streaming is True
     assert transport._backend_spec("hdf5").config == {"backend": "hdf5"}
 
-    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "hdf5")
+    monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "hdf5")
     assert _file_backend_for_tests() == "hdf5"
-    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "adios")
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "adios")
     assert _file_backend_for_tests() == "adios"
-    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKEND", "adios-sst")
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "adios-sst")
     assert _file_backend_for_tests() == "adios"
 
     for backend in ("bp", "unsupported"):
         with pytest.raises(ValueError, match="unsupported openPMD backend"):
             transport._backend_spec(backend)
+
 
 
 def test_openpmd_watchdog_interval_defaults_to_thirty_seconds(monkeypatch):
@@ -1240,10 +1231,7 @@ def test_python_writer_openpmd_cpp_parser_result_round_trip(contract_input, tmp_
 
 
 def _openpmd_backend_values():
-    raw = os.environ.get("HASE_OPENPMD_TEST_BACKENDS")
-    if raw:
-        return [backend.strip() for backend in raw.split(",") if backend.strip()]
-    return ["adios"]
+    return openpmd_test_backends()
 
 
 def _cache_value(cache_path, name):

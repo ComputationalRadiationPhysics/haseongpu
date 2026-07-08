@@ -23,20 +23,7 @@ requiredHaseApi = (
 )
 
 
-def _configured_openpmd_backend():
-    for name in ("HASE_OPENPMD_TEST_BACKEND", "OPENPMD_RUNTIME_BACKEND"):
-        value = os.environ.get(name, "").strip()
-        if value:
-            return value
-
-    values = [
-        value.strip()
-        for value in os.environ.get("HASE_OPENPMD_TEST_BACKENDS", "").split(",")
-        if value.strip()
-    ]
-    if len(values) == 1:
-        return values[0]
-    return "adios"
+from openpmd_backend_matrix import openpmd_test_backends
 
 
 def _resolve_import_path(entry):
@@ -131,9 +118,9 @@ import numpy as np
 import pytest
 
 
-@pytest.fixture(scope="session")
-def openPmdRuntimeBackend():
-    return _configured_openpmd_backend()
+@pytest.fixture(scope="session", params=openpmd_test_backends())
+def openPmdRuntimeBackend(request):
+    return request.param
 
 
 @pytest.fixture(scope="session")
