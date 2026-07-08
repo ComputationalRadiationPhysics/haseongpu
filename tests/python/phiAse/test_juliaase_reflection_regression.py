@@ -42,7 +42,7 @@ def _native_executable_or_skip():
     try:
         return openpmd_transport.findCalcPhiAse()
     except (FileNotFoundError, RuntimeError) as exc:
-        pytest.skip(f"no usable native calcPhiASE executable is available: {exc}")
+        pytest.skip(f"no usable native hase-cpp executable is available: {exc}")
 
 
 def _medium_from_reference(reference):

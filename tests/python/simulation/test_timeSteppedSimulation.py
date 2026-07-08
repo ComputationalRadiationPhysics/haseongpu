@@ -279,7 +279,7 @@ def testCompiledSimulationRejectsCustomPythonPumpSolver(
             return input["betaCell"] + 0.25
 
     monkeypatch.setattr(transport, "_ensure_backend_available", lambda backend: None)
-    monkeypatch.setattr(transport, "findCalcPhiAse", lambda: "calcPhiASE")
+    monkeypatch.setattr(transport, "findCalcPhiAse", lambda: "hase-cpp")
     pump = PumpProperties(
         spectralProperties=crossSections,
         intensity=16e3,

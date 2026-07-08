@@ -21,7 +21,10 @@ requiredHaseApi = (
     "OpenPmdBackends",
     "PhiASE",
     "PumpProperties",
+    "PumpRadiationProfile",
     "SpectralDecomposition",
+    "Constants",
+    "oneDimensionalZTraversalPumpRate",
 )
 
 
