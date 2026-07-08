@@ -133,14 +133,14 @@ def _mediumForGrid(grid, *, flat):
         (Grid(xExtent=3.0, yExtent=2.0, zExtent=1.5, tileSizeX=1.0, tileSizeY=0.5, tileSizeZ=0.75), False),
     ],
 )
-def testGridGeometrySatisfiesPhiAseGainMediumShapeContracts(grid, flat):
+def test_gridGeometryShapeContracts(grid, flat):
     medium = _mediumForGrid(grid, flat=flat)
 
     _assertTopologyLaunchContract(medium.topology)
     _assertGainMediumLaunchContract(medium)
 
 
-def testPointIndexAtFallsBackToNearestTopologyPoint():
+def test_pointIndexFallsBackToNearest():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=1.0, tileSizeX=0.5))
 
     exact = topology.pointIndexAt(0.5, 0.5)
@@ -150,7 +150,7 @@ def testPointIndexAtFallsBackToNearestTopologyPoint():
 
 
 
-def testGainMediumPrimitiveViewsShareCanonicalFlatStorage():
+def test_gainMediumPrimitiveViewsShareCanonicalFlatStorage():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology).withPhysicalProperties(
         betaCells=backendFlat(np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64)),
@@ -180,7 +180,7 @@ def testGainMediumPrimitiveViewsShareCanonicalFlatStorage():
     assert medium.get("reflectivities").value[topology.numberOfTriangles] == np.float32(0.75)
 
 
-def testGainMediumRejectsAmbiguousFlatArraysUnlessMarkedBackendFlat():
+def test_gainMediumRejectsAmbiguousFlat():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
     flat = np.arange(topology.numberOfPrisms, dtype=np.float64)
@@ -192,7 +192,7 @@ def testGainMediumRejectsAmbiguousFlatArraysUnlessMarkedBackendFlat():
     np.testing.assert_array_equal(medium.get("betaVolume").value, flat)
 
 
-def testGainMediumRejectsArraysThatBreakGeometryDependencies():
+def test_gainMediumRejectsArraysThatBreakGeometryDependencies():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 
@@ -210,7 +210,7 @@ def testGainMediumRejectsArraysThatBreakGeometryDependencies():
 
 
 
-def testGainMediumDefineFieldAttachesCustomFieldsToPrimitiveViews():
+def test_defineFieldAttachesCustomFields():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
     temperature = np.array(
@@ -244,7 +244,7 @@ def testGainMediumDefineFieldAttachesCustomFieldsToPrimitiveViews():
     assert medium.customFields["temperature"].spec.backendRequired is False
 
 
-def testGainMediumDefineFieldValidatesNameEntityDtypeUnitAndFlatOrder():
+def test_defineFieldValidatesSpec():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 

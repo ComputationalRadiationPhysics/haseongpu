@@ -149,7 +149,7 @@ def _requireAvailableAlpakaBackend(backend):
 
 @pytest.mark.parametrize("backend", alpakaBackends)
 @pytest.mark.parametrize(("radius", "g0"), sphereCases, ids=sphereCaseIds)
-def testCenterPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAseTestConfigPath, openPmdRuntimeBackend):
+def test_centerPointIntegralMatchesAnalyticalSolution(radius, g0, backend, phiAseTestConfigPath, openPmdRuntimeBackend):
     _requireAvailableAlpakaBackend(backend)
     xDim = radius * 2.0
     nTot = np.float64(1.38e20 * 1.0)
@@ -240,7 +240,7 @@ if not diskCases:
 
 diskCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in diskCases]
 @pytest.mark.parametrize(("radius", "g0"), diskCases, ids=diskCaseIds)
-def testDiskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath, openPmdRuntimeBackend):
+def test_diskPointsMatchAnalyticalSolutionForG02(radius, g0, phiAseTestConfigPath, openPmdRuntimeBackend):
     global expected
     backend=alpakaBackends[-1]
     _requireAvailableAlpakaBackend(backend)

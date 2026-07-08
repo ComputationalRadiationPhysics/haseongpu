@@ -410,7 +410,7 @@ def _context_for_spec(spec_name):
     return _field_context()
 
 
-def test_layout_helpers_define_exact_backend_flat_contract():
+def test_layoutHelpersDefineExactBackendFlatContract():
     mesh = asymmetric_mesh()
     for name, values in _mesh_field_values(mesh).items():
         spec = fieldSpec(name)
@@ -429,7 +429,7 @@ def test_layout_helpers_define_exact_backend_flat_contract():
         assert primitiveView(backendFlat(values), spec, context).shape == spec.expectedShape(context)
 
 
-def test_openpmd_backend_names_map_to_expected_suffixes_and_configs(monkeypatch):
+def test_backendNamesMapToConfigs(monkeypatch):
     assert transport._backend_spec().name == "adios-sst"
     assert transport._backend_spec("adios").suffix == ".bp"
     assert transport._backend_spec("adios").config == {"backend": "adios2"}
@@ -454,13 +454,13 @@ def test_openpmd_backend_names_map_to_expected_suffixes_and_configs(monkeypatch)
 
 
 
-def test_openpmd_watchdog_interval_defaults_to_thirty_seconds(monkeypatch):
+def test_openPmdWatchdogIntervalDefaultsToThirtySeconds(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_WATCHDOG_INTERVAL", raising=False)
 
     assert transport._watchdog_interval() == 30.0
 
 
-def test_openpmd_watchdog_interval_accepts_explicit_and_environment_values(monkeypatch):
+def test_watchdogIntervalAcceptsInputs(monkeypatch):
     assert transport._watchdog_interval(12) == 12.0
     assert transport._watchdog_interval("2.5") == 2.5
     assert transport._watchdog_interval("none") is None
@@ -471,7 +471,7 @@ def test_openpmd_watchdog_interval_accepts_explicit_and_environment_values(monke
     assert transport._watchdog_interval() is None
 
 
-def test_openpmd_watchdog_interval_rejects_invalid_values(monkeypatch):
+def test_openPmdWatchdogIntervalRejectsInvalidValues(monkeypatch):
     monkeypatch.setenv("HASE_OPENPMD_WATCHDOG_INTERVAL", "not-a-number")
     with pytest.raises(ValueError, match="HASE_OPENPMD_WATCHDOG_INTERVAL"):
         transport._watchdog_interval()
@@ -480,7 +480,7 @@ def test_openpmd_watchdog_interval_rejects_invalid_values(monkeypatch):
         transport._watchdog_interval(-1)
 
 
-def test_streaming_wait_ignores_watchdog_alive_events():
+def test_streamingWaitIgnoresWatchdogAliveEvents():
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     result = object()
     session._sender_errors = transport.queue.Queue()
@@ -494,7 +494,7 @@ def test_streaming_wait_ignores_watchdog_alive_events():
     assert session._wait_for_result(0) is result
 
 
-def test_streaming_wait_raises_on_watchdog_failure():
+def test_streamingWaitRaisesOnWatchdogFailure():
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     session._sender_errors = transport.queue.Queue()
     session._watchdog_events = transport.queue.Queue()
@@ -507,7 +507,7 @@ def test_streaming_wait_raises_on_watchdog_failure():
         session._wait_for_result(0)
 
 
-def test_streaming_reader_queues_eof_sentinel_when_stream_ends(monkeypatch, tmp_path):
+def test_streamingReaderQueuesEofSentinelWhenStreamEnds(monkeypatch, tmp_path):
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     session._result_queue = transport.queue.Queue()
     session._output_path = tmp_path / "results.sst"
@@ -546,7 +546,7 @@ def test_streaming_reader_queues_eof_sentinel_when_stream_ends(monkeypatch, tmp_
     assert closed == [True]
 
 
-def test_streaming_wait_fails_when_result_stream_ends_without_expected_iteration():
+def test_streamingWaitFailsOnEarlyEof():
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     session._sender_errors = transport.queue.Queue()
     session._watchdog_events = transport.queue.Queue()
@@ -561,7 +561,7 @@ def test_streaming_wait_fails_when_result_stream_ends_without_expected_iteration
         session._wait_for_result(0)
 
 
-def test_streaming_wait_fails_when_backend_finishes_before_expected(monkeypatch):
+def test_streamingWaitFailsWhenBackendFinishesBeforeExpected(monkeypatch):
     monkeypatch.setattr(transport, "_STREAMING_RESULT_POLL_SECONDS", 0.001)
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     session._sender_errors = transport.queue.Queue()
@@ -573,7 +573,7 @@ def test_streaming_wait_fails_when_backend_finishes_before_expected(monkeypatch)
         session._wait_for_result(2)
 
 
-def test_streaming_wait_fails_when_reader_thread_stops(monkeypatch):
+def test_streamingWaitFailsWhenReaderThreadStops(monkeypatch):
     monkeypatch.setattr(transport, "_STREAMING_RESULT_POLL_SECONDS", 0.001)
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
     session._sender_errors = transport.queue.Queue()
@@ -586,7 +586,7 @@ def test_streaming_wait_fails_when_reader_thread_stops(monkeypatch):
         session._wait_for_result(3)
 
 
-def test_streaming_thread_join_uses_finite_timeout(monkeypatch):
+def test_streamingThreadJoinUsesFiniteTimeout(monkeypatch):
     monkeypatch.setenv("HASE_OPENPMD_THREAD_JOIN_TIMEOUT", "0.25")
     session = transport.OpenPmdPhiAseSession(transport="adios-sst", watchdog_interval="none")
 
@@ -609,7 +609,7 @@ def test_streaming_thread_join_uses_finite_timeout(monkeypatch):
 
 
 @pytest.mark.integration
-def test_adios_sst_python_pair_publishes_one_iteration(tmp_path):
+def test_adiosSstPythonPairPublishesOneIteration(tmp_path):
     io = _io()
     if "sst" not in getattr(io, "file_extensions", []):
         pytest.skip("openPMD-api was not built with ADIOS2 SST support")
@@ -709,7 +709,7 @@ def test_adios_sst_python_pair_publishes_one_iteration(tmp_path):
 
 
 @pytest.mark.integration
-def test_adios_sst_threads_can_send_and_receive_independent_streams(tmp_path):
+def test_adiosSstThreadsUseStreams(tmp_path):
     io = _io()
     if "sst" not in getattr(io, "file_extensions", []):
         pytest.skip("openPMD-api was not built with ADIOS2 SST support")
@@ -855,7 +855,7 @@ print("receiver done", flush=True)
     assert "receiver done" in receiver_stdout
 
 
-def test_run_phi_ase_uses_openpmd_session_manager(monkeypatch):
+def test_runPhiAseUsesOpenPmdSessionManager(monkeypatch):
     result = object()
     events = []
 
@@ -889,7 +889,7 @@ def test_run_phi_ase_uses_openpmd_session_manager(monkeypatch):
     ]
 
 
-def testRunPhiAseUsesProvidedOpenPmdSessionWithoutClosingIt(monkeypatch):
+def test_runPhiAseUsesProvidedSession(monkeypatch):
     result = object()
     events = []
 
@@ -918,7 +918,7 @@ def testRunPhiAseUsesProvidedOpenPmdSessionWithoutClosingIt(monkeypatch):
     assert events == [("run", phiAse, gainMedium, crossSections)]
 
 
-def test_openpmd_session_assigns_monotonic_request_iterations(monkeypatch):
+def test_openPmdSessionAssignsMonotonicRequestIterations(monkeypatch):
     calls = []
 
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: Path("calcPhiASE"))
@@ -939,7 +939,7 @@ def test_openpmd_session_assigns_monotonic_request_iterations(monkeypatch):
     assert calls == [(0, "phi0", "medium0", "cross0"), (1, "phi1", "medium1", "cross1")]
 
 
-def test_forward_backend_logging_replays_streams_when_enabled(monkeypatch, capsys):
+def test_forwardBackendLoggingReplaysStreamsWhenEnabled(monkeypatch, capsys):
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "ON")
 
     transport._forward_backend_logging(stdout="backend stdout\n", stderr="backend stderr\n")
@@ -949,7 +949,7 @@ def test_forward_backend_logging_replays_streams_when_enabled(monkeypatch, capsy
     assert captured.err == "backend stderr\n"
 
 
-def test_forward_backend_logging_is_quiet_when_disabled(monkeypatch, capsys):
+def test_forwardBackendLoggingIsQuietWhenDisabled(monkeypatch, capsys):
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
 
     transport._forward_backend_logging(stdout="backend stdout\n", stderr="backend stderr\n")
@@ -959,7 +959,7 @@ def test_forward_backend_logging_is_quiet_when_disabled(monkeypatch, capsys):
     assert captured.err == ""
 
 
-def test_backend_failure_detail_includes_stdout_and_stderr():
+def test_backendFailureDetailIncludesStdoutAndStderr():
     detail = transport._backend_failure_detail(
         stdout=" parser progress \n",
         stderr=" backend error \n",
@@ -969,7 +969,7 @@ def test_backend_failure_detail_includes_stdout_and_stderr():
     assert "calcPhiASE stderr:\nbackend error" in detail
 
 
-def test_openpmd_api_preference_rejects_missing_cmake_selected_module(monkeypatch, tmp_path):
+def test_openPmdApiRejectsMissingModule(monkeypatch, tmp_path):
     active = tmp_path / "site-packages" / "openpmd_api" / "__init__.py"
     monkeypatch.setitem(transport.sys.modules, "openpmd_api", SimpleNamespace(__file__=str(active)))
     monkeypatch.setattr(transport, "_candidate_python_paths", lambda executable: iter([tmp_path / "missing"]))
@@ -983,7 +983,7 @@ def test_openpmd_api_preference_rejects_missing_cmake_selected_module(monkeypatc
         transport._prefer_matching_openpmd_api(Path("calcPhiASE"))
 
 
-def test_openpmd_api_preference_allows_normal_import_for_external_openpmd(monkeypatch):
+def test_openPmdApiAllowsExternalImport(monkeypatch):
     monkeypatch.setattr(transport, "_candidate_python_paths", lambda executable: iter([]))
     monkeypatch.setattr(
         transport,
@@ -994,7 +994,7 @@ def test_openpmd_api_preference_allows_normal_import_for_external_openpmd(monkey
     transport._prefer_matching_openpmd_api(Path("calcPhiASE"))
 
 
-def test_openpmd_api_candidate_paths_include_configured_provider(monkeypatch, tmp_path):
+def test_openPmdApiCandidatePathsIncludeConfiguredProvider(monkeypatch, tmp_path):
     configured = tmp_path / "site-packages"
     (configured / "openpmd_api").mkdir(parents=True)
     monkeypatch.delenv("HASE_OPENPMD_PYTHONPATH", raising=False)
@@ -1010,7 +1010,7 @@ def test_openpmd_api_candidate_paths_include_configured_provider(monkeypatch, tm
     assert configured in candidates
 
 
-def test_openpmd_api_candidate_paths_include_explicit_runtime_override(monkeypatch, tmp_path):
+def test_openPmdApiUsesRuntimeOverride(monkeypatch, tmp_path):
     configured = tmp_path / "configured"
     runtime_package = tmp_path / "runtime" / "openpmd_api"
     runtime_package.mkdir(parents=True)
@@ -1026,7 +1026,7 @@ def test_openpmd_api_candidate_paths_include_explicit_runtime_override(monkeypat
     assert candidates[0] == runtime_package.parent
 
 
-def test_openpmd_api_preference_rejects_mismatched_bundled_build(monkeypatch, tmp_path):
+def test_openPmdApiPreferenceRejectsMismatchedBundledBuild(monkeypatch, tmp_path):
     candidate = tmp_path / "build" / "site-packages"
     candidate.mkdir(parents=True)
     active = tmp_path / "other" / "site-packages" / "openpmd_api" / "__init__.py"
@@ -1037,7 +1037,7 @@ def test_openpmd_api_preference_rejects_mismatched_bundled_build(monkeypatch, tm
         transport._prefer_matching_openpmd_api(Path("calcPhiASE"))
 
 
-def test_layout_helpers_reject_accidental_transpose_views():
+def test_layoutHelpersRejectAccidentalTransposeViews():
     mesh = asymmetric_mesh()
     spec = fieldSpec("betaVolume")
     primitive = primitiveView(backendFlat(MESH_FIELD_VALUES["betaVolume"]), spec, mesh)
@@ -1046,7 +1046,7 @@ def test_layout_helpers_reject_accidental_transpose_views():
         backendFlatArray(transposed_same_size, spec, mesh)
 
 
-def test_openpmd_input_series_contains_exact_values_order_shape_dtype_units_and_metadata(contract_input):
+def test_inputSeriesWritesContract(contract_input):
     io = _io()
     series = io.Series(str(contract_input), io.Access.read_only)
     for name, value in haseTransportAttributes.items():
@@ -1164,7 +1164,7 @@ def _parser_validation_binary():
     pytest.skip("no openPMD parser validation binary found; build tests_openpmdParserValidation or set HASE_OPENPMD_PARSER_VALIDATION")
 
 
-def test_openpmd_input_series_omits_static_topology_after_first_iteration(tmp_path):
+def test_inputSeriesOmitsStaticTopology(tmp_path):
     _require_openpmd_transport_io()
     output = tmp_path / ("dynamic_split" + _file_suffix_for_tests())
     with transport.OpenPmdInputSeries(output, backend=_file_backend_for_tests()) as writer:
@@ -1184,7 +1184,7 @@ def test_openpmd_input_series_omits_static_topology_after_first_iteration(tmp_pa
     series.close()
 
 
-def test_python_writer_openpmd_cpp_parser_result_round_trip(contract_input, tmp_path):
+def test_cppParserRoundTripsPythonWriter(contract_input, tmp_path):
     output = tmp_path / ("round_trip_result" + _file_suffix_for_tests())
     env = os.environ.copy()
     env["HASE_OPENPMD_PYTHON_CONTRACT_INPUT"] = str(contract_input)
@@ -1320,7 +1320,7 @@ def _openpmd_calc_phi_ase():
 
 
 @pytest.mark.integration
-def testAdiosSstWatchdogEmitsFiveAliveBeatsFromNormalSession(monkeypatch):
+def test_adiosSstWatchdogBeats(monkeypatch):
     configuredBackends = _openpmd_backend_values()
     if "adios-sst" not in configuredBackends:
         pytest.skip("watchdog beat test only runs when HASE_OPENPMD_TEST_BACKENDS includes adios-sst")
@@ -1444,7 +1444,7 @@ def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
 
 @pytest.mark.integration
 @pytest.mark.parametrize("openpmd_backend", _openpmd_backend_values())
-def test_python_api_launches_configured_openpmd_backend_once(monkeypatch, openpmd_backend):
+def test_pythonApiLaunchesConfiguredOpenPmdBackendOnce(monkeypatch, openpmd_backend):
     _require_openpmd_transport_io()
     executable, _ = _openpmd_calc_phi_ase()
     monkeypatch.setenv("HASE_CALCPHIASE", str(executable))
@@ -1457,17 +1457,17 @@ def test_python_api_launches_configured_openpmd_backend_once(monkeypatch, openpm
 
 
 @pytest.mark.integration
-def test_calc_phi_ase_single_openpmd_round_trip(tmp_path):
+def test_calcPhiAseSingleOpenPmdRoundTrip(tmp_path):
     _round_trip_calc_phi_ase(tmp_path, "single")
 
 
 @pytest.mark.integration
-def test_calc_phi_ase_mpi_openpmd_round_trip_when_mpi_enabled(tmp_path):
+def test_mpiRoundTripWhenEnabled(tmp_path):
     _round_trip_calc_phi_ase(tmp_path, "mpi")
 
 
 @pytest.mark.integration
-def test_calc_phi_ase_mpi_openpmd_round_trip_with_matrix_rank(monkeypatch, tmp_path):
+def test_mpiMatrixRoundTrip(monkeypatch, tmp_path):
     _require_openpmd_transport_io()
     ranks = _matrix_mpi_rank_count()
     executable, build_dir = _openpmd_calc_phi_ase()
@@ -1490,7 +1490,7 @@ def test_calc_phi_ase_mpi_openpmd_round_trip_with_matrix_rank(monkeypatch, tmp_p
     _assert_launch_smoke_result(result)
 
 
-def test_openpmd_input_series_preserves_custom_fields(tmp_path):
+def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
     _require_openpmd_transport_io()
 
     temperature_dimension = unitDimension.tFluo

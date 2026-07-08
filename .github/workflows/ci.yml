@@ -67,8 +67,6 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
-      HASE_OPENPMD_TEST_BACKEND: ${{ matrix.config.openpmd_backend }}
-      HASE_OPENPMD_TEST_BACKENDS: ${{ matrix.config.openpmd_backend }}
       BUILD_DIR: build/ci
       HASE_MPI: ${{ matrix.config.mpi }}
       HASE_MPI_TEST_RANKS: ${{ matrix.config.mpi_ranks || '' }}
@@ -242,10 +240,16 @@ jobs:
               -DHASE_OPENPMD_USE_HDF5=ON
               -DHASE_OPENPMD_FETCH_HDF5=ON
             )
-          else
+          elif [[ "$OPENPMD_RUNTIME_BACKEND" == "adios-sst" ]]; then
             cmake_args+=(
               -DHASE_OPENPMD_USE_ADIOS2=ON
               -DHASE_OPENPMD_USE_SST=ON
+              -DHASE_OPENPMD_USE_HDF5=OFF
+            )
+          else
+            cmake_args+=(
+              -DHASE_OPENPMD_USE_ADIOS2=ON
+              -DHASE_OPENPMD_USE_SST=OFF
               -DHASE_OPENPMD_USE_HDF5=OFF
             )
           fi
@@ -294,10 +298,16 @@ jobs:
               -DHASE_OPENPMD_USE_HDF5=ON
               -DHASE_OPENPMD_FETCH_HDF5=ON
             )
-          else
+          elif [[ "$OPENPMD_RUNTIME_BACKEND" == "adios-sst" ]]; then
             pip_cmake_args+=(
               -DHASE_OPENPMD_USE_ADIOS2=ON
               -DHASE_OPENPMD_USE_SST=ON
+              -DHASE_OPENPMD_USE_HDF5=OFF
+            )
+          else
+            pip_cmake_args+=(
+              -DHASE_OPENPMD_USE_ADIOS2=ON
+              -DHASE_OPENPMD_USE_SST=OFF
               -DHASE_OPENPMD_USE_HDF5=OFF
             )
           fi
@@ -397,7 +407,6 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
       OPENPMD_BACKENDS: adios adios-sst hdf5
       OPENPMD_PROVIDER_VERSIONS: 0.17.0 0.17.1
-      HASE_OPENPMD_TEST_BACKENDS: adios,adios-sst,hdf5
       HASE_CMAKE_ARGS: >-
         -DBUILD_TESTING=ON
         -DHASE_TESTING=ON

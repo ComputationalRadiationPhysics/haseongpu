@@ -29,7 +29,7 @@ def _context():
     return SimpleNamespace(numberOfTriangles=2, numberOfLevels=4, numberOfPoints=5, spectral=3)
 
 
-def testPrimitiveShapeConvertsToBackendFlatFirstAxisFastest():
+def test_primitiveShapeToBackendFlat():
     spec = fieldSpec("betaVolume")
     primitive = np.array([[1.0, 10.0, 100.0], [2.0, 20.0, 200.0]])
 
@@ -38,7 +38,7 @@ def testPrimitiveShapeConvertsToBackendFlatFirstAxisFastest():
     np.testing.assert_array_equal(flat, np.array([1.0, 2.0, 10.0, 20.0, 100.0, 200.0]))
 
 
-def testBackendFlatConvertsBackToPrimitiveShape():
+def test_backendFlatConvertsBackToPrimitiveShape():
     spec = fieldSpec("reflectivity")
     flat = backendFlat(np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32))
 
@@ -47,7 +47,7 @@ def testBackendFlatConvertsBackToPrimitiveShape():
     np.testing.assert_array_equal(primitive, np.array([[0.1, 0.3], [0.2, 0.4]], dtype=np.float32))
 
 
-def testAmbiguousFlatArrayIsRejectedUnlessMarkedBackendFlat():
+def test_ambiguousFlatRequiresMarker():
     spec = fieldSpec("pointBeta")
     values = np.arange(20, dtype=np.float64)
 
@@ -58,7 +58,7 @@ def testAmbiguousFlatArrayIsRejectedUnlessMarkedBackendFlat():
 
 
 
-def testExtensionDocumentDefinesPrimitiveClassesAndBackendAttributeNames():
+def test_extensionDocumentNames():
     assert HASE_TRANSPORT_VERSION == "0.1"
     assert haseTransportAttributes["haseTopologyConvention"] == "vtkWedgeExtrudedTriangularPrism"
     assert set(primitiveSchemas) == {"point", "triangle", "prism"}
@@ -79,7 +79,7 @@ def testExtensionDocumentDefinesPrimitiveClassesAndBackendAttributeNames():
     assert simulationAttributeSpec("claddingAbsorption").unitSI == 100.0
 
 
-def testSchemaFieldsAreDerivedFromPrimitiveSchemas():
+def test_schemaFieldsAreDerivedFromPrimitiveSchemas():
     triangle_names = {spec.name for spec in primitiveFieldSpecs("triangle")}
     prism_names = {spec.name for spec in primitiveFieldSpecs("prism")}
     point_names = {spec.name for spec in primitiveFieldSpecs("point")}
@@ -91,7 +91,7 @@ def testSchemaFieldsAreDerivedFromPrimitiveSchemas():
     assert schemaFields["betaVolume"] in primitiveFieldSpecs("prism")
 
 
-def testPointSchemaShapeIsDefinedByPositionField():
+def test_pointSchemaShapeIsDefinedByPositionField():
     schema = primitiveSchema("point")
     position = fieldSpec("position")
 
@@ -101,7 +101,7 @@ def testPointSchemaShapeIsDefinedByPositionField():
     assert fieldSpec("points") is position
 
 
-def testRecordNameDefaultsToDerivedFieldName():
+def test_recordNameDefaultsToDerivedFieldName():
     field = PrimitiveFieldSpec("thermalLoad", np.float64, unit="W")
     explicit = PrimitiveFieldSpec("thermalLoad", "transport_thermal", np.float64, unit="W")
 
@@ -109,7 +109,7 @@ def testRecordNameDefaultsToDerivedFieldName():
     assert explicit.recordName == "transport_thermal"
 
 
-def testPrimitiveSchemaCanBeExtendedWithUserFieldSpec():
+def test_primitiveSchemaExtendsFields():
     extended = primitiveSchema("prism").extend(
         PrimitiveFieldSpec("temperature", "custom_temperature", float, unit="K", backendRequired=False, userDefined=True)
     )
@@ -122,7 +122,7 @@ def testPrimitiveSchemaCanBeExtendedWithUserFieldSpec():
     assert spec.userDefined is True
 
 
-def testUnitDimensionNamespaceCoversDocumentedSchemaFields():
+def test_unitDimensionNamespaceCoversDocumentedSchemaFields():
     assert unitDimension.lambda_ == unitDimension.wavelength
     assert unitDimension.tFluo == unitDimension.crystalTFluo
     assert unitDimension.lambdaResolution == unitDimension.dimensionless
@@ -135,7 +135,7 @@ def testUnitDimensionNamespaceCoversDocumentedSchemaFields():
 
 
 
-def testPrimitiveSchemaCanBeDeclaredByInheritance():
+def test_primitiveSchemaCanBeDeclaredByInheritance():
     class ThermalPrism(PrismSchema):
         temperature = PrimitiveFieldSpec("temperature", "custom_temperature", np.float64, unit="K", backendRequired=False)
 
@@ -148,7 +148,7 @@ def testPrimitiveSchemaCanBeDeclaredByInheritance():
     assert fields["temperature"].unit == "K"
 
 
-def testPrimitiveFieldAxesAreOptionalAndInheritParentSchemaShape():
+def test_fieldAxesInheritShape():
     class ThermalPrism(PrismSchema):
         temperature = PrimitiveFieldSpec("temperature", np.float64, unit="K", backendRequired=False)
 
@@ -160,7 +160,7 @@ def testPrimitiveFieldAxesAreOptionalAndInheritParentSchemaShape():
     assert fields["temperature"].expectedShape(_context()) == (2, 3)
 
 
-def testTriangleSchemaExposesMultidimensionalFieldsButKeepsBackendSpecs():
+def test_triangleSchemaKeepsBackendSpecs():
     context = _context()
     fields = {spec.name: spec for spec in TriangleSchema.fieldSpecs()}
 

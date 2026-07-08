@@ -34,7 +34,7 @@ def _installedBindingsDirs():
 
 
 @pytest.mark.integration
-def testRepoRootImportFallsBackToInstalledBindingsWithoutBuildTree(tmp_path):
+def test_repoRootUsesInstalledBindings(tmp_path):
     installedBindings = _installedBindingsDirs()
     if not installedBindings:
         pytest.skip("installed HASEonGPU_Bindings package is not available for this interpreter")

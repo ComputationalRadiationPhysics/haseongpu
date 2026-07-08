@@ -200,18 +200,3 @@ def pumpProperties(crossSections):
         wavelength=940e-9,
         radiusX=1.5,
     )
-
-
-@pytest.fixture
-def makeFakePhiAse(monkeypatch, crossSections, phiAseTestConfigPath):
-    def make(topology, **overrides):
-        phiAse = PhiASE.fromYaml(phiAseTestConfigPath, spectralProperties=crossSections, **overrides)
-
-        class Result:
-            phiAse = np.zeros(topology.numberOfPoints * topology.levels)
-
-        monkeypatch.setattr(phiAse, "run", lambda *args, **kwargs: phiAse)
-        monkeypatch.setattr(phiAse, "getResults", lambda: Result())
-        return phiAse
-
-    return make

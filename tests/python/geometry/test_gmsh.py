@@ -61,7 +61,7 @@ def _cylindricalCoreCladdingSurfaces(coreRadius, claddingRadius, *, meshSize):
     return core, cladding
 
 
-def testMeshTopologyFrom2dGmshUsesGmshLibrary(tmp_path):
+def test_gmshBuildsTopology(tmp_path):
     msh = tmp_path / "surface.msh"
     _write2dTriangleMesh(msh)
 
@@ -79,7 +79,7 @@ def testMeshTopologyFrom2dGmshUsesGmshLibrary(tmp_path):
     assert isinstance(topology.metadata["gmsh"], Gmsh)
 
 
-def testMeshTopologyFrom2dGmshMapsCladdingSurface(tmp_path):
+def test_gmshMapsCladdingSurface(tmp_path):
     msh = tmp_path / "core_cladding.msh"
     _write2dTriangleMesh(msh)
 

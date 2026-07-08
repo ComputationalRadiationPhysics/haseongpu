@@ -37,7 +37,7 @@ def _scalarNamesByDataKind(path):
     return names
 
 
-def testVtkWedgeWritesPointDataFromState(tmp_path):
+def test_vtkWedgeWritesPointDataFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
     values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
         (topology.numberOfPoints, topology.levels),
@@ -67,7 +67,7 @@ def testVtkWedgeWritesPointDataFromState(tmp_path):
     assert "phiAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
 
 
-def testVtkWedgeWritesMultiplePointFieldsFromState(tmp_path):
+def test_vtkWedgeWritesMultiplePointFieldsFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
     values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
         (topology.numberOfPoints, topology.levels),
@@ -94,7 +94,7 @@ def testVtkWedgeWritesMultiplePointFieldsFromState(tmp_path):
     assert "dndtAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
 
 
-def testVtkWedgeWritesAliasedFieldMappingFromState(tmp_path):
+def test_vtkWedgeWritesAliasedFieldMappingFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
     values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
         (topology.numberOfPoints, topology.levels),
@@ -120,7 +120,7 @@ def testVtkWedgeWritesAliasedFieldMappingFromState(tmp_path):
     assert "dn" in _scalarNamesByDataKind(path)["POINT_DATA"]
 
 
-def testVtkWedgeWritesDirectlyFromStateTopology(tmp_path):
+def test_vtkWedgeWritesDirectlyFromStateTopology(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
     values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
         (topology.numberOfPoints, topology.levels),
@@ -157,7 +157,7 @@ def testVtkWedgeWritesDirectlyFromStateTopology(tmp_path):
     assert "cladAbs" in _scalarNamesByDataKind(path)["POINT_DATA"]
 
 
-def testVtkWedgeWritesMixedPointAndCellFields(tmp_path):
+def test_vtkWedgeWritesMixedPointAndCellFields(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
     point_values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
         (topology.numberOfPoints, topology.levels),

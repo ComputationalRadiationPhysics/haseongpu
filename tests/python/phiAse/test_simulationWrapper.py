@@ -19,7 +19,7 @@ class DummyResult:
     dndtAse = [0.0]
 
 
-def testSimulationRunUsesOpenPmdTransportAndStoresResults(
+def test_simulationRunStoresResults(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -57,7 +57,7 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     assert captured["phi_ase"].rngSeed == 1234
 
 
-def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
+def test_phiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     phiAse = PhiASE(phiAseTestConfigPath)
 
     assert phiAse.minRaysPerSample == 1000
@@ -83,13 +83,13 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     assert fromArgs.openpmdBackend == "adios-sst"
 
 
-def testPhiAseLoadsOpenPmdBackendFromConfig():
+def test_phiAseLoadsOpenPmdBackendFromConfig():
     assert PhiASE().openpmdBackend == "adios-sst"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
     assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
 
 
-def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
+def test_phiAseMpiRunMetadata(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -125,7 +125,7 @@ def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
     assert captured["openpmd_session"] is None
 
 
-def testPhiAseRunUsesProvidedOpenPmdSession(
+def test_phiAseRunUsesProvidedOpenPmdSession(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -148,7 +148,7 @@ def testPhiAseRunUsesProvidedOpenPmdSession(
     assert captured["openpmdSession"] is openpmdSession
 
 
-def testPhiAseRunForwardsConfiguredOpenPmdBackend(
+def test_phiAseRunForwardsConfiguredOpenPmdBackend(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -175,7 +175,7 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     assert captured == {"transport": "hdf5", "openpmdSession": None}
 
 
-def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
+def test_phiAsePersistentSessionLifecycle(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -216,7 +216,7 @@ def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
     ]
 
 
-def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
+def test_phiAseIntervalUsesOneShot(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -238,7 +238,7 @@ def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
     assert captured["openpmdSession"] is None
 
 
-def testSimulationRunStepsKeepsPersistentOpenPmdSessionUntilIntervalCompletes(monkeypatch):
+def test_runStepsKeepsPersistentSession(monkeypatch):
     events = []
     openpmdSession = object()
     simulation = object.__new__(simulation_module.Simulation)
@@ -268,7 +268,7 @@ def testSimulationRunStepsKeepsPersistentOpenPmdSessionUntilIntervalCompletes(mo
     ]
 
 
-def testSimulationRunStepsDefaultsToPersistentOpenPmdSessionForStreamingBackend(monkeypatch):
+def test_runStepsDefaultsToPersistentSession(monkeypatch):
     events = []
     openpmdSession = object()
     simulation = object.__new__(simulation_module.Simulation)
@@ -300,7 +300,7 @@ def testSimulationRunStepsDefaultsToPersistentOpenPmdSessionForStreamingBackend(
     assert captured["backend"] == "adios-sst"
 
 
-def testPhiAseNPerNodeLoadsFromArgsAndConfig():
+def test_phiAseNPerNodeLoadsConfig():
     phiAse = PhiASE({"compute": {"nPerNode": 3}})
     assert phiAse.nPerNode == 3
 
@@ -312,7 +312,7 @@ def testPhiAseNPerNodeLoadsFromArgsAndConfig():
     assert fromArgs.nPerNode == 5
 
 
-def testPhiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
+def test_phiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
     monkeypatch.setattr(simulation_module, "_preferredDefaultBackend", lambda: "Host_Cpu_CpuSerial")
 
     attributes = PhiASE().openPmdAttributes(numberOfSamples=1)
@@ -320,7 +320,7 @@ def testPhiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
     assert attributes["backend"] == "Host_Cpu_CpuSerial"
 
 
-def testPhiAseDefaultBackendFailureMentionsConfigure(monkeypatch):
+def test_phiAseDefaultBackendFailureMentionsConfigure(monkeypatch):
     def fail():
         raise RuntimeError("Run `hase-configure` to generate a matching backend/openPMD setup.")
 

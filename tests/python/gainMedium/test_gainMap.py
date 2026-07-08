@@ -24,7 +24,7 @@ def _state(topology, beta):
     )
 
 
-def testCalcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
+def test_calcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
     beta = np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.25)
     state = _state(smallTopology, beta)
 
@@ -37,7 +37,7 @@ def testCalcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
     assert np.allclose(gain, expected)
 
 
-def testCalcGainFromStateRequiresNTot(smallTopology, crossSections):
+def test_calcGainFromStateRequiresNTot(smallTopology, crossSections):
     beta = np.ones((smallTopology.numberOfPoints, smallTopology.levels), dtype=np.float64)
     state = _state(smallTopology, beta)
 

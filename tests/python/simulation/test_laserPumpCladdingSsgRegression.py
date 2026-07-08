@@ -45,7 +45,7 @@ def _readColumns(path, columns):
 
 
 @pytest.mark.integration
-def testJulia1DMatchesDisabledAseLaserPumpCladdingSsgPlot(tmp_path):
+def test_julia1DMatchesDisabledAse(tmp_path):
     vtkOutputDir = tmp_path / "vtk"
     plotPrefix = tmp_path / "ssg_z_origin"
     vtkOutputDir.mkdir()

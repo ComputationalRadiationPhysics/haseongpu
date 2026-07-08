@@ -12,7 +12,7 @@ def _load_preflight_module():
     return module
 
 
-def test_python_backend_check_accepts_default_adios_sst_provider():
+def test_pythonBackendCheckAcceptsDefaultAdiosSstProvider():
     preflight = _load_preflight_module()
     errors = []
     info = {
@@ -25,7 +25,7 @@ def test_python_backend_check_accepts_default_adios_sst_provider():
     assert errors == []
 
 
-def test_python_backend_check_rejects_missing_hdf5_support():
+def test_pythonBackendCheckRejectsMissingHdf5Support():
     preflight = _load_preflight_module()
     errors = []
     info = {
@@ -38,7 +38,7 @@ def test_python_backend_check_rejects_missing_hdf5_support():
     assert "HDF5 support" in "\n".join(errors)
 
 
-def test_backend_summary_marks_unconfirmed_sst_support():
+def test_backendSummaryMarksUnconfirmedSstSupport():
     preflight = _load_preflight_module()
     info = {
         "openPMD_VERSION": "0.17.0",
@@ -54,7 +54,7 @@ def test_backend_summary_marks_unconfirmed_sst_support():
     ]
 
 
-def test_python_backend_summary_reports_supported_runtime_backends():
+def test_pythonBackendSummaryReportsSupportedRuntimeBackends():
     preflight = _load_preflight_module()
     info = {
         "variants": {"adios2": True, "hdf5": True},
@@ -68,7 +68,7 @@ def test_python_backend_summary_reports_supported_runtime_backends():
     ]
 
 
-def test_default_cmake_generator_prefers_ninja(monkeypatch, tmp_path):
+def test_defaultCmakeGeneratorPrefersNinja(monkeypatch, tmp_path):
     preflight = _load_preflight_module()
     ninja = tmp_path / "ninja"
     ninja.touch()
@@ -79,7 +79,7 @@ def test_default_cmake_generator_prefers_ninja(monkeypatch, tmp_path):
     assert preflight._default_cmake_generator() == "Ninja"
 
 
-def test_default_cmake_generator_respects_cmake_generator_env(monkeypatch, tmp_path):
+def test_defaultCmakeGeneratorRespectsCmakeGeneratorEnv(monkeypatch, tmp_path):
     preflight = _load_preflight_module()
     ninja = tmp_path / "ninja"
     ninja.touch()
@@ -90,7 +90,7 @@ def test_default_cmake_generator_respects_cmake_generator_env(monkeypatch, tmp_p
     assert preflight._default_cmake_generator() is None
 
 
-def test_cmake_probe_reports_missing_cmake_executable():
+def test_cmakeProbeReportsMissingCmakeExecutable():
     preflight = _load_preflight_module()
     errors = []
     info = preflight._cmake_probe(

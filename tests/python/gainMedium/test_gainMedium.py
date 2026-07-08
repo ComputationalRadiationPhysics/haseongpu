@@ -10,7 +10,7 @@ from HASEonGPU import GainMedium, Grid, MeshTopology, backendFlat
 from pyInclude.openpmd import PrimitiveFieldSpec, PrismSchema
 
 
-def testMeshTopologyFromPointsConstructsTriangles():
+def test_meshTopologyFromPointsConstructsTriangles():
     points = np.array(
         [
             [0.0, 0.0],
@@ -29,7 +29,7 @@ def testMeshTopologyFromPointsConstructsTriangles():
     assert topology.trianglePointIndices.shape == (2, 3)
 
 
-def testGridDefersPointConstructionUntilUsed():
+def test_gridDefersPointConstructionUntilUsed():
     grid = Grid(xExtent=2, yExtent=1, zExtent=1, tileSizeX=0.5)
 
     points = grid.constructPoints()
@@ -44,7 +44,7 @@ def testGridDefersPointConstructionUntilUsed():
     assert topology.numberOfTriangles == 16
 
 
-def testGridTopologyTriangulatesXyPlaneOnly():
+def test_gridTopologyTriangulatesXyPlaneOnly():
     shallow = MeshTopology.fromGrid(Grid(xExtent=2, yExtent=1, zExtent=1, tileSizeX=1.0, tileSizeZ=0.5))
     deep = MeshTopology.fromGrid(Grid(xExtent=2, yExtent=1, zExtent=10, tileSizeX=1.0, tileSizeZ=0.25))
 
@@ -65,7 +65,7 @@ def testGridTopologyTriangulatesXyPlaneOnly():
     assert shallow.thickness != deep.thickness
 
 
-def testMeshTopologyFromAsciiStl(tmp_path):
+def test_meshTopologyFromAsciiStl(tmp_path):
     stl = tmp_path / "surface.stl"
     stl.write_text(
         """
@@ -89,7 +89,7 @@ endsolid planar
     assert topology.metadata["format"] == "stl"
 
 
-def testGainMediumOwnsPhysicalProperties():
+def test_gainMediumOwnsPhysicalProperties():
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=2, tileSizeX=1.0, tileSizeZ=0.25))
     gainMedium = (
         GainMedium(topology=topology)
@@ -110,7 +110,7 @@ def testGainMediumOwnsPhysicalProperties():
     assert not hasattr(gainMedium, "toHostMesh")
 
 
-def testTopLevelFrontendDoesNotExposeLegacyBackendAdapters():
+def test_frontendHidesLegacyAdapters():
     import HASEonGPU
 
     for name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh"):
@@ -118,7 +118,7 @@ def testTopLevelFrontendDoesNotExposeLegacyBackendAdapters():
     assert hasattr(HASEonGPU, "calcPhiASE")
 
 
-def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
+def test_gainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=2, tileSizeZ=0.25))
     gainMedium = GainMedium(topology=topology)
 
@@ -139,7 +139,7 @@ def testGainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
 
 
 
-def testGainMediumAcceptsInheritedPrimitiveSchemaFields():
+def test_gainMediumAcceptsInheritedPrimitiveSchemaFields():
     class ThermalPrism(PrismSchema):
         temperature = PrimitiveFieldSpec("temperature", "custom_temperature", np.float64, unit="K", backendRequired=False)
 
@@ -156,7 +156,7 @@ def testGainMediumAcceptsInheritedPrimitiveSchemaFields():
     assert [prism.temperature for prism in medium.getPrisms()] == [300.0, 310.0, 320.0, 330.0]
 
 
-def testPrimitiveElementsAssignFieldsAndExposeMetadata():
+def test_primitiveElementsAssignFieldsAndExposeMetadata():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 
@@ -192,7 +192,7 @@ def testPrimitiveElementsAssignFieldsAndExposeMetadata():
     assert next(iter(medium.getPrisms())).betaVolume == 0.75
 
 
-def testMeshPrimitiveViewsExposeVectorFields():
+def test_meshPrimitiveViewsExposeVectorFields():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 
@@ -213,7 +213,7 @@ def testMeshPrimitiveViewsExposeVectorFields():
     assert fields["normal"].meta()["axes"] == ("cell", "local_side", "coordinate")
 
 
-def testPrimitiveSchemaCanBeRegisteredBeforeValuesAreAssigned():
+def test_registerSchemaBeforeValues():
     class ThermalPrism(PrismSchema):
         temperature = PrimitiveFieldSpec("temperature", "custom_temperature", np.float64, unit="K", backendRequired=False)
 

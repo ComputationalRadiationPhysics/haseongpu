@@ -11,7 +11,7 @@ import pytest
 from HASEonGPU import CrossSectionData, LaserProperties
 
 
-def testLaserPropertiesDescribeAndExportCalcPhiAseDict():
+def test_laserPropertiesExportCalcPhiAse():
     laser = LaserProperties.spectral(
         wavelengthsAbsorption=[900.0, 910.0],
         crossSectionAbsorption=[0.01, 0.02],
@@ -37,7 +37,7 @@ def testLaserPropertiesDescribeAndExportCalcPhiAseDict():
     assert np.allclose(exported["s_ems"], [0.03, 0.04])
 
 
-def testLaserPropertiesValidateMatchingSpectrumLengths():
+def test_laserPropertiesValidateMatchingSpectrumLengths():
     laser = LaserProperties()
     laser.get("l_abs").value = [900.0, 910.0]
 
@@ -45,7 +45,7 @@ def testLaserPropertiesValidateMatchingSpectrumLengths():
         laser.get("s_abs").value = [0.01]
 
 
-def testLaserPropertiesMonochromaticConstructor():
+def test_laserPropertiesMonochromaticConstructor():
     laser = LaserProperties.monochromatic(absorption=0.01, emission=0.02)
 
     assert laser.toDict()["l_res"] == 1
@@ -53,7 +53,7 @@ def testLaserPropertiesMonochromaticConstructor():
     assert np.allclose(laser.toDict()["s_ems"], [0.02])
 
 
-def testCrossSectionDataExposesSpectralFields():
+def test_crossSectionDataExposesSpectralFields():
     cross_sections = CrossSectionData(
         wavelengthsAbsorption=[900.0, 910.0],
         crossSectionAbsorption=[0.01, 0.02],
@@ -77,7 +77,7 @@ def testCrossSectionDataExposesSpectralFields():
         cross_sections.getField("sigmaAbsorption").value([0.07])
 
 
-def testCrossSectionDataOpenPmdFieldsAreFieldObjects():
+def test_crossSectionOpenPmdFields():
     cross_sections = CrossSectionData.monochromatic(
         wavelength=940e-9,
         crossSectionAbsorption=0.01,
