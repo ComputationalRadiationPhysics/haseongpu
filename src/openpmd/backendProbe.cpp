@@ -1,10 +1,12 @@
 #include <openPMD/openPMD.hpp>
+#include <openpmd/backendProbe.hpp>
 
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -21,10 +23,16 @@ namespace
         std::string_view config;
     };
 
+#if defined(HASE_OPENPMD_PROBE_ADIOS)
     constexpr std::string_view ADIOS_CONFIG = R"({"backend":"adios2"})";
+#endif
+#if defined(HASE_OPENPMD_PROBE_HDF5)
     constexpr std::string_view HDF5_CONFIG = R"({"backend":"hdf5"})";
+#endif
+#if defined(HASE_OPENPMD_PROBE_ADIOS_SST)
     constexpr std::string_view SST_CONFIG
         = R"({"backend":"adios2","adios2":{"engine":{"type":"sst","parameters":{"DataTransport":"WAN","OpenTimeoutSecs":"1"}}}})";
+#endif
 
     std::vector<Backend> candidates()
     {
@@ -96,40 +104,66 @@ namespace
     }
 } // namespace
 
-int main(int argc, char** argv)
+namespace hase::openpmd
 {
-    if(argc != 2)
+    std::vector<std::string> availableOpenPmdBackends()
     {
-        std::cerr << "usage: " << argv[0] << " <output-file>\n";
-        return 2;
+        auto const workdir = std::filesystem::temp_directory_path()
+                             / ("hase-openpmd-backend-probe-"
+                                + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::remove_all(workdir);
+        std::filesystem::create_directories(workdir);
+
+        std::vector<std::string> available;
+        for(auto const& backend : candidates())
+        {
+            if(handshake(backend, workdir))
+            {
+                available.emplace_back(backend.name);
+            }
+        }
+        std::filesystem::remove_all(workdir);
+        return available;
     }
 
-    auto const output = std::filesystem::path{argv[1]};
-    std::filesystem::create_directories(output.parent_path());
-    auto const workdir = output.parent_path() / "openpmd-backend-probe-work";
-    std::filesystem::remove_all(workdir);
-    std::filesystem::create_directories(workdir);
-
-    std::vector<std::string> available;
-    for(auto const& backend : candidates())
+    void writeAvailableOpenPmdBackends(std::filesystem::path const& output)
     {
-        if(handshake(backend, workdir))
+        std::filesystem::create_directories(output.parent_path());
+        auto const available = availableOpenPmdBackends();
+        if(available.empty())
         {
-            available.emplace_back(backend.name);
+            throw std::runtime_error("No configured openPMD backend passed the create/read probe.");
+        }
+
+        std::ofstream stream(output);
+        for(auto const& backend : available)
+        {
+            stream << backend << '\n';
+        }
+        if(!stream)
+        {
+            throw std::runtime_error("Failed to write openPMD backend probe output to " + output.string());
         }
     }
-    std::filesystem::remove_all(workdir);
+} // namespace hase::openpmd
 
-    if(available.empty())
+#if defined(HASE_OPENPMD_BACKEND_PROBE_STANDALONE)
+int main(int argc, char** argv)
+{
+    try
     {
-        std::cerr << "No configured openPMD backend passed the create/read probe.\n";
+        if(argc != 2)
+        {
+            std::cerr << "usage: " << argv[0] << " <output-file>\n";
+            return 2;
+        }
+        hase::openpmd::writeAvailableOpenPmdBackends(std::filesystem::path{argv[1]});
+        return 0;
+    }
+    catch(std::exception const& exc)
+    {
+        std::cerr << exc.what() << '\n';
         return 1;
     }
-
-    std::ofstream stream(output);
-    for(auto const& backend : available)
-    {
-        stream << backend << '\n';
-    }
-    return stream ? 0 : 1;
 }
+#endif
