@@ -521,6 +521,7 @@ list(
     REMOVE_ITEM
     HASE_RUNTIME_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd/backendProbe.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/alpakaUtils/backendNamesLibrary.cpp"
 )
 add_library(hase STATIC ${HASE_RUNTIME_SOURCES})
@@ -545,6 +546,7 @@ endif()
 alpaka_finalize(hase)
 
 include(cmake/AlpakaBackendNames.cmake)
+include(cmake/OpenPmdBackendProbe.cmake)
 add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp")
 set_target_properties(
     calcPhiASE

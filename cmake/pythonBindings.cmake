@@ -21,6 +21,7 @@ if(TARGET hase_openpmd_python)
     add_dependencies(HASEonGPU hase_openpmd_python)
     add_dependencies(calcPhiASE hase_openpmd_python)
 endif()
+add_dependencies(HASEonGPU HaseOpenPmdBackendProbe)
 if(HASE_FORWARD_LOGGING)
     set(HASE_FORWARD_LOGGING_PY True)
 else()
@@ -97,11 +98,23 @@ add_custom_command(
         "Copying calcPhiASE executable to build package ${HASE_PYTHON_RUNTIME_DIR}"
     VERBATIM
 )
+add_custom_command(
+    TARGET HaseOpenPmdBackendProbe
+    POST_BUILD
+    COMMAND
+        "$<TARGET_FILE:HaseOpenPmdBackendProbe>"
+        "${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
+    COMMENT
+        "Probing openPMD backends into ${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
+    VERBATIM
+)
 install(TARGETS HASEonGPU LIBRARY DESTINATION HASEonGPU_Bindings)
 install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
 install(TARGETS HaseAlpakaBackendNames LIBRARY DESTINATION HASEonGPU_Bindings)
 install(
-    FILES "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
+    FILES
+        "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
+        "${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
     DESTINATION HASEonGPU_Bindings
 )
 install(FILES HASEonGPU.py DESTINATION .)
