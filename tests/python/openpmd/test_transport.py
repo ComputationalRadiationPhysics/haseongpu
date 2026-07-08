@@ -453,6 +453,35 @@ def test_backendNamesMapToConfigs(monkeypatch):
             transport._backend_spec(backend)
 
 
+def test_openPmdBackendProbeIsCachedPerExecutable(tmp_path):
+    transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
+    executable = tmp_path / "calcPhiASE"
+    executable.write_text("", encoding="utf-8")
+    artifact = tmp_path / "openpmd_backends.txt"
+    artifact.write_text("adios\n", encoding="utf-8")
+
+    assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
+
+    artifact.write_text("hdf5\n", encoding="utf-8")
+
+    assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
+
+
+def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path):
+    transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
+    executable = tmp_path / "calcPhiASE"
+    executable.write_text("", encoding="utf-8")
+    (tmp_path / "openpmd_backends.txt").write_text("adios\n", encoding="utf-8")
+    monkeypatch.setattr(transport, "findCalcPhiAse", lambda: executable)
+    monkeypatch.setattr(
+        transport,
+        "_io",
+        lambda executable=None: (_ for _ in ()).throw(AssertionError("openpmd_api should not be imported")),
+    )
+
+    with pytest.raises(RuntimeError, match="YAML 'openpmd_backend'.*available backends: adios"):
+        transport._ensure_backend_available("hdf5")
+
 
 def test_openPmdWatchdogIntervalDefaultsToThirtySeconds(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_WATCHDOG_INTERVAL", raising=False)

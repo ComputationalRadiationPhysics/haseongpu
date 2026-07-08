@@ -159,7 +159,9 @@ OPENPMD_BACKENDS = {
     "hdf5": _BackendSpec("hdf5", ".h5", HDF5_CONFIG),
 }
 DEFAULT_OPENPMD_BACKEND = "adios-sst"
+OPENPMD_BACKEND_PROBE_ARTIFACT = "openpmd_backends.txt"
 HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
+_OPENPMD_BACKEND_PROBE_CACHE = {}
 
 
 def _normalize_backend(backend=None):
@@ -173,6 +175,89 @@ def _normalize_backend(backend=None):
 
 def _backend_spec(backend=None):
     return OPENPMD_BACKENDS[_normalize_backend(backend)]
+
+
+def _clean_probe_backends(values):
+    backends = []
+    for value in values:
+        normalized = str(value).strip().lower()
+        if normalized and normalized in OPENPMD_BACKENDS and normalized not in backends:
+            backends.append(normalized)
+    return tuple(backends)
+
+
+def _binding_package_dirs():
+    try:
+        import HASEonGPU_Bindings
+    except ImportError:
+        return ()
+
+    return tuple(Path(path) for path in HASEonGPU_Bindings.__path__)
+
+
+def _openpmd_backend_probe_candidates(executable):
+    executable = Path(executable).resolve()
+    yield executable.with_name(OPENPMD_BACKEND_PROBE_ARTIFACT)
+
+    for package_dir in _binding_package_dirs():
+        yield package_dir / OPENPMD_BACKEND_PROBE_ARTIFACT
+
+    pyinclude_dir = Path(__file__).resolve().parents[1]
+    yield pyinclude_dir / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
+
+    build_dir = _build_dir_for_executable(executable)
+    if build_dir is not None:
+        yield build_dir / "python" / "HASEonGPU_Bindings" / OPENPMD_BACKEND_PROBE_ARTIFACT
+        yield build_dir / "python" / "pyInclude" / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
+
+    root = Path(__file__).resolve().parents[2]
+    for build_dir in _build_dir_candidates(root):
+        yield build_dir / "python" / "HASEonGPU_Bindings" / OPENPMD_BACKEND_PROBE_ARTIFACT
+        yield build_dir / "python" / "pyInclude" / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
+
+
+def _openpmd_backend_probe_artifact(executable):
+    seen = set()
+    for candidate in _openpmd_backend_probe_candidates(executable):
+        resolved = Path(candidate).resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if resolved.is_file():
+            return resolved
+    return None
+
+
+def _probed_openpmd_backends(executable):
+    cache_key = str(Path(executable).resolve())
+    if cache_key in _OPENPMD_BACKEND_PROBE_CACHE:
+        return _OPENPMD_BACKEND_PROBE_CACHE[cache_key]
+
+    artifact = _openpmd_backend_probe_artifact(executable)
+    if artifact is None:
+        result = (None, None)
+    else:
+        backends = _clean_probe_backends(artifact.read_text(encoding="utf-8").splitlines())
+        if not backends:
+            raise RuntimeError(f"openPMD backend probe artifact is empty: {artifact}. {HASE_CONFIGURE_HINT}")
+        result = (backends, artifact)
+    _OPENPMD_BACKEND_PROBE_CACHE[cache_key] = result
+    return result
+
+
+def _ensure_compiled_backend_available(spec, executable):
+    backends, artifact = _probed_openpmd_backends(executable)
+    if backends is None:
+        return
+    if spec.name not in backends:
+        available = ", ".join(backends)
+        raise RuntimeError(
+            f"openPMD backend '{spec.name}' is selected by PhiASE.openpmdBackend/YAML "
+            f"'openpmd_backend', but the calcPhiASE/openPMD provider probe reports "
+            f"available backends: {available}. Probe artifact: {artifact}. Change "
+            f"openpmd_backend in the YAML or rebuild/reconfigure HASEonGPU with "
+            f"'{spec.name}' support. {HASE_CONFIGURE_HINT}"
+        )
 
 
 def _truthy(value):
@@ -354,8 +439,8 @@ def _series_config(path: Path, backend=None):
     return {}
 
 
-def _io():
-    _prefer_matching_openpmd_api(findCalcPhiAse())
+def _io(executable=None):
+    _prefer_matching_openpmd_api(findCalcPhiAse() if executable is None else Path(executable))
     try:
         import openpmd_api as io
     except ImportError as exc:
@@ -369,9 +454,11 @@ def _io():
     return io
 
 
-def _ensure_backend_available(backend):
+def _ensure_backend_available(backend, executable=None):
     spec = _backend_spec(backend)
-    io = _io()
+    executable = findCalcPhiAse() if executable is None else Path(executable)
+    _ensure_compiled_backend_available(spec, executable)
+    io = _io(executable)
     variants = getattr(io, "variants", {})
     extensions = set(getattr(io, "file_extensions", []))
 
@@ -897,7 +984,7 @@ class OpenPmdPhiAseSession:
         self._tmp_path = Path(tmp)
         self._tmp_path.mkdir(parents=True, exist_ok=True)
         self._executable = findCalcPhiAse()
-        _ensure_backend_available(self.spec.name)
+        _ensure_backend_available(self.spec.name, self._executable)
 
         artifact_id = _artifact_run_id() if artifact_root is not None else None
         if self.spec.streaming:

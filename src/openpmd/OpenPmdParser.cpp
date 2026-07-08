@@ -63,6 +63,7 @@ namespace
   }
 })";
 
+    constexpr char const* OPENPMD_HDF5_CONFIG = R"({"backend":"hdf5"})";
     constexpr char const* OPENPMD_DEFAULT_CONFIG = "{}";
     constexpr char const* HASE_TRANSPORT_VERSION = "0.1";
 
@@ -73,7 +74,15 @@ namespace
 
     char const* seriesConfig(std::string const& stream)
     {
-        return hasSuffix(stream, ".sst") ? OPENPMD_SST_CONFIG : OPENPMD_DEFAULT_CONFIG;
+        if(hasSuffix(stream, ".sst"))
+        {
+            return OPENPMD_SST_CONFIG;
+        }
+        if(hasSuffix(stream, ".h5"))
+        {
+            return OPENPMD_HDF5_CONFIG;
+        }
+        return OPENPMD_DEFAULT_CONFIG;
     }
 
     template<typename T>
