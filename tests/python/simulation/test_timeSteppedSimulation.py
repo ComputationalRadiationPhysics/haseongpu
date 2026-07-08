@@ -5,7 +5,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
+from types import SimpleNamespace
+
 import numpy as np
+import pytest
 
 from HASEonGPU import (
     Constants,
@@ -25,7 +28,48 @@ from HASEonGPU import (
     oneDimensionalZTraversalPumpRate,
 )
 
-def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
+
+class _FakePhiAse:
+    def __init__(self, topology, crossSections=None, **overrides):
+        self.crossSections = overrides.get("crossSections", crossSections)
+        self.spectralProperties = overrides.get("spectralProperties", self.crossSections)
+        self.laserProperties = overrides.get("laserProperties")
+        self.backend = overrides.get("backend", "FakeBackend")
+        self.openpmdBackend = overrides.get("openpmdBackend", overrides.get("openpmd_backend", "adios-sst"))
+        self._shape = (topology.numberOfPoints, topology.levels)
+        self._openpmdSession = None
+        self.runCalls = []
+        self.streamEvents = []
+
+    def openStream(self, **kwargs):
+        if self._openpmdSession is None:
+            self._openpmdSession = object()
+            self.streamEvents.append(("openStream", self._openpmdSession, kwargs))
+        return self._openpmdSession
+
+    def closeStream(self):
+        self.streamEvents.append(("closeStream", self._openpmdSession))
+        self._openpmdSession = None
+
+    def run(self, gainMedium=None, crossSections=None, *, openpmdSession=None):
+        self.runCalls.append(
+            SimpleNamespace(gainMedium=gainMedium, crossSections=crossSections, openpmdSession=openpmdSession)
+        )
+        return self
+
+    def getResults(self):
+        return SimpleNamespace(phiAse=np.zeros(int(np.prod(self._shape)), dtype=np.float64))
+
+
+@pytest.fixture
+def makeFakePhiAse(crossSections):
+    def make(topology, **overrides):
+        return _FakePhiAse(topology, crossSections=crossSections, **overrides)
+
+    return make
+
+
+def test_timeSteppedSimulationRunsCallbacksWithFakeAse(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -50,9 +94,12 @@ def testTimeSteppedSimulationRunsCallbacksWithFakeAse(
     assert seen[-1].step == 2
     assert seen[-1].betaCells.shape == (4, 3)
     assert seen[-1].betaVolume.shape == (2, 2)
+    assert phiAse.streamEvents[0][0] == "openStream"
+    assert phiAse.streamEvents[1] == ("closeStream", phiAse.streamEvents[0][1])
+    assert all(call.openpmdSession is phiAse.streamEvents[0][1] for call in phiAse.runCalls)
 
 
-def testSimulationCanDisableAseWithoutBreakingState(
+def test_simulationCanDisableAseWithoutBreakingState(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -81,7 +128,7 @@ def testSimulationCanDisableAseWithoutBreakingState(
     assert np.all(np.isfinite(state.betaCells))
 
 
-def testRunStepsCanLimitPumpContribution(
+def test_runStepsCanLimitPumpContribution(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -108,7 +155,7 @@ def testRunStepsCanLimitPumpContribution(
     assert np.allclose(seen[2].dndtPump, 0.0)
 
 
-def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
+def test_runStepsUsesPumpStepDefault(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -136,7 +183,7 @@ def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
     assert np.allclose(seen[2].dndtPump, 0.0)
 
 
-def testOnStepPassesStateBeforeUserArguments(
+def test_onStepPassesStateBeforeUserArguments(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -160,7 +207,7 @@ def testOnStepPassesStateBeforeUserArguments(
     assert seen == [("vtk", 1, 2.0, (4, 3)), ("vtk", 2, 2.0, (4, 3))]
 
 
-def testInitAndBeforeStepPassSimulationBeforeUserArguments(
+def test_hooksPassSimulationFirst(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -191,7 +238,7 @@ def testInitAndBeforeStepPassSimulationBeforeUserArguments(
     ]
 
 
-def testTimeSteppedSimulationLifecycleHooksGetSimulation(
+def test_timeSteppedSimulationLifecycleHooksGetSimulation(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -232,7 +279,7 @@ def testTimeSteppedSimulationLifecycleHooksGetSimulation(
     ]
 
 
-def testTimeSteppedSimulationAcceptsCustomPumpSolver(
+def test_timeSteppedSimulationAcceptsCustomPumpSolver(
     smallGainMedium,
     smallTopology,
     crossSections,
@@ -265,7 +312,7 @@ def testTimeSteppedSimulationAcceptsCustomPumpSolver(
     assert np.allclose(state.betaCells[:, -1], expected)
 
 
-def testCustomPumpSolverCanReadAdditionalPumpProperties(
+def test_customPumpSolverCanReadAdditionalPumpProperties(
     smallGainMedium,
     smallTopology,
     crossSections,
@@ -299,7 +346,7 @@ def testCustomPumpSolverCanReadAdditionalPumpProperties(
     assert np.allclose(state.betaCells, expected)
 
 
-def testOneDimensionalZTraversalProducesFrozenStatePumpRate(
+def test_zTraversalProducesPumpRate(
     smallGainMedium,
     smallTopology,
     crossSections,
@@ -335,7 +382,7 @@ def testOneDimensionalZTraversalProducesFrozenStatePumpRate(
     assert np.allclose(state.phiAse, 0.0)
 
 
-def testOneDimensionalZTraversalUsesProfileCenter(
+def test_oneDimensionalZTraversalUsesProfileCenter(
     smallTopology,
 ):
     spectra = CrossSectionData.monochromatic(
@@ -375,7 +422,7 @@ def testOneDimensionalZTraversalUsesProfileCenter(
     assert np.any(rate[0] > rate[1:])
 
 
-def testPumpRadiationProfileUsesCrystalSpectraAndDefaultUnitWeights(
+def test_pumpProfileUsesCrystalSpectra(
     smallTopology,
 ):
     spectra = CrossSectionData(
@@ -426,7 +473,7 @@ def testPumpRadiationProfileUsesCrystalSpectraAndDefaultUnitWeights(
     assert np.allclose(rate, expected_per_point[:, None])
 
 
-def testOneDimensionalZTraversalSupportsMultichromaticWeightsAndDirection(
+def test_zTraversalSupportsWeights(
     smallTopology,
 ):
     spectra = CrossSectionData(
@@ -484,7 +531,7 @@ def testOneDimensionalZTraversalSupportsMultichromaticWeightsAndDirection(
     assert np.allclose(rate, expected_per_point[:, None])
 
 
-def testDefaultPumpSolverRequiresGaussianRadius(crossSections):
+def test_defaultPumpSolverRequiresGaussianRadius(crossSections):
     try:
         PumpProperties(
             spectralProperties=crossSections,
@@ -497,7 +544,7 @@ def testDefaultPumpSolverRequiresGaussianRadius(crossSections):
         raise AssertionError("default Gaussian pump accepted missing radiusX")
 
 
-def testAseDerivativeUsesPhiAseScalingFromBackend(
+def test_aseDerivativeUsesPhiAseScalingFromBackend(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -523,7 +570,7 @@ def testAseDerivativeUsesPhiAseScalingFromBackend(
     assert np.allclose(derivative, gainPerDensity * phiAse)
 
 
-def testPumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
+def test_pumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
     pump = PumpProperties(
         spectralProperties=crossSections,
         intensity=16e3,
@@ -541,7 +588,7 @@ def testPumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
     assert pump.superGaussianOrder == 40
 
 
-def testTimeIntegrationSolverIsMandatory(
+def test_timeIntegrationSolverIsMandatory(
     smallGainMedium,
     pumpProperties,
     makeFakePhiAse,
@@ -578,7 +625,7 @@ def _mediumLikeSmallTopology(smallTopology, betaCells=None):
     )
 
 
-def testFrozenPhiAseRungeKutta4RunsAseBackendOncePerStep(
+def test_frozenRungeKuttaRunsAseOnce(
     smallTopology,
     pumpProperties,
     makeFakePhiAse,
@@ -604,7 +651,7 @@ def testFrozenPhiAseRungeKutta4RunsAseBackendOncePerStep(
     assert state.phiAse.shape == (smallTopology.numberOfPoints, smallTopology.levels)
 
 
-def testSimulationPrePumpSkipsAseBackendForInitialStepOnly(
+def test_prePumpSkipsInitialAse(
     smallTopology,
     pumpProperties,
     makeFakePhiAse,
@@ -644,7 +691,7 @@ def testSimulationPrePumpSkipsAseBackendForInitialStepOnly(
     assert np.any(calls[0] > 0.0)
 
 
-def testFrozenPhiAseRungeKutta4SkipsAseBackendWhenDisabled(
+def test_frozenRungeKuttaSkipsDisabledAse(
     smallTopology,
     pumpProperties,
     makeFakePhiAse,
@@ -688,7 +735,7 @@ def testFrozenPhiAseRungeKutta4SkipsAseBackendWhenDisabled(
     assert np.allclose(frozenState.dndtAse, 0.0)
 
 
-def testFrozenPhiAseDerivativeReusesPhiAseWhileAseCouplingFollowsBeta(
+def test_frozenDerivativeReusesPhiAse(
     smallGainMedium,
     smallTopology,
     pumpProperties,
@@ -715,7 +762,7 @@ def testFrozenPhiAseDerivativeReusesPhiAseWhileAseCouplingFollowsBeta(
     assert not np.array_equal(low.dndtAse, high.dndtAse)
 
 
-def testTimeIntegrationSolversCanStepSimulation(
+def test_timeIntegrationSolversCanStepSimulation(
     smallGainMedium,
     pumpProperties,
     makeFakePhiAse,

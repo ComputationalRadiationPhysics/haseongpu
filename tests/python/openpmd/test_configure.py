@@ -28,7 +28,7 @@ from pyInclude.config import (
 )
 
 
-def test_supported_external_openpmd_backends_intersects_python_and_cmake_support():
+def test_externalBackendsIntersectSupport():
     python_info = {
         "variants": {"adios2": True, "hdf5": True},
         "file_extensions": ["bp", "sst", "h5"],
@@ -43,12 +43,12 @@ def test_supported_external_openpmd_backends_intersects_python_and_cmake_support
     assert supported_external_openpmd_backends(python_info, cmake_info) == ["adios-sst", "adios"]
 
 
-def test_preferred_openpmd_backend_uses_priority_and_validates_request():
+def test_preferredBackendValidatesRequest():
     assert preferred_openpmd_backend(["adios", "hdf5"]) == "adios"
     assert preferred_openpmd_backend(["adios", "hdf5"], "hdf5") == "hdf5"
 
 
-def test_bundled_defaults_are_adios2_only():
+def test_bundledDefaultsAreAdios2Only():
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH) == [
         "adios-sst",
         "adios",
@@ -66,12 +66,12 @@ def test_bundled_defaults_are_adios2_only():
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_OFF, BUNDLED_HDF5_SYSTEM) == ["hdf5"]
 
 
-def test_preferred_compute_backend_uses_cpu_backend_for_first_validation():
+def test_preferredComputeBackend():
     assert preferred_compute_backend(["Cuda_Gpu_CudaRt", "Host_Cpu_CpuSerial"]) == "Host_Cpu_CpuSerial"
     assert preferred_compute_backend(["Cuda_Gpu_CudaRt"]) == "Cuda_Gpu_CudaRt"
 
 
-def test_bundled_fetch_install_command_mentions_source_build():
+def test_bundledFetchInstallCommandMentionsSourceBuild():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -90,7 +90,7 @@ def test_bundled_fetch_install_command_mentions_source_build():
     assert "-DHASE_OPENPMD_FETCH_HDF5=ON" in command
 
 
-def test_bundled_install_command_can_skip_openpmd_python_bindings():
+def test_bundledInstallSkipsPythonBindings():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -102,7 +102,7 @@ def test_bundled_install_command_can_skip_openpmd_python_bindings():
     assert "-DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON" not in install_command(selection)
 
 
-def test_bundled_hdf5_only_install_command_uses_system_hdf5():
+def test_bundledHdf5UsesSystemHdf5():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="hdf5",
@@ -119,7 +119,7 @@ def test_bundled_hdf5_only_install_command_uses_system_hdf5():
     assert "-DHASE_OPENPMD_FETCH_HDF5=OFF" in command
 
 
-def test_bundled_adios_only_install_command_disables_hdf5():
+def test_bundledAdiosOnlyInstallCommandDisablesHdf5():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios",
@@ -133,7 +133,7 @@ def test_bundled_adios_only_install_command_disables_hdf5():
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_OFF) == ["adios-sst", "adios"]
 
 
-def test_bundled_system_adios2_install_command_carries_adios2_paths():
+def test_bundledSystemCarriesAdios2Paths():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -150,7 +150,7 @@ def test_bundled_system_adios2_install_command_carries_adios2_paths():
     assert "-DADIOS2_DIR=/opt/adios2/lib/cmake/adios2" in command
 
 
-def test_bundled_system_hdf5_install_command_carries_hdf5_paths():
+def test_bundledSystemCarriesHdf5Paths():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="hdf5",
@@ -168,7 +168,7 @@ def test_bundled_system_hdf5_install_command_carries_hdf5_paths():
     assert "-DHDF5_DIR=/opt/hdf5/lib/cmake/hdf5" in command
 
 
-def test_system_openpmd_with_adios2_install_command_carries_provider_paths():
+def test_systemOpenPmdCarriesProviderPaths():
     selection = WizardSelection(
         provider=PROVIDER_SYSTEM,
         openpmd_backend="adios-sst",
@@ -185,7 +185,7 @@ def test_system_openpmd_with_adios2_install_command_carries_provider_paths():
     assert "-DADIOS2_DIR=/opt/adios2/lib/cmake/adios2" in command
 
 
-def test_install_command_can_enable_mpi_build_support():
+def test_installCommandCanEnableMpiBuildSupport():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -196,7 +196,7 @@ def test_install_command_can_enable_mpi_build_support():
     assert "-DDISABLE_MPI=OFF" in install_command(selection)
 
 
-def test_provider_notes_include_new_guidance_shape():
+def test_providerNotesIncludeNewGuidanceShape():
     selection = WizardSelection(
         provider=PROVIDER_SYSTEM,
         openpmd_backend="hdf5",
@@ -212,7 +212,7 @@ def test_provider_notes_include_new_guidance_shape():
     assert "alpaka backend guidance" in notes
 
 
-def test_alpaka_guidance_explains_missing_gpu_backends():
+def test_alpakaGuidanceExplainsMissingGpuBackends():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -227,7 +227,7 @@ def test_alpaka_guidance_explains_missing_gpu_backends():
     assert "To get AMD/HIP backends" in guidance
 
 
-def test_install_command_uses_env_var_and_safe_defaults():
+def test_installCommandUsesEnvVarAndSafeDefaults():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -242,7 +242,7 @@ def test_install_command_uses_env_var_and_safe_defaults():
     assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in command
 
 
-def test_install_command_can_pass_break_system_packages():
+def test_installCommandCanPassBreakSystemPackages():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -254,7 +254,7 @@ def test_install_command_can_pass_break_system_packages():
     assert "python3 -m pip install -v --break-system-packages ." in command
 
 
-def test_install_command_can_disable_native_optimizations():
+def test_installCommandCanDisableNativeOptimizations():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -265,7 +265,7 @@ def test_install_command_can_disable_native_optimizations():
     assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in install_command(selection)
 
 
-def test_main_writes_default_yaml_under_config(tmp_path, monkeypatch, capsys):
+def test_mainWritesDefaultYamlUnderConfig(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         configure_module,
@@ -285,7 +285,7 @@ def test_main_writes_default_yaml_under_config(tmp_path, monkeypatch, capsys):
     assert "configuration file is present under config/hase-phiase.yaml" in output
 
 
-def test_auto_provider_falls_back_to_bundled_when_cmake_missing(monkeypatch, capsys):
+def test_autoProviderFallsBackToBundled(monkeypatch, capsys):
     monkeypatch.setattr(
         configure_module,
         "available_alpaka_backends",
@@ -300,7 +300,7 @@ def test_auto_provider_falls_back_to_bundled_when_cmake_missing(monkeypatch, cap
     assert "CMake executable '/definitely/missing/cmake' was not found" in captured.err
 
 
-def test_bundled_provider_template_sets_fetched_dependency_versions():
+def test_bundledProviderTemplateSetsFetchedDependencyVersions():
     hdf5_template = Path("cmake/HaseHdf5Provider.cmake.in").read_text(encoding="utf-8")
     adios2_template = Path("cmake/HaseAdios2Provider.cmake.in").read_text(encoding="utf-8")
     openpmd_template = Path("cmake/HaseOpenPmdProvider.cmake.in").read_text(encoding="utf-8")
@@ -313,7 +313,7 @@ def test_bundled_provider_template_sets_fetched_dependency_versions():
     assert "HDF5_IS_PARALLEL" in openpmd_template
 
 
-def test_cmake_mpi_disable_uses_current_disable_mpi_choice():
+def test_cmakeMpiDisableUsesCurrentDisableMpiChoice():
     cmake_lists = Path("CMakeLists.txt").read_text(encoding="utf-8")
     provider_script = Path("cmake/findOpenPmd.cmake").read_text(encoding="utf-8")
 
@@ -324,7 +324,7 @@ def test_cmake_mpi_disable_uses_current_disable_mpi_choice():
     assert "if(HASE_MPI_ENABLED)\n            set(HASE_PROVIDER_USE_MPI ON)" in provider_script
 
 
-def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
+def test_bundledProviderStagesFetchedDependenciesBeforeOpenPmd():
     script = Path("cmake/findOpenPmd.cmake").read_text(encoding="utf-8")
     normalized_script = " ".join(script.split())
 
@@ -340,7 +340,7 @@ def test_bundled_provider_stages_fetched_dependencies_before_openpmd():
     assert script.index(adios2_stage) < script.index(openpmd_stage)
 
 
-def test_hdf5_prompt_requires_hdf5_when_adios2_is_disabled(monkeypatch, capsys):
+def test_hdf5PromptRequiresHdf5(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda prompt: "")
 
     choice = configure_module._interactive_bundled_hdf5(BUNDLED_ADIOS2_OFF)
@@ -351,7 +351,7 @@ def test_hdf5_prompt_requires_hdf5_when_adios2_is_disabled(monkeypatch, capsys):
     assert "  2) system  use an existing HDF5 installation" in output
 
 
-def test_interactive_mpi_no_disables_mpi_build(monkeypatch):
+def test_interactiveMpiNoDisablesMpiBuild(monkeypatch):
     args = configure_module._parse_args(["--provider", PROVIDER_BUNDLED])
     args.interactive = True
     answers = iter(["", "", "", "n", "n"])
@@ -364,7 +364,7 @@ def test_interactive_mpi_no_disables_mpi_build(monkeypatch):
     assert "-DDISABLE_MPI=ON" in install_command(selection)
 
 
-def test_interactive_install_prompt_defaults_to_yes(tmp_path, monkeypatch):
+def test_interactiveInstallPromptDefaultsToYes(tmp_path, monkeypatch):
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -396,7 +396,7 @@ def test_interactive_install_prompt_defaults_to_yes(tmp_path, monkeypatch):
     assert seen == {"break_system_packages": True, "use_ccache": False}
 
 
-def test_install_command_can_enable_ccache_launchers():
+def test_installCommandCanEnableCcacheLaunchers():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -410,7 +410,7 @@ def test_install_command_can_enable_ccache_launchers():
     assert "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache" in command
 
 
-def test_reinstall_fails_without_previous_build(tmp_path, monkeypatch, capsys):
+def test_reinstallFailsWithoutPreviousBuild(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
 
     assert configure_module.main(["--reinstall"]) == 1
@@ -418,7 +418,7 @@ def test_reinstall_fails_without_previous_build(tmp_path, monkeypatch, capsys):
     assert "--reinstall requires a previous HASE CMake configure/install" in capsys.readouterr().err
 
 
-def test_reinstall_uses_previous_cmake_cache(tmp_path, monkeypatch):
+def test_reinstallUsesPreviousCmakeCache(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cache_dir = tmp_path / "build" / "cp-test"
     cache_dir.mkdir(parents=True)
@@ -448,7 +448,7 @@ def test_reinstall_uses_previous_cmake_cache(tmp_path, monkeypatch):
     assert seen["record_state"] is True
 
 
-def test_autoinstall_uses_defaults_and_runs_install(tmp_path, monkeypatch):
+def test_autoinstallUsesDefaultsAndRunsInstall(tmp_path, monkeypatch):
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios-sst",
@@ -473,7 +473,7 @@ def test_autoinstall_uses_defaults_and_runs_install(tmp_path, monkeypatch):
     assert seen == {"selected": selection, "break_system_packages": False, "use_ccache": False}
 
 
-def test_generated_yaml_loads_as_phi_ase_config():
+def test_generatedYamlLoadsAsPhiAseConfig():
     selection = WizardSelection(
         provider=PROVIDER_BUNDLED,
         openpmd_backend="adios",

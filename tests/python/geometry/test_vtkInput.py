@@ -14,7 +14,7 @@ from HASEonGPU import GainMedium, MeshTopology
 repoRoot = Path(__file__).resolve().parents[3]
 
 
-def testGainMediumRoundTripsThroughLegacyVtk(tmp_path, smallGainMedium):
+def test_gainMediumRoundTripsThroughLegacyVtk(tmp_path, smallGainMedium):
     vtk_path = tmp_path / "gain_medium.vtk"
 
     smallGainMedium.toVtk(vtk_path)
@@ -37,7 +37,7 @@ def testGainMediumRoundTripsThroughLegacyVtk(tmp_path, smallGainMedium):
     assert loaded.get("claddingAbsorption").value == smallGainMedium.get("claddingAbsorption").value
 
 
-def testMeshTopologyCanBeLoadedFromVtk(tmp_path, smallGainMedium):
+def test_meshTopologyCanBeLoadedFromVtk(tmp_path, smallGainMedium):
     vtk_path = tmp_path / "topology.vtk"
 
     smallGainMedium.toVtk(vtk_path)
@@ -49,7 +49,7 @@ def testMeshTopologyCanBeLoadedFromVtk(tmp_path, smallGainMedium):
     assert topology.thickness == smallGainMedium.topology.thickness
 
 
-def testBundledExampleVtkFixturesExposeFrontendFields():
+def test_bundledExampleVtkFixturesExposeFrontendFields():
     fixtures = {
         "pt.vtk": (421, 812, 10),
         "cuboid.vtk": (321, 600, 10),

@@ -21,7 +21,7 @@ def _vtkScalarNames(path):
     return {tokens[index + 1] for index, token in enumerate(tokens) if token.upper() == "SCALARS"}
 
 
-def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
+def test_laserPumpCladdingMediumUsesPrimitiveReflectivityShape():
     medium = laserPumpCladding.laserPumpCladdingMedium()
 
     assert medium.get("reflectivities").expectedShape == (
@@ -70,7 +70,7 @@ class _FakePhiASE:
         result.phiAse = np.ones(int(np.prod(self._shape)), dtype=np.float64)
         return result
 
-def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, smallGainMedium):
+def test_laserPumpExampleWritesVtk(monkeypatch, tmp_path, smallGainMedium):
     monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _NoPumpSolver())
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
     monkeypatch.setattr(
@@ -90,7 +90,7 @@ def testLaserPumpCladdingExampleWritesVtkFromOnStep(monkeypatch, tmp_path, small
     assert {"betaCells", "phiASE", "dndtAse", "dndtPump", "cladAbs"}.issubset(scalars)
 
 
-def testLaserPumpCladdingExampleSkipsAseBackendForInitialStep(monkeypatch, tmp_path, smallGainMedium):
+def test_laserPumpExampleSkipsInitialAse(monkeypatch, tmp_path, smallGainMedium):
     monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _ConstantPumpSolver())
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
     phiAse = _FakePhiASE()
@@ -107,7 +107,7 @@ def testLaserPumpCladdingExampleSkipsAseBackendForInitialStep(monkeypatch, tmp_p
     assert np.any(phiAse.runInputs[0] > 0.0)
 
 
-def testLaserPumpCladdingExamplePassesPumpStepsToSimulation(monkeypatch, tmp_path, smallGainMedium):
+def test_laserPumpExamplePassesPumpSteps(monkeypatch, tmp_path, smallGainMedium):
     monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _ConstantPumpSolver())
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
     monkeypatch.setattr(

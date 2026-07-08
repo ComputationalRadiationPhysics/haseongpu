@@ -63,7 +63,7 @@ def _runExampleScript(workdir, phiAseConfigPath, backend, openPmdBackend, timeSl
 
 @pytest.mark.integration
 @pytest.mark.parametrize("backend", alpakaBackends)
-def testTimeSteppedSimulationMatchesLaserPumpCladdingScript(
+def test_timeSteppedSimulationMatchesLaserPumpCladdingScript(
     backend,
     tmp_path,
     legacyPhiAseConfigPath,

@@ -20,7 +20,7 @@ alpakaBackends = AlpakaBackends.all()
 REGRESSION_RNG_SEED = 5489
 
 
-def testFindCalcPhiASENearModuleFallsBackToInstalledBindingsPath(monkeypatch, tmp_path):
+def test_findCalcPhiAseNearModule(monkeypatch, tmp_path):
     localBindings = tmp_path / "repo" / "HASEonGPU_Bindings"
     installedBindings = tmp_path / "site-packages" / "HASEonGPU_Bindings"
     localBindings.mkdir(parents=True)
@@ -294,7 +294,7 @@ def referenceOutputs(dummyData, backend):
 @pytest.mark.parametrize("layout", ["matrix", "flat"])
 @pytest.mark.parametrize("container", ["ndarray", "list"])
 @pytest.mark.parametrize("parallel", ["single", "debugFileIOPath"])
-def testCalcPhiAseCases(backend, layout, container, parallel, dummyData, referenceOutputs):
+def test_calcPhiAseCases(backend, layout, container, parallel, dummyData, referenceOutputs):
     phiAseValues, mseValues, rayCounts = runWithOptions(
         layout,
         container,
@@ -347,7 +347,7 @@ def testCalcPhiAseCases(backend, layout, container, parallel, dummyData, referen
 
 
 @pytest.mark.parametrize("backend", alpakaBackends)
-def testDirectRepeat(backend, dummyData):
+def test_directRepeat(backend, dummyData):
     firstPhiAseValues, firstMseValues, firstRayCounts = runWithOptions(
         layout="matrix",
         container="ndarray",

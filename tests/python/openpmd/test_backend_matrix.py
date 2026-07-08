@@ -3,7 +3,7 @@ import pytest
 import openpmd_backend_matrix
 
 
-def test_openpmd_backend_matrix_uses_probe_artifact_by_default(monkeypatch, tmp_path):
+def test_backendMatrixUsesProbe(monkeypatch, tmp_path):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
     (tmp_path / "openpmd_backends.txt").write_text("hdf5\n", encoding="utf-8")
     monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: (tmp_path,))
@@ -12,13 +12,13 @@ def test_openpmd_backend_matrix_uses_probe_artifact_by_default(monkeypatch, tmp_
     assert openpmd_backend_matrix.openpmd_test_backends() == ["hdf5"]
 
 
-def test_openpmd_backend_matrix_accepts_explicit_plural_selector(monkeypatch):
+def test_backendMatrixAcceptsSelector(monkeypatch):
     monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "hdf5, adios-sst")
 
     assert openpmd_backend_matrix.openpmd_test_backends() == ["adios-sst", "hdf5"]
 
 
-def test_openpmd_backend_matrix_fails_without_probe_artifact(monkeypatch):
+def test_backendMatrixFailsWithoutProbe(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
     monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: ())
     monkeypatch.setattr(openpmd_backend_matrix, "_build_artifact_candidates", lambda: ())
@@ -27,7 +27,7 @@ def test_openpmd_backend_matrix_fails_without_probe_artifact(monkeypatch):
         openpmd_backend_matrix.openpmd_test_backends()
 
 
-def test_openpmd_backend_matrix_fails_on_empty_probe_artifact(monkeypatch, tmp_path):
+def test_backendMatrixFailsOnEmptyProbe(monkeypatch, tmp_path):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
     (tmp_path / "openpmd_backends.txt").write_text("", encoding="utf-8")
     monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: (tmp_path,))
