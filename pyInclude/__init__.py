@@ -27,7 +27,15 @@ from .openpmd import (
     unitDimension,
 )
 from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, VolumeTopology, writeGainMediumVtk
-from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
+from .laser import (
+    Constants,
+    CrossSectionData,
+    LaserProperties,
+    PumpProperties,
+    PumpRadiationProfile,
+    SpectralDecomposition,
+    oneDimensionalZTraversalPumpRate,
+)
 from .simulation import (
     ConnectivityAverageBetaVolumeMapper,
     LegacyGridDataBetaVolumeMapper,

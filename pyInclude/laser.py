@@ -323,6 +323,102 @@ class CrossSectionData:
 SpectralDecomposition = CrossSectionData
 
 
+@dataclass(frozen=True)
+class Constants:
+    """Physical constants used by Python pump helper routines."""
+
+    c: float = 299792458.0
+    h: float = 6.62607015e-34
+
+
+@dataclass(frozen=True)
+class PumpRadiationProfile:
+    """Beam profile used by the one-dimensional z-traversal pump helper."""
+
+    intensity: float
+    wavelengths: object
+    waist: tuple[float, float]
+    center: object = (0.0, 0.0, 0.0)
+    propagationDirection: object = (0.0, 0.0, 1.0)
+    backReflection: bool = True
+    reflectivity: float = 1.0
+    superGaussianOrder: float = 40.0
+    spectralWeights: object | None = None
+    extraction: bool = False
+
+    def intensityAt(self, points):
+        points = np.asarray(points, dtype=np.float64)
+        center = np.asarray(self.center, dtype=np.float64).reshape(-1)
+        center_x = center[0] if center.size > 0 else 0.0
+        center_y = center[1] if center.size > 1 else 0.0
+        waist_x, waist_y = self.waist
+        if waist_x <= 0.0 or waist_y <= 0.0:
+            raise ValueError("pump waist values must be positive")
+        radius_squared = (
+            ((points[:, 0] - center_x) ** 2) / (waist_x**2)
+            + ((points[:, 1] - center_y) ** 2) / (waist_y**2)
+        )
+        return float(self.intensity) * np.exp(-(radius_squared ** (0.5 * float(self.superGaussianOrder))))
+
+
+def _profile_from_pump(pump):
+    profile = pump.getProperty("profile")
+    if profile is not None:
+        return profile
+    return PumpRadiationProfile(
+        intensity=pump.intensity,
+        wavelengths=np.asarray(pump.crossSections.wavelengthsAbsorption, dtype=np.float64),
+        waist=(pump.radiusX, pump.radiusY),
+        propagationDirection=pump.getProperty("propagationDirection", (0.0, 0.0, 1.0)),
+        backReflection=pump.backReflection,
+        reflectivity=pump.reflectivity,
+        superGaussianOrder=pump.getProperty("superGaussianOrder", pump.exponent),
+        spectralWeights=pump.getProperty("spectralWeights"),
+        extraction=pump.extraction,
+    )
+
+
+def oneDimensionalZTraversalPumpRate(points, betaCells, pump, gainMedium, constants=Constants()):
+    """Evaluate the frozen-state pump rate used by one-dimensional z traversal."""
+
+    points = np.asarray(points, dtype=np.float64)
+    beta = np.asarray(betaCells, dtype=np.float64)
+    if beta.ndim == 1:
+        topology = getattr(gainMedium, "topology", None)
+        levels = getattr(topology, "levels", 1)
+        beta = beta.reshape((points.shape[0], int(levels)), order="F")
+    if beta.shape[0] != points.shape[0]:
+        raise ValueError("betaCells first dimension must match number of points")
+
+    profile = _profile_from_pump(pump)
+    spectra = pump.crossSections
+    wavelengths = np.asarray(profile.wavelengths, dtype=np.float64).reshape(-1)
+    if wavelengths.size == 0:
+        wavelengths = np.asarray(spectra.wavelengthsAbsorption, dtype=np.float64).reshape(-1)
+
+    weights = profile.spectralWeights
+    if weights is None:
+        weights = pump.getProperty("spectralWeights")
+    if weights is None:
+        weights = np.ones(wavelengths.size, dtype=np.float64)
+    else:
+        weights = np.asarray(weights, dtype=np.float64).reshape(-1)
+    if weights.size != wavelengths.size:
+        raise ValueError("spectralWeights must match the number of pump wavelengths")
+
+    local_intensity = np.zeros(points.shape[0], dtype=np.float64) if profile.extraction else profile.intensityAt(points)
+    if profile.backReflection:
+        local_intensity = local_intensity * (1.0 + float(profile.reflectivity))
+
+    rate = np.zeros_like(beta, dtype=np.float64)
+    for wavelength, weight in zip(wavelengths, weights):
+        sigma_absorption = spectra.absorptionAt(wavelength)
+        sigma_emission = spectra.emissionAt(wavelength)
+        photon_flux = local_intensity[:, None] * float(wavelength) / (float(constants.h) * float(constants.c))
+        rate += float(weight) * (sigma_absorption - beta * (sigma_absorption + sigma_emission)) * photon_flux
+    return rate
+
+
 @dataclass
 class LaserProperties:
     """Mutable low-level laser-property store.
@@ -477,8 +573,13 @@ class PumpProperties:
     customProperties: dict
     """Extensible store for beam shape, reflection, spectra, and solver handles."""
 
-    def __init__(self, *, intensity, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
+    def __init__(self, *, intensity=None, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
         """Create pump settings from core fields plus arbitrary custom properties."""
+        profile = properties.get("profile")
+        if intensity is None and profile is not None:
+            intensity = profile.intensity
+        if intensity is None:
+            raise TypeError("PumpProperties requires intensity or profile")
         self.intensity = float(intensity)
         self.wavelength = None if wavelength is None else float(wavelength)
         self.pumpSubsteps = int(pumpSubsteps)
@@ -545,6 +646,18 @@ class PumpProperties:
         )
 
     def _normalizeProperties(self):
+        profile = self.customProperties.get("profile")
+        if profile is not None:
+            self.customProperties.setdefault("radiusX", profile.waist[0])
+            self.customProperties.setdefault("radiusY", profile.waist[1])
+            self.customProperties.setdefault("superGaussianOrder", profile.superGaussianOrder)
+            self.customProperties.setdefault("exponent", profile.superGaussianOrder)
+            self.customProperties.setdefault("backReflection", profile.backReflection)
+            self.customProperties.setdefault("reflectivity", profile.reflectivity)
+            self.customProperties.setdefault("extraction", profile.extraction)
+            self.customProperties.setdefault("propagationDirection", profile.propagationDirection)
+            if profile.spectralWeights is not None:
+                self.customProperties.setdefault("spectralWeights", profile.spectralWeights)
         if "pumpDuration" not in self.customProperties and self.customProperties.get("duration") is not None:
             self.customProperties["pumpDuration"] = self.customProperties["duration"]
         if self.crossSections is None and self.spectralProperties is not None:

@@ -39,7 +39,7 @@ ASE can be run once without a ``Simulation`` time loop:
    )
 
 ``run(...)`` canonicalizes the domain objects for the openPMD transport,
-launches the compiled ``calcPhiASE`` backend, stores the raw result, and
+launches the compiled ``hase-cpp`` backend, stores the raw result, and
 returns ``self``. The returned ``result.phiAse`` values correspond to the ASE
 flux :math:`\Phi_i` described in the scientific background.
 
