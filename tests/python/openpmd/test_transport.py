@@ -453,26 +453,35 @@ def test_backendNamesMapToConfigs(monkeypatch):
             transport._backend_spec(backend)
 
 
-def test_openPmdBackendProbeIsCachedPerExecutable(tmp_path):
+def test_openPmdBackendProbeIsCachedPerExecutable(monkeypatch, tmp_path):
     transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
     executable = tmp_path / "calcPhiASE"
     executable.write_text("", encoding="utf-8")
-    artifact = tmp_path / "openpmd_backends.txt"
-    artifact.write_text("adios\n", encoding="utf-8")
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout="adios\n", stderr="")
+
+    monkeypatch.setattr(transport.subprocess, "run", fake_run)
 
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
-
-    artifact.write_text("hdf5\n", encoding="utf-8")
-
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
+    assert calls == [
+        ([str(executable.resolve()), "--probe-openpmd-backends"], {"check": False, "text": True, "capture_output": True})
+    ]
 
 
 def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path):
     transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
     executable = tmp_path / "calcPhiASE"
     executable.write_text("", encoding="utf-8")
-    (tmp_path / "openpmd_backends.txt").write_text("adios\n", encoding="utf-8")
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: executable)
+    monkeypatch.setattr(
+        transport.subprocess,
+        "run",
+        lambda command, **kwargs: SimpleNamespace(returncode=0, stdout="adios\n", stderr=""),
+    )
     monkeypatch.setattr(
         transport,
         "_io",
@@ -951,7 +960,7 @@ def test_openPmdSessionAssignsMonotonicRequestIterations(monkeypatch):
     calls = []
 
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: Path("calcPhiASE"))
-    monkeypatch.setattr(transport, "_ensure_backend_available", lambda backend: None)
+    monkeypatch.setattr(transport, "_ensure_backend_available", lambda backend, executable=None: None)
 
     def fake_run_file_iteration(self, iteration_index, phi_ase, gain_medium, cross_sections):
         calls.append((iteration_index, phi_ase, gain_medium, cross_sections))

@@ -159,7 +159,6 @@ OPENPMD_BACKENDS = {
     "hdf5": _BackendSpec("hdf5", ".h5", HDF5_CONFIG),
 }
 DEFAULT_OPENPMD_BACKEND = "adios-sst"
-OPENPMD_BACKEND_PROBE_ARTIFACT = "openpmd_backends.txt"
 HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
 _OPENPMD_BACKEND_PROBE_CACHE = {}
 
@@ -186,77 +185,41 @@ def _clean_probe_backends(values):
     return tuple(backends)
 
 
-def _binding_package_dirs():
-    try:
-        import HASEonGPU_Bindings
-    except ImportError:
-        return ()
-
-    return tuple(Path(path) for path in HASEonGPU_Bindings.__path__)
-
-
-def _openpmd_backend_probe_candidates(executable):
-    executable = Path(executable).resolve()
-    yield executable.with_name(OPENPMD_BACKEND_PROBE_ARTIFACT)
-
-    for package_dir in _binding_package_dirs():
-        yield package_dir / OPENPMD_BACKEND_PROBE_ARTIFACT
-
-    pyinclude_dir = Path(__file__).resolve().parents[1]
-    yield pyinclude_dir / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
-
-    build_dir = _build_dir_for_executable(executable)
-    if build_dir is not None:
-        yield build_dir / "python" / "HASEonGPU_Bindings" / OPENPMD_BACKEND_PROBE_ARTIFACT
-        yield build_dir / "python" / "pyInclude" / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
-
-    root = Path(__file__).resolve().parents[2]
-    for build_dir in _build_dir_candidates(root):
-        yield build_dir / "python" / "HASEonGPU_Bindings" / OPENPMD_BACKEND_PROBE_ARTIFACT
-        yield build_dir / "python" / "pyInclude" / "_native" / OPENPMD_BACKEND_PROBE_ARTIFACT
-
-
-def _openpmd_backend_probe_artifact(executable):
-    seen = set()
-    for candidate in _openpmd_backend_probe_candidates(executable):
-        resolved = Path(candidate).resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        if resolved.is_file():
-            return resolved
-    return None
-
-
 def _probed_openpmd_backends(executable):
-    cache_key = str(Path(executable).resolve())
+    executable = Path(executable).resolve()
+    cache_key = str(executable)
     if cache_key in _OPENPMD_BACKEND_PROBE_CACHE:
         return _OPENPMD_BACKEND_PROBE_CACHE[cache_key]
 
-    artifact = _openpmd_backend_probe_artifact(executable)
-    if artifact is None:
-        result = (None, None)
-    else:
-        backends = _clean_probe_backends(artifact.read_text(encoding="utf-8").splitlines())
-        if not backends:
-            raise RuntimeError(f"openPMD backend probe artifact is empty: {artifact}. {HASE_CONFIGURE_HINT}")
-        result = (backends, artifact)
+    completed = subprocess.run(
+        [str(executable), "--probe-openpmd-backends"],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
+        raise RuntimeError(f"calcPhiASE openPMD backend probe failed with return code {completed.returncode}{detail}")
+
+    backends = _clean_probe_backends(completed.stdout.splitlines())
+    if not backends:
+        raise RuntimeError(
+            "calcPhiASE openPMD backend probe did not report any supported backends. " + HASE_CONFIGURE_HINT
+        )
+    result = (backends, executable)
     _OPENPMD_BACKEND_PROBE_CACHE[cache_key] = result
     return result
 
 
 def _ensure_compiled_backend_available(spec, executable):
-    backends, artifact = _probed_openpmd_backends(executable)
-    if backends is None:
-        return
+    backends, probed_executable = _probed_openpmd_backends(executable)
     if spec.name not in backends:
         available = ", ".join(backends)
         raise RuntimeError(
             f"openPMD backend '{spec.name}' is selected by PhiASE.openpmdBackend/YAML "
-            f"'openpmd_backend', but the calcPhiASE/openPMD provider probe reports "
-            f"available backends: {available}. Probe artifact: {artifact}. Change "
-            f"openpmd_backend in the YAML or rebuild/reconfigure HASEonGPU with "
-            f"'{spec.name}' support. {HASE_CONFIGURE_HINT}"
+            f"'openpmd_backend', but the calcPhiASE runtime probe reports "
+            f"available backends: {available}. Executable: {probed_executable}. Change "
+            f"openpmd_backend in the YAML or fix the runtime openPMD provider environment. {HASE_CONFIGURE_HINT}"
         )
 
 
