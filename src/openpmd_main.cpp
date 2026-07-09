@@ -78,11 +78,13 @@ int main(int argc, char** argv)
 #endif
         if(paths.cppControl)
         {
-            openPmdParser.runTimeSteppedSimulation();
+            // C++ core owns the full pump/ASE/time-integration loop and writes snapshots.
+            openPmdParser.runCoreSimulation();
         }
         else
         {
-            openPmdParser.processAll(
+            // Python or another caller owns request iteration timing; C++ evaluates each request.
+            openPmdParser.processRequestIterations(
                 [](hase::core::SimulationContext& simulation)
                 {
                     int const result = hase::core::startSimulation<false>(
