@@ -1544,7 +1544,7 @@ namespace hase::openpmd
         iteration.close();
     }
 
-    void Parser::processAll(std::function<void(core::SimulationContext&)> process)
+    void Parser::processRequestIterations(std::function<void(core::SimulationContext&)> process)
     {
         auto const inputStream = m_inputPath.string();
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
@@ -1611,7 +1611,7 @@ namespace hase::openpmd
         }
     }
 
-    void Parser::runTimeSteppedSimulation()
+    void Parser::runCoreSimulation()
     {
         auto simulation = read();
         bool const writesOutput = isHeadRank();

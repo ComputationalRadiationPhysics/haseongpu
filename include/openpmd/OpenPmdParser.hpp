@@ -34,8 +34,8 @@ namespace hase::openpmd
 
         [[nodiscard]] core::SimulationContext read();
         void writeResult(core::Result const& result, core::HostMesh const& mesh);
-        void processAll(std::function<void(core::SimulationContext&)> process);
-        void runTimeSteppedSimulation();
+        void processRequestIterations(std::function<void(core::SimulationContext&)> process);
+        void runCoreSimulation();
 
     private:
         [[nodiscard]] bool isHeadRank() const;

@@ -330,7 +330,7 @@ jobs:
             )
           fi
 
-          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install ".[test]"
+          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install -v ".[test]"
 
       - name: Debug Python install
         shell: bash

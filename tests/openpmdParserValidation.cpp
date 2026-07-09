@@ -682,14 +682,14 @@ TEST_CASE("openPMD parser rejects unsupported compute settings explicitly", "[op
     REQUIRE(error.find("unsupported compute setting") != std::string::npos);
 }
 
-TEST_CASE("openPMD parser processAll consumes stream until producer close", "[openpmd][parser]")
+TEST_CASE("openPMD parser processRequestIterations consumes stream until producer close", "[openpmd][parser]")
 {
     auto const input = writeParserInput("process_all");
     auto const output = testPath("process_all_output");
 
     hase::openpmd::Parser parser{input, output};
     unsigned calls = 0u;
-    parser.processAll(
+    parser.processRequestIterations(
         [&calls](hase::core::SimulationContext& context)
         {
             ++calls;
@@ -719,14 +719,16 @@ TEST_CASE("openPMD parser processAll consumes stream until producer close", "[op
     REQUIRE(outputIterations == 1u);
 }
 
-TEST_CASE("openPMD parser processAll reuses cached topology for dynamic-only iterations", "[openpmd][parser]")
+TEST_CASE(
+    "openPMD parser processRequestIterations reuses cached topology for dynamic-only iterations",
+    "[openpmd][parser]")
 {
     auto const input = writeCanonicalStaticDynamicInput("process_all_dynamic");
     auto const output = testPath("process_all_dynamic_output");
 
     hase::openpmd::Parser parser{input, output};
     unsigned calls = 0u;
-    parser.processAll(
+    parser.processRequestIterations(
         [&calls](hase::core::SimulationContext& context)
         {
             ++calls;
@@ -773,7 +775,7 @@ TEST_CASE("openPMD parser rejects non-dynamic changes after iteration 0", "[open
         hase::openpmd::Parser parser{input, testPath("dynamic_contract_output")};
         try
         {
-            parser.processAll([](hase::core::SimulationContext&) {});
+            parser.processRequestIterations([](hase::core::SimulationContext&) {});
         }
         catch(std::runtime_error const& err)
         {
