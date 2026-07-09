@@ -102,19 +102,19 @@ add_custom_command(
     TARGET HaseOpenPmdBackendProbe
     POST_BUILD
     COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:HaseOpenPmdBackendProbe>"
-        "${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
+        "${HASE_PYTHON_RUNTIME_DIR}/$<TARGET_FILE_NAME:HaseOpenPmdBackendProbe>"
     COMMENT
-        "Probing openPMD backends into ${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
+        "Copying openPMD backend-probe library to build package ${HASE_PYTHON_RUNTIME_DIR}"
     VERBATIM
 )
 install(TARGETS HASEonGPU LIBRARY DESTINATION HASEonGPU_Bindings)
 install(TARGETS calcPhiASE RUNTIME DESTINATION HASEonGPU_Bindings)
 install(TARGETS HaseAlpakaBackendNames LIBRARY DESTINATION HASEonGPU_Bindings)
+install(TARGETS HaseOpenPmdBackendProbe LIBRARY DESTINATION HASEonGPU_Bindings)
 install(
-    FILES
-        "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
-        "${HASE_PYTHON_RUNTIME_DIR}/openpmd_backends.txt"
+    FILES "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
     DESTINATION HASEonGPU_Bindings
 )
 install(FILES HASEonGPU.py DESTINATION .)

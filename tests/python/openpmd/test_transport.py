@@ -459,17 +459,15 @@ def test_openPmdBackendProbeIsCachedPerExecutable(monkeypatch, tmp_path):
     executable.write_text("", encoding="utf-8")
     calls = []
 
-    def fake_run(command, **kwargs):
-        calls.append((command, kwargs))
-        return SimpleNamespace(returncode=0, stdout="adios\n", stderr="")
+    def fake_load_backend_names(extra_dirs):
+        calls.append(tuple(extra_dirs))
+        return ("adios",), tmp_path / "libHaseOpenPmdBackendProbe.so"
 
-    monkeypatch.setattr(transport.subprocess, "run", fake_run)
+    monkeypatch.setattr(transport, "_load_backend_names", fake_load_backend_names)
 
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
-    assert calls == [
-        ([str(executable.resolve()), "--probe-openpmd-backends"], {"check": False, "text": True, "capture_output": True})
-    ]
+    assert calls == [(executable.resolve().parent, executable.resolve().parent / "python" / "HASEonGPU_Bindings")]
 
 
 def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path):
@@ -478,9 +476,9 @@ def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path)
     executable.write_text("", encoding="utf-8")
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: executable)
     monkeypatch.setattr(
-        transport.subprocess,
-        "run",
-        lambda command, **kwargs: SimpleNamespace(returncode=0, stdout="adios\n", stderr=""),
+        transport,
+        "_load_backend_names",
+        lambda extra_dirs: (("adios",), tmp_path / "libHaseOpenPmdBackendProbe.so"),
     )
     monkeypatch.setattr(
         transport,

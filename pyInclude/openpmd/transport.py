@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from ..geometry import OpenPmdComponentField, OpenPmdScalarField
+from .backends import _clean_backend_names, _load_backend_names
 from . import HASE_TRANSPORT_VERSION, FieldSpec, backendFlatArray, fieldSpec, flatEntityLabel, haseTransportAttributes, resultFieldSpecs, simulationAttributeSpecs, spectralContext, unitDimension
 from ..structures import Result
 
@@ -176,49 +177,36 @@ def _backend_spec(backend=None):
     return OPENPMD_BACKENDS[_normalize_backend(backend)]
 
 
-def _clean_probe_backends(values):
-    backends = []
-    for value in values:
-        normalized = str(value).strip().lower()
-        if normalized and normalized in OPENPMD_BACKENDS and normalized not in backends:
-            backends.append(normalized)
-    return tuple(backends)
-
-
 def _probed_openpmd_backends(executable):
     executable = Path(executable).resolve()
     cache_key = str(executable)
     if cache_key in _OPENPMD_BACKEND_PROBE_CACHE:
         return _OPENPMD_BACKEND_PROBE_CACHE[cache_key]
 
-    completed = subprocess.run(
-        [str(executable), "--probe-openpmd-backends"],
-        check=False,
-        text=True,
-        capture_output=True,
+    backends, probe_library = _load_backend_names(
+        (
+            executable.parent,
+            executable.parent / "python" / "HASEonGPU_Bindings",
+        )
     )
-    if completed.returncode != 0:
-        detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
-        raise RuntimeError(f"calcPhiASE openPMD backend probe failed with return code {completed.returncode}{detail}")
-
-    backends = _clean_probe_backends(completed.stdout.splitlines())
+    backends = _clean_backend_names(backends)
     if not backends:
         raise RuntimeError(
-            "calcPhiASE openPMD backend probe did not report any supported backends. " + HASE_CONFIGURE_HINT
+            "openPMD backend-probe library did not report any supported backends. " + HASE_CONFIGURE_HINT
         )
-    result = (backends, executable)
+    result = (backends, probe_library)
     _OPENPMD_BACKEND_PROBE_CACHE[cache_key] = result
     return result
 
 
 def _ensure_compiled_backend_available(spec, executable):
-    backends, probed_executable = _probed_openpmd_backends(executable)
+    backends, probe_library = _probed_openpmd_backends(executable)
     if spec.name not in backends:
         available = ", ".join(backends)
         raise RuntimeError(
             f"openPMD backend '{spec.name}' is selected by PhiASE.openpmdBackend/YAML "
-            f"'openpmd_backend', but the calcPhiASE runtime probe reports "
-            f"available backends: {available}. Executable: {probed_executable}. Change "
+            f"'openpmd_backend', but the runtime openPMD backend-probe library reports "
+            f"available backends: {available}. Probe library: {probe_library}. Change "
             f"openpmd_backend in the YAML or fix the runtime openPMD provider environment. {HASE_CONFIGURE_HINT}"
         )
 

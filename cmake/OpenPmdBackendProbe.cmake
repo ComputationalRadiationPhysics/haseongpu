@@ -21,13 +21,15 @@ else()
     endif()
 endif()
 
-add_executable(
+add_library(
     HaseOpenPmdBackendProbe
+    SHARED
     "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd/backendProbe.cpp"
 )
 set_target_properties(
     HaseOpenPmdBackendProbe
     PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
         BUILD_RPATH_USE_ORIGIN ON
         BUILD_RPATH "${HASE_BUILD_TREE_RPATH}"
         INSTALL_RPATH "${HASE_INSTALL_RPATH}"
@@ -39,6 +41,6 @@ target_include_directories(
 )
 target_compile_definitions(
     HaseOpenPmdBackendProbe
-    PRIVATE ${HASE_OPENPMD_PROBE_DEFINES} HASE_OPENPMD_BACKEND_PROBE_STANDALONE
+    PRIVATE ${HASE_OPENPMD_PROBE_DEFINES}
 )
 target_link_libraries(HaseOpenPmdBackendProbe PRIVATE openPMD::openPMD)

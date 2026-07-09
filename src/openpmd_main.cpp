@@ -1,6 +1,5 @@
 #include <core/simulation.hpp>
 #include <openpmd/OpenPmdParser.hpp>
-#include <openpmd/backendProbe.hpp>
 
 #include <exception>
 #include <filesystem>
@@ -15,7 +14,6 @@ namespace
     {
         std::filesystem::path input;
         std::filesystem::path output;
-        bool probeOpenPmdBackends = false;
     };
 
     std::optional<std::string_view> valueFor(std::string_view arg, std::string_view name)
@@ -44,20 +42,11 @@ namespace
                 paths.output = std::string(*value);
                 continue;
             }
-            if(arg == "--probe-openpmd-backends")
-            {
-                paths.probeOpenPmdBackends = true;
-                continue;
-            }
             throw std::runtime_error(
                 "Unsupported argument '" + std::string(arg)
-                + "'. calcPhiASE only accepts --input-path, --output-path, and --probe-openpmd-backends.");
+                + "'. calcPhiASE only accepts --input-path and --output-path.");
         }
 
-        if(paths.probeOpenPmdBackends)
-        {
-            return paths;
-        }
         if(paths.input.empty())
         {
             throw std::runtime_error("Missing required --input-path=<openPMD-series>.");
@@ -75,19 +64,6 @@ int main(int argc, char** argv)
     try
     {
         auto paths = parsePaths(argc, argv);
-        if(paths.probeOpenPmdBackends)
-        {
-            auto const backends = hase::openpmd::availableOpenPmdBackends();
-            if(backends.empty())
-            {
-                throw std::runtime_error("No configured openPMD backend passed the create/read probe.");
-            }
-            for(auto const& backend : backends)
-            {
-                std::cout << backend << '\n';
-            }
-            return 0;
-        }
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
         MPI_Init(&argc, &argv);
         hase::openpmd::Parser openPmdParser{paths.input, paths.output, MPI_COMM_WORLD};
