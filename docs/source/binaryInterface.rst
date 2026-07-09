@@ -62,15 +62,37 @@ Arguments
 Compiled Simulation Mode
 ------------------------
 
-``Simulation.runSteps(...)`` uses ``calcPhiASE --run-simulation`` rather than
+``Simulation.runSteps(...)`` uses ``calcPhiASE --cpp-control`` rather than
 running a Python pump loop. Python writes the initial geometry, material,
 spectra, beta state, and run-control attributes; C++/Alpaka advances the
 requested steps and writes a snapshot after each one. The snapshots contain the
 updated beta fields, ASE results, and pump and ASE derivatives. The first
 snapshot also carries the static context needed to read the series on its own.
 
+.. code-block:: bash
+
+   ./build/calcPhiASE \
+       --input-path=./simulation-input.bp \
+       --output-path=./simulation-output.bp \
+       --cpp-control
+
 The run control selects a time step, step count, pump-step limit, and one of the
 compiled integrators (explicit Euler, Heun, midpoint, RK4, implicit Euler, or
 exponential Euler). The supported pump routine is
 ``one-dimensional-z-traversal``. It is configured through ``PumpProperties``;
 custom Python pump routines are not part of this execution path.
+
+In this mode Python sends the initial mesh/material/spectra/beta state and the
+binary writes one output iteration per completed time step. The output snapshot
+iterations include ``core_point_beta``, ``core_beta_volume``,
+``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``,
+``core_result_dndt_ase``, and ``core_result_dndt_pump``. Iteration 0 also
+carries the static mesh/material/spectral records so the snapshot series can be
+read independently.
+
+Run-control attributes include ``time_step``, ``number_of_steps``,
+``pump_steps``, ``time_integrator``, optional implicit-Euler controls
+``implicit_iterations`` and ``implicit_tolerance``, and pump attributes such as
+``pump_routine``, ``pump_intensity``, ``pump_wavelength``, ``pump_radius_x``,
+``pump_radius_y``, ``pump_duration``, and ``pump_substeps``. The supported pump
+routine is ``one-dimensional-z-traversal``.
