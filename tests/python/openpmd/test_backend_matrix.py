@@ -3,11 +3,9 @@ import pytest
 import openpmd_backend_matrix
 
 
-def test_backendMatrixUsesProbe(monkeypatch, tmp_path):
+def test_backendMatrixUsesFrontEndBackends(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
-    (tmp_path / "openpmd_backends.txt").write_text("hdf5\n", encoding="utf-8")
-    monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: (tmp_path,))
-    monkeypatch.setattr(openpmd_backend_matrix, "_build_artifact_candidates", lambda: ())
+    monkeypatch.setattr(openpmd_backend_matrix, "_front_end_backends", lambda: ["hdf5"])
 
     assert openpmd_backend_matrix.openpmd_test_backends() == ["hdf5"]
 
@@ -20,18 +18,26 @@ def test_backendMatrixAcceptsSelector(monkeypatch):
 
 def test_backendMatrixFailsWithoutProbe(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
-    monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: ())
-    monkeypatch.setattr(openpmd_backend_matrix, "_build_artifact_candidates", lambda: ())
+    monkeypatch.setattr(openpmd_backend_matrix, "_front_end_backends", lambda: [])
 
-    with pytest.raises(RuntimeError, match="No openPMD backend probe artifact found"):
+    with pytest.raises(RuntimeError, match="frontend did not report any available openPMD backends"):
         openpmd_backend_matrix.openpmd_test_backends()
 
 
-def test_backendMatrixFailsOnEmptyProbe(monkeypatch, tmp_path):
+def test_backendMatrixPropagatesFrontEndProbeFailure(monkeypatch):
     monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
-    (tmp_path / "openpmd_backends.txt").write_text("", encoding="utf-8")
-    monkeypatch.setattr(openpmd_backend_matrix, "_binding_package_dirs", lambda: (tmp_path,))
-    monkeypatch.setattr(openpmd_backend_matrix, "_build_artifact_candidates", lambda: ())
 
-    with pytest.raises(RuntimeError, match="probe artifact is empty"):
+    def fail():
+        raise RuntimeError("probe library missing")
+
+    monkeypatch.setattr(openpmd_backend_matrix, "_front_end_backends", fail)
+
+    with pytest.raises(RuntimeError, match="probe library missing"):
         openpmd_backend_matrix.openpmd_test_backends()
+
+
+def test_backendMatrixDropsUnknownFrontEndBackends(monkeypatch):
+    monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
+    monkeypatch.setattr(openpmd_backend_matrix, "_front_end_backends", lambda: ["hdf5", "unsupported", "adios"])
+
+    assert openpmd_backend_matrix.openpmd_test_backends() == ["adios", "hdf5"]

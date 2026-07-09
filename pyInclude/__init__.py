@@ -16,6 +16,7 @@ from .openpmd import (
     BaseGroup,
     BaseSchema,
     GroupFieldSpec,
+    OpenPmdBackends,
     PointSchema,
     PrimitiveFieldSpec,
     PrismSchema,

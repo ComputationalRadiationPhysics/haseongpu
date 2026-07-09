@@ -2,8 +2,8 @@
 #include <openpmd/backendProbe.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <future>
 #include <iostream>
 #include <stdexcept>
@@ -126,44 +126,50 @@ namespace hase::openpmd
         return available;
     }
 
-    void writeAvailableOpenPmdBackends(std::filesystem::path const& output)
+    std::vector<std::string> const& backendNames()
     {
-        std::filesystem::create_directories(output.parent_path());
-        auto const available = availableOpenPmdBackends();
-        if(available.empty())
-        {
-            throw std::runtime_error("No configured openPMD backend passed the create/read probe.");
-        }
-
-        std::ofstream stream(output);
-        for(auto const& backend : available)
-        {
-            stream << backend << '\n';
-        }
-        if(!stream)
-        {
-            throw std::runtime_error("Failed to write openPMD backend probe output to " + output.string());
-        }
+        static std::vector<std::string> const names = availableOpenPmdBackends();
+        return names;
     }
 } // namespace hase::openpmd
 
-#if defined(HASE_OPENPMD_BACKEND_PROBE_STANDALONE)
-int main(int argc, char** argv)
+extern "C" std::size_t haseOpenPmdBackendCount() noexcept
 {
     try
     {
-        if(argc != 2)
-        {
-            std::cerr << "usage: " << argv[0] << " <output-file>\n";
-            return 2;
-        }
-        hase::openpmd::writeAvailableOpenPmdBackends(std::filesystem::path{argv[1]});
-        return 0;
+        return hase::openpmd::backendNames().size();
     }
     catch(std::exception const& exc)
     {
-        std::cerr << exc.what() << '\n';
-        return 1;
+        std::cerr << "openPMD backend probe failed: " << exc.what() << '\n';
+        return 0;
+    }
+    catch(...)
+    {
+        std::cerr << "openPMD backend probe failed with an unknown exception\n";
+        return 0;
     }
 }
-#endif
+
+extern "C" char const* haseOpenPmdBackendName(std::size_t index) noexcept
+{
+    try
+    {
+        auto const& names = hase::openpmd::backendNames();
+        if(index >= names.size())
+        {
+            return nullptr;
+        }
+        return names[index].c_str();
+    }
+    catch(std::exception const& exc)
+    {
+        std::cerr << "openPMD backend probe failed: " << exc.what() << '\n';
+        return nullptr;
+    }
+    catch(...)
+    {
+        std::cerr << "openPMD backend probe failed with an unknown exception\n";
+        return nullptr;
+    }
+}

@@ -1,4 +1,5 @@
 from .FieldSpec import FieldSpec
+from .backends import OpenPmdBackends
 from .layout import (
     HASE_TRANSPORT_VERSION,
     BackendFlatArray,
@@ -32,6 +33,7 @@ from .layout import (
 
 __all__ = [
     "FieldSpec",
+    "OpenPmdBackends",
     "HASE_TRANSPORT_VERSION",
     "BackendFlatArray",
     "BaseGroup",

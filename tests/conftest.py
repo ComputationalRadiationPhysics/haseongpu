@@ -17,6 +17,7 @@ requiredHaseApi = (
     "GainMedium",
     "Grid",
     "MeshTopology",
+    "OpenPmdBackends",
     "PhiASE",
     "PumpProperties",
     "SpectralDecomposition",
@@ -97,8 +98,7 @@ def _import_hase_api():
         if err.name not in {"HASEonGPU", "HASEonGPU_Bindings", "HASEonGPU_Bindings.HASEonGPU"}:
             raise
     _clear_hase_modules()
-    sys.path[:0] = [str(path) for path in _build_python_roots()]
-    sys.path.append(str(repoRoot))
+    sys.path[:0] = [str(repoRoot), *(str(path) for path in _build_python_roots())]
     module = importlib.import_module("HASEonGPU")
     if not _has_required_api(module):
         missing = ", ".join(name for name in requiredHaseApi if not hasattr(module, name))

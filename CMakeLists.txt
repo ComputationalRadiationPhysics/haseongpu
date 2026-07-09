@@ -547,11 +547,7 @@ alpaka_finalize(hase)
 
 include(cmake/AlpakaBackendNames.cmake)
 include(cmake/OpenPmdBackendProbe.cmake)
-add_executable(
-    calcPhiASE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd/backendProbe.cpp"
-)
+add_executable(calcPhiASE "${CMAKE_CURRENT_SOURCE_DIR}/src/openpmd_main.cpp")
 set_target_properties(
     calcPhiASE
     PROPERTIES
@@ -562,7 +558,6 @@ set_target_properties(
         INSTALL_RPATH "${HASE_INSTALL_RPATH}"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
-target_compile_definitions(calcPhiASE PRIVATE ${HASE_OPENPMD_PROBE_DEFINES})
 target_link_libraries(calcPhiASE PRIVATE hase::hase)
 foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
     if(TARGET ${HASE_ADIOS2_RUNTIME_MODULE})
