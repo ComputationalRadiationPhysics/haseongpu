@@ -1809,7 +1809,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
 
     spec = SimpleNamespace(name="adios-sst")
     states = transport._run_streaming_simulation(
-        ["calcPhiASE", "--run-simulation"],
+        ["calcPhiASE", "--cpp-control"],
         tmp_path / "input.sst",
         tmp_path / "output.sst",
         spec,

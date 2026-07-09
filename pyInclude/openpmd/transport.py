@@ -1732,7 +1732,7 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
             str(executable),
             f"--input-path={input_path}",
             f"--output-path={output_path}",
-            "--run-simulation",
+            "--cpp-control",
         ]
 
         if spec.streaming:

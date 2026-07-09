@@ -65,7 +65,7 @@ Simulation Step Order
 ---------------------
 
 Each call to ``step()`` or ``runSteps(...)`` serializes the initial setup to
-openPMD, launches the compiled ``hase-cpp --run-simulation`` path, and then
+openPMD, launches the compiled ``hase-cpp --cpp-control`` path, and then
 receives one streamed snapshot per completed step.  Pump traversal, ASE
 evaluation, derivative composition, time integration, clipping, and prism beta
 mapping all run in C++/Alpaka.  Python only runs ``onInit`` before launch and

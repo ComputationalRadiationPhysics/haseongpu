@@ -59,6 +59,16 @@ Use ``openpmdSession="persistent"`` to let ``PhiASE`` own a reusable stream, or
 ``openpmdSession="interval"`` to force one-shot behavior.  ``Simulation`` owns a separate transport session for each compiled run;
 caller-managed simulation sessions are not supported.
 
+``Simulation.runSteps(...)`` and ``Simulation.runUntil(...)`` launch the
+compiled ``calcPhiASE --cpp-control`` path. Python writes one initial input
+iteration with run-control attributes, then reads the snapshot series produced
+by the C++ time loop. For streaming backends, Python starts a dedicated
+snapshot receiver thread before sending the input iteration, so the C++ backend
+can drain its output stream and finish independently of slower Python
+``onStep`` callbacks such as VTK file writers. Caller-managed simulation
+openPMD sessions are not supported; the compiled run owns its transport
+lifetime.
+
 Provider Compatibility
 ----------------------
 
