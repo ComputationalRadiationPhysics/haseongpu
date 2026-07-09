@@ -67,17 +67,19 @@ in sync with that runnable example.
 Geometry
 ^^^^^^^^
 
-Describe the transverse mesh and z-levels.  HASEonGPU currently uses a 2D
-triangular mesh extruded into prism layers.
+Describe the simulation geometry. Legacy planar workflows use a 2D triangular
+mesh extruded into prism layers; forward volume transport uses Tet4 geometry.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: topology
    :end-before: # docs:end: topology
 
-``Grid`` is the shortest path for rectangular media.  ``MeshTopology`` can also
-be created from point clouds, planar STL files, legacy VTK wedge files, and
-gmsh triangle meshes; see :doc:`python_interface/topology`.
+``MeshTopology.fromGrid(...)`` triangulates that rectangular grid and keeps the
+z-level information needed later by legacy planar workflows.  Tet4 runtime
+geometry uses ``VolumeTopology`` instead.  ``MeshTopology`` can also be created
+from 2 dimensional point clouds, legacy VTK wedge files, or gmsh triangle
+meshes; see :doc:`python_interface/topology`.
 
 Material and State
 ^^^^^^^^^^^^^^^^^^

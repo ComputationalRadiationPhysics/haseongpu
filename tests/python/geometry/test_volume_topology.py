@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from HASEonGPU import Gmsh, VolumeTopology
+from HASEonGPU import AlpakaBackends, GainMedium, Gmsh, PhiASE, SpectralDecomposition, VolumeTopology
 from pyInclude.geometry import GmshElement
 import pyInclude.openpmd.transport as transport
 from pyInclude.geometry.volume import BOUND_STOP, GMSH_TET4, GMSH_TRI3, VTK_TETRA
@@ -36,6 +36,79 @@ def _twoTetPoints():
 
 def _oneTetTopology():
     return VolumeTopology.fromTetrahedra(_twoTetPoints()[:4], np.array([[0, 1, 2, 3]], dtype=np.uint32))
+
+
+def _writeClosedCubeStl(path):
+    vertices = {
+        "000": (0.0, 0.0, 0.0),
+        "100": (1.0, 0.0, 0.0),
+        "110": (1.0, 1.0, 0.0),
+        "010": (0.0, 1.0, 0.0),
+        "001": (0.0, 0.0, 1.0),
+        "101": (1.0, 0.0, 1.0),
+        "111": (1.0, 1.0, 1.0),
+        "011": (0.0, 1.0, 1.0),
+    }
+    triangles = [
+        ("000", "010", "110"),
+        ("000", "110", "100"),
+        ("001", "101", "111"),
+        ("001", "111", "011"),
+        ("000", "100", "101"),
+        ("000", "101", "001"),
+        ("010", "011", "111"),
+        ("010", "111", "110"),
+        ("000", "001", "011"),
+        ("000", "011", "010"),
+        ("100", "110", "111"),
+        ("100", "111", "101"),
+    ]
+    lines = ["solid cube"]
+    for triangle in triangles:
+        lines.extend(["  facet normal 0 0 0", "    outer loop"])
+        for vertex in triangle:
+            x, y, z = vertices[vertex]
+            lines.append(f"      vertex {x} {y} {z}")
+        lines.extend(["    endloop", "  endfacet"])
+    lines.append("endsolid cube")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _runtimeAlpakaBackend():
+    backends = AlpakaBackends.all()
+    for preferred in ("Host_Cpu_CpuOmpBlocks", "Host_Cpu_CpuSerial"):
+        if preferred in backends:
+            return preferred
+    for backend in backends:
+        if "Cpu" in backend:
+            return backend
+    if backends:
+        return backends[0]
+    pytest.skip("no Alpaka backend is available in this build")
+
+
+def _runtimeOpenPmdBackend():
+    from openpmd_backend_matrix import openpmd_runtime_backend
+
+    try:
+        return openpmd_runtime_backend()
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
+
+
+def _requireRuntimeBackendExecutable(monkeypatch):
+    try:
+        executable = transport.findCalcPhiAse()
+    except FileNotFoundError as exc:
+        pytest.skip(str(exc))
+    monkeypatch.setenv("HASE_CPP_EXECUTABLE", str(executable))
+
+
+def _requireOpenPmdTransportBackend(backend):
+    try:
+        transport._ensure_backend_available(backend)
+    except (FileNotFoundError, ImportError) as exc:
+        pytest.skip(str(exc))
 
 
 def testVolumeTopologyBuildsExplicitTetNeighborsWithoutLayoutOrdering():
@@ -93,6 +166,69 @@ def testVolumeTopologyImportsSyntheticGmshTetPhysicalGroups():
     assert topology.cellDomains.tolist() == [4]
     assert np.count_nonzero(topology.faceBoundaries == 30) == 1
     assert np.count_nonzero(topology.faceBoundaries == BOUND_STOP) == 3
+
+
+@pytest.mark.integration
+def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch):
+    if gmshApi is None:
+        pytest.skip(GMSH_SKIP_REASON)
+    stl = tmp_path / "closed_cube.stl"
+    _writeClosedCubeStl(stl)
+
+    with pytest.warns(RuntimeWarning, match="STL volume import assumes a closed 3D surface"):
+        topology = VolumeTopology.fromFile(stl, format="stl", meshSize=0.35)
+
+    assert topology.numberOfPrisms >= 10
+    assert topology.numberOfCells == topology.numberOfPrisms
+    assert np.all(topology.cellTypes == VTK_TETRA)
+    _requireRuntimeBackendExecutable(monkeypatch)
+
+    medium = GainMedium(topology=topology).withPhysicalProperties(
+        betaVolume=np.zeros(topology.numberOfCells, dtype=np.float64),
+        betaCells=np.zeros(topology.numberOfSamplePoints, dtype=np.float64),
+        claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
+        refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
+        reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),
+        nTot=1.0,
+        crystalTFluo=1.0,
+        claddingNumber=99,
+        claddingAbsorption=0.0,
+    )
+    crossSections = SpectralDecomposition.monochromatic(
+        wavelength=1000e-9,
+        crossSectionAbsorption=0.0,
+        crossSectionEmission=0.0,
+    )
+    phiAse = PhiASE(
+        spectralProperties=crossSections,
+        minRaysPerSample=1,
+        maxRaysPerSample=1,
+        forwardRayCount=1,
+        forwardRayLength=1.0,
+        repetitions=1,
+        adaptiveSteps=1,
+        mseThreshold=0.25,
+        useReflections=False,
+        backend=_runtimeAlpakaBackend(),
+        openpmdBackend=_runtimeOpenPmdBackend(),
+        parallelMode="single",
+        numDevices=1,
+        minSampleRange=0,
+        maxSampleRange=0,
+        monochromatic=True,
+        rngSeed=1234,
+    )
+    _requireOpenPmdTransportBackend(phiAse.openpmdBackend)
+
+    phiAse.run(gainMedium=medium)
+
+    result = phiAse.getResults()
+    assert result.phiAse.shape == (topology.numberOfSamplePoints,)
+    assert result.mse.shape == (topology.numberOfSamplePoints,)
+    assert result.totalRays.shape == (topology.numberOfSamplePoints,)
+    assert result.dndtAse.shape == (topology.numberOfSamplePoints,)
+    assert np.all(np.isfinite(result.phiAse))
+    assert np.all(result.totalRays >= 0)
 
 
 def testVolumeTopologyImportsGenerated3dGmshTets(tmp_path):
