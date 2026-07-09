@@ -155,7 +155,7 @@ def launch_smoke_cross_sections():
     )
 
 
-def launch_smoke_phi_ase():
+def launch_smoke_phi_ase(*, parallel_mode="single"):
     cross_sections = launch_smoke_cross_sections()
     return PhiASE(
         crossSections=cross_sections,
@@ -166,7 +166,7 @@ def launch_smoke_phi_ase():
         adaptiveSteps=1,
         useReflections=False,
         backend=_launch_backend(),
-        parallelMode="single",
+        parallelMode=parallel_mode,
         numDevices=1,
         minSampleRange=0,
         maxSampleRange=0,
@@ -1415,10 +1415,10 @@ def _assert_mpi_mode_rejected_by_non_mpi_build(tmp_path, executable):
     assert completed.returncode != 0
 
 
-def _matrix_mpi_rank_count():
+def _configured_mpi_rank_count():
     value = os.environ.get("HASE_MPI_TEST_RANKS", "").strip()
     if not value:
-        pytest.skip("HASE_MPI_TEST_RANKS is not configured for this CI row")
+        return None
     if "," in value:
         pytest.fail("HASE_MPI_TEST_RANKS must contain exactly one rank count per CI row")
     try:
@@ -1430,8 +1430,28 @@ def _matrix_mpi_rank_count():
     return ranks
 
 
+def _matrix_mpi_rank_count():
+    ranks = _configured_mpi_rank_count()
+    if ranks is None:
+        pytest.skip("HASE_MPI_TEST_RANKS is not configured for this CI row")
+    return ranks
+
+
 def _mpiexec_command_prefix(ranks):
     return ["mpiexec", *shlex.split(os.environ.get("HASE_MPIEXEC_EXTRA_ARGS", "")), "-n", str(ranks)]
+
+
+def _backend_execution_parallel_mode():
+    return "mpi" if _configured_mpi_rank_count() is not None else "single"
+
+
+def _backend_execution_command_prefix(build_dir):
+    ranks = _configured_mpi_rank_count()
+    if ranks is None:
+        return None
+    if not _mpi_enabled(build_dir):
+        pytest.fail("HASE_MPI_TEST_RANKS is configured, but calcPhiASE was not built with MPI")
+    return _mpiexec_command_prefix(ranks)
 
 
 def _assert_launch_smoke_result(result):
@@ -1450,8 +1470,11 @@ def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
     executable, build_dir = _openpmd_calc_phi_ase()
     if parallel_mode == "mpi" and not _mpi_enabled(build_dir):
         return _assert_mpi_mode_rejected_by_non_mpi_build(tmp_path, executable)
+    command_prefix = []
+    if parallel_mode == "mpi":
+        command_prefix = _backend_execution_command_prefix(build_dir) or []
 
-    phi_ase = launch_smoke_phi_ase()
+    phi_ase = launch_smoke_phi_ase(parallel_mode=parallel_mode)
     phi_ase.parallelMode = parallel_mode
     input_path = tmp_path / f"{parallel_mode}_input{_file_suffix_for_tests()}"
     output_path = tmp_path / f"{parallel_mode}_output{_file_suffix_for_tests()}"
@@ -1459,7 +1482,7 @@ def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
     with transport.OpenPmdInputSeries(input_path, backend=_file_backend_for_tests()) as writer:
         writer.write(phi_ase, launch_smoke_medium(), launch_smoke_cross_sections())
     completed = subprocess.run(
-        [str(executable), f"--input-path={input_path}", f"--output-path={output_path}"],
+        [*command_prefix, str(executable), f"--input-path={input_path}", f"--output-path={output_path}"],
         check=False,
         text=True,
         capture_output=True,
@@ -1480,13 +1503,25 @@ def _round_trip_calc_phi_ase(tmp_path, parallel_mode):
 
 @pytest.mark.integration
 @pytest.mark.parametrize("openpmd_backend", _openpmd_backend_values())
-def test_pythonApiLaunchesConfiguredOpenPmdBackendOnce(monkeypatch, openpmd_backend):
+def test_pythonApiLaunchesConfiguredOpenPmdBackendOnce(monkeypatch, tmp_path, openpmd_backend):
     _require_openpmd_transport_io()
-    executable, _ = _openpmd_calc_phi_ase()
+    executable, build_dir = _openpmd_calc_phi_ase()
     monkeypatch.setenv("HASE_CALCPHIASE", str(executable))
-    phi_ase = launch_smoke_phi_ase()
+    phi_ase = launch_smoke_phi_ase(parallel_mode=_backend_execution_parallel_mode())
     phi_ase.openpmdBackend = openpmd_backend
-    phi_ase.run(gainMedium=launch_smoke_medium(), crossSections=launch_smoke_cross_sections())
+    command_prefix = _backend_execution_command_prefix(build_dir)
+    if command_prefix is None:
+        phi_ase.run(gainMedium=launch_smoke_medium(), crossSections=launch_smoke_cross_sections())
+    else:
+        session = phi_ase.openStream(command_prefix=command_prefix, workspace_dir=tmp_path)
+        try:
+            phi_ase.run(
+                gainMedium=launch_smoke_medium(),
+                crossSections=launch_smoke_cross_sections(),
+                openpmdSession=session,
+            )
+        finally:
+            phi_ase.closeStream()
     result = phi_ase.getResults()
 
     _assert_launch_smoke_result(result)
@@ -1494,6 +1529,8 @@ def test_pythonApiLaunchesConfiguredOpenPmdBackendOnce(monkeypatch, openpmd_back
 
 @pytest.mark.integration
 def test_calcPhiAseSingleOpenPmdRoundTrip(tmp_path):
+    if _backend_execution_parallel_mode() == "mpi":
+        pytest.skip("MPI CI rows exercise backend launches with parallelMode='mpi'")
     _round_trip_calc_phi_ase(tmp_path, "single")
 
 
