@@ -21,6 +21,7 @@ import laserPumpCladding  # noqa: E402
 
 referenceRoot = repoRoot / "tests" / "data" / "laserPumpCladding"
 referencePath = referenceRoot / "upstream_master_reference.json"
+REFERENCE_RTOL = 0.01
 
 
 def _tokens(path):
@@ -109,12 +110,11 @@ def testLaserPumpCladdingTet4InputLoadsLegacyPointSamples(laserPumpCladdingRefer
 
 
 @pytest.mark.integration
-def testLaserPumpCladdingTet4ForwardMeanPhiMatchesReferenceData(laserPumpCladdingReference):
-    if os.environ.get("HASE_RUN_LASERPUMP_REFERENCE") != "1":
-        pytest.skip("set HASE_RUN_LASERPUMP_REFERENCE=1 to run the full PhiASE reference comparison")
-
+def testLaserPumpCladdingTet4ForwardMeanPhiMatchesReferenceData(
+    laserPumpCladdingReference,
+    openPmdRuntimeBackend,
+):
     backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", "Host_Cpu_CpuOmpBlocks")
-    tolerance = float(os.environ.get("HASE_LASERPUMP_REFERENCE_RTOL", "0.35"))
     forwardRayLength = float(os.environ.get("HASE_LASERPUMP_REFERENCE_FORWARD_RAY_LENGTH", "1.0"))
     observed = []
     expected = []
@@ -125,10 +125,11 @@ def testLaserPumpCladdingTet4ForwardMeanPhiMatchesReferenceData(laserPumpCladdin
             propagationMode="forward",
             forwardRayLength=forwardRayLength,
             useReflections=False,
+            openpmdBackend=openPmdRuntimeBackend,
             rngSeed=laserPumpCladdingReference.get("rngSeed", 12345),
         )
         phi = np.asarray(result.phiAse, dtype=np.float64).reshape(-1)
         observed.append(float(phi.mean()))
         expected.append(float(step["meanPhi"]))
 
-    np.testing.assert_allclose(observed, expected, rtol=tolerance, atol=0.0)
+    np.testing.assert_allclose(observed, expected, rtol=REFERENCE_RTOL, atol=0.0)
