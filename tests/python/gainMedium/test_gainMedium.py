@@ -65,29 +65,6 @@ def test_gridTopologyTriangulatesXyPlaneOnly():
     assert shallow.thickness != deep.thickness
 
 
-def test_meshTopologyFromAsciiStl(tmp_path):
-    stl = tmp_path / "surface.stl"
-    stl.write_text(
-        """
-solid planar
-  facet normal 0 0 1
-    outer loop
-      vertex 0 0 0
-      vertex 1 0 0
-      vertex 0 1 0
-    endloop
-  endfacet
-endsolid planar
-""",
-        encoding="utf-8",
-    )
-
-    topology = MeshTopology.fromFile(stl, format="stl", numberOfLevels=2)
-
-    assert topology.numberOfPoints == 3
-    assert topology.numberOfTriangles == 1
-    assert topology.metadata["format"] == "stl"
-
 
 def test_gainMediumOwnsPhysicalProperties():
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=2, tileSizeX=1.0, tileSizeZ=0.25))

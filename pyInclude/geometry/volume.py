@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import math
+import warnings
+
 import numpy as np
 
 
@@ -331,8 +333,15 @@ def _fromGmshVolume(gmsh, *, boundaryDefault):
 def _fromStlVolume(filename, *, boundaryDefault, meshSize):
     try:
         import gmsh as gmshApi
-    except ImportError as exc:
-        raise ImportError("STL volume import requires the 'gmsh' Python package for tetrahedralization") from exc
+    except (ImportError, OSError) as exc:
+        raise ImportError("STL volume import requires a working 'gmsh' Python package for tetrahedralization") from exc
+
+    warnings.warn(
+        "STL volume import assumes a closed 3D surface suitable for Tet4 volume meshing; "
+        "HASEonGPU does not run a full tetrahedral mesh validation pass.",
+        RuntimeWarning,
+        stacklevel=3,
+    )
 
     from .msh import Gmsh, _read_elements as readElements, _read_nodes as readNodes, _read_physical_names as readPhysicalNames
 

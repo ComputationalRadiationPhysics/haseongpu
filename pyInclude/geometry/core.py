@@ -17,7 +17,6 @@ import warnings
 import numpy as np
 from ..openpmd import BackendFlatArray, FieldSpec, GroupFieldSpec, PrimitiveSchema, PrimitiveSchemaDefinition, schemaFields
 from .msh import Gmsh
-from .stl import from_stl
 from .vtk import gainMediumFromVtk, topologyFromVtk, writeGainMediumVtk
 try:
     from numba import njit
