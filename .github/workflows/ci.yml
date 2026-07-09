@@ -116,8 +116,9 @@ jobs:
             python3-dev \
             python3-pip \
             python3-venv \
-            libomp-dev \
+            libgl1 \
             libglu1 \
+            libomp-dev \
             software-properties-common \
             wget
 
@@ -436,6 +437,7 @@ jobs:
             git \
             g++-13 \
             gcc-13 \
+            libgl1 \
             libglu1 \
             libhdf5-dev \
             libhwloc-dev \
