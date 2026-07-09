@@ -119,6 +119,10 @@ jobs:
             libgl1 \
             libglu1 \
             libomp-dev \
+            libxcursor1 \
+            libxft2 \
+            libxinerama1 \
+            libxrender1 \
             software-properties-common \
             wget
 
@@ -442,6 +446,10 @@ jobs:
             libhdf5-dev \
             libhwloc-dev \
             libomp-dev \
+            libxcursor1 \
+            libxft2 \
+            libxinerama1 \
+            libxrender1 \
             ninja-build \
             pkg-config \
             python3 \

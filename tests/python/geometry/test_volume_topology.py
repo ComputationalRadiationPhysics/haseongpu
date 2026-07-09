@@ -16,9 +16,9 @@ try:
     import gmsh as gmshApi
 except (ImportError, OSError) as exc:
     gmshApi = None
-    GMSH_SKIP_REASON = f"gmsh is not importable: {exc}"
+    GMSH_IMPORT_ERROR = f"gmsh is required for gmsh-backed volume topology tests: {exc}"
 else:
-    GMSH_SKIP_REASON = ""
+    GMSH_IMPORT_ERROR = ""
 
 
 def _twoTetPoints():
@@ -171,7 +171,7 @@ def testVolumeTopologyImportsSyntheticGmshTetPhysicalGroups():
 @pytest.mark.integration
 def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch):
     if gmshApi is None:
-        pytest.skip(GMSH_SKIP_REASON)
+        pytest.fail(GMSH_IMPORT_ERROR)
     stl = tmp_path / "closed_cube.stl"
     _writeClosedCubeStl(stl)
 
@@ -233,7 +233,7 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
 
 def testVolumeTopologyImportsGenerated3dGmshTets(tmp_path):
     if gmshApi is None:
-        pytest.skip(GMSH_SKIP_REASON)
+        pytest.fail(GMSH_IMPORT_ERROR)
     msh = tmp_path / "tet4_3d.msh"
 
     gmshApi.initialize()

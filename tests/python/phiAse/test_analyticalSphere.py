@@ -37,8 +37,16 @@ def calcBetaFromGain(gain, nTot, sigmaA, sigmaE):
     return (gain / nTot + sigmaA) / (sigmaA + sigmaE)
 
 
+def _requireGmsh():
+    try:
+        import gmsh as gmshApi
+    except (ImportError, OSError) as exc:
+        pytest.fail(f"gmsh is required for analytical sphere topology generation: {exc}")
+    return gmshApi
+
+
 def constructExplicitSphereTopology(radius, *, samplePoints=None, meshSizeDivisor=8.0):
-    gmshApi = pytest.importorskip("gmsh")
+    gmshApi = _requireGmsh()
     center = np.asarray((radius, radius, radius), dtype=np.float64)
     with tempfile.TemporaryDirectory() as tmpdir:
         msh = f"{tmpdir}/sphere_tet4.msh"
