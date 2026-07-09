@@ -15,11 +15,14 @@ starts with:
 
    sudo apt-get install -y --no-install-recommends \
      build-essential cmake ninja-build pkg-config python3-dev \
-     libgl1 libglu1 libomp-dev
+     libgl1 libglu1 libomp-dev \
+     libxcursor1 libxft2 libxinerama1 libxrender1
 
 ``libgl1`` provides ``libGL.so.1`` and ``libglu1`` provides ``libGLU.so.1``.
-These libraries are used by Python packages such as ``gmsh`` and ``vtk`` but
-are not installed by pip. Depending on the selected build options, add:
+The ``libx*`` packages provide X11 runtime libraries loaded by the Python
+``gmsh`` wheel, including ``libXrender.so.1``. These libraries are used by
+Python packages such as ``gmsh`` and ``vtk`` but are not installed by pip.
+Depending on the selected build options, add:
 
 * ``libhwloc-dev`` for Alpaka host-memory support when it is enabled
 * ``openmpi-bin libopenmpi-dev`` for MPI builds

@@ -10,18 +10,22 @@ import pytest
 
 from HASEonGPU import GainMedium, Gmsh, MeshTopology
 
-try:
-    import gmsh
-except (ImportError, OSError) as exc:
-    pytest.skip(f"gmsh is not importable: {exc}", allow_module_level=True)
+
+def _requireGmsh():
+    try:
+        import gmsh
+    except (ImportError, OSError) as exc:
+        pytest.fail(f"gmsh is required for gmsh geometry tests: {exc}")
+    return gmsh
 
 
 def _withGmshModel(name, path, dim, build):
+    gmsh = _requireGmsh()
     gmsh.initialize()
     try:
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add(name)
-        build()
+        build(gmsh)
         gmsh.model.mesh.generate(dim)
         gmsh.write(str(path))
     finally:
@@ -29,8 +33,8 @@ def _withGmshModel(name, path, dim, build):
 
 
 def _write2dTriangleMesh(path):
-    def build():
-        core, cladding = _cylindricalCoreCladdingSurfaces(0.5, 0.8, meshSize=0.4)
+    def build(gmsh):
+        core, cladding = _cylindricalCoreCladdingSurfaces(gmsh, 0.5, 0.8, meshSize=0.4)
         gmsh.model.geo.synchronize()
         gmsh.model.addPhysicalGroup(2, [core], 20)
         gmsh.model.setPhysicalName(2, 20, "Core")
@@ -40,7 +44,7 @@ def _write2dTriangleMesh(path):
     _withGmshModel("triangle_2d", path, 2, build)
 
 
-def _cylindricalCoreCladdingSurfaces(coreRadius, claddingRadius, *, meshSize):
+def _cylindricalCoreCladdingSurfaces(gmsh, coreRadius, claddingRadius, *, meshSize):
     geo = gmsh.model.geo
     center = geo.addPoint(0.0, 0.0, 0.0, meshSize)
     rings = []
