@@ -36,3 +36,9 @@ def openpmd_test_backends():
 
 def openpmd_runtime_backend():
     return openpmd_test_backends()[0]
+
+
+def openpmd_runtime_executable():
+    from pyInclude.openpmd.transport import findCalcPhiAse
+
+    return findCalcPhiAse()

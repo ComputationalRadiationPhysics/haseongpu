@@ -45,15 +45,22 @@ def _readColumns(path, columns):
 
 
 @pytest.mark.integration
-def test_julia1DMatchesDisabledAse(tmp_path):
+def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRuntimeExecutable, alpakaRuntimeBackend):
     vtkOutputDir = tmp_path / "vtk"
     plotPrefix = tmp_path / "ssg_z_origin"
     vtkOutputDir.mkdir()
+
+    env = os.environ.copy()
+    env["HASE_CALCPHIASE"] = str(openPmdRuntimeExecutable)
 
     _runCommand(
         [
             sys.executable,
             str(exampleScript),
+            "--backend",
+            alpakaRuntimeBackend,
+            "--openpmd-backend",
+            openPmdRuntimeBackend,
             "--disable-ase",
             "--timeSteps",
             "100",
@@ -63,9 +70,9 @@ def test_julia1DMatchesDisabledAse(tmp_path):
             str(vtkOutputDir),
         ],
         cwd=repoRoot,
+        env=env,
     )
 
-    env = os.environ.copy()
     env.setdefault("MPLBACKEND", "Agg")
     _runCommand(
         [

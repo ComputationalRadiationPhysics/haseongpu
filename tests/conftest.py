@@ -14,6 +14,7 @@ repoRoot = Path(__file__).resolve().parents[1]
 pythonTestPhiAseConfig = Path(__file__).parent / "data" / "cfg" / "phiAseTestConfig.yaml"
 legacyPhiAseConfigFile = Path(__file__).parent / "data" / "cfg" / "legacy_config.yaml"
 requiredHaseApi = (
+    "AlpakaBackends",
     "GainMedium",
     "Grid",
     "MeshTopology",
@@ -96,6 +97,7 @@ def _import_hase_api():
 
 
 _hase_api = _import_hase_api()
+AlpakaBackends = _hase_api.AlpakaBackends
 GainMedium = _hase_api.GainMedium
 Grid = _hase_api.Grid
 MeshTopology = _hase_api.MeshTopology
@@ -110,6 +112,24 @@ import pytest
 @pytest.fixture(scope="session", params=openpmd_test_backends())
 def openPmdRuntimeBackend(request):
     return request.param
+
+
+@pytest.fixture(scope="session")
+def openPmdRuntimeExecutable():
+    from openpmd_backend_matrix import openpmd_runtime_executable
+
+    return openpmd_runtime_executable()
+
+
+@pytest.fixture(scope="session")
+def alpakaRuntimeBackend():
+    backends = AlpakaBackends.all()
+    if not backends:
+        pytest.skip("no Alpaka backend is available in this build")
+    for backend in backends:
+        if "CpuOmpBlocks" in backend:
+            return backend
+    return backends[0]
 
 
 @pytest.fixture(scope="session")
