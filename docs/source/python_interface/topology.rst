@@ -16,7 +16,8 @@ The public import names are:
 Grid
 ----
 
-``Grid`` is the shortest path to a usable topology for rectangular media.
+``Grid`` is the shortest path to a usable topology for three-dimensional
+rectangular media.
 
 .. code-block:: python
 
@@ -49,15 +50,6 @@ From a grid:
 .. code-block:: python
 
    topology = MeshTopology.fromGrid(grid)
-
-From points:
-
-.. code-block:: python
-
-   points = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=float)
-   topology = MeshTopology.fromPoints(points, numberOfLevels=5).withThickness(0.1)
-
-``fromPoints`` performs a Delaunay triangulation of the 2D points.
 
 From a legacy planar file:
 
