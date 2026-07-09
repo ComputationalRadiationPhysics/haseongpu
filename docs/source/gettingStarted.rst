@@ -34,24 +34,12 @@ Optional dependencies depend on the run mode:
 * ParaView for VTK visualization
 * ``matplotlib`` for helper plotting scripts
 
-Python package installation provides only the Python-level dependencies listed
-in ``pyproject.toml``. A source build still needs development tools and runtime
-libraries from the operating system. On Ubuntu-like systems, a CPU-only source
-install or test environment commonly starts with:
+Additional system packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: bash
-
-   sudo apt-get install -y --no-install-recommends \
-     build-essential cmake ninja-build pkg-config python3-dev \
-     libgl1 libglu1 libomp-dev
-
-``libgl1`` provides ``libGL.so.1`` and ``libglu1`` provides ``libGLU.so.1``;
-minimal containers often miss these libraries even though the Python ``gmsh``
-and ``vtk`` packages are installed by pip. Add ``libhwloc-dev`` for the default
-Alpaka host-memory support path, ``openmpi-bin libopenmpi-dev`` for MPI builds,
-``libtbb-dev`` when enabling TBB-backed host execution, and ``libhdf5-dev`` when
-using a system HDF5/openPMD provider. CUDA and HIP builds additionally require
-the matching vendor toolkit/runtime packages outside of pip.
+Python and CMake do not install operating-system packages. If a minimal system
+or container misses graphics, MPI, HDF5, or accelerator runtime libraries, see
+:doc:`Additional Dependencies <additional_deps>`.
 
 Windows support is experimental; see :doc:`windows`.
 
