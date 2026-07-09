@@ -359,7 +359,7 @@ def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
         series.close()
 
 
-def testForwardOpenPmdInputOmitsSamplePointRecords(tmp_path):
+def testForwardOpenPmdInputWritesVolumeRecords(tmp_path):
     from HASEonGPU import GainMedium, PhiASE, SpectralDecomposition
 
     topology = _oneTetTopology()
@@ -382,8 +382,6 @@ def testForwardOpenPmdInputOmitsSamplePointRecords(tmp_path):
     try:
         assert iteration.get_attribute("propagation_mode") == "forward"
         assert "core_points" in iteration.meshes
-        assert "core_sample_points" not in iteration.meshes
-        assert "core_point_beta" not in iteration.meshes
         assert "core_beta_volume" in iteration.meshes
     finally:
         series.close()

@@ -27,6 +27,7 @@ Contents
    :caption: Documentation
 
    gettingStarted
+   additional_deps
    theoryAndModel
    backendSelection
    compilation

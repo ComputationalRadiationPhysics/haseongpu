@@ -474,7 +474,7 @@ def _attributeValues(phiAse, gainMedium, crossSections):
 def _arrayFields(gainMedium, crossSections, *, phiAse=None, include_static=True):
     context = _fieldContext(gainMedium)
     for field in _fieldsFromDomain(gainMedium.openPmdFields(context)):
-        if field.spec.name == "pointBeta":
+        if field.spec.name in {"pointBeta", "betaCells"}:
             continue
         if include_static or field.spec.name in DYNAMIC_FIELD_NAMES:
             yield field
