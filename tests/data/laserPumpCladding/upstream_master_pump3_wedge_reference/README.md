@@ -1,0 +1,72 @@
+# laserPumpCladding upstream/master wedge PhiASE reference
+
+This directory stores the deterministic legacy wedge reference used by the
+laserPumpCladding Tet4 integration test.
+
+The reference was generated from a detached `upstream/master` worktree at:
+
+```text
+469c87770ed13796f2e82385bcf83528e8aeaf1b refactor cuda architecture pass-through
+```
+
+The upstream script was not run through its CLI, because that CLI did not expose
+an RNG seed argument.  Instead, the script module was imported and `runExample`
+was called directly so the ASE backend seed is part of the fixture contract.
+
+```python
+from pathlib import Path
+import sys
+
+sys.path.insert(0, "/tmp/hase-laserpump-upstream-master/example/python_example")
+import laserPumpCladding
+
+state = laserPumpCladding.runExample(
+    phiAseConfigPath=Path(
+        "/tmp/hase-laserpump-upstream-master/example/python_example/config/phiASE.yaml"
+    ),
+    backend="Host_Cpu_CpuOmpBlocks",
+    timeSlices=6,
+    pumpSteps=3,
+    vtkOutputDir=Path("/tmp/hase-laserpump-upstream-master-wedge6"),
+    enableAse=True,
+    prePump=True,
+    rngSeed=5489,
+)
+```
+
+The build/import environment was:
+
+```text
+PYTHONPATH=/tmp/hase-laserpump-upstream-master-build/python:/tmp/hase-laserpump-upstream-master
+cwd=/tmp
+```
+
+The upstream `example/python_example/config/phiASE.yaml` settings were:
+
+```yaml
+experiment:
+  minRaysPerSample: 2000
+  maxRaysPerSample: 1000000
+  mseThreshold: 0.01087
+  adaptiveSteps: 8
+  useReflections: true
+
+compute:
+  repetitions: 1
+  backend: Cuda_NvidiaGpu_GpuCuda
+  parallelMode: single
+  numDevices: 4
+  nPerNode: 1
+```
+
+The generated archive `phiase_reference.npz` contains:
+
+- `metadata`: JSON string with commit, command, config, seed, and checksums.
+- `phiASE`: `float64` array with shape `(6, 4210)`, one full legacy wedge
+  point buffer per simulation step.
+- `points`, `cells`, `cellTypes`: wedge geometry arrays that define the
+  reference point order.
+
+The stored `meanPhi` values are only diagnostics.  The intended comparison is a
+pointwise comparison after converting the current Tet4 VTK output back to the
+legacy wedge point order.
