@@ -1,9 +1,8 @@
 Scripts
 ========
 
-The ``scripts`` directory contains small command-line helpers for inspecting
-outputs produced by HASEonGPU examples and simulations.  These scripts are kept
-outside the Python package API and are intended to be run from a checkout.
+The ``scripts`` directory contains checkout-only helpers for inspecting example
+and simulation output.  They are not part of the Python package API.
 
 Small-Signal Gain Plot
 ----------------------

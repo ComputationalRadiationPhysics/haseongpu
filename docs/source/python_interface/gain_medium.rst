@@ -137,26 +137,30 @@ Convenience Dimensions
 Custom Fields
 -------------
 
-``GainMedium.defineField(...)`` attaches additional primitive fields to the
-medium. Custom fields are persisted by the openPMD transport as normal mesh
-records with the same base openPMD metadata as built-in scalar records. They
-are useful for downstream tools or future backends; the current ASE backend
-does not consume them unless a backend explicitly opts in.
+Custom fields are primarily an openPMD extension point.  They let a Python
+workflow write additional mesh records next to the HASEonGPU records so
+downstream analysis tools, coupled codes, or future backends can read them.
+The current ASE backend ignores custom records unless a backend explicitly opts
+in.
 
-If no unit metadata is provided, custom fields default to ``unitSI=1.0`` and
-``unitDimension=unitDimension.dimensionless``. Provide a raw seven-entry
-openPMD dimension tuple or one of the predefined ``unitDimension`` entries when
-the field has a physical dimension:
+``GainMedium.defineField(...)`` creates one additional openPMD mesh record.
+Choose the entity from the location of the data:
+
+* ``"point"`` for arrays shaped like ``(numberOfPoints, numberOfLevels)``
+* ``"prism"`` for arrays shaped like ``(numberOfTriangles, numberOfLevels - 1)``
+* ``"triangle"`` for arrays shaped like ``(numberOfTriangles,)``
+
+Always provide unit metadata when the field has a physical meaning.  If omitted,
+the transport writes ``unitSI=1.0`` and
+``unitDimension=unitDimension.dimensionless``.  Unit dimensions follow the
+standard seven-entry openPMD tuple.
 
 .. code-block:: python
 
    import numpy as np
    from HASEonGPU import unitDimension
 
-   temperature = np.full(
-       (medium.topology.numberOfTriangles, medium.topology.levels - 1),
-       300.0,
-   )
+   temperature = np.full(medium.get("betaVolume").expectedShape, 300.0)
 
    medium.defineField(
        "temperature",
@@ -167,13 +171,13 @@ the field has a physical dimension:
        unitDimension=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
    )
 
-For Python inheritance-based field declarations, put the same unit metadata on
+Inheritance-based declarations use the same openPMD metadata on
 ``PrimitiveFieldSpec``:
 
 .. code-block:: python
 
    import numpy as np
-   from HASEonGPU import PrimitiveFieldSpec, PrismSchema, unitDimension
+   from HASEonGPU import PrimitiveFieldSpec, PrismSchema
 
    class ThermalPrism(PrismSchema):
        temperature = PrimitiveFieldSpec(
@@ -188,6 +192,5 @@ For Python inheritance-based field declarations, put the same unit metadata on
 
    medium.withPrimitiveSchema(ThermalPrism, temperature=temperature)
 
-Use the predefined constants for built-in HASE dimensions, for example
-``unitDimension.lambdaAbsorption``, ``unitDimension.crystalTFluo``,
-``unitDimension.phiAse``, and ``unitDimension.dimensionless``.
+Predefined openPMD dimension tuples are available from ``unitDimension`` for
+HASEonGPU fields and common dimensionless records.

@@ -2,19 +2,15 @@
 
 :doc:`<- Back to Binary Interface <binaryInterface>`
 
-Compilation
-===========
+CMake Build Options
+===================
 
-This page describes how to build HASEonGPU manually from source.
+This page summarizes manual CMake configuration for HASEonGPU.  Most Python
+users should start with :doc:`Getting Started <gettingStarted>` and let
+``hase-configure`` print the matching ``CMAKE_ARGS`` command.
 
-For most users, manual compilation is only required when using the standalone
-binary directly or when adjusting build options. For general setup and
-dependency information, see :doc:`Getting Started <gettingStarted>`.
-
-Basic Build
------------
-
-Clone the repository and build HASEonGPU with CMake:
+Manual Build
+------------
 
 .. code-block:: bash
 
@@ -23,381 +19,207 @@ Clone the repository and build HASEonGPU with CMake:
    cmake -S . -B build
    cmake --build build
 
-After compilation, the ``calcPhiASE`` binary is available under:
+The standalone binary is then available as:
 
 .. code-block:: text
 
    ./build/calcPhiASE
 
-When Python bindings are enabled, they are built alongside the C++ backend.
-
-Typical Build Variants
-----------------------
-
-Minimal default build:
+For Python source installs, pass the same CMake cache options through
+``CMAKE_ARGS``:
 
 .. code-block:: bash
 
-   cmake -S . -B build
+   CMAKE_ARGS="-DHASE_OPENPMD_PROVIDER=system -DCMAKE_PREFIX_PATH=/path/to/openpmd" \
+     python3 -m pip install -v .
+
+Common Configurations
+---------------------
+
+CPU-only first build:
+
+.. code-block:: bash
+
+   cmake -S . -B build -DHASE_NATIVE_OPTIMIZATIONS=OFF
    cmake --build build
 
-Build with MPI support:
+Require MPI support:
 
 .. code-block:: bash
 
    cmake -S . -B build -DDISABLE_MPI=OFF
    cmake --build build
 
-CMake Options
--------------
+Use a system openPMD-api provider:
 
-The following CMake variables control important build options.
+.. code-block:: bash
 
-``DISABLE_MPI``
-^^^^^^^^^^^^^^^
+   cmake -S . -B build \
+     -DHASE_OPENPMD_PROVIDER=system \
+     -DCMAKE_PREFIX_PATH=/path/to/openpmd/prefix
 
-* Default: ``AUTO``
-* Description:
-  Controls whether MPI support is required, disabled, or auto-detected.
+Use HASE-managed bundled openPMD dependencies:
 
-* Values:
+.. code-block:: bash
 
-  * ``AUTO``: try to find MPI and continue without MPI if it is unavailable
-  * ``OFF``: require MPI support; configuration fails if MPI is missing
-  * ``ON``: disable MPI support
+   cmake -S . -B build -DHASE_OPENPMD_PROVIDER=bundled
 
-``HASE_USE_SYSTEM_ALPAKA``
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Manually select Alpaka backends, for example CUDA only:
 
-* Default: ``OFF``
-* Description:
-  Uses an existing alpaka package from ``alpaka_DIR`` or ``CMAKE_PREFIX_PATH``
-  instead of fetching the pinned alpaka version during CMake configuration.
+.. code-block:: bash
 
-``HASE_CUDA_ARCHITECTURES``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   cmake -S . -B build \
+     -DHASE_SELECT_BACKEND_ALPAKA=ON \
+     -Dalpaka_DEP_CUDA=ON \
+     -Dalpaka_DEP_HIP=OFF \
+     -Dalpaka_DEP_TBB=OFF \
+     -Dalpaka_EXEC_CpuSerial=OFF
 
-* Default: ``native`` with fallback to ``70;80;90;100`` when no local NVIDIA GPU is visible
-* Description:
-  Selects the CUDA target architecture used for compilation.
-
-* Typical values:
-
-  * ``native``: detect the local GPU architecture automatically
-  * explicit CUDA architectures such as ``70``, ``80``, ``90``, ``100``
-
-Using ``native`` is convenient for local builds when CMake can query a local GPU.
-For reproducible builds on different systems, specifying the CUDA architecture is recommended.
-
-``HASE_ENABLE_PYTHON``
-^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Controls whether the Python extension and package helpers are built. Turn
-  this off only for command-line-only C++ builds. For normal Python
-  installation and usage, see :doc:`Python Interface Guide <pythonInterface>`.
-
-* Values:
-
-  * ``OFF``: build only the C++ project and binary interface
-  * ``ON``: build the Python interface
+Core HASE Options
+-----------------
 
 ``HASE_BUILD_RELEASE``
-^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Controls whether HASEonGPU applies its release build configuration.  When
-  enabled, CMake forces ``CMAKE_BUILD_TYPE=Release`` and enables the release
-  optimization options used by the project, including CUDA/HIP fast-math
-  related flags where applicable.
-
-  Important: ``HASE_BUILD_RELEASE=ON`` overwrites user-provided
-  ``CMAKE_BUILD_TYPE`` values and related optimization settings during
-  configuration.  Set ``HASE_BUILD_RELEASE=OFF`` if you need a custom build
-  type, debug flags, or manually controlled compiler optimization options.
-
-* Values:
-
-  * ``OFF``: keep user-provided build type and optimization settings
-  * ``ON``: force the project release configuration
+   Default ``ON``.  Forces the project release configuration, including
+   ``CMAKE_BUILD_TYPE=Release`` and release optimization flags.  Set ``OFF``
+   when you need a custom debug or profiling build type.
 
 ``HASE_NATIVE_OPTIMIZATIONS``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   CMake default ``ON``; Python package default ``OFF``.  Adds host-specific
+   CPU tuning such as ``-march=native``.  Enable for local performance builds;
+   disable for redistributable wheels or unknown target CPUs.
 
-* Default: ``ON``
-* Description:
-  Enables host-specific CPU tuning with ``-march=native`` and
-  ``-mtune=native``. Keep this enabled for local source builds when peak
-  performance on the build machine is desired. Disable it for redistributable
-  binaries or wheels that need to run on unknown CPUs.
-
-* Values:
-
-  * ``OFF``: do not add host-specific native CPU tuning flags
-  * ``ON``: build for the local host CPU
-
-For Python source installs, pass the option through ``CMAKE_ARGS``:
-
-.. code-block:: bash
-
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=ON" python3 -m pip install .
-
-For redistributable wheels or binaries, configure with:
-
-.. code-block:: bash
-
-   CMAKE_ARGS="-DHASE_NATIVE_OPTIMIZATIONS=OFF" python3 -m pip install .
-
-``HASE_SELECT_BACKEND_ALPAKA``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``OFF``
-
-* Description:
-  Controls whether HASEonGPU selects available alpaka backends automatically or
-  whether backend selection is delegated to alpaka's CMake options.
-
-  For general information about backend names and runtime backend selection,
-  see :doc:`Backend Selection <backendSelection>`.
-
-* Values:
-
-  * ``OFF``:
-    HASEonGPU automatically searches for supported backend dependencies such as
-    CUDA, HIP, and TBB and enables the corresponding alpaka backends when
-    possible.
-
-    If both HIP and CUDA are installed on the same system, automatic detection
-    may cause configuration issues in alpaka. In that case, manual backend
-    selection should be used to explicitly disable one of the conflicting
-    backends.
-
-  * ``ON``:
-    Enables manual backend selection using alpaka's existing CMake options.
-
-    The relevant alpaka CMake options are documented in the
-    `alpaka CMake argument documentation <https://alpaka3.readthedocs.io/en/latest/advanced/cmake.html#arguments>`__.
-
-    Example: configure HASEonGPU only for an NVIDIA GPU backend:
-
-    .. code-block:: bash
-
-       cmake -S . -B build \
-         -DHASE_SELECT_BACKEND_ALPAKA=ON \
-         -Dalpaka_DEP_CUDA=ON \
-         -Dalpaka_DEP_HIP=OFF \
-         -Dalpaka_DEP_TBB=OFF \
-         -Dalpaka_EXEC_CpuSerial=OFF
-
-
-openPMD Provider and Runtime Backend
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-For a guided first-run setup, run ``python3 utils/configure_hase.py`` from a
-source checkout or ``hase-configure`` after installation. The helper first
-chooses bundled versus system openPMD, then asks only the follow-up questions
-that apply: system openPMD prefix and matching Python module, system
-ADIOS2/HDF5 hints when needed, or bundled ADIOS2/HDF5 fetch/off/system
-choices. It then emits matching CMake and
-PhiASE YAML snippets under ``config/hase-phiase.yaml`` by default, asks
-whether to install immediately with yes as the default answer, and defaults
-native CPU optimizations to off for redistributable wheels. Use
-``--autoinstall`` to accept all defaults and install non-interactively,
-``--use-ccache`` to add CMake compiler launchers for ccache, and
-``--reinstall`` to rerun pip with the previous HASE CMake settings from the
-last script install or build cache.
-
-The CMake build selects the openPMD provider, not the storage backend used by a
-simulation. Runtime backend selection belongs to Python or YAML through
-``PhiASE.openpmdBackend`` or ``openpmd_backend``. The default runtime backend is
-``adios-sst`` when the selected provider supports ADIOS2 SST. Bundled
-HDF5-only configurations use ``hdf5`` instead. Accepted values are
-``adios-sst``, ``adios``, and ``hdf5`` when the provider supports them.
-
-Provider modes are separate from runtime backend selection:
-
-* System provider, ``HASE_OPENPMD_PROVIDER=system``: HASEonGPU uses an
-  already installed C++ ``openPMD::openPMD`` package and a compatible Python
-  ``openpmd_api`` module. This mode does not build ADIOS2. For source-built
-  system openPMD-api providers, install or build ADIOS2 first when the
-  provider must support ``adios`` or ``adios-sst``, then expose it through
-  openPMD-api's ``CMAKE_PREFIX_PATH`` or ``ADIOS2_DIR``. For ADIOS2 source
-  installs used this way, pass ``-DADIOS2_INSTALL_GENERATE_CONFIG=OFF`` unless
-  you need the legacy ``adios2-config`` shell helper; HASEonGPU and openPMD-api
-  use ADIOS2's CMake package config. openPMD-api 0.17.x does not FetchContent
-  ADIOS2 through ``openPMD_SUPERBUILD``; it only finds an existing ADIOS2
-  package.
-* Bundled provider, ``HASE_OPENPMD_PROVIDER=bundled``: HASEonGPU installs the
-  selected pinned dependencies into a build-local CMake prefix before
-  configuring the pinned openPMD-api provider against that prefix. This keeps
-  HDF5, ADIOS2, and openPMD-api reusable for later installs with matching
-  settings.
-
-Use ``utils/check_openpmd_compatibility.py`` before installing when in doubt.
-The preflight prints the selected backend, the backends confirmed by the active
-Python and CMake providers, and the built-in HASE source-build backend set
-(``adios-sst`` by default, plus ``adios`` and ``hdf5``).
-
-The CI matrix keeps most jobs on the bundled provider and includes
-a dedicated Ubuntu job that runs an ordered system-provider smoke matrix in a
-single container. For each pinned openPMD-api version, it builds and
-installs the system provider prerequisites, builds an openPMD-api C++ prefix
-against those prerequisites, installs the matching Python package, installs
-HASEonGPU against that prefix, and then checks ``adios``, ``adios-sst``, and
-``hdf5`` smoke scenarios. The current pinned external versions are ``0.17.0``
-and ``0.17.1``.
-This keeps system-versus-bundled provider selection covered without
-multiplying every compiler and accelerator combination.
-
-``HASE_OPENPMD_PROVIDER``
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``auto``
-* Description:
-  Controls the openPMD install contract.
-
-  * ``auto``: use a system openPMD-api C++ package when CMake can find one,
-    otherwise build a bundled provider.
-  * ``system``: use an installed openPMD-api C++ package found through
-    ``find_package(openPMD CONFIG REQUIRED)``. The Python ``openpmd_api``
-    package installed in the runtime environment must match the C++
-    openPMD-api version and must support the same runtime backend used by your
-    workflow.
-  * ``bundled``: install the selected pinned ADIOS2 and/or HDF5 dependencies
-    into a build-local CMake prefix, then install pinned openPMD-api against
-    those installed packages.
-
-The HASE wheel does not vendor openPMD runtime libraries or generated
-``openpmd_api`` bindings in either mode. The target runtime environment must
-provide compatible openPMD shared libraries and a compatible Python
-``openpmd_api`` package. HASEonGPU records the detected openPMD provider
-library directory in the installed targets' RPATH; set
-``HASE_OPENPMD_RUNTIME_RPATH`` when the provider needs additional runtime
-library directories.
-
-``HASE_OPENPMD_USE_ADIOS2``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Applies to the bundled provider. Enables ADIOS2-backed openPMD
-  runtime backends. Disable this for an HDF5-only bundled provider.
-
-``HASE_OPENPMD_USE_HDF5``
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``OFF``
-* Description:
-  Applies to the bundled provider. Enables HDF5 support in the
-  pinned openPMD-api provider. At least one of ``HASE_OPENPMD_USE_ADIOS2`` or
-  ``HASE_OPENPMD_USE_HDF5`` must be enabled. MPI-enabled HDF5 provider builds
-  require a parallel HDF5 installation unless ``HASE_OPENPMD_FETCH_HDF5=ON``
-  is set to build the pinned HDF5 provider.
-
-``HASE_OPENPMD_USE_SST``
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Applies to the bundled provider when ADIOS2 support is enabled.
-  Enables ADIOS2 SST support for the ``adios-sst`` runtime backend.
-
-``HASE_OPENPMD_FETCH_ADIOS2``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Applies to the bundled provider when ADIOS2 support is enabled.
-  ``ON`` fetches and builds the pinned ADIOS2 dependency. ``OFF`` uses a
-  system ADIOS2 package found through ``ADIOS2_DIR`` or ``CMAKE_PREFIX_PATH``.
-
-``HASE_OPENPMD_FETCH_HDF5``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON``
-* Description:
-  Applies to the bundled provider when HDF5 support is enabled. ``ON`` fetches
-  and builds the pinned HDF5 dependency. ``OFF`` uses a system HDF5 package
-  found through ``HDF5_DIR`` or ``CMAKE_PREFIX_PATH``.
-
-``HASE_OPENPMD_SUPERBUILD``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``ON`` unless inherited from ``openPMD_SUPERBUILD``
-* Description:
-  Applies only when ``HASE_OPENPMD_PROVIDER=bundled``. Allows the pinned
-  openPMD-api build to fetch or build its helper dependencies. This is not an
-  ADIOS2 or HDF5 install switch; HASE's bundled path installs those
-  dependencies before openPMD-api is configured. Disable this only when the
-  required openPMD helper dependencies are provided externally.
-
-``HASE_USE_SYSTEM_OPENPMD``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: deprecated
-* Description:
-  Deprecated compatibility alias. Use ``HASE_OPENPMD_PROVIDER`` instead.
-  ``HASE_USE_SYSTEM_OPENPMD=ON`` maps to
-  ``HASE_OPENPMD_PROVIDER=system``; ``HASE_USE_SYSTEM_OPENPMD=OFF`` maps to
-  ``HASE_OPENPMD_PROVIDER=bundled``.
-
-``HASE_OPENPMD_BUILD_PYTHON_BINDINGS``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: ``OFF``
-* Description:
-  Builds openPMD-api Python bindings as part of the HASE CMake build tree when
-  using the bundled provider. These bindings are not installed
-  into the HASE wheel. Instead, HASE records the generated build-tree
-  ``site-packages`` directory in its runtime configuration so Python runs can
-  load the matching ``openpmd_api`` module from that provider path. Keep the
-  build tree available for that local install, or provide a separately
-  installed matching ``openpmd_api`` through the runtime environment. This
-  option is ignored for the system-provider contract.
-
-``HASE_OPENPMD_PYTHON_PACKAGE_DIR``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: empty
-* Description:
-  Directory containing the matching ``openpmd_api`` Python package. Normally
-  leave this empty so the installed Python environment supplies
-  ``openpmd_api``. Set it only when the runtime must prefer a specific
-  site-packages directory from the same system openPMD installation as
-  ``openPMD::openPMD``.
-
-``HASE_OPENPMD_RUNTIME_RPATH``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Default: empty
-* Description:
-  Additional semicolon-separated runtime library directories to encode into
-  the installed HASE targets. Use this for non-vendored openPMD providers when
-  ``openPMD::openPMD`` does not expose every required runtime directory through
-  its CMake target metadata.
+``HASE_ENABLE_PYTHON``
+   Default ``ON``.  Builds the Python extension and package artifacts.  Set
+   ``OFF`` for command-line-only C++ builds.
 
 ``HASE_TESTING``
-^^^^^^^^^^^^^^^^
+   Default ``OFF``.  Enables test targets.
 
-* Default: ``OFF``
-* Description:
-  Enables the test suite during configuration and build.
+``HASE_BENCHMARK``
+   Default ``OFF``.  Enables scoped PhiASE benchmark CSV output.
 
-* Values:
+``HASE_FORWARD_LOGGING``
+   Default ``OFF``.  Forwards captured ``calcPhiASE`` stdout/stderr through the
+   Python openPMD launcher.
 
-  * ``OFF``: tests are not built
-  * ``ON``: test targets are enabled
+MPI Option
+----------
 
-This option is primarily useful for development and validation work.
+``DISABLE_MPI``
+   Default ``AUTO``.
 
-Notes
------
+   * ``AUTO``: use MPI if CMake can find it, otherwise build without MPI
+   * ``OFF``: require MPI; configuration fails if MPI is unavailable
+   * ``ON``: disable MPI support
 
-Manual compilation is usually not required for every workflow.
+The runtime ``parallel_mode``/``parallelMode`` setting must agree with how the
+binary was built and launched.  See :doc:`mpi` for execution guidance.
 
-For example, when using the Python interface, the backend may be built as part
-of the Python installation process. However, a manual build can be useful for
-adjusting CMake options, debugging, or working directly with the standalone
-binary.
+Alpaka and Accelerator Options
+------------------------------
+
+``HASE_SELECT_BACKEND_ALPAKA``
+   Default ``OFF``.  ``OFF`` lets HASEonGPU auto-detect supported Alpaka
+   dependencies such as CUDA, HIP, and TBB.  ``ON`` delegates backend selection
+   to Alpaka CMake options such as ``alpaka_DEP_CUDA`` and
+   ``alpaka_EXEC_CpuSerial``.
+
+``HASE_USE_SYSTEM_ALPAKA``
+   Default ``OFF``.  Uses an installed Alpaka package found through
+   ``alpaka_DIR`` or ``CMAKE_PREFIX_PATH`` instead of fetching the pinned
+   version.
+
+``HASE_CUDA_ARCHITECTURES``
+   Default ``native`` with fallback architectures when no local NVIDIA GPU is
+   visible.  Set explicit values such as ``80`` or ``90`` for reproducible CUDA
+   builds on machines different from the target system.
+
+``HASE_CUDA_FLUSHTOZERO``
+   Default ``OFF``.  Enables CUDA flush-to-zero behavior.
+
+CUDA debugging options
+   ``HASE_CUDA_SHOW_REGISTER``, ``HASE_CUDA_KEEP_FILES``, and
+   ``HASE_CUDA_SHOW_CODELINES`` default to ``OFF``.  They are debugging aids
+   for CUDA compilation and diagnostics.
+
+openPMD Provider Options
+------------------------
+
+CMake chooses the openPMD-api provider used to build HASEonGPU.  The storage
+backend used by a simulation is selected at runtime with
+``PhiASE.openpmdBackend`` or YAML ``openpmd_backend``.
+
+``HASE_OPENPMD_PROVIDER``
+   Default ``auto``.
+
+   * ``auto``: use a system openPMD-api C++ package if found, otherwise build a
+     bundled provider
+   * ``system``: require an installed ``openPMD::openPMD`` package; the runtime
+     Python environment must provide a compatible ``openpmd_api`` module
+   * ``bundled``: build the pinned openPMD-api provider and selected
+     dependencies into a build-local prefix
+
+``HASE_OPENPMD_USE_ADIOS2``
+   Default ``ON`` for the bundled provider.  Enables ADIOS2-backed runtime
+   backends.
+
+``HASE_OPENPMD_USE_SST``
+   Default ``ON`` when ADIOS2 is enabled.  Enables the ``adios-sst`` runtime
+   backend.
+
+``HASE_OPENPMD_USE_HDF5``
+   Default ``OFF`` for the bundled provider.  Enable when the ``hdf5`` runtime
+   backend is required.
+
+``HASE_OPENPMD_FETCH_ADIOS2`` / ``HASE_OPENPMD_FETCH_HDF5``
+   Default ``ON``.  With the bundled provider, fetch and build the pinned
+   dependency.  Set ``OFF`` to use a system package found through
+   ``CMAKE_PREFIX_PATH``, ``ADIOS2_DIR``, or ``HDF5_DIR``.
+
+``HASE_OPENPMD_SUPERBUILD``
+   Default ``ON`` unless inherited from ``openPMD_SUPERBUILD``.  Allows
+   openPMD-api to handle its helper dependencies.  This is not the ADIOS2/HDF5
+   selection switch.
+
+``HASE_OPENPMD_BUILD_PYTHON_BINDINGS``
+   Default ``OFF`` in CMake; the configurator may enable it for bundled local
+   installs.  Builds matching ``openpmd_api`` Python bindings in the build tree;
+   they are not vendored into the HASEonGPU wheel.
+
+``HASE_OPENPMD_PYTHON_PACKAGE_DIR``
+   Default empty.  Path to a matching ``openpmd_api`` package directory when it
+   is not found on the normal Python path.
+
+``HASE_OPENPMD_RUNTIME_RPATH``
+   Default empty.  Extra semicolon-separated runtime library directories to
+   encode into installed HASEonGPU targets.
+
+``HASE_OPENPMD_BUNDLED_PREFIX`` / ``HASE_OPENPMD_BUNDLED_BUILD_DIR``
+   Default below the CMake build directory.  Override only when you need a
+   custom location for bundled-provider artifacts.
+
+``HASE_OPENPMD_BUNDLED_REBUILD``
+   Default ``OFF``.  Forces rebuilding the HASE-managed bundled provider.
+
+Deprecated aliases ``HASE_BUILD_OPENPMD_FROM_SOURCE`` and
+``HASE_USE_SYSTEM_OPENPMD`` are still recognized for compatibility, but new
+commands should use ``HASE_OPENPMD_PROVIDER``.
+
+Runtime Backend Reminder
+------------------------
+
+Build options decide which providers and compute backends are available.
+Runtime selection is still done through user configuration:
+
+.. code-block:: python
+
+   phi_ase = PhiASE(..., backend="Host_Cpu_CpuSerial", openpmdBackend="adios-sst")
+
+.. code-block:: yaml
+
+   compute:
+     backend: Host_Cpu_CpuSerial
+     openpmd_backend: adios-sst
+
+Use ``python3 utils/configure_hase.py`` or ``hase-configure`` to generate a
+matching YAML snippet and install command for common setups.

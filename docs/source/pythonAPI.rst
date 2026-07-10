@@ -80,7 +80,6 @@ Pump solvers, field helpers, and utilities
    TriangleSchema
    PrismSchema
    PrimitiveFieldSpec
-   unitDimension
    backendFlat
    vtkWedge
    writeGainMediumVtk
@@ -99,25 +98,3 @@ Compatibility helpers
    beta_int3Main
    integrateLaserPump
    runLaserPumpStep
-
-Module Summaries
-----------------
-
-These modules back the public API. They are documented for users who need to
-inspect implementation helpers or extension points.
-
-.. currentmodule:: pyInclude
-
-.. autosummary::
-   :toctree: generated
-   :recursive:
-
-   geometry.core
-   geometry.msh
-   geometry.vtk
-   laser
-   pumping
-   simulation
-   gainMap
-   timeIntegration
-   vtkWedge

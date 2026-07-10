@@ -32,8 +32,7 @@ only ``--input-path`` and ``--output-path`` and reads simulation settings from
 the openPMD input series.
 
 See :doc:`openpmdTransport` for the openPMD record layout, storage backend
-options, dynamic-iteration behavior, MPI launch examples, and unsupported
-metadata such as ``write_vtk`` and explicit ``devices``.
+options, dynamic-iteration behavior, and MPI launch examples.
 
 Migration Guide
 ---------------

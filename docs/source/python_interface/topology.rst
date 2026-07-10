@@ -1,9 +1,8 @@
 Topology
 ========
 
-``MeshTopology`` describes the spatial discretization used by HASEonGPU.  It is
-the user-facing replacement for manually constructing point arrays, triangle
-indices, derived triangle geometry, and z-level metadata.
+``MeshTopology`` describes the spatial discretization used by HASEonGPU: a
+transverse triangular mesh plus z-levels for the extruded prism mesh.
 
 The public import names are:
 
@@ -69,18 +68,12 @@ From a file:
 
 Supported mesh formats are:
 
-* ``vtk`` or ``legacy-vtk``: legacy ASCII VTK unstructured grids containing
-  wedge cells are accepted.  The importer reads the wedge cells, extracts the
-  transverse ``(x, y)`` points from the first z-level, reconstructs the base
-  triangle connectivity from the lower three nodes of each wedge, and infers
-  ``numberOfLevels`` and ``thickness`` from the point z-coordinates.
-* ``stl``: ASCII STL and binary STL are supported.  The STL must be planar;
-  current import projects vertices to ``(x, y)`` and keeps triangle topology.
-  Because STL files do not store HASEonGPU layer information, set
-  ``numberOfLevels`` and ``thickness`` before using the topology in a run.
-* ``msh`` or ``gmsh``: gmsh 2D triangle meshes are supported through the Python
-  ``gmsh`` package.  The mesh must be planar and must contain triangle
-  elements.  ``numberOfLevels`` and ``thickness`` are required.
+* ``vtk`` or ``legacy-vtk``: legacy ASCII VTK wedge meshes.  Layer metadata can
+  be inferred from the z coordinates.
+* ``stl``: planar ASCII or binary STL.  Set ``numberOfLevels`` and
+  ``thickness`` because STL does not store HASEonGPU layer metadata.
+* ``msh`` or ``gmsh``: planar gmsh triangle meshes through the Python ``gmsh``
+  package.  ``numberOfLevels`` and ``thickness`` are required.
 
 ``MeshTopology.fromFile(...)`` can override auto-detection with ``format=``.
 This is useful for temporary files or non-standard extensions:
@@ -104,19 +97,12 @@ both geometry and HASEonGPU field data, load a full gain medium instead:
    medium = GainMedium.fromVtk("medium.vtk")
    medium = GainMedium.fromFile("medium.vtk")
 
-``GainMedium.fromVtk(...)`` reads the same legacy wedge geometry as
-``MeshTopology.fromFile(...)`` and then imports recognized HASEonGPU fields.
-``betaCells`` is read from point data, ``betaVolume`` from cell data, and
-``claddingCellTypes``, ``refractiveIndices``, ``reflectivities``, ``nTot``,
-``crystalTFluo``, ``claddingNumber``, and ``claddingAbsorption`` from VTK
-``FIELD`` arrays when present.  ``numberOfLevels`` and ``thickness`` may be
+``GainMedium.fromVtk(...)`` reads the same geometry and imports recognized
+HASEonGPU fields when present.  ``numberOfLevels`` and ``thickness`` may be
 passed as overrides after loading.
 
-The gmsh importer can also map physical groups whose names contain
-``cladding`` to ``claddingCellTypes`` when the topology is used by
-``GainMedium``.  The stored value is the gmsh physical tag for triangles in
-matching two-dimensional physical groups; all other triangles keep the default
-cladding type ``0``.
+For gmsh input, physical groups whose names contain ``cladding`` can be mapped
+to ``claddingCellTypes`` when the topology is used by ``GainMedium``.
 
 Shape and Size Queries
 ----------------------
