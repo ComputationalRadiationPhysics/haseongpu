@@ -114,6 +114,57 @@ The gmsh importer can also map physical groups whose names contain
 matching two-dimensional physical groups; all other triangles keep the default
 cladding type ``0``.
 
+Domains
+-------
+
+Domains are integer labels attached to topology entities.  Cell domains label
+volume cells; surface domains label boundary faces.  The labels are independent
+of mesh ordering, so they are a stable way to assign material regions, cladding
+groups, boundary optics, or later solver options to named parts of a mesh.
+
+For gmsh input, HASEonGPU keeps physical group names as domain metadata:
+three-dimensional physical groups become cell-domain names, and
+two-dimensional physical groups become surface-domain names.  The names can be
+resolved later, so code can refer to ``"gain"`` or ``"crystal_exit"`` instead
+of hard-coding a physical tag.  Domains can also be assigned directly in Python
+when a file format does not contain the required group labels.
+
+.. code-block:: python
+
+   from HASEonGPU import GainMedium, SurfaceOptics, VolumeTopology
+
+   topology = (
+       VolumeTopology.fromFile("crystal.vtk")
+       .withCellDomains({"where": "all", "domain": 1, "name": "gain"})
+       .withSurfaceDomains(
+           [
+               {"where": "z_min", "domain": 10, "name": "entry"},
+               {"where": "z_max", "domain": 11, "name": "exit"},
+           ]
+       )
+   )
+
+   medium = GainMedium(topology).withSurfaceOptics(
+       {
+           "entry": SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
+           "exit": SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
+       }
+   )
+
+``withCellDomains(...)`` accepts assignments for cell indices, ``where="all"``,
+gmsh physical names, or gmsh physical tags.  ``withSurfaceDomains(...)`` accepts
+face indices, exterior z-plane selectors such as ``where="z_min"`` and
+``where="z_max"``, all exterior faces, gmsh physical names, or gmsh physical
+tags.  Surface assignments reject internal faces by default; pass
+``allowInternal=True`` only when the caller intentionally labels internal
+interfaces.
+
+``SurfaceOptics`` fills the backend arrays used for reflective boundaries:
+explicit reflectivity, refractive index inside the surface, and refractive
+index outside the surface.  A reflectivity of ``0.0`` still allows total
+internal reflection when ``n_inside`` and ``n_outside`` make the incident angle
+supercritical; this matches the legacy reflection model.
+
 Shape and Size Queries
 ----------------------
 
