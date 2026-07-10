@@ -4,11 +4,40 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
-from HASEonGPU import AlpakaBackends, GainMedium, Gmsh, PhiASE, SpectralDecomposition, VolumeTopology
-from pyInclude.geometry import GmshElement
+repoRoot = Path(__file__).resolve().parents[3]
+
+
+def _module_from_repo(module):
+    filename = getattr(module, "__file__", None)
+    if filename is None:
+        return True
+    try:
+        Path(filename).resolve().relative_to(repoRoot)
+        return True
+    except ValueError:
+        return False
+
+
+for module_name, module in list(sys.modules.items()):
+    if (
+        module_name == "HASEonGPU"
+        or module_name.startswith("HASEonGPU.")
+        or module_name == "pyInclude"
+        or module_name.startswith("pyInclude.")
+    ) and not _module_from_repo(module):
+        del sys.modules[module_name]
+
+if str(repoRoot) not in sys.path:
+    sys.path.insert(0, str(repoRoot))
+
+from HASEonGPU import AlpakaBackends, PhiASE, SpectralDecomposition
+from pyInclude.geometry import GainMedium, Gmsh, GmshElement, SurfaceOptics, VolumeTopology
 import pyInclude.openpmd.transport as transport
 from pyInclude.geometry.volume import BOUND_STOP, GMSH_TET4, GMSH_TRI3, VTK_TETRA
 
@@ -36,6 +65,29 @@ def _twoTetPoints():
 
 def _oneTetTopology():
     return VolumeTopology.fromTetrahedra(_twoTetPoints()[:4], np.array([[0, 1, 2, 3]], dtype=np.uint32))
+
+
+def _slabTopology():
+    points = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    cells = np.asarray(
+        [
+            [0, 1, 2, 3],
+            [1, 2, 4, 3],
+            [2, 4, 5, 3],
+        ],
+        dtype=np.uint32,
+    )
+    return VolumeTopology.fromTetrahedra(points, cells)
 
 
 def _writeClosedCubeStl(path):
@@ -166,6 +218,84 @@ def testVolumeTopologyImportsSyntheticGmshTetPhysicalGroups():
     assert topology.cellDomains.tolist() == [4]
     assert np.count_nonzero(topology.faceBoundaries == 30) == 1
     assert np.count_nonzero(topology.faceBoundaries == BOUND_STOP) == 3
+    assert topology.cellDomainNames == {4: "gain"}
+    assert topology.surfaceDomainNames == {30: "side_wall"}
+
+
+def testVolumeTopologyAssignsCellAndSurfaceDomainsBySelector():
+    topology = _slabTopology()
+    assigned = topology.withDomains(
+        cellDomains={"where": "all", "domain": 6},
+        surfaceDomains=[
+            {"where": "z_min", "domain": 1},
+            {"where": "z_max", "domain": 2},
+        ],
+    )
+
+    np.testing.assert_array_equal(topology.cellDomains, np.ones(topology.numberOfCells, dtype=np.int32))
+    np.testing.assert_array_equal(assigned.cellDomains, np.full(topology.numberOfCells, 6, dtype=np.int32))
+    assert np.count_nonzero(assigned.faceBoundaries == 1) > 0
+    assert np.count_nonzero(assigned.faceBoundaries == 2) > 0
+    assert np.count_nonzero(topology.faceBoundaries > 0) == 0
+
+
+def testVolumeTopologyRemapsGmshDomainsByName():
+    nodes = {
+        10: (0.0, 0.0, 0.0),
+        11: (1.0, 0.0, 0.0),
+        12: (0.0, 1.0, 0.0),
+        13: (0.0, 0.0, 1.0),
+    }
+    gmsh = Gmsh(
+        nodes=nodes,
+        elements=[
+            GmshElement(1, GMSH_TET4, (10, 11, 12, 13), physical_tag=4),
+            GmshElement(2, GMSH_TRI3, (10, 11, 12), physical_tag=30),
+        ],
+        physical_names={3: {4: "gain"}, 2: {30: "outer"}},
+        source="synthetic.msh",
+    )
+    topology = VolumeTopology.fromGmsh(gmsh).withDomains(
+        cellDomains={"gmshName": "gain", "domain": 9},
+        surfaceDomains={"gmshName": "outer", "domain": 11},
+    )
+
+    np.testing.assert_array_equal(topology.cellDomains, np.asarray([9], dtype=np.int32))
+    assert np.count_nonzero(topology.faceBoundaries == 11) == 1
+    assert np.count_nonzero(topology.faceBoundaries == BOUND_STOP) == 3
+    assert topology.cellDomainNames[9] == "gain"
+    assert topology.surfaceDomainNames[11] == "outer"
+
+    medium = GainMedium(topology).withSurfaceOptics(
+        {"outer": SurfaceOptics(reflectivity=0.5, n_inside=1.4, n_outside=1.0)}
+    )
+    assert medium.get("surfaceReflectivity").expectedShape == (12,)
+    assert medium.get("surfaceReflectivity").value[11] == np.float32(0.5)
+
+
+def testGainMediumSurfaceOpticsUsesAssignedSurfaceDomains():
+    topology = _slabTopology().withSurfaceDomains(
+        [
+            {"where": "z_min", "domain": 1},
+            {"where": "z_max", "domain": 2},
+        ]
+    )
+    medium = GainMedium(topology).withSurfaceOptics(
+        {
+            1: SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
+            2: SurfaceOptics(reflectivity=0.25, n_inside=1.5, n_outside=1.0),
+        }
+    )
+
+    np.testing.assert_allclose(medium.get("surfaceReflectivity").value, np.asarray([0.0, 0.0, 0.25], dtype=np.float32))
+    np.testing.assert_allclose(
+        medium.get("surfaceRefractiveIndexInside").value,
+        np.asarray([1.0, 1.83, 1.5], dtype=np.float32),
+    )
+    np.testing.assert_allclose(
+        medium.get("surfaceRefractiveIndexOutside").value,
+        np.asarray([1.0, 1.0, 1.0], dtype=np.float32),
+    )
 
 
 @pytest.mark.integration

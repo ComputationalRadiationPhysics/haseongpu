@@ -26,7 +26,18 @@ from .openpmd import (
     backendFlat,
     unitDimension,
 )
-from .geometry import GainMedium, GainMediumGeometry, Gmsh, Grid, MeshTopology, VolumeTopology, writeGainMediumVtk
+from .geometry import (
+    DomainMap,
+    GainMedium,
+    GainMediumGeometry,
+    Gmsh,
+    Grid,
+    MeshTopology,
+    SurfaceDomainMap,
+    SurfaceOptics,
+    VolumeTopology,
+    writeGainMediumVtk,
+)
 from .laser import (
     Constants,
     CrossSectionData,

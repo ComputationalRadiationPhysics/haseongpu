@@ -15,6 +15,8 @@ import warnings
 
 import numpy as np
 
+from .domains import DomainMap
+
 
 VTK_TETRA = np.uint32(10)
 GMSH_TET4 = 4
@@ -209,6 +211,70 @@ class VolumeTopology:
     def numberOfPrisms(self):
         return self.numberOfCells
 
+    @property
+    def cellDomainNames(self):
+        return dict(self.metadata.get("cellDomainNames", {})) if isinstance(self.metadata, dict) else {}
+
+    @property
+    def surfaceDomainNames(self):
+        return dict(self.metadata.get("surfaceDomainNames", {})) if isinstance(self.metadata, dict) else {}
+
+    def cellDomainMap(self):
+        return DomainMap(self.cellDomainNames)
+
+    def surfaceDomainMap(self):
+        return DomainMap(self.surfaceDomainNames)
+
+    def withDomains(self, *, cellDomains=None, surfaceDomains=None):
+        topology = self
+        if cellDomains is not None:
+            topology = topology.withCellDomains(cellDomains)
+        if surfaceDomains is not None:
+            topology = topology.withSurfaceDomains(surfaceDomains)
+        return topology
+
+    def withCellDomains(self, assignments=None, **assignment):
+        """Return a copy with selected cells assigned to positive domain ids."""
+        cellDomains = np.asarray(self.cellDomains, dtype=np.int32).copy()
+        names = self.cellDomainNames
+        domainMap = DomainMap(names)
+        for spec in _normalizeAssignments(assignments, assignment):
+            mask = _selectCells(self, cellDomains, spec)
+            target = _targetDomain(domainMap, spec)
+            if not np.any(mask):
+                raise ValueError(f"cell domain assignment selected no cells: {spec}")
+            cellDomains[mask] = np.int32(target)
+            _updateDomainNames(names, domainMap, spec, target)
+        metadata = {**self.metadata, "cellDomainNames": names}
+        return self._copyWith(cellDomains=cellDomains, metadata=metadata)
+
+    def withSurfaceDomains(self, assignments=None, *, allowInternal=False, **assignment):
+        """Return a copy with selected faces assigned to positive surface-domain ids."""
+        faceBoundaries = np.asarray(self.faceBoundaries, dtype=np.int32).copy()
+        names = self.surfaceDomainNames
+        domainMap = DomainMap(names)
+        for spec in _normalizeAssignments(assignments, assignment):
+            mask = _selectFaces(self, faceBoundaries, spec)
+            if not bool(spec.get("allowInternal", allowInternal)) and np.any(mask & (self.neighborCells >= 0)):
+                raise ValueError("surface domain assignment selected internal faces; pass allowInternal=True to permit this")
+            target = _targetDomain(domainMap, spec)
+            if not np.any(mask):
+                raise ValueError(f"surface domain assignment selected no faces: {spec}")
+            faceBoundaries[mask] = np.int32(target)
+            _updateDomainNames(names, domainMap, spec, target)
+        metadata = {**self.metadata, "surfaceDomainNames": names}
+        return self._copyWith(faceBoundaries=faceBoundaries, metadata=metadata)
+
+    def _copyWith(self, *, cellDomains=None, faceBoundaries=None, metadata=None):
+        return type(self)(
+            self.points.copy(),
+            self.cellPointIndices.copy(),
+            cellTypes=self.cellTypes.copy(),
+            cellDomains=np.asarray(self.cellDomains if cellDomains is None else cellDomains, dtype=np.int32).copy(),
+            faceBoundaries=np.asarray(self.faceBoundaries if faceBoundaries is None else faceBoundaries, dtype=np.int32).copy(),
+            metadata=dict(self.metadata if metadata is None else metadata),
+        )
+
     def openPmdAttributes(self, context=None):
         context = context or self
         return {
@@ -291,6 +357,80 @@ def _deriveTet4Topology(points, cells, faceBoundariesArg):
     }
 
 
+def _normalizeAssignments(assignments, assignment):
+    if assignments is None:
+        if not assignment:
+            raise ValueError("at least one domain assignment is required")
+        return [assignment]
+    if assignment:
+        raise ValueError("pass either assignments or keyword assignment arguments, not both")
+    if isinstance(assignments, dict):
+        return [assignments]
+    return list(assignments)
+
+
+def _targetDomain(domainMap, spec):
+    if "domain" in spec:
+        return domainMap.resolve(spec["domain"])
+    if "gmshName" in spec:
+        return domainMap.resolve(spec["gmshName"])
+    if "gmshTag" in spec:
+        return domainMap.resolve(spec["gmshTag"])
+    raise ValueError("domain assignment requires domain, gmshName, or gmshTag")
+
+
+def _updateDomainNames(names, domainMap, spec, target):
+    name = spec.get("name")
+    if name is None and isinstance(spec.get("domain"), str):
+        name = spec["domain"]
+    if name is None and "gmshName" in spec:
+        name = spec["gmshName"]
+    if name is None and "gmshTag" in spec:
+        name = domainMap.names.get(int(spec["gmshTag"]))
+    if name is not None:
+        for domain, existingName in list(names.items()):
+            if domain != int(target) and existingName == name:
+                del names[domain]
+        names[int(target)] = str(name)
+
+
+def _selectCells(topology, cellDomains, spec):
+    if "cellIndices" in spec:
+        mask = np.zeros(topology.numberOfCells, dtype=bool)
+        mask[np.asarray(spec["cellIndices"], dtype=np.int64)] = True
+        return mask
+    if spec.get("where") == "all":
+        return np.ones(topology.numberOfCells, dtype=bool)
+    if "gmshName" in spec:
+        source = topology.cellDomainMap().resolve(spec["gmshName"])
+        return cellDomains == source
+    if "gmshTag" in spec:
+        return cellDomains == int(spec["gmshTag"])
+    raise ValueError("cell domain assignment requires where='all', cellIndices, gmshName, or gmshTag")
+
+
+def _selectFaces(topology, faceBoundaries, spec):
+    if "faceIndices" in spec:
+        mask = np.zeros_like(faceBoundaries, dtype=bool)
+        for cell, face in spec["faceIndices"]:
+            mask[int(cell), int(face)] = True
+        return mask
+    where = spec.get("where")
+    if where in {"z_min", "z_max"}:
+        z = np.asarray(topology.points, dtype=np.float64)[:, 2]
+        target = np.min(z) if where == "z_min" else np.max(z)
+        faceZ = z[np.asarray(topology.facePointIndices, dtype=np.uint32)]
+        return (topology.neighborCells < 0) & np.all(np.isclose(faceZ, target), axis=2)
+    if where == "all_exterior":
+        return topology.neighborCells < 0
+    if "gmshName" in spec:
+        source = topology.surfaceDomainMap().resolve(spec["gmshName"])
+        return faceBoundaries == source
+    if "gmshTag" in spec:
+        return faceBoundaries == int(spec["gmshTag"])
+    raise ValueError("surface domain assignment requires where, faceIndices, gmshName, or gmshTag")
+
+
 def _fromGmshVolume(gmsh, *, boundaryDefault):
     tetElements = [element for element in gmsh.elements if element.element_type == GMSH_TET4]
     unsupported = sorted({element.element_type for element in gmsh.elements if element.element_type in GMSH_UNSUPPORTED_VOLUME_TYPES})
@@ -326,7 +466,14 @@ def _fromGmshVolume(gmsh, *, boundaryDefault):
         cells,
         cellDomains=domains,
         faceBoundaries=faceBoundariesArg,
-        metadata={"source": gmsh.source, "format": "gmsh", "dimension": 3, "gmsh": gmsh},
+        metadata={
+            "source": gmsh.source,
+            "format": "gmsh",
+            "dimension": 3,
+            "gmsh": gmsh,
+            "cellDomainNames": {int(tag): str(name) for tag, name in gmsh.physical_names.get(3, {}).items()},
+            "surfaceDomainNames": {int(tag): str(name) for tag, name in gmsh.physical_names.get(2, {}).items()},
+        },
     )
 
 

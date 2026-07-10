@@ -16,6 +16,7 @@ import warnings
 
 import numpy as np
 from ..openpmd import BackendFlatArray, FieldSpec, GroupFieldSpec, PrimitiveSchema, PrimitiveSchemaDefinition, schemaFields
+from .domains import DomainMap, surfaceOpticsArrays
 from .msh import Gmsh
 from .vtk import gainMediumFromVtk, writeGainMediumVtk
 try:
@@ -1227,6 +1228,21 @@ class GainMedium:
         for name, value in properties.items():
             self.set(name, value)
         return self
+
+    def withSurfaceOptics(self, opticsByDomain):
+        """Set surface optics arrays from a mapping keyed by surface-domain id or name."""
+        if not hasattr(self.topology, "faceBoundaries"):
+            raise TypeError("surface optics require a Tet4 VolumeTopology")
+        boundaries = np.asarray(self.topology.faceBoundaries, dtype=np.int32)
+        positive = boundaries[boundaries > 0]
+        min_size = int(np.max(positive) + 1) if positive.size else 0
+        domain_map = self.topology.surfaceDomainMap() if hasattr(self.topology, "surfaceDomainMap") else DomainMap({})
+        reflectivity, inside, outside = surfaceOpticsArrays(domain_map, opticsByDomain, minSize=min_size)
+        return self.withPhysicalProperties(
+            surfaceReflectivity=reflectivity,
+            surfaceRefractiveIndexInside=inside,
+            surfaceRefractiveIndexOutside=outside,
+        )
 
     def toVtk(self, filename):
         """Write this Tet4 gain medium to an ASCII VTK file."""
