@@ -17,7 +17,7 @@ import warnings
 import numpy as np
 from ..openpmd import BackendFlatArray, FieldSpec, GroupFieldSpec, PrimitiveSchema, PrimitiveSchemaDefinition, schemaFields
 from .msh import Gmsh
-from .vtk import gainMediumFromVtk, topologyFromVtk, writeGainMediumVtk
+from .vtk import gainMediumFromVtk, writeGainMediumVtk
 try:
     from numba import njit
 except ImportError:
@@ -1010,13 +1010,8 @@ class MeshTopology:
 
     @classmethod
     def fromVtk(cls, filename, *, numberOfLevels=None, thickness=None):
-        """Import a legacy VTK wedge mesh as ``MeshTopology``."""
-        topology = topologyFromVtk(filename, cls)
-        if numberOfLevels is not None:
-            topology.numberOfLevels(numberOfLevels)
-        if thickness is not None:
-            topology.withThickness(thickness)
-        return topology
+        """VTK input is Tet4 volume-only; use ``VolumeTopology.fromVtk``."""
+        raise NotImplementedError("MeshTopology.fromVtk is not supported; VTK input must be Tet4 VolumeTopology")
 
     @classmethod
     def fromFile(cls, filename, format=None, numberOfLevels=None, thickness=None):
@@ -1214,7 +1209,6 @@ class GainMedium:
             cls,
             numberOfLevels=numberOfLevels,
             thickness=thickness,
-            legacyTopologyCls=MeshTopology,
         )
 
     @classmethod

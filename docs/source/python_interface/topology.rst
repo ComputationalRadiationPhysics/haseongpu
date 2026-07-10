@@ -55,16 +55,10 @@ From a legacy planar file:
 
 .. code-block:: python
 
-   topology = MeshTopology.fromFile("medium.vtk")
    topology = MeshTopology.fromFile("mesh.msh", numberOfLevels=5, thickness=0.1)
 
 Supported ``MeshTopology`` mesh formats are:
 
-* ``vtk`` or ``legacy-vtk``: legacy ASCII VTK unstructured grids containing
-  wedge cells are accepted.  The importer reads the wedge cells, extracts the
-  transverse ``(x, y)`` points from the first z-level, reconstructs the base
-  triangle connectivity from the lower three nodes of each wedge, and infers
-  ``numberOfLevels`` and ``thickness`` from the point z-coordinates.
 * ``msh`` or ``gmsh``: gmsh 2D triangle meshes are supported through the Python
   ``gmsh`` package.  The mesh must be planar and must contain triangle
   elements.  ``numberOfLevels`` and ``thickness`` are required.
@@ -106,13 +100,13 @@ both geometry and HASEonGPU field data, load a full gain medium instead:
    medium = GainMedium.fromVtk("medium.vtk")
    medium = GainMedium.fromFile("medium.vtk")
 
-``GainMedium.fromVtk(...)`` reads the same legacy wedge geometry as
-``MeshTopology.fromFile(...)`` and then imports recognized HASEonGPU fields.
-``betaCells`` is read from point data, ``betaVolume`` from cell data, and
-``claddingCellTypes``, ``refractiveIndices``, ``reflectivities``, ``nTot``,
-``crystalTFluo``, ``claddingNumber``, and ``claddingAbsorption`` from VTK
-``FIELD`` arrays when present.  ``numberOfLevels`` and ``thickness`` may be
-passed as overrides after loading.
+``GainMedium.fromVtk(...)`` expects a Tet4 VTK unstructured grid, the same
+format accepted by ``VolumeTopology.fromVtk(...)``. ``betaCells`` is read from
+point or cell data, ``betaVolume`` from cell data, and ``claddingCellTypes``,
+``refractiveIndices``, ``reflectivities``, ``nTot``, ``crystalTFluo``,
+``claddingNumber``, and ``claddingAbsorption`` from VTK ``FIELD`` arrays when
+present. ``numberOfLevels`` and ``thickness`` are metadata in the Tet4 file and
+are not accepted as import overrides.
 
 The gmsh importer can also map physical groups whose names contain
 ``cladding`` to ``claddingCellTypes`` when the topology is used by

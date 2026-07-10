@@ -84,8 +84,7 @@ mesh spacing, while ``tileSizeZ`` controls the spacing between z-levels.
 description, triangulates the transverse ``(x, y)`` footprint, and keeps the
 z-level information needed later by legacy planar workflows.  Tet4 runtime
 geometry uses ``VolumeTopology`` instead.  Legacy planar topologies can also be
-loaded from VTK wedge files or gmsh triangle meshes; see
-:doc:`python_interface/topology`.
+loaded from gmsh triangle meshes; see :doc:`python_interface/topology`.
 
 Material and State
 ^^^^^^^^^^^^^^^^^^
