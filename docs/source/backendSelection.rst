@@ -1,41 +1,24 @@
 Backend Selection
 =================
 
-HASEonGPU uses alpaka to support different hardware backends.
+HASEonGPU has two independent backend choices:
 
-Backend selection happens in two steps:
+* **Alpaka compute backend**: where kernels run, for example a CPU, CUDA, or HIP
+  backend.
+* **openPMD storage backend**: how Python and ``calcPhiASE`` exchange data, for
+  example ``adios-sst``, ``adios``, or ``hdf5``.
 
-* build-time backend selection
-* runtime backend selection
+Do not use an openPMD backend name as the Alpaka ``backend`` value.
 
-The build-time selection defines which alpaka backends are compiled into
-HASEonGPU. The runtime selection chooses one of these compiled and available
-backends for a specific simulation run.
+Build-Time Compute Backends
+---------------------------
 
-HASEonGPU also builds a small backend-name library,
-``HaseAlpakaBackendNames``, which exposes the backend names detected by the
-compiled alpaka configuration.  The Python interface uses this library to ask
-the installed build which backend names are valid on the current machine.
+Only Alpaka backends enabled at build time can be selected at runtime.  By
+default, HASEonGPU tries to detect supported dependencies such as CUDA, HIP,
+and TBB automatically.
 
-
-Build-time backend selection
-----------------------------
-
-The backends available at runtime depend on which alpaka backends were enabled
-when configuring HASEonGPU with CMake.
-
-By default, HASEonGPU tries to detect supported backend dependencies such as
-CUDA, HIP, and TBB automatically.
-In the case of manual compilation: discrete/manual backend selection can be enabled with
-the CMake option ``HASE_SELECT_BACKEND_ALPAKA``.
-
-When manual selection is enabled, the existing alpaka CMake options can be used
-directly to select APIs, device kinds, and executors.
-
-The relevant alpaka CMake options are documented in the
-`alpaka CMake argument documentation <https://alpaka3.readthedocs.io/en/latest/advanced/cmake.html#arguments>`__.
-
-For example, a manual CUDA-focused backend configuration can use:
+For manual selection, configure with ``HASE_SELECT_BACKEND_ALPAKA=ON`` and pass
+Alpaka's CMake options directly:
 
 .. code-block:: bash
 
@@ -46,125 +29,49 @@ For example, a manual CUDA-focused backend configuration can use:
      -Dalpaka_DEP_TBB=OFF \
      -Dalpaka_EXEC_CpuSerial=OFF
 
-For more information about manually compiling HASEonGPU, see
-:doc:`Compilation <compilation>`.
+The exact Alpaka option names are defined by Alpaka; see the
+`Alpaka CMake argument documentation <https://alpaka3.readthedocs.io/en/latest/advanced/cmake.html#arguments>`__.
+HASEonGPU is mainly validated with host, CUDA, and HIP backends.  Other Alpaka
+backends should be treated as experimental unless validated in your environment.
 
-The exact set of available alpaka CMake options may change between alpaka
-versions. Therefore, the alpaka documentation should be treated as the primary
-reference for the supported backend configuration flags.
-It is possible to compile HASEonGPU with all backends provided by alpaka,
-including SYCL CPU/GPU backends. However, HASEonGPU is currently tested mainly
-with CUDA, HIP and host backends. Other backends should therefore be treated
-as experimental.
+Runtime Compute Backend
+-----------------------
 
-Backend-name helper library
----------------------------
-
-During the CMake build, HASEonGPU also builds the shared library target
-``HaseAlpakaBackendNames``.  This library links against the same HASEonGPU core
-and alpaka configuration as the simulation code.  It enumerates alpaka's
-enabled APIs and executors, filters them to backends for which a device can be
-created, and exposes the resulting names through a small C ABI.
-
-For Python builds, CMake copies this library into the build package next to the
-Python extension:
+The Python ``PhiASE.backend`` value, or the equivalent openPMD metadata used by
+``calcPhiASE``, selects one compiled-and-available compute backend.  Backend
+names have the form:
 
 .. code-block:: text
 
-   build/python/HASEonGPU_Bindings/libHaseAlpakaBackendNames.so
+   api_deviceKind_executor
 
-On macOS the filename ends in ``.dylib``.  On Windows it is
-``HaseAlpakaBackendNames.dll``.
+Use ``hase-configure`` for an interactive list of backends available in the
+installed build.  It also keeps this compute choice separate from the openPMD
+storage backend.
 
-This library is useful because backend availability is not only a static CMake
-setting.  A backend must be compiled in and usable on the machine where the
-code runs.  For example, a CUDA backend name should only be reported when that
-backend was enabled in the build and alpaka can create a CUDA device.
+From Python, query the same list with ``AlpakaBackends``:
 
-If the Python package cannot find this helper library, build the target
+.. code-block:: python
+
+   from HASEonGPU import AlpakaBackends, PhiASE
+
+   available = AlpakaBackends.all()
+   phi_ase = PhiASE(backend=available[0])
+
+``AlpakaBackends.known()`` is an alias for ``all()``.  Names that are valid
+Python identifiers are also exposed as attributes, for example
+``AlpakaBackends.Host_Cpu_CpuSerial``.
+
+Backend-Name Helper Library
+---------------------------
+
+The Python query uses the small CMake-built helper library
+``HaseAlpakaBackendNames``.  If importing ``AlpakaBackends`` reports that this
+library is missing, rebuild/install the Python package or build the target
 explicitly:
 
 .. code-block:: bash
 
    cmake --build build --target HaseAlpakaBackendNames
 
-When the Python interface is built, the regular Python extension target also
-copies the helper library into the Python runtime package.
-
-
-Runtime backend selection
--------------------------
-
-If you are unsure which names to use, run ``hase-configure``. It lists the
-Alpaka compute backends available in the installed build, recommends a CPU host
-backend for first validation, and explains how CUDA/HIP choices relate to
-build-time Alpaka options. The same guide keeps this compute-backend choice
-separate from the openPMD storage backend.
-
-At runtime, the ``backend`` setting in the Python interface, or the equivalent
-openPMD transport metadata consumed by the command-line binary, selects which
-of the compiled backends should be used for the simulation.
-
-If the openPMD input metadata contains a backend string that does not match any
-compiled backend with an available device, the binary prints the list of
-currently available runtime backends before exiting. Use one of those names as
-the Python ``backend`` value or openPMD ``backend`` metadata value.
-
-Backend names are constructed from alpaka's ``api``, ``deviceKind``, and
-``executor``:
-
-.. code-block:: text
-
-   api_deviceKind_executor
-
-Only backends that were enabled at build time can be selected at runtime.
-
-Query available backends from Python
-------------------------------------
-
-The Python front end exposes the CMake-built backend-name library through
-``AlpakaBackends``:
-
-.. code-block:: python
-
-   from HASEonGPU import AlpakaBackends
-
-   print(AlpakaBackends.all())
-
-``AlpakaBackends.known()`` is an alias for ``AlpakaBackends.all()``:
-
-.. code-block:: python
-
-   available = AlpakaBackends.known()
-   backend = available[0]
-
-If a backend name is a valid Python identifier, it is also available as a class
-attribute:
-
-.. code-block:: python
-
-   backend = AlpakaBackends.Host_Cpu_CpuSerial
-
-The returned strings are the values to pass to the Python interface:
-
-.. code-block:: python
-
-   from HASEonGPU import PhiASE
-
-   phi_ase = PhiASE(
-       spectralProperties=spectra,
-       backend=AlpakaBackends.Host_Cpu_CpuSerial,
-       parallelMode="single",
-   )
-
-If importing ``AlpakaBackends`` raises an error about the backend-name library,
-the Python package can see the Python files but not the compiled helper
-library.  Build ``HaseAlpakaBackendNames`` and make sure the generated library
-is either installed with the Python package or present under
-``build/python/HASEonGPU_Bindings``.
-
-The available APIs, device kinds, and executors are documented in the
-`alpaka cheatsheet <https://alpaka3.readthedocs.io/en/latest/basic/cheatsheet.html#accelerator-platform-and-device>`__.
-
-For a more detailed explanation of alpaka devices and backend selection, see
-the `alpaka device documentation <https://alpaka3.readthedocs.io/en/latest/tutorial/device.html>`__.
+For CMake option details, see :doc:`CMake Build Options <compilation>`.

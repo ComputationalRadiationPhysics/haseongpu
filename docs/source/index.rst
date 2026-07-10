@@ -19,9 +19,10 @@ It is intended to support the design and analysis of high-power laser systems,
 where ASE is an important limiting effect for stored energy, gain distribution,
 and overall amplifier performance.
 
-Start with :doc:`Getting Started <gettingStarted>` for setup and interface
-selection.  The :doc:`Theory and Model <theoryAndModel>` page explains
-the ASE model, estimator, pump coupling, and implementation restrictions.
+Start with :doc:`Getting Started <gettingStarted>` for installation and
+interface selection.  Use :doc:`CMake Build Options <compilation>` only when
+you need manual build configuration.  The :doc:`Theory and Model
+<theoryAndModel>` page explains the ASE model and pump coupling.
 
 Contents
 --------

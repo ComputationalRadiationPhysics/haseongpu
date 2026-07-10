@@ -1,20 +1,15 @@
 Binary Interface
 ================
 
-This page documents the direct command-line usage of the generated
-``calcPhiASE`` binary.
+``calcPhiASE`` is the standalone C++ executable.  Most users call it through
+``PhiASE.run(...)``; use the binary directly when you already have a HASEonGPU
+openPMD input series.
 
-For general setup and dependency information, see
-:doc:`Getting Started <gettingStarted>`.
+Build
+-----
 
-Compilation
------------
-
-In order to use haseongpu from the command line, manual compilation is required.
-
-For compilation details see :doc:`compilation`.
-
-After compilation, the executable is available as:
+Manual compilation is required for direct command-line use.  See
+:doc:`CMake Build Options <compilation>`.
 
 .. code-block:: text
 
@@ -23,7 +18,7 @@ After compilation, the executable is available as:
 Usage
 -----
 
-The binary consumes an openPMD input series and writes an openPMD result series. The input layout is the same one written by the Python ``PhiASE`` transport; see :doc:`openpmdTransport` for record names, storage backends, and iteration update rules.
+The binary reads one openPMD input series and writes one openPMD result series:
 
 .. code-block:: bash
 
@@ -31,24 +26,21 @@ The binary consumes an openPMD input series and writes an openPMD result series.
        --input-path=<openPMD-input-series> \
        --output-path=<openPMD-output-series>
 
-Simulation parameters, mesh topology, dynamic gain fields, backend selection,
-parallel mode, sample range, and optional RNG seed are read from the openPMD
-transport metadata. The command line accepts only the openPMD transport
-entrypoint options for those values. Unsupported metadata such as ``write_vtk = true`` or
-explicit ``devices`` is rejected by the parser.
+The input series contains mesh topology, material fields, dynamic beta fields,
+backend settings, parallel mode, sample range, and optional RNG seed.  This is
+the same transport layout written by the Python interface; see
+:doc:`openpmdTransport`.
 
-Example
--------
+Examples
+--------
 
-Single-process run:
+Single process:
 
 .. code-block:: bash
 
-   ./build/calcPhiASE \
-       --input-path=./input.bp \
-       --output-path=./output.bp
+   ./build/calcPhiASE --input-path=./input.bp --output-path=./output.bp
 
-MPI run:
+MPI launch:
 
 .. code-block:: bash
 
@@ -56,23 +48,13 @@ MPI run:
        --input-path=./input.bp \
        --output-path=./output.bp
 
-Command-Line Arguments
-----------------------
+Arguments
+---------
 
 ``--input-path``
-^^^^^^^^^^^^^^^^
-
-Path to the input openPMD series.
-
-This must point to an openPMD series following the HASE openPMD transport
-layout. Python-written series store arrays as openPMD ``Mesh`` records, but
-the unstructured extruded-prism topology encoded by ``core_points``,
-``core_cells_connectivity``, ``core_cells_offsets``, and ``core_cells_types`` is
-HASE-defined. Static iterations include that topology; dynamic-only iterations
-contain only ``core_beta_volume`` plus ``core_point_beta`` and reuse the cached
-static topology.
+   Path to the HASEonGPU openPMD input series.
 
 ``--output-path``
-^^^^^^^^^^^^^^^^^
-
-Path where ``calcPhiASE`` writes the result openPMD series. Results are written as ``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``, and ``core_result_dndt_ase`` mesh records.
+   Path for the result series.  Results are written as
+   ``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``,
+   and ``core_result_dndt_ase`` records.

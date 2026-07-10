@@ -111,10 +111,6 @@ Backend and Parallel Settings
    Optional inclusive sample-index range.  When omitted, all beta samples
    :math:`\beta_i` are processed.
 
-``writeVtk``
-   Not supported by the openPMD transport. Keep this false and use the
-   Python-side VTK helpers in :doc:`utilities` for visualization output.
-
 openPMD Transport Options
 -------------------------
 
@@ -136,7 +132,7 @@ Configuration Helpers
 ``PhiASE`` can read settings from a dictionary or YAML file.  This is intended
 for run-control values: sampling, convergence, reflection flags, Alpaka compute
 backend selection, openPMD storage backend selection, MPI launcher settings,
-optional sample ranges, and the disabled ``writeVtk`` compatibility key.
+and optional sample ranges.
 Objects such as ``GainMedium``, ``SpectralDecomposition``, and pump solvers are
 still passed from Python.
 
@@ -167,7 +163,6 @@ A YAML file can keep experiment and compute settings together:
      parallel_mode: single
      numDevices: 1
      n_per_node: 1
-     write_vtk: false  # must remain false for the openPMD transport
      min_sample_range: 0
      max_sample_range: 999
      rng_seed: 1234
@@ -183,9 +178,7 @@ Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``maxRaysPerSample``, ``min_rays_per_sample``, ``max_rays_per_sample``,
 ``mse_threshold``, ``adaptive_steps``, ``use_reflections``,
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
-``write_vtk``, ``min_sample_range``, ``max_sample_range``, and
-``rng_seed``. ``write_vtk`` is accepted as a configuration key, but the
-openPMD transport rejects true values.
+``min_sample_range``, ``max_sample_range``, and ``rng_seed``.
 
 Loading YAML requires ``PyYAML``. The package installation installs this
 dependency from ``pyproject.toml``; source-tree usage must provide it in the
