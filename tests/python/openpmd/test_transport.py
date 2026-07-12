@@ -1297,7 +1297,7 @@ def test_cppParserRoundTripsPythonWriter(contract_input, tmp_path):
     iteration = series.iterations[0]
     expected_units = {
         "phi_ase": "cm^-2 s^-1",
-        "mse": "1",
+        "mse": "cm^-2 s^-1",
         "total_rays": "count",
         "dndt_ase": "s^-1",
     }

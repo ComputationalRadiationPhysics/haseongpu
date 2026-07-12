@@ -20,21 +20,24 @@ def analyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad):
     beta = float(beta)
 
     if abs(gain) < 1.0e-12:
-        return beta * radius
+        return nTot * (beta / tauRad) * radius
 
     return nTot * (beta / tauRad) * np.expm1(gain * radius) / gain
 
 
-def forwardAnalyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad):
-    # The forward estimator launches oriented source rays and scores the
-    # traversed target volume.  At the sphere center this samples one oriented
-    # half of the symmetric center integral used by the legacy point-sampling
-    # analytical solution.
-    return 0.5 * analyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad)
-
-
 def calcBetaFromGain(gain, nTot, sigmaA, sigmaE):
     return (gain / nTot + sigmaA) / (sigmaA + sigmaE)
+
+
+def testAnalyticalPhiAseSphereCenterHasCorrectZeroGainLimit():
+    radius = 2.0
+    beta = 0.25
+    nTot = 3.0
+    tauRad = 0.5
+    expected = nTot * beta * radius / tauRad
+
+    assert analyticalPhiAseSphereCenter(0.0, radius, beta, nTot, tauRad) == expected
+    assert np.isclose(analyticalPhiAseSphereCenter(1.0e-11, radius, beta, nTot, tauRad), expected)
 
 
 def _requireGmsh():
@@ -121,7 +124,7 @@ def openPmdBackendForTest():
 
 
 def analyticalSphereRayCount():
-    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "100000"))
+    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "1000000"))
 
 
 @pytest.mark.parametrize("backend", analyticalSphereBackends())
@@ -180,7 +183,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
     assert totalRays[centerVolume] > 0
 
     numerical = phiAseValues[centerVolume]
-    expected = forwardAnalyticalPhiAseSphereCenter(
+    expected = analyticalPhiAseSphereCenter(
         gain=gain,
         radius=radius,
         beta=beta,
@@ -194,7 +197,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
     )
     assert np.isfinite(numerical)
     assert numerical > 0.0
-    assert np.isclose(numerical, expected, rtol=0.35)
+    assert np.isclose(numerical, expected, rtol=0.10)
 
 
 if __name__ == "__main__":
