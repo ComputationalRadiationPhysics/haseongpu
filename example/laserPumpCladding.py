@@ -29,6 +29,7 @@ from HASEonGPU import (  # noqa: E402
     PhiASE,
     PumpProperties,
     Simulation,
+    SurfaceOptics,
     vtkWedge,
     writeParaviewState,
 )
@@ -153,29 +154,43 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
     return vtkWedge(path, state, fields=fields)
 
 
+BOTTOM_ASE_SURFACE_ID = 1
+TOP_ASE_SURFACE_ID = 2
+CLADDING_SURFACE_ID = 3
 
-def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5.5):
-    materialPath = scriptDir / "data" / "pt.vtk"
-    topology = VolumeTopology.fromVtk(materialPath)
 
-    if numberOfLevels is not None and topology.structuredNumberOfLevels != numberOfLevels:
-        raise ValueError(
-            f"{materialPath} contains {topology.structuredNumberOfLevels} levels, expected {numberOfLevels}"
-        )
-    if thickness is not None and not np.isclose(topology.structuredThickness, thickness):
-        raise ValueError(
-            f"{materialPath} has thickness {topology.structuredThickness}, expected {thickness}"
-        )
+def laserPumpCladdingMedium(cladAbsorption=5.5):
+    materialPath = scriptDir / "data" / "laserPumpCladding.msh"
+    topology = VolumeTopology.fromFile(materialPath)
+    refractiveIndices = np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32)
     return GainMedium(topology=topology).withPhysicalProperties(
         betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
         betaVolume=backendFlat(np.zeros(topology.numberOfCells, dtype=np.float64)),
         claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
-        refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
+        refractiveIndices=refractiveIndices,
         reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),
         nTot=2 * 1.388e20,
         crystalTFluo=9.41e-4,
         claddingNumber=1,
         claddingAbsorption=cladAbsorption,
+    ).withSurfaceOptics(
+        {
+            "ase_bottom": SurfaceOptics(
+                reflectivity=0.0,
+                n_inside=refractiveIndices[0],
+                n_outside=refractiveIndices[1],
+            ),
+            "ase_top": SurfaceOptics(
+                reflectivity=0.0,
+                n_inside=refractiveIndices[2],
+                n_outside=refractiveIndices[3],
+            ),
+            "cladding": SurfaceOptics(
+                reflectivity=0.0,
+                n_inside=refractiveIndices[1],
+                n_outside=refractiveIndices[1],
+            ),
+        }
     )
 
 
@@ -193,9 +208,6 @@ def runExample(
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
-    numberOfLevels = 10
-    thickness = 0.7 / (numberOfLevels - 1)
-
     spectralProperties = laserPumpCladdingSpectralProperties()
 
     pumpCrossSections = CrossSectionData.monochromatic(
@@ -204,11 +216,7 @@ def runExample(
         crossSectionEmission=0.195e-20,
     )
     absorption=5.5
-    medium = laserPumpCladdingMedium(
-        numberOfLevels=numberOfLevels,
-        thickness=thickness,
-        cladAbsorption=absorption
-    )
+    medium = laserPumpCladdingMedium(cladAbsorption=absorption)
 
     AseOverride.setdefault("forwardRayLength", 1.0)
     phiAse = PhiASE.fromYaml(
