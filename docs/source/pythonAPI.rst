@@ -49,7 +49,6 @@ Simulation and time integration
    ExplicitEuler
    ExponentialEuler
    FrozenPhiAseRungeKutta4
-   FrozenPhiAseRungeKutta4
    Heun
    ImplicitEuler
    Midpoint

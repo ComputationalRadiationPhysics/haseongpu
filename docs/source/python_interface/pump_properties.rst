@@ -53,7 +53,8 @@ the inlet pump.
 
 ``pumpSteps`` limits the number of *outer* simulation steps that receive pump
 energy; set it on the object or pass it to ``Simulation.runSteps``. The retained
-``pumpSubsteps`` setting does not count outer simulation steps.
+``pumpSubsteps`` setting is currently ignored by the compiled traversal and does
+not count outer simulation steps.
 
 Limits and Utilities
 --------------------

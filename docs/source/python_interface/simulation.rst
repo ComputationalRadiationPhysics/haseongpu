@@ -194,7 +194,7 @@ with a ``.name`` attribute. Built-in descriptors are documented in
 
 ``ImplicitEuler(iterations=8, tolerance=1e-10)`` also serializes
 ``implicit_iterations`` and ``implicit_tolerance`` run-control attributes.
-Set ``simulation.enableAse = False`` to advance pump and fluorescence without ASE. Custom Python time integrators are not supported by compiled runs.
+Set ``simulation.enableASE = False`` to advance pump and fluorescence without ASE. Custom Python time integrators are not supported by compiled runs.
 
 Beta Volume Mapping
 -------------------
