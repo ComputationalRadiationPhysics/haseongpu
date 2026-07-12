@@ -43,19 +43,9 @@ def _is_under_repo(path):
         return False
 
 
-def _editable_finder_matches_checkout(finder):
-    if finder.__class__.__module__ != "_HASEonGPU_editable":
-        return True
-
-    source_files = getattr(finder, "known_source_files", {})
-    if any(_is_under_repo(Path(path)) for path in source_files.values()):
-        return True
-
-    build_path = getattr(finder, "path", None)
-    return build_path is not None and _is_under_repo(Path(build_path))
-
-
-sys.meta_path = [finder for finder in sys.meta_path if _editable_finder_matches_checkout(finder)]
+sys.meta_path = [
+    finder for finder in sys.meta_path if finder.__class__.__module__ != "_HASEonGPU_editable"
+]
 
 
 def _remove_checkout_import_paths():
@@ -90,6 +80,7 @@ def _has_required_api(module):
 
 def _import_hase_api():
     _remove_checkout_import_paths()
+    _clear_hase_modules()
     try:
         module = importlib.import_module("HASEonGPU")
         if _has_required_api(module):
