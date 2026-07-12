@@ -20,6 +20,7 @@ namespace hase::core
         double time = 0.0;
         HostMesh mesh;
         Result aseResult;
+        Result volumeAseResult;
         std::vector<double> dndtPump;
         std::vector<double> dndtAse;
     };

@@ -1051,6 +1051,14 @@ def read_simulation_output(path):
         beta_volume = _loadScalar(series, iteration, "core_beta_volume", np.float64)
         phi_ase = _loadScalar(series, iteration, "core_result_phi_ase", np.float32)
         dndt_ase = _loadScalar(series, iteration, "core_result_dndt_ase", np.float64)
+        volume_phi_ase = _read_optional_scalar(series, iteration, "core_result_volume_phi_ase", np.float32, number_of_cells)
+        volume_mse = _read_optional_scalar(series, iteration, "core_result_volume_mse", np.float64, number_of_cells)
+        volume_total_rays = _read_optional_scalar(
+            series, iteration, "core_result_volume_total_rays", np.uint32, number_of_cells
+        )
+        volume_dndt_ase = _read_optional_scalar(
+            series, iteration, "core_result_volume_dndt_ase", np.float64, number_of_cells
+        )
         beta_volume_shape = (number_of_cells,) if beta_volume.size == number_of_cells else (number_of_cells, number_of_levels - 1)
         result_shape = (number_of_points, number_of_levels)
         states.append(SimpleNamespace(
@@ -1060,6 +1068,10 @@ def read_simulation_output(path):
             betaCells=beta_cells.reshape(result_shape, order="F"),
             betaVolume=beta_volume.reshape(beta_volume_shape, order="F"),
             phiAse=phi_ase.reshape(result_shape, order="F"),
+            volumePhiAse=volume_phi_ase.reshape((number_of_cells,), order="F"),
+            volumeMse=volume_mse.reshape((number_of_cells,), order="F"),
+            volumeTotalRays=volume_total_rays.reshape((number_of_cells,), order="F"),
+            volumeDndtAse=volume_dndt_ase.reshape((number_of_cells,), order="F"),
             dndtAse=dndt_ase.reshape(result_shape, order="F"),
             dndtPump=_read_optional_scalar(
                 series,
@@ -1614,6 +1626,7 @@ def _simulation_run_control(simulation, *, steps, pumpSteps):
         "time_step": float(simulation.timeStep),
         "number_of_steps": int(steps),
         "enable_ase": bool(getattr(simulation, "enableASE", True)),
+        "pre_pump": bool(getattr(simulation, "prePump", False)),
         "pump_steps": pump_steps_value,
         "time_integrator": _time_integrator_name(solver),
         "pump_routine": "one-dimensional-z-traversal",
