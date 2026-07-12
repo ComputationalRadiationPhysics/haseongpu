@@ -34,6 +34,7 @@ Install from the repository root after following
    # run the printed command, typically:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
+<<<<<<< HEAD
 ``pip install -v .`` configures or reuses the native runtime in ``build/`` and
 installs a thin Python frontend that remembers it. The configurator chooses
 compatible openPMD provider settings, prints the install command, and writes
@@ -47,6 +48,19 @@ metadata directly, so it does not need to be reinstalled:
 
    cmake -S . -B build <updated options>
    cmake --build build
+=======
+``pip install -v .`` builds the C++ extension through CMake and installs the
+Python package.  The configurator chooses compatible openPMD provider settings,
+prints the install command, and writes the optional
+``config/hase-phiase.yaml`` compute-settings file.
+
+If you change the compiler or C++ runtime used for the extension, rebuild and
+reinstall:
+
+.. code-block:: bash
+
+   python3 -m pip install --force-reinstall --no-cache-dir -v .
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 
 Concept Pages
 -------------
@@ -72,8 +86,13 @@ in sync with that runnable example.
 Geometry
 ^^^^^^^^
 
+<<<<<<< HEAD
 Describe the simulation geometry. Legacy planar workflows use a 2D triangular
 mesh extruded into prism layers; forward volume transport uses Tet4 geometry.
+=======
+Describe the transverse mesh and z-levels.  HASEonGPU currently uses a 2D
+triangular mesh extruded into prism layers.
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
@@ -87,6 +106,12 @@ gmsh triangle meshes; see :doc:`python_interface/topology`.
 Material and State
 ^^^^^^^^^^^^^^^^^^
 
+<<<<<<< HEAD
+Material and State
+^^^^^^^^^^^^^^^^^^
+
+=======
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 Attach physical arrays and scalar material properties to the topology:
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
