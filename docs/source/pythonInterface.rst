@@ -14,6 +14,11 @@ The usual workflow is:
 #. configure :doc:`PhiASE <python_interface/phi_ase>`
 #. run a :doc:`Simulation <python_interface/simulation>`
 
+For explicit Tet4 geometry, use ``VolumeTopology`` instead of the legacy
+planar ``MeshTopology`` workflow. ``VolumeTopology`` supports Tet4 VTK, gmsh,
+and closed STL volume input, plus named cell and surface domains for material
+regions and ``SurfaceOptics``. See :doc:`python_interface/topology`.
+
 For generated signatures and member lists, use the
 :doc:`Python API Reference <pythonAPI>`.
 
@@ -29,6 +34,7 @@ Install from the repository root after following
    # run the printed command, typically:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
+<<<<<<< HEAD
 ``pip install -v .`` configures or reuses the native runtime in ``build/`` and
 installs a thin Python frontend that remembers it. The configurator chooses
 compatible openPMD provider settings, prints the install command, and writes the optional
@@ -42,6 +48,19 @@ metadata directly, so it does not need to be reinstalled:
 
    cmake -S . -B build <updated options>
    cmake --build build
+=======
+``pip install -v .`` builds the C++ extension through CMake and installs the
+Python package.  The configurator chooses compatible openPMD provider settings,
+prints the install command, and writes the optional
+``config/hase-phiase.yaml`` compute-settings file.
+
+If you change the compiler or C++ runtime used for the extension, rebuild and
+reinstall:
+
+.. code-block:: bash
+
+   python3 -m pip install --force-reinstall --no-cache-dir -v .
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 
 Concept Pages
 -------------
@@ -67,28 +86,32 @@ in sync with that runnable example.
 Geometry
 ^^^^^^^^
 
+<<<<<<< HEAD
 Describe the simulation geometry. Legacy planar workflows use a 2D triangular
 mesh extruded into prism layers; forward volume transport uses Tet4 geometry.
+=======
+Describe the transverse mesh and z-levels.  HASEonGPU currently uses a 2D
+triangular mesh extruded into prism layers.
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
    :start-after: # docs:start: topology
    :end-before: # docs:end: topology
 
-Here ``Grid`` describes a rectangular crystal.  ``xExtent`` and ``yExtent`` are
-the transverse size of the mesh.  ``zExtent`` is the crystal length in the
-propagation direction.  ``tileSizeX`` and ``tileSizeY`` control the transverse
-mesh spacing, while ``tileSizeZ`` controls the spacing between z-levels.
-
-``MeshTopology.fromGrid(...)`` accepts a three-dimensional ``Grid``
-description, triangulates the transverse ``(x, y)`` footprint, and keeps the
-z-level information needed later by legacy planar workflows.  Tet4 runtime
-geometry uses ``VolumeTopology`` instead.  Legacy planar topologies can also be
-loaded from gmsh triangle meshes; see :doc:`python_interface/topology`.
+``Grid`` is the shortest path for rectangular media.  ``MeshTopology`` can also
+be created from point clouds, planar STL files, legacy VTK wedge files, and
+gmsh triangle meshes; see :doc:`python_interface/topology`.
 
 Material and State
 ^^^^^^^^^^^^^^^^^^
 
+<<<<<<< HEAD
+Material and State
+^^^^^^^^^^^^^^^^^^
+
+=======
+>>>>>>> b8bc915c (Keep forward documentation concise after rebase)
 Attach physical arrays and scalar material properties to the topology:
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
@@ -162,6 +185,10 @@ Simulation
 ``Simulation`` sends the setup to the C++/Alpaka backend, which owns the pump,
 ASE, and time-integration loop. Python receives one ``TimeStepState`` snapshot
 per completed step and invokes ``onStep`` callbacks for each snapshot.
+
+Forward Tet4 runs support surface reflections and the same compiled controls as
+other simulations: set ``enableASE=False`` for pump-only evolution, or use
+``FrozenPhiAseRungeKutta4`` when one ASE evaluation per RK4 step is sufficient.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python

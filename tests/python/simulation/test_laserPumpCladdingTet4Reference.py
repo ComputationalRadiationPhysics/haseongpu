@@ -177,7 +177,7 @@ def testLaserPumpCladdingTet4MediumAssignsLegacySlabSurfaceOptics():
 
 
 @pytest.mark.integration
-def testLaserPumpCladdingRunExampleReflectionToggleChangesVolumePhiAse(
+def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
     monkeypatch,
     tmp_path,
     alpakaRuntimeBackend,
@@ -205,7 +205,7 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesVolumePhiAse(
             reflectionTolerance=0.0,
             surfaceReservoirSize=32,
         )
-        return np.asarray(state.volumePhiAse, dtype=np.float64).reshape(-1)
+        return np.asarray(state.phiAse, dtype=np.float64).reshape(-1)
 
     without_reflections = run(False)
     with_reflections = run(True)
