@@ -59,6 +59,7 @@ namespace
         constexpr char const* timeStep = "time_step";
         constexpr char const* numberOfSteps = "number_of_steps";
         constexpr char const* enableAse = "enable_ase";
+        constexpr char const* prePump = "pre_pump";
         constexpr char const* pumpSteps = "pump_steps";
         constexpr char const* timeIntegrator = "time_integrator";
         constexpr char const* implicitIterations = "implicit_iterations";
@@ -1186,6 +1187,7 @@ namespace hase::openpmd
         run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
         run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
         run.enableAse = attributeOr<bool>(iteration, field::enableAse, true);
+        run.prePump = attributeOr<bool>(iteration, field::prePump, false);
         run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
         run.timeIntegration.method
             = attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
@@ -1529,6 +1531,37 @@ namespace hase::openpmd
             snapshot.dndtAse,
             io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
             {"point", "level"},
+            "s^-1",
+            1.0,
+            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            resultPrefix + "volume_phi_ase",
+            snapshot.volumeAseResult.phiAse,
+            io::Extent{snapshot.mesh.numberOfCells},
+            {"cell"},
+            "cm^-2 s^-1",
+            1.0e4,
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            resultPrefix + "volume_mse",
+            snapshot.volumeAseResult.mse,
+            io::Extent{snapshot.mesh.numberOfCells},
+            {"cell"});
+        writeScalar(
+            iteration,
+            resultPrefix + "volume_total_rays",
+            snapshot.volumeAseResult.totalRays,
+            io::Extent{snapshot.mesh.numberOfCells},
+            {"cell"},
+            "count");
+        writeScalar(
+            iteration,
+            resultPrefix + "volume_dndt_ase",
+            snapshot.volumeAseResult.dndtAse,
+            io::Extent{snapshot.mesh.numberOfCells},
+            {"cell"},
             "s^-1",
             1.0,
             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});

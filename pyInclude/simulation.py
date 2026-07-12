@@ -421,6 +421,14 @@ class TimeStepState:
     """Raw lower-level ASE result object for advanced inspection."""
     topology: object | None = None
     """Static mesh topology used by geometry-aware state callbacks."""
+    volumePhiAse: np.ndarray | None = None
+    """Native volume-centered ASE flux, when provided by the compiled backend."""
+    volumeDndtAse: np.ndarray | None = None
+    """Native volume-centered ASE depletion contribution, when available."""
+    volumeMse: np.ndarray | None = None
+    """Native volume-centered Monte Carlo error estimate, when available."""
+    volumeTotalRays: np.ndarray | None = None
+    """Native volume-centered ray visit counts, when available."""
 
 
 @dataclass
@@ -450,6 +458,8 @@ class Simulation:
     """Optional target physical time for ``runUntil()``."""
     enableASE: bool = True
     """Whether compiled time-stepped runs include ASE depletion."""
+    prePump: bool = False
+    """When true, the first compiled time step advances without ASE so pump can seed beta."""
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
     _initialized: bool = field(default=False, init=False, repr=False)
@@ -580,6 +590,22 @@ class Simulation:
                 dndtPump=np.asarray(raw_state.dndtPump, dtype=np.float64).copy(),
                 aseResult=raw_state.aseResult,
                 topology=self.gainMedium.topology,
+                volumePhiAse=(
+                    None if getattr(raw_state, "volumePhiAse", None) is None
+                    else np.asarray(raw_state.volumePhiAse, dtype=np.float64).copy()
+                ),
+                volumeDndtAse=(
+                    None if getattr(raw_state, "volumeDndtAse", None) is None
+                    else np.asarray(raw_state.volumeDndtAse, dtype=np.float64).copy()
+                ),
+                volumeMse=(
+                    None if getattr(raw_state, "volumeMse", None) is None
+                    else np.asarray(raw_state.volumeMse, dtype=np.float64).copy()
+                ),
+                volumeTotalRays=(
+                    None if getattr(raw_state, "volumeTotalRays", None) is None
+                    else np.asarray(raw_state.volumeTotalRays, dtype=np.uint32).copy()
+                ),
             )
             if hasattr(self.gainMedium.topology, "cellPointIndices"):
                 self.gainMedium.get("betaCells").value = backendFlat(state.betaCells.reshape(-1, order="F"))

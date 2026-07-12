@@ -58,6 +58,7 @@ namespace hase::core
         double timeStep = 0.0;
         unsigned numberOfSteps = 0u;
         bool enableAse = true;
+        bool prePump = false;
         unsigned pumpSteps = std::numeric_limits<unsigned>::max();
         TimeIntegrationParameters timeIntegration;
         PumpParameters pump;

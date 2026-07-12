@@ -143,6 +143,10 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
         "cladAbs": state.phiAse * np.float64(claddingAbsorption),
         "localGain": calcGainFromState(state, crossSections, nTot),
     }
+    if getattr(state, "volumePhiAse", None) is not None:
+        fields["volumePhiASE"] = state.volumePhiAse
+    if getattr(state, "volumeDndtAse", None) is not None:
+        fields["volumeDndtAse"] = state.volumeDndtAse
     path = Path(vtkOutputDir) / f"laserPumpCladding_{state.step:03d}.vtk"
     if hasattr(state.topology, "cellPointIndices"):
         return _writeTet4StateVtk(path, state, fields)
@@ -185,6 +189,7 @@ def runExample(
     openPmdOutputDir=None,
     openpmdBackend="UseConfig",
     enableASE=True,
+    prePump=True,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -240,6 +245,7 @@ def runExample(
         timeStep=2e-5,
         crossSections=spectralProperties,
         enableASE=enableASE,
+        prePump=prePump,
     )
     simulation.onStep(printState)
     simulation.onStep(
@@ -284,6 +290,11 @@ def main(argv=None):
         "--disable-ase",
         action="store_true",
         help="Disable ASE depletion during the time-stepped pump simulation.",
+    )
+    parser.add_argument(
+        "--disable-pre-pump",
+        action="store_true",
+        help="Run ASE during the first pump time step instead of seeding beta without ASE.",
     )
     parser.add_argument("--tet4-input", type=Path, default=None)
     parser.add_argument("--phiase-only", action="store_true")
@@ -332,6 +343,7 @@ def main(argv=None):
         openPmdOutputDir=args.openpmd_output_dir,
         openpmdBackend=args.openpmd_backend,
         enableASE=not args.disable_ase,
+        prePump=not args.disable_pre_pump,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")
