@@ -178,17 +178,16 @@ returned ``phiAse`` as
    \Phi_i.
 
 Because :math:`\Phi_i` already includes :math:`N_{\mathrm{tot}} / \tau`, this derivative must not be
-multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.  In the
-Python ``Simulation`` time loop, the cross sections used for this scalar
+multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.  In the compiled ``Simulation`` time loop, the cross sections used for this scalar
 conversion are the maximum emission cross section and the absorption cross
 section at the emission-peak wavelength.
 
 Pump and Time Stepping
 ----------------------
 
-The ASE calculation can be used directly, but the Python interface also
-provides a time-stepped pump model.  In that model ``betaCells`` is advanced by
-combining pump excitation, ASE depletion, and fluorescence decay:
+The high-level Python interface constructs the physical state, then sends it to
+the C++/Alpaka backend, which advances ``betaCells``.  It combines pump
+excitation, ASE depletion, and fluorescence decay:
 
 .. math::
 
@@ -197,72 +196,47 @@ combining pump excitation, ASE depletion, and fluorescence decay:
    \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
    -
    \left.\frac{d\beta}{dt}\right|_{\mathrm{ASE}}
-   -
-   \frac{\beta}{\tau}.
+   - \frac{\beta}{\tau}.
 
-HASEonGPU provides two built-in pump solvers.  Both use the same local pump
-physics but package the time update differently.  The transverse input field is
-represented as a super-Gaussian profile,
+The compiled pump is ``one-dimensional-z-traversal``. At each transverse mesh
+point it uses the super-Gaussian inlet profile
 
 .. math::
 
    I_0(x,y) = I_{\mathrm{peak}}
-   \exp\left[-\left(\sqrt{\frac{(x-x_c)^2}{r_y^2}
-   + \frac{(y-y_c)^2}{r_x^2}}\right)^q\right].
+   \exp\left[-\left(\sqrt{\frac{x^2}{r_y^2} + \frac{y^2}{r_x^2}}\right)^q\right].
 
-The continuous ``OneDimensionalZTraversal`` solver propagates each wavelength
-sample along the z levels.  Between two adjacent levels it uses the average
-population :math:`\bar\beta_z` and the active-ion density
-:math:`N_{\mathrm{tot}}`:
+For the configured pump wavelength, it propagates intensity through adjacent z
+levels using the mean population :math:`\bar\beta_z`:
 
 .. math::
 
-   I_{k,z+\Delta z} = I_{k,z}
-   \exp\left[-\left(\sigma_{a,k}
-   - \bar\beta_z(\sigma_{a,k}+\sigma_{e,k})\right)
+   I_{z+\Delta z} = I_z
+   \exp\left[-\left(\sigma_a
+   - \bar\beta_z(\sigma_a+\sigma_e)\right)
    N_{\mathrm{tot}}\Delta z\right].
 
-The local photon flux is
-
-.. math::
-
-   \Phi_k = I_k\frac{\lambda_k}{hc},
-
-and the frozen-state pump rate is
+The local pump rate is
 
 .. math::
 
    \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
-   =
-   \sum_k\left[\sigma_{a,k}
-   - \beta(\sigma_{a,k}+\sigma_{e,k})\right]\Phi_k.
+   = \left[\sigma_a - \beta(\sigma_a+\sigma_e)\right]
+   I\frac{\lambda}{hc}.
 
-If back reflection is enabled, the transmitted intensity at the far crystal
-surface is multiplied by the configured reflectivity and propagated back through
-the same layer factors before the forward and reflected intensities are summed.
+With back reflection, the transmitted far-end intensity is scaled by the chosen
+reflectivity and propagated in the reverse direction before both intensities
+are added. ``extraction`` suppresses the inlet pump. The configured
+``pumpSubsteps`` value is retained in the transport format for compatibility;
+the current compiled traversal evaluates this rate directly and does not use it
+to subdivide a time step.
 
-The legacy/default ``BetaIntegrationGaussianSolver`` instead advances beta with
-a local analytical update over internal pump substeps:
-
-.. math::
-
-   \beta(t + \Delta t)
-   =
-   \frac{A}{C}\left(1 - e^{-C\Delta t}\right)
-   +
-   \beta(t)e^{-C\Delta t},
-
-with
-
-.. math::
-
-   A = \sigma_a I \frac{\lambda}{hc},
-   \qquad
-   C = (\sigma_a + \sigma_e) I \frac{\lambda}{hc} + \frac{1}{\tau}.
-
-The pump model is deliberately separate from the ASE estimator. Python workflows
-can replace it with a custom pump solver while keeping the same HASEonGPU ASE
-calculation.
+The compiled integrator then advances the combined derivative. Standard RK4
+re-evaluates ASE at each stage; ``FrozenPhiAseRungeKutta4`` reuses its first ASE
+calculation for the remaining stages when that approximation is appropriate.
+``Simulation(enableASE=False, ...)`` disables ASE and advances only pump and
+fluorescence. Custom Python pump or time-integration functions cannot run
+inside the compiled loop.
 
 Restrictions
 ------------
