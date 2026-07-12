@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <exception>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -113,8 +114,9 @@ namespace hase::core
         std::vector<float>& runtimes)
     {
         unsigned const volumeCount = hostMesh.numberOfCells;
+        // Each partial contributes the histories it actually launched; starting
+        // this counter at the requested total would count every history twice.
         ForwardPhiAseRawResult combined = makeForwardRawResult(volumeCount);
-        combined.rayCount = rayCount;
         if(rayCount == 0u || assignedDeviceCount == 0u)
         {
             return combined;
@@ -147,6 +149,10 @@ namespace hase::core
         for(auto const& partial : partials)
         {
             mergeForwardRawResult(combined, partial);
+        }
+        if(combined.rayCount != rayCount)
+        {
+            throw std::runtime_error("Forward ray partition accounting mismatch.");
         }
         return combined;
     }

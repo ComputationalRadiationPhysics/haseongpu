@@ -47,6 +47,7 @@ build = [
 test = [
     "pytest",
     "pytest-cov",
+    "pyyaml"
 ]
 dev = [
     "scikit-build-core>=0.10",

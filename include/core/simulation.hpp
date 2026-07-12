@@ -301,7 +301,9 @@ namespace hase::core
                 for(unsigned volume = 0u; volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
                     ++volume)
                 {
-                    result.phiAse.at(volume) *= (hostMesh.nTot / hostMesh.crystalTFluo);
+                    double const fluorescenceRate = hostMesh.nTot / hostMesh.crystalTFluo;
+                    result.phiAse.at(volume) *= fluorescenceRate;
+                    result.mse.at(volume) *= fluorescenceRate;
                     result.dndtAse.at(volume) = calcVolumeDndtAse(
                         hostMesh,
                         experiment.maxSigmaA,
