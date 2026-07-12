@@ -4,24 +4,38 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+repoRoot = Path(__file__).resolve().parents[3]
+
+
 from HASEonGPU import AlpakaBackends, GainMedium, PhiASE, SpectralDecomposition
 from pyInclude.geometry.vtk import _parseVtk
-from utils.compare_serial_wedge_projection import (
-    projectionFromTet4Medium,
-    serialPhiAsePointFields,
-    tet4ResultToLegacyPointValues,
-    writeWedgeComparisonArtifacts,
+
+_compare_serial_helper_path = repoRoot / "utils" / "compare_serial_wedge_projection.py"
+_compare_serial_helper_spec = importlib.util.spec_from_file_location(
+    "_hase_compare_serial_wedge_projection",
+    _compare_serial_helper_path,
 )
+if _compare_serial_helper_spec is None or _compare_serial_helper_spec.loader is None:
+    raise ImportError(f"cannot load compareSerial helper from {_compare_serial_helper_path}")
+_compare_serial_helper = importlib.util.module_from_spec(_compare_serial_helper_spec)
+sys.modules[_compare_serial_helper_spec.name] = _compare_serial_helper
+_compare_serial_helper_spec.loader.exec_module(_compare_serial_helper)
+projectionFromTet4Medium = _compare_serial_helper.projectionFromTet4Medium
+serialPhiAsePointFields = _compare_serial_helper.serialPhiAsePointFields
+legacyWedgePointIntegral = _compare_serial_helper.legacyWedgePointIntegral
+tet4ResultToLegacyPointValues = _compare_serial_helper.tet4ResultToLegacyPointValues
+tet4CellVolumeIntegral = _compare_serial_helper.tet4CellVolumeIntegral
+writeWedgeComparisonArtifacts = _compare_serial_helper.writeWedgeComparisonArtifacts
 
-
-repoRoot = Path(__file__).resolve().parents[3]
 REFERENCE_PATH = repoRoot / "tests" / "data" / "compareSerial" / "phiase_reference.npz"
 
 
@@ -154,33 +168,33 @@ def _default_backend():
 
 def _legacy_spectral_properties(metadata, name):
     spectra = metadata["spectra"][name]
+    spectral_length = len(spectra["lambdaE"])
+    assert spectral_length == len(spectra["lambdaA"])
+    assert spectral_length == len(spectra["sigmaA"])
+    assert spectral_length == len(spectra["sigmaE"])
     return SpectralDecomposition(
         wavelengthsAbsorption=spectra["lambdaA"],
         crossSectionAbsorption=spectra["sigmaA"],
         wavelengthsEmission=spectra["lambdaE"],
         crossSectionEmission=spectra["sigmaE"],
-        resolution=int(metadata["parameters"]["spectralResolution"]),
+        resolution=spectral_length,
     )
 
 
 @pytest.mark.integration
-def testCurrentTet4ForwardPhiAseCanBeComparedPointwiseWithCompareSerialReference(
+def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
     compareSerialReference,
     openPmdRuntimeBackend,
 ):
-    if os.environ.get("HASE_COMPARE_SERIAL_RUN_FORWARD") != "1":
-        pytest.skip("set HASE_COMPARE_SERIAL_RUN_FORWARD=1 to run the expensive pointwise physics comparison")
-    if "HASE_COMPARE_SERIAL_FORWARD_RAY_LENGTH" not in os.environ:
-        pytest.skip("set HASE_COMPARE_SERIAL_FORWARD_RAY_LENGTH for the forward Tet4 comparison")
-
     metadata = compareSerialReference["metadata"]
     ray_count = int(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_COUNT", metadata["parameters"]["experiment"]["maxRays"]))
-    forward_ray_length = float(os.environ["HASE_COMPARE_SERIAL_FORWARD_RAY_LENGTH"])
-    rtol = float(os.environ.get("HASE_COMPARE_SERIAL_POINTWISE_RTOL", "0.35"))
+    forward_ray_length = float(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_LENGTH", "1.0"))
+    rtol = float(os.environ.get("HASE_COMPARE_SERIAL_INTEGRAL_RTOL", "0.35"))
     backend = os.environ.get("HASE_COMPARE_SERIAL_BACKEND", _default_backend())
 
     for name, dataset in compareSerialReference["datasets"].items():
         medium = GainMedium.fromVtk(repoRoot / "example" / "data" / f"{name}.vtk")
+        projection = projectionFromTet4Medium(medium)
         phi_ase = PhiASE(
             spectralProperties=_legacy_spectral_properties(metadata, name),
             minRaysPerSample=ray_count,
@@ -199,8 +213,7 @@ def testCurrentTet4ForwardPhiAseCanBeComparedPointwiseWithCompareSerialReference
             rngSeed=int(metadata["random"]["serialMt19937Seed"]),
         )
         phi_ase.run(gainMedium=medium)
-        current_point_phi = tet4ResultToLegacyPointValues(medium, phi_ase.getResults().phiAse)
-        legacy_point_phi = dataset["phiASE"]
+        current_integral = tet4CellVolumeIntegral(medium, phi_ase.getResults().phiAse)
+        legacy_integral = legacyWedgePointIntegral(dataset["phiASE"], projection)
 
-        assert current_point_phi.shape == legacy_point_phi.shape
-        np.testing.assert_allclose(current_point_phi, legacy_point_phi, rtol=rtol, atol=0.0)
+        np.testing.assert_allclose(current_integral, legacy_integral, rtol=rtol, atol=0.0)

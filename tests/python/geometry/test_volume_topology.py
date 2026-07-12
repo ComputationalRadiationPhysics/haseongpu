@@ -13,29 +13,6 @@ import pytest
 repoRoot = Path(__file__).resolve().parents[3]
 
 
-def _module_from_repo(module):
-    filename = getattr(module, "__file__", None)
-    if filename is None:
-        return True
-    try:
-        Path(filename).resolve().relative_to(repoRoot)
-        return True
-    except ValueError:
-        return False
-
-
-for module_name, module in list(sys.modules.items()):
-    if (
-        module_name == "HASEonGPU"
-        or module_name.startswith("HASEonGPU.")
-        or module_name == "pyInclude"
-        or module_name.startswith("pyInclude.")
-    ) and not _module_from_repo(module):
-        del sys.modules[module_name]
-
-if str(repoRoot) not in sys.path:
-    sys.path.insert(0, str(repoRoot))
-
 from HASEonGPU import AlpakaBackends, PhiASE, SpectralDecomposition
 from pyInclude.geometry import GainMedium, Gmsh, GmshElement, SurfaceOptics, VolumeTopology
 import pyInclude.openpmd.transport as transport
