@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -13,11 +14,22 @@ import numpy as np
 import pytest
 
 repoRoot = Path(__file__).resolve().parents[3]
-if str(repoRoot) not in sys.path:
-    sys.path.insert(0, str(repoRoot))
+
 
 from pyInclude.geometry.vtk import _parseVtk
-from utils.convert_vtk_topology import convertVtk
+
+
+_convert_vtk_topology_path = repoRoot / "utils" / "convert_vtk_topology.py"
+_convert_vtk_topology_spec = importlib.util.spec_from_file_location(
+    "_hase_convert_vtk_topology",
+    _convert_vtk_topology_path,
+)
+if _convert_vtk_topology_spec is None or _convert_vtk_topology_spec.loader is None:
+    raise ImportError(f"cannot load VTK topology converter from {_convert_vtk_topology_path}")
+_convert_vtk_topology = importlib.util.module_from_spec(_convert_vtk_topology_spec)
+sys.modules[_convert_vtk_topology_spec.name] = _convert_vtk_topology
+_convert_vtk_topology_spec.loader.exec_module(_convert_vtk_topology)
+convertVtk = _convert_vtk_topology.convertVtk
 
 
 exampleDir = repoRoot / "example"
@@ -33,7 +45,50 @@ REFERENCE_PATH = (
     / "upstream_master_pump3_wedge_reference"
     / "phiase_reference.npz"
 )
-POINTWISE_RTOL = 0.35
+INTEGRAL_RTOL = 0.35
+
+
+def _triangle_area(points):
+    a, b, c = np.asarray(points, dtype=np.float64)
+    ab = b[:2] - a[:2]
+    ac = c[:2] - a[:2]
+    return 0.5 * abs(float(ab[0] * ac[1] - ab[1] * ac[0]))
+
+
+def _wedge_volume(points, cell):
+    vertices = np.asarray(points, dtype=np.float64)[np.asarray(cell, dtype=np.uint32)]
+    z_values = np.unique(vertices[:, 2])
+    if z_values.size != 2:
+        raise ValueError("wedge cell must span exactly two z levels")
+    lower = vertices[np.isclose(vertices[:, 2], z_values[0])]
+    if lower.shape[0] != 3:
+        raise ValueError("wedge cell must have three lower vertices")
+    return _triangle_area(lower) * float(z_values[1] - z_values[0])
+
+
+def _tet_volume(points, cell):
+    a, b, c, d = np.asarray(points, dtype=np.float64)[np.asarray(cell, dtype=np.uint32)]
+    return abs(float(np.dot(b - a, np.cross(c - a, d - a)))) / 6.0
+
+
+def _wedge_point_integrals(points, cells, phi_by_step):
+    points = np.asarray(points, dtype=np.float64)
+    cells = np.asarray(cells, dtype=np.uint32)
+    volumes = np.asarray([_wedge_volume(points, cell) for cell in cells], dtype=np.float64)
+    result = []
+    for phi in np.asarray(phi_by_step, dtype=np.float64):
+        cell_values = phi[cells].mean(axis=1)
+        result.append(float(np.sum(cell_values * volumes)))
+    return np.asarray(result, dtype=np.float64)
+
+
+def _tet_cell_integral(points, cells, values):
+    values = np.asarray(values, dtype=np.float64).reshape(-1)
+    cells = np.asarray(cells, dtype=np.uint32)
+    volumes = np.asarray([_tet_volume(points, cell) for cell in cells], dtype=np.float64)
+    if values.shape != volumes.shape:
+        raise ValueError(f"Tet4 field has {values.size} values for {volumes.size} cells")
+    return float(np.sum(values * volumes))
 
 
 @pytest.fixture(scope="module")
@@ -94,23 +149,82 @@ def testCurrentTet4LaserPumpGeometryConvertsBackToLegacyWedgeOrder(
     assert "betaVolume" in cell_data
 
 
+def testLaserPumpCladdingTet4MediumAssignsLegacySlabSurfaceOptics():
+    medium = laserPumpCladding.laserPumpCladdingMedium()
+    topology = medium.topology
+    boundaries = np.asarray(topology.faceBoundaries, dtype=np.int32)
+    points = np.asarray(topology.points, dtype=np.float64)
+    face_nodes = np.asarray(topology.facePointIndices, dtype=np.uint32)
+    face_z = points[:, 2][face_nodes]
+
+    bottom_id = laserPumpCladding.BOTTOM_ASE_SURFACE_ID
+    top_id = laserPumpCladding.TOP_ASE_SURFACE_ID
+
+    assert topology.surfaceDomainNames == {bottom_id: "ase_bottom", top_id: "ase_top"}
+    assert np.count_nonzero(boundaries == bottom_id) > 0
+    assert np.count_nonzero(boundaries == top_id) > 0
+    np.testing.assert_allclose(face_z[boundaries == bottom_id], np.min(points[:, 2]), rtol=0.0, atol=1.0e-12)
+    np.testing.assert_allclose(face_z[boundaries == top_id], np.max(points[:, 2]), rtol=0.0, atol=1.0e-12)
+
+    surface_reflectivity = np.asarray(medium.get("surfaceReflectivity").value, dtype=np.float32)
+    surface_inside = np.asarray(medium.get("surfaceRefractiveIndexInside").value, dtype=np.float32)
+    surface_outside = np.asarray(medium.get("surfaceRefractiveIndexOutside").value, dtype=np.float32)
+
+    assert surface_reflectivity.shape == (top_id + 1,)
+    np.testing.assert_array_equal(surface_reflectivity[[bottom_id, top_id]], np.asarray([0.0, 0.0], dtype=np.float32))
+    np.testing.assert_array_equal(surface_inside[[bottom_id, top_id]], np.asarray([1.83, 1.83], dtype=np.float32))
+    np.testing.assert_array_equal(surface_outside[[bottom_id, top_id]], np.asarray([1.0, 1.0], dtype=np.float32))
+
+
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason=(
-        "Current forward Tet4 PhiASE is spatially sparse relative to the "
-        "legacy upstream/master wedge reference; keep this as the executable "
-        "pointwise comparison until the physics discrepancy is resolved."
-    ),
-    strict=False,
-)
-def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferencePointwise(
+def testLaserPumpCladdingRunExampleReflectionToggleChangesVolumePhiAse(
+    monkeypatch,
+    tmp_path,
+    alpakaRuntimeBackend,
+    openPmdRuntimeBackend,
+):
+    monkeypatch.setattr(laserPumpCladding, "writeVtkFields", lambda *args, **kwargs: None)
+
+    def run(use_reflections):
+        state = laserPumpCladding.runExample(
+            backend=alpakaRuntimeBackend,
+            openpmdBackend=openPmdRuntimeBackend,
+            timeSlices=2,
+            pumpSteps=1,
+            vtkOutputDir=tmp_path / f"reflections_{int(use_reflections)}",
+            enableASE=True,
+            prePump=True,
+            rngSeed=1234,
+            useReflections=use_reflections,
+            minRaysPerSample=256,
+            maxRaysPerSample=256,
+            adaptiveSteps=1,
+            mseThreshold=1.0,
+            forwardRayLength=1.0,
+            reflectionMaxIterations=4,
+            reflectionTolerance=0.0,
+            surfaceReservoirSize=32,
+        )
+        return np.asarray(state.volumePhiAse, dtype=np.float64).reshape(-1)
+
+    without_reflections = run(False)
+    with_reflections = run(True)
+
+    assert without_reflections.shape == with_reflections.shape
+    assert np.count_nonzero(with_reflections) > 0
+    assert not np.array_equal(with_reflections, without_reflections)
+    assert float(np.sum(with_reflections)) > float(np.sum(without_reflections))
+
+
+@pytest.mark.integration
+def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
     laserPumpCladdingReference,
     openPmdRuntimeBackend,
     tmp_path,
 ):
     metadata = laserPumpCladdingReference["metadata"]
     backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", metadata["parameters"]["backend"])
-    rtol = float(os.environ.get("HASE_LASERPUMP_POINTWISE_RTOL", str(POINTWISE_RTOL)))
+    rtol = float(os.environ.get("HASE_LASERPUMP_INTEGRAL_RTOL", str(INTEGRAL_RTOL)))
     tet4_dir = tmp_path / "current_tet4"
     wedge_dir = tmp_path / "current_wedge"
     tet4_dir.mkdir()
@@ -123,27 +237,33 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferencePointwise(
         pumpSteps=metadata["parameters"]["pumpSteps"],
         vtkOutputDir=tet4_dir,
         enableASE=True,
+        prePump=metadata["parameters"]["prePump"],
         rngSeed=metadata["random"]["rngSeed"],
-        useReflections=False,
+        useReflections=metadata["parameters"]["useReflections"],
         minRaysPerSample=metadata["parameters"]["minRaysPerSample"],
         maxRaysPerSample=metadata["parameters"]["maxRaysPerSample"],
         mseThreshold=metadata["parameters"]["mseThreshold"],
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
     )
 
-    observed = []
+    observed_integrals = []
     for step in metadata["observable"]["stepNumbers"]:
         tet4_path = tet4_dir / f"laserPumpCladding_{step:03d}.vtk"
+        tet4_points, tet4_cells, _tet4_cell_types, _tet4_point_data, tet4_cell_data, _tet4_fields = _parseVtk(tet4_path)
+        observed_integrals.append(_tet_cell_integral(tet4_points, tet4_cells, tet4_cell_data["volumePhiASE"]))
         wedge_path = convertVtk(
             tet4_path,
             wedge_dir / tet4_path.name,
             direction="tet4-to-wedge",
         )
-        points, cells, cell_types, point_data, _cell_data, _fields = _parseVtk(wedge_path)
+        points, cells, cell_types, _point_data, _cell_data, _fields = _parseVtk(wedge_path)
         np.testing.assert_allclose(points, laserPumpCladdingReference["points"], rtol=0.0, atol=0.0)
         np.testing.assert_array_equal(np.asarray(cells, dtype=np.uint32), laserPumpCladdingReference["cells"])
         np.testing.assert_array_equal(np.asarray(cell_types, dtype=np.uint32), laserPumpCladdingReference["cellTypes"])
-        observed.append(np.asarray(point_data["phiASE"], dtype=np.float64).reshape(-1))
 
-    observed = np.vstack(observed)
-    np.testing.assert_allclose(observed, laserPumpCladdingReference["phiASE"], rtol=rtol, atol=0.0)
+    reference_integrals = _wedge_point_integrals(
+        laserPumpCladdingReference["points"],
+        laserPumpCladdingReference["cells"],
+        laserPumpCladdingReference["phiASE"],
+    )
+    np.testing.assert_allclose(np.asarray(observed_integrals), reference_integrals, rtol=rtol, atol=0.0)

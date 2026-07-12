@@ -180,9 +180,9 @@ Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
 ``min_sample_range``, ``max_sample_range``, and ``rng_seed``.
 
-Loading YAML requires ``PyYAML``. The package installation installs this
-dependency from ``pyproject.toml``; source-tree usage must provide it in the
-Python environment.
+Loading YAML requires ``PyYAML``. Package installation installs that
+dependency; the openPMD Python bindings come from the runtime provider selected
+at build time. Source-tree usage must provide both in the Python environment.
 
 For command-line tools:
 
