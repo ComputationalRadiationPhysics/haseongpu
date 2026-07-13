@@ -1,7 +1,7 @@
 experiment:
   minRaysPerSample: 1000
   maxRaysPerSample: 10000
-  mseThreshold: 0.1
+  relativeStandardErrorThreshold: 0.1
   adaptiveSteps: 3
   useReflections: false
   monochromatic: false

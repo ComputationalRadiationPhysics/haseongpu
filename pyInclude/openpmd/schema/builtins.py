@@ -32,7 +32,12 @@ SIMULATION_ATTRIBUTE_SPECS = (
     ExtensionAttributeSpec("maxRaysPerSample", "max_rays_per_sample", "int", unit="count", unitDimension=unitDimension.maxRaysPerSample),
     ExtensionAttributeSpec("propagationMode", "propagation_mode", "str", unitDimension=unitDimension.propagationMode),
     ExtensionAttributeSpec("forwardRayCount", "forward_ray_count", "int", unit="count", unitDimension=unitDimension.forwardRayCount),
-    ExtensionAttributeSpec("mseThreshold", "mse_threshold", "float", unitDimension=unitDimension.mseThreshold),
+    ExtensionAttributeSpec(
+        "relativeStandardErrorThreshold",
+        "relative_standard_error_threshold",
+        "float",
+        unitDimension=unitDimension.relativeStandardErrorThreshold,
+    ),
     ExtensionAttributeSpec("repetitions", "repetitions", "int", unit="count", unitDimension=unitDimension.repetitions),
     ExtensionAttributeSpec("adaptiveSteps", "adaptive_steps", "int", unit="count", unitDimension=unitDimension.adaptiveSteps),
     ExtensionAttributeSpec("useReflections", "use_reflections", "bool", unitDimension=unitDimension.useReflections),
@@ -93,8 +98,27 @@ class PointSchema(PrimitiveSchemaDefinition):
         backendRequired=False,
         schemaRole="result",
     )
-    mse = PrimitiveFieldSpec(
-        "mse", np.float64, axes=("point", "level"), unitDimension=unitDimension.mse, dynamic=True, backendRequired=False, schemaRole="result"
+    standardError = PrimitiveFieldSpec(
+        "standardError",
+        "standard_error",
+        np.float64,
+        axes=("point", "level"),
+        unit="cm^-2 s^-1",
+        unitSI=1.0e4,
+        unitDimension=unitDimension.standardError,
+        dynamic=True,
+        backendRequired=False,
+        schemaRole="result",
+    )
+    relativeStandardError = PrimitiveFieldSpec(
+        "relativeStandardError",
+        "relative_standard_error",
+        np.float64,
+        axes=("point", "level"),
+        unitDimension=unitDimension.relativeStandardError,
+        dynamic=True,
+        backendRequired=False,
+        schemaRole="result",
     )
     totalRays = PrimitiveFieldSpec(
         "totalRays",

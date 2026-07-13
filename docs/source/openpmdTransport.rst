@@ -149,9 +149,11 @@ Main input field records are:
 * ``core_lambda_absorption``, ``core_lambda_emission``,
   ``core_sigma_absorption``, and ``core_sigma_emission`` for spectra
 
-The backend writes result records named ``core_result_phi_ase``,
-``core_result_mse``, ``core_result_total_rays``, and
-``core_result_dndt_ase``.
+The C++ backend writes result records under ``core_result_``:
+``phi_ase``, ``standard_error``, ``relative_standard_error``, ``total_rays``,
+and ``dndt_ase``. ``standard_error`` has the same flux unit as ``phi_ase``;
+``relative_standard_error`` is dimensionless. Result records use record-C
+layout.
 
 Custom fields declared with ``GainMedium.defineField(...)`` or
 ``PrimitiveFieldSpec`` are serialized as additional openPMD mesh records with
@@ -187,7 +189,8 @@ metadata:
 
 The C++ backend writes one output iteration per completed step. Snapshot
 iterations contain dynamic beta records plus ``core_result_phi_ase``,
-``core_result_mse``, ``core_result_total_rays``, ``core_result_dndt_ase``, and
+``core_result_standard_error``, ``core_result_relative_standard_error``,
+``core_result_total_rays``, ``core_result_dndt_ase``, and
 ``core_result_dndt_pump``. The first snapshot also includes the static canonical
 mesh/material/spectral records.
 

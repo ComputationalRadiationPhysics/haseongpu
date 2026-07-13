@@ -119,7 +119,7 @@ def test_schemaFieldsAreDerivedFromPrimitiveSchemas():
     assert {"connectivity", "center", "normal", "surface", "claddingGroup"} <= triangle_names
     assert {"cellCenterX", "cellCenterY", "cellNormalX", "cellNormalY", "claddingCellType"}.isdisjoint(triangle_names)
     assert "betaVolume" in prism_names
-    assert {"position", "phiAse", "mse", "totalRays", "dndtAse"} <= point_names
+    assert {"position", "phiAse", "standardError", "relativeStandardError", "totalRays", "dndtAse"} <= point_names
     assert schemaFields["betaVolume"] in primitiveFieldSpecs("prism")
 
 

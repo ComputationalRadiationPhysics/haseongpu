@@ -43,11 +43,8 @@ namespace hase::core
         using T_UnsignedBuffer
             = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
         using T_CharBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<char>(std::declval<T_Device&>(), std::size_t{1}));
-        using T_Accumulation = hase::kernels::forward::ForwardAccumulationSpans<
-            T_DoubleBuffer,
-            T_DoubleBuffer,
-            T_UnsignedBuffer,
-            T_UnsignedBuffer>;
+        using T_Accumulation = hase::kernels::forward::
+            ForwardAccumulationSpans<T_DoubleBuffer, T_DoubleBuffer, T_UnsignedBuffer, T_UnsignedBuffer>;
         using T_Spectrum = hase::kernels::forward::ForwardSpectrumSpans<T_DoubleBuffer, T_DoubleBuffer>;
         using T_Reservoir = hase::kernels::forward::SurfaceReservoirSpans<
             T_UnsignedBuffer,
@@ -57,10 +54,8 @@ namespace hase::core
             T_DoubleBuffer,
             T_UnsignedBuffer,
             T_DoubleBuffer>;
-        using T_SamplingCdf = hase::kernels::forward::SurfaceReservoirSamplingCdfSpans<
-            T_DoubleBuffer,
-            T_DoubleBuffer,
-            T_UnsignedBuffer>;
+        using T_SamplingCdf = hase::kernels::forward::
+            SurfaceReservoirSamplingCdfSpans<T_DoubleBuffer, T_DoubleBuffer, T_UnsignedBuffer>;
 
     public:
         ForwardSrmDeviceState(
@@ -103,10 +98,8 @@ namespace hase::core
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(reservoirSlots())))
             , m_sigmaIndicesB(
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(reservoirSlots())))
-            , m_faceWeightsA(
-                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
-            , m_faceWeightsB(
-                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
+            , m_faceWeightsA(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
+            , m_faceWeightsB(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
             , m_samplingCdf(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
             , m_samplingTotalWeight(alpaka::onHost::alloc<double>(m_devBundle.device, std::size_t{1}))
             , m_systematicOffset(alpaka::onHost::alloc<double>(m_devBundle.device, std::size_t{1}))
@@ -116,41 +109,19 @@ namespace hase::core
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
             , m_stratifiedRayFaces(
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(m_rayCount)))
-            , m_samplingCdfScanBuffer(alpaka::onHost::alloc<char>(
-                  m_devBundle.device,
-                  alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{static_cast<std::size_t>(faceCount())})))
-            , m_stratifiedCountScanBuffer(alpaka::onHost::alloc<char>(
-                  m_devBundle.device,
-                  alpaka::onHost::getScanBufferSize<unsigned>(alpaka::Vec{static_cast<std::size_t>(faceCount())})))
-            , m_reservoirA{
-                  m_countsA,
-                  m_dirXA,
-                  m_dirYA,
-                  m_dirZA,
-                  m_weightsA,
-                  m_sigmaIndicesA,
-                  m_faceWeightsA,
-                  m_slotsPerFace}
-            , m_reservoirB{
-                  m_countsB,
-                  m_dirXB,
-                  m_dirYB,
-                  m_dirZB,
-                  m_weightsB,
-                  m_sigmaIndicesB,
-                  m_faceWeightsB,
-                  m_slotsPerFace}
-            , m_samplingCdfSpans{
-                  m_samplingCdf,
-                  m_samplingTotalWeight,
-                  m_stratifiedRayFaces,
-                  faceCount() <= m_rayCount}
+            , m_samplingCdfScanBuffer(
+                  alpaka::onHost::alloc<char>(
+                      m_devBundle.device,
+                      alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{static_cast<std::size_t>(faceCount())})))
+            , m_stratifiedCountScanBuffer(
+                  alpaka::onHost::alloc<char>(
+                      m_devBundle.device,
+                      alpaka::onHost::getScanBufferSize<unsigned>(alpaka::Vec{static_cast<std::size_t>(faceCount())})))
+            , m_reservoirA{m_countsA, m_dirXA, m_dirYA, m_dirZA, m_weightsA, m_sigmaIndicesA, m_faceWeightsA, m_slotsPerFace}
+            , m_reservoirB{m_countsB, m_dirXB, m_dirYB, m_dirZB, m_weightsB, m_sigmaIndicesB, m_faceWeightsB, m_slotsPerFace}
+            , m_samplingCdfSpans{m_samplingCdf, m_samplingTotalWeight, m_stratifiedRayFaces, faceCount() <= m_rayCount}
         {
-            alpaka::onHost::fill(
-                m_queue,
-                m_phi,
-                0.0,
-                alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
+            alpaka::onHost::fill(m_queue, m_phi, 0.0, alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
             alpaka::onHost::fill(
                 m_queue,
                 m_phiSquare,
@@ -270,10 +241,8 @@ namespace hase::core
                 m_devBundle.device,
                 m_devBundle.executor,
                 alpaka::Vec{faceCount()});
-            auto const scalarFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-                m_devBundle.device,
-                m_devBundle.executor,
-                alpaka::Vec{1u});
+            auto const scalarFrameSpec
+                = hase::alpakaUtils::getFrameSpec<uint32_t>(m_devBundle.device, m_devBundle.executor, alpaka::Vec{1u});
             alpaka::onHost::inclusiveScan(
                 m_queue,
                 m_devBundle.executor,
@@ -334,11 +303,7 @@ namespace hase::core
 
         void clearReservoir(T_Reservoir& reservoir)
         {
-            alpaka::onHost::fill(
-                m_queue,
-                reservoir.counts,
-                0u,
-                alpaka::Vec{static_cast<std::size_t>(faceCount())});
+            alpaka::onHost::fill(m_queue, reservoir.counts, 0u, alpaka::Vec{static_cast<std::size_t>(faceCount())});
             alpaka::onHost::fill(
                 m_queue,
                 reservoir.faceWeights,

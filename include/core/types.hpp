@@ -66,7 +66,7 @@ namespace hase::core
         static inline std::string const output_path = "output-path";
         static inline std::string const min_rays = "min-rays";
         static inline std::string const max_rays = "max-rays";
-        static inline std::string const mse = "mse-threshold";
+        static inline std::string const relativeStandardError = "relative-standard-error-threshold";
         static inline std::string const reflection = "reflection";
         static inline std::string const spectral = "spectral-resolution";
         static inline std::string const monochromatic = "monochromatic";
@@ -202,7 +202,8 @@ namespace hase::core
 
         Result(
             std::vector<float> phiAse,
-            std::vector<double> mse,
+            std::vector<double> standardError,
+            std::vector<double> relativeStandardError,
             std::vector<unsigned> totalRays,
             std::vector<double> dndtAse,
             std::vector<unsigned> droppedRays = {},
@@ -212,7 +213,8 @@ namespace hase::core
             unsigned srmMaxIterations = 0u,
             unsigned srmDivergenceStreak = 0u)
             : phiAse(std::move(phiAse))
-            , mse(std::move(mse))
+            , standardError(std::move(standardError))
+            , relativeStandardError(std::move(relativeStandardError))
             , totalRays(std::move(totalRays))
             , dndtAse(std::move(dndtAse))
             , droppedRays(std::move(droppedRays))
@@ -227,7 +229,8 @@ namespace hase::core
         }
 
         std::vector<float> phiAse;
-        std::vector<double> mse;
+        std::vector<double> standardError;
+        std::vector<double> relativeStandardError;
         std::vector<unsigned> totalRays;
         std::vector<double> dndtAse;
         std::vector<unsigned> droppedRays;
@@ -253,7 +256,7 @@ namespace hase::core
             std::vector<double> sigmaE,
             double maxSigmaA,
             double maxSigmaE,
-            double mseThreshold,
+            double relativeStandardErrorThreshold,
             bool useReflections,
             unsigned spectral,
             bool monochromatic = false)
@@ -265,7 +268,7 @@ namespace hase::core
             , sigmaE(std::move(sigmaE))
             , maxSigmaA(maxSigmaA)
             , maxSigmaE(maxSigmaE)
-            , mseThreshold(mseThreshold)
+            , relativeStandardErrorThreshold(relativeStandardErrorThreshold)
             , useReflections(useReflections)
             , monochromatic(monochromatic)
             , spectral(spectral)
@@ -279,7 +282,7 @@ namespace hase::core
             std::vector<double> sigmaE,
             double maxSigmaA,
             double maxSigmaE,
-            double mseThreshold,
+            double relativeStandardErrorThreshold,
             bool useReflections,
             bool monochromatic = false)
             : minRaysPerSample(minRaysPerSample)
@@ -288,7 +291,7 @@ namespace hase::core
             , sigmaE(std::move(sigmaE))
             , maxSigmaA(maxSigmaA)
             , maxSigmaE(maxSigmaE)
-            , mseThreshold(mseThreshold)
+            , relativeStandardErrorThreshold(relativeStandardErrorThreshold)
             , useReflections(useReflections)
             , monochromatic(monochromatic)
         {
@@ -314,7 +317,7 @@ namespace hase::core
         std::vector<double> sigmaE;
         double maxSigmaA;
         double maxSigmaE;
-        double mseThreshold;
+        double relativeStandardErrorThreshold;
         bool useReflections;
         bool monochromatic = false;
         unsigned spectral;

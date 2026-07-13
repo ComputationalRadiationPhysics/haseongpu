@@ -211,7 +211,7 @@ material arrays, spectra, and pump setup in Python:
    phiASE:
      min_rays_per_sample: 100000
      max_rays_per_sample: 1000000
-     mse_threshold: 0.05
+     relative_standard_error_threshold: 0.05
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true

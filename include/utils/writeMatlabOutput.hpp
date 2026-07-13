@@ -31,7 +31,7 @@
  * @param experimentPath the path where to create the output files
  * @param ase the phi_ASE values to print
  * @param N_rays the number of rays used per sample point
- * @param mse_values the error for each sample point
+ * @param standard_error_values the absolute standard error for each sample point
  * @param numberOfSamples the amount of sampled points in the mesh
  * @param columnCount output column count for reshape-style post-processing
  *
@@ -47,7 +47,7 @@ namespace hase::utils
         std::filesystem::path const experimentPath,
         std::vector<float> const ase,
         std::vector<unsigned> const N_rays,
-        std::vector<double> const mse_values,
+        std::vector<double> const standard_error_values,
         unsigned const numberOfSamples,
         unsigned const columnCount);
 } // namespace hase::utils

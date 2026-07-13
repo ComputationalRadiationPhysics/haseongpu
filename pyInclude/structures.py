@@ -7,7 +7,8 @@ from typing import Sequence
 @dataclass
 class Result:
     phiAse: Sequence[float] = field(default_factory=list)
-    mse: Sequence[float] = field(default_factory=list)
+    standardError: Sequence[float] = field(default_factory=list)
+    relativeStandardError: Sequence[float] = field(default_factory=list)
     totalRays: Sequence[int] = field(default_factory=list)
     dndtAse: Sequence[float] = field(default_factory=list)
     srmStatus: str = "disabled"

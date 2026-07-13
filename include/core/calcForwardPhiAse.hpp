@@ -31,6 +31,8 @@ namespace hase::core
 
     void mergeForwardRawResult(ForwardPhiAseRawResult& target, ForwardPhiAseRawResult const& source);
 
+    [[nodiscard]] double calcForwardRelativeStandardError(double scoreSum, double scoreSquareSum, unsigned rayCount);
+
     [[nodiscard]] double calcForwardStandardError(
         double scoreSum,
         double scoreSquareSum,
@@ -38,10 +40,7 @@ namespace hase::core
         double normalizationVolume,
         double volumeSize);
 
-    void finalizeForwardPhiAse(
-        HostMesh const& hostMesh,
-        ForwardPhiAseRawResult const& rawResult,
-        Result& result);
+    void finalizeForwardPhiAse(HostMesh const& hostMesh, ForwardPhiAseRawResult const& rawResult, Result& result);
 
     template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
     float calcForwardPhiAseRaw(
@@ -80,7 +79,8 @@ namespace hase::core
         alpaka::concepts::IBuffer auto dPhiAccumulator = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
         alpaka::concepts::IBuffer auto dPhiSquareAccumulator
             = alpaka::onHost::alloc<double>(devBundle.device, volumeCount);
-        alpaka::concepts::IBuffer auto dVolumeRayVisits = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
+        alpaka::concepts::IBuffer auto dVolumeRayVisits
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
         alpaka::concepts::IBuffer auto dDroppedRays = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
         alpaka::concepts::IBuffer auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
         alpaka::concepts::IBuffer auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);

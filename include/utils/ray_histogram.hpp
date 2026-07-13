@@ -30,8 +30,8 @@ namespace hase::utils
     void ray_histogram(
         std::vector<unsigned> const totalRays,
         unsigned const max,
-        double const mseThreshold,
-        std::vector<double> const mseValues,
+        double const relativeStandardErrorThreshold,
+        std::vector<double> const relativeStandardErrors,
         std::vector<unsigned> const droppedRays);
 
 } // namespace hase::utils

@@ -37,7 +37,8 @@ namespace
         constexpr char const* propagationMode = "propagation_mode";
         constexpr char const* forwardRayCount = "forward_ray_count";
         constexpr char const* retiredForwardRayLength = "forward_ray_length";
-        constexpr char const* mseThreshold = "mse_threshold";
+        constexpr char const* relativeStandardErrorThreshold = "relative_standard_error_threshold";
+        constexpr char const* retiredMseThreshold = "mse_threshold";
         constexpr char const* useReflections = "use_reflections";
         constexpr char const* reflectionMaxIterations = "reflection_max_iterations";
         constexpr char const* reflectionTolerance = "reflection_tolerance";
@@ -533,6 +534,7 @@ namespace
         result = hase::core::Result(
             std::vector<float>(resultSize, 0.0f),
             std::vector<double>(resultSize, 100000.0),
+            std::vector<double>(resultSize, 0.0),
             std::vector<unsigned>(resultSize, 0u),
             std::vector<double>(resultSize, 0.0));
     }
@@ -871,7 +873,10 @@ namespace hase::openpmd
             iteration,
             field::maxRaysPerSample,
             simulation.experiment.maxRaysPerSample);
-        validateUnchangedAttribute<double>(iteration, field::mseThreshold, simulation.experiment.mseThreshold);
+        validateUnchangedAttribute<double>(
+            iteration,
+            field::relativeStandardErrorThreshold,
+            simulation.experiment.relativeStandardErrorThreshold);
         validateUnchangedAttribute<bool>(iteration, field::useReflections, simulation.experiment.useReflections);
         validateUnchangedAttribute<unsigned>(
             iteration,
@@ -1101,6 +1106,13 @@ namespace hase::openpmd
             thickness,
             samplePointsAreMeshPoints);
 
+        if(iteration.containsAttribute(field::retiredMseThreshold))
+        {
+            validationError(
+                field::retiredMseThreshold,
+                "is retired; configure relative_standard_error_threshold instead");
+        }
+
         core::ExperimentParameters experiment(
             attribute<unsigned>(iteration, field::minRaysPerSample),
             attribute<unsigned>(iteration, field::maxRaysPerSample),
@@ -1146,7 +1158,7 @@ namespace hase::openpmd
                 "cm^2"),
             0.0,
             0.0,
-            attribute<double>(iteration, field::mseThreshold),
+            attribute<double>(iteration, field::relativeStandardErrorThreshold),
             attribute<bool>(iteration, field::useReflections),
             attribute<unsigned>(iteration, field::spectralResolution),
             attributeOr<bool>(iteration, field::monochromatic, false));
@@ -1286,7 +1298,8 @@ namespace hase::openpmd
 
         std::string const prefix = m_meshGroup + "_result_";
         auto phiAse = result.phiAse;
-        auto mse = result.mse;
+        auto standardError = result.standardError;
+        auto relativeStandardError = result.relativeStandardError;
         auto totalRays = result.totalRays;
         auto dndtAse = result.dndtAse;
         writeScalar(
@@ -1301,8 +1314,18 @@ namespace hase::openpmd
             resultEntity);
         writeScalar(
             iteration,
-            prefix + "mse",
-            mse,
+            prefix + "standard_error",
+            standardError,
+            extent,
+            resultAxes,
+            "cm^-2 s^-1",
+            1.0e4,
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0},
+            resultEntity);
+        writeScalar(
+            iteration,
+            prefix + "relative_standard_error",
+            relativeStandardError,
             extent,
             resultAxes,
             "1",
@@ -1524,8 +1547,17 @@ namespace hase::openpmd
             {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
         writeScalar(
             iteration,
-            resultPrefix + "mse",
-            snapshot.aseResult.mse,
+            resultPrefix + "standard_error",
+            snapshot.aseResult.standardError,
+            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {"point", "level"},
+            "cm^-2 s^-1",
+            1.0e4,
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            resultPrefix + "relative_standard_error",
+            snapshot.aseResult.relativeStandardError,
             io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
             {"point", "level"});
         writeScalar(
@@ -1555,8 +1587,17 @@ namespace hase::openpmd
             {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
         writeScalar(
             iteration,
-            resultPrefix + "volume_mse",
-            snapshot.volumeAseResult.mse,
+            resultPrefix + "volume_standard_error",
+            snapshot.volumeAseResult.standardError,
+            io::Extent{snapshot.mesh.numberOfCells},
+            {"cell"},
+            "cm^-2 s^-1",
+            1.0e4,
+            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        writeScalar(
+            iteration,
+            resultPrefix + "volume_relative_standard_error",
+            snapshot.volumeAseResult.relativeStandardError,
             io::Extent{snapshot.mesh.numberOfCells},
             {"cell"});
         writeScalar(

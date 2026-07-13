@@ -52,11 +52,8 @@ namespace hase::core
         unsigned const threadLocalStridingRNG,
         SrmControls const srmControls)
     {
-        auto accumulationSpans = hase::kernels::forward::ForwardAccumulationSpans{
-            phi,
-            phiSquare,
-            volumeRayVisits,
-            droppedRays};
+        auto accumulationSpans
+            = hase::kernels::forward::ForwardAccumulationSpans{phi, phiSquare, volumeRayVisits, droppedRays};
         auto spectrumSpans = hase::kernels::forward::ForwardSpectrumSpans{sigmaA, sigmaE, lambdaResolution};
         unsigned const faceCount = mesh.numberOfCells * mesh.numberOfFacesPerCell;
         unsigned const reservoirSlots = faceCount * experiment.surfaceReservoirSize;
@@ -70,16 +67,21 @@ namespace hase::core
         alpaka::concepts::IBuffer auto dirZB = alpaka::onHost::alloc<double>(devBundle.device, reservoirSlots);
         alpaka::concepts::IBuffer auto weightsA = alpaka::onHost::alloc<double>(devBundle.device, reservoirSlots);
         alpaka::concepts::IBuffer auto weightsB = alpaka::onHost::alloc<double>(devBundle.device, reservoirSlots);
-        alpaka::concepts::IBuffer auto sigmaIndicesA = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
-        alpaka::concepts::IBuffer auto sigmaIndicesB = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
+        alpaka::concepts::IBuffer auto sigmaIndicesA
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
+        alpaka::concepts::IBuffer auto sigmaIndicesB
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
         alpaka::concepts::IBuffer auto faceWeightsA = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
         alpaka::concepts::IBuffer auto faceWeightsB = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
         alpaka::concepts::IBuffer auto samplingCdf = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
         alpaka::concepts::IBuffer auto samplingTotalWeight = alpaka::onHost::alloc<double>(devBundle.device, 1u);
         alpaka::concepts::IBuffer auto systematicOffset = alpaka::onHost::alloc<double>(devBundle.device, 1u);
-        alpaka::concepts::IBuffer auto stratifiedRayCounts = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
-        alpaka::concepts::IBuffer auto stratifiedRayOffsets = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
-        alpaka::concepts::IBuffer auto stratifiedRayFaces = alpaka::onHost::alloc<unsigned>(devBundle.device, rayCount);
+        alpaka::concepts::IBuffer auto stratifiedRayCounts
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
+        alpaka::concepts::IBuffer auto stratifiedRayOffsets
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
+        alpaka::concepts::IBuffer auto stratifiedRayFaces
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, rayCount);
         alpaka::concepts::IBuffer auto samplingCdfScanBuffer = alpaka::onHost::alloc<char>(
             devBundle.device,
             alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{faceCount}));
@@ -142,14 +144,10 @@ namespace hase::core
             devBundle.executor,
             alpaka::Vec{static_cast<unsigned int>(rayCount)});
         bool inputA = true;
-        auto const faceFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-            devBundle.device,
-            devBundle.executor,
-            alpaka::Vec{faceCount});
-        auto const scalarFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-            devBundle.device,
-            devBundle.executor,
-            alpaka::Vec{1u});
+        auto const faceFrameSpec
+            = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{faceCount});
+        auto const scalarFrameSpec
+            = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{1u});
         auto samplingTotalWeightHost = alpaka::onHost::allocHostLike(samplingTotalWeight);
         auto updateSamplingCdf = [&](auto const& reservoir, unsigned const seed)
         {

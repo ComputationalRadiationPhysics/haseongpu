@@ -15,7 +15,8 @@ import pyInclude.simulation as simulation_module
 
 class DummyResult:
     phiAse = [1.0]
-    mse = [0.0]
+    standardError = [0.0]
+    relativeStandardError = [0.0]
     totalRays = [4]
     dndtAse = [0.0]
 
@@ -96,6 +97,11 @@ def testPhiAseLoadsOpenPmdBackendFromConfig():
     assert PhiASE().openpmdBackend == "auto"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
     assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
+
+
+def testPhiAseRejectsRetiredMseThreshold():
+    with pytest.raises(ValueError, match="relative_standard_error_threshold"):
+        PhiASE({"experiment": {"mse_threshold": 0.1}})
 
 
 def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
