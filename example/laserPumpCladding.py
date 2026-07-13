@@ -157,11 +157,54 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
 BOTTOM_ASE_SURFACE_ID = 1
 TOP_ASE_SURFACE_ID = 2
 CLADDING_SURFACE_ID = 3
+NUMBER_OF_Z_LAYERS = 10
+
+
+def _assignLegacyTet4SurfaceDomains(topology):
+    """Attach the legacy optical regions to its geometrically identical Tet4 mesh."""
+    sample_points = np.asarray(topology.samplePoints, dtype=np.float64).copy()
+    points = np.asarray(topology.points, dtype=np.float64)
+    exterior = topology.neighborCells < 0
+    z = points[:, 2]
+    face_z = z[np.asarray(topology.facePointIndices, dtype=np.uint32)]
+    bottom = exterior & np.all(np.isclose(face_z, np.min(z)), axis=2)
+    top = exterior & np.all(np.isclose(face_z, np.max(z)), axis=2)
+    side = exterior & ~bottom & ~top
+    if not (np.any(bottom) and np.any(top) and np.any(side)):
+        raise ValueError(
+            "ptTet4.vtk must contain bottom, top, and cladding exterior faces"
+        )
+
+    topology = topology.withCellDomains(
+        domain=1,
+        name="gain_medium",
+        where="all",
+    ).withSurfaceDomains(
+        [
+            {
+                "domain": BOTTOM_ASE_SURFACE_ID,
+                "name": "ase_bottom",
+                "faceIndices": np.argwhere(bottom),
+            },
+            {
+                "domain": TOP_ASE_SURFACE_ID,
+                "name": "ase_top",
+                "faceIndices": np.argwhere(top),
+            },
+            {
+                "domain": CLADDING_SURFACE_ID,
+                "name": "cladding",
+                "faceIndices": np.argwhere(side),
+            },
+        ]
+    )
+    topology.samplePoints = sample_points
+    return topology
 
 
 def laserPumpCladdingMedium(cladAbsorption=5.5):
-    materialPath = scriptDir / "data" / "laserPumpCladding.msh"
-    topology = VolumeTopology.fromFile(materialPath)
+    materialPath = scriptDir / "data" / "ptTet4.vtk"
+    topology = _assignLegacyTet4SurfaceDomains(VolumeTopology.fromVtk(materialPath))
     refractiveIndices = np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32)
     return GainMedium(topology=topology).withPhysicalProperties(
         betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
@@ -218,7 +261,6 @@ def runExample(
     absorption=5.5
     medium = laserPumpCladdingMedium(cladAbsorption=absorption)
 
-    AseOverride.setdefault("forwardRayLength", 1.0)
     phiAse = PhiASE.fromYaml(
         phiAseConfigPath,
         spectralProperties=spectralProperties,
@@ -312,7 +354,7 @@ def main(argv=None):
     parser.add_argument(
         "--disable-reflections",
         action="store_true",
-        help="Disable ASE surface reflections; required by the current forward Tet4 backend.",
+        help="Disable ASE surface reflections.",
     )
     args = parser.parse_args(argv)
 
@@ -330,7 +372,6 @@ def main(argv=None):
         if args.tet4_input is None:
             parser.error("--phiase-only requires --tet4-input")
         aseOverrides.setdefault("propagationMode", "forward")
-        aseOverrides.setdefault("forwardRayLength", 1.0)
         result = runTet4PhiAseInput(
             args.tet4_input,
             args.phi_ase_config,

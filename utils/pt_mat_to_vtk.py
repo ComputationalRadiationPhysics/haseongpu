@@ -108,7 +108,7 @@ def convert(repo_root: Path = REPO_ROOT, output_dir: Path | None = None) -> list
 
     inputs = repo_root / "example" / "c_example" / "input"
     outputs = [
-        (_pt_mat_medium(repo_root / "example" / "python_example" / "legacy" / "pt.mat"), output_dir / "pt.vtk"),
+        (_pt_mat_medium(repo_root / "example" / "python_example" / "legacy" / "pt.mat"), output_dir / "ptTet4.vtk"),
         (_text_medium(inputs / "cuboid"), output_dir / "cuboid.vtk"),
         (_text_medium(inputs / "cylindrical"), output_dir / "cylindrical.vtk"),
     ]

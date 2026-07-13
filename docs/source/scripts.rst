@@ -8,8 +8,10 @@ Small-Signal Gain Plot
 ----------------------
 
 ``scripts/plot_ssg.py`` reads ``laserPumpCladding_*.vtk`` files, integrates a
-point-data scalar field along one coordinate direction, and writes a CSV plus a
-PNG plot of the resulting net gain factor over time.
+point-data scalar field along one coordinate direction, or follows that line
+through Tet4 cells and integrates a cell-data scalar along its tetrahedron
+chords. It writes a CSV plus a PNG plot of the resulting net gain factor over
+time.
 
 For the default ``laserPumpCladding.py`` output, run for example:
 

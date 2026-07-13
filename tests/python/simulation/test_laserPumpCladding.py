@@ -73,6 +73,15 @@ def _tet_volume(points, cell):
     return abs(float(np.dot(b - a, np.cross(c - a, d - a)))) / 6.0
 
 
+def _tet_cell_integral(points, cells, values):
+    values = np.asarray(values, dtype=np.float64).reshape(-1)
+    cells = np.asarray(cells, dtype=np.uint32)
+    volumes = np.asarray([_tet_volume(points, cell) for cell in cells], dtype=np.float64)
+    if values.shape != volumes.shape:
+        raise ValueError(f"Tet4 field has {values.size} values for {volumes.size} cells")
+    return float(np.sum(values * volumes))
+
+
 def _wedge_point_integrals(points, cells, phi_by_step):
     points = np.asarray(points, dtype=np.float64)
     cells = np.asarray(cells, dtype=np.uint32)
@@ -82,15 +91,6 @@ def _wedge_point_integrals(points, cells, phi_by_step):
         cell_values = phi[cells].mean(axis=1)
         result.append(float(np.sum(cell_values * volumes)))
     return np.asarray(result, dtype=np.float64)
-
-
-def _tet_cell_integral(points, cells, values):
-    values = np.asarray(values, dtype=np.float64).reshape(-1)
-    cells = np.asarray(cells, dtype=np.uint32)
-    volumes = np.asarray([_tet_volume(points, cell) for cell in cells], dtype=np.float64)
-    if values.shape != volumes.shape:
-        raise ValueError(f"Tet4 field has {values.size} values for {volumes.size} cells")
-    return float(np.sum(values * volumes))
 
 
 def _vtkScalarNames(path):
@@ -138,12 +138,12 @@ def testLaserPumpCladdingReferenceStoresFullWedgePointBuffers(laserPumpCladdingR
     np.testing.assert_allclose(phi.mean(axis=1), metadata["meanPhi"], rtol=0.0, atol=0.0)
 
 
-def testCurrentTet4LaserPumpGeometryConvertsBackToLegacyWedgeOrder(
+def testPtTet4GeometryConvertsBackToLegacyWedgeOrder(
     laserPumpCladdingReference,
     tmp_path,
 ):
     wedge_path = convertVtk(
-        repoRoot / "example" / "data" / "pt.vtk",
+        repoRoot / "example" / "data" / "ptTet4.vtk",
         tmp_path / "pt_wedge.vtk",
         direction="tet4-to-wedge",
     )
@@ -156,7 +156,7 @@ def testCurrentTet4LaserPumpGeometryConvertsBackToLegacyWedgeOrder(
     assert "betaVolume" in cell_data
 
 
-def testLaserPumpCladdingTet4MediumAssignsLegacySlabSurfaceOptics():
+def testLaserPumpCladdingTet4MediumAssignsCylinderSurfaceOptics():
     medium = laserPumpCladding.laserPumpCladdingMedium()
     topology = medium.topology
     boundaries = np.asarray(topology.faceBoundaries, dtype=np.int32)
@@ -190,6 +190,44 @@ def testLaserPumpCladdingTet4MediumAssignsLegacySlabSurfaceOptics():
     np.testing.assert_array_equal(surface_outside[[bottom_id, top_id, cladding_id]], np.asarray([1.0, 1.0, 1.0], dtype=np.float32))
 
 
+def testLaserPumpCladdingTet4MediumPreservesLegacyTenLayerPumpLayout():
+    medium = laserPumpCladding.laserPumpCladdingMedium()
+    topology = medium.topology
+    points = np.asarray(topology.points, dtype=np.float64)
+    z_planes = np.unique(points[:, 2])
+
+    assert topology.cellDomainNames == {1: "gain_medium"}
+    np.testing.assert_array_equal(topology.cellDomains, np.ones(topology.numberOfCells, dtype=np.int32))
+    assert z_planes.size == laserPumpCladding.NUMBER_OF_Z_LAYERS
+    np.testing.assert_allclose(
+        z_planes,
+        np.linspace(0.0, 0.7, laserPumpCladding.NUMBER_OF_Z_LAYERS),
+        rtol=0.0,
+        atol=1.0e-12,
+    )
+
+    assert topology.structuredNumberOfLevels == laserPumpCladding.NUMBER_OF_Z_LAYERS
+    assert topology.numberOfSamplePoints == topology.numberOfPoints
+    assert topology.numberOfSamplePoints == topology.structuredNumberOfPoints * topology.structuredNumberOfLevels
+    assert medium.get("betaCells").expectedShape == (topology.numberOfSamplePoints,)
+
+    points_by_level = points.reshape(
+        (topology.structuredNumberOfLevels, topology.structuredNumberOfPoints, 3)
+    )
+    np.testing.assert_allclose(
+        points_by_level[:, :, 2],
+        np.broadcast_to(z_planes[:, None], points_by_level[:, :, 2].shape),
+        rtol=0.0,
+        atol=1.0e-12,
+    )
+    np.testing.assert_allclose(
+        points_by_level[:, :, :2],
+        np.broadcast_to(points_by_level[0, :, :2], points_by_level[:, :, :2].shape),
+        rtol=0.0,
+        atol=1.0e-12,
+    )
+
+
 @pytest.mark.integration
 def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
     tmp_path,
@@ -212,7 +250,6 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             maxRaysPerSample=20_000,
             adaptiveSteps=1,
             mseThreshold=1.0,
-            forwardRayLength=1.0,
             reflectionMaxIterations=17,
             reflectionTolerance=0.0,
             surfaceReservoirSize=32,

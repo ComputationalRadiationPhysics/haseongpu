@@ -46,6 +46,15 @@ class LineSelection:
     coordinate_groups: tuple[tuple[float, tuple[int, ...]], ...]
 
 
+@dataclass(frozen=True)
+class VtkScalarField:
+    association: str
+    values: list[float]
+    count: int
+    points: list[tuple[float, float, float]] | None
+    cells: list[tuple[int, ...]] | None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -73,7 +82,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--field",
         default="gain",
-        help="POINT_DATA scalar field to integrate (default: gain).",
+        help="POINT_DATA or Tet4 CELL_DATA scalar field to integrate (default: gain).",
     )
     parser.add_argument(
         "--output-prefix",
@@ -144,56 +153,66 @@ def parse_ascii_vtk_scalar(
     path: Path,
     scalar_name: str,
     *,
-    include_points: bool,
-) -> tuple[list[tuple[float, float, float]] | None, list[float], int]:
+    include_geometry: bool,
+) -> VtkScalarField:
     lines = path.read_text(encoding="utf-8").splitlines()
     if len(lines) < 4 or lines[2].strip().upper() != "ASCII":
         raise ValueError(f"{path} is not an ASCII VTK file.")
 
     points: list[tuple[float, float, float]] | None = None
     point_count: int | None = None
-
-    if include_points:
-        for index, line in enumerate(lines):
-            if line.startswith("POINTS "):
-                parts = line.split()
-                point_count = int(parts[1])
-                flat_points = collect_float_values(lines, index + 1, point_count * 3)
-                points = [
-                    (
-                        flat_points[offset],
-                        flat_points[offset + 1],
-                        flat_points[offset + 2],
-                    )
-                    for offset in range(0, len(flat_points), 3)
-                ]
-                break
-        if points is None or point_count is None:
-            raise ValueError(f"{path} does not contain a POINTS section.")
-
-    point_data_count: int | None = None
+    cells: list[tuple[int, ...]] | None = None
+    association: str | None = None
+    scalar_count: int | None = None
     scalar_values: list[float] | None = None
     scalar_header = f"SCALARS {scalar_name} "
 
     for index, line in enumerate(lines):
-        if line.startswith("POINT_DATA "):
-            point_data_count = int(line.split()[1])
+        if include_geometry and line.startswith("POINTS "):
+            point_count = int(line.split()[1])
+            flat_points = collect_float_values(lines, index + 1, point_count * 3)
+            points = [
+                (
+                    flat_points[offset],
+                    flat_points[offset + 1],
+                    flat_points[offset + 2],
+                )
+                for offset in range(0, len(flat_points), 3)
+            ]
+        elif include_geometry and line.startswith("CELLS "):
+            cell_count = int(line.split()[1])
+            cells = []
+            for cell_line in lines[index + 1:index + 1 + cell_count]:
+                indices = [int(value) for value in cell_line.split()]
+                if not indices:
+                    raise ValueError(f"{path} contains an empty cell declaration.")
+                if len(indices) != indices[0] + 1:
+                    raise ValueError(f"{path} contains a malformed cell declaration.")
+                cells.append(tuple(indices[1:]))
+        elif line.startswith("POINT_DATA "):
+            association = "POINT_DATA"
+            scalar_count = int(line.split()[1])
+        elif line.startswith("CELL_DATA "):
+            association = "CELL_DATA"
+            scalar_count = int(line.split()[1])
         if line.startswith(scalar_header):
-            if point_data_count is None:
-                raise ValueError(f"{path} declares scalar '{scalar_name}' before POINT_DATA.")
-            scalar_values = collect_float_values(lines, index + 2, point_data_count)
+            if association is None or scalar_count is None:
+                raise ValueError(f"{path} declares scalar '{scalar_name}' before a data association.")
+            scalar_values = collect_float_values(lines, index + 2, scalar_count)
             break
 
-    if point_data_count is None:
-        raise ValueError(f"{path} does not contain POINT_DATA.")
-    if scalar_values is None:
+    if association is None or scalar_count is None or scalar_values is None:
         raise ValueError(f"{path} does not contain scalar '{scalar_name}'.")
-    if include_points and point_count != point_data_count:
+    if include_geometry and points is None:
+        raise ValueError(f"{path} does not contain a POINTS section.")
+    if association == "POINT_DATA" and include_geometry and point_count != scalar_count:
         raise ValueError(
-            f"{path} POINTS count ({point_count}) does not match POINT_DATA count ({point_data_count})."
+            f"{path} POINTS count ({point_count}) does not match POINT_DATA count ({scalar_count})."
         )
+    if association == "CELL_DATA" and include_geometry and cells is None:
+        raise ValueError(f"{path} does not contain a CELLS section for CELL_DATA scalar '{scalar_name}'.")
 
-    return points, scalar_values, point_data_count
+    return VtkScalarField(association, scalar_values, scalar_count, points, cells)
 
 
 def collect_float_values(lines: list[str], start_index: int, expected_count: int) -> list[float]:
@@ -280,6 +299,57 @@ def compute_distance_gain(selection: LineSelection, gains: list[float], np_modul
     return float(np_module.trapezoid(point_gains, axis_coordinates))
 
 
+def select_tetrahedron_line_segments(points, cells, varying_axis, fixed_axes, requested_coords, np_module):
+    line_origin = np_module.zeros(3, dtype=float)
+    line_origin[AXIS_INDEX[fixed_axes[0]]] = requested_coords[0]
+    line_origin[AXIS_INDEX[fixed_axes[1]]] = requested_coords[1]
+    direction = np_module.zeros(3, dtype=float)
+    direction[AXIS_INDEX[varying_axis]] = 1.0
+    segments = []
+    tolerance = 1.0e-12
+
+    for cell_index, cell in enumerate(cells):
+        if len(cell) != 4:
+            raise ValueError("CELL_DATA line integration requires four-node tetrahedra.")
+        vertices = np_module.asarray([points[vertex] for vertex in cell], dtype=float)
+        matrix = (vertices[:3] - vertices[3]).T
+        try:
+            barycentric_origin = np_module.linalg.solve(matrix, line_origin - vertices[3])
+            barycentric_slope = np_module.linalg.solve(matrix, direction)
+        except np_module.linalg.LinAlgError as exc:
+            raise ValueError(f"Encountered a degenerate tetrahedron at cell {cell_index}.") from exc
+
+        values_at_origin = np_module.append(barycentric_origin, 1.0 - barycentric_origin.sum())
+        slopes = np_module.append(barycentric_slope, -barycentric_slope.sum())
+        lower = -np_module.inf
+        upper = np_module.inf
+        valid = True
+        for value, slope in zip(values_at_origin, slopes, strict=True):
+            if abs(slope) <= tolerance:
+                if value < -tolerance:
+                    valid = False
+                    break
+            elif slope > 0.0:
+                lower = max(lower, -value / slope)
+            else:
+                upper = min(upper, -value / slope)
+        if valid and upper - lower > tolerance:
+            segments.append((cell_index, float(upper - lower)))
+
+    if not segments:
+        raise ValueError(
+            f"The requested {varying_axis}-line at {fixed_axes[0]}={requested_coords[0]}, "
+            f"{fixed_axes[1]}={requested_coords[1]} does not intersect any tetrahedra."
+        )
+    return tuple(segments)
+
+
+def compute_cell_distance_gain(segments, gains, np_module) -> float:
+    if len(gains) <= max(cell_index for cell_index, _ in segments):
+        raise ValueError("CELL_DATA scalar has fewer values than the intersected tetrahedra.")
+    return float(sum(gains[cell_index] * length for cell_index, length in segments))
+
+
 def compute_single_pass_gain_factor(distance_gain: float, np_module) -> float:
     return float(np_module.exp(distance_gain))
 
@@ -336,16 +406,38 @@ def main() -> int:
             "matplotlib is required to generate the gain-versus-timestep plot."
         ) from exc
 
-    reference_points, reference_gains, point_count = parse_ascii_vtk_scalar(
+    reference_field = parse_ascii_vtk_scalar(
         vtk_files[0][1],
         args.field,
-        include_points=True,
+        include_geometry=True,
     )
-    assert reference_points is not None
+    if reference_field.association == "POINT_DATA":
+        assert reference_field.points is not None
+        selection = select_line(reference_field.points, varying_axis, fixed_axes, requested_coords)
+        distance_gain = lambda values: compute_distance_gain(selection, values, np)
+        actual_coords = selection.actual_coords
+        sample_count = len(selection.coordinate_groups)
+        sample_description = "point samples"
+    elif reference_field.association == "CELL_DATA":
+        assert reference_field.points is not None
+        assert reference_field.cells is not None
+        segments = select_tetrahedron_line_segments(
+            reference_field.points,
+            reference_field.cells,
+            varying_axis,
+            fixed_axes,
+            requested_coords,
+            np,
+        )
+        distance_gain = lambda values: compute_cell_distance_gain(segments, values, np)
+        actual_coords = requested_coords
+        sample_count = len(segments)
+        sample_description = "tetrahedron chords"
+    else:  # pragma: no cover - VTK has only point and cell scalar associations
+        raise ValueError(f"Unsupported VTK data association: {reference_field.association}")
 
-    selection = select_line(reference_points, varying_axis, fixed_axes, requested_coords)
     results: list[tuple[int, float, float, float]] = []
-    first_distance_gain = compute_distance_gain(selection, reference_gains, np)
+    first_distance_gain = distance_gain(reference_field.values)
     first_single_pass = compute_single_pass_gain_factor(first_distance_gain, np)
     results.append(
         (
@@ -361,17 +453,21 @@ def main() -> int:
     )
 
     for timestep, path in vtk_files[1:]:
-        _, gains, current_point_count = parse_ascii_vtk_scalar(path, args.field, include_points=False)
-        if current_point_count != point_count:
+        field = parse_ascii_vtk_scalar(path, args.field, include_geometry=False)
+        if field.association != reference_field.association:
             raise ValueError(
-                f"{path} has {current_point_count} point values, expected {point_count}."
+                f"{path} stores '{args.field}' as {field.association}, expected {reference_field.association}."
             )
-        distance_gain = compute_distance_gain(selection, gains, np)
-        single_pass_gain = compute_single_pass_gain_factor(distance_gain, np)
+        if field.count != reference_field.count:
+            raise ValueError(
+                f"{path} has {field.count} values for '{args.field}', expected {reference_field.count}."
+            )
+        current_distance_gain = distance_gain(field.values)
+        single_pass_gain = compute_single_pass_gain_factor(current_distance_gain, np)
         results.append(
             (
                 timestep,
-                distance_gain,
+                current_distance_gain,
                 single_pass_gain,
                 compute_net_gain_factor(
                     single_pass_gain,
@@ -401,8 +497,8 @@ def main() -> int:
     plt.ylabel("Net gain factor")
     plt.title(
         f"Net gain factor along {varying_axis} at "
-        f"{fixed_axes[0]}={selection.actual_coords[0]:.6g}, "
-        f"{fixed_axes[1]}={selection.actual_coords[1]:.6g}"
+        f"{fixed_axes[0]}={actual_coords[0]:.6g}, "
+        f"{fixed_axes[1]}={actual_coords[1]:.6g}"
     )
     plt.grid(True, alpha=0.35)
     plt.tight_layout()
@@ -412,10 +508,10 @@ def main() -> int:
     plt.close()
 
     requested_text = ", ".join(
-        f"{axis}={value:.6g}" for axis, value in zip(fixed_axes, selection.requested_coords)
+        f"{axis}={value:.6g}" for axis, value in zip(fixed_axes, requested_coords)
     )
     actual_text = ", ".join(
-        f"{axis}={value:.6g}" for axis, value in zip(fixed_axes, selection.actual_coords)
+        f"{axis}={value:.6g}" for axis, value in zip(fixed_axes, actual_coords)
     )
     mode_text = (
         f"round-trip reflection enabled (R={args.reflectivity:.6g})"
@@ -425,7 +521,7 @@ def main() -> int:
     print(f"Processed {len(results)} files from {input_dir}")
     print(f"Integrated local gain along {varying_axis} using requested coordinates: {requested_text}")
     print(f"Nearest available line used: {actual_text}")
-    print(f"Samples along {varying_axis}: {len(selection.coordinate_groups)}")
+    print(f"Samples along {varying_axis}: {sample_count} {sample_description}")
     print(f"Mode: {mode_text}")
     print(f"Saved CSV: {csv_path}")
     print(f"Saved plot: {png_path}")
