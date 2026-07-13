@@ -67,6 +67,22 @@ def testCompareSerialReferenceDataDocumentsGenerator(compareSerialReference):
     assert metadata["observable"]["entity"] == "legacy sample point"
     assert metadata["observable"]["coverage"] == "full point buffer"
     assert metadata["datasets"] == ["cuboid", "cylindrical"]
+    assert metadata["parameters"]["experiment"] == {
+        "minRays": 1_000_000,
+        "maxRays": 1_000_000,
+        "mseThreshold": 0.1,
+        "reflection": False,
+        "monochromatic": True,
+    }
+    assert metadata["parameters"]["compute"] == {
+        "parallelMode": "single",
+        "repetitions": 1,
+        "adaptiveSteps": 1,
+        "numDevices": 1,
+        "minSampleIndex": 0,
+        "maxSampleIndex": "full point buffer",
+    }
+    assert metadata["parameters"]["spectralResolution"] == 1
 
 
 def testCompareSerialReferenceStoresFullPointBuffers(compareSerialReference):
@@ -172,13 +188,33 @@ def _legacy_spectral_properties(metadata, name):
     assert spectral_length == len(spectra["lambdaA"])
     assert spectral_length == len(spectra["sigmaA"])
     assert spectral_length == len(spectra["sigmaE"])
+    assert metadata["parameters"]["experiment"]["monochromatic"] is True
+    assert metadata["parameters"]["spectralResolution"] == 1
+
+    # The legacy parser reduced monochromatic input tables to sigmaA.front()
+    # and sigmaE.front() before constructing ExperimentParameters.  Sending
+    # the complete tables would make the current forward kernel sample every
+    # stored wavelength even when the run is marked monochromatic.
     return SpectralDecomposition(
-        wavelengthsAbsorption=spectra["lambdaA"],
-        crossSectionAbsorption=spectra["sigmaA"],
-        wavelengthsEmission=spectra["lambdaE"],
-        crossSectionEmission=spectra["sigmaE"],
-        resolution=spectral_length,
+        wavelengthsAbsorption=spectra["lambdaA"][:1],
+        crossSectionAbsorption=spectra["sigmaA"][:1],
+        wavelengthsEmission=spectra["lambdaE"][:1],
+        crossSectionEmission=spectra["sigmaE"][:1],
+        resolution=1,
     )
+
+
+def testLegacyMonochromaticSpectralPropertiesUseFirstStoredPair(compareSerialReference):
+    metadata = compareSerialReference["metadata"]
+    for name in compareSerialReference["datasets"]:
+        spectra = metadata["spectra"][name]
+        properties = _legacy_spectral_properties(metadata, name)
+
+        assert properties.resolution == 1
+        np.testing.assert_array_equal(properties.wavelengthsAbsorption, spectra["lambdaA"][:1])
+        np.testing.assert_array_equal(properties.crossSectionAbsorption, spectra["sigmaA"][:1])
+        np.testing.assert_array_equal(properties.wavelengthsEmission, spectra["lambdaE"][:1])
+        np.testing.assert_array_equal(properties.crossSectionEmission, spectra["sigmaE"][:1])
 
 
 @pytest.mark.integration
@@ -190,7 +226,9 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
         pytest.skip("volume-centered Tet4 comparison helpers are not enabled in this trimmed runtime")
 
     metadata = compareSerialReference["metadata"]
-    ray_count = int(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_COUNT", metadata["parameters"]["experiment"]["maxRays"]))
+    experiment = metadata["parameters"]["experiment"]
+    compute = metadata["parameters"]["compute"]
+    ray_count = int(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_COUNT", experiment["maxRays"]))
     rtol = float(os.environ.get("HASE_COMPARE_SERIAL_INTEGRAL_RTOL", "0.05"))
     backend = os.environ.get("HASE_COMPARE_SERIAL_BACKEND", _default_backend())
 
@@ -205,18 +243,18 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
         projection = projectionFromTet4Medium(medium)
         phi_ase = PhiASE(
             spectralProperties=_legacy_spectral_properties(metadata, name),
-            minRaysPerSample=ray_count,
-            maxRaysPerSample=ray_count,
+            minRaysPerSample=int(experiment["minRays"]),
+            maxRaysPerSample=int(experiment["maxRays"]),
             forwardRayCount=ray_count,
-            repetitions=1,
-            adaptiveSteps=1,
+            repetitions=int(compute["repetitions"]),
+            adaptiveSteps=int(compute["adaptiveSteps"]),
             relativeStandardErrorThreshold=relative_standard_error_threshold,
-            useReflections=False,
+            useReflections=bool(experiment["reflection"]),
             backend=backend,
             openpmdBackend=openPmdRuntimeBackend,
-            parallelMode="single",
-            numDevices=1,
-            monochromatic=True,
+            parallelMode=str(compute["parallelMode"]),
+            numDevices=int(compute["numDevices"]),
+            monochromatic=bool(experiment["monochromatic"]),
             rngSeed=int(metadata["random"]["serialMt19937Seed"]),
         )
         phi_ase.run(gainMedium=medium)
