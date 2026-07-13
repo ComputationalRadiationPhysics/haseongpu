@@ -13,7 +13,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-
 repoRoot = Path(__file__).resolve().parents[3]
 exampleScript = repoRoot / "example" / "laserPumpCladding.py"
 plotSsgScript = repoRoot / "scripts" / "plot_ssg.py"

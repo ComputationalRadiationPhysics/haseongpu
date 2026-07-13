@@ -1,7 +1,9 @@
 # laserPumpCladding upstream/master wedge PhiASE reference
 
 This directory stores the deterministic legacy wedge reference used by the
-laserPumpCladding Tet4 integration test.
+laserPumpCladding Tet4 integration test. `ptTet4.vtk` represents the same
+material geometry with Tet4 cells; the comparison is a retained numerical
+contract across topology and transport changes.
 
 The reference was generated from a detached `upstream/master` worktree at:
 
@@ -67,6 +69,5 @@ The generated archive `phiase_reference.npz` contains:
 - `points`, `cells`, `cellTypes`: wedge geometry arrays that define the
   reference point order.
 
-The stored `meanPhi` values are only diagnostics.  The intended comparison is a
-pointwise comparison after converting the current Tet4 VTK output back to the
-legacy wedge point order.
+The stored `meanPhi` values are only diagnostics. The intended comparison is a
+volume integral of the current Tet4 field against the legacy wedge field.
