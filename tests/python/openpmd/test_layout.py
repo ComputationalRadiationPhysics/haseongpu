@@ -18,6 +18,7 @@ from pyInclude.openpmd import (
     primitiveFieldSpecs,
     primitiveSchema,
     primitiveSchemas,
+    resultAttributeSpecs,
     schemaFields,
     simulationAttributeSpec,
     simulationAttributeSpecs,
@@ -67,6 +68,9 @@ def test_extensionDocumentNames():
     assert PrismSchema.primitiveSchema().name == "prism"
     assert simulationAttributeSpec("maxSigmaEmission").attribute == "max_sigma_emission"
     assert simulationAttributeSpec("rngSeed").attribute == "rng_seed"
+    result_attributes = {spec.name: spec for spec in resultAttributeSpecs}
+    assert result_attributes["srmStatus"].attribute == "srm_status"
+    assert result_attributes["srmDivergenceStreak"].attribute == "srm_divergence_streak"
     assert fieldSpec("surface").unit == "m^2"
     assert fieldSpec("surface").unitDimension == (2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     assert fieldSpec("sigmaAbsorption").unit == "cm^2"
@@ -77,6 +81,34 @@ def test_extensionDocumentNames():
     assert simulationAttributeSpec("nTot").unitDimension == (-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     assert simulationAttributeSpec("claddingAbsorption").unit == "cm^-1"
     assert simulationAttributeSpec("claddingAbsorption").unitSI == 100.0
+
+
+def test_srm_result_attributes_have_schema_defaults_and_casts():
+    from pyInclude.openpmd import transport
+
+    class Iteration:
+        attributes = {
+            "srm_status": "diverged",
+            "srm_passes": np.uint32(3),
+            "srm_remaining_fraction": np.float64(1.25),
+            "srm_max_iterations": np.uint32(8),
+            "srm_divergence_streak": np.uint32(3),
+        }
+
+        def contains_attribute(self, name):
+            return name in self.attributes
+
+        def get_attribute(self, name):
+            return self.attributes[name]
+
+    values = transport._result_status_values(Iteration())
+    assert values == {
+        "srmStatus": "diverged",
+        "srmPasses": 3,
+        "srmRemainingFraction": 1.25,
+        "srmMaxIterations": 8,
+        "srmDivergenceStreak": 3,
+    }
 
 
 def test_schemaFieldsAreDerivedFromPrimitiveSchemas():
@@ -128,6 +160,9 @@ def test_unitDimensionNamespaceCoversDocumentedSchemaFields():
     assert unitDimension.lambdaResolution == unitDimension.dimensionless
 
     for spec in simulationAttributeSpecs:
+        assert spec.unitDimension == getattr(unitDimension, spec.name)
+
+    for spec in resultAttributeSpecs:
         assert spec.unitDimension == getattr(unitDimension, spec.name)
 
     for name, spec in schemaFields.items():

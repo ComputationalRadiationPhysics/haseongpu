@@ -68,7 +68,30 @@ Sampling and Physics Settings
    ``maxRaysPerSample``.
 
 ``useReflections``
-   Enables or disables reflections at the top and bottom surfaces.
+   Enables or disables the surface-reservoir method (SRM) for reflected ASE
+   sources. Direct and relaunched rays always propagate from their starting
+   point to a physical mesh boundary; there is no forward ray-length cutoff.
+
+``reflectionMaxIterations``
+   Hard cap on reflected SRM passes after the direct pass. It is serialized as
+   the openPMD ``reflection_max_iterations`` request attribute and defaults to
+   ``8``. ``HASE_SRM_MAX_ITERATIONS`` overrides it at runtime and must be a
+   positive integer.
+
+``reflectionTolerance``
+   Fraction used for the SRM convergence and stability checks. A pass is
+   converged when its remaining reflected source weight divided by the direct
+   pass's reflected source weight is below this value.
+
+``surfaceReservoirSize``
+   Number of weighted SRM source records retained per physical boundary face.
+   It is serialized as ``surface_reservoir_size``.
+
+``HASE_SRM_DIVERGENCE_STREAK``
+   Runtime-only positive-integer override for the number of consecutive growing
+   reflected passes required to report ``diverged``. It defaults to ``3``.
+   This setting is intentionally not an openPMD request attribute: it is a
+   runtime safety policy, like ``HASE_SRM_MAX_ITERATIONS``.
 
 ``monochromatic``
    Forces the ASE computation to use only the first absorption and emission
@@ -156,6 +179,9 @@ A YAML file can keep experiment and compute settings together:
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true
+     reflection_max_iterations: 8
+     reflection_tolerance: 1.0e-4
+     surface_reservoir_size: 32
      monochromatic: false
 
    compute:
@@ -210,3 +236,9 @@ objects rather than backend adapter containers:
    prisms = medium.getPrisms()
 
 ``getResults()`` raises ``RuntimeError`` if the object has not been run yet.
+For reflected runs, the returned result also exposes ``srmStatus``,
+``srmPasses``, ``srmRemainingFraction``, ``srmMaxIterations``, and
+``srmDivergenceStreak``. Terminal statuses are ``converged`` (the reflected
+source decayed), ``stable`` (non-growing equilibrium), ``diverged`` (the
+configured consecutive-growth streak), and ``max_iterations`` (hard cap
+reached). ``disabled`` is reported when reflections were not requested.

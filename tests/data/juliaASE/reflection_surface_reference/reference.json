@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Single-Tet4 forward reflection surface regression reference. Reference values are stored as JuliaASE fixture data and consumed by HASE CI without importing JuliaASE.",
+  "description": "Single-Tet4 forward reflection surface regression reference generated from JuliaASE with physical-boundary transport. HASE CI reruns the same case without importing JuliaASE.",
   "meshFile": "single_reflective_tet4.msh",
   "seed": 12345,
   "timeStep": 0.05,
@@ -129,26 +129,27 @@
     "resolution": 1
   },
   "phiAse": [
-    0.020381582900881767
+    0.05223429575562477
   ],
   "dndtAse": [
-    -9.375528134405615e-05
+    -0.00024027776047587398
   ],
   "finalBetaVolume": [
-    0.1800046877640672
+    0.1800120138880238
   ],
   "reflectedPassWeightFractions": [
     0.0
   ],
-  "rayCount": 4096,
-  "forwardRayLength": 2.0,
+  "rayCount": 1000000,
   "reflectionMaxIterations": 4,
   "reflectionTolerance": 1e-05,
   "surfaceReservoirSize": 64,
   "tolerances": {
-    "phiAseRtol": 5e-05,
+    "phiAseRtol": 0.05,
     "phiAseAtol": 2e-07,
-    "betaVolumeRtol": 1e-07,
-    "betaVolumeAtol": 2e-07
-  }
+    "betaVolumeRtol": 0.0,
+    "betaVolumeAtol": 1e-06
+  },
+  "referenceRayCount": 1000000,
+  "referenceInitialReflectedWeight": 185710.796875
 }

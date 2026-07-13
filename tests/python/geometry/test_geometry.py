@@ -301,7 +301,6 @@ def test_phi_ase_reflection_controls_are_openpmd_attributes():
         reflectionMaxIterations=3,
         reflectionTolerance=2.5e-3,
         surfaceReservoirSize=5,
-        forwardRayLength=1.0,
     )
     attributes = phi.openPmdAttributes(numberOfSamples=4)
 
@@ -309,3 +308,11 @@ def test_phi_ase_reflection_controls_are_openpmd_attributes():
     assert attributes["reflectionMaxIterations"] == 3
     assert attributes["reflectionTolerance"] == 2.5e-3
     assert attributes["surfaceReservoirSize"] == 5
+    assert "forwardRayLength" not in attributes
+
+
+def test_phi_ase_rejects_retired_forward_ray_length_config():
+    from pyInclude.simulation import PhiASE
+
+    with pytest.raises(ValueError, match="forward_ray_length is retired"):
+        PhiASE({"forward_ray_length": 1.0})

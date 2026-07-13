@@ -97,19 +97,47 @@ The HASEonGPU wheel does not vendor openPMD runtime libraries or generated
 ``openpmd_api`` bindings.  The runtime environment must provide compatible
 openPMD libraries and Python bindings.
 
-Record Layout
--------------
+openPMD Record Layout
+---------------------
 
-All array data is written as openPMD ``Mesh`` records below each iteration's
-``meshes`` group.  Scalar simulation settings such as ``number_of_points``,
-``backend``, ``openpmd_backend``, and ``parallel_mode`` are iteration
-attributes, not mesh records.
+The Python frontend has its own object model: ``MeshTopology``,
+``GainMedium``, ``CrossSectionData``, and ``PhiASE``. Those names are not an
+openPMD schema. The transport boundary is the openPMD series written for the
+C++ backend.
 
-Topology records use a VTK-compatible unstructured wedge layout inside openPMD:
+All array data at that boundary is written as openPMD ``Mesh`` records below
+each ``Iteration``'s ``meshes`` group. Scalar arrays are named openPMD records
+with the scalar ``SCALAR`` record component. Component records, currently
+``core_points``, use named components such as ``x``, ``y``, and ``z``. The
+record names are HASE-owned, which is allowed by openPMD, but the records carry
+the normal openPMD mesh and component metadata: ``geometry``,
+``geometryParameters``, ``dataOrder``, ``axisLabels``, ``gridSpacing``,
+``gridGlobalOffset``, ``gridUnitSI``, ``unitDimension``, component ``unitSI``,
+and component ``position``.
 
-* ``core_points`` stores point coordinates as ``x``, ``y``, and ``z``
-  components.
-* ``core_cells_connectivity`` stores VTK wedge point ids.
+Scalar simulation and backend settings are not openPMD field records. Values
+such as ``number_of_points``, ``thickness``, ``rng_seed``, ``backend``, and
+``parallel_mode`` are stored as attributes on the openPMD iteration.
+These values configure the HASE backend and do
+not represent sampled mesh data. They therefore are not part of ``/meshes``
+and do not carry record metadata such as ``axisLabels`` or component
+``position``.
+
+Forward-reflection request attributes follow the same HASE openPMD extension
+schema: ``use_reflections``, ``reflection_max_iterations``,
+``reflection_tolerance``, and ``surface_reservoir_size``. The parser rejects
+the retired ``forward_ray_length`` attribute; forward rays now traverse to a
+physical boundary. Runtime environment overrides ``HASE_SRM_MAX_ITERATIONS``
+and ``HASE_SRM_DIVERGENCE_STREAK`` are deliberately not serialized because
+they are local execution policy rather than portable request data.
+
+The topology convention inside ``/meshes`` follows VTK's unstructured-grid
+model and ``vtkWedge`` cell. openPMD provides the mesh-record model, but it
+does not standardize VTK-style wedge connectivity itself. HASEonGPU therefore
+stores a VTK-compatible unstructured-cell layout in openPMD records:
+
+* ``core_points`` stores VTK ``POINTS`` as ``x``, ``y``, and ``z`` components.
+* ``core_cells_connectivity`` stores the VTK cell connectivity point ids.
 * ``core_cells_offsets`` stores offsets into the connectivity array.
 * ``core_cells_types`` stores the VTK cell type id; wedge cells use type ``13``.
 
@@ -130,16 +158,39 @@ Custom fields declared with ``GainMedium.defineField(...)`` or
 their unit metadata.  They are available to downstream readers; the current ASE
 backend ignores them unless a future backend explicitly consumes them.
 
-Compiled Simulation Snapshots
------------------------------
+Result iterations also carry registered HASE extension attributes for SRM
+termination: ``srm_status``, ``srm_passes``, ``srm_remaining_fraction``,
+``srm_max_iterations``, and ``srm_divergence_streak``. They are scalar
+iteration metadata, not mesh records. Python readers expose them as
+``Result.srmStatus``, ``srmPasses``, ``srmRemainingFraction``,
+``srmMaxIterations``, and ``srmDivergenceStreak``.
 
-A compiled ``Simulation`` input additionally stores run control as iteration
-attributes: the time step, number of steps, pump-step limit, ASE switch, integrator, and
-one-dimensional pump parameters. The C++ backend writes one output iteration
-per completed step. The integrator can also be
-``frozen-phi-ase-runge-kutta-4``. Each snapshot contains the dynamic beta fields plus the ASE
-results and ``core_result_dndt_pump``; its first snapshot also contains the
-static topology, material, and spectral records.
+Compiled Simulation Run Control
+--------------------------------
+
+For compiled ``Simulation`` runs, iteration attributes also include run-control
+metadata:
+
+* ``time_step`` and ``number_of_steps``
+* ``pump_steps``
+* ``enable_ase`` and ``pre_pump``
+* ``time_integrator`` (``explicit-euler``, ``heun``, ``midpoint``,
+  ``runge-kutta-4``, ``frozen-phi-ase-runge-kutta-4``,
+  ``implicit-euler``, or ``exponential-euler``)
+* ``implicit_iterations`` and ``implicit_tolerance`` for implicit Euler
+* ``pump_routine`` (currently ``one-dimensional-z-traversal``)
+* pump parameters ``pump_intensity``, ``pump_wavelength``, ``pump_radius_x``,
+  ``pump_radius_y``, ``pump_exponent``, ``pump_duration``, ``pump_substeps``,
+  ``pump_sigma_absorption``, ``pump_sigma_emission``,
+  ``pump_back_reflection``, ``pump_reflectivity``, ``pump_extraction``, and
+  ``pump_temporary_fluorescence``
+
+The C++ backend writes one output iteration per completed step. Snapshot
+iterations contain dynamic beta records plus ``core_result_phi_ase``,
+``core_result_mse``, ``core_result_total_rays``, ``core_result_dndt_ase``, and
+``core_result_dndt_pump``. The first snapshot also includes the static canonical
+mesh/material/spectral records.
+
 For streaming backends, a dedicated receiver drains snapshots while the backend
 runs, so slow Python ``onStep`` work (such as file output) does not prevent the
 backend from completing its output stream.

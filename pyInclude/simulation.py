@@ -70,8 +70,6 @@ class PhiASE:
     """Maximum rays per sample allowed during adaptive refinement."""
     forwardRayCount: int | None = None
     """Number of globally launched forward rays; defaults to ``maxRaysPerSample``."""
-    forwardRayLength: float | None = None
-    """Fixed forward ray length in metres; required for forward mode."""
     mseThreshold: float = 0.1
     """Target mean-squared-error threshold for adaptive ASE sampling."""
     repetitions: int = 4
@@ -154,7 +152,6 @@ class PhiASE:
         parser.add_argument("--max-rays-per-sample", type=int, default=None)
         parser.add_argument("--propagation-mode", choices=("forward",), default=None)
         parser.add_argument("--forward-ray-count", type=int, default=None)
-        parser.add_argument("--forward-ray-length", type=float, default=None)
         parser.add_argument("--mse-threshold", type=float, default=None)
         parser.add_argument("--reflection-max-iterations", type=int, default=None)
         parser.add_argument("--reflection-tolerance", type=float, default=None)
@@ -179,7 +176,6 @@ class PhiASE:
             "max_rays_per_sample": "maxRaysPerSample",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
-            "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
             "reflection_max_iterations": "reflectionMaxIterations",
             "reflection_tolerance": "reflectionTolerance",
@@ -228,7 +224,6 @@ class PhiASE:
             "max_rays_per_sample": "maxRaysPerSample",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
-            "forward_ray_length": "forwardRayLength",
             "mse_threshold": "mseThreshold",
             "reflection_max_iterations": "reflectionMaxIterations",
             "reflection_tolerance": "reflectionTolerance",
@@ -246,7 +241,7 @@ class PhiASE:
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "propagationMode", "forwardRayCount",
-            "forwardRayLength", "mseThreshold", "reflectionMaxIterations", "reflectionTolerance",
+            "mseThreshold", "reflectionMaxIterations", "reflectionTolerance",
             "surfaceReservoirSize", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
             "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
@@ -258,6 +253,10 @@ class PhiASE:
         }
         for section in sections:
             for name, value in section.items():
+                if name in {"forwardRayLength", "forward_ray_length"}:
+                    raise ValueError(
+                        "forward_ray_length is retired; forward rays now propagate to their physical boundary"
+                    )
                 attr = aliases.get(name, name)
                 if attr in allowed:
                     setattr(self, attr, value)
@@ -287,8 +286,6 @@ class PhiASE:
             "minSampleRange": min_sample,
             "maxSampleRange": max_sample,
         }
-        if self.forwardRayLength is not None:
-            attributes["forwardRayLength"] = float(self.forwardRayLength)
         if self.rngSeed is not None:
             attributes["rngSeed"] = int(self.rngSeed)
         return attributes

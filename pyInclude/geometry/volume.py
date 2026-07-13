@@ -266,7 +266,7 @@ class VolumeTopology:
         return self._copyWith(faceBoundaries=faceBoundaries, metadata=metadata)
 
     def _copyWith(self, *, cellDomains=None, faceBoundaries=None, metadata=None):
-        return type(self)(
+        topology = type(self)(
             self.points.copy(),
             self.cellPointIndices.copy(),
             cellTypes=self.cellTypes.copy(),
@@ -274,6 +274,8 @@ class VolumeTopology:
             faceBoundaries=np.asarray(self.faceBoundaries if faceBoundaries is None else faceBoundaries, dtype=np.int32).copy(),
             metadata=dict(self.metadata if metadata is None else metadata),
         )
+        topology.samplePoints = np.asarray(self.samplePoints, dtype=np.float64).copy()
+        return topology
 
     def openPmdAttributes(self, context=None):
         context = context or self

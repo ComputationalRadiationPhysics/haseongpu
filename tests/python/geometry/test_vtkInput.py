@@ -68,7 +68,7 @@ def test_gainMediumRoundTripsThroughTet4Vtk(tmp_path):
 
 def test_meshTopologyRejectsVtkInput():
     with pytest.raises(NotImplementedError, match="Tet4 VolumeTopology"):
-        MeshTopology.fromFile(repoRoot / "example" / "data" / "pt.vtk")
+        MeshTopology.fromFile(repoRoot / "example" / "data" / "ptTet4.vtk")
 
 
 def test_gainMediumRejectsWedgeVtkInput(tmp_path):
@@ -102,7 +102,7 @@ def test_gainMediumRejectsNonVolumeTopologyVtkWrite(tmp_path, smallGainMedium):
 
 def test_bundledExampleVtkFixturesExposeFrontendFields():
     fixtures = {
-        "pt.vtk": (421, 21924, 10),
+        "ptTet4.vtk": (421, 21924, 10),
         "cuboid.vtk": (321, 16200, 10),
         "cylindrical.vtk": (421, 21924, 10),
     }
