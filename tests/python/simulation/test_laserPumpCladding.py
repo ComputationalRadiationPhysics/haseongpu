@@ -44,15 +44,12 @@ REFERENCE_PATH = (
     / "tests"
     / "data"
     / "laserPumpCladding"
-    / "upstream_master_pump3_wedge_reference"
+    / "fixed_legacy_reflection_pump3_wedge_reference"
     / "phiase_reference.npz"
 )
-# The legacy reflection solver mirrors the top plane at ``levels * thickness``
-# (0.777... m) while the physical Tet4 mesh ends at 0.7 m. The retained
-# fixture therefore includes one extra virtual gain layer on reflected paths.
-# Keep the contract broad enough to compare the physical forward solver while
-# still catching the pre-conforming mesh failure (which was ~90% low).
-INTEGRAL_RTOL = 0.10
+# The fixed legacy wedge and Tet4 solvers both reflect at the physical top
+# plane, z = (numberOfLevels - 1) * thickness.
+INTEGRAL_RTOL = 0.05
 
 
 def _triangle_area(points):
@@ -120,7 +117,7 @@ def laserPumpCladdingReference():
 def testLaserPumpCladdingReferenceDocumentsGeneratorAndSeed(laserPumpCladdingReference):
     metadata = laserPumpCladdingReference["metadata"]
 
-    assert metadata["generator"]["commit"] == "469c87770ed13796f2e82385bcf83528e8aeaf1b"
+    assert metadata["generator"]["commit"] == "effd8077edccef93a68d818e8a5eb2f0ebdc03b4"
     assert metadata["parameters"]["backend"] == "Host_Cpu_CpuOmpBlocks"
     assert metadata["parameters"]["timeSlices"] == 6
     assert metadata["parameters"]["pumpSteps"] == 3
@@ -330,10 +327,6 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
         maxRaysPerSample=metadata["parameters"]["maxRaysPerSample"],
         relativeStandardErrorThreshold=0.05,
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
-        # The legacy reference's virtual 0.777... m reflection plane makes
-        # its long reflection series equivalent to about two physical Tet4
-        # boundary passes.
-        reflectionMaxIterations=2,
     )
 
     relative_standard_error = np.asarray(state.volumeRelativeStandardError, dtype=np.float64)

@@ -674,17 +674,17 @@ namespace hase::core
                 surfaceRefractiveIndexInside,
                 surfaceRefractiveIndexOutside,
                 totalReflectionAngles,
-                 cellPointIndices,
-                 cellTypes,
-                 cellFaces,
+                cellPointIndices,
+                cellTypes,
+                cellFaces,
                 cellNeighborCells,
                 cellNeighborLocalFaces,
                 cellFaceBoundaries,
-                 cellVolumes,
-                 cellVolumePrefix,
-                 betaVolumePrefix,
-                 cellCenters,
-                 samplePoints};
+                cellVolumes,
+                cellVolumePrefix,
+                betaVolumePrefix,
+                cellCenters,
+                samplePoints};
         }
     };
 

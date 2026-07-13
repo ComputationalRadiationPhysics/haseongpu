@@ -1,14 +1,15 @@
-# laserPumpCladding upstream/master wedge PhiASE reference
+# laserPumpCladding fixed-legacy-reflection wedge PhiASE reference
 
-This directory stores the deterministic legacy wedge reference used by the
-laserPumpCladding Tet4 integration test. `ptTet4.vtk` represents the same
+This directory stores the deterministic fixed-legacy wedge reference used by
+the laserPumpCladding Tet4 integration test. `ptTet4.vtk` represents the same
 material geometry with Tet4 cells; the comparison is a retained numerical
 contract across topology and transport changes.
 
-The reference was generated from a detached `upstream/master` worktree at:
+The reference was generated from a detached `fix-legacy-reflection-plane`
+worktree at:
 
 ```text
-469c87770ed13796f2e82385bcf83528e8aeaf1b refactor cuda architecture pass-through
+effd8077edccef93a68d818e8a5eb2f0ebdc03b4 Fix legacy reflection plane height
 ```
 
 The upstream script was not run through its CLI, because that CLI did not expose
@@ -19,17 +20,17 @@ was called directly so the ASE backend seed is part of the fixture contract.
 from pathlib import Path
 import sys
 
-sys.path.insert(0, "/tmp/hase-laserpump-upstream-master/example/python_example")
+sys.path.insert(0, "/tmp/hase-laserpump-fixed-legacy/example/python_example")
 import laserPumpCladding
 
 state = laserPumpCladding.runExample(
     phiAseConfigPath=Path(
-        "/tmp/hase-laserpump-upstream-master/example/python_example/config/phiASE.yaml"
+        "/tmp/hase-laserpump-fixed-legacy/example/python_example/config/phiASE.yaml"
     ),
     backend="Host_Cpu_CpuOmpBlocks",
     timeSlices=6,
     pumpSteps=3,
-    vtkOutputDir=Path("/tmp/hase-laserpump-upstream-master-wedge6"),
+    vtkOutputDir=Path("/tmp/hase-laserpump-fixed-legacy-wedge6"),
     enableAse=True,
     prePump=True,
     rngSeed=5489,
@@ -39,11 +40,11 @@ state = laserPumpCladding.runExample(
 The build/import environment was:
 
 ```text
-PYTHONPATH=/tmp/hase-laserpump-upstream-master-build/python:/tmp/hase-laserpump-upstream-master
+PYTHONPATH=/tmp/hase-laserpump-fixed-legacy-build/python:/tmp/hase-laserpump-fixed-legacy
 cwd=/tmp
 ```
 
-The upstream `example/python_example/config/phiASE.yaml` settings were:
+The fixed-legacy `example/python_example/config/phiASE.yaml` settings were:
 
 ```yaml
 experiment:
@@ -80,11 +81,7 @@ The historical parser interpolates both ASE spectra to 1000 equally spaced
 samples over 905--1095 nm before transport; the pump uses the original table
 values at 940 nm. The current example reproduces those inputs.
 
-The historical reflection implementation places its virtual top reflection
-plane at `numberOfLevels * thickness` (0.777... m), although the ten sampled
-planes end at 0.7 m. The current Tet4 walker reflects at the physical 0.7 m
-boundary. For the retained comparison, two physical SRM passes reproduce the
-legacy reflection series within 10%; using the current default eight passes
-would count the virtual legacy layer repeatedly. The integration contract
-therefore pins `reflectionMaxIterations=2`. The Tet4 conversion now orders
-each wedge's base vertices globally so all shared prism faces are conforming.
+The fixed legacy implementation reflects at the physical top plane,
+`(numberOfLevels - 1) * thickness` (0.7 m for the ten sampled planes), the
+same boundary used by the Tet4 walker. The Tet4 conversion orders each
+wedge's base vertices globally so all shared prism faces are conforming.
