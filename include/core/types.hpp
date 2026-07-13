@@ -167,6 +167,33 @@ namespace hase::core
         unsigned maxGpusPerNode = 0;
     };
 
+    enum class SrmStatus
+    {
+        DISABLED,
+        CONVERGED,
+        STABLE,
+        DIVERGED,
+        MAX_ITERATIONS
+    };
+
+    [[nodiscard]] inline char const* toString(SrmStatus const status)
+    {
+        switch(status)
+        {
+        case SrmStatus::DISABLED:
+            return "disabled";
+        case SrmStatus::CONVERGED:
+            return "converged";
+        case SrmStatus::STABLE:
+            return "stable";
+        case SrmStatus::DIVERGED:
+            return "diverged";
+        case SrmStatus::MAX_ITERATIONS:
+            return "max_iterations";
+        }
+        return "max_iterations";
+    }
+
     struct Result
     {
         Result()
@@ -178,12 +205,22 @@ namespace hase::core
             std::vector<double> mse,
             std::vector<unsigned> totalRays,
             std::vector<double> dndtAse,
-            std::vector<unsigned> droppedRays = {})
+            std::vector<unsigned> droppedRays = {},
+            SrmStatus srmStatus = SrmStatus::DISABLED,
+            unsigned srmPasses = 0u,
+            double srmRemainingFraction = 0.0,
+            unsigned srmMaxIterations = 0u,
+            unsigned srmDivergenceStreak = 0u)
             : phiAse(std::move(phiAse))
             , mse(std::move(mse))
             , totalRays(std::move(totalRays))
             , dndtAse(std::move(dndtAse))
             , droppedRays(std::move(droppedRays))
+            , srmStatus(srmStatus)
+            , srmPasses(srmPasses)
+            , srmRemainingFraction(srmRemainingFraction)
+            , srmMaxIterations(srmMaxIterations)
+            , srmDivergenceStreak(srmDivergenceStreak)
         {
             if(this->droppedRays.empty())
                 this->droppedRays.assign(this->phiAse.size(), 0u);
@@ -194,6 +231,11 @@ namespace hase::core
         std::vector<unsigned> totalRays;
         std::vector<double> dndtAse;
         std::vector<unsigned> droppedRays;
+        SrmStatus srmStatus = SrmStatus::DISABLED;
+        unsigned srmPasses = 0u;
+        double srmRemainingFraction = 0.0;
+        unsigned srmMaxIterations = 0u;
+        unsigned srmDivergenceStreak = 0u;
     };
 
     struct ExperimentParameters
@@ -265,7 +307,6 @@ namespace hase::core
         unsigned minRaysPerSample;
         unsigned maxRaysPerSample;
         unsigned forwardRayCount = 0u;
-        double forwardRayLength = 0.0;
         std::string propagationMode = "forward";
         std::vector<double> lambdaA;
         std::vector<double> lambdaE;

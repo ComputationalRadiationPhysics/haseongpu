@@ -285,7 +285,7 @@ namespace hase::core
                 {
                     return 0;
                 }
-                finalizeForwardPhiAse(experiment, hostMesh, rawResult, result);
+                finalizeForwardPhiAse(hostMesh, rawResult, result);
 
                 dout(V_INFO) << "Active nodes             : " << topology.activeNodes << std::endl;
                 dout(V_INFO) << "Active ranks             : " << topology.activeRanks << std::endl;
