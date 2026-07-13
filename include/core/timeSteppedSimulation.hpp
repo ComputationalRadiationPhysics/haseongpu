@@ -229,7 +229,8 @@ namespace hase::core
                 }
                 m_lastAseResult = m_lastVolumeAseResult;
                 m_lastAseResult.phiAse = detail::mapVolumePhiToSamples(m_hostMesh, m_lastVolumeAseResult.phiAse);
-                m_lastAseResult.mse.assign(m_hostMesh.numberOfSamples, 0.0);
+                m_lastAseResult.standardError.assign(m_hostMesh.numberOfSamples, 0.0);
+                m_lastAseResult.relativeStandardError.assign(m_hostMesh.numberOfSamples, 0.0);
                 m_lastAseResult.totalRays.assign(m_hostMesh.numberOfSamples, 0u);
                 m_lastAseResult.droppedRays.assign(m_hostMesh.numberOfSamples, 0u);
                 detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
@@ -365,11 +366,12 @@ namespace hase::core
             }
         }
 
-        void initializeResult(double mseValue, unsigned resultSize)
+        void initializeResult(double standardErrorValue, unsigned resultSize)
         {
             m_lastAseResult = Result(
                 std::vector<float>(resultSize, 0.0f),
-                std::vector<double>(resultSize, mseValue),
+                std::vector<double>(resultSize, standardErrorValue),
+                std::vector<double>(resultSize, 0.0),
                 std::vector<unsigned>(resultSize, 0u),
                 std::vector<double>(resultSize, 0.0));
             m_lastVolumeAseResult = m_lastAseResult;

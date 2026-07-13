@@ -62,6 +62,8 @@ If new reference data is generated from that old branch, record the exact
 generator commit, input geometry, backend, RNG seed, command line/config, and
 observable beside the data file.
 
+Previous versions use ``mse-threshold=0.1``, calibrated here to RSE ``0.14`` for ``cuboid`` and ``0.10`` for ``cylindrical``.
+
 ## Wedge comparison artifacts
 
 Current Tet4 fixtures can be inverted back to the legacy wedge/prism topology

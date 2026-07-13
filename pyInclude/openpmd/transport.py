@@ -1068,7 +1068,12 @@ def read_simulation_output(path):
         phi_ase = _loadScalar(series, iteration, "core_result_phi_ase", np.float32)
         dndt_ase = _loadScalar(series, iteration, "core_result_dndt_ase", np.float64)
         volume_phi_ase = _read_optional_scalar(series, iteration, "core_result_volume_phi_ase", np.float32, number_of_cells)
-        volume_mse = _read_optional_scalar(series, iteration, "core_result_volume_mse", np.float64, number_of_cells)
+        volume_standard_error = _read_optional_scalar(
+            series, iteration, "core_result_volume_standard_error", np.float64, number_of_cells
+        )
+        volume_relative_standard_error = _read_optional_scalar(
+            series, iteration, "core_result_volume_relative_standard_error", np.float64, number_of_cells
+        )
         volume_total_rays = _read_optional_scalar(
             series, iteration, "core_result_volume_total_rays", np.uint32, number_of_cells
         )
@@ -1085,7 +1090,8 @@ def read_simulation_output(path):
             betaVolume=beta_volume.reshape(beta_volume_shape, order="F"),
             phiAse=phi_ase.reshape(result_shape, order="F"),
             volumePhiAse=volume_phi_ase.reshape((number_of_cells,), order="F"),
-            volumeMse=volume_mse.reshape((number_of_cells,), order="F"),
+            volumeStandardError=volume_standard_error.reshape((number_of_cells,), order="F"),
+            volumeRelativeStandardError=volume_relative_standard_error.reshape((number_of_cells,), order="F"),
             volumeTotalRays=volume_total_rays.reshape((number_of_cells,), order="F"),
             volumeDndtAse=volume_dndt_ase.reshape((number_of_cells,), order="F"),
             dndtAse=dndt_ase.reshape(result_shape, order="F"),
@@ -1098,7 +1104,12 @@ def read_simulation_output(path):
             ).reshape((number_of_points, number_of_levels), order="F"),
             aseResult=Result(
                 phiAse=_read_optional_scalar(series, iteration, "core_result_phi_ase", np.float32, point_count),
-                mse=_read_optional_scalar(series, iteration, "core_result_mse", np.float64, point_count),
+                standardError=_read_optional_scalar(
+                    series, iteration, "core_result_standard_error", np.float64, point_count
+                ),
+                relativeStandardError=_read_optional_scalar(
+                    series, iteration, "core_result_relative_standard_error", np.float64, point_count
+                ),
                 totalRays=_read_optional_scalar(series, iteration, "core_result_total_rays", np.uint32, point_count),
                 dndtAse=_read_optional_scalar(series, iteration, "core_result_dndt_ase", np.float64, point_count),
                 **_result_status_values(iteration),

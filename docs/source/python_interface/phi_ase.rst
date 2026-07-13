@@ -15,7 +15,7 @@ frontend modeling interface.
        maxRaysPerSample=1000,
        repetitions=1,
        adaptiveSteps=1,
-       mseThreshold=0.005,
+       relativeStandardErrorThreshold=0.1,
        useReflections=True,
        backend="Host_Cpu_CpuSerial",
        parallelMode="single",
@@ -52,17 +52,17 @@ Sampling and Physics Settings
 ``maxRaysPerSample``
    Maximum number of Monte Carlo rays used for adaptive sampling.
 
-``mseThreshold``
-   Target mean squared error threshold for the ASE estimate.
+``relativeStandardErrorThreshold``
+   Target dimensionless relative standard error; ``0.1`` requests 10%.
 
 ``repetitions``
    Maximum number of repeated ``PhiASE`` runs using the same number of rays if
-   the MSE target is not reached.  Since the importance-sampling distribution
+   the relative-error target is not reached.  Since the importance-sampling distribution
    assigns rays to prisms stochastically, repeating the calculation can improve
    the estimate without increasing the number of rays per run.
 
 ``adaptiveSteps``
-   If the MSE threshold is not reached for one backend run, HASEonGPU increases
+   If the relative-error threshold is not reached for one backend run, HASEonGPU increases
    the rays per sample up to ``maxRaysPerSample``.  This parameter controls how
    many ray-count steps are available between ``minRaysPerSample`` and
    ``maxRaysPerSample``.
@@ -175,7 +175,7 @@ A YAML file can keep experiment and compute settings together:
    experiment:
      min_rays_per_sample: 100000
      max_rays_per_sample: 1000000
-     mse_threshold: 0.05
+     relative_standard_error_threshold: 0.05
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true
@@ -202,7 +202,7 @@ overrides passed to ``fromYaml(...)`` are applied after the file is read.
 Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
 ``minRays`` -> ``minRaysPerSample``, ``maxRays`` ->
 ``maxRaysPerSample``, ``min_rays_per_sample``, ``max_rays_per_sample``,
-``mse_threshold``, ``adaptive_steps``, ``use_reflections``,
+``relative_standard_error_threshold``, ``adaptive_steps``, ``use_reflections``,
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
 ``min_sample_range``, ``max_sample_range``, and ``rng_seed``.
 

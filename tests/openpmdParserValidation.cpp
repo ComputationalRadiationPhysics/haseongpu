@@ -275,7 +275,7 @@ namespace
         iteration.setAttribute("cladding_absorption", 0.05);
         iteration.setAttribute("min_rays_per_sample", 1u);
         iteration.setAttribute("max_rays_per_sample", 2u);
-        iteration.setAttribute("mse_threshold", 0.5);
+        iteration.setAttribute("relative_standard_error_threshold", 0.5);
         iteration.setAttribute("repetitions", 3u);
         iteration.setAttribute("adaptive_steps", 4u);
         iteration.setAttribute("max_gpus", 1u);
@@ -386,7 +386,7 @@ namespace
             iteration.setAttribute("cladding_absorption", 0.05);
             iteration.setAttribute("min_rays_per_sample", 1u);
             iteration.setAttribute("max_rays_per_sample", 2u);
-            iteration.setAttribute("mse_threshold", 0.5);
+            iteration.setAttribute("relative_standard_error_threshold", 0.5);
             iteration.setAttribute("repetitions", 3u);
             iteration.setAttribute("adaptive_steps", 4u);
             iteration.setAttribute("max_gpus", 1u);
@@ -468,7 +468,7 @@ namespace
         iteration.setAttribute("cladding_absorption", 0.075);
         iteration.setAttribute("min_rays_per_sample", 1u);
         iteration.setAttribute("max_rays_per_sample", 1u);
-        iteration.setAttribute("mse_threshold", 0.25);
+        iteration.setAttribute("relative_standard_error_threshold", 0.25);
         iteration.setAttribute("repetitions", 1u);
         iteration.setAttribute("adaptive_steps", 1u);
         iteration.setAttribute("max_gpus", 1u);
@@ -911,18 +911,22 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
     REQUIRE(context.compute.rngSeed == 1234u);
 
     std::vector<float> phiAse(3u);
-    std::vector<double> mse(3u);
+    std::vector<double> standardError(3u);
+    std::vector<double> relativeStandardError(3u);
     std::vector<unsigned> totalRays(3u);
     std::vector<double> dndtAse(3u);
     for(unsigned i = 0; i < 3u; ++i)
     {
         phiAse[i] = 0.5f + static_cast<float>(i);
-        mse[i] = 1000.0 + static_cast<double>(i);
+        standardError[i] = 1000.0 + static_cast<double>(i);
+        relativeStandardError[i] = 0.1 * static_cast<double>(i + 1u);
         totalRays[i] = 200u + i;
         dndtAse[i] = -10.0 - static_cast<double>(i);
     }
 
-    parser.writeResult(hase::core::Result{phiAse, mse, totalRays, dndtAse}, context.mesh);
+    parser.writeResult(
+        hase::core::Result{phiAse, standardError, relativeStandardError, totalRays, dndtAse},
+        context.mesh);
 }
 
 #ifdef HASE_OPENPMD_PARSER_VALIDATION_CUSTOM_MAIN

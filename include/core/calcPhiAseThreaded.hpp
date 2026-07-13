@@ -152,14 +152,15 @@ namespace hase::core
             unsigned const deviceIndex = firstDevice + localDeviceIndex;
             unsigned const localRayCount
                 = localDeviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
-            devices.emplace_back(std::make_unique<ForwardSrmDeviceState<T_Device, T_Exec>>(
-                meshes.at(deviceIndex).m_device,
-                exec,
-                meshes.at(deviceIndex),
-                experiment,
-                betaVolumeTotal,
-                localRayCount,
-                hase::random::seedForWorker(baseSeed, rank, deviceIndex)));
+            devices.emplace_back(
+                std::make_unique<ForwardSrmDeviceState<T_Device, T_Exec>>(
+                    meshes.at(deviceIndex).m_device,
+                    exec,
+                    meshes.at(deviceIndex),
+                    experiment,
+                    betaVolumeTotal,
+                    localRayCount,
+                    hase::random::seedForWorker(baseSeed, rank, deviceIndex)));
             deviceIndices.emplace_back(deviceIndex);
         }
 
@@ -203,9 +204,9 @@ namespace hase::core
                 auto const passStarted = std::chrono::steady_clock::now();
                 if(debugSrm)
                 {
-                    dout(V_INFO) << "SRM: reflected pass " << pass << "/" << controls.maxIterations
-                                 << ": launching " << rayCount << " rays from weight=" << previousWeight
-                                 << " across " << activeDevices << " in-memory reservoir strata" << std::endl;
+                    dout(V_INFO) << "SRM: reflected pass " << pass << "/" << controls.maxIterations << ": launching "
+                                 << rayCount << " rays from weight=" << previousWeight << " across " << activeDevices
+                                 << " in-memory reservoir strata" << std::endl;
                 }
                 for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
                 {
@@ -226,8 +227,8 @@ namespace hase::core
                     double const passSeconds
                         = std::chrono::duration<double>(std::chrono::steady_clock::now() - passStarted).count();
                     dout(V_INFO) << "SRM: reflected pass " << pass << " completed in " << passSeconds
-                                 << " s; next weight=" << currentWeight
-                                 << ", W/W0=" << combined.srmRemainingFraction << std::endl;
+                                 << " s; next weight=" << currentWeight << ", W/W0=" << combined.srmRemainingFraction
+                                 << std::endl;
                 }
                 if(currentWeight > previousWeight)
                 {
@@ -267,8 +268,8 @@ namespace hase::core
         {
             throw std::runtime_error("Forward ray partition accounting mismatch.");
         }
-        float const runtime = static_cast<float>(
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
+        float const runtime
+            = static_cast<float>(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
         for(unsigned const deviceIndex : deviceIndices)
         {
             runtimes.at(deviceIndex) = runtime;

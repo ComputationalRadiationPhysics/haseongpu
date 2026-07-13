@@ -187,8 +187,7 @@ namespace alpaka::onHost
         }
 
         auto operator()(
-            hase::kernels::forward::SurfaceReservoirSamplingCdfSpans<TCdf, TTotalWeight, TRayFaces> const& spans)
-            const
+            hase::kernels::forward::SurfaceReservoirSamplingCdfSpans<TCdf, TTotalWeight, TRayFaces> const& spans) const
         {
             return hase::kernels::forward::SurfaceReservoirSamplingCdfSpans{
                 makeAccessibleOnAcc(spans.cdf),
@@ -249,8 +248,7 @@ namespace alpaka::trait
     struct IsKernelArgumentTriviallyCopyable<
         hase::kernels::forward::SurfaceReservoirSamplingCdfSpans<TCdf, TTotalWeight, TRayFaces>>
         : std::bool_constant<
-              IsKernelArgumentTriviallyCopyable<TCdf>::value
-              && IsKernelArgumentTriviallyCopyable<TTotalWeight>::value
+              IsKernelArgumentTriviallyCopyable<TCdf>::value && IsKernelArgumentTriviallyCopyable<TTotalWeight>::value
               && IsKernelArgumentTriviallyCopyable<TRayFaces>::value>
     {
     };
@@ -551,16 +549,11 @@ namespace hase::kernels::forward
 
     struct NormalizeSurfaceReservoirSamplingCdf
     {
-        ALPAKA_FN_HOST_ACC void operator()(
-            auto const& acc,
-            unsigned const faceCount,
-            auto samplingCdf) const
+        ALPAKA_FN_HOST_ACC void operator()(auto const& acc, unsigned const faceCount, auto samplingCdf) const
         {
             double const totalWeight = samplingCdf.totalWeight[0u];
-            for(auto [face] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{faceCount}))
+            for(auto [face] :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{faceCount}))
             {
                 samplingCdf.cdf[face] = totalWeight > 0.0 ? samplingCdf.cdf[face] / totalWeight : 0.0;
             }
@@ -569,10 +562,7 @@ namespace hase::kernels::forward
 
     struct CaptureSurfaceReservoirSamplingTotalWeight
     {
-        ALPAKA_FN_HOST_ACC void operator()(
-            auto const&,
-            unsigned const faceCount,
-            auto samplingCdf) const
+        ALPAKA_FN_HOST_ACC void operator()(auto const&, unsigned const faceCount, auto samplingCdf) const
         {
             samplingCdf.totalWeight[0u] = faceCount == 0u ? 0.0 : samplingCdf.cdf[faceCount - 1u];
         }
@@ -583,10 +573,7 @@ namespace hase::kernels::forward
         ALPAKA_FN_HOST_ACC void operator()(auto const&, auto systematicOffset, unsigned const rngSeed) const
         {
             auto rng = alpaka::rand::engine::Philox4x32x10{rngSeed};
-            systematicOffset[0u]
-                = alpaka::rand::distribution::UniformReal<
-                    double,
-                    alpaka::rand::interval::OO>{}(rng);
+            systematicOffset[0u] = alpaka::rand::distribution::UniformReal<double, alpaka::rand::interval::OO>{}(rng);
         }
     };
 
@@ -601,16 +588,14 @@ namespace hase::kernels::forward
             auto rayCounts) const
         {
             double const offset = systematicOffset[0u];
-            for(auto [face] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{faceCount}))
+            for(auto [face] :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{faceCount}))
             {
                 double const lowerCdf = face == 0u ? 0.0 : samplingCdf.cdf[face - 1u];
                 double const scaledLower = static_cast<double>(rayCount) * lowerCdf - offset;
                 double const scaledUpper = static_cast<double>(rayCount) * samplingCdf.cdf[face] - offset;
-                rayCounts[face] = static_cast<unsigned>(
-                    alpaka::math::floor(scaledUpper) - alpaka::math::floor(scaledLower));
+                rayCounts[face]
+                    = static_cast<unsigned>(alpaka::math::floor(scaledUpper) - alpaka::math::floor(scaledLower));
             }
         }
     };
@@ -624,10 +609,8 @@ namespace hase::kernels::forward
             auto rayOffsets,
             auto rayFaces) const
         {
-            for(auto [face] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{faceCount}))
+            for(auto [face] :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{faceCount}))
             {
                 unsigned const firstRay = rayOffsets[face];
                 unsigned const endRay = firstRay + rayCounts[face];
@@ -700,8 +683,7 @@ namespace hase::kernels::forward
                     slotWeight += inReservoir.weights[offset + slot];
                 if(slotWeight <= 0.0)
                     continue;
-                double const slotTarget
-                    = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) * slotWeight;
+                double const slotTarget = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) *slotWeight;
                 double cumulativeSlotWeight = 0.0;
                 unsigned localSlot = filledSlots - 1u;
                 for(unsigned slot = 0u; slot < filledSlots; ++slot)

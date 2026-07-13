@@ -209,9 +209,10 @@ namespace hase::core
                 oneDidRun = true;
                 // Statistics data
                 float runtime = 0.0;
-                double maxMSE = 0;
-                float avgMSE = 0;
-                unsigned highMSE = 0;
+                double maxRelativeStandardError = 0;
+                double avgRelativeStandardError = 0;
+                unsigned highRelativeStandardError = 0;
+                unsigned definedRelativeStandardErrors = 0;
                 time_t starttime = time(0);
                 unsigned maxDevices = compute.devices.size();
                 std::vector runtimes(maxDevices, 0.f);
@@ -303,7 +304,7 @@ namespace hase::core
                 {
                     double const fluorescenceRate = hostMesh.nTot / hostMesh.crystalTFluo;
                     result.phiAse.at(volume) *= fluorescenceRate;
-                    result.mse.at(volume) *= fluorescenceRate;
+                    result.standardError.at(volume) *= fluorescenceRate;
                     result.dndtAse.at(volume) = calcVolumeDndtAse(
                         hostMesh,
                         experiment.maxSigmaA,
@@ -320,7 +321,8 @@ namespace hase::core
                     for(unsigned sample_i = 0; sample_i < debugResultSize; ++sample_i)
                     {
                         dout(V_DEBUG) << "PHI ASE[" << sample_i << "]: " << result.phiAse.at(sample_i) << " "
-                                      << result.mse.at(sample_i) << std::endl;
+                                      << result.standardError.at(sample_i)
+                                      << " (RSE=" << result.relativeStandardError.at(sample_i) << ")" << std::endl;
                         if(sample_i >= 10)
                             break;
                     }
@@ -349,7 +351,7 @@ namespace hase::core
                         vtkPath / fs::path("dndt_" + currentTime + ".vtk"),
                         experiment.minRaysPerSample,
                         experiment.maxRaysPerSample,
-                        experiment.mseThreshold,
+                        experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
 
@@ -359,17 +361,17 @@ namespace hase::core
                         vtkPath / fs::path("phiase_" + currentTime + ".vtk"),
                         experiment.minRaysPerSample,
                         experiment.maxRaysPerSample,
-                        experiment.mseThreshold,
+                        experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
 
                     hase::utils::writePointsToVtk(
                         hostMesh,
-                        result.mse,
-                        vtkPath / fs::path("mse_" + currentTime + ".vtk"),
+                        result.standardError,
+                        vtkPath / fs::path("standard_error_" + currentTime + ".vtk"),
                         experiment.minRaysPerSample,
                         experiment.maxRaysPerSample,
-                        experiment.mseThreshold,
+                        experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
 
@@ -379,7 +381,17 @@ namespace hase::core
                         vtkPath / fs::path("total_rays_" + currentTime + ".vtk"),
                         experiment.minRaysPerSample,
                         experiment.maxRaysPerSample,
-                        experiment.mseThreshold,
+                        experiment.relativeStandardErrorThreshold,
+                        experiment.useReflections,
+                        runtime);
+
+                    hase::utils::writePointsToVtk(
+                        hostMesh,
+                        result.relativeStandardError,
+                        vtkPath / fs::path("relative_standard_error_" + currentTime + ".vtk"),
+                        experiment.minRaysPerSample,
+                        experiment.maxRaysPerSample,
+                        experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
                 }
@@ -391,20 +403,28 @@ namespace hase::core
                 {
                     unsigned numSamples = compute.maxSampleRange - compute.minSampleRange + 1;
                     for(unsigned sample_i = compute.minSampleRange;
-                        sample_i <= compute.maxSampleRange && sample_i < result.mse.size();
+                        sample_i <= compute.maxSampleRange && sample_i < result.relativeStandardError.size();
                         ++sample_i)
                     {
-                        auto& element = result.mse[sample_i];
-                        maxMSE = std::max(maxMSE, element);
-                        avgMSE += element;
-                        if(element >= experiment.mseThreshold)
+                        double const element = result.relativeStandardError[sample_i];
+                        if(!std::isfinite(element))
                         {
-                            std::cout << " to high mse at for element: " << sample_i << " mse: " << element
-                                      << std::endl;
-                            highMSE++;
+                            continue;
+                        }
+                        maxRelativeStandardError = std::max(maxRelativeStandardError, element);
+                        avgRelativeStandardError += element;
+                        ++definedRelativeStandardErrors;
+                        if(element >= experiment.relativeStandardErrorThreshold)
+                        {
+                            std::cout << " too high relative standard error at element: " << sample_i
+                                      << " rse: " << element << std::endl;
+                            highRelativeStandardError++;
                         }
                     }
-                    avgMSE /= numSamples;
+                    if(definedRelativeStandardErrors > 0u)
+                    {
+                        avgRelativeStandardError /= static_cast<double>(definedRelativeStandardErrors);
+                    }
 
                     try
                     {
@@ -430,11 +450,12 @@ namespace hase::core
                     dout(V_STAT | V_NOLABEL) << std::endl;
                     dout(V_STAT) << "sum(totalRays)    : "
                                  << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
-                    dout(V_STAT) << "MSE threshold     : " << experiment.mseThreshold << std::endl;
+                    dout(V_STAT) << "RSE threshold     : " << experiment.relativeStandardErrorThreshold << std::endl;
                     dout(V_STAT) << "int. Wavelength   : " << experiment.sigmaA.size() << std::endl;
-                    dout(V_STAT) << "max. MSE          : " << maxMSE << std::endl;
-                    dout(V_STAT) << "avg. MSE          : " << avgMSE << std::endl;
-                    dout(V_STAT) << "too high MSE      : " << highMSE << " of " << numSamples << std::endl;
+                    dout(V_STAT) << "max. RSE          : " << maxRelativeStandardError << std::endl;
+                    dout(V_STAT) << "avg. RSE          : " << avgRelativeStandardError << std::endl;
+                    dout(V_STAT) << "too high RSE      : " << highRelativeStandardError << " of "
+                                 << definedRelativeStandardErrors << " defined" << std::endl;
 
                     if constexpr(alpaka::thisApi() == alpaka::api::cuda || alpaka::thisApi() == alpaka::api::hip)
                     {
@@ -453,8 +474,8 @@ namespace hase::core
                         hase::utils::ray_histogram(
                             result.totalRays,
                             experiment.maxRaysPerSample,
-                            experiment.mseThreshold,
-                            result.mse,
+                            experiment.relativeStandardErrorThreshold,
+                            result.relativeStandardError,
                             result.droppedRays);
                     }
                     dout(V_STAT) << std::endl;

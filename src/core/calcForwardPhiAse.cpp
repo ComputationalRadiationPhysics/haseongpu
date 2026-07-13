@@ -65,6 +65,25 @@ namespace hase::core
         }
     }
 
+    double calcForwardRelativeStandardError(
+        double const scoreSum,
+        double const scoreSquareSum,
+        unsigned const rayCount)
+    {
+        if(rayCount < 2u || !std::isfinite(scoreSum) || !std::isfinite(scoreSquareSum))
+        {
+            return std::numeric_limits<double>::max();
+        }
+        if(scoreSum == 0.0)
+        {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        double const n = static_cast<double>(rayCount);
+        double const relativeVariance = (n * scoreSquareSum / (scoreSum * scoreSum) - 1.0) / n;
+        return std::sqrt(std::max(0.0, relativeVariance));
+    }
+
     double calcForwardStandardError(
         double const scoreSum,
         double const scoreSquareSum,
@@ -78,22 +97,29 @@ namespace hase::core
             return std::numeric_limits<double>::max();
         }
 
-        double const n = static_cast<double>(rayCount);
-        double const varianceOfMean = (scoreSquareSum - scoreSum * scoreSum / n) / (n * (n - 1.0));
+        double const relativeStandardError = calcForwardRelativeStandardError(scoreSum, scoreSquareSum, rayCount);
+        if(std::isnan(relativeStandardError))
+        {
+            return 0.0;
+        }
+        if(!std::isfinite(relativeStandardError))
+        {
+            return std::numeric_limits<double>::max();
+        }
+
         double const volumeScale = normalizationVolume / volumeSize;
-        return std::sqrt(std::max(0.0, varianceOfMean)) * volumeScale;
+        double const estimate = scoreSum * volumeScale / rayCount;
+        return relativeStandardError * std::abs(estimate);
     }
 
-    void finalizeForwardPhiAse(
-        HostMesh const& hostMesh,
-        ForwardPhiAseRawResult const& rawResult,
-        Result& result)
+    void finalizeForwardPhiAse(HostMesh const& hostMesh, ForwardPhiAseRawResult const& rawResult, Result& result)
     {
         unsigned const volumeCount = static_cast<unsigned>(rawResult.scoreSum.size());
         double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
 
         result = Result(
             std::vector(volumeCount, 0.0f),
+            std::vector(volumeCount, 0.0),
             std::vector(volumeCount, 0.0),
             rawResult.totalRays,
             std::vector(volumeCount, 0.0),
@@ -112,18 +138,26 @@ namespace hase::core
                 double const estimate
                     = scoreSum * betaVolumeTotal / (static_cast<double>(rawResult.rayCount) * volumeSize);
                 result.phiAse.at(volume) = static_cast<float>(estimate);
-                result.mse.at(volume) = result.droppedRays[volume] == 0u ? calcForwardStandardError(
-                                                                               scoreSum,
-                                                                               rawResult.scoreSquareSum.at(volume),
-                                                                               rawResult.rayCount,
-                                                                               betaVolumeTotal,
-                                                                               volumeSize)
-                                                                         : std::numeric_limits<double>::max();
+                result.relativeStandardError.at(volume) = result.droppedRays[volume] == 0u
+                                                              ? calcForwardRelativeStandardError(
+                                                                    scoreSum,
+                                                                    rawResult.scoreSquareSum.at(volume),
+                                                                    rawResult.rayCount)
+                                                              : std::numeric_limits<double>::max();
+                result.standardError.at(volume) = result.droppedRays[volume] == 0u
+                                                      ? calcForwardStandardError(
+                                                            scoreSum,
+                                                            rawResult.scoreSquareSum.at(volume),
+                                                            rawResult.rayCount,
+                                                            betaVolumeTotal,
+                                                            volumeSize)
+                                                      : std::numeric_limits<double>::max();
             }
             else
             {
                 result.phiAse.at(volume) = 0.0f;
-                result.mse.at(volume) = std::numeric_limits<double>::max();
+                result.standardError.at(volume) = std::numeric_limits<double>::max();
+                result.relativeStandardError.at(volume) = std::numeric_limits<double>::max();
             }
         }
     }

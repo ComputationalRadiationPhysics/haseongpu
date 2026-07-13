@@ -43,7 +43,7 @@ namespace hase::utils
      * @param filename the output filename to write
      * @param minRaysPerSample with which the experiment was started (see README)
      * @param maxRaysPerSample with which the experiment was started (see README)
-     * @param mseThreshold with which the experiment was started (see README)
+     * @param relativeStandardErrorThreshold with which the experiment was started (see README)
      * @param useReflections with which the experiment was started (see README)
      * @param runtime the time needed to complete the experiment
      *
@@ -55,7 +55,7 @@ namespace hase::utils
         std::filesystem::path const filename,
         unsigned const minRaysPerSample,
         unsigned const maxRaysPerSample,
-        float const mseThreshold,
+        float const relativeStandardErrorThreshold,
         bool const useReflections,
         float const runtime);
 
@@ -68,7 +68,7 @@ namespace hase::utils
      * @param filename the output filename to write
      * @param minRaysPerSample with which the experiment was started (see README)
      * @param maxRaysPerSample with which the experiment was started (see README)
-     * @param mseThreshold with which the experiment was started (see README)
+     * @param relativeStandardErrorThreshold with which the experiment was started (see README)
      * @param useReflections with which the experiment was started (see README)
      * @param runtime the time needed to complete the experiment
      *
@@ -80,7 +80,7 @@ namespace hase::utils
         std::filesystem::path const filename,
         unsigned const minRaysPerSample,
         unsigned const maxRaysPerSample,
-        float const mseThreshold,
+        float const relativeStandardErrorThreshold,
         bool const useReflections,
         float const runtime);
 

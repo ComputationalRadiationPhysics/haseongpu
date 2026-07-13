@@ -313,7 +313,7 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
         forwardRayCount=1,
         repetitions=1,
         adaptiveSteps=1,
-        mseThreshold=0.25,
+        relativeStandardErrorThreshold=0.25,
         useReflections=False,
         backend=_runtimeAlpakaBackend(),
         openpmdBackend=_runtimeOpenPmdBackend(),
@@ -330,7 +330,8 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
 
     result = phiAse.getResults()
     assert result.phiAse.shape == (topology.numberOfSamplePoints,)
-    assert result.mse.shape == (topology.numberOfSamplePoints,)
+    assert result.standardError.shape == (topology.numberOfSamplePoints,)
+    assert result.relativeStandardError.shape == (topology.numberOfSamplePoints,)
     assert result.totalRays.shape == (topology.numberOfSamplePoints,)
     assert result.dndtAse.shape == (topology.numberOfSamplePoints,)
     assert np.all(np.isfinite(result.phiAse))

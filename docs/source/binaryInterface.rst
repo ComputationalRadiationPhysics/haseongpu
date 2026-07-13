@@ -64,8 +64,9 @@ Arguments
 
 ``--output-path``
    Path for the result series.  Results are written as
-   ``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``,
-   and ``core_result_dndt_ase`` mesh records. Result iterations also report SRM
+   ``core_result_phi_ase``, ``core_result_standard_error``,
+   ``core_result_relative_standard_error``, ``core_result_total_rays``, and
+   ``core_result_dndt_ase`` mesh records. Result iterations also report SRM
    termination through ``srm_status``, ``srm_passes``,
    ``srm_remaining_fraction``, ``srm_max_iterations``, and
    ``srm_divergence_streak`` attributes.
@@ -96,7 +97,8 @@ custom Python pump routines are not part of this execution path.
 In this mode Python sends the initial mesh/material/spectra/beta state and the
 binary writes one output iteration per completed time step. The output snapshot
 iterations include ``core_point_beta``, ``core_beta_volume``,
-``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``,
+``core_result_phi_ase``, ``core_result_standard_error``,
+``core_result_relative_standard_error``, ``core_result_total_rays``,
 ``core_result_dndt_ase``, and ``core_result_dndt_pump``. Iteration 0 also
 carries the static mesh/material/spectral records so the snapshot series can be
 read independently.

@@ -70,8 +70,8 @@ class PhiASE:
     """Maximum rays per sample allowed during adaptive refinement."""
     forwardRayCount: int | None = None
     """Number of globally launched forward rays; defaults to ``maxRaysPerSample``."""
-    mseThreshold: float = 0.1
-    """Target mean-squared-error threshold for adaptive ASE sampling."""
+    relativeStandardErrorThreshold: float = 0.1
+    """Target one-sigma relative sampling uncertainty for ASE flux estimates."""
     repetitions: int = 4
     """Maximum repeated ASE estimates at a fixed ray count."""
     adaptiveSteps: int = 4
@@ -152,7 +152,7 @@ class PhiASE:
         parser.add_argument("--max-rays-per-sample", type=int, default=None)
         parser.add_argument("--propagation-mode", choices=("forward",), default=None)
         parser.add_argument("--forward-ray-count", type=int, default=None)
-        parser.add_argument("--mse-threshold", type=float, default=None)
+        parser.add_argument("--relative-standard-error-threshold", type=float, default=None)
         parser.add_argument("--reflection-max-iterations", type=int, default=None)
         parser.add_argument("--reflection-tolerance", type=float, default=None)
         parser.add_argument("--surface-reservoir-size", type=int, default=None)
@@ -176,7 +176,7 @@ class PhiASE:
             "max_rays_per_sample": "maxRaysPerSample",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
-            "mse_threshold": "mseThreshold",
+            "relative_standard_error_threshold": "relativeStandardErrorThreshold",
             "reflection_max_iterations": "reflectionMaxIterations",
             "reflection_tolerance": "reflectionTolerance",
             "surface_reservoir_size": "surfaceReservoirSize",
@@ -224,7 +224,7 @@ class PhiASE:
             "max_rays_per_sample": "maxRaysPerSample",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
-            "mse_threshold": "mseThreshold",
+            "relative_standard_error_threshold": "relativeStandardErrorThreshold",
             "reflection_max_iterations": "reflectionMaxIterations",
             "reflection_tolerance": "reflectionTolerance",
             "surface_reservoir_size": "surfaceReservoirSize",
@@ -241,11 +241,11 @@ class PhiASE:
         }
         allowed = {
             "minRaysPerSample", "maxRaysPerSample", "propagationMode", "forwardRayCount",
-            "mseThreshold", "reflectionMaxIterations", "reflectionTolerance",
+            "relativeStandardErrorThreshold", "reflectionMaxIterations", "reflectionTolerance",
             "surfaceReservoirSize", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
             "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
-            "minRaysPerSample", "maxRaysPerSample", "mseThreshold", "reflectionMaxIterations",
+            "minRaysPerSample", "maxRaysPerSample", "relativeStandardErrorThreshold", "reflectionMaxIterations",
             "reflectionTolerance", "surfaceReservoirSize", "repetitions",
             "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
             "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
@@ -256,6 +256,10 @@ class PhiASE:
                 if name in {"forwardRayLength", "forward_ray_length"}:
                     raise ValueError(
                         "forward_ray_length is retired; forward rays now propagate to their physical boundary"
+                    )
+                if name in {"mseThreshold", "mse_threshold"}:
+                    raise ValueError(
+                        "mse_threshold is retired; configure relative_standard_error_threshold instead"
                     )
                 attr = aliases.get(name, name)
                 if attr in allowed:
@@ -272,7 +276,7 @@ class PhiASE:
             "maxRaysPerSample": self.maxRaysPerSample,
             "propagationMode": self.propagationMode,
             "forwardRayCount": self.maxRaysPerSample if self.forwardRayCount is None else self.forwardRayCount,
-            "mseThreshold": self.mseThreshold,
+            "relativeStandardErrorThreshold": self.relativeStandardErrorThreshold,
             "reflectionMaxIterations": self.reflectionMaxIterations,
             "reflectionTolerance": self.reflectionTolerance,
             "surfaceReservoirSize": self.surfaceReservoirSize,
@@ -422,8 +426,10 @@ class TimeStepState:
     """Native volume-centered ASE flux, when provided by the compiled backend."""
     volumeDndtAse: np.ndarray | None = None
     """Native volume-centered ASE depletion contribution, when available."""
-    volumeMse: np.ndarray | None = None
-    """Native volume-centered Monte Carlo error estimate, when available."""
+    volumeStandardError: np.ndarray | None = None
+    """Native volume-centered absolute one-sigma sampling uncertainty, when available."""
+    volumeRelativeStandardError: np.ndarray | None = None
+    """Native volume-centered relative one-sigma sampling uncertainty, when available."""
     volumeTotalRays: np.ndarray | None = None
     """Native volume-centered ray visit counts, when available."""
 
@@ -595,9 +601,13 @@ class Simulation:
                     None if getattr(raw_state, "volumeDndtAse", None) is None
                     else np.asarray(raw_state.volumeDndtAse, dtype=np.float64).copy()
                 ),
-                volumeMse=(
-                    None if getattr(raw_state, "volumeMse", None) is None
-                    else np.asarray(raw_state.volumeMse, dtype=np.float64).copy()
+                volumeStandardError=(
+                    None if getattr(raw_state, "volumeStandardError", None) is None
+                    else np.asarray(raw_state.volumeStandardError, dtype=np.float64).copy()
+                ),
+                volumeRelativeStandardError=(
+                    None if getattr(raw_state, "volumeRelativeStandardError", None) is None
+                    else np.asarray(raw_state.volumeRelativeStandardError, dtype=np.float64).copy()
                 ),
                 volumeTotalRays=(
                     None if getattr(raw_state, "volumeTotalRays", None) is None

@@ -163,7 +163,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
         forwardRayCount=rayCount,
         repetitions=1,
         adaptiveSteps=1,
-        mseThreshold=0.05,
+        relativeStandardErrorThreshold=0.05,
         useReflections=False,
         backend=backend,
         openpmdBackend=openPmdBackendForTest(),

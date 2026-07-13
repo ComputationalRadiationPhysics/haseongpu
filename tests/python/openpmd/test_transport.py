@@ -132,7 +132,7 @@ def asymmetric_phi_ase():
         crossSections=asymmetric_cross_sections(),
         minRaysPerSample=1,
         maxRaysPerSample=1,
-        mseThreshold=0.25,
+        relativeStandardErrorThreshold=0.25,
         repetitions=1,
         adaptiveSteps=1,
         useReflections=True,
@@ -186,7 +186,7 @@ def launch_smoke_phi_ase(*, parallel_mode="single"):
         crossSections=cross_sections,
         minRaysPerSample=1,
         maxRaysPerSample=1,
-        mseThreshold=0.25,
+        relativeStandardErrorThreshold=0.25,
         repetitions=1,
         adaptiveSteps=1,
         useReflections=False,
@@ -1152,7 +1152,7 @@ def test_inputSeriesWritesContract(contract_input):
     assert iteration.get_attribute("crystal_t_fluo") == pytest.approx(1.75)
     assert iteration.get_attribute("spectral_resolution") == 3
     assert iteration.get_attribute("rng_seed") == 1234
-    assert iteration.get_attribute("propagation_mode") == "backward"
+    assert iteration.get_attribute("propagation_mode") == "forward"
 
     points = iteration.meshes["core_points"]
     assert points.get_attribute("haseTransportVersion") == HASE_TRANSPORT_VERSION
@@ -1283,12 +1283,14 @@ def test_cppParserRoundTripsPythonWriter(contract_input, tmp_path):
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
     result = transport.read_result(output)
-    expected_phi = np.array([0.5 + i for i in range(30)], dtype=np.float32)
-    expected_mse = np.array([1000.0 + i for i in range(30)], dtype=np.float64)
-    expected_total_rays = np.array([200 + i for i in range(30)], dtype=np.uint32)
-    expected_dndt_ase = np.array([-10.0 - i for i in range(30)], dtype=np.float64)
+    expected_phi = np.array([0.5 + i for i in range(3)], dtype=np.float32)
+    expected_standard_error = np.array([1000.0 + i for i in range(3)], dtype=np.float64)
+    expected_relative_standard_error = np.array([0.1 * (i + 1) for i in range(3)], dtype=np.float64)
+    expected_total_rays = np.array([200 + i for i in range(3)], dtype=np.uint32)
+    expected_dndt_ase = np.array([-10.0 - i for i in range(3)], dtype=np.float64)
     np.testing.assert_array_equal(result.phiAse, expected_phi)
-    np.testing.assert_array_equal(result.mse, expected_mse)
+    np.testing.assert_array_equal(result.standardError, expected_standard_error)
+    np.testing.assert_array_equal(result.relativeStandardError, expected_relative_standard_error)
     np.testing.assert_array_equal(result.totalRays, expected_total_rays)
     np.testing.assert_array_equal(result.dndtAse, expected_dndt_ase)
 
@@ -1297,19 +1299,20 @@ def test_cppParserRoundTripsPythonWriter(contract_input, tmp_path):
     iteration = series.iterations[0]
     expected_units = {
         "phi_ase": "cm^-2 s^-1",
-        "mse": "cm^-2 s^-1",
+        "standard_error": "cm^-2 s^-1",
+        "relative_standard_error": "1",
         "total_rays": "count",
         "dndt_ase": "s^-1",
     }
-    for name in ["phi_ase", "mse", "total_rays", "dndt_ase"]:
+    for name in ["phi_ase", "standard_error", "relative_standard_error", "total_rays", "dndt_ase"]:
         record = iteration.meshes["core_result_" + name]
         assert record.get_attribute("haseTransportVersion") == HASE_TRANSPORT_VERSION
-        assert record.get_attribute("haseEntity") == "point_level"
-        assert _attribute_list(record.get_attribute("haseAxes")) == ["point", "level"]
+        assert record.get_attribute("haseEntity") == "cell"
+        assert _attribute_list(record.get_attribute("haseAxes")) == ["cell"]
         assert record.get_attribute("haseLayoutOrder") == "recordC"
-        assert _attribute_list(record.get_attribute("hasePrimitiveShape")) == [5, 6]
+        assert _attribute_list(record.get_attribute("hasePrimitiveShape")) == [3]
         assert record.get_attribute("haseUnit") == expected_units[name]
-        assert list(record.axis_labels) == ["point", "level"]
+        assert list(record.axis_labels) == ["cell"]
     series.close()
 
 
@@ -1432,11 +1435,13 @@ def _backend_execution_command_prefix(build_dir):
 def _assert_launch_smoke_result(result):
     expected_size = launch_smoke_topology().numberOfSamplePoints
     assert result.phiAse.shape == (expected_size,)
-    assert result.mse.shape == (expected_size,)
+    assert result.standardError.shape == (expected_size,)
+    assert result.relativeStandardError.shape == (expected_size,)
     assert result.totalRays.shape == (expected_size,)
     assert result.dndtAse.shape == (expected_size,)
     assert np.all(np.isfinite(result.phiAse))
-    assert np.all(np.isfinite(result.mse))
+    assert np.all(np.isfinite(result.standardError))
+    assert np.all(np.isfinite(result.relativeStandardError))
     assert np.all(result.totalRays >= 0)
 
 
@@ -1618,7 +1623,8 @@ def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
     _write_minimal_snapshot_scalar(iteration, "core_point_beta", sample_flat.astype(np.float64))
     _write_minimal_snapshot_scalar(iteration, "core_beta_volume", cell_layer_flat.astype(np.float64))
     _write_minimal_snapshot_scalar(iteration, "core_result_phi_ase", sample_flat.astype(np.float32))
-    _write_minimal_snapshot_scalar(iteration, "core_result_mse", (sample_flat + 1000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_standard_error", (sample_flat + 1000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_relative_standard_error", (sample_flat + 0.1).astype(np.float64))
     _write_minimal_snapshot_scalar(iteration, "core_result_total_rays", np.arange(sample_flat.size, dtype=np.uint32))
     _write_minimal_snapshot_scalar(iteration, "core_result_dndt_ase", (sample_flat + 2000.0).astype(np.float64))
     _write_minimal_snapshot_scalar(iteration, "core_result_dndt_pump", (sample_flat + 3000.0).astype(np.float64))

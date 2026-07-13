@@ -71,3 +71,5 @@ The generated archive `phiase_reference.npz` contains:
 
 The stored `meanPhi` values are only diagnostics. The intended comparison is a
 volume integral of the current Tet4 field against the legacy wedge field.
+
+Previous versions use ``mseThreshold: 0.01087``, calibrated here to ``relativeStandardErrorThreshold: 0.05``.

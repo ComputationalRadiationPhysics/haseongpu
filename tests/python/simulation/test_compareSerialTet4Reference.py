@@ -195,6 +195,12 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
     backend = os.environ.get("HASE_COMPARE_SERIAL_BACKEND", _default_backend())
 
     for name, dataset in compareSerialReference["datasets"].items():
+        if name == "cuboid":
+            relative_standard_error_threshold = 0.14
+        elif name == "cylindrical":
+            relative_standard_error_threshold = 0.10
+        else:
+            raise ValueError(f"no calibrated RSE threshold for compareSerial dataset '{name}'")
         medium = GainMedium.fromVtk(repoRoot / "example" / "data" / f"{name}.vtk")
         projection = projectionFromTet4Medium(medium)
         phi_ase = PhiASE(
@@ -204,7 +210,7 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
             forwardRayCount=ray_count,
             repetitions=1,
             adaptiveSteps=1,
-            mseThreshold=float(metadata["parameters"]["experiment"]["mseThreshold"]),
+            relativeStandardErrorThreshold=relative_standard_error_threshold,
             useReflections=False,
             backend=backend,
             openpmdBackend=openPmdRuntimeBackend,
@@ -214,6 +220,10 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
             rngSeed=int(metadata["random"]["serialMt19937Seed"]),
         )
         phi_ase.run(gainMedium=medium)
+        np.testing.assert_array_less(
+            np.asarray(phi_ase.getResults().relativeStandardError, dtype=np.float64),
+            relative_standard_error_threshold,
+        )
         current_integral = tet4CellVolumeIntegral(medium, phi_ase.getResults().phiAse)
         legacy_integral = legacyWedgePointIntegral(dataset["phiASE"], projection)
 

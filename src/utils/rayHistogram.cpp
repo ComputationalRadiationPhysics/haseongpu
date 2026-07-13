@@ -40,8 +40,8 @@ namespace hase::utils
     void ray_histogram(
         std::vector<unsigned> const totalRays,
         unsigned const max,
-        double const mseThreshold,
-        std::vector<double> const mseValues,
+        double const relativeStandardErrorThreshold,
+        std::vector<double> const relativeStandardErrors,
         std::vector<unsigned> const droppedRays)
     {
         // length of the maximum number of samples (e.g. max==4210)
@@ -62,7 +62,9 @@ namespace hase::utils
                 histGreen.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
                 histRed.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
             }
-            if(mseValues.at(j) <= mseThreshold && droppedRays.at(j) == 0u)
+            if((!std::isfinite(relativeStandardErrors.at(j))
+                || relativeStandardErrors.at(j) <= relativeStandardErrorThreshold)
+               && droppedRays.at(j) == 0u)
             {
                 histGreen.find(totalRays.at(j))->second++;
                 // itG->second++;

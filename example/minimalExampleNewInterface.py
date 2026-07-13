@@ -110,7 +110,7 @@ def main():
         maxRaysPerSample=1000,
         repetitions=1,
         adaptiveSteps=1,
-        mseThreshold=0.005,
+        relativeStandardErrorThreshold=0.1,
         useReflections=True,
         backend="Host_Cpu_CpuSerial",
         parallelMode="single",

@@ -249,7 +249,7 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             minRaysPerSample=20_000,
             maxRaysPerSample=20_000,
             adaptiveSteps=1,
-            mseThreshold=1.0,
+            relativeStandardErrorThreshold=0.1,
             reflectionMaxIterations=17,
             reflectionTolerance=0.0,
             surfaceReservoirSize=32,
@@ -278,7 +278,7 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
     tet4_dir = tmp_path / "current_tet4"
     tet4_dir.mkdir()
 
-    laserPumpCladding.runExample(
+    state = laserPumpCladding.runExample(
         backend=backend,
         openpmdBackend=openPmdRuntimeBackend,
         timeSlices=metadata["parameters"]["timeSlices"],
@@ -290,9 +290,14 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
         useReflections=metadata["parameters"]["useReflections"],
         minRaysPerSample=metadata["parameters"]["minRaysPerSample"],
         maxRaysPerSample=metadata["parameters"]["maxRaysPerSample"],
-        mseThreshold=metadata["parameters"]["mseThreshold"],
+        relativeStandardErrorThreshold=0.05,
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
     )
+
+    relative_standard_error = np.asarray(state.volumeRelativeStandardError, dtype=np.float64)
+    defined_relative_standard_error = relative_standard_error[np.isfinite(relative_standard_error)]
+    assert defined_relative_standard_error.size > 0
+    assert np.max(defined_relative_standard_error) < 0.05
 
     observed_integrals = []
     for step in metadata["observable"]["stepNumbers"]:

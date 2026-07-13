@@ -1,13 +1,14 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
+
 #include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <string>
 #include <type_traits>
 
-TEST_CASE("forward PhiASE standard error includes zero-score histories", "[forward][mse]")
+TEST_CASE("forward PhiASE RSE includes zero-score histories", "[forward][rse]")
 {
     // Four globally launched histories with cell scores [1, 3, 0, 0].
     // The forward cell estimator scales the per-history mean by totalVolume / cellVolume.
@@ -17,25 +18,34 @@ TEST_CASE("forward PhiASE standard error includes zero-score histories", "[forwa
     double const totalVolume = 8.0;
     double const cellVolume = 4.0;
 
-    double const varianceOfMean = (sumSquares - sum * sum / rayCount) / (rayCount * (rayCount - 1u));
-    double const expected = std::sqrt(varianceOfMean) * (totalVolume / cellVolume);
+    double const expectedRelativeStandardError = std::sqrt((rayCount * sumSquares / (sum * sum) - 1.0) / rayCount);
+    double const expectedStandardError = expectedRelativeStandardError * (sum * totalVolume / (rayCount * cellVolume));
 
     CHECK(
+        hase::core::calcForwardRelativeStandardError(sum, sumSquares, rayCount)
+        == Catch::Approx(expectedRelativeStandardError));
+    CHECK(
         hase::core::calcForwardStandardError(sum, sumSquares, rayCount, totalVolume, cellVolume)
-        == Catch::Approx(expected));
+        == Catch::Approx(expectedStandardError));
 }
 
-TEST_CASE("forward PhiASE standard error rejects invalid sample sizes and geometry", "[forward][mse]")
+TEST_CASE("forward PhiASE RSE handles invalid and zero-score estimates", "[forward][rse]")
 {
+    CHECK(hase::core::calcForwardRelativeStandardError(1.0, 1.0, 1u) == std::numeric_limits<double>::max());
+    CHECK(std::isnan(hase::core::calcForwardRelativeStandardError(0.0, 0.0, 2u)));
+    CHECK(
+        hase::core::calcForwardRelativeStandardError(std::numeric_limits<double>::infinity(), 1.0, 2u)
+        == std::numeric_limits<double>::max());
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 1u, 1.0, 1.0) == std::numeric_limits<double>::max());
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 2u, 0.0, 1.0) == 0.0);
+    CHECK(hase::core::calcForwardStandardError(0.0, 0.0, 2u, 1.0, 1.0) == 0.0);
     CHECK(hase::core::calcForwardStandardError(1.0, 1.0, 2u, 1.0, 0.0) == std::numeric_limits<double>::max());
     CHECK(
         hase::core::calcForwardStandardError(std::numeric_limits<double>::infinity(), 1.0, 2u, 1.0, 1.0)
         == std::numeric_limits<double>::max());
 }
 
-TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[forward][mse]")
+TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[forward][rse]")
 {
     hase::core::BetaVolumeContribution contribution;
     auto const value = contribution(alpaka::Simd<double, 1u>{0.25}, alpaka::Simd<float, 1u>{0.5f});

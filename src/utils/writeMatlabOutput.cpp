@@ -67,13 +67,13 @@ namespace hase::utils
         std::filesystem::path const experimentPath,
         std::vector<float> const ase,
         std::vector<unsigned> const N_rays,
-        std::vector<double> const expectedValues,
+        std::vector<double> const standardErrorValues,
         unsigned const numberOfSamples,
         unsigned const columnCount)
     {
         std::ofstream aseFile;
         std::ofstream raysFile;
-        std::ofstream expectedValuesFile;
+        std::ofstream standardErrorFile;
         unsigned const rowCount = numberOfSamples / columnCount;
 
         aseFile.open(experimentPath / "phi_ASE.txt");
@@ -84,9 +84,9 @@ namespace hase::utils
         write3dMatrix(N_rays, raysFile, rowCount, columnCount, 1);
         raysFile.close();
 
-        expectedValuesFile.open(experimentPath / "mse_values.txt");
-        write3dMatrix(expectedValues, expectedValuesFile, rowCount, columnCount, 1);
-        expectedValuesFile.close();
+        standardErrorFile.open(experimentPath / "standard_error_values.txt");
+        write3dMatrix(standardErrorValues, standardErrorFile, rowCount, columnCount, 1);
+        standardErrorFile.close();
     }
 
 } // namespace hase::utils
