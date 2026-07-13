@@ -58,6 +58,24 @@ min-sample-i=0
 max-sample-i=<full point buffer>
 ```
 
+With ``monochromatic=true``, the legacy parser reduced each stored spectrum to
+the first absorption/emission cross-section pair before starting the serial
+calculation.  For these inputs that is the pair at 905 nm; the remaining 190
+table entries were not sampled by the reference calculation.
+
+At generator commit ``469c8777``, ``BaseVersionSerial`` then consumed
+``minRaysPerSample`` (one million), that one cross-section pair, and the legacy
+mesh's points, prism connectivity, ``betaVolume``, ``betaCells``, ``nTot``, and
+``crystalTFluo``.  Its implementation did not consult the maximum-ray, MSE,
+reflection, cladding-optics, repetition, or adaptive-step controls.  A clean
+historical build invoking ``BaseVersionSerial`` directly reproduced both
+stored arrays bit-for-bit for cylindrical indices 0 through 10; across both
+full datasets, every stored ``dndtAse`` value also exactly satisfies the
+legacy first-pair ``gainPerDensity * phiASE`` calculation.
+The temporary full-buffer dump patch itself is not present in the cited
+generator commit, so regenerating the complete archive still requires
+reconstructing that small test-only patch.
+
 If new reference data is generated from that old branch, record the exact
 generator commit, input geometry, backend, RNG seed, command line/config, and
 observable beside the data file.
