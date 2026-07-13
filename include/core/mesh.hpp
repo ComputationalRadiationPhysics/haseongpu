@@ -725,7 +725,7 @@ namespace hase::core
         {
             double d = calculateMaxDiameter(points.data(), numberOfPoints);
             float alpha = getReflectionAngle(reflectionPlane, *this) * static_cast<float>(M_PI) / 180.0f;
-            double h = numberOfLevels * thickness;
+            double h = (numberOfLevels - 1u) * thickness;
             double z = d / std::tan(alpha);
             return static_cast<unsigned>(std::ceil(z / h));
         }

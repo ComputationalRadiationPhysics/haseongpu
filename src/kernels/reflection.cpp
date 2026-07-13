@@ -56,7 +56,7 @@ namespace hase::kernels
         if(reflectionPlane == hase::core::TOP_REFLECTION)
         {
             // Reflection on TOP plane
-            planeZ = mesh.thickness * mesh.numberOfLevels;
+            planeZ = mesh.thickness * (mesh.numberOfLevels - 1u);
         }
         double denominator = reflectionRay.dir.z;
         if(denominator != 0.0)
@@ -92,7 +92,7 @@ namespace hase::kernels
         {
             // Even reflectionCount is postponement
 
-            endPoint.z = endPoint.z + reflectionSign * (reflectionsLeft * mesh.thickness * mesh.numberOfLevels);
+            endPoint.z = endPoint.z + reflectionSign * (reflectionsLeft * mesh.thickness * (mesh.numberOfLevels - 1u));
         }
         else
         {
@@ -100,12 +100,13 @@ namespace hase::kernels
 
             if(reflectionPlane == hase::core::TOP_REFLECTION)
             {
-                mirrorPlaneZ = alpaka::math::ceil(reflectionsLeft / (double) 2) * mesh.thickness * mesh.numberOfLevels;
+                mirrorPlaneZ
+                    = alpaka::math::ceil(reflectionsLeft / (double) 2) * mesh.thickness * (mesh.numberOfLevels - 1u);
             }
             else
             {
-                mirrorPlaneZ = alpaka::math::floor(reflectionsLeft / (double) 2) * mesh.thickness * mesh.numberOfLevels
-                               * reflectionSign;
+                mirrorPlaneZ = alpaka::math::floor(reflectionsLeft / (double) 2) * mesh.thickness
+                               * (mesh.numberOfLevels - 1u) * reflectionSign;
             }
 
             endPoint.z = reflectionSign * alpaka::math::abs((mirrorPlaneZ + mirrorPlaneZ - endPoint.z));

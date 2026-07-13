@@ -15,6 +15,7 @@
 #include <core/mesh.hpp>
 #include <kernels/importanceSampling.hpp>
 #include <kernels/propagateRay.hpp>
+#include <kernels/reflection.hpp>
 
 #include <cmath>
 #include <iostream>
@@ -80,6 +81,27 @@ struct PropagationKernel
     }
 };
 
+struct ReflectionPlaneKernel
+{
+    ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto result) const
+    {
+        for(auto [id] : alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{1u}))
+        {
+            hase::core::Point reflectionPoint{0.0, 0.0, 0.0};
+            double reflectionAngle = 0.0;
+            result[id * 2u] = static_cast<double>(hase::kernels::calcNextReflection(
+                {1.0 / 3.0, 1.0 / 3.0, 0.25},
+                {1.0 / 3.0, 1.0 / 3.0, 0.25},
+                1u,
+                hase::core::TOP_REFLECTION,
+                &reflectionPoint,
+                &reflectionAngle,
+                mesh));
+            result[id * 2u + 1u] = reflectionPoint.z;
+        }
+    }
+};
+
 struct ReflectionKernel
 {
     // this needs adjustment since only the z is the only DOF for the rays - not comparable to real simulation
@@ -125,6 +147,24 @@ std::vector<double> runPropagationKernel(hase::core::HostMesh& hostMesh, T_Devic
 }
 
 template<typename T_Device, typename T_Executor>
+std::vector<double> runReflectionPlaneKernel(
+    hase::core::HostMesh& hostMesh,
+    T_Device& device,
+    T_Executor const& executor)
+{
+    auto queue = device.makeQueue();
+    auto deviceMesh = hostMesh.toDevice(device);
+    auto result = alpaka::onHost::alloc<double>(device, 2u);
+    auto frameSpec = alpaka::onHost::getFrameSpec(device, executor, 1u);
+    queue.enqueue(frameSpec, alpaka::KernelBundle{ReflectionPlaneKernel{}, deviceMesh.toView(), result});
+    auto hostResult = alpaka::onHost::allocHostLike(result);
+    alpaka::onHost::memcpy(queue, hostResult, result);
+    alpaka::onHost::wait(queue);
+    auto* data = alpaka::onHost::data(hostResult);
+    return {data, data + 2u};
+}
+
+template<typename T_Device, typename T_Executor>
 std::vector<double> runReflectionKernel(hase::core::HostMesh& hostMesh, T_Device& device, T_Executor const& executor)
 {
     auto queue = device.makeQueue();
@@ -166,6 +206,31 @@ TEMPLATE_LIST_TEST_CASE("propagateRay preserves neutral gain inside a prism", ""
         CHECK(result[offset + 1u] == Catch::Approx(0.0));
         CHECK(result[offset + 2u] == Catch::Approx(0.0));
     }
+}
+
+TEMPLATE_LIST_TEST_CASE("legacy top reflections use the final physical z plane", "", TestApis)
+{
+    auto cfg = TestType::makeDict();
+    auto deviceSpec = cfg[alpaka::object::deviceSpec];
+    auto exec = cfg[alpaka::object::exec];
+
+    auto devSelector = alpaka::onHost::makeDeviceSelector(deviceSpec);
+    if(!devSelector.isAvailable())
+    {
+        std::cout << "No device available for " << deviceSpec.getName() << std::endl;
+        return;
+    }
+
+    auto device = devSelector.makeDevice(0);
+    auto mesh = constructDummyMesh(0.0);
+    auto const result = runReflectionPlaneKernel(mesh, device, exec);
+
+    REQUIRE(result.size() == 2u);
+    CHECK(result[0] == Catch::Approx(0.0));
+    // Two planes at z=0 and z=1 form one physical layer, not a second
+    // virtual layer at z=2.
+    CHECK(result[1] == Catch::Approx(1.0));
+    CHECK(mesh.getMaxReflections(hase::core::TOP_REFLECTION) == 2u);
 }
 
 TEMPLATE_LIST_TEST_CASE("hase::kernels::propagateRayWithReflection responds to surface reflectivity", "", TestApis)
