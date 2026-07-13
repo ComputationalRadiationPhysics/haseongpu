@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate the committed JuliaASE reflection surface fixture.
 
-This helper is intentionally not used by CI.  It requires a JuliaASE checkout
-(via JULIAASE_ROOT or ./juliaASE) so that maintainers do not accidentally treat
-HASE as the source of truth when updating the reference artifact.  The current
-implementation prepares the same CI fixture schema and can be extended with the
-project-local JuliaASE driver used for the reference campaign.
+This helper is intentionally not used by CI. It runs the repository-local
+single-Tet4 driver with JuliaASE, rather than using HASE as the source of truth.
 """
 
 from __future__ import annotations
@@ -23,11 +20,12 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "tests" / "data" / "juliaASE" / "reflection_surface_reference"
 REFERENCE_PATH = FIXTURE_DIR / "reference.json"
+JULIA_DRIVER = REPO_ROOT / "scripts" / "juliaase_reflection_fixture.jl"
 
 
 def juliaase_root() -> Path:
     configured = os.environ.get("JULIAASE_ROOT")
-    root = Path(configured) if configured else REPO_ROOT / "juliaASE"
+    root = Path(configured) if configured else REPO_ROOT.parent / "juliaASE"
     if not (root / "Project.toml").is_file():
         raise SystemExit(
             "JuliaASE checkout not found. Set JULIAASE_ROOT or place a checkout at ./juliaASE."
@@ -58,34 +56,55 @@ def write_reference(reference: dict, *, dry_run: bool) -> None:
     REFERENCE_PATH.write_text(text, encoding="utf-8")
 
 
+def generate_reference(root: Path, julia: str, ray_count: int) -> dict:
+    environment = dict(os.environ, HASE_JULIAASE_FIXTURE_RAYS=str(ray_count))
+    completed = subprocess.run(
+        [julia, f"--project={root}", str(JULIA_DRIVER), str(root.resolve())],
+        check=True,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"JuliaASE fixture driver produced invalid JSON:\\n{completed.stdout}") from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="print regenerated JSON instead of overwriting")
     parser.add_argument(
-        "--accept-existing-reference",
-        action="store_true",
-        help=(
-            "validate JuliaASE availability and rewrite the currently committed arrays. "
-            "Use this until the local JuliaASE driver for this fixture is published."
-        ),
+        "--ray-count",
+        type=int,
+        default=1_000_000,
+        help="JuliaASE histories used to establish the stored Monte Carlo reference (default: %(default)s)",
     )
     args = parser.parse_args(argv)
 
+    if args.ray_count <= 0:
+        raise SystemExit("--ray-count must be positive")
+
     root = juliaase_root()
     require_julia(root)
-
-    if not args.accept_existing_reference:
-        raise SystemExit(
-            "JuliaASE is available, but no repository-local JuliaASE driver is wired for this fixture yet. "
-            "Pass --accept-existing-reference to rewrite the committed artifact unchanged, or add the "
-            "JuliaASE case driver here before updating reference values."
-        )
-
     reference = load_reference()
-    # Recompute the stored one-step beta update from the reference dndt to keep
-    # deterministic formatting and catch accidental manual edits.
+    generated = generate_reference(root, shutil.which("julia"), args.ray_count)
+    if generated["status"] != "converged":
+        raise SystemExit(f"JuliaASE fixture did not converge: {generated['status']}")
+
+    reference["phiAse"] = generated["phiAse"]
+    reference["reflectedPassWeightFractions"] = generated["reflectedPassWeightFractions"]
+    reference["referenceRayCount"] = generated["rayCount"]
+    reference["referenceInitialReflectedWeight"] = generated["initialReflectedWeight"]
+
+    # JuliaASE and HASE use opposite signs for this rate convention. The stored
+    # rate is deliberately the HASE/openPMD convention tested below.
     beta = np.asarray(reference["initialBetaVolume"], dtype=np.float64)
-    dndt = np.asarray(reference["dndtAse"], dtype=np.float64)
+    absorption = float(max(reference["crossSections"]["crossSectionAbsorption"]))
+    emission = float(max(reference["crossSections"]["crossSectionEmission"]))
+    dndt = (beta * (emission + absorption) - absorption) * np.asarray(reference["phiAse"], dtype=np.float64)
+    reference["dndtAse"] = dndt.tolist()
     reference["finalBetaVolume"] = (beta - float(reference["timeStep"]) * dndt).tolist()
     write_reference(reference, dry_run=args.dry_run)
     return 0

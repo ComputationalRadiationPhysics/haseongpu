@@ -36,12 +36,17 @@ namespace
         constexpr char const* maxRaysPerSample = "max_rays_per_sample";
         constexpr char const* propagationMode = "propagation_mode";
         constexpr char const* forwardRayCount = "forward_ray_count";
-        constexpr char const* forwardRayLength = "forward_ray_length";
+        constexpr char const* retiredForwardRayLength = "forward_ray_length";
         constexpr char const* mseThreshold = "mse_threshold";
         constexpr char const* useReflections = "use_reflections";
         constexpr char const* reflectionMaxIterations = "reflection_max_iterations";
         constexpr char const* reflectionTolerance = "reflection_tolerance";
         constexpr char const* surfaceReservoirSize = "surface_reservoir_size";
+        constexpr char const* srmStatus = "srm_status";
+        constexpr char const* srmPasses = "srm_passes";
+        constexpr char const* srmRemainingFraction = "srm_remaining_fraction";
+        constexpr char const* srmMaxIterations = "srm_max_iterations";
+        constexpr char const* srmDivergenceStreak = "srm_divergence_streak";
         constexpr char const* spectralResolution = "spectral_resolution";
         constexpr char const* monochromatic = "monochromatic";
         constexpr char const* maxSigmaAbsorption = "max_sigma_absorption";
@@ -1149,14 +1154,9 @@ namespace hase::openpmd
         experiment.propagationMode = propagationMode;
         experiment.forwardRayCount
             = attributeOr<unsigned>(iteration, field::forwardRayCount, experiment.maxRaysPerSample);
-        if(!iteration.containsAttribute(field::forwardRayLength))
+        if(iteration.containsAttribute(field::retiredForwardRayLength))
         {
-            validationError("forward_ray_length", "required when propagation_mode is 'forward'");
-        }
-        experiment.forwardRayLength = attribute<double>(iteration, field::forwardRayLength);
-        if(experiment.forwardRayLength <= 0.0)
-        {
-            validationError("forward_ray_length", "must be positive");
+            validationError("forward_ray_length", "is retired; forward rays now propagate to their physical boundary");
         }
         experiment.reflectionMaxIterations = attributeOr<unsigned>(iteration, field::reflectionMaxIterations, 8u);
         experiment.reflectionTolerance = attributeOr<double>(iteration, field::reflectionTolerance, 1.0e-4);
@@ -1278,6 +1278,11 @@ namespace hase::openpmd
         iteration.setAttribute(field::numberOfPoints, mesh.numberOfPoints);
         iteration.setAttribute(field::numberOfCells, mesh.numberOfCells);
         iteration.setAttribute(field::numberOfLevels, mesh.numberOfLevels);
+        iteration.setAttribute(field::srmStatus, std::string{core::toString(result.srmStatus)});
+        iteration.setAttribute(field::srmPasses, result.srmPasses);
+        iteration.setAttribute(field::srmRemainingFraction, result.srmRemainingFraction);
+        iteration.setAttribute(field::srmMaxIterations, result.srmMaxIterations);
+        iteration.setAttribute(field::srmDivergenceStreak, result.srmDivergenceStreak);
 
         std::string const prefix = m_meshGroup + "_result_";
         auto phiAse = result.phiAse;
@@ -1346,6 +1351,11 @@ namespace hase::openpmd
         iteration.setAttribute(field::numberOfPoints, snapshot.mesh.numberOfPoints);
         iteration.setAttribute(field::numberOfCells, snapshot.mesh.numberOfTriangles);
         iteration.setAttribute(field::numberOfLevels, snapshot.mesh.numberOfLevels);
+        iteration.setAttribute(field::srmStatus, std::string{core::toString(snapshot.aseResult.srmStatus)});
+        iteration.setAttribute(field::srmPasses, snapshot.aseResult.srmPasses);
+        iteration.setAttribute(field::srmRemainingFraction, snapshot.aseResult.srmRemainingFraction);
+        iteration.setAttribute(field::srmMaxIterations, snapshot.aseResult.srmMaxIterations);
+        iteration.setAttribute(field::srmDivergenceStreak, snapshot.aseResult.srmDivergenceStreak);
 
         std::string const prefix = m_meshGroup + "_";
         if(includeStatic)

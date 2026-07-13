@@ -311,7 +311,6 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
         minRaysPerSample=1,
         maxRaysPerSample=1,
         forwardRayCount=1,
-        forwardRayLength=1.0,
         repetitions=1,
         adaptiveSteps=1,
         mseThreshold=0.25,
@@ -477,7 +476,7 @@ def testForwardOpenPmdInputWritesVolumeRecords(tmp_path):
         crossSectionAbsorption=0.0,
         crossSectionEmission=0.0,
     )
-    phiAse = PhiASE(spectralProperties=crossSections, forwardRayLength=1.0)
+    phiAse = PhiASE(spectralProperties=crossSections)
     path = tmp_path / ("forward_volume" + transport._backend_spec("adios").suffix)
 
     with transport.OpenPmdInputSeries(path, backend="adios") as series:

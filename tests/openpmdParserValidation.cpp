@@ -285,7 +285,6 @@ namespace
         iteration.setAttribute("max_sample_range", 5u);
         iteration.setAttribute("rng_seed", 1234u);
         iteration.setAttribute("use_reflections", true);
-        iteration.setAttribute("forward_ray_length", 1.0);
         iteration.setAttribute("spectral_resolution", 2u);
         iteration.setAttribute("monochromatic", false);
         iteration.setAttribute("max_sigma_absorption", 0.02);
@@ -397,7 +396,6 @@ namespace
             iteration.setAttribute("max_sample_range", 5u);
             iteration.setAttribute("rng_seed", 1234u);
             iteration.setAttribute("use_reflections", true);
-            iteration.setAttribute("forward_ray_length", 1.0);
             iteration.setAttribute("spectral_resolution", 2u);
             iteration.setAttribute("monochromatic", false);
             iteration.setAttribute("max_sigma_absorption", 0.02);
@@ -480,7 +478,6 @@ namespace
         iteration.setAttribute("max_sample_range", 0u);
         iteration.setAttribute("rng_seed", 1234u);
         iteration.setAttribute("use_reflections", true);
-        iteration.setAttribute("forward_ray_length", 1.0);
         iteration.setAttribute("spectral_resolution", 3u);
         iteration.setAttribute("monochromatic", false);
         iteration.setAttribute("max_sigma_absorption", 0.040);
@@ -682,6 +679,20 @@ TEST_CASE("openPMD parser rejects unsupported compute settings explicitly", "[op
     REQUIRE(error.find("unsupported compute setting") != std::string::npos);
 }
 
+TEST_CASE("openPMD parser rejects the retired forward ray-length request field", "[openpmd][parser]")
+{
+    auto const path = writeParserInput(
+        "retired_forward_ray_length",
+        [](io::Series& series, io::Iteration& iteration)
+        {
+            (void) series;
+            iteration.setAttribute("forward_ray_length", 1.0);
+        });
+    auto const error = parserError(path);
+    REQUIRE(error.find("openPMD validation error for 'forward_ray_length'") != std::string::npos);
+    REQUIRE(error.find("is retired") != std::string::npos);
+}
+
 TEST_CASE("openPMD parser processRequestIterations consumes stream until producer close", "[openpmd][parser]")
 {
     auto const input = writeParserInput("process_all");
@@ -694,6 +705,11 @@ TEST_CASE("openPMD parser processRequestIterations consumes stream until produce
         {
             ++calls;
             context.result.phiAse = std::vector<float>{1.0f};
+            context.result.srmStatus = hase::core::SrmStatus::STABLE;
+            context.result.srmPasses = 2u;
+            context.result.srmRemainingFraction = 0.25;
+            context.result.srmMaxIterations = 8u;
+            context.result.srmDivergenceStreak = 3u;
         });
 
     REQUIRE(calls == 1u);
@@ -706,6 +722,11 @@ TEST_CASE("openPMD parser processRequestIterations consumes stream until produce
         REQUIRE(iteration.iterationIndex == 0u);
         REQUIRE(iteration.getAttribute("number_of_points").get<unsigned>() == 4u);
         REQUIRE(iteration.getAttribute("number_of_levels").get<unsigned>() == 1u);
+        REQUIRE(iteration.getAttribute("srm_status").get<std::string>() == "stable");
+        REQUIRE(iteration.getAttribute("srm_passes").get<unsigned>() == 2u);
+        REQUIRE(iteration.getAttribute("srm_remaining_fraction").get<double>() == Catch::Approx(0.25));
+        REQUIRE(iteration.getAttribute("srm_max_iterations").get<unsigned>() == 8u);
+        REQUIRE(iteration.getAttribute("srm_divergence_streak").get<unsigned>() == 3u);
 
         auto component = iteration.meshes["core_result_phi_ase"][io::MeshRecordComponent::SCALAR];
         auto chunk = component.loadChunk<float>();

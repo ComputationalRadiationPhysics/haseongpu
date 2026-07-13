@@ -32,7 +32,6 @@ SIMULATION_ATTRIBUTE_SPECS = (
     ExtensionAttributeSpec("maxRaysPerSample", "max_rays_per_sample", "int", unit="count", unitDimension=unitDimension.maxRaysPerSample),
     ExtensionAttributeSpec("propagationMode", "propagation_mode", "str", unitDimension=unitDimension.propagationMode),
     ExtensionAttributeSpec("forwardRayCount", "forward_ray_count", "int", unit="count", unitDimension=unitDimension.forwardRayCount),
-    ExtensionAttributeSpec("forwardRayLength", "forward_ray_length", "float", unit="m", unitDimension=unitDimension.forwardRayLength),
     ExtensionAttributeSpec("mseThreshold", "mse_threshold", "float", unitDimension=unitDimension.mseThreshold),
     ExtensionAttributeSpec("repetitions", "repetitions", "int", unit="count", unitDimension=unitDimension.repetitions),
     ExtensionAttributeSpec("adaptiveSteps", "adaptive_steps", "int", unit="count", unitDimension=unitDimension.adaptiveSteps),
@@ -54,6 +53,18 @@ SIMULATION_ATTRIBUTE_SPECS = (
     ExtensionAttributeSpec("minSampleRange", "min_sample_range", "int", unit="index", unitDimension=unitDimension.minSampleRange),
     ExtensionAttributeSpec("maxSampleRange", "max_sample_range", "int", unit="index", unitDimension=unitDimension.maxSampleRange),
     ExtensionAttributeSpec("rngSeed", "rng_seed", "int", unitDimension=unitDimension.rngSeed),
+)
+
+
+# Result-iteration attributes are HASE openPMD extensions, registered separately
+# from request attributes so readers can validate their names and types without
+# accidentally serializing them into an input request.
+RESULT_ATTRIBUTE_SPECS = (
+    ExtensionAttributeSpec("srmStatus", "srm_status", "str", unitDimension=unitDimension.srmStatus),
+    ExtensionAttributeSpec("srmPasses", "srm_passes", "int", unit="count", unitDimension=unitDimension.srmPasses),
+    ExtensionAttributeSpec("srmRemainingFraction", "srm_remaining_fraction", "float", unitDimension=unitDimension.srmRemainingFraction),
+    ExtensionAttributeSpec("srmMaxIterations", "srm_max_iterations", "int", unit="count", unitDimension=unitDimension.srmMaxIterations),
+    ExtensionAttributeSpec("srmDivergenceStreak", "srm_divergence_streak", "int", unit="count", unitDimension=unitDimension.srmDivergenceStreak),
 )
 
 

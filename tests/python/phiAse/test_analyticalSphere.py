@@ -124,7 +124,7 @@ def openPmdBackendForTest():
 
 
 def analyticalSphereRayCount():
-    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "1000000"))
+    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "5000000"))
 
 
 @pytest.mark.parametrize("backend", analyticalSphereBackends())
@@ -161,7 +161,6 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
         spectralProperties=crossSections,
         maxRaysPerSample=rayCount,
         forwardRayCount=rayCount,
-        forwardRayLength=2.0 * float(radius),
         repetitions=1,
         adaptiveSteps=1,
         mseThreshold=0.05,
@@ -197,7 +196,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
     )
     assert np.isfinite(numerical)
     assert numerical > 0.0
-    assert np.isclose(numerical, expected, rtol=0.10)
+    assert np.isclose(numerical, expected, rtol=0.05)
 
 
 if __name__ == "__main__":

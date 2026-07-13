@@ -25,6 +25,7 @@ from . import (
     fieldSpec,
     flatEntityLabel,
     haseTransportAttributes,
+    resultAttributeSpecs,
     resultFieldSpecs,
     simulationAttributeSpecs,
     spectralContext,
@@ -442,7 +443,7 @@ def _attributeFields(phiAse, gainMedium, crossSections):
     values = _attributeValues(phiAse, gainMedium, crossSections)
     for spec in simulationAttributeSpecs:
         if spec.name not in values:
-            if spec.name in {"rngSeed", "forwardRayLength"}:
+            if spec.name == "rngSeed":
                 continue
             raise KeyError(spec.name)
         yield _AttributeField(spec.attribute, spec.cast(values[spec.name]))
@@ -999,6 +1000,7 @@ def _read_result_iteration(series, iteration, *, fallback_index=None) -> tuple[i
         spec.name: _loadScalar(series, iteration, prefix + spec.recordName, spec.dtypeObject)
         for spec in resultFieldSpecs()
     }
+    values.update(_result_status_values(iteration))
     iteration.close()
     return iteration_index, Result(**values)
 
@@ -1034,6 +1036,20 @@ def _has_attribute(obj, name):
         return True
     except Exception:
         return False
+
+
+def _result_status_values(iteration):
+    defaults = {
+        "srmStatus": "disabled",
+        "srmPasses": 0,
+        "srmRemainingFraction": 0.0,
+        "srmMaxIterations": 0,
+        "srmDivergenceStreak": 0,
+    }
+    return {
+        spec.name: spec.cast(iteration.get_attribute(spec.attribute)) if _has_attribute(iteration, spec.attribute) else defaults[spec.name]
+        for spec in resultAttributeSpecs
+    }
 
 
 def read_simulation_output(path):
@@ -1085,6 +1101,7 @@ def read_simulation_output(path):
                 mse=_read_optional_scalar(series, iteration, "core_result_mse", np.float64, point_count),
                 totalRays=_read_optional_scalar(series, iteration, "core_result_total_rays", np.uint32, point_count),
                 dndtAse=_read_optional_scalar(series, iteration, "core_result_dndt_ase", np.float64, point_count),
+                **_result_status_values(iteration),
             ),
             staticUpdate=bool(iteration.get_attribute("haseStaticUpdate")) if _has_attribute(iteration, "haseStaticUpdate") else iteration_index == 0,
         ))

@@ -31,6 +31,14 @@ backend settings, parallel mode, sample range, and optional RNG seed.  This is
 the same transport layout written by the Python interface; see
 :doc:`openpmdTransport`.
 
+For forward reflections, the request uses the schema-defined iteration
+attributes ``use_reflections``, ``reflection_max_iterations``,
+``reflection_tolerance``, and ``surface_reservoir_size``. ``forward_ray_length``
+is retired and rejected. The local environment variables
+``HASE_SRM_MAX_ITERATIONS`` and ``HASE_SRM_DIVERGENCE_STREAK`` override the
+maximum reflected-pass count and the consecutive-growth divergence threshold;
+both must be positive integers. The latter defaults to ``3``.
+
 Examples
 --------
 
@@ -57,7 +65,10 @@ Arguments
 ``--output-path``
    Path for the result series.  Results are written as
    ``core_result_phi_ase``, ``core_result_mse``, ``core_result_total_rays``,
-   and ``core_result_dndt_ase`` records.
+   and ``core_result_dndt_ase`` mesh records. Result iterations also report SRM
+   termination through ``srm_status``, ``srm_passes``,
+   ``srm_remaining_fraction``, ``srm_max_iterations``, and
+   ``srm_divergence_streak`` attributes.
 
 Compiled Simulation Mode
 ------------------------

@@ -191,8 +191,7 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
 
     metadata = compareSerialReference["metadata"]
     ray_count = int(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_COUNT", metadata["parameters"]["experiment"]["maxRays"]))
-    forward_ray_length = float(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_LENGTH", "1.0"))
-    rtol = float(os.environ.get("HASE_COMPARE_SERIAL_INTEGRAL_RTOL", "0.35"))
+    rtol = float(os.environ.get("HASE_COMPARE_SERIAL_INTEGRAL_RTOL", "0.05"))
     backend = os.environ.get("HASE_COMPARE_SERIAL_BACKEND", _default_backend())
 
     for name, dataset in compareSerialReference["datasets"].items():
@@ -203,7 +202,6 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
             minRaysPerSample=ray_count,
             maxRaysPerSample=ray_count,
             forwardRayCount=ray_count,
-            forwardRayLength=forward_ray_length,
             repetitions=1,
             adaptiveSteps=1,
             mseThreshold=float(metadata["parameters"]["experiment"]["mseThreshold"]),

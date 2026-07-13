@@ -12,6 +12,7 @@ from .schema import (
     FIELD_ALIASES,
     HASE_TRANSPORT_ATTRIBUTES,
     PRIMITIVE_SCHEMA_CLASSES,
+    RESULT_ATTRIBUTE_SPECS,
     SIMULATION_ATTRIBUTE_SPECS,
     BaseGroup,
     BaseSchema,
@@ -41,6 +42,7 @@ def backendFlat(values):
 
 haseTransportAttributes = HASE_TRANSPORT_ATTRIBUTES
 simulationAttributeSpecs = SIMULATION_ATTRIBUTE_SPECS
+resultAttributeSpecs = RESULT_ATTRIBUTE_SPECS
 primitiveSchemaClasses = PRIMITIVE_SCHEMA_CLASSES
 primitiveSchemas = {name: schema_class.primitiveSchema() for name, schema_class in primitiveSchemaClasses.items()}
 componentFieldSpecs = tuple(spec.toFieldSpec(tuple(spec.axes)) for spec in COMPONENT_FIELD_SPECS)

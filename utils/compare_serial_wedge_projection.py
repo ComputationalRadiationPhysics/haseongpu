@@ -118,6 +118,36 @@ def tet4ResultToLegacyPointValues(medium: GainMedium, values):
     return result
 
 
+def tet4CellVolumeIntegral(medium: GainMedium, values):
+    """Integrate one Tet4 cell-centered field over the current volume mesh."""
+    values = np.asarray(values, dtype=np.float64).reshape(-1)
+    volumes = np.asarray(medium.topology.cellVolumes, dtype=np.float64).reshape(-1)
+    if values.shape != volumes.shape:
+        raise ValueError(f"Tet4 integral needs one value per cell, got {values.size} values for {volumes.size} cells")
+    return float(np.sum(values * volumes))
+
+
+def legacyWedgePointIntegral(values, projection: WedgeProjection):
+    """Integrate a legacy wedge point field with linear prism averaging."""
+    values = np.asarray(values, dtype=np.float64).reshape(-1)
+    topology = projection.topology
+    point_count = int(topology.numberOfPoints) * int(topology.levels)
+    if values.size != point_count:
+        raise ValueError(f"legacy point field needs {point_count} values, got {values.size}")
+    point_values = values.reshape((topology.numberOfPoints, topology.levels), order="F")
+    triangles = np.asarray(topology.trianglePointIndices, dtype=np.uint32)
+    prism_values = np.empty((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
+    for level in range(topology.levels - 1):
+        lower = point_values[triangles, level]
+        upper = point_values[triangles, level + 1]
+        prism_values[:, level] = (lower.sum(axis=1) + upper.sum(axis=1)) / 6.0
+    flat_prism_values = prism_values.reshape(-1, order="F")
+    prism_volumes = np.asarray(projection.prismVolumes, dtype=np.float64).reshape(-1)
+    if flat_prism_values.shape != prism_volumes.shape:
+        raise ValueError("legacy point integral prism values and volumes have incompatible shapes")
+    return float(np.sum(flat_prism_values * prism_volumes))
+
+
 def _unique_in_order(values):
     seen = set()
     ordered = []

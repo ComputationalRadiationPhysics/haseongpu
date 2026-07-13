@@ -93,7 +93,6 @@ def test_hase_forward_reflection_matches_committed_juliaase_surface_fixture():
         minRaysPerSample=int(reference["rayCount"]),
         maxRaysPerSample=int(reference["rayCount"]),
         forwardRayCount=int(reference["rayCount"]),
-        forwardRayLength=float(reference["forwardRayLength"]),
         mseThreshold=1.0,
         repetitions=1,
         adaptiveSteps=1,
@@ -116,6 +115,12 @@ def test_hase_forward_reflection_matches_committed_juliaase_surface_fixture():
     actual_dndt = np.asarray(result.dndtAse, dtype=np.float64)
     actual_final_beta = np.asarray(reference["initialBetaVolume"], dtype=np.float64) - float(reference["timeStep"]) * actual_dndt
     tolerances = reference["tolerances"]
+
+    assert result.srmStatus == "converged"
+    assert result.srmPasses == 1
+    assert result.srmMaxIterations == int(reference["reflectionMaxIterations"])
+    assert result.srmDivergenceStreak == 3
+    assert result.srmRemainingFraction == pytest.approx(0.0)
 
     np.testing.assert_allclose(
         actual_phi,

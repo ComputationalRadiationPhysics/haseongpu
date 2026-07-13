@@ -142,7 +142,7 @@ def asymmetric_phi_ase():
         minSampleRange=0,
         maxSampleRange=0,
         rngSeed=1234,
-        propagationMode="backward",
+        propagationMode="forward",
     )
 
 
@@ -196,7 +196,7 @@ def launch_smoke_phi_ase(*, parallel_mode="single"):
         minSampleRange=0,
         maxSampleRange=0,
         rngSeed=1234,
-        propagationMode="backward",
+        propagationMode="forward",
     )
 
 
@@ -1608,6 +1608,11 @@ def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
     iteration.set_attribute("step_index", 1)
     iteration.set_attribute("time", 0.25)
     iteration.set_attribute("haseStaticUpdate", True)
+    iteration.set_attribute("srm_status", "stable")
+    iteration.set_attribute("srm_passes", 2)
+    iteration.set_attribute("srm_remaining_fraction", 0.25)
+    iteration.set_attribute("srm_max_iterations", 8)
+    iteration.set_attribute("srm_divergence_streak", 3)
     iteration.time = 0.25
 
     _write_minimal_snapshot_scalar(iteration, "core_point_beta", sample_flat.astype(np.float64))
@@ -1631,6 +1636,11 @@ def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
         state.betaVolume,
         cell_layer_flat.reshape((number_of_cells, number_of_levels - 1), order="F"),
     )
+    assert state.aseResult.srmStatus == "stable"
+    assert state.aseResult.srmPasses == 2
+    assert state.aseResult.srmRemainingFraction == pytest.approx(0.25)
+    assert state.aseResult.srmMaxIterations == 8
+    assert state.aseResult.srmDivergenceStreak == 3
 
 
 def test_simulation_run_control_serializes_compiled_solver_metadata():
