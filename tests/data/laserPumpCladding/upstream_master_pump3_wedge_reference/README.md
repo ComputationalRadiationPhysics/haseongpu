@@ -73,3 +73,18 @@ The stored `meanPhi` values are only diagnostics. The intended comparison is a
 volume integral of the current Tet4 field against the legacy wedge field.
 
 Previous versions use ``mseThreshold: 0.01087``, calibrated here to ``relativeStandardErrorThreshold: 0.05``.
+
+## Reference audit notes
+
+The historical parser interpolates both ASE spectra to 1000 equally spaced
+samples over 905--1095 nm before transport; the pump uses the original table
+values at 940 nm. The current example reproduces those inputs.
+
+The historical reflection implementation places its virtual top reflection
+plane at `numberOfLevels * thickness` (0.777... m), although the ten sampled
+planes end at 0.7 m. The current Tet4 walker reflects at the physical 0.7 m
+boundary. For the retained comparison, two physical SRM passes reproduce the
+legacy reflection series within 10%; using the current default eight passes
+would count the virtual legacy layer repeatedly. The integration contract
+therefore pins `reflectionMaxIterations=2`. The Tet4 conversion now orders
+each wedge's base vertices globally so all shared prism faces are conforming.

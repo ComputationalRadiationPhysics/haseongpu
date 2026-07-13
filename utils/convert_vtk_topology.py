@@ -33,7 +33,12 @@ def _tet_volume(points):
 
 
 def _tetrahedra_from_wedge(cell):
-    a, b, c, d, e, f = [int(vertex) for vertex in cell]
+    # Use a global base-vertex order so neighboring prisms choose the same
+    # diagonal on every shared quadrilateral face.
+    vertices = np.asarray(cell, dtype=np.uint32)
+    order = np.argsort(vertices[:3])
+    a, b, c = [int(vertex) for vertex in vertices[:3][order]]
+    d, e, f = [int(vertex) for vertex in vertices[3:][order]]
     return np.asarray(
         [
             [a, b, c, d],
