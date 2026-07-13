@@ -35,14 +35,56 @@ from HASEonGPU import (  # noqa: E402
 )
 
 
-def laserPumpCladdingSpectralProperties():
+LEGACY_ASE_SPECTRAL_RESOLUTION = 1000
+
+
+def _resampleLegacySpectrum(wavelengths, cross_sections):
+    wavelengths = np.asarray(wavelengths, dtype=np.float64)
+    cross_sections = np.asarray(cross_sections, dtype=np.float64)
+    effective_wavelengths = np.linspace(
+        wavelengths[0],
+        wavelengths[-1],
+        LEGACY_ASE_SPECTRAL_RESOLUTION,
+    )
+    return effective_wavelengths, np.interp(
+        effective_wavelengths,
+        wavelengths,
+        cross_sections,
+    )
+
+
+def _loadLaserPumpCladdingRawSpectra():
     materialDir = scriptDir / "input"
+    return (
+        np.loadtxt(materialDir / "lambda_a.txt"),
+        np.loadtxt(materialDir / "sigma_a.txt"),
+        np.loadtxt(materialDir / "lambda_e.txt"),
+        np.loadtxt(materialDir / "sigma_e.txt"),
+    )
+
+
+def laserPumpCladdingSpectralProperties():
+    """Return the spectrum actually sampled by the retained legacy fixture."""
+    (
+        raw_wavelengths_absorption,
+        raw_cross_section_absorption,
+        raw_wavelengths_emission,
+        raw_cross_section_emission,
+    ) = _loadLaserPumpCladdingRawSpectra()
+    wavelengths_absorption, cross_section_absorption = _resampleLegacySpectrum(
+        raw_wavelengths_absorption,
+        raw_cross_section_absorption,
+    )
+    wavelengths_emission, cross_section_emission = _resampleLegacySpectrum(
+        raw_wavelengths_emission,
+        raw_cross_section_emission,
+    )
     return CrossSectionData(
-        wavelengthsAbsorption=np.loadtxt(materialDir / "lambda_a.txt"),
-        crossSectionAbsorption=np.loadtxt(materialDir / "sigma_a.txt"),
-        wavelengthsEmission=np.loadtxt(materialDir / "lambda_e.txt"),
-        crossSectionEmission=np.loadtxt(materialDir / "sigma_e.txt"),
-        resolution=np.loadtxt(materialDir / "lambda_a.txt").size,
+        wavelengthsAbsorption=wavelengths_absorption,
+        crossSectionAbsorption=cross_section_absorption,
+        wavelengthsEmission=wavelengths_emission,
+        crossSectionEmission=cross_section_emission,
+        resolution=LEGACY_ASE_SPECTRAL_RESOLUTION,
     )
 
 
@@ -253,10 +295,25 @@ def runExample(
     vtkOutputDir = Path(vtkOutputDir)
     spectralProperties = laserPumpCladdingSpectralProperties()
 
+    pumpWavelength = 940e-9
+    (
+        raw_wavelengths_absorption,
+        raw_cross_section_absorption,
+        raw_wavelengths_emission,
+        raw_cross_section_emission,
+    ) = _loadLaserPumpCladdingRawSpectra()
     pumpCrossSections = CrossSectionData.monochromatic(
-        wavelength=940e-9,
-        crossSectionAbsorption=0.778e-20,
-        crossSectionEmission=0.195e-20,
+        wavelength=pumpWavelength,
+        crossSectionAbsorption=np.interp(
+            pumpWavelength * 1.0e9,
+            raw_wavelengths_absorption,
+            raw_cross_section_absorption,
+        ),
+        crossSectionEmission=np.interp(
+            pumpWavelength * 1.0e9,
+            raw_wavelengths_emission,
+            raw_cross_section_emission,
+        ),
     )
     absorption=5.5
     medium = laserPumpCladdingMedium(cladAbsorption=absorption)
@@ -278,7 +335,7 @@ def runExample(
                          pumpSubsteps=100,
                          temporaryFluorescence=1.0,
                          pumpSteps=pumpSteps,
-                         wavelength=940e-9,
+                         wavelength=pumpWavelength,
                          radiusX=1.5,
                          radiusY=1.5,
                          exponent=40,

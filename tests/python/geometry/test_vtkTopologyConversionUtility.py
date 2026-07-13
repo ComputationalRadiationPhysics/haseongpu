@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from collections import Counter
 import subprocess
 import sys
 from pathlib import Path
@@ -112,7 +113,26 @@ def testConvertWedgeVtkToTet4AndBackTransfersCellAdjacentFields(tmp_path):
     assert round_points.shape == (8, 3)
     assert len(round_cells) == 2
     assert np.all(np.asarray(round_types) == 13)
-    np.testing.assert_array_equal(np.asarray(round_cells, dtype=np.uint32), np.asarray([[0, 1, 2, 4, 5, 6], [1, 3, 2, 5, 7, 6]], dtype=np.uint32))
+    np.testing.assert_array_equal(
+        np.sort(np.asarray(round_cells, dtype=np.uint32), axis=1),
+        np.sort(
+            np.asarray(
+                [[0, 1, 2, 4, 5, 6], [1, 3, 2, 5, 7, 6]],
+                dtype=np.uint32,
+            ),
+            axis=1,
+        ),
+    )
+
+    face_counts = Counter(
+        tuple(sorted(np.delete(cell, opposite).tolist()))
+        for cell in np.asarray(cells, dtype=np.uint32)
+        for opposite in range(4)
+    )
+    assert set(face_counts.values()) == {1, 2}
+    assert sum(count == 1 for count in face_counts.values()) == 12
+    assert face_counts[(1, 2, 5)] == 2
+    assert face_counts[(2, 5, 6)] == 2
     np.testing.assert_allclose(round_point_data["betaCells"], point_data["betaCells"])
     np.testing.assert_allclose(round_cell_data["betaVolume"], [10.0, 20.0])
     np.testing.assert_array_equal(round_fields["cellMaterial"], [7, 8])
