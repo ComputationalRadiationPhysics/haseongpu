@@ -84,6 +84,68 @@ TEST_CASE("forward source stratification places one shifted point in each CDF in
     }
 }
 
+TEST_CASE("forward Tet4 face planes are barycentric", "[forward][traversal]")
+{
+    hase::core::HostMesh mesh;
+    mesh.points = {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+    mesh.numberOfCells = 1u;
+    mesh.numberOfMeshPoints = 4u;
+    mesh.cellPointIndices = {0u, 1u, 2u, 3u};
+    mesh.cellFaces = {1, 2, 3, 0, 3, 2, 0, 1, 3, 0, 2, 1};
+    mesh.precomputeBarycentricFacePlanes();
+
+    auto const point = [](unsigned const vertex)
+    {
+        return std::array<hase::core::Point, 4u>{
+            hase::core::Point{0.0, 0.0, 0.0},
+            hase::core::Point{1.0, 0.0, 0.0},
+            hase::core::Point{0.0, 1.0, 0.0},
+            hase::core::Point{0.0, 0.0, 1.0}}
+            .at(vertex);
+    };
+    auto const coordinate = [&mesh](unsigned const face, hase::core::Point const value)
+    {
+        unsigned const offset = face * hase::core::tet4BarycentricPlaneWidth;
+        return mesh.barycentricFacePlanes[offset] * value.x + mesh.barycentricFacePlanes[offset + 1u] * value.y
+               + mesh.barycentricFacePlanes[offset + 2u] * value.z + mesh.barycentricFacePlanes[offset + 3u];
+    };
+
+    for(unsigned face = 0u; face < hase::core::tet4FaceCount; ++face)
+    {
+        CHECK(coordinate(face, point(face)) == Catch::Approx(1.0));
+        for(unsigned localVertex = 0u; localVertex < hase::core::tet4FaceWidth; ++localVertex)
+        {
+            CHECK(
+                coordinate(
+                    face,
+                    point(static_cast<unsigned>(mesh.cellFaces[face * hase::core::tet4FaceWidth + localVertex])))
+                == Catch::Approx(0.0));
+        }
+    }
+    hase::core::Point const center{0.25, 0.25, 0.25};
+    for(unsigned face = 0u; face < hase::core::tet4FaceCount; ++face)
+        CHECK(coordinate(face, center) == Catch::Approx(0.25));
+
+    CHECK(hase::kernels::forward::barycentricFaceIntersectionLength(0.3, -0.2, 2.0) == Catch::Approx(1.5));
+    CHECK(hase::kernels::forward::barycentricFaceIntersectionLength(0.3, 0.2, 2.0) == 0.0);
+    CHECK(hase::kernels::forward::barycentricFaceIntersectionLength(0.3, -0.2, 1.0) == 0.0);
+
+    hase::core::DeviceMeshView view{};
+    view.barycentricFacePlanes = mesh.barycentricFacePlanes;
+    view.numberOfFacesPerCell = hase::core::tet4FaceCount;
+    double length = std::numeric_limits<double>::max();
+    CHECK(
+        hase::kernels::forward::nextFaceIntersection(
+            view,
+            0u,
+            hase::core::Point{0.25, 0.25, 0.25},
+            hase::core::Point{1.0, 0.0, 0.0},
+            -1,
+            length)
+        == 0);
+    CHECK(length == Catch::Approx(0.25));
+}
+
 TEST_CASE("forward SRM environment controls are strict positive overrides", "[forward][srm]")
 {
     auto const restore = [](char const* name, char const* value)

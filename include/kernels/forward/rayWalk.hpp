@@ -22,52 +22,6 @@ namespace hase::kernels::forward
         return point + direction * length;
     }
 
-    [[nodiscard]] inline ALPAKA_FN_ACC bool pointInTriangle(
-        hase::core::Point const point,
-        hase::core::Point const a,
-        hase::core::Point const b,
-        hase::core::Point const c)
-    {
-        hase::core::Point const v0 = c - a;
-        hase::core::Point const v1 = b - a;
-        hase::core::Point const v2 = point - a;
-        double const dot00 = hase::core::dot(v0, v0);
-        double const dot01 = hase::core::dot(v0, v1);
-        double const dot02 = hase::core::dot(v0, v2);
-        double const dot11 = hase::core::dot(v1, v1);
-        double const dot12 = hase::core::dot(v1, v2);
-        double const denominator = dot00 * dot11 - dot01 * dot01;
-        if(alpaka::math::abs(denominator) <= std::numeric_limits<double>::epsilon())
-        {
-            return false;
-        }
-        double const invDenominator = 1.0 / denominator;
-        double const u = (dot11 * dot02 - dot01 * dot12) * invDenominator;
-        double const v = (dot00 * dot12 - dot01 * dot02) * invDenominator;
-        constexpr double tolerance = 1.0e-10;
-        return u >= -tolerance && v >= -tolerance && (u + v) <= 1.0 + tolerance;
-    }
-
-    [[nodiscard]] inline ALPAKA_FN_ACC bool pointInFace(
-        hase::core::Point const point,
-        hase::core::DeviceMeshView const& mesh,
-        unsigned const tet,
-        unsigned const localFace)
-    {
-        int const p0 = mesh.getCellFacePoint(tet, localFace, 0u);
-        int const p1 = mesh.getCellFacePoint(tet, localFace, 1u);
-        int const p2 = mesh.getCellFacePoint(tet, localFace, 2u);
-        if(p0 < 0 || p1 < 0 || p2 < 0)
-        {
-            return false;
-        }
-        return pointInTriangle(
-            point,
-            mesh.getPoint(static_cast<unsigned>(p0)),
-            mesh.getPoint(static_cast<unsigned>(p1)),
-            mesh.getPoint(static_cast<unsigned>(p2)));
-    }
-
     [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point normalize(hase::core::Point const value)
     {
         double const length = value.euclidLength();
@@ -127,38 +81,18 @@ namespace hase::kernels::forward
         return normalize(direction - outwardNormal * (2.0 * hase::core::dot(direction, outwardNormal)));
     }
 
-    [[nodiscard]] inline ALPAKA_FN_ACC double faceIntersectionLength(
-        hase::core::DeviceMeshView const& mesh,
-        unsigned const tet,
-        unsigned const localFace,
-        hase::core::Point const origin,
-        hase::core::Point const direction,
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC double barycentricFaceIntersectionLength(
+        double const coordinate,
+        double const directionalChange,
         double const maxLength)
     {
-        int const p0 = mesh.getCellFacePoint(tet, localFace, 0u);
-        int const p1 = mesh.getCellFacePoint(tet, localFace, 1u);
-        int const p2 = mesh.getCellFacePoint(tet, localFace, 2u);
-        if(p0 < 0 || p1 < 0 || p2 < 0)
+        if(directionalChange >= -std::numeric_limits<double>::epsilon())
         {
             return 0.0;
         }
-
-        hase::core::Point const a = mesh.getPoint(static_cast<unsigned>(p0));
-        hase::core::Point const b = mesh.getPoint(static_cast<unsigned>(p1));
-        hase::core::Point const c = mesh.getPoint(static_cast<unsigned>(p2));
-        hase::core::Point const normal = hase::core::cross(b - a, c - a);
-        double const denominator = hase::core::dot(normal, direction);
-        if(alpaka::math::abs(denominator) <= std::numeric_limits<double>::epsilon())
-        {
-            return 0.0;
-        }
-        double const length = hase::core::dot(normal, a - origin) / denominator;
+        double const length = -coordinate / directionalChange;
         constexpr double tolerance = 1.0e-10;
-        if(length <= tolerance || length > maxLength)
-        {
-            return 0.0;
-        }
-        return pointInFace(advance(origin, direction, length), mesh, tet, localFace) ? length : 0.0;
+        return length > tolerance && length <= maxLength ? length : 0.0;
     }
 
     [[nodiscard]] inline ALPAKA_FN_ACC int nextFaceIntersection(
@@ -170,13 +104,17 @@ namespace hase::kernels::forward
         double& length)
     {
         int nextFace = -1;
+        // The first decreasing face coordinate to reach zero is the Tet4 exit face.
         for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
         {
             if(static_cast<int>(localFace) == forbiddenFace)
             {
                 continue;
             }
-            double const candidate = faceIntersectionLength(mesh, tet, localFace, origin, direction, length);
+            double const candidate = barycentricFaceIntersectionLength(
+                mesh.getFaceBarycentricCoordinate(tet, localFace, origin),
+                mesh.getFaceBarycentricDirection(tet, localFace, direction),
+                length);
             if(candidate > 0.0)
             {
                 length = candidate;
