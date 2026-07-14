@@ -29,7 +29,8 @@ Required tools are:
 
 Optional dependencies depend on the run mode:
 
-* CUDA or HIP/ROCm for GPU builds
+* CUDA Toolkit ``>= 12.5`` for CUDA GPU builds, or ROCm/HIP ``>= 6.2.4`` for
+  HIP GPU builds
 * OpenMPI for MPI runs
 * ParaView for VTK visualization
 * ``matplotlib`` for helper plotting scripts

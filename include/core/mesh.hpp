@@ -152,7 +152,6 @@ namespace hase::core
         std::span<float const> surfaceReflectivities;
         std::span<float const> surfaceRefractiveIndexInside;
         std::span<float const> surfaceRefractiveIndexOutside;
-        std::span<float const> totalReflectionAngles;
         std::span<unsigned const> cellPointIndices;
         std::span<unsigned const> cellTypes;
         std::span<int const> cellFaces;
@@ -343,7 +342,6 @@ namespace hase::core
             std::vector<float> surfaceReflectivities,
             std::vector<float> surfaceRefractiveIndexInside,
             std::vector<float> surfaceRefractiveIndexOutside,
-            std::vector<float> totalReflectionAngles,
             std::vector<unsigned> cellPointIndices,
             std::vector<unsigned> cellTypes,
             std::vector<int> cellFaces,
@@ -366,7 +364,6 @@ namespace hase::core
             , surfaceReflectivities(hase::alpakaUtils::toDevice(m_queue, surfaceReflectivities))
             , surfaceRefractiveIndexInside(hase::alpakaUtils::toDevice(m_queue, surfaceRefractiveIndexInside))
             , surfaceRefractiveIndexOutside(hase::alpakaUtils::toDevice(m_queue, surfaceRefractiveIndexOutside))
-            , totalReflectionAngles(hase::alpakaUtils::toDevice(m_queue, totalReflectionAngles))
             , cellPointIndices(hase::alpakaUtils::toDevice(m_queue, cellPointIndices))
             , cellTypes(hase::alpakaUtils::toDevice(m_queue, cellTypes))
             , cellFaces(hase::alpakaUtils::toDevice(m_queue, cellFaces))
@@ -413,9 +410,6 @@ namespace hase::core
                 std::span<float const>(
                     surfaceRefractiveIndexOutside.data(),
                     surfaceRefractiveIndexOutside.getMdSpan().getExtents().x()),
-                std::span<float const>(
-                    totalReflectionAngles.data(),
-                    totalReflectionAngles.getMdSpan().getExtents().x()),
                 std::span<unsigned const>(cellPointIndices.data(), cellPointIndices.getMdSpan().getExtents().x()),
                 std::span<unsigned const>(cellTypes.data(), cellTypes.getMdSpan().getExtents().x()),
                 std::span<int const>(cellFaces.data(), cellFaces.getMdSpan().getExtents().x()),
@@ -465,7 +459,6 @@ namespace hase::core
         T_Buffer<float> surfaceReflectivities;
         T_Buffer<float> surfaceRefractiveIndexInside;
         T_Buffer<float> surfaceRefractiveIndexOutside;
-        T_Buffer<float> totalReflectionAngles;
         T_Buffer<unsigned> cellPointIndices;
         T_Buffer<unsigned> cellTypes;
         T_Buffer<int> cellFaces;
@@ -506,7 +499,6 @@ namespace hase::core
         std::vector<float> surfaceReflectivities;
         std::vector<float> surfaceRefractiveIndexInside;
         std::vector<float> surfaceRefractiveIndexOutside;
-        std::vector<float> totalReflectionAngles;
         std::vector<unsigned> cellPointIndices;
         std::vector<unsigned> cellTypes;
         std::vector<int> cellFaces;
@@ -635,17 +627,6 @@ namespace hase::core
             }
         }
 
-        void calcTotalReflectionAngles()
-        {
-            std::vector<float> angles(refractiveIndices.size() / 2u, 0.0f);
-            for(unsigned i = 0; i + 1u < refractiveIndices.size(); i += 2u)
-            {
-                angles.at(i / 2u) = 180.0f / static_cast<float>(M_PI)
-                                    * alpaka::math::asin(refractiveIndices.at(i + 1u) / refractiveIndices.at(i));
-            }
-            totalReflectionAngles = std::move(angles);
-        }
-
         template<typename T_Device>
         [[nodiscard]] DeviceMeshContainer<T_Device> toDevice(T_Device& device)
         {
@@ -673,7 +654,6 @@ namespace hase::core
                 surfaceReflectivities,
                 surfaceRefractiveIndexInside,
                 surfaceRefractiveIndexOutside,
-                totalReflectionAngles,
                 cellPointIndices,
                 cellTypes,
                 cellFaces,

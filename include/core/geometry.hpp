@@ -99,12 +99,6 @@ namespace hase::core
         TwoDimDir dir;
     };
 
-    enum ReflectionPlane : int32_t
-    {
-        TOP_REFLECTION = 1,
-        BOTTOM_REFLECTION = -1
-    };
-
     ALPAKA_FN_HOST_ACC Vector direction(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC double distance(Point startPoint, Point endPoint);
     ALPAKA_FN_HOST_ACC Ray generateRay(Point startPoint, Point endPoint);

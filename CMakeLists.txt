@@ -511,7 +511,11 @@ endif()
 if(NOT HASE_SELECT_BACKEND_ALPAKA)
     include(cmake/searchBackends.cmake)
 endif()
-
+if(alpaka_DEP_CUDA)
+    if(NOT DEFINED CUDAToolkit_VERSION)
+        find_package(CUDAToolkit 12.5 REQUIRED)
+    endif()
+endif()
 if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
     # Probe nvidia-smi to check whether a GPU is visible and "native" can work.
     execute_process(
@@ -523,15 +527,17 @@ if(alpaka_DEP_CUDA AND HASE_CUDA_ARCHITECTURES STREQUAL "native")
 
     if(NOT HASE_NVIDIA_SMI_RESULT EQUAL 0)
         # If no GPU is visible, fall back to a static architecture list.
-        if(NOT DEFINED CUDAToolkit_VERSION)
-            find_package(CUDAToolkit QUIET)
-        endif()
 
         if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
             # CUDA 13 removed Maxwell/Pascal/Volta support, so no 50/60/70.
-            set(_hase_default_cuda_archs "75;80;90")
+            set(_hase_default_cuda_archs "75-real;80-real;90-real;100-real;120")
+        elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.8")
+            # CUDA 12.8 is the first toolkit with Blackwell support.
+            set(_hase_default_cuda_archs
+                "60-real;70-real;80-real;90-real;100-real;120"
+            )
         else()
-            set(_hase_default_cuda_archs "60;70;80;90")
+            set(_hase_default_cuda_archs "60-real;70-real;80-real;90")
         endif()
 
         message(
