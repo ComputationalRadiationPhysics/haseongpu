@@ -159,7 +159,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
     rayCount = analyticalSphereRayCount()
     phiAse = PhiASE(
         spectralProperties=crossSections,
-        maxRaysPerSample=rayCount,
+        maxRays=rayCount,
         forwardRayCount=rayCount,
         repetitions=1,
         adaptiveSteps=1,

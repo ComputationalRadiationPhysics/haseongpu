@@ -243,8 +243,8 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
         projection = projectionFromTet4Medium(medium)
         phi_ase = PhiASE(
             spectralProperties=_legacy_spectral_properties(metadata, name),
-            minRaysPerSample=int(experiment["minRays"]),
-            maxRaysPerSample=int(experiment["maxRays"]),
+            minRays=int(experiment["minRays"]),
+            maxRays=int(experiment["maxRays"]),
             forwardRayCount=ray_count,
             repetitions=int(compute["repetitions"]),
             adaptiveSteps=int(compute["adaptiveSteps"]),

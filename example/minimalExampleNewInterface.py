@@ -106,10 +106,8 @@ def main():
     # docs:start: phi-ase
     phi_ase = PhiASE(
         spectralProperties=cross_sections_data,
-        minRaysPerSample=1000,
-        maxRaysPerSample=1000,
+        forwardRayCount=1000,
         repetitions=1,
-        adaptiveSteps=1,
         relativeStandardErrorThreshold=0.1,
         useReflections=True,
         backend="Host_Cpu_CpuSerial",

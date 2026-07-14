@@ -29,7 +29,7 @@ print("numberOfPrisms:", gain_medium.numberOfPrisms)
 
 assert gain_medium.numberOfPrisms == 4
 assert result.phiAse == []
-assert phi_ase.minRaysPerSample == 100000
+assert phi_ase.minRays == 100000
 
 for legacy_name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh"):
     assert not hasattr(HASEonGPU, legacy_name), legacy_name

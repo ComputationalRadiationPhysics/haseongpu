@@ -169,8 +169,8 @@ namespace hase::benchmark
         if(writeHeader)
         {
             out << "API,DeviceKind,Executor,Timestamp,DeviceName,DeviceIndex,Kernel,AdditionalArgs,EndUnixNs,"
-                   "DurationNs,numDevices,MaxRepetitions,AdaptiveSteps,MinSampleRange,MaxSampleRange,MinRaysPerSample,"
-                   "MaxRaysPerSample,UseReflections,Environment\n";
+                   "DurationNs,numDevices,MaxRepetitions,AdaptiveSteps,MinSampleRange,MaxSampleRange,MinRays,"
+                   "MaxRays,UseReflections,Environment\n";
         }
 
         for(auto const& row : snapshot)
@@ -180,9 +180,8 @@ namespace hase::benchmark
                 << ',' << row.context.gpuIndex << ',' << csvEscape(row.kernel) << ',' << csvEscape(row.additionalArgs)
                 << ',' << row.endUnixNs << ',' << row.durationNs << ',' << row.context.numDevices << ','
                 << row.context.maxRepetitions << ',' << row.context.adaptiveSteps << ',' << row.context.minSampleRange
-                << ',' << row.context.maxSampleRange << ',' << row.context.minRaysPerSample << ','
-                << row.context.maxRaysPerSample << ',' << row.context.useReflections << ','
-                << csvEscape(row.context.additionalEnvironment) << '\n';
+                << ',' << row.context.maxSampleRange << ',' << row.context.minRays << ',' << row.context.maxRays << ','
+                << row.context.useReflections << ',' << csvEscape(row.context.additionalEnvironment) << '\n';
         }
     }
 } // namespace hase::benchmark

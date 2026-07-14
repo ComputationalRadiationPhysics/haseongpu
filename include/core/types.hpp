@@ -23,6 +23,8 @@
 
 #include <core/mesh.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <limits>
 #include <string>
@@ -248,8 +250,8 @@ namespace hase::core
         }
 
         ExperimentParameters(
-            unsigned minRaysPerSample,
-            unsigned maxRaysPerSample,
+            unsigned minRays,
+            unsigned maxRays,
             std::vector<double> lambdaA,
             std::vector<double> lambdaE,
             std::vector<double> sigmaA,
@@ -260,8 +262,8 @@ namespace hase::core
             bool useReflections,
             unsigned spectral,
             bool monochromatic = false)
-            : minRaysPerSample(minRaysPerSample)
-            , maxRaysPerSample(maxRaysPerSample)
+            : minRays(minRays)
+            , maxRays(maxRays)
             , lambdaA(std::move(lambdaA))
             , lambdaE(std::move(lambdaE))
             , sigmaA(std::move(sigmaA))
@@ -276,8 +278,8 @@ namespace hase::core
         }
 
         ExperimentParameters(
-            unsigned minRaysPerSample,
-            unsigned maxRaysPerSample,
+            unsigned minRays,
+            unsigned maxRays,
             std::vector<double> sigmaA,
             std::vector<double> sigmaE,
             double maxSigmaA,
@@ -285,8 +287,8 @@ namespace hase::core
             double relativeStandardErrorThreshold,
             bool useReflections,
             bool monochromatic = false)
-            : minRaysPerSample(minRaysPerSample)
-            , maxRaysPerSample(maxRaysPerSample)
+            : minRays(minRays)
+            , maxRays(maxRays)
             , sigmaA(std::move(sigmaA))
             , sigmaE(std::move(sigmaE))
             , maxSigmaA(maxSigmaA)
@@ -304,11 +306,11 @@ namespace hase::core
 
         [[nodiscard]] unsigned resolvedForwardRayCount() const
         {
-            return forwardRayCount == 0u ? maxRaysPerSample : forwardRayCount;
+            return forwardRayCount == 0u ? minRays : forwardRayCount;
         }
 
-        unsigned minRaysPerSample;
-        unsigned maxRaysPerSample;
+        unsigned minRays;
+        unsigned maxRays;
         unsigned forwardRayCount = 0u;
         std::string propagationMode = "forward";
         std::vector<double> lambdaA;
@@ -325,6 +327,70 @@ namespace hase::core
         double reflectionTolerance = 1.0e-4;
         unsigned surfaceReservoirSize = 32u;
     };
+
+    [[nodiscard]] inline unsigned adaptiveRayTarget(
+        ExperimentParameters const& experiment,
+        ComputeParameters const& compute,
+        unsigned const completedIncreases)
+    {
+        if(experiment.forwardRayCount != 0u || experiment.maxRays <= experiment.minRays || compute.adaptiveSteps == 0u)
+        {
+            return experiment.resolvedForwardRayCount();
+        }
+        if(completedIncreases >= compute.adaptiveSteps)
+        {
+            return experiment.maxRays;
+        }
+
+        double const growth = std::pow(
+            static_cast<double>(experiment.maxRays) / static_cast<double>(experiment.minRays),
+            1.0 / static_cast<double>(compute.adaptiveSteps));
+        double const target
+            = static_cast<double>(experiment.minRays) * std::pow(growth, static_cast<double>(completedIncreases));
+        unsigned const rounded = static_cast<unsigned>(std::ceil(target));
+        return std::clamp(rounded, experiment.minRays, experiment.maxRays);
+    }
+
+    [[nodiscard]] inline bool forwardResultMeetsRelativeStandardError(
+        Result const& result,
+        double const relativeStandardErrorThreshold)
+    {
+        return !result.relativeStandardError.empty()
+               && std::all_of(
+                   result.relativeStandardError.cbegin(),
+                   result.relativeStandardError.cend(),
+                   [relativeStandardErrorThreshold](double const relativeStandardError)
+                   {
+                       return std::isfinite(relativeStandardError)
+                              && relativeStandardError <= relativeStandardErrorThreshold;
+                   });
+    }
+
+    inline void recordAdaptiveRayConvergence(
+        Result const& result,
+        unsigned const targetRayCount,
+        double const relativeStandardErrorThreshold,
+        std::vector<unsigned>& convergenceRayCounts)
+    {
+        if(convergenceRayCounts.empty())
+        {
+            convergenceRayCounts.assign(result.relativeStandardError.size(), 0u);
+        }
+
+        unsigned const volumeCount = std::min(
+            static_cast<unsigned>(convergenceRayCounts.size()),
+            static_cast<unsigned>(result.relativeStandardError.size()));
+        for(unsigned volume = 0u; volume < volumeCount; ++volume)
+        {
+            bool const hasDroppedRays = !result.droppedRays.empty() && result.droppedRays.at(volume) != 0u;
+            double const relativeStandardError = result.relativeStandardError.at(volume);
+            if(convergenceRayCounts.at(volume) == 0u && !hasDroppedRays && std::isfinite(relativeStandardError)
+               && relativeStandardError <= relativeStandardErrorThreshold)
+            {
+                convergenceRayCounts.at(volume) = targetRayCount;
+            }
+        }
+    }
 
 
 } // namespace hase::core

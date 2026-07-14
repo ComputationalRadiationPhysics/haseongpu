@@ -42,8 +42,8 @@ namespace hase::utils
         hase::core::HostMesh const& mesh,
         std::vector<double> const data,
         std::filesystem::path filename,
-        unsigned const raysPerSample,
-        unsigned const maxRaysPerSample,
+        unsigned const raysLaunched,
+        unsigned const maxRays,
         float const expectationThreshold,
         bool const useReflections,
         float const runtime,
@@ -55,7 +55,7 @@ namespace hase::utils
         vtkFile.open(filename);
 
         vtkFile << "# vtk DataFile Version 2.0" << std::endl;
-        vtkFile << "RAYS=" << raysPerSample << " MAXRAYS=" << maxRaysPerSample << " REFLECTIONS=0"
+        vtkFile << "RAYS=" << raysLaunched << " MAXRAYS=" << maxRays << " REFLECTIONS=0"
                 << " EXPECTATION=" << expectationThreshold << " RUNTIME=" << runtime
                 << " REQUESTED_REFLECTIONS=" << useReflections << std::endl;
         vtkFile << "ASCII" << std::endl;
@@ -103,8 +103,8 @@ namespace hase::utils
         hase::core::HostMesh const& mesh,
         std::vector<double> const prismData,
         std::filesystem::path const filename,
-        unsigned const raysPerSample,
-        unsigned const maxRaysPerSample,
+        unsigned const raysLaunched,
+        unsigned const maxRays,
         float const expectationThreshold,
         bool const useReflections,
         float const runtime)
@@ -113,8 +113,8 @@ namespace hase::utils
             mesh,
             prismData,
             filename,
-            raysPerSample,
-            maxRaysPerSample,
+            raysLaunched,
+            maxRays,
             expectationThreshold,
             useReflections,
             runtime,
@@ -125,8 +125,8 @@ namespace hase::utils
         hase::core::HostMesh const& hostMesh,
         std::vector<double> const prismData,
         std::filesystem::path const filename,
-        unsigned const raysPerSample,
-        unsigned const maxRaysPerSample,
+        unsigned const raysLaunched,
+        unsigned const maxRays,
         float const expectationThreshold,
         bool const useReflections,
         float const runtime)
@@ -135,8 +135,8 @@ namespace hase::utils
             hostMesh,
             prismData,
             filename,
-            raysPerSample,
-            maxRaysPerSample,
+            raysLaunched,
+            maxRays,
             expectationThreshold,
             useReflections,
             runtime,

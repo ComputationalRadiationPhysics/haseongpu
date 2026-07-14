@@ -11,10 +11,8 @@ frontend modeling interface.
 
    phi_ase = PhiASE(
        spectralProperties=spectra,
-       minRaysPerSample=1000,
-       maxRaysPerSample=1000,
+       forwardRayCount=1000,
        repetitions=1,
-       adaptiveSteps=1,
        relativeStandardErrorThreshold=0.1,
        useReflections=True,
        backend="Host_Cpu_CpuSerial",
@@ -46,26 +44,29 @@ flux :math:`\Phi_i` described in the scientific background.
 Sampling and Physics Settings
 -----------------------------
 
-``minRaysPerSample``
-   Minimum number of Monte Carlo rays :math:`N` used for each sample point.
+``minRays``
+   Initial number of globally launched Monte Carlo rays :math:`N`.
 
-``maxRaysPerSample``
-   Maximum number of Monte Carlo rays used for adaptive sampling.
+``maxRays``
+   Hard cap on the cumulative forward-ray histories.  If ``forwardRayCount`` is
+   unset and this exceeds ``minRays``, the backend adds geometrically sized
+   batches until every cell meets the RSE target or this cap is reached.
+
+``forwardRayCount``
+   Explicit fixed number of globally launched forward rays. When nonzero it
+   overrides the adaptive ``minRays``/``maxRays`` range.
 
 ``relativeStandardErrorThreshold``
    Target dimensionless relative standard error; ``0.1`` requests 10%.
 
 ``repetitions``
-   Maximum number of repeated ``PhiASE`` runs using the same number of rays if
-   the relative-error target is not reached.  Since the importance-sampling distribution
-   assigns rays to prisms stochastically, repeating the calculation can improve
-   the estimate without increasing the number of rays per run.
+   Retained transport compatibility field. The forward backend currently uses
+   the adaptive ray range instead; it does not schedule extra fixed-count
+   repetitions.
 
 ``adaptiveSteps``
-   If the relative-error threshold is not reached for one backend run, HASEonGPU increases
-   the rays per sample up to ``maxRaysPerSample``.  This parameter controls how
-   many ray-count steps are available between ``minRaysPerSample`` and
-   ``maxRaysPerSample``.
+   Maximum number of geometric ray-count increases between ``minRays`` and
+   ``maxRays``. It is ignored for an explicit ``forwardRayCount``.
 
 ``useReflections``
    Enables or disables the surface-reservoir method (SRM) for reflected ASE
@@ -161,7 +162,7 @@ still passed from Python.
 
 .. code-block:: python
 
-   phi_ase = PhiASE({"minRaysPerSample": 1000, "backend": "Host_Cpu_CpuSerial"})
+   phi_ase = PhiASE({"forwardRayCount": 1000, "backend": "Host_Cpu_CpuSerial"})
    phi_ase = PhiASE.fromYaml(
        "phi_ase.yaml",
        spectralProperties=spectra,
@@ -173,8 +174,8 @@ A YAML file can keep experiment and compute settings together:
 .. code-block:: yaml
 
    experiment:
-     min_rays_per_sample: 100000
-     max_rays_per_sample: 1000000
+     min_rays: 100000
+     max_rays: 1000000
      relative_standard_error_threshold: 0.05
      repetitions: 2
      adaptive_steps: 4
@@ -199,9 +200,9 @@ YAML keys may be placed at the top level or under ``phiASE``, ``phi_ase``,
 ``experiment``, ``compute``, then the top-level mapping.  Explicit keyword
 overrides passed to ``fromYaml(...)`` are applied after the file is read.
 
-Accepted setting names are the ``PhiASE`` attribute names plus these aliases:
-``minRays`` -> ``minRaysPerSample``, ``maxRays`` ->
-``maxRaysPerSample``, ``min_rays_per_sample``, ``max_rays_per_sample``,
+Accepted setting names are the ``PhiASE`` attribute names plus the legacy aliases
+``minRaysPerSample`` -> ``minRays``, ``maxRaysPerSample`` -> ``maxRays``,
+``min_rays_per_sample`` -> ``minRays``, ``max_rays_per_sample`` -> ``maxRays``,
 ``relative_standard_error_threshold``, ``adaptive_steps``, ``use_reflections``,
 ``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
 ``min_sample_range``, ``max_sample_range``, and ``rng_seed``.

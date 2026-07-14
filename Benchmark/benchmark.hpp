@@ -35,8 +35,8 @@ namespace hase::benchmark
         unsigned adaptiveSteps = 0u;
         unsigned minSampleRange = 0u;
         unsigned maxSampleRange = 0u;
-        unsigned minRaysPerSample = 0u;
-        unsigned maxRaysPerSample = 0u;
+        unsigned minRays = 0u;
+        unsigned maxRays = 0u;
         bool useReflections = false;
     };
 
@@ -121,8 +121,8 @@ namespace hase::benchmark
         context.adaptiveSteps = compute.adaptiveSteps;
         context.minSampleRange = compute.minSampleRange;
         context.maxSampleRange = compute.maxSampleRange;
-        context.minRaysPerSample = experiment.minRaysPerSample;
-        context.maxRaysPerSample = experiment.maxRaysPerSample;
+        context.minRays = experiment.minRays;
+        context.maxRays = experiment.maxRays;
         context.useReflections = experiment.useReflections;
         return context;
     }

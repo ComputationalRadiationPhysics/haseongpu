@@ -66,7 +66,9 @@ namespace hase::core
         std::vector<DeviceMeshContainer<T_Device>> const& meshes,
         ForwardPhiAseRawResult& result,
         RuntimeTopology& topology,
-        float& maxRankRuntime)
+        float& maxRankRuntime,
+        unsigned& adaptiveLaunches,
+        std::vector<unsigned>& convergenceRayCounts)
     {
         int mpiAlreadyInitialized = 0;
         MPI_Initialized(&mpiAlreadyInitialized);
@@ -130,7 +132,8 @@ namespace hase::core
         }
 
         int const firstSample = 0;
-        int const sampleCount = static_cast<int>(experiment.resolvedForwardRayCount());
+        int const sampleCount
+            = static_cast<int>(experiment.forwardRayCount != 0u ? experiment.forwardRayCount : experiment.maxRays);
 
         int const base = activeSize > 0 ? sampleCount / activeSize : 0;
         int const rem = activeSize > 0 ? sampleCount % activeSize : 0;
@@ -284,82 +287,122 @@ namespace hase::core
         }
 
         auto const& mesh = meshes.at(static_cast<std::size_t>(firstDevice));
-        int const totalSamples = sampleCount;
-        float runtime = 0.0f;
-        ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells);
-
-        if(localCount > 0)
-        {
-            std::vector<float> deviceRuntimes(meshes.size(), 0.0f);
-            localResult = calcForwardPhiAseOnDevices(
-                exec,
-                experiment,
-                hostMesh,
-                meshes,
-                static_cast<unsigned>(firstDevice),
-                static_cast<unsigned>(assignedDeviceCount),
-                static_cast<unsigned>(localCount),
-                baseSeed,
-                static_cast<unsigned>(rank),
-                deviceRuntimes);
-            runtime = *std::ranges::max_element(deviceRuntimes);
-        }
-
+        int const volumeCount = static_cast<int>(mesh.numberOfCells);
+        int totalUsedDevices = 0;
+        adaptiveLaunches = 0u;
         if(activeRank == HEAD_NODE)
         {
             result = makeForwardRawResult(mesh.numberOfCells);
+            convergenceRayCounts.assign(mesh.numberOfCells, 0u);
         }
-        int const volumeCount = static_cast<int>(mesh.numberOfCells);
-        MPI_Reduce(
-            localResult.scoreSum.data(),
-            activeRank == HEAD_NODE ? result.scoreSum.data() : nullptr,
-            volumeCount,
-            MPI_DOUBLE,
-            MPI_SUM,
-            HEAD_NODE,
-            activeComm);
-        MPI_Reduce(
-            localResult.scoreSquareSum.data(),
-            activeRank == HEAD_NODE ? result.scoreSquareSum.data() : nullptr,
-            volumeCount,
-            MPI_DOUBLE,
-            MPI_SUM,
-            HEAD_NODE,
-            activeComm);
-        MPI_Reduce(
-            localResult.totalRays.data(),
-            activeRank == HEAD_NODE ? result.totalRays.data() : nullptr,
-            volumeCount,
-            MPI_UNSIGNED,
-            MPI_SUM,
-            HEAD_NODE,
-            activeComm);
-        MPI_Reduce(
-            localResult.droppedRays.data(),
-            activeRank == HEAD_NODE ? result.droppedRays.data() : nullptr,
-            volumeCount,
-            MPI_UNSIGNED,
-            MPI_SUM,
-            HEAD_NODE,
-            activeComm);
-        MPI_Reduce(
-            &localResult.rayCount,
-            activeRank == HEAD_NODE ? &result.rayCount : nullptr,
-            1,
-            MPI_UNSIGNED,
-            MPI_SUM,
-            HEAD_NODE,
-            activeComm);
+        unsigned accumulatedRayCount = 0u;
 
-        MPI_Reduce(&runtime, &maxRankRuntime, 1, MPI_FLOAT, MPI_MAX, HEAD_NODE, activeComm);
+        for(unsigned completedIncreases = 0u;; ++completedIncreases)
+        {
+            unsigned const targetRayCount = adaptiveRayTarget(experiment, compute, completedIncreases);
+            unsigned const batchRayCount = targetRayCount - accumulatedRayCount;
+            int const batchBase = batchRayCount / static_cast<unsigned>(activeSize);
+            int const batchRemainder = batchRayCount % static_cast<unsigned>(activeSize);
+            int const batchLocalCount = batchBase + (activeRank < batchRemainder ? 1 : 0);
+            int const batchUsedDevices = std::min(assignedDeviceCount, batchLocalCount);
 
-        int totalUsedDevices = 0;
-        MPI_Reduce(&actuallyUsedDevices, &totalUsedDevices, 1, MPI_INT, MPI_SUM, HEAD_NODE, activeComm);
+            ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells);
+            float batchRuntime = 0.0f;
+            if(batchLocalCount > 0)
+            {
+                std::vector<float> deviceRuntimes(meshes.size(), 0.0f);
+                localResult = calcForwardPhiAseOnDevices(
+                    exec,
+                    experiment,
+                    hostMesh,
+                    meshes,
+                    static_cast<unsigned>(firstDevice),
+                    static_cast<unsigned>(assignedDeviceCount),
+                    static_cast<unsigned>(batchLocalCount),
+                    random::seedForAdaptiveLaunch(baseSeed, adaptiveLaunches),
+                    static_cast<unsigned>(rank),
+                    deviceRuntimes);
+                batchRuntime = *std::ranges::max_element(deviceRuntimes);
+            }
+
+            ForwardPhiAseRawResult batchResult = makeForwardRawResult(mesh.numberOfCells);
+            MPI_Reduce(
+                localResult.scoreSum.data(),
+                activeRank == HEAD_NODE ? batchResult.scoreSum.data() : nullptr,
+                volumeCount,
+                MPI_DOUBLE,
+                MPI_SUM,
+                HEAD_NODE,
+                activeComm);
+            MPI_Reduce(
+                localResult.scoreSquareSum.data(),
+                activeRank == HEAD_NODE ? batchResult.scoreSquareSum.data() : nullptr,
+                volumeCount,
+                MPI_DOUBLE,
+                MPI_SUM,
+                HEAD_NODE,
+                activeComm);
+            MPI_Reduce(
+                localResult.totalRays.data(),
+                activeRank == HEAD_NODE ? batchResult.totalRays.data() : nullptr,
+                volumeCount,
+                MPI_UNSIGNED,
+                MPI_SUM,
+                HEAD_NODE,
+                activeComm);
+            MPI_Reduce(
+                localResult.droppedRays.data(),
+                activeRank == HEAD_NODE ? batchResult.droppedRays.data() : nullptr,
+                volumeCount,
+                MPI_UNSIGNED,
+                MPI_SUM,
+                HEAD_NODE,
+                activeComm);
+            MPI_Reduce(
+                &localResult.rayCount,
+                activeRank == HEAD_NODE ? &batchResult.rayCount : nullptr,
+                1,
+                MPI_UNSIGNED,
+                MPI_SUM,
+                HEAD_NODE,
+                activeComm);
+
+            float maxBatchRuntime = 0.0f;
+            MPI_Reduce(&batchRuntime, &maxBatchRuntime, 1, MPI_FLOAT, MPI_MAX, HEAD_NODE, activeComm);
+            int batchTotalUsedDevices = 0;
+            MPI_Reduce(&batchUsedDevices, &batchTotalUsedDevices, 1, MPI_INT, MPI_SUM, HEAD_NODE, activeComm);
+
+            int stop = 0;
+            if(activeRank == HEAD_NODE)
+            {
+                mergeForwardRawResult(result, batchResult);
+                maxRankRuntime += maxBatchRuntime;
+                totalUsedDevices = std::max(totalUsedDevices, batchTotalUsedDevices);
+                ++adaptiveLaunches;
+                Result provisional;
+                finalizeForwardPhiAse(hostMesh, result, provisional);
+                recordAdaptiveRayConvergence(
+                    provisional,
+                    targetRayCount,
+                    experiment.relativeStandardErrorThreshold,
+                    convergenceRayCounts);
+                stop = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays
+                       || forwardResultMeetsRelativeStandardError(
+                           provisional,
+                           experiment.relativeStandardErrorThreshold);
+            }
+            MPI_Bcast(&stop, 1, MPI_INT, HEAD_NODE, activeComm);
+            accumulatedRayCount = targetRayCount;
+            if(stop != 0)
+            {
+                break;
+            }
+        }
 
         if(activeRank == HEAD_NODE)
         {
             hase::utils::ProgressBar bar;
-            for(int i = 0; i < totalSamples; ++i)
+            for(unsigned i = 0u; i < result.rayCount; ++i)
             {
                 bar.printFancyProgressBar(mesh.numberOfSamples);
             }

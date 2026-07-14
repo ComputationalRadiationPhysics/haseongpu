@@ -224,22 +224,60 @@ namespace hase::core
                 }
 
                 ForwardPhiAseRawResult rawResult;
+                unsigned adaptiveLaunches = 0u;
+                std::vector<unsigned> convergenceRayCounts;
                 if(compute.parallelMode == ParallelMode::SINGLE)
                 {
-                    unsigned const rayCount = experiment.resolvedForwardRayCount();
-                    unsigned const activeDevices = std::min(maxDevices, rayCount);
-                    rawResult = calcForwardPhiAseOnDevices(
-                        exec,
-                        experiment,
-                        hostMesh,
-                        meshes,
-                        0u,
-                        activeDevices,
-                        rayCount,
-                        baseRngSeed(compute),
-                        0u,
-                        runtimes);
-                    usedGPUs = activeDevices;
+                    unsigned const rngSeed = baseRngSeed(compute);
+                    for(unsigned completedIncreases = 0u;; ++completedIncreases)
+                    {
+                        unsigned const targetRayCount = adaptiveRayTarget(experiment, compute, completedIncreases);
+                        unsigned const batchRayCount = targetRayCount - rawResult.rayCount;
+                        unsigned const activeDevices = std::min(maxDevices, batchRayCount);
+                        if(batchRayCount == 0u)
+                        {
+                            if(targetRayCount == experiment.maxRays || experiment.forwardRayCount != 0u)
+                            {
+                                break;
+                            }
+                            continue;
+                        }
+                        if(activeDevices == 0u)
+                        {
+                            break;
+                        }
+
+                        std::fill(runtimes.begin(), runtimes.end(), 0.0f);
+                        ForwardPhiAseRawResult const batchResult = calcForwardPhiAseOnDevices(
+                            exec,
+                            experiment,
+                            hostMesh,
+                            meshes,
+                            0u,
+                            activeDevices,
+                            batchRayCount,
+                            random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches),
+                            0u,
+                            runtimes);
+                        mergeForwardRawResult(rawResult, batchResult);
+                        runtime += *std::ranges::max_element(runtimes);
+                        usedGPUs = std::max(usedGPUs, activeDevices);
+                        ++adaptiveLaunches;
+                        finalizeForwardPhiAse(hostMesh, rawResult, result);
+                        recordAdaptiveRayConvergence(
+                            result,
+                            targetRayCount,
+                            experiment.relativeStandardErrorThreshold,
+                            convergenceRayCounts);
+
+                        if(experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays
+                           || forwardResultMeetsRelativeStandardError(
+                               result,
+                               experiment.relativeStandardErrorThreshold))
+                        {
+                            break;
+                        }
+                    }
                     topology = RuntimeTopology{};
                     topology.activeNodes = 1u;
                     topology.activeRanks = 1u;
@@ -251,7 +289,6 @@ namespace hase::core
                     topology.avgGpusPerNode = static_cast<double>(usedGPUs);
                     topology.minGpusPerNode = usedGPUs;
                     topology.maxGpusPerNode = usedGPUs;
-                    runtime = *std::ranges::max_element(runtimes);
                 }
                 else if(compute.parallelMode == ParallelMode::MPI)
                 {
@@ -264,7 +301,9 @@ namespace hase::core
                         meshes,
                         rawResult,
                         topology,
-                        runtime);
+                        runtime,
+                        adaptiveLaunches,
+                        convergenceRayCounts);
 #else
 #    if !defined(MPI_FOUND)
                     dout(V_ERROR) << "Did not find MPI on your system!";
@@ -349,8 +388,8 @@ namespace hase::core
                         hostMesh,
                         result.dndtAse,
                         vtkPath / fs::path("dndt_" + currentTime + ".vtk"),
-                        experiment.minRaysPerSample,
-                        experiment.maxRaysPerSample,
+                        rawResult.rayCount,
+                        experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
@@ -359,8 +398,8 @@ namespace hase::core
                         hostMesh,
                         tmpPhiAse,
                         vtkPath / fs::path("phiase_" + currentTime + ".vtk"),
-                        experiment.minRaysPerSample,
-                        experiment.maxRaysPerSample,
+                        rawResult.rayCount,
+                        experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
@@ -369,8 +408,8 @@ namespace hase::core
                         hostMesh,
                         result.standardError,
                         vtkPath / fs::path("standard_error_" + currentTime + ".vtk"),
-                        experiment.minRaysPerSample,
-                        experiment.maxRaysPerSample,
+                        rawResult.rayCount,
+                        experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
@@ -379,8 +418,8 @@ namespace hase::core
                         hostMesh,
                         tmpTotalRays,
                         vtkPath / fs::path("total_rays_" + currentTime + ".vtk"),
-                        experiment.minRaysPerSample,
-                        experiment.maxRaysPerSample,
+                        rawResult.rayCount,
+                        experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
@@ -389,8 +428,8 @@ namespace hase::core
                         hostMesh,
                         result.relativeStandardError,
                         vtkPath / fs::path("relative_standard_error_" + currentTime + ".vtk"),
-                        experiment.minRaysPerSample,
-                        experiment.maxRaysPerSample,
+                        rawResult.rayCount,
+                        experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
                         runtime);
@@ -442,12 +481,20 @@ namespace hase::core
                     dout(V_STAT) << "Prisms            : " << meshes[0].numberOfPrisms << std::endl;
                     dout(V_STAT) << "Samples           : "
                                  << std::min(static_cast<unsigned>(result.dndtAse.size()), numSamples) << std::endl;
-                    dout(V_STAT) << "RaysPerSample     : " << experiment.minRaysPerSample;
-                    if(experiment.maxRaysPerSample > experiment.minRaysPerSample)
+                    if(experiment.forwardRayCount != 0u)
                     {
-                        dout(V_STAT | V_NOLABEL) << " - " << experiment.maxRaysPerSample << " (adaptive)";
+                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << " (explicit)" << std::endl;
                     }
-                    dout(V_STAT | V_NOLABEL) << std::endl;
+                    else if(experiment.maxRays > experiment.minRays)
+                    {
+                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << " of " << experiment.minRays
+                                     << " - " << experiment.maxRays << " (" << adaptiveLaunches << " launches)"
+                                     << std::endl;
+                    }
+                    else
+                    {
+                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << std::endl;
+                    }
                     dout(V_STAT) << "sum(totalRays)    : "
                                  << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
                     dout(V_STAT) << "RSE threshold     : " << experiment.relativeStandardErrorThreshold << std::endl;
@@ -468,16 +515,10 @@ namespace hase::core
                     dout(V_STAT) << "Simulation runtime: " << runtime << "s" << std::endl;
                     dout(V_STAT) << "Total runtime     : " << difftime(time(0), starttime) << "s" << std::endl;
                     dout(V_STAT) << std::endl;
-                    if(experiment.maxRaysPerSample > experiment.minRaysPerSample)
-                    {
-                        dout(V_STAT) << "=== Sampling resolution as Histogram ===" << std::endl;
-                        hase::utils::ray_histogram(
-                            result.totalRays,
-                            experiment.maxRaysPerSample,
-                            experiment.relativeStandardErrorThreshold,
-                            result.relativeStandardError,
-                            result.droppedRays);
-                    }
+                    dout(V_STAT) << "=== Adaptive forward-ray convergence by cell (green: RSE target reached; red: "
+                                    "budget exhausted) ==="
+                                 << std::endl;
+                    hase::utils::ray_histogram(convergenceRayCounts, rawResult.rayCount);
                     dout(V_STAT) << std::endl;
                 }
                 // Cleanup device memory

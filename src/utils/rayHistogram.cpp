@@ -22,6 +22,7 @@
 
 #include <alpaka/alpaka.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -37,15 +38,18 @@
 namespace hase::utils
 {
 
-    void ray_histogram(
-        std::vector<unsigned> const totalRays,
-        unsigned const max,
-        double const relativeStandardErrorThreshold,
-        std::vector<double> const relativeStandardErrors,
-        std::vector<unsigned> const droppedRays)
+    void ray_histogram(std::vector<unsigned> const& convergenceRayCounts, unsigned const exhaustedRayCount)
     {
-        // length of the maximum number of samples (e.g. max==4210)
-        int fillwidth = alpaka::math::log10(max) + 4;
+        if(convergenceRayCounts.empty())
+        {
+            return;
+        }
+        // A forward ray may visit many cells, so totalRays contains a different
+        // physical visit count for nearly every cell.  Instead, bin by the first
+        // scheduled global budget that satisfied the cell's RSE target.
+        unsigned const largestRayCount
+            = std::max(exhaustedRayCount, *std::max_element(convergenceRayCounts.begin(), convergenceRayCounts.end()));
+        int fillwidth = alpaka::math::log10(std::max(1u, largestRayCount)) + 4;
 
         // maximum length of the filling bar
         unsigned maxLength = 50;
@@ -54,25 +58,22 @@ namespace hase::utils
         std::map<unsigned, unsigned> histGreen;
         std::map<unsigned, unsigned> histRed;
         // if the entry doesn't exist, create it
-        for(unsigned j = 0; j < totalRays.size(); ++j)
+        for(unsigned j = 0; j < convergenceRayCounts.size(); ++j)
         {
-            // std::map<unsigned,unsigned>::iterator it = hist.find(totalRays.at(j));
-            if(histGreen.find(totalRays.at(j)) == histGreen.end())
+            unsigned const rayCount
+                = convergenceRayCounts.at(j) == 0u ? exhaustedRayCount : convergenceRayCounts.at(j);
+            if(histGreen.find(rayCount) == histGreen.end())
             {
-                histGreen.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
-                histRed.insert(std::pair<unsigned, unsigned>(totalRays.at(j), 0));
+                histGreen.insert(std::pair<unsigned, unsigned>(rayCount, 0));
+                histRed.insert(std::pair<unsigned, unsigned>(rayCount, 0));
             }
-            if((!std::isfinite(relativeStandardErrors.at(j))
-                || relativeStandardErrors.at(j) <= relativeStandardErrorThreshold)
-               && droppedRays.at(j) == 0u)
+            if(convergenceRayCounts.at(j) != 0u)
             {
-                histGreen.find(totalRays.at(j))->second++;
-                // itG->second++;
+                histGreen.find(rayCount)->second++;
             }
             else
             {
-                histRed.find(totalRays.at(j))->second++;
-                // itR->second++;
+                histRed.find(rayCount)->second++;
             }
         }
 
@@ -84,22 +85,26 @@ namespace hase::utils
         {
             hase::core::dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') << itG->first << " (";
             hase::core::dout(V_STAT | V_NOLABEL)
-                << "\033[0;32m" << std::setw(alpaka::math::log10(totalRays.size()) + 3) << itG->second << "x";
+                << "\033[0;32m" << std::setw(alpaka::math::log10(convergenceRayCounts.size()) + 3) << itG->second
+                << "x";
             hase::core::dout(V_STAT | V_NOLABEL) << "\033[0m" << " / ";
             hase::core::dout(V_STAT | V_NOLABEL)
-                << "\033[0;31m" << std::setw(alpaka::math::log10(totalRays.size()) + 3) << itR->second << "x";
+                << "\033[0;31m" << std::setw(alpaka::math::log10(convergenceRayCounts.size()) + 3) << itR->second
+                << "x";
             hase::core::dout(V_STAT | V_NOLABEL) << "\033[0m" << "):";
 
             // set color = green
             hase::core::dout(V_STAT | V_NOLABEL) << "\033[0;32m";
-            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itG->second) / totalRays.size())); ++j)
+            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itG->second) / convergenceRayCounts.size()));
+                ++j)
             {
                 hase::core::dout(V_STAT | V_NOLABEL) << "#";
             }
 
             // set color = red
             hase::core::dout(V_STAT | V_NOLABEL) << "\033[0;31m";
-            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itR->second) / totalRays.size())); ++j)
+            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itR->second) / convergenceRayCounts.size()));
+                ++j)
             {
                 hase::core::dout(V_STAT | V_NOLABEL) << "#";
             }
@@ -113,25 +118,27 @@ namespace hase::utils
             hase::core::dout(V_STAT) << std::setw(fillwidth) << std::setfill(' ') << itG->first << " (";
             SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
             hase::core::dout(V_STAT | V_NOLABEL)
-                << std::setw(alpaka::math::log10(totalRays.size()) + 3) << itG->second << "x";
+                << std::setw(alpaka::math::log10(convergenceRayCounts.size()) + 3) << itG->second << "x";
             SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
             hase::core::dout(V_STAT | V_NOLABEL) << " / ";
             SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
             hase::core::dout(V_STAT | V_NOLABEL)
-                << std::setw(alpaka::math::log10(totalRays.size()) + 3) << itR->second << "x";
+                << std::setw(alpaka::math::log10(convergenceRayCounts.size()) + 3) << itR->second << "x";
             SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
             hase::core::dout(V_STAT | V_NOLABEL) << "):";
 
             // set color = green
             SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itG->second) / totalRays.size())); ++j)
+            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itG->second) / convergenceRayCounts.size()));
+                ++j)
             {
                 hase::core::dout(V_STAT | V_NOLABEL) << "#";
             }
 
             // set color = red
             SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itR->second) / totalRays.size())); ++j)
+            for(unsigned j = 0; j < alpaka::math::ceil(maxLength * (float(itR->second) / convergenceRayCounts.size()));
+                ++j)
             {
                 hase::core::dout(V_STAT | V_NOLABEL) << "#";
             }

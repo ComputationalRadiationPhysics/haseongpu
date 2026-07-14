@@ -32,8 +32,10 @@ namespace
         constexpr char const* crystalTFluo = "crystal_t_fluo";
         constexpr char const* claddingNumber = "cladding_number";
         constexpr char const* claddingAbsorption = "cladding_absorption";
-        constexpr char const* minRaysPerSample = "min_rays_per_sample";
-        constexpr char const* maxRaysPerSample = "max_rays_per_sample";
+        constexpr char const* minRays = "min_rays";
+        constexpr char const* maxRays = "max_rays";
+        constexpr char const* legacyMinRays = "min_rays_per_sample";
+        constexpr char const* legacyMaxRays = "max_rays_per_sample";
         constexpr char const* propagationMode = "propagation_mode";
         constexpr char const* forwardRayCount = "forward_ray_count";
         constexpr char const* retiredForwardRayLength = "forward_ray_length";
@@ -146,6 +148,20 @@ namespace
     [[noreturn]] void validationError(std::string const& field, std::string const& message)
     {
         throw std::runtime_error("openPMD validation error for '" + field + "': " + message);
+    }
+
+    template<typename T>
+    T renamedAttribute(io::Attributable const& obj, std::string const& canonicalName, std::string const& legacyName)
+    {
+        if(obj.containsAttribute(canonicalName))
+        {
+            return attribute<T>(obj, canonicalName);
+        }
+        if(obj.containsAttribute(legacyName))
+        {
+            return attribute<T>(obj, legacyName);
+        }
+        validationError(canonicalName, "missing required attribute");
     }
 
     std::string entityFromAxes(std::vector<std::string> const& axes);
@@ -865,14 +881,10 @@ namespace hase::openpmd
         validateUnchangedAttribute<unsigned>(iteration, field::claddingNumber, simulation.mesh.claddingNumber);
         validateUnchangedAttribute<double>(iteration, field::claddingAbsorption, simulation.mesh.claddingAbsorption);
 
-        validateUnchangedAttribute<unsigned>(
-            iteration,
-            field::minRaysPerSample,
-            simulation.experiment.minRaysPerSample);
-        validateUnchangedAttribute<unsigned>(
-            iteration,
-            field::maxRaysPerSample,
-            simulation.experiment.maxRaysPerSample);
+        validateUnchangedAttribute<unsigned>(iteration, field::minRays, simulation.experiment.minRays);
+        validateUnchangedAttribute<unsigned>(iteration, field::legacyMinRays, simulation.experiment.minRays);
+        validateUnchangedAttribute<unsigned>(iteration, field::maxRays, simulation.experiment.maxRays);
+        validateUnchangedAttribute<unsigned>(iteration, field::legacyMaxRays, simulation.experiment.maxRays);
         validateUnchangedAttribute<double>(
             iteration,
             field::relativeStandardErrorThreshold,
@@ -1114,8 +1126,8 @@ namespace hase::openpmd
         }
 
         core::ExperimentParameters experiment(
-            attribute<unsigned>(iteration, field::minRaysPerSample),
-            attribute<unsigned>(iteration, field::maxRaysPerSample),
+            renamedAttribute<unsigned>(iteration, field::minRays, field::legacyMinRays),
+            renamedAttribute<unsigned>(iteration, field::maxRays, field::legacyMaxRays),
             loadScalar<double>(
                 series,
                 iteration,
@@ -1164,8 +1176,15 @@ namespace hase::openpmd
             attributeOr<bool>(iteration, field::monochromatic, false));
 
         experiment.propagationMode = propagationMode;
-        experiment.forwardRayCount
-            = attributeOr<unsigned>(iteration, field::forwardRayCount, experiment.maxRaysPerSample);
+        experiment.forwardRayCount = attributeOr<unsigned>(iteration, field::forwardRayCount, 0u);
+        if(experiment.minRays == 0u)
+        {
+            validationError(field::minRays, "must be greater than zero");
+        }
+        if(experiment.maxRays < experiment.minRays)
+        {
+            validationError(field::maxRays, "must be greater than or equal to min_rays");
+        }
         if(iteration.containsAttribute(field::retiredForwardRayLength))
         {
             validationError("forward_ray_length", "is retired; forward rays now propagate to their physical boundary");
