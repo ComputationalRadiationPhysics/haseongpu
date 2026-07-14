@@ -70,4 +70,14 @@ namespace hase::random
         return launch == 0u ? base : internal::mixSeed(base, launch);
     }
 
+    inline constexpr double stratifiedUnitOffset(std::uint32_t const base)
+    {
+        return static_cast<double>(internal::mixSeed(base, 0x7d3a'9f21u)) / 4294967296.0;
+    }
+
+    inline constexpr std::uint32_t stratifiedSpectrumPhase(std::uint32_t const base, std::uint32_t const spectrumSize)
+    {
+        return spectrumSize == 0u ? 0u : internal::mixSeed(base, 0x6ca4'c37du) % spectrumSize;
+    }
+
 } // namespace hase::random

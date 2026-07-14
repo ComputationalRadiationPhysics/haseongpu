@@ -80,11 +80,26 @@ namespace hase::core
         ForwardPhiAseRawResult& result,
         unsigned const rayCount,
         unsigned rngSeed,
+        unsigned const globalRayOffset,
+        unsigned const globalRayCount,
+        double const sourceStratificationOffset,
+        unsigned const spectrumStratificationPhase,
         float& runtime)
     {
         threadIds.emplace_back(
             std::thread(
-                [&experiment, &hostMesh, &mesh, &result, &runtime, devBundle, rayCount, rngSeed]() mutable
+                [&experiment,
+                 &hostMesh,
+                 &mesh,
+                 &result,
+                 &runtime,
+                 devBundle,
+                 rayCount,
+                 rngSeed,
+                 globalRayOffset,
+                 globalRayCount,
+                 sourceStratificationOffset,
+                 spectrumStratificationPhase]() mutable
                 {
                     try
                     {
@@ -96,7 +111,11 @@ namespace hase::core
                             result,
                             runtime,
                             rayCount,
-                            rngSeed);
+                            rngSeed,
+                            globalRayOffset,
+                            globalRayCount,
+                            sourceStratificationOffset,
+                            spectrumStratificationPhase);
                     }
                     catch(...)
                     {
@@ -115,6 +134,10 @@ namespace hase::core
         unsigned const firstDevice,
         unsigned const assignedDeviceCount,
         unsigned const rayCount,
+        unsigned const globalRayOffset,
+        unsigned const globalRayCount,
+        double const sourceStratificationOffset,
+        unsigned const spectrumStratificationPhase,
         unsigned const baseSeed,
         unsigned const rank,
         std::vector<float>& runtimes)
@@ -147,6 +170,7 @@ namespace hase::core
         devices.reserve(activeDevices);
         std::vector<unsigned> deviceIndices;
         deviceIndices.reserve(activeDevices);
+        unsigned localRayOffset = globalRayOffset;
         for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
         {
             unsigned const deviceIndex = firstDevice + localDeviceIndex;
@@ -160,8 +184,13 @@ namespace hase::core
                     experiment,
                     betaVolumeTotal,
                     localRayCount,
-                    hase::random::seedForWorker(baseSeed, rank, deviceIndex)));
+                    hase::random::seedForWorker(baseSeed, rank, deviceIndex),
+                    localRayOffset,
+                    globalRayCount,
+                    sourceStratificationOffset,
+                    spectrumStratificationPhase));
             deviceIndices.emplace_back(deviceIndex);
+            localRayOffset += localRayCount;
         }
 
         auto const started = std::chrono::steady_clock::now();
@@ -286,6 +315,8 @@ namespace hase::core
         unsigned const firstDevice,
         unsigned const assignedDeviceCount,
         unsigned const rayCount,
+        unsigned const globalRayOffset,
+        unsigned const globalRayCount,
         unsigned const baseSeed,
         unsigned const rank,
         std::vector<float>& runtimes)
@@ -299,6 +330,10 @@ namespace hase::core
             return combined;
         }
 
+        double const sourceStratificationOffset = random::stratifiedUnitOffset(baseSeed);
+        unsigned const spectrumStratificationPhase
+            = random::stratifiedSpectrumPhase(baseSeed, static_cast<unsigned>(experiment.sigmaA.size()));
+
         if(experiment.useReflections)
         {
             return calcForwardPhiAseSrmOnDevices(
@@ -309,6 +344,10 @@ namespace hase::core
                 firstDevice,
                 assignedDeviceCount,
                 rayCount,
+                globalRayOffset,
+                globalRayCount,
+                sourceStratificationOffset,
+                spectrumStratificationPhase,
                 baseSeed,
                 rank,
                 runtimes);
@@ -318,6 +357,7 @@ namespace hase::core
         unsigned const raysPerDevice = rayCount / activeDevices;
         unsigned const remainder = rayCount % activeDevices;
         std::vector<ForwardPhiAseRawResult> partials(activeDevices, makeForwardRawResult(volumeCount));
+        unsigned localRayOffset = globalRayOffset;
 
         for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
         {
@@ -334,7 +374,12 @@ namespace hase::core
                 partials.at(localDeviceIndex),
                 localRayCount,
                 rngSeed,
+                localRayOffset,
+                globalRayCount,
+                sourceStratificationOffset,
+                spectrumStratificationPhase,
                 runtimes.at(deviceIndex));
+            localRayOffset += localRayCount;
         }
 
         joinAll();
