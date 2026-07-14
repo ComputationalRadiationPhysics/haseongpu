@@ -54,6 +54,7 @@ namespace hase::core
     constexpr unsigned tet4VertexCount = 4u;
     constexpr unsigned tet4FaceCount = 4u;
     constexpr unsigned tet4FaceWidth = 3u;
+    constexpr unsigned tet4BarycentricPlaneWidth = 4u;
     constexpr unsigned vtkTetraCellType = 10u;
 
     template<class T, class B, class E>
@@ -155,6 +156,8 @@ namespace hase::core
         std::span<unsigned const> cellPointIndices;
         std::span<unsigned const> cellTypes;
         std::span<int const> cellFaces;
+        // Affine barycentric coordinates of the vertex opposite each local face.
+        std::span<double const> barycentricFacePlanes;
         std::span<int const> cellNeighborCells;
         std::span<int const> cellNeighborLocalFaces;
         std::span<int const> cellFaceBoundaries;
@@ -195,6 +198,26 @@ namespace hase::core
         [[nodiscard]] ALPAKA_FN_ACC int getCellFacePoint(unsigned cell, unsigned localFace, unsigned localVertex) const
         {
             return cellFaces[(cell * numberOfFacesPerCell + localFace) * tet4FaceWidth + localVertex];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC double getFaceBarycentricCoordinate(
+            unsigned const cell,
+            unsigned const localFace,
+            Point const point) const
+        {
+            unsigned const offset = (cell * numberOfFacesPerCell + localFace) * tet4BarycentricPlaneWidth;
+            return barycentricFacePlanes[offset] * point.x + barycentricFacePlanes[offset + 1u] * point.y
+                   + barycentricFacePlanes[offset + 2u] * point.z + barycentricFacePlanes[offset + 3u];
+        }
+
+        [[nodiscard]] ALPAKA_FN_ACC double getFaceBarycentricDirection(
+            unsigned const cell,
+            unsigned const localFace,
+            Point const direction) const
+        {
+            unsigned const offset = (cell * numberOfFacesPerCell + localFace) * tet4BarycentricPlaneWidth;
+            return barycentricFacePlanes[offset] * direction.x + barycentricFacePlanes[offset + 1u] * direction.y
+                   + barycentricFacePlanes[offset + 2u] * direction.z;
         }
 
         [[nodiscard]] ALPAKA_FN_ACC int getCellNeighbor(unsigned cell, unsigned localFace) const
@@ -345,6 +368,7 @@ namespace hase::core
             std::vector<unsigned> cellPointIndices,
             std::vector<unsigned> cellTypes,
             std::vector<int> cellFaces,
+            std::vector<double> barycentricFacePlanes,
             std::vector<int> cellNeighborCells,
             std::vector<int> cellNeighborLocalFaces,
             std::vector<int> cellFaceBoundaries,
@@ -367,6 +391,7 @@ namespace hase::core
             , cellPointIndices(hase::alpakaUtils::toDevice(m_queue, cellPointIndices))
             , cellTypes(hase::alpakaUtils::toDevice(m_queue, cellTypes))
             , cellFaces(hase::alpakaUtils::toDevice(m_queue, cellFaces))
+            , barycentricFacePlanes(hase::alpakaUtils::toDevice(m_queue, barycentricFacePlanes))
             , cellNeighborCells(hase::alpakaUtils::toDevice(m_queue, cellNeighborCells))
             , cellNeighborLocalFaces(hase::alpakaUtils::toDevice(m_queue, cellNeighborLocalFaces))
             , cellFaceBoundaries(hase::alpakaUtils::toDevice(m_queue, cellFaceBoundaries))
@@ -413,6 +438,9 @@ namespace hase::core
                 std::span<unsigned const>(cellPointIndices.data(), cellPointIndices.getMdSpan().getExtents().x()),
                 std::span<unsigned const>(cellTypes.data(), cellTypes.getMdSpan().getExtents().x()),
                 std::span<int const>(cellFaces.data(), cellFaces.getMdSpan().getExtents().x()),
+                std::span<double const>(
+                    barycentricFacePlanes.data(),
+                    barycentricFacePlanes.getMdSpan().getExtents().x()),
                 std::span<int const>(cellNeighborCells.data(), cellNeighborCells.getMdSpan().getExtents().x()),
                 std::span<int const>(
                     cellNeighborLocalFaces.data(),
@@ -462,6 +490,7 @@ namespace hase::core
         T_Buffer<unsigned> cellPointIndices;
         T_Buffer<unsigned> cellTypes;
         T_Buffer<int> cellFaces;
+        T_Buffer<double> barycentricFacePlanes;
         T_Buffer<int> cellNeighborCells;
         T_Buffer<int> cellNeighborLocalFaces;
         T_Buffer<int> cellFaceBoundaries;
@@ -502,6 +531,7 @@ namespace hase::core
         std::vector<unsigned> cellPointIndices;
         std::vector<unsigned> cellTypes;
         std::vector<int> cellFaces;
+        std::vector<double> barycentricFacePlanes;
         std::vector<int> cellNeighborCells;
         std::vector<int> cellNeighborLocalFaces;
         std::vector<int> cellFaceBoundaries;
@@ -610,6 +640,7 @@ namespace hase::core
                 triangleCenterY.push_back(this->cellCenters.at(cell + numberOfCells));
             }
             calcCellVolumePrefix();
+            precomputeBarycentricFacePlanes();
         }
 
         void calcCellVolumePrefix()
@@ -624,6 +655,78 @@ namespace hase::core
                 double const beta = cell < betaVolume.size() ? betaVolume[cell] : 0.0;
                 runningBetaVolume += beta * static_cast<double>(cellVolumes[cell]);
                 betaVolumePrefix[cell] = runningBetaVolume;
+            }
+        }
+
+        void precomputeBarycentricFacePlanes()
+        {
+            barycentricFacePlanes.assign(
+                static_cast<std::size_t>(numberOfCells) * numberOfFacesPerCell * tet4BarycentricPlaneWidth,
+                0.0);
+            for(unsigned cell = 0u; cell < numberOfCells; ++cell)
+            {
+                for(unsigned localFace = 0u; localFace < numberOfFacesPerCell; ++localFace)
+                {
+                    unsigned const faceOffset = (cell * numberOfFacesPerCell + localFace) * tet4FaceWidth;
+                    if(faceOffset + tet4FaceWidth > cellFaces.size())
+                    {
+                        continue;
+                    }
+                    int const p0 = cellFaces[faceOffset];
+                    int const p1 = cellFaces[faceOffset + 1u];
+                    int const p2 = cellFaces[faceOffset + 2u];
+                    if(p0 < 0 || p1 < 0 || p2 < 0 || static_cast<unsigned>(p0) >= numberOfMeshPoints
+                       || static_cast<unsigned>(p1) >= numberOfMeshPoints
+                       || static_cast<unsigned>(p2) >= numberOfMeshPoints)
+                    {
+                        continue;
+                    }
+
+                    int opposite = -1;
+                    unsigned const cellOffset = cell * numberOfCellVertices;
+                    for(unsigned localVertex = 0u; localVertex < numberOfCellVertices; ++localVertex)
+                    {
+                        if(cellOffset + localVertex >= cellPointIndices.size())
+                        {
+                            break;
+                        }
+                        unsigned const vertex = cellPointIndices[cellOffset + localVertex];
+                        if(vertex != static_cast<unsigned>(p0) && vertex != static_cast<unsigned>(p1)
+                           && vertex != static_cast<unsigned>(p2))
+                        {
+                            opposite = static_cast<int>(vertex);
+                            break;
+                        }
+                    }
+                    if(opposite < 0 || static_cast<unsigned>(opposite) >= numberOfMeshPoints)
+                    {
+                        continue;
+                    }
+
+                    auto const point = [this](unsigned const index)
+                    {
+                        return Point{
+                            points[index],
+                            points[index + numberOfMeshPoints],
+                            points[index + 2u * numberOfMeshPoints]};
+                    };
+                    Point const a = point(static_cast<unsigned>(p0));
+                    Point const b = point(static_cast<unsigned>(p1));
+                    Point const c = point(static_cast<unsigned>(p2));
+                    Point const oppositePoint = point(static_cast<unsigned>(opposite));
+                    Point const normal = cross(b - a, c - a);
+                    double const denominator = dot(normal, oppositePoint - a);
+                    if(std::abs(denominator) <= std::numeric_limits<double>::epsilon())
+                    {
+                        continue;
+                    }
+                    Point const gradient = normal * (1.0 / denominator);
+                    unsigned const planeOffset = (cell * numberOfFacesPerCell + localFace) * tet4BarycentricPlaneWidth;
+                    barycentricFacePlanes[planeOffset] = gradient.x;
+                    barycentricFacePlanes[planeOffset + 1u] = gradient.y;
+                    barycentricFacePlanes[planeOffset + 2u] = gradient.z;
+                    barycentricFacePlanes[planeOffset + 3u] = -dot(gradient, a);
+                }
             }
         }
 
@@ -657,6 +760,7 @@ namespace hase::core
                 cellPointIndices,
                 cellTypes,
                 cellFaces,
+                barycentricFacePlanes,
                 cellNeighborCells,
                 cellNeighborLocalFaces,
                 cellFaceBoundaries,

@@ -75,7 +75,8 @@ Each direct ray samples a spectral bin, an emitting Tet4 volume and point, and
 an isotropic direction. The volume probability is proportional to
 ``betaVolume * cellVolume``; this matches the source strength and uses a unit
 source weight. A ray then deposits its gain-weighted track-length contribution
-in each Tet4 volume it crosses.
+in each Tet4 volume it crosses. The next Tet4 boundary is selected from
+precomputed barycentric face planes instead of testing every triangular face.
 
 Within every adaptive batch, direct rays are distributed as evenly as possible
 over the discrete ASE spectral bins. They also use one randomly shifted
