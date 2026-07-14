@@ -54,16 +54,16 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     assert captured["gain_medium"] is smallGainMedium
     assert captured["spectral_properties"] is crossSections
     assert captured["openpmd_session"] is None
-    assert captured["phi_ase"].minRaysPerSample == 1000
+    assert captured["phi_ase"].minRays == 1000
     assert captured["phi_ase"].useReflections is False
     assert captured["phi_ase"].rngSeed == 1234
 
 
-def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
+def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath, legacyPhiAseConfigPath):
     phiAse = PhiASE(phiAseTestConfigPath)
 
-    assert phiAse.minRaysPerSample == 1000
-    assert phiAse.maxRaysPerSample == 10000
+    assert phiAse.minRays == 1000
+    assert phiAse.maxRays == 10000
     assert phiAse.repetitions == 1
     assert phiAse.backend == "Host_Cpu_CpuSerial"
 
@@ -72,7 +72,7 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     args = parser.parse_args([
         "--phi-ase-config",
         str(phiAseTestConfigPath),
-        "--min-rays-per-sample",
+        "--min-rays",
         "32",
         "--openpmd-backend",
         "adios-sst",
@@ -80,9 +80,13 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
 
     fromArgs = PhiASE.fromArgs(args)
 
-    assert fromArgs.minRaysPerSample == 32
-    assert fromArgs.maxRaysPerSample == 10000
+    assert fromArgs.minRays == 32
+    assert fromArgs.maxRays == 10000
     assert fromArgs.openpmdBackend == "adios-sst"
+
+    legacy = PhiASE(legacyPhiAseConfigPath)
+    assert legacy.minRays == 1000
+    assert legacy.maxRays == 100000
 
 
 def testPhiAseDefaultBackendSerializesAvailableAlpakaBackend():
@@ -91,6 +95,20 @@ def testPhiAseDefaultBackendSerializesAvailableAlpakaBackend():
 
     assert backend != "gpu"
     assert backend in simulation_module.AlpakaBackends.all()
+
+
+def testPhiAseSerializesAdaptiveRangeWithoutAnImplicitFixedRayCount():
+    phiAse = PhiASE(minRays=100, maxRays=1600, adaptiveSteps=4)
+
+    attributes = phiAse.openPmdAttributes(numberOfSamples=1)
+
+    assert attributes["minRays"] == 100
+    assert attributes["maxRays"] == 1600
+    assert attributes["adaptiveSteps"] == 4
+    assert attributes["forwardRayCount"] == 0
+
+    fixed = PhiASE(minRays=100, maxRays=1600, forwardRayCount=250)
+    assert fixed.openPmdAttributes(numberOfSamples=1)["forwardRayCount"] == 250
 
 
 def testPhiAseLoadsOpenPmdBackendFromConfig():

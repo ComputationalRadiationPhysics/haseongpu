@@ -255,7 +255,8 @@ namespace
         std::string const& name,
         std::function<void(io::Series&, io::Iteration&)> mutate = {},
         bool betaVolumeAsFloat = false,
-        bool betaVolumeBadExtent = false)
+        bool betaVolumeBadExtent = false,
+        bool legacyRayAttributeNames = false)
     {
         auto path = testPath(name);
         io::Series series(path.string(), io::Access::CREATE_LINEAR, "{}");
@@ -273,8 +274,16 @@ namespace
         iteration.setAttribute("crystal_t_fluo", 1.25f);
         iteration.setAttribute("cladding_number", 7u);
         iteration.setAttribute("cladding_absorption", 0.05);
-        iteration.setAttribute("min_rays_per_sample", 1u);
-        iteration.setAttribute("max_rays_per_sample", 2u);
+        if(legacyRayAttributeNames)
+        {
+            iteration.setAttribute("min_rays_per_sample", 1u);
+            iteration.setAttribute("max_rays_per_sample", 2u);
+        }
+        else
+        {
+            iteration.setAttribute("min_rays", 1u);
+            iteration.setAttribute("max_rays", 2u);
+        }
         iteration.setAttribute("relative_standard_error_threshold", 0.5);
         iteration.setAttribute("repetitions", 3u);
         iteration.setAttribute("adaptive_steps", 4u);
@@ -384,8 +393,8 @@ namespace
             iteration.setAttribute("crystal_t_fluo", 1.25f);
             iteration.setAttribute("cladding_number", 7u);
             iteration.setAttribute("cladding_absorption", 0.05);
-            iteration.setAttribute("min_rays_per_sample", 1u);
-            iteration.setAttribute("max_rays_per_sample", 2u);
+            iteration.setAttribute("min_rays", 1u);
+            iteration.setAttribute("max_rays", 2u);
             iteration.setAttribute("relative_standard_error_threshold", 0.5);
             iteration.setAttribute("repetitions", 3u);
             iteration.setAttribute("adaptive_steps", 4u);
@@ -466,8 +475,8 @@ namespace
         iteration.setAttribute("crystal_t_fluo", 1.75f);
         iteration.setAttribute("cladding_number", 3u);
         iteration.setAttribute("cladding_absorption", 0.075);
-        iteration.setAttribute("min_rays_per_sample", 1u);
-        iteration.setAttribute("max_rays_per_sample", 1u);
+        iteration.setAttribute("min_rays", 1u);
+        iteration.setAttribute("max_rays", 1u);
         iteration.setAttribute("relative_standard_error_threshold", 0.25);
         iteration.setAttribute("repetitions", 1u);
         iteration.setAttribute("adaptive_steps", 1u);
@@ -591,8 +600,50 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     REQUIRE(context.compute.writeVtk == false);
     REQUIRE(context.compute.devices.empty());
     REQUIRE(context.compute.rngSeed == 1234u);
+    REQUIRE(context.experiment.forwardRayCount == 0u);
     REQUIRE(context.run.enableAse == true);
     REQUIRE(context.run.timeIntegration.method == "explicit-euler");
+}
+
+TEST_CASE("openPMD parser accepts legacy per-sample ray attributes", "[openpmd][parser]")
+{
+    auto const path = writeParserInput("legacy_ray_attributes", {}, false, false, true);
+    hase::openpmd::Parser parser{path, testPath("legacy-ray-attributes-output")};
+    auto context = parser.read();
+
+    REQUIRE(context.experiment.minRays == 1u);
+    REQUIRE(context.experiment.maxRays == 2u);
+}
+
+TEST_CASE("forward ray schedule retains the configured adaptive range", "[openpmd][parser]")
+{
+    hase::core::ExperimentParameters experiment;
+    experiment.minRays = 100u;
+    experiment.maxRays = 1600u;
+    hase::core::ComputeParameters compute;
+    compute.adaptiveSteps = 4u;
+
+    REQUIRE(hase::core::adaptiveRayTarget(experiment, compute, 0u) == 100u);
+    REQUIRE(hase::core::adaptiveRayTarget(experiment, compute, 4u) == 1600u);
+    REQUIRE(hase::core::adaptiveRayTarget(experiment, compute, 1u) > 100u);
+
+    experiment.forwardRayCount = 250u;
+    REQUIRE(hase::core::adaptiveRayTarget(experiment, compute, 0u) == 250u);
+}
+
+TEST_CASE("adaptive convergence records only configured global ray targets", "[openpmd][parser]")
+{
+    hase::core::Result result;
+    result.relativeStandardError = {0.05, 0.2, std::numeric_limits<double>::quiet_NaN()};
+    result.droppedRays = {0u, 0u, 0u};
+    std::vector<unsigned> convergenceRayCounts;
+
+    hase::core::recordAdaptiveRayConvergence(result, 100u, 0.1, convergenceRayCounts);
+    REQUIRE(convergenceRayCounts == std::vector<unsigned>{100u, 0u, 0u});
+
+    result.relativeStandardError.at(1) = 0.05;
+    hase::core::recordAdaptiveRayConvergence(result, 400u, 0.1, convergenceRayCounts);
+    REQUIRE(convergenceRayCounts == std::vector<unsigned>{100u, 400u, 0u});
 }
 
 TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[openpmd][parser]")

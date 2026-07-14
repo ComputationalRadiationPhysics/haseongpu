@@ -28,8 +28,8 @@ SIMULATION_ATTRIBUTE_SPECS = (
     ExtensionAttributeSpec(
         "claddingAbsorption", "cladding_absorption", "float", unit="cm^-1", unitSI=100.0, unitDimension=unitDimension.claddingAbsorption
     ),
-    ExtensionAttributeSpec("minRaysPerSample", "min_rays_per_sample", "int", unit="count", unitDimension=unitDimension.minRaysPerSample),
-    ExtensionAttributeSpec("maxRaysPerSample", "max_rays_per_sample", "int", unit="count", unitDimension=unitDimension.maxRaysPerSample),
+    ExtensionAttributeSpec("minRays", "min_rays", "int", unit="count", unitDimension=unitDimension.minRays),
+    ExtensionAttributeSpec("maxRays", "max_rays", "int", unit="count", unitDimension=unitDimension.maxRays),
     ExtensionAttributeSpec("propagationMode", "propagation_mode", "str", unitDimension=unitDimension.propagationMode),
     ExtensionAttributeSpec("forwardRayCount", "forward_ray_count", "int", unit="count", unitDimension=unitDimension.forwardRayCount),
     ExtensionAttributeSpec(

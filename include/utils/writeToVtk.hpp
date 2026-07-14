@@ -41,8 +41,8 @@ namespace hase::utils
      * @param mesh explicit 3D cell mesh to write
      * @param ase the input data to write (one value for each vertex in the grid)
      * @param filename the output filename to write
-     * @param minRaysPerSample with which the experiment was started (see README)
-     * @param maxRaysPerSample with which the experiment was started (see README)
+     * @param raysLaunched actual cumulative forward-ray histories in this result
+     * @param maxRays configured adaptive ray budget
      * @param relativeStandardErrorThreshold with which the experiment was started (see README)
      * @param useReflections with which the experiment was started (see README)
      * @param runtime the time needed to complete the experiment
@@ -53,8 +53,8 @@ namespace hase::utils
         hase::core::HostMesh const& mesh,
         std::vector<double> const ase,
         std::filesystem::path const filename,
-        unsigned const minRaysPerSample,
-        unsigned const maxRaysPerSample,
+        unsigned const raysLaunched,
+        unsigned const maxRays,
         float const relativeStandardErrorThreshold,
         bool const useReflections,
         float const runtime);
@@ -66,8 +66,8 @@ namespace hase::utils
      * @param mesh explicit 3D cell mesh to write
      * @param ase the input data to write (one value for each vertex in the grid)
      * @param filename the output filename to write
-     * @param minRaysPerSample with which the experiment was started (see README)
-     * @param maxRaysPerSample with which the experiment was started (see README)
+     * @param raysLaunched actual cumulative forward-ray histories in this result
+     * @param maxRays configured adaptive ray budget
      * @param relativeStandardErrorThreshold with which the experiment was started (see README)
      * @param useReflections with which the experiment was started (see README)
      * @param runtime the time needed to complete the experiment
@@ -78,8 +78,8 @@ namespace hase::utils
         hase::core::HostMesh const& mesh,
         std::vector<double> const prismData,
         std::filesystem::path const filename,
-        unsigned const minRaysPerSample,
-        unsigned const maxRaysPerSample,
+        unsigned const raysLaunched,
+        unsigned const maxRays,
         float const relativeStandardErrorThreshold,
         bool const useReflections,
         float const runtime);

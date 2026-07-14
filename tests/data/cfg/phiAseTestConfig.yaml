@@ -1,6 +1,6 @@
 experiment:
-  minRaysPerSample: 1000
-  maxRaysPerSample: 10000
+  minRays: 1000
+  maxRays: 10000
   relativeStandardErrorThreshold: 0.1
   adaptiveSteps: 3
   useReflections: false

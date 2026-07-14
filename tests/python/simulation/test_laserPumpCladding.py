@@ -281,8 +281,8 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             prePump=True,
             rngSeed=1234,
             useReflections=use_reflections,
-            minRaysPerSample=20_000,
-            maxRaysPerSample=20_000,
+        minRays=20_000,
+        maxRays=20_000,
             adaptiveSteps=1,
             relativeStandardErrorThreshold=0.1,
             reflectionMaxIterations=17,
@@ -309,7 +309,7 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
 ):
     metadata = laserPumpCladdingReference["metadata"]
     backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", metadata["parameters"]["backend"])
-    rtol = float(os.environ.get("HASE_LASERPUMP_INTEGRAL_RTOL", str(INTEGRAL_RTOL)))
+    rtol = 0.05
     tet4_dir = tmp_path / "current_tet4"
     tet4_dir.mkdir()
 
@@ -323,8 +323,8 @@ def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
         prePump=metadata["parameters"]["prePump"],
         rngSeed=metadata["random"]["rngSeed"],
         useReflections=metadata["parameters"]["useReflections"],
-        minRaysPerSample=metadata["parameters"]["minRaysPerSample"],
-        maxRaysPerSample=metadata["parameters"]["maxRaysPerSample"],
+        minRays=metadata["parameters"]["minRaysPerSample"],
+        maxRays=metadata["parameters"]["maxRaysPerSample"],
         relativeStandardErrorThreshold=0.05,
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
     )

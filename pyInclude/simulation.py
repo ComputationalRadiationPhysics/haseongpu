@@ -64,18 +64,18 @@ class PhiASE:
 
     propagationMode: str = "forward"
     """ASE propagation mode; only ``forward`` is supported."""
-    minRaysPerSample: int = 100000
-    """Minimum Monte Carlo rays retained for legacy configuration compatibility."""
-    maxRaysPerSample: int = 100000
-    """Maximum rays per sample allowed during adaptive refinement."""
+    minRays: int = 100000
+    """Initial number of globally launched Monte Carlo rays."""
+    maxRays: int = 100000
+    """Maximum total number of globally launched rays during adaptive refinement."""
     forwardRayCount: int | None = None
-    """Number of globally launched forward rays; defaults to ``maxRaysPerSample``."""
+    """Explicit fixed forward-ray count; disables adaptive refinement when set."""
     relativeStandardErrorThreshold: float = 0.1
     """Target one-sigma relative sampling uncertainty for ASE flux estimates."""
     repetitions: int = 4
     """Maximum repeated ASE estimates at a fixed ray count."""
     adaptiveSteps: int = 4
-    """Number of ray-count increases between min and max rays."""
+    """Maximum geometric ray-count increases from ``minRays`` to ``maxRays``."""
     useReflections: bool = False
     """Whether surface reflectivities affect forward propagation."""
     reflectionMaxIterations: int = 8
@@ -148,8 +148,8 @@ class PhiASE:
     def addArguments(parser):
         """Add command-line arguments that map to ``PhiASE`` settings."""
         parser.add_argument("--phi-ase-config", default=None, help="YAML file with PhiASE compute/experiment settings")
-        parser.add_argument("--min-rays-per-sample", type=int, default=None)
-        parser.add_argument("--max-rays-per-sample", type=int, default=None)
+        parser.add_argument("--min-rays", "--min-rays-per-sample", dest="min_rays", type=int, default=None)
+        parser.add_argument("--max-rays", "--max-rays-per-sample", dest="max_rays", type=int, default=None)
         parser.add_argument("--propagation-mode", choices=("forward",), default=None)
         parser.add_argument("--forward-ray-count", type=int, default=None)
         parser.add_argument("--relative-standard-error-threshold", type=float, default=None)
@@ -172,8 +172,10 @@ class PhiASE:
         config = getattr(args, "phi_ase_config", None)
         obj = cls(config) if config else cls()
         mapping = {
-            "min_rays_per_sample": "minRaysPerSample",
-            "max_rays_per_sample": "maxRaysPerSample",
+            "min_rays": "minRays",
+            "max_rays": "maxRays",
+            "min_rays_per_sample": "minRays",
+            "max_rays_per_sample": "maxRays",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
             "relative_standard_error_threshold": "relativeStandardErrorThreshold",
@@ -218,10 +220,12 @@ class PhiASE:
                 sections.append(value)
         sections.append(config)
         aliases = {
-            "minRays": "minRaysPerSample",
-            "maxRays": "maxRaysPerSample",
-            "min_rays_per_sample": "minRaysPerSample",
-            "max_rays_per_sample": "maxRaysPerSample",
+            "minRaysPerSample": "minRays",
+            "maxRaysPerSample": "maxRays",
+            "min_rays": "minRays",
+            "max_rays": "maxRays",
+            "min_rays_per_sample": "minRays",
+            "max_rays_per_sample": "maxRays",
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
             "relative_standard_error_threshold": "relativeStandardErrorThreshold",
@@ -240,15 +244,10 @@ class PhiASE:
             "rng_seed": "rngSeed",
         }
         allowed = {
-            "minRaysPerSample", "maxRaysPerSample", "propagationMode", "forwardRayCount",
+            "minRays", "maxRays", "propagationMode", "forwardRayCount",
             "relativeStandardErrorThreshold", "reflectionMaxIterations", "reflectionTolerance",
-            "surfaceReservoirSize", "repetitions",
-            "adaptiveSteps", "useReflections", "monochromatic", "backend", "parallelMode",
-            "numDevices", "nPerNode", "writeVtk", "devices", "minSampleRange", "maxSampleRange", "rngSeed",
-            "minRaysPerSample", "maxRaysPerSample", "relativeStandardErrorThreshold", "reflectionMaxIterations",
-            "reflectionTolerance", "surfaceReservoirSize", "repetitions",
-            "adaptiveSteps", "useReflections", "monochromatic", "backend", "openpmdBackend",
-            "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
+            "surfaceReservoirSize", "repetitions", "adaptiveSteps", "useReflections", "monochromatic",
+            "backend", "openpmdBackend", "parallelMode", "numDevices", "nPerNode", "writeVtk", "devices",
             "minSampleRange", "maxSampleRange", "rngSeed",
         }
         for section in sections:
@@ -269,19 +268,31 @@ class PhiASE:
     def openPmdAttributes(self, *, numberOfSamples):
         if str(self.propagationMode).strip().lower() != "forward":
             raise ValueError("PhiASE.propagationMode must be 'forward'")
+        min_rays = int(self.minRays)
+        max_rays = int(self.maxRays)
+        adaptive_steps = int(self.adaptiveSteps)
+        forward_ray_count = 0 if self.forwardRayCount is None else int(self.forwardRayCount)
+        if min_rays == 0:
+            raise ValueError("PhiASE.minRays must be greater than zero")
+        if max_rays < min_rays:
+            raise ValueError("PhiASE.maxRays must be greater than or equal to PhiASE.minRays")
+        if adaptive_steps < 0:
+            raise ValueError("PhiASE.adaptiveSteps must not be negative")
+        if forward_ray_count < 0:
+            raise ValueError("PhiASE.forwardRayCount must not be negative")
         min_sample = 0 if self.minSampleRange is None else int(self.minSampleRange)
         max_sample = int(numberOfSamples) - 1 if self.maxSampleRange is None else int(self.maxSampleRange)
         attributes = {
-            "minRaysPerSample": self.minRaysPerSample,
-            "maxRaysPerSample": self.maxRaysPerSample,
+            "minRays": min_rays,
+            "maxRays": max_rays,
             "propagationMode": self.propagationMode,
-            "forwardRayCount": self.maxRaysPerSample if self.forwardRayCount is None else self.forwardRayCount,
+            "forwardRayCount": forward_ray_count,
             "relativeStandardErrorThreshold": self.relativeStandardErrorThreshold,
             "reflectionMaxIterations": self.reflectionMaxIterations,
             "reflectionTolerance": self.reflectionTolerance,
             "surfaceReservoirSize": self.surfaceReservoirSize,
             "repetitions": self.repetitions,
-            "adaptiveSteps": self.adaptiveSteps,
+            "adaptiveSteps": adaptive_steps,
             "useReflections": self.useReflections,
             "monochromatic": self.monochromatic,
             "backend": _preferredDefaultBackend() if self.backend is None else self.backend,

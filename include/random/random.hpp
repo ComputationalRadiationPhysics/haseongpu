@@ -65,4 +65,9 @@ namespace hase::random
         return internal::mixSeed(internal::mixSeed(base, rank), deviceIndex);
     }
 
+    inline constexpr std::uint32_t seedForAdaptiveLaunch(std::uint32_t base, std::uint32_t launch)
+    {
+        return launch == 0u ? base : internal::mixSeed(base, launch);
+    }
+
 } // namespace hase::random

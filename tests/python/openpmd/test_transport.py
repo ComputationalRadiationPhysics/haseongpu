@@ -130,8 +130,8 @@ def asymmetric_cross_sections():
 def asymmetric_phi_ase():
     return PhiASE(
         crossSections=asymmetric_cross_sections(),
-        minRaysPerSample=1,
-        maxRaysPerSample=1,
+        minRays=1,
+        maxRays=1,
         relativeStandardErrorThreshold=0.25,
         repetitions=1,
         adaptiveSteps=1,
@@ -184,8 +184,8 @@ def launch_smoke_phi_ase(*, parallel_mode="single"):
     cross_sections = launch_smoke_cross_sections()
     return PhiASE(
         crossSections=cross_sections,
-        minRaysPerSample=1,
-        maxRaysPerSample=1,
+        minRays=1,
+        maxRays=1,
         relativeStandardErrorThreshold=0.25,
         repetitions=1,
         adaptiveSteps=1,
@@ -1514,6 +1514,32 @@ def test_calcPhiAseSingleOpenPmdRoundTrip(tmp_path):
     if _backend_execution_parallel_mode() == "mpi":
         pytest.skip("MPI CI rows exercise backend launches with parallelMode='mpi'")
     _round_trip_calc_phi_ase(tmp_path, "single")
+
+
+@pytest.mark.integration
+def test_calcPhiAseAdaptiveRangeReachesMaxForUnconvergedCell(tmp_path):
+    if _backend_execution_parallel_mode() == "mpi":
+        pytest.skip("MPI CI rows exercise backend launches with parallelMode='mpi'")
+
+    phi_ase = launch_smoke_phi_ase()
+    phi_ase.minRays = 1
+    phi_ase.maxRays = 8
+    phi_ase.adaptiveSteps = 3
+    phi_ase.forwardRayCount = None
+    phi_ase.relativeStandardErrorThreshold = 0.0
+
+    result = transport.runPhiASE(
+        phi_ase,
+        launch_smoke_medium(),
+        launch_smoke_cross_sections(),
+        transport=_configured_backend_for_tests(),
+        workspace_dir=tmp_path,
+    )
+
+    # The zero-emission fixture has an undefined RSE, so refinement must use
+    # every scheduled batch: 1, 1, 2, then 4 additional rays.
+    np.testing.assert_array_equal(result.totalRays, np.array([8], dtype=np.uint32))
+    assert np.isnan(result.relativeStandardError[0])
 
 
 @pytest.mark.integration

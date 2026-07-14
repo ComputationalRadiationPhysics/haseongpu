@@ -308,8 +308,8 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
     )
     phiAse = PhiASE(
         spectralProperties=crossSections,
-        minRaysPerSample=1,
-        maxRaysPerSample=1,
+        minRays=1,
+        maxRays=1,
         forwardRayCount=1,
         repetitions=1,
         adaptiveSteps=1,
