@@ -263,6 +263,10 @@ namespace hase::kernels::forward
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
+            unsigned const globalRayOffset,
+            unsigned const globalRayCount,
+            double const sourceStratificationOffset,
+            unsigned const spectrumStratificationPhase,
             double const betaVolumeTotal,
             auto accumulation,
             auto spectrum,
@@ -270,17 +274,29 @@ namespace hase::kernels::forward
         {
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             auto rndEngine = alpaka::rand::engine::Philox4x32x10{threadLocalStridingRNG + tIdx};
-            for(auto rayNumber : alpaka::onAcc::makeIdxMap(
+            for(auto [rayNumber] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                (void) rayNumber;
-                unsigned tet = sampleVolumeByBetaVolume(mesh, betaVolumeTotal, rndEngine);
+                unsigned const globalRayIndex = globalRayOffset + rayNumber;
+                unsigned const tet = sampleStratifiedVolumeByBetaVolume(
+                    mesh,
+                    betaVolumeTotal,
+                    globalRayIndex,
+                    globalRayCount,
+                    sourceStratificationOffset,
+                    rndEngine);
+                // Beta-volume sampling carries its importance factor in the
+                // source probability, so the compensating weight is one.
                 double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
-                unsigned const sigmaIndex = sampleSpectrumIndex(spectrum.lambdaResolution, rndEngine);
+                unsigned const sigmaIndex = stratifiedSpectrumIndex(
+                    spectrum.lambdaResolution,
+                    globalRayIndex,
+                    globalRayCount,
+                    spectrumStratificationPhase);
                 walkVolumeSeededForwardRay(
                     acc,
                     mesh,
@@ -483,6 +499,10 @@ namespace hase::kernels::forward
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
+            unsigned const globalRayOffset,
+            unsigned const globalRayCount,
+            double const sourceStratificationOffset,
+            unsigned const spectrumStratificationPhase,
             double const betaVolumeTotal,
             auto accumulation,
             auto reservoir,
@@ -491,17 +511,27 @@ namespace hase::kernels::forward
         {
             auto const tIdx = hase::alpakaUtils::getLinGlobalIdx(acc);
             auto rndEngine = alpaka::rand::engine::Philox4x32x10{threadLocalStridingRNG + tIdx};
-            for(auto rayNumber : alpaka::onAcc::makeIdxMap(
+            for(auto [rayNumber] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                (void) rayNumber;
-                unsigned tet = sampleVolumeByBetaVolume(mesh, betaVolumeTotal, rndEngine);
+                unsigned const globalRayIndex = globalRayOffset + rayNumber;
+                unsigned const tet = sampleStratifiedVolumeByBetaVolume(
+                    mesh,
+                    betaVolumeTotal,
+                    globalRayIndex,
+                    globalRayCount,
+                    sourceStratificationOffset,
+                    rndEngine);
                 double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
-                unsigned const sampledSigmaIndex = sampleSpectrumIndex(spectrum.lambdaResolution, rndEngine);
+                unsigned const sampledSigmaIndex = stratifiedSpectrumIndex(
+                    spectrum.lambdaResolution,
+                    globalRayIndex,
+                    globalRayCount,
+                    spectrumStratificationPhase);
                 walkForwardRay(
                     acc,
                     mesh,

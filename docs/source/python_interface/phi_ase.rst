@@ -68,6 +68,30 @@ Sampling and Physics Settings
    Maximum number of geometric ray-count increases between ``minRays`` and
    ``maxRays``. It is ignored for an explicit ``forwardRayCount``.
 
+How direct rays are sampled
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Each direct ray samples a spectral bin, an emitting Tet4 volume and point, and
+an isotropic direction. The volume probability is proportional to
+``betaVolume * cellVolume``; this matches the source strength and uses a unit
+source weight. A ray then deposits its gain-weighted track-length contribution
+in each Tet4 volume it crosses.
+
+Within every adaptive batch, direct rays are distributed as evenly as possible
+over the discrete ASE spectral bins. They also use one randomly shifted
+systematic point per interval of the beta-volume CDF. Both strategies preserve
+the original sampling distributions while reducing spectral and source-cell
+selection noise.
+
+The stratifiers use global batch indices, so their coverage is preserved when a
+batch is split across devices or MPI ranks. They apply to direct volume sources
+only. Reflected rays retain the surface-reservoir sampler because their source
+distribution is determined by incident boundary weight.
+
+Directions remain isotropic. HASE does not infer a preferred axis from an
+arbitrary Tet4 mesh; directional importance sampling requires a separate,
+explicitly validated proposal model.
+
 ``useReflections``
    Enables or disables the surface-reservoir method (SRM) for reflected ASE
    sources. Direct and relaunched rays always propagate from their starting

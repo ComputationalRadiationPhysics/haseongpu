@@ -304,6 +304,8 @@ namespace hase::core
             int const batchBase = batchRayCount / static_cast<unsigned>(activeSize);
             int const batchRemainder = batchRayCount % static_cast<unsigned>(activeSize);
             int const batchLocalCount = batchBase + (activeRank < batchRemainder ? 1 : 0);
+            unsigned const batchGlobalOffset = static_cast<unsigned>(activeRank) * static_cast<unsigned>(batchBase)
+                                               + static_cast<unsigned>(std::min(activeRank, batchRemainder));
             int const batchUsedDevices = std::min(assignedDeviceCount, batchLocalCount);
 
             ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells);
@@ -319,6 +321,8 @@ namespace hase::core
                     static_cast<unsigned>(firstDevice),
                     static_cast<unsigned>(assignedDeviceCount),
                     static_cast<unsigned>(batchLocalCount),
+                    batchGlobalOffset,
+                    batchRayCount,
                     random::seedForAdaptiveLaunch(baseSeed, adaptiveLaunches),
                     static_cast<unsigned>(rank),
                     deviceRuntimes);

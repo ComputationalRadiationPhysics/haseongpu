@@ -2,9 +2,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <numeric>
+#include <ranges>
 #include <string>
 #include <type_traits>
 
@@ -51,6 +55,33 @@ TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[for
     auto const value = contribution(alpaka::Simd<double, 1u>{0.25}, alpaka::Simd<float, 1u>{0.5f});
     STATIC_REQUIRE(std::is_same_v<alpaka::trait::GetValueType_t<std::remove_cvref_t<decltype(value)>>, double>);
     CHECK(value[0] == Catch::Approx(0.125));
+}
+
+TEST_CASE("forward spectrum stratification balances discrete bins", "[forward][sampling]")
+{
+    constexpr unsigned spectrumSize = 7u;
+    constexpr unsigned rayCount = 25u;
+    std::array<unsigned, spectrumSize> visits{};
+    for(unsigned ray = 0u; ray < rayCount; ++ray)
+    {
+        ++visits.at(hase::kernels::forward::stratifiedSpectrumIndex(spectrumSize, ray, rayCount, 3u));
+    }
+
+    auto const [minimum, maximum] = std::ranges::minmax_element(visits);
+    CHECK(*maximum - *minimum <= 1u);
+    CHECK(std::accumulate(visits.cbegin(), visits.cend(), 0u) == rayCount);
+}
+
+TEST_CASE("forward source stratification places one shifted point in each CDF interval", "[forward][sampling]")
+{
+    constexpr unsigned rayCount = 10u;
+    constexpr double shift = 0.25;
+    for(unsigned ray = 0u; ray < rayCount; ++ray)
+    {
+        double const target = hase::kernels::forward::stratifiedUnitInterval(ray, rayCount, shift);
+        CHECK(target > static_cast<double>(ray) / rayCount);
+        CHECK(target < static_cast<double>(ray + 1u) / rayCount);
+    }
 }
 
 TEST_CASE("forward SRM environment controls are strict positive overrides", "[forward][srm]")

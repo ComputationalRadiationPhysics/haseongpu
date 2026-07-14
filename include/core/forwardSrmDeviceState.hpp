@@ -65,12 +65,20 @@ namespace hase::core
             ExperimentParameters const& experiment,
             double const betaVolumeTotal,
             unsigned const rayCount,
-            unsigned const rngSeed)
+            unsigned const rngSeed,
+            unsigned const globalRayOffset,
+            unsigned const globalRayCount,
+            double const sourceStratificationOffset,
+            unsigned const spectrumStratificationPhase)
             : m_devBundle(device, executor)
             , m_queue(m_devBundle.device.makeQueue(alpaka::queueKind::blocking))
             , m_mesh(meshContainer.toView())
             , m_rayCount(rayCount)
             , m_rngSeed(rngSeed)
+            , m_globalRayOffset(globalRayOffset)
+            , m_globalRayCount(globalRayCount)
+            , m_sourceStratificationOffset(sourceStratificationOffset)
+            , m_spectrumStratificationPhase(spectrumStratificationPhase)
             , m_betaVolumeTotal(betaVolumeTotal)
             , m_slotsPerFace(experiment.surfaceReservoirSize)
             , m_phi(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
@@ -154,6 +162,10 @@ namespace hase::core
                     hase::kernels::forward::AccumulateForwardPhiAseReservoir{},
                     m_mesh,
                     m_rayCount,
+                    m_globalRayOffset,
+                    m_globalRayCount,
+                    m_sourceStratificationOffset,
+                    m_spectrumStratificationPhase,
                     m_betaVolumeTotal,
                     m_accumulation,
                     m_reservoirA,
@@ -316,6 +328,10 @@ namespace hase::core
         DeviceMeshView m_mesh;
         unsigned m_rayCount;
         unsigned m_rngSeed;
+        unsigned m_globalRayOffset;
+        unsigned m_globalRayCount;
+        double m_sourceStratificationOffset;
+        unsigned m_spectrumStratificationPhase;
         double m_betaVolumeTotal;
         unsigned m_slotsPerFace;
         T_DoubleBuffer m_phi;

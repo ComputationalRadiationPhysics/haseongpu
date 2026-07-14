@@ -9,6 +9,7 @@
 
 #include <core/forwardSrm.hpp>
 #include <core/mesh.hpp>
+#include <random/random.hpp>
 
 #include <ctime>
 #include <stdexcept>
@@ -51,7 +52,11 @@ namespace hase::core
         ForwardPhiAseRawResult& result,
         float& runtime,
         unsigned rayCount,
-        unsigned threadLocalStridingRNG)
+        unsigned threadLocalStridingRNG,
+        unsigned const globalRayOffset = 0u,
+        unsigned const globalRayCount = 0u,
+        double const sourceStratificationOffset = 0.0,
+        unsigned const spectrumStratificationPhase = 0u)
     {
         if(experiment.useReflections && experiment.surfaceReservoirSize == 0u)
         {
@@ -63,6 +68,14 @@ namespace hase::core
         DeviceMeshView mesh = meshContainer.toView();
         unsigned const volumeCount = mesh.numberOfCells;
         double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
+        unsigned const resolvedGlobalRayCount = globalRayCount == 0u ? rayCount : globalRayCount;
+        double const resolvedSourceStratificationOffset
+            = globalRayCount == 0u ? random::stratifiedUnitOffset(threadLocalStridingRNG) : sourceStratificationOffset;
+        unsigned const resolvedSpectrumStratificationPhase = globalRayCount == 0u
+                                                                 ? random::stratifiedSpectrumPhase(
+                                                                       threadLocalStridingRNG,
+                                                                       static_cast<unsigned>(experiment.sigmaA.size()))
+                                                                 : spectrumStratificationPhase;
 
         result = makeForwardRawResult(volumeCount);
         result.rayCount = rayCount;
@@ -112,6 +125,10 @@ namespace hase::core
                     hase::kernels::forward::AccumulateForwardPhiAse{},
                     mesh,
                     rayCount,
+                    globalRayOffset,
+                    resolvedGlobalRayCount,
+                    resolvedSourceStratificationOffset,
+                    resolvedSpectrumStratificationPhase,
                     betaVolumeTotal,
                     accumulationSpans,
                     spectrumSpans,
@@ -127,6 +144,10 @@ namespace hase::core
                 experiment,
                 result,
                 rayCount,
+                globalRayOffset,
+                resolvedGlobalRayCount,
+                resolvedSourceStratificationOffset,
+                resolvedSpectrumStratificationPhase,
                 betaVolumeTotal,
                 dPhiAccumulator,
                 dPhiSquareAccumulator,

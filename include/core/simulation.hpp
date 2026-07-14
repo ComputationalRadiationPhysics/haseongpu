@@ -256,6 +256,8 @@ namespace hase::core
                             0u,
                             activeDevices,
                             batchRayCount,
+                            0u,
+                            batchRayCount,
                             random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches),
                             0u,
                             runtimes);
