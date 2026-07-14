@@ -151,9 +151,13 @@ Alpaka and Accelerator Options
    version.
 
 ``HASE_CUDA_ARCHITECTURES``
-   Default ``native`` with fallback architectures when no local NVIDIA GPU is
-   visible.  Set explicit values such as ``80`` or ``90`` for reproducible CUDA
-   builds on machines different from the target system.
+   Default ``native``. If no local NVIDIA GPU is visible, the fallback is
+   ``75-real;80-real;90-real;100-real;120`` with CUDA 13 or newer,
+   ``60-real;70-real;80-real;90-real;100-real;120`` with CUDA 12.8, or
+   ``60-real;70-real;80-real;90`` with an older supported toolkit. Set an
+   explicit value such as ``90``, ``100``, or ``120`` for a reproducible build
+   targeting a different system. Explicit architecture values generate cubin
+   and PTX code; the ``-real`` suffix requests cubin only.
 
 ``HASE_CUDA_FLUSHTOZERO``
    Default ``OFF``.  Enables CUDA flush-to-zero behavior.

@@ -11,6 +11,16 @@
 
 namespace hase::kernels::forward
 {
+    [[nodiscard]] inline ALPAKA_FN_ACC unsigned sampleSpectrumIndex(
+        unsigned const spectrumSize,
+        alpaka::rand::engine::Philox4x32x10& rndEngine)
+    {
+        return alpaka::rand::distribution::UniformReal{
+            0.0f,
+            static_cast<float>(spectrumSize),
+            alpaka::rand::interval::oc}(rndEngine);
+    }
+
     [[nodiscard]] inline ALPAKA_FN_ACC unsigned sampleVolumeByVolume(
         hase::core::DeviceMeshView const& mesh,
         double const totalVolume,

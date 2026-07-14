@@ -8,9 +8,9 @@
 #pragma once
 
 #include <core/mesh.hpp>
-#include <kernels/calcSampleGainSum.hpp>
-#include <kernels/forward/rayWalk.hpp>
-#include <kernels/forward/volumeSampling.hpp>
+#include <kernels/importanceSampling.hpp>
+#include <kernels/propagateRay.hpp>
+#include <kernels/reflection.hpp>
 
 #include <cassert>
 #include <limits>
@@ -280,7 +280,7 @@ namespace hase::kernels::forward
                 double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
-                unsigned const sigmaIndex = GenRndSigmas{}(spectrum.lambdaResolution, rndEngine);
+                unsigned const sigmaIndex = sampleSpectrumIndex(spectrum.lambdaResolution, rndEngine);
                 walkVolumeSeededForwardRay(
                     acc,
                     mesh,
@@ -353,34 +353,6 @@ namespace hase::kernels::forward
             }
         }
     };
-
-    [[nodiscard]] inline ALPAKA_FN_HOST_ACC double boundaryReflectance(
-        hase::core::DeviceMeshView const& mesh,
-        unsigned const tet,
-        unsigned const localFace,
-        hase::core::Point const direction,
-        hase::core::Point const outwardNormal)
-    {
-        int const boundary = mesh.cellFaceBoundaries[tet * mesh.numberOfFacesPerCell + localFace];
-        if(boundary <= 0)
-        {
-            return 0.0;
-        }
-        double const nInside = static_cast<double>(mesh.getSurfaceRefractiveIndexInside(tet, localFace));
-        double const nOutside = static_cast<double>(mesh.getSurfaceRefractiveIndexOutside(tet, localFace));
-        if(nInside > 0.0 && nOutside > 0.0)
-        {
-            double const cosIncident
-                = alpaka::math::min(1.0, alpaka::math::abs(hase::core::dot(normalize(direction), outwardNormal)));
-            double const sin2Incident = alpaka::math::max(0.0, 1.0 - cosIncident * cosIncident);
-            double const ratio = nInside / nOutside;
-            if(ratio * ratio * sin2Incident > 1.0)
-            {
-                return 1.0;
-            }
-        }
-        return alpaka::math::max(0.0, static_cast<double>(mesh.getSurfaceReflectivity(tet, localFace)));
-    }
 
     struct AccumulateForwardPhiAseReservoir
     {
@@ -529,7 +501,7 @@ namespace hase::kernels::forward
                 double const sourceWeight = betaVolumeTotal > 0.0 ? 1.0 : 0.0;
                 hase::core::Point origin = samplePointInVolume(mesh, tet, rndEngine);
                 hase::core::Point const direction = sampleIsotropicDirection(rndEngine);
-                unsigned const sampledSigmaIndex = GenRndSigmas{}(spectrum.lambdaResolution, rndEngine);
+                unsigned const sampledSigmaIndex = sampleSpectrumIndex(spectrum.lambdaResolution, rndEngine);
                 walkForwardRay(
                     acc,
                     mesh,

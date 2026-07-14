@@ -1221,7 +1221,6 @@ namespace hase::openpmd
         run.pump.extraction = attributeOr<bool>(iteration, field::pumpExtraction, false);
         run.pump.temporaryFluorescence = attributeOr<double>(iteration, field::pumpTemporaryFluorescence, 0.0);
 
-        mesh.calcTotalReflectionAngles();
         mesh.resultAtVolumes = true;
 
         core::Result result;
