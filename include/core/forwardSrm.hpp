@@ -13,6 +13,7 @@
 #include <core/srm.hpp>
 #include <core/types.hpp>
 #include <kernels/forward/accumulation.hpp>
+#include <kernels/forward/rayBundling.hpp>
 
 #include <limits>
 #include <vector>
@@ -60,6 +61,7 @@ namespace hase::core
             = hase::kernels::forward::ForwardAccumulationSpans{phi, phiSquare, volumeRayVisits, droppedRays};
         auto spectrumSpans = hase::kernels::forward::ForwardSpectrumSpans{sigmaA, sigmaE, lambdaResolution};
         unsigned const faceCount = mesh.numberOfCells * mesh.numberOfFacesPerCell;
+        unsigned const directionBucketCount = faceCount * hase::kernels::forward::forwardDirectionStrata;
         unsigned const reservoirSlots = faceCount * experiment.surfaceReservoirSize;
         alpaka::concepts::IBuffer auto countsA = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
         alpaka::concepts::IBuffer auto countsB = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
@@ -77,21 +79,24 @@ namespace hase::core
             = alpaka::onHost::alloc<unsigned>(devBundle.device, reservoirSlots);
         alpaka::concepts::IBuffer auto faceWeightsA = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
         alpaka::concepts::IBuffer auto faceWeightsB = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
-        alpaka::concepts::IBuffer auto samplingCdf = alpaka::onHost::alloc<double>(devBundle.device, faceCount);
+        alpaka::concepts::IBuffer auto directionBucketWeights
+            = alpaka::onHost::alloc<double>(devBundle.device, directionBucketCount);
+        alpaka::concepts::IBuffer auto samplingCdf
+            = alpaka::onHost::alloc<double>(devBundle.device, directionBucketCount);
         alpaka::concepts::IBuffer auto samplingTotalWeight = alpaka::onHost::alloc<double>(devBundle.device, 1u);
         alpaka::concepts::IBuffer auto systematicOffset = alpaka::onHost::alloc<double>(devBundle.device, 1u);
         alpaka::concepts::IBuffer auto stratifiedRayCounts
-            = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, directionBucketCount);
         alpaka::concepts::IBuffer auto stratifiedRayOffsets
-            = alpaka::onHost::alloc<unsigned>(devBundle.device, faceCount);
-        alpaka::concepts::IBuffer auto stratifiedRayFaces
+            = alpaka::onHost::alloc<unsigned>(devBundle.device, directionBucketCount);
+        alpaka::concepts::IBuffer auto stratifiedRayBuckets
             = alpaka::onHost::alloc<unsigned>(devBundle.device, rayCount);
         alpaka::concepts::IBuffer auto samplingCdfScanBuffer = alpaka::onHost::alloc<char>(
             devBundle.device,
-            alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{faceCount}));
+            alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{directionBucketCount}));
         alpaka::concepts::IBuffer auto stratifiedCountScanBuffer = alpaka::onHost::alloc<char>(
             devBundle.device,
-            alpaka::onHost::getScanBufferSize<unsigned>(alpaka::Vec{faceCount}));
+            alpaka::onHost::getScanBufferSize<unsigned>(alpaka::Vec{directionBucketCount}));
         auto reservoirSpansA = hase::kernels::forward::SurfaceReservoirSpans{
             countsA,
             dirXA,
@@ -104,8 +109,7 @@ namespace hase::core
         auto samplingCdfSpans = hase::kernels::forward::SurfaceReservoirSamplingCdfSpans{
             samplingCdf,
             samplingTotalWeight,
-            stratifiedRayFaces,
-            faceCount <= rayCount};
+            stratifiedRayBuckets};
         auto reservoirSpansB = hase::kernels::forward::SurfaceReservoirSpans{
             countsB,
             dirXB,
@@ -154,61 +158,69 @@ namespace hase::core
         bool inputA = true;
         auto const faceFrameSpec
             = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{faceCount});
+        auto const bucketFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+            devBundle.device,
+            devBundle.executor,
+            alpaka::Vec{directionBucketCount});
         auto const scalarFrameSpec
             = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{1u});
         auto samplingTotalWeightHost = alpaka::onHost::allocHostLike(samplingTotalWeight);
         auto updateSamplingCdf = [&](auto const& reservoir, unsigned const seed)
         {
+            queue.enqueue(
+                faceFrameSpec,
+                alpaka::KernelBundle{
+                    hase::kernels::forward::ComputeSurfaceReservoirDirectionBucketWeights{},
+                    faceCount,
+                    reservoir,
+                    directionBucketWeights});
             alpaka::onHost::inclusiveScan(
                 queue,
                 devBundle.executor,
                 samplingCdfScanBuffer,
                 samplingCdf,
-                reservoir.faceWeights);
+                directionBucketWeights);
             queue.enqueue(
                 scalarFrameSpec,
                 alpaka::KernelBundle{
                     hase::kernels::forward::CaptureSurfaceReservoirSamplingTotalWeight{},
-                    faceCount,
+                    directionBucketCount,
                     samplingCdfSpans});
             queue.enqueue(
-                faceFrameSpec,
+                bucketFrameSpec,
                 alpaka::KernelBundle{
                     hase::kernels::forward::NormalizeSurfaceReservoirSamplingCdf{},
-                    faceCount,
+                    directionBucketCount,
                     samplingCdfSpans});
-            if(samplingCdfSpans.useFaceStratification)
-            {
-                queue.enqueue(
-                    scalarFrameSpec,
-                    alpaka::KernelBundle{
-                        hase::kernels::forward::GenerateSurfaceReservoirSystematicOffset{},
-                        systematicOffset,
-                        seed});
-                queue.enqueue(
-                    faceFrameSpec,
-                    alpaka::KernelBundle{
-                        hase::kernels::forward::AssignSurfaceReservoirStratifiedRayCounts{},
-                        faceCount,
-                        rayCount,
-                        samplingCdfSpans,
-                        systematicOffset,
-                        stratifiedRayCounts});
-                alpaka::onHost::exclusiveScan(
-                    queue,
-                    devBundle.executor,
-                    stratifiedCountScanBuffer,
+            queue.enqueue(
+                scalarFrameSpec,
+                alpaka::KernelBundle{
+                    hase::kernels::forward::GenerateSurfaceReservoirSystematicOffset{},
+                    systematicOffset,
+                    seed});
+            queue.enqueue(
+                bucketFrameSpec,
+                alpaka::KernelBundle{
+                    hase::kernels::forward::AssignSurfaceReservoirStratifiedRayCounts{},
+                    directionBucketCount,
+                    rayCount,
+                    samplingCdfSpans,
+                    systematicOffset,
+                    stratifiedRayCounts});
+            alpaka::onHost::exclusiveScan(
+                queue,
+                devBundle.executor,
+                stratifiedCountScanBuffer,
+                stratifiedRayOffsets,
+                stratifiedRayCounts);
+            queue.enqueue(
+                bucketFrameSpec,
+                alpaka::KernelBundle{
+                    hase::kernels::forward::ScatterSurfaceReservoirStratifiedRayBuckets{},
+                    directionBucketCount,
+                    stratifiedRayCounts,
                     stratifiedRayOffsets,
-                    stratifiedRayCounts);
-                queue.enqueue(
-                    faceFrameSpec,
-                    alpaka::KernelBundle{
-                        hase::kernels::forward::ScatterSurfaceReservoirStratifiedRayFaces{},
-                        faceCount,
-                        stratifiedRayCounts,
-                        stratifiedRayOffsets,
-                        stratifiedRayFaces});
-            }
+                    stratifiedRayBuckets});
             alpaka::onHost::wait(queue);
             alpaka::onHost::memcpy(queue, samplingTotalWeightHost, samplingTotalWeight);
             alpaka::onHost::wait(queue);
