@@ -2,6 +2,7 @@
 #include <openPMD/openPMD.hpp>
 #include <openpmd/OpenPmdParser.hpp>
 #include <openpmd/SimulationSnapshotWriter.hpp>
+#include <utils/interpolation.hpp>
 
 #include <algorithm>
 #include <array>
@@ -1125,54 +1126,65 @@ namespace hase::openpmd
                 "is retired; configure relative_standard_error_threshold instead");
         }
 
+        auto const spectralResolution = attribute<unsigned>(iteration, field::spectralResolution);
+        if(spectralResolution == 0u)
+        {
+            validationError(field::spectralResolution, "must be greater than zero");
+        }
+        auto loadRawSpectrum = [&](std::string const& name, std::string const& unit)
+        {
+            auto const sampleCount = componentExtent(iteration, name, io::MeshRecordComponent::SCALAR);
+            return loadScalar<double>(
+                series,
+                iteration,
+                name,
+                io::Extent{sampleCount},
+                {"wavelength"},
+                {sampleCount},
+                false,
+                false,
+                unit);
+        };
+        auto lambdaA = loadRawSpectrum(prefix + "lambda_absorption", "m");
+        auto lambdaE = loadRawSpectrum(prefix + "lambda_emission", "m");
+        auto sigmaA = loadRawSpectrum(prefix + "sigma_absorption", "cm^2");
+        auto sigmaE = loadRawSpectrum(prefix + "sigma_emission", "cm^2");
+        auto interpolateSpectrum
+            = [&](std::string const& name, std::vector<double>& wavelengths, std::vector<double>& values)
+        {
+            if(wavelengths.size() != values.size())
+            {
+                validationError(name, "wavelength and cross-section sample counts must match");
+            }
+            if(spectralResolution < wavelengths.size())
+            {
+                validationError(
+                    field::spectralResolution,
+                    "must be greater than or equal to every input spectrum sample count");
+            }
+            if(spectralResolution == wavelengths.size())
+            {
+                return;
+            }
+            auto interpolatedValues = hase::utils::interpolateLinear(values, wavelengths, spectralResolution);
+            wavelengths = hase::utils::interpolateLinear(wavelengths, wavelengths, spectralResolution);
+            values = std::move(interpolatedValues);
+        };
+        interpolateSpectrum("absorption spectrum", lambdaA, sigmaA);
+        interpolateSpectrum("emission spectrum", lambdaE, sigmaE);
+
         core::ExperimentParameters experiment(
             renamedAttribute<unsigned>(iteration, field::minRays, field::legacyMinRays),
             renamedAttribute<unsigned>(iteration, field::maxRays, field::legacyMaxRays),
-            loadScalar<double>(
-                series,
-                iteration,
-                prefix + "lambda_absorption",
-                io::Extent{attribute<unsigned>(iteration, field::spectralResolution)},
-                {"wavelength"},
-                {attribute<unsigned>(iteration, field::spectralResolution)},
-                false,
-                false,
-                "m"),
-            loadScalar<double>(
-                series,
-                iteration,
-                prefix + "lambda_emission",
-                io::Extent{attribute<unsigned>(iteration, field::spectralResolution)},
-                {"wavelength"},
-                {attribute<unsigned>(iteration, field::spectralResolution)},
-                false,
-                false,
-                "m"),
-            loadScalar<double>(
-                series,
-                iteration,
-                prefix + "sigma_absorption",
-                io::Extent{attribute<unsigned>(iteration, field::spectralResolution)},
-                {"wavelength"},
-                {attribute<unsigned>(iteration, field::spectralResolution)},
-                false,
-                false,
-                "cm^2"),
-            loadScalar<double>(
-                series,
-                iteration,
-                prefix + "sigma_emission",
-                io::Extent{attribute<unsigned>(iteration, field::spectralResolution)},
-                {"wavelength"},
-                {attribute<unsigned>(iteration, field::spectralResolution)},
-                false,
-                false,
-                "cm^2"),
+            std::move(lambdaA),
+            std::move(lambdaE),
+            std::move(sigmaA),
+            std::move(sigmaE),
             0.0,
             0.0,
             attribute<double>(iteration, field::relativeStandardErrorThreshold),
             attribute<bool>(iteration, field::useReflections),
-            attribute<unsigned>(iteration, field::spectralResolution),
+            spectralResolution,
             attributeOr<bool>(iteration, field::monochromatic, false));
 
         experiment.propagationMode = propagationMode;
