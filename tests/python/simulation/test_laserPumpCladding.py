@@ -293,11 +293,12 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
 @pytest.mark.integration
 def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
     laserPumpCladdingReference,
+    alpakaRuntimeBackend,
     openPmdRuntimeBackend,
     tmp_path,
 ):
     metadata = laserPumpCladdingReference["metadata"]
-    backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", metadata["parameters"]["backend"])
+    backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", alpakaRuntimeBackend)
     rtol = 0.05
     tet4_dir = tmp_path / "current_tet4"
     tet4_dir.mkdir()

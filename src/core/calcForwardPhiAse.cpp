@@ -5,6 +5,8 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+#include <alpaka/math.hpp>
+
 #include <core/calcForwardPhiAse.hpp>
 
 #include <algorithm>
@@ -70,7 +72,7 @@ namespace hase::core
         double const scoreSquareSum,
         unsigned const rayCount)
     {
-        if(rayCount < 2u || !std::isfinite(scoreSum) || !std::isfinite(scoreSquareSum))
+        if(rayCount < 2u || !alpaka::math::isfinite(scoreSum) || !alpaka::math::isfinite(scoreSquareSum))
         {
             return std::numeric_limits<double>::max();
         }
@@ -91,18 +93,18 @@ namespace hase::core
         double const normalizationVolume,
         double const volumeSize)
     {
-        if(rayCount < 2u || volumeSize <= 0.0 || normalizationVolume < 0.0 || !std::isfinite(scoreSum)
-           || !std::isfinite(scoreSquareSum))
+        if(rayCount < 2u || volumeSize <= 0.0 || normalizationVolume < 0.0 || !alpaka::math::isfinite(scoreSum)
+           || !alpaka::math::isfinite(scoreSquareSum))
         {
             return std::numeric_limits<double>::max();
         }
 
         double const relativeStandardError = calcForwardRelativeStandardError(scoreSum, scoreSquareSum, rayCount);
-        if(std::isnan(relativeStandardError))
+        if(alpaka::math::isnan(relativeStandardError))
         {
             return 0.0;
         }
-        if(!std::isfinite(relativeStandardError))
+        if(!alpaka::math::isfinite(relativeStandardError))
         {
             return std::numeric_limits<double>::max();
         }

@@ -435,11 +435,11 @@ def _readOpenPmdScalar(series, iteration, name):
     return np.array(chunk, copy=True).reshape(-1)
 
 
-def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
+def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path, openPmdFileBackend):
     topology = _oneTetTopology()
-    path = tmp_path / ("explicit_volume" + transport._backend_spec("adios").suffix)
+    path = tmp_path / ("explicit_volume" + transport._backend_spec(openPmdFileBackend).suffix)
 
-    series = transport._open_input_series(path, backend="adios")
+    series = transport._open_input_series(path, backend=openPmdFileBackend)
     iteration = series.snapshots()[0]
     try:
         transport._write_explicit_static_topology(iteration, topology)
@@ -466,7 +466,7 @@ def testExplicitOpenPmdStaticTopologyWriterStoresFaceLookupTables(tmp_path):
         series.close()
 
 
-def testForwardOpenPmdInputWritesVolumeRecords(tmp_path):
+def testForwardOpenPmdInputWritesVolumeRecords(tmp_path, openPmdFileBackend):
     from HASEonGPU import GainMedium, PhiASE, SpectralDecomposition
 
     topology = _oneTetTopology()
@@ -478,9 +478,9 @@ def testForwardOpenPmdInputWritesVolumeRecords(tmp_path):
         crossSectionEmission=0.0,
     )
     phiAse = PhiASE(spectralProperties=crossSections)
-    path = tmp_path / ("forward_volume" + transport._backend_spec("adios").suffix)
+    path = tmp_path / ("forward_volume" + transport._backend_spec(openPmdFileBackend).suffix)
 
-    with transport.OpenPmdInputSeries(path, backend="adios") as series:
+    with transport.OpenPmdInputSeries(path, backend=openPmdFileBackend) as series:
         series.write(phiAse, medium, crossSections)
 
     io = transport._io()

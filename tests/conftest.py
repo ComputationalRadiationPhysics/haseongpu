@@ -31,6 +31,13 @@ requiredHaseApi = (
 from openpmd_backend_matrix import openpmd_test_backends
 
 
+def _openpmd_file_backends():
+    backends = [backend for backend in openpmd_test_backends() if backend in {"adios", "hdf5"}]
+    if not backends:
+        raise RuntimeError("The HASEonGPU frontend did not report an available persistent openPMD backend.")
+    return backends
+
+
 def _resolve_import_path(entry):
     path = Path.cwd() if entry == "" else Path(entry)
     try:
@@ -114,6 +121,11 @@ import pytest
 
 @pytest.fixture(scope="session", params=openpmd_test_backends())
 def openPmdRuntimeBackend(request):
+    return request.param
+
+
+@pytest.fixture(scope="session", params=_openpmd_file_backends())
+def openPmdFileBackend(request):
     return request.param
 
 
