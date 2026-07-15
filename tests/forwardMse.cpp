@@ -1,3 +1,5 @@
+#include <alpaka/math.hpp>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
@@ -36,7 +38,7 @@ TEST_CASE("forward PhiASE RSE includes zero-score histories", "[forward][rse]")
 TEST_CASE("forward PhiASE RSE handles invalid and zero-score estimates", "[forward][rse]")
 {
     CHECK(hase::core::calcForwardRelativeStandardError(1.0, 1.0, 1u) == std::numeric_limits<double>::max());
-    CHECK(std::isnan(hase::core::calcForwardRelativeStandardError(0.0, 0.0, 2u)));
+    CHECK(alpaka::math::isnan(hase::core::calcForwardRelativeStandardError(0.0, 0.0, 2u)));
     CHECK(
         hase::core::calcForwardRelativeStandardError(std::numeric_limits<double>::infinity(), 1.0, 2u)
         == std::numeric_limits<double>::max());

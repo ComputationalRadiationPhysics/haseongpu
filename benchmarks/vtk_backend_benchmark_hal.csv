@@ -1,0 +1,10 @@
+timestamp_utc,host,vtk,backend,rays,adaptive_steps,rng_seed,elapsed_seconds,seconds_per_million_rays,million_rays_per_second
+2026-07-15T09:46:47.766698+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Cuda_NvidiaGpu_GpuCuda,1000000,0,12345,1.823032649,1.823032649,0.548536528
+2026-07-15T09:46:49.077039+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Cuda_NvidiaGpu_GpuCuda,10000000,0,12345,1.308019616,0.130801962,7.645145285
+2026-07-15T09:46:50.769639+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Cuda_NvidiaGpu_GpuCuda,50000000,0,12345,1.690509556,0.033810191,29.576881020
+2026-07-15T09:46:51.972197+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuOmpBlocks,1000000,0,12345,1.200455822,1.200455822,0.833016910
+2026-07-15T09:46:53.773612+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuOmpBlocks,10000000,0,12345,1.799949166,0.179994917,5.555712455
+2026-07-15T09:46:57.982729+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuOmpBlocks,50000000,0,12345,4.207820386,0.084156408,11.882636475
+2026-07-15T09:47:00.686965+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuSerial,1000000,0,12345,2.702779158,2.702779158,0.369989534
+2026-07-15T09:47:16.713268+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuSerial,10000000,0,12345,16.024284200,1.602428420,0.624052836
+2026-07-15T09:48:31.911898+00:00,hal8999,/home/th168408/workspace/myhaseonpu/example/data/ptTet4.vtk,Host_Cpu_CpuSerial,50000000,0,12345,75.196499326,1.503929987,0.664924570

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <alpaka/math.hpp>
+
 #include <core/mesh.hpp>
 
 #include <algorithm>
@@ -361,7 +363,7 @@ namespace hase::core
                    result.relativeStandardError.cend(),
                    [relativeStandardErrorThreshold](double const relativeStandardError)
                    {
-                       return std::isfinite(relativeStandardError)
+                       return alpaka::math::isfinite(relativeStandardError)
                               && relativeStandardError <= relativeStandardErrorThreshold;
                    });
     }
@@ -384,7 +386,8 @@ namespace hase::core
         {
             bool const hasDroppedRays = !result.droppedRays.empty() && result.droppedRays.at(volume) != 0u;
             double const relativeStandardError = result.relativeStandardError.at(volume);
-            if(convergenceRayCounts.at(volume) == 0u && !hasDroppedRays && std::isfinite(relativeStandardError)
+            if(convergenceRayCounts.at(volume) == 0u && !hasDroppedRays
+               && alpaka::math::isfinite(relativeStandardError)
                && relativeStandardError <= relativeStandardErrorThreshold)
             {
                 convergenceRayCounts.at(volume) = targetRayCount;
