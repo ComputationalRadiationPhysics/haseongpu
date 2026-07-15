@@ -6,13 +6,13 @@
 
 import json
 import importlib.util
-import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from HASEonGPU import AlpakaBackends
 
 repoRoot = Path(__file__).resolve().parents[3]
 
@@ -291,20 +291,20 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("alpakaBackend", AlpakaBackends.all())
 def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
     laserPumpCladdingReference,
-    alpakaRuntimeBackend,
+    alpakaBackend,
     openPmdRuntimeBackend,
     tmp_path,
 ):
     metadata = laserPumpCladdingReference["metadata"]
-    backend = os.environ.get("HASE_LASERPUMP_REFERENCE_BACKEND", alpakaRuntimeBackend)
     rtol = 0.05
     tet4_dir = tmp_path / "current_tet4"
     tet4_dir.mkdir()
 
     state = laserPumpCladding.runExample(
-        backend=backend,
+        backend=alpakaBackend,
         openpmdBackend=openPmdRuntimeBackend,
         timeSlices=metadata["parameters"]["timeSlices"],
         pumpSteps=metadata["parameters"]["pumpSteps"],
