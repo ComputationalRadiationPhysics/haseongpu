@@ -35,24 +35,6 @@ from HASEonGPU import (  # noqa: E402
 )
 
 
-LEGACY_ASE_SPECTRAL_RESOLUTION = 1000
-
-
-def _resampleLegacySpectrum(wavelengths, cross_sections):
-    wavelengths = np.asarray(wavelengths, dtype=np.float64)
-    cross_sections = np.asarray(cross_sections, dtype=np.float64)
-    effective_wavelengths = np.linspace(
-        wavelengths[0],
-        wavelengths[-1],
-        LEGACY_ASE_SPECTRAL_RESOLUTION,
-    )
-    return effective_wavelengths, np.interp(
-        effective_wavelengths,
-        wavelengths,
-        cross_sections,
-    )
-
-
 def _loadLaserPumpCladdingRawSpectra():
     materialDir = scriptDir / "input"
     return (
@@ -63,28 +45,20 @@ def _loadLaserPumpCladdingRawSpectra():
     )
 
 
-def laserPumpCladdingSpectralProperties():
-    """Return the spectrum actually sampled by the retained legacy fixture."""
+def laserPumpCladdingSpectralProperties(spectralResolution=1000):
+    """Return the raw material spectrum; transport resampling belongs to the backend."""
     (
         raw_wavelengths_absorption,
         raw_cross_section_absorption,
         raw_wavelengths_emission,
         raw_cross_section_emission,
     ) = _loadLaserPumpCladdingRawSpectra()
-    wavelengths_absorption, cross_section_absorption = _resampleLegacySpectrum(
-        raw_wavelengths_absorption,
-        raw_cross_section_absorption,
-    )
-    wavelengths_emission, cross_section_emission = _resampleLegacySpectrum(
-        raw_wavelengths_emission,
-        raw_cross_section_emission,
-    )
     return CrossSectionData(
-        wavelengthsAbsorption=wavelengths_absorption,
-        crossSectionAbsorption=cross_section_absorption,
-        wavelengthsEmission=wavelengths_emission,
-        crossSectionEmission=cross_section_emission,
-        resolution=LEGACY_ASE_SPECTRAL_RESOLUTION,
+        wavelengthsAbsorption=raw_wavelengths_absorption,
+        crossSectionAbsorption=raw_cross_section_absorption,
+        wavelengthsEmission=raw_wavelengths_emission,
+        crossSectionEmission=raw_cross_section_emission,
+        resolution=spectralResolution,
     )
 
 
@@ -101,9 +75,10 @@ def runTet4PhiAseInput(
     materialPath,
     phiAseConfigPath=defaultPhiAseConfigPath,
     backend="UseConfig",
+    spectralResolution=1000,
     **AseOverride,
 ):
-    spectralProperties = laserPumpCladdingSpectralProperties()
+    spectralProperties = laserPumpCladdingSpectralProperties(spectralResolution)
     medium = loadLaserPumpCladdingTet4Medium(materialPath)
     phiAse = PhiASE.fromYaml(
         phiAseConfigPath,
@@ -290,10 +265,11 @@ def runExample(
     openpmdBackend="UseConfig",
     enableASE=True,
     prePump=True,
+    spectralResolution=1000,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
-    spectralProperties = laserPumpCladdingSpectralProperties()
+    spectralProperties = laserPumpCladdingSpectralProperties(spectralResolution)
 
     pumpWavelength = 940e-9
     (
@@ -409,6 +385,12 @@ def main(argv=None):
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
     parser.add_argument(
+        "--spectral-resolution",
+        type=int,
+        default=1000,
+        help="Backend spectral interpolation resolution. Default: 1000.",
+    )
+    parser.add_argument(
         "--disable-reflections",
         action="store_true",
         help="Disable ASE surface reflections.",
@@ -433,6 +415,7 @@ def main(argv=None):
             args.tet4_input,
             args.phi_ase_config,
             args.backend,
+            args.spectral_resolution,
             **aseOverrides,
         )
         phi = np.asarray(result.phiAse)
@@ -450,6 +433,7 @@ def main(argv=None):
         openpmdBackend=args.openpmd_backend,
         enableASE=not args.disable_ase,
         prePump=not args.disable_pre_pump,
+        spectralResolution=args.spectral_resolution,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")

@@ -161,33 +161,22 @@ def testPtTet4GeometryConvertsBackToLegacyWedgeOrder(
     assert "betaVolume" in cell_data
 
 
-def testLaserPumpCladdingUsesLegacyEffectiveAseSpectrum():
+def testLaserPumpCladdingPassesRawAseSpectrumToBackend():
     spectra = laserPumpCladding.laserPumpCladdingSpectralProperties()
+    regression_spectra = laserPumpCladding.laserPumpCladdingSpectralProperties(191)
     material_dir = repoRoot / "example" / "input"
-    raw_wavelengths = np.loadtxt(material_dir / "lambda_a.txt")
+    raw_wavelengths_absorption = np.loadtxt(material_dir / "lambda_a.txt")
     raw_absorption = np.loadtxt(material_dir / "sigma_a.txt")
+    raw_wavelengths_emission = np.loadtxt(material_dir / "lambda_e.txt")
     raw_emission = np.loadtxt(material_dir / "sigma_e.txt")
-    effective_wavelengths = np.linspace(
-        raw_wavelengths[0],
-        raw_wavelengths[-1],
-        laserPumpCladding.LEGACY_ASE_SPECTRAL_RESOLUTION,
-    )
 
+    assert raw_wavelengths_absorption.size == 191
     assert spectra.resolution == 1000
-    np.testing.assert_array_equal(spectra.wavelengthsAbsorption, effective_wavelengths)
-    np.testing.assert_array_equal(spectra.wavelengthsEmission, effective_wavelengths)
-    np.testing.assert_allclose(
-        spectra.crossSectionAbsorption,
-        np.interp(effective_wavelengths, raw_wavelengths, raw_absorption),
-        rtol=0.0,
-        atol=0.0,
-    )
-    np.testing.assert_allclose(
-        spectra.crossSectionEmission,
-        np.interp(effective_wavelengths, raw_wavelengths, raw_emission),
-        rtol=0.0,
-        atol=0.0,
-    )
+    assert regression_spectra.resolution == 191
+    np.testing.assert_array_equal(spectra.wavelengthsAbsorption, raw_wavelengths_absorption)
+    np.testing.assert_array_equal(spectra.crossSectionAbsorption, raw_absorption)
+    np.testing.assert_array_equal(spectra.wavelengthsEmission, raw_wavelengths_emission)
+    np.testing.assert_array_equal(spectra.crossSectionEmission, raw_emission)
 
 
 def testLaserPumpCladdingTet4MediumAssignsCylinderSurfaceOptics():
@@ -476,7 +465,10 @@ def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
             "1",
             "--vtk-output-dir",
             str(tmp_path),
+            "--spectral-resolution",
+            "191",
         ]
     )
 
     assert calls[-1]["kwargs"]["enableASE"] is False
+    assert calls[-1]["kwargs"]["spectralResolution"] == 191

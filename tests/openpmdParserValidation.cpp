@@ -256,7 +256,8 @@ namespace
         std::function<void(io::Series&, io::Iteration&)> mutate = {},
         bool betaVolumeAsFloat = false,
         bool betaVolumeBadExtent = false,
-        bool legacyRayAttributeNames = false)
+        bool legacyRayAttributeNames = false,
+        unsigned spectralResolution = 2u)
     {
         auto path = testPath(name);
         io::Series series(path.string(), io::Access::CREATE_LINEAR, "{}");
@@ -294,7 +295,7 @@ namespace
         iteration.setAttribute("max_sample_range", 5u);
         iteration.setAttribute("rng_seed", 1234u);
         iteration.setAttribute("use_reflections", true);
-        iteration.setAttribute("spectral_resolution", 2u);
+        iteration.setAttribute("spectral_resolution", spectralResolution);
         iteration.setAttribute("monochromatic", false);
         iteration.setAttribute("max_sigma_absorption", 0.02);
         iteration.setAttribute("max_sigma_emission", 0.04);
@@ -603,6 +604,19 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     REQUIRE(context.experiment.forwardRayCount == 0u);
     REQUIRE(context.run.enableAse == true);
     REQUIRE(context.run.timeIntegration.method == "explicit-euler");
+}
+
+TEST_CASE("openPMD parser interpolates raw spectra to the requested resolution", "[openpmd][parser]")
+{
+    auto const path = writeParserInput("interpolated_spectrum", {}, false, false, false, 3u);
+    hase::openpmd::Parser parser{path, testPath("interpolated-spectrum-output")};
+    auto context = parser.read();
+
+    REQUIRE(context.experiment.spectral == 3u);
+    requireNear(context.experiment.lambdaA, {900.0, 905.0, 910.0});
+    requireNear(context.experiment.lambdaE, {1000.0, 1005.0, 1010.0});
+    requireNear(context.experiment.sigmaA, {0.01, 0.015, 0.02});
+    requireNear(context.experiment.sigmaE, {0.03, 0.035, 0.04});
 }
 
 TEST_CASE("openPMD parser accepts legacy per-sample ray attributes", "[openpmd][parser]")

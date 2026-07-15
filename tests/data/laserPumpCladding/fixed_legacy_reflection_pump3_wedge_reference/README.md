@@ -79,7 +79,9 @@ Previous versions use ``mseThreshold: 0.01087``, calibrated here to ``relativeSt
 
 The historical parser interpolates both ASE spectra to 1000 equally spaced
 samples over 905--1095 nm before transport; the pump uses the original table
-values at 940 nm. The current example reproduces those inputs.
+values at 940 nm. The current example passes the raw 191-point spectra and a
+default interpolation resolution of 1000 to the backend; transport-specific
+resampling is backend-owned. The SSG regression explicitly requests 191.
 
 The fixed legacy implementation reflects at the physical top plane,
 `(numberOfLevels - 1) * thickness` (0.7 m for the ten sampled planes), the
