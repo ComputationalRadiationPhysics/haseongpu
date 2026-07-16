@@ -569,8 +569,16 @@ def test_generatedYamlLoadsAsPhiAseConfig():
     )
 
     config = yaml.safe_load(yaml_config(selection))
+    assert config["experiment"] == {
+        "minRays": 100000,
+        "maxRays": 100000,
+        "relativeStandardErrorThreshold": 0.1,
+    }
     phi_ase = PhiASE(config)
 
+    assert phi_ase.minRays == 100000
+    assert phi_ase.maxRays == 100000
+    assert phi_ase.relativeStandardErrorThreshold == 0.1
     assert phi_ase.backend == "Host_Cpu_CpuSerial"
     assert phi_ase.openpmdBackend == "adios"
     assert phi_ase.parallelMode == "mpi"

@@ -94,9 +94,9 @@ selection:
 The script writes a small PhiASE YAML run-control file to
 ``config/hase-phiase.yaml`` by default, prints the exact install command, and
 finishes with guidance for the selected openPMD backend, MPI setting, and
-available compute backends.  The generated YAML contains compute settings only;
-physics inputs such as geometry, spectra, pump settings, and material state are
-still constructed in Python.
+available compute backends.  The generated YAML contains the default ray range,
+relative-standard-error threshold, and compute settings; geometry, spectra,
+pump settings, and material state are still constructed in Python.
 
 Useful non-interactive options include ``--autoinstall``, ``--reinstall``,
 ``--use-ccache``, ``--provider``, ``--openpmd-backend``, ``--runtime-dir``, and
