@@ -27,6 +27,13 @@ else:
     GMSH_IMPORT_ERROR = ""
 
 
+def _requireGmshApi():
+    if gmshApi is None:
+        if "libGLU.so.1" in GMSH_IMPORT_ERROR:
+            pytest.xfail(GMSH_IMPORT_ERROR)
+        pytest.fail(GMSH_IMPORT_ERROR)
+
+
 def _twoTetPoints():
     return np.array(
         [
@@ -277,8 +284,7 @@ def testGainMediumSurfaceOpticsUsesAssignedSurfaceDomains():
 
 @pytest.mark.integration
 def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch):
-    if gmshApi is None:
-        pytest.fail(GMSH_IMPORT_ERROR)
+    _requireGmshApi()
     stl = tmp_path / "closed_cube.stl"
     _writeClosedCubeStl(stl)
 
@@ -339,8 +345,7 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
 
 
 def testVolumeTopologyImportsGenerated3dGmshTets(tmp_path):
-    if gmshApi is None:
-        pytest.fail(GMSH_IMPORT_ERROR)
+    _requireGmshApi()
     msh = tmp_path / "tet4_3d.msh"
 
     gmshApi.initialize()

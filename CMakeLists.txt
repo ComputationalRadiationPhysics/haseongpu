@@ -874,6 +874,8 @@ target_compile_definitions(
 target_link_libraries(hase_core INTERFACE alpaka::alpaka)
 if(TARGET CUDA::cudart)
     target_link_libraries(hase_core INTERFACE CUDA::cudart)
+    list(APPEND HASE_BUILD_TREE_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+    list(APPEND HASE_INSTALL_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
 endif()
 
 file(

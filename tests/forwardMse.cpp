@@ -338,30 +338,34 @@ TEST_CASE("thin Tet4 mesh reproduces the old nudge lost-ray failure", "[forward]
     hase::core::Point const direction{1.0, 0.0, 0.0};
     hase::core::Point const origin{-0.5 * longCellHeight, 0.125, 0.125};
 
-    auto const longCellIntersection
-        = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
+    auto const longCellIntersection = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
     REQUIRE(longCellIntersection.localFace == 0);
     REQUIRE(longCellIntersection.tiedFaceMask == 1u);
     hase::core::Point const sharedFacePoint
         = hase::kernels::forward::advance(origin, direction, longCellIntersection.length);
 
     auto const transition = hase::kernels::forward::transitionAcrossIntersection(
-        view, 0u, longCellIntersection, sharedFacePoint, direction);
+        view,
+        0u,
+        longCellIntersection,
+        sharedFacePoint,
+        direction);
     REQUIRE(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
     REQUIRE(transition.cell == 1u);
 
-    auto const exactThinCellIntersection
-        = hase::kernels::forward::nextFaceIntersection(
-            view, transition.cell, sharedFacePoint, direction, transition.forbiddenFace);
+    auto const exactThinCellIntersection = hase::kernels::forward::nextFaceIntersection(
+        view,
+        transition.cell,
+        sharedFacePoint,
+        direction,
+        transition.forbiddenFace);
     REQUIRE(exactThinCellIntersection.localFace >= 0);
     CHECK(exactThinCellIntersection.length > 0.0);
     CHECK(exactThinCellIntersection.length < 2.0 * thinCellHeight);
 
-    double const oldNudge
-        = 64.0 * std::numeric_limits<double>::epsilon() * longCellIntersection.length;
+    double const oldNudge = 64.0 * std::numeric_limits<double>::epsilon() * longCellIntersection.length;
     REQUIRE(oldNudge > exactThinCellIntersection.length);
-    hase::core::Point const oldNudgedOrigin
-        = hase::kernels::forward::advance(sharedFacePoint, direction, oldNudge);
+    hase::core::Point const oldNudgedOrigin = hase::kernels::forward::advance(sharedFacePoint, direction, oldNudge);
     auto const lostRayIntersection
         = hase::kernels::forward::nextFaceIntersection(view, 1u, oldNudgedOrigin, direction, 0);
     // This was the walker's droppedRays branch: the nudge has skipped the thin cell completely.
@@ -387,15 +391,13 @@ TEST_CASE("forward Tet4 recovery crosses a shared edge", "[forward][traversal]")
         });
     auto const view = traversalView(mesh);
     hase::core::Point const origin{0.25, 0.25, 0.0};
-    hase::core::Point const direction
-        = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, 0.0});
+    hase::core::Point const direction = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, 0.0});
     auto const intersection = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
     REQUIRE(hase::kernels::forward::hasMultipleTiedFaces(intersection.tiedFaceMask));
-    hase::core::Point const edgePoint
-        = hase::kernels::forward::advance(origin, direction, intersection.length);
+    hase::core::Point const edgePoint = hase::kernels::forward::advance(origin, direction, intersection.length);
 
-    auto const transition = hase::kernels::forward::transitionAcrossIntersection(
-        view, 0u, intersection, edgePoint, direction);
+    auto const transition
+        = hase::kernels::forward::transitionAcrossIntersection(view, 0u, intersection, edgePoint, direction);
     CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
     CHECK(transition.cell == 2u);
 }
@@ -420,17 +422,58 @@ TEST_CASE("forward Tet4 recovery crosses a shared vertex", "[forward][traversal]
         });
     auto const view = traversalView(mesh);
     hase::core::Point const origin{0.25, 0.25, 0.25};
-    hase::core::Point const direction
-        = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, -1.0});
+    hase::core::Point const direction = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, -1.0});
     auto const intersection = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
     REQUIRE(hase::kernels::forward::hasMultipleTiedFaces(intersection.tiedFaceMask));
-    hase::core::Point const vertex
-        = hase::kernels::forward::advance(origin, direction, intersection.length);
+    hase::core::Point const vertex = hase::kernels::forward::advance(origin, direction, intersection.length);
 
-    auto const transition = hase::kernels::forward::transitionAcrossIntersection(
-        view, 0u, intersection, vertex, direction);
+    auto const transition
+        = hase::kernels::forward::transitionAcrossIntersection(view, 0u, intersection, vertex, direction);
     CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
     CHECK(transition.cell == 3u);
+}
+
+TEST_CASE("forward Tet4 probe recovery selects an alternate neighbor", "[forward][traversal]")
+{
+    constexpr unsigned numberOfCells = 3u;
+    constexpr unsigned faceCount = hase::core::tet4FaceCount;
+    constexpr unsigned planeWidth = hase::core::tet4BarycentricPlaneWidth;
+    std::array<double, numberOfCells * faceCount * planeWidth> planes{};
+    auto const setNegativeProbeFace = [&planes](unsigned const cell, unsigned const face)
+    { planes[(cell * faceCount + face) * planeWidth] = -1.0; };
+    setNegativeProbeFace(0u, 0u);
+    setNegativeProbeFace(0u, 1u);
+    setNegativeProbeFace(1u, 0u);
+
+    std::array<int, numberOfCells * faceCount> neighbors{};
+    std::array<int, numberOfCells * faceCount> neighborFaces{};
+    neighbors.fill(-1);
+    neighborFaces.fill(-1);
+    neighbors[0u * faceCount + 0u] = 1;
+    neighborFaces[0u * faceCount + 0u] = 0;
+    neighbors[0u * faceCount + 1u] = 2;
+    neighborFaces[0u * faceCount + 1u] = 0;
+    neighbors[1u * faceCount + 0u] = 0;
+    neighborFaces[1u * faceCount + 0u] = 0;
+    neighbors[2u * faceCount + 0u] = 0;
+    neighborFaces[2u * faceCount + 0u] = 1;
+
+    hase::core::DeviceMeshView view{};
+    view.barycentricFacePlanes = planes;
+    view.cellNeighborCells = neighbors;
+    view.cellNeighborLocalFaces = neighborFaces;
+    view.numberOfCells = numberOfCells;
+    view.numberOfFacesPerCell = faceCount;
+
+    hase::core::Point const hitPoint{0.0, 0.0, 0.0};
+    auto const transition
+        = hase::kernels::forward::recoverFaceTransition(view, 0u, 0, hitPoint, hase::core::Point{1.0, 0.0, 0.0});
+
+    CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
+    CHECK(transition.cell == 2u);
+    CHECK(hitPoint.x == 0.0);
+    CHECK(hitPoint.y == 0.0);
+    CHECK(hitPoint.z == 0.0);
 }
 
 TEST_CASE("forward Tet4 recovery remains bounded on cyclic connectivity", "[forward][traversal]")

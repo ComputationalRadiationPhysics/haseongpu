@@ -14,8 +14,7 @@
 
 namespace hase::kernels::forward
 {
-    inline constexpr double barycentricTraversalTolerance
-        = 64.0 * std::numeric_limits<double>::epsilon();
+    inline constexpr double barycentricTraversalTolerance = 64.0 * std::numeric_limits<double>::epsilon();
 
     struct Tet4FaceIntersection
     {
@@ -123,10 +122,8 @@ namespace hase::kernels::forward
             }
             double const coordinate = mesh.getFaceBarycentricCoordinate(tet, localFace, origin);
             double const directionalChange = mesh.getFaceBarycentricDirection(tet, localFace, direction);
-            candidates[localFace] = barycentricFaceIntersectionLength(
-                coordinate,
-                directionalChange,
-                std::numeric_limits<double>::max());
+            candidates[localFace]
+                = barycentricFaceIntersectionLength(coordinate, directionalChange, std::numeric_limits<double>::max());
             if(candidates[localFace] > 0.0 && candidates[localFace] < result.length)
             {
                 result.length = candidates[localFace];
@@ -147,8 +144,7 @@ namespace hase::kernels::forward
             }
             double const coordinate = mesh.getFaceBarycentricCoordinate(tet, localFace, origin);
             double const directionalChange = mesh.getFaceBarycentricDirection(tet, localFace, direction);
-            double const coordinateAtIntersection
-                = coordinate + result.length * directionalChange;
+            double const coordinateAtIntersection = coordinate + result.length * directionalChange;
             if(alpaka::math::abs(coordinateAtIntersection) <= barycentricTraversalTolerance)
             {
                 result.tiedFaceMask |= 1u << localFace;
