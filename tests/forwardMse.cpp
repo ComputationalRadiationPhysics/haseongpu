@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
+#include <kernels/forward/rayTransition.hpp>
 
 #include <algorithm>
 #include <array>
@@ -13,6 +14,90 @@
 #include <ranges>
 #include <string>
 #include <type_traits>
+#include <vector>
+
+namespace
+{
+    hase::core::HostMesh makeTraversalMesh(
+        std::vector<hase::core::Point> const& points,
+        std::vector<std::array<unsigned, hase::core::tet4VertexCount>> const& cells)
+    {
+        hase::core::HostMesh mesh;
+        mesh.numberOfCells = static_cast<unsigned>(cells.size());
+        mesh.numberOfMeshPoints = static_cast<unsigned>(points.size());
+        mesh.numberOfCellVertices = hase::core::tet4VertexCount;
+        mesh.numberOfFacesPerCell = hase::core::tet4FaceCount;
+        mesh.points.resize(points.size() * 3u);
+        for(unsigned point = 0u; point < points.size(); ++point)
+        {
+            mesh.points[point] = points[point].x;
+            mesh.points[point + points.size()] = points[point].y;
+            mesh.points[point + 2u * points.size()] = points[point].z;
+        }
+
+        using Face = std::array<unsigned, hase::core::tet4FaceWidth>;
+        std::vector<Face> faces;
+        faces.reserve(cells.size() * hase::core::tet4FaceCount);
+        for(auto const& cell : cells)
+        {
+            mesh.cellPointIndices.insert(mesh.cellPointIndices.end(), cell.cbegin(), cell.cend());
+            for(unsigned localFace = 0u; localFace < hase::core::tet4FaceCount; ++localFace)
+            {
+                Face face{};
+                unsigned faceVertex = 0u;
+                for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
+                {
+                    if(localVertex != localFace)
+                    {
+                        face[faceVertex++] = cell[localVertex];
+                    }
+                }
+                std::ranges::sort(face);
+                faces.push_back(face);
+                mesh.cellFaces.insert(mesh.cellFaces.end(), face.cbegin(), face.cend());
+            }
+        }
+
+        mesh.cellNeighborCells.assign(faces.size(), -1);
+        mesh.cellNeighborLocalFaces.assign(faces.size(), -1);
+        for(unsigned face = 0u; face < faces.size(); ++face)
+        {
+            for(unsigned candidate = face + 1u; candidate < faces.size(); ++candidate)
+            {
+                if(faces[face] != faces[candidate])
+                {
+                    continue;
+                }
+                unsigned const cell = face / hase::core::tet4FaceCount;
+                unsigned const localFace = face % hase::core::tet4FaceCount;
+                unsigned const neighbor = candidate / hase::core::tet4FaceCount;
+                unsigned const neighborLocalFace = candidate % hase::core::tet4FaceCount;
+                mesh.cellNeighborCells[face] = static_cast<int>(neighbor);
+                mesh.cellNeighborLocalFaces[face] = static_cast<int>(neighborLocalFace);
+                mesh.cellNeighborCells[candidate] = static_cast<int>(cell);
+                mesh.cellNeighborLocalFaces[candidate] = static_cast<int>(localFace);
+            }
+        }
+        mesh.precomputeBarycentricFacePlanes();
+        return mesh;
+    }
+
+    hase::core::DeviceMeshView traversalView(hase::core::HostMesh const& mesh)
+    {
+        hase::core::DeviceMeshView view{};
+        view.points = mesh.points;
+        view.cellPointIndices = mesh.cellPointIndices;
+        view.cellFaces = mesh.cellFaces;
+        view.barycentricFacePlanes = mesh.barycentricFacePlanes;
+        view.cellNeighborCells = mesh.cellNeighborCells;
+        view.cellNeighborLocalFaces = mesh.cellNeighborLocalFaces;
+        view.numberOfCells = mesh.numberOfCells;
+        view.numberOfFacesPerCell = mesh.numberOfFacesPerCell;
+        view.numberOfCellVertices = mesh.numberOfCellVertices;
+        view.numberOfMeshPoints = mesh.numberOfMeshPoints;
+        return view;
+    }
+} // namespace
 
 TEST_CASE("forward PhiASE RSE includes zero-score histories", "[forward][rse]")
 {
@@ -86,6 +171,24 @@ TEST_CASE("forward source stratification places one shifted point in each CDF in
     }
 }
 
+TEST_CASE("forward random histories are separated by ray, pass, and sampling domain", "[forward][sampling]")
+{
+    using hase::kernels::forward::rayHistoryId;
+    using hase::kernels::forward::surfaceSamplingHistoryId;
+
+    CHECK(rayHistoryId(0u, 7u) != rayHistoryId(0u, 8u));
+    CHECK(rayHistoryId(0u, 7u) != rayHistoryId(1u, 7u));
+    CHECK(rayHistoryId(1u, 7u) != surfaceSamplingHistoryId(1u));
+
+    constexpr unsigned seed = 1234u;
+    auto first = alpaka::rand::engine::Philox4x32x10{seed, rayHistoryId(3u, 11u)};
+    auto repeated = alpaka::rand::engine::Philox4x32x10{seed, rayHistoryId(3u, 11u)};
+    auto otherRay = alpaka::rand::engine::Philox4x32x10{seed, rayHistoryId(3u, 12u)};
+
+    CHECK(first() == repeated());
+    CHECK(first() != otherRay());
+}
+
 TEST_CASE("forward Tet4 face planes are barycentric", "[forward][traversal]")
 {
     hase::core::HostMesh mesh;
@@ -133,19 +236,224 @@ TEST_CASE("forward Tet4 face planes are barycentric", "[forward][traversal]")
     CHECK(hase::kernels::forward::barycentricFaceIntersectionLength(0.3, -0.2, 1.0) == 0.0);
 
     hase::core::DeviceMeshView view{};
+    view.points = mesh.points;
+    view.cellPointIndices = mesh.cellPointIndices;
+    view.cellFaces = mesh.cellFaces;
     view.barycentricFacePlanes = mesh.barycentricFacePlanes;
+    view.numberOfCells = 1u;
     view.numberOfFacesPerCell = hase::core::tet4FaceCount;
-    double length = std::numeric_limits<double>::max();
-    CHECK(
-        hase::kernels::forward::nextFaceIntersection(
+    view.numberOfCellVertices = hase::core::tet4VertexCount;
+    view.numberOfMeshPoints = 4u;
+    auto const intersection = hase::kernels::forward::nextFaceIntersection(
+        view,
+        0u,
+        hase::core::Point{0.25, 0.25, 0.25},
+        hase::core::Point{1.0, 0.0, 0.0},
+        -1);
+    CHECK(intersection.localFace == 0);
+    CHECK(intersection.length == Catch::Approx(0.25));
+    CHECK(intersection.tiedFaceMask == 1u);
+
+    auto const twoFaceTie = hase::kernels::forward::nextFaceIntersection(
+        view,
+        0u,
+        center,
+        hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, 0.0}),
+        -1);
+    CHECK(twoFaceTie.localFace == 1);
+    CHECK(twoFaceTie.tiedFaceMask == ((1u << 1u) | (1u << 2u)));
+
+    auto const threeFaceTie = hase::kernels::forward::nextFaceIntersection(
+        view,
+        0u,
+        center,
+        hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, -1.0}),
+        -1);
+    CHECK(threeFaceTie.localFace == 1);
+    CHECK(threeFaceTie.tiedFaceMask == ((1u << 1u) | (1u << 2u) | (1u << 3u)));
+
+    hase::core::Point const reflectedOrigin = hase::kernels::forward::faceCentroid(view, 0u, 0u);
+    auto const reflectedIntersection = hase::kernels::forward::nextFaceIntersection(
+        view,
+        0u,
+        reflectedOrigin,
+        hase::kernels::forward::normalize(hase::core::Point{-1.0, -2.0, -3.0}),
+        0);
+    CHECK(reflectedIntersection.localFace == 3);
+    CHECK(reflectedIntersection.length > 0.0);
+}
+
+TEST_CASE("forward Tet4 intersection distances follow mesh scale", "[forward][traversal]")
+{
+    for(double const scale : {1.0e-9, 1.0, 1.0e9})
+    {
+        std::array<double, hase::core::tet4FaceCount * hase::core::tet4BarycentricPlaneWidth> planes{
+            -1.0 / scale,
+            -1.0 / scale,
+            -1.0 / scale,
+            1.0,
+            1.0 / scale,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0 / scale,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0 / scale,
+            0.0};
+        hase::core::DeviceMeshView view{};
+        view.barycentricFacePlanes = planes;
+        view.numberOfCells = 1u;
+        view.numberOfFacesPerCell = hase::core::tet4FaceCount;
+
+        auto const intersection = hase::kernels::forward::nextFaceIntersection(
             view,
             0u,
-            hase::core::Point{0.25, 0.25, 0.25},
+            hase::core::Point{0.25 * scale, 0.25 * scale, 0.25 * scale},
             hase::core::Point{1.0, 0.0, 0.0},
-            -1,
-            length)
-        == 0);
-    CHECK(length == Catch::Approx(0.25));
+            -1);
+        CHECK(intersection.localFace == 0);
+        CHECK(intersection.tiedFaceMask == 1u);
+        CHECK(intersection.length == Catch::Approx(0.25 * scale));
+    }
+}
+
+TEST_CASE("thin Tet4 mesh reproduces the old nudge lost-ray failure", "[forward][traversal]")
+{
+    constexpr double longCellHeight = 1.0e9;
+    constexpr double thinCellHeight = 1.0e-7;
+    auto const mesh = makeTraversalMesh(
+        {
+            {-longCellHeight, 0.0, 0.0},
+            {0.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            {0.0, 0.0, 1.0},
+            {thinCellHeight, 0.0, 0.0},
+        },
+        {{0u, 1u, 2u, 3u}, {4u, 1u, 2u, 3u}});
+    auto const view = traversalView(mesh);
+    hase::core::Point const direction{1.0, 0.0, 0.0};
+    hase::core::Point const origin{-0.5 * longCellHeight, 0.125, 0.125};
+
+    auto const longCellIntersection
+        = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
+    REQUIRE(longCellIntersection.localFace == 0);
+    REQUIRE(longCellIntersection.tiedFaceMask == 1u);
+    hase::core::Point const sharedFacePoint
+        = hase::kernels::forward::advance(origin, direction, longCellIntersection.length);
+
+    auto const transition = hase::kernels::forward::transitionAcrossIntersection(
+        view, 0u, longCellIntersection, sharedFacePoint, direction);
+    REQUIRE(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
+    REQUIRE(transition.cell == 1u);
+
+    auto const exactThinCellIntersection
+        = hase::kernels::forward::nextFaceIntersection(
+            view, transition.cell, sharedFacePoint, direction, transition.forbiddenFace);
+    REQUIRE(exactThinCellIntersection.localFace >= 0);
+    CHECK(exactThinCellIntersection.length > 0.0);
+    CHECK(exactThinCellIntersection.length < 2.0 * thinCellHeight);
+
+    double const oldNudge
+        = 64.0 * std::numeric_limits<double>::epsilon() * longCellIntersection.length;
+    REQUIRE(oldNudge > exactThinCellIntersection.length);
+    hase::core::Point const oldNudgedOrigin
+        = hase::kernels::forward::advance(sharedFacePoint, direction, oldNudge);
+    auto const lostRayIntersection
+        = hase::kernels::forward::nextFaceIntersection(view, 1u, oldNudgedOrigin, direction, 0);
+    // This was the walker's droppedRays branch: the nudge has skipped the thin cell completely.
+    CHECK(lostRayIntersection.localFace < 0);
+}
+
+TEST_CASE("forward Tet4 recovery crosses a shared edge", "[forward][traversal]")
+{
+    auto const mesh = makeTraversalMesh(
+        {
+            {0.0, 0.0, -1.0},
+            {0.0, 0.0, 1.0},
+            {1.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            {-1.0, 0.0, 0.0},
+            {0.0, -1.0, 0.0},
+        },
+        {
+            {0u, 1u, 2u, 3u},
+            {0u, 1u, 3u, 4u},
+            {0u, 1u, 4u, 5u},
+            {0u, 1u, 5u, 2u},
+        });
+    auto const view = traversalView(mesh);
+    hase::core::Point const origin{0.25, 0.25, 0.0};
+    hase::core::Point const direction
+        = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, 0.0});
+    auto const intersection = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
+    REQUIRE(hase::kernels::forward::hasMultipleTiedFaces(intersection.tiedFaceMask));
+    hase::core::Point const edgePoint
+        = hase::kernels::forward::advance(origin, direction, intersection.length);
+
+    auto const transition = hase::kernels::forward::transitionAcrossIntersection(
+        view, 0u, intersection, edgePoint, direction);
+    CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
+    CHECK(transition.cell == 2u);
+}
+
+TEST_CASE("forward Tet4 recovery crosses a shared vertex", "[forward][traversal]")
+{
+    auto const mesh = makeTraversalMesh(
+        {
+            {0.0, 0.0, 0.0},
+            {1.0, 0.0, 0.0},
+            {-1.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            {0.0, -1.0, 0.0},
+            {0.0, 0.0, 1.0},
+            {0.0, 0.0, -1.0},
+        },
+        {
+            {0u, 1u, 3u, 5u},
+            {0u, 2u, 3u, 5u},
+            {0u, 2u, 4u, 5u},
+            {0u, 2u, 4u, 6u},
+        });
+    auto const view = traversalView(mesh);
+    hase::core::Point const origin{0.25, 0.25, 0.25};
+    hase::core::Point const direction
+        = hase::kernels::forward::normalize(hase::core::Point{-1.0, -1.0, -1.0});
+    auto const intersection = hase::kernels::forward::nextFaceIntersection(view, 0u, origin, direction, -1);
+    REQUIRE(hase::kernels::forward::hasMultipleTiedFaces(intersection.tiedFaceMask));
+    hase::core::Point const vertex
+        = hase::kernels::forward::advance(origin, direction, intersection.length);
+
+    auto const transition = hase::kernels::forward::transitionAcrossIntersection(
+        view, 0u, intersection, vertex, direction);
+    CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::enteredCell);
+    CHECK(transition.cell == 3u);
+}
+
+TEST_CASE("forward Tet4 recovery remains bounded on cyclic connectivity", "[forward][traversal]")
+{
+    std::array<double, hase::core::tet4FaceCount * hase::core::tet4BarycentricPlaneWidth> planes{};
+    planes[0u] = -1.0;
+    std::array<int, hase::core::tet4FaceCount> neighbors{0, -1, -1, -1};
+    std::array<int, hase::core::tet4FaceCount> neighborFaces{1, -1, -1, -1};
+
+    hase::core::DeviceMeshView view{};
+    view.barycentricFacePlanes = planes;
+    view.cellNeighborCells = neighbors;
+    view.cellNeighborLocalFaces = neighborFaces;
+    view.numberOfCells = 1u;
+    view.numberOfFacesPerCell = hase::core::tet4FaceCount;
+
+    auto const transition = hase::kernels::forward::recoverFaceTransition(
+        view,
+        0u,
+        0,
+        hase::core::Point{0.0, 0.0, 0.0},
+        hase::core::Point{1.0, 0.0, 0.0});
+    CHECK(transition.status == hase::kernels::forward::Tet4TransitionStatus::failed);
 }
 
 TEST_CASE("forward SRM environment controls are strict positive overrides", "[forward][srm]")

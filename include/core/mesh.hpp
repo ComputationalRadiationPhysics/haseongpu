@@ -38,7 +38,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -114,10 +113,10 @@ namespace hase::core
 
     inline double calculateMaxDiameter(double const* points, unsigned const offset)
     {
-        TwoDimPoint minX = {DBL_MAX, 0};
-        TwoDimPoint minY = {0, DBL_MAX};
-        TwoDimPoint maxX = {DBL_MIN, 0};
-        TwoDimPoint maxY = {0, DBL_MIN};
+        TwoDimPoint minX = {std::numeric_limits<double>::max(), 0};
+        TwoDimPoint minY = {0, std::numeric_limits<double>::max()};
+        TwoDimPoint maxX = {std::numeric_limits<double>::lowest(), 0};
+        TwoDimPoint maxY = {0, std::numeric_limits<double>::lowest()};
 
         for(unsigned p = 0; p < offset; ++p)
         {

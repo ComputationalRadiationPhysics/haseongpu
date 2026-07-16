@@ -14,6 +14,16 @@
 
 namespace hase::kernels::forward
 {
+    inline constexpr double barycentricTraversalTolerance
+        = 64.0 * std::numeric_limits<double>::epsilon();
+
+    struct Tet4FaceIntersection
+    {
+        int localFace = -1;
+        double length = std::numeric_limits<double>::max();
+        unsigned tiedFaceMask = 0u;
+    };
+
     [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point advance(
         hase::core::Point const point,
         hase::core::Point const direction,
@@ -86,24 +96,24 @@ namespace hase::kernels::forward
         double const directionalChange,
         double const maxLength)
     {
-        if(directionalChange >= -std::numeric_limits<double>::epsilon())
+        if(directionalChange >= 0.0)
         {
             return 0.0;
         }
         double const length = -coordinate / directionalChange;
-        constexpr double tolerance = 1.0e-10;
-        return length > tolerance && length <= maxLength ? length : 0.0;
+        return length > 0.0 && length <= maxLength ? length : 0.0;
     }
 
-    [[nodiscard]] inline ALPAKA_FN_ACC int nextFaceIntersection(
+    [[nodiscard]] inline ALPAKA_FN_ACC Tet4FaceIntersection nextFaceIntersection(
         hase::core::DeviceMeshView const& mesh,
         unsigned const tet,
         hase::core::Point const origin,
         hase::core::Point const direction,
-        int const forbiddenFace,
-        double& length)
+        int const forbiddenFace)
     {
-        int nextFace = -1;
+        alpaka::Vec<double, hase::core::tet4FaceCount> candidates{0.0, 0.0, 0.0, 0.0};
+        Tet4FaceIntersection result;
+
         // The first decreasing face coordinate to reach zero is the Tet4 exit face.
         for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
         {
@@ -111,17 +121,54 @@ namespace hase::kernels::forward
             {
                 continue;
             }
-            double const candidate = barycentricFaceIntersectionLength(
-                mesh.getFaceBarycentricCoordinate(tet, localFace, origin),
-                mesh.getFaceBarycentricDirection(tet, localFace, direction),
-                length);
-            if(candidate > 0.0)
+            double const coordinate = mesh.getFaceBarycentricCoordinate(tet, localFace, origin);
+            double const directionalChange = mesh.getFaceBarycentricDirection(tet, localFace, direction);
+            candidates[localFace] = barycentricFaceIntersectionLength(
+                coordinate,
+                directionalChange,
+                std::numeric_limits<double>::max());
+            if(candidates[localFace] > 0.0 && candidates[localFace] < result.length)
             {
-                length = candidate;
-                nextFace = static_cast<int>(localFace);
+                result.length = candidates[localFace];
+                result.localFace = static_cast<int>(localFace);
             }
         }
-        return nextFace;
+
+        if(result.localFace < 0)
+        {
+            return result;
+        }
+
+        for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
+        {
+            if(static_cast<int>(localFace) == forbiddenFace || candidates[localFace] <= 0.0)
+            {
+                continue;
+            }
+            double const coordinate = mesh.getFaceBarycentricCoordinate(tet, localFace, origin);
+            double const directionalChange = mesh.getFaceBarycentricDirection(tet, localFace, direction);
+            double const coordinateAtIntersection
+                = coordinate + result.length * directionalChange;
+            if(alpaka::math::abs(coordinateAtIntersection) <= barycentricTraversalTolerance)
+            {
+                result.tiedFaceMask |= 1u << localFace;
+            }
+        }
+        result.tiedFaceMask |= 1u << static_cast<unsigned>(result.localFace);
+        for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
+        {
+            if((result.tiedFaceMask & (1u << localFace)) != 0u)
+            {
+                result.localFace = static_cast<int>(localFace);
+                break;
+            }
+        }
+        return result;
+    }
+
+    [[nodiscard]] inline ALPAKA_FN_ACC bool hasMultipleTiedFaces(unsigned const tiedFaceMask)
+    {
+        return tiedFaceMask != 0u && (tiedFaceMask & (tiedFaceMask - 1u)) != 0u;
     }
 
     [[nodiscard]] inline ALPAKA_FN_ACC double localGainCoefficient(

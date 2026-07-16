@@ -6,6 +6,7 @@
 
 import json
 import importlib.util
+import itertools
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -290,52 +291,95 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
     assert with_reflections > without_reflections * 1.05
 
 
-@pytest.mark.integration
-@pytest.mark.parametrize("alpakaBackend", AlpakaBackends.all())
-def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
+@pytest.fixture(scope="module")
+def laserPumpCladdingBackendResults(
     laserPumpCladdingReference,
-    alpakaBackend,
     openPmdRuntimeBackend,
-    tmp_path,
+    tmp_path_factory,
 ):
     metadata = laserPumpCladdingReference["metadata"]
-    rtol = 0.05
-    tet4_dir = tmp_path / "current_tet4"
-    tet4_dir.mkdir()
+    results = {}
+    for alpakaBackend in AlpakaBackends.all():
+        tet4_dir = tmp_path_factory.mktemp(f"laser_pump_{openPmdRuntimeBackend}_{alpakaBackend}")
+        state = laserPumpCladding.runExample(
+            backend=alpakaBackend,
+            openpmdBackend=openPmdRuntimeBackend,
+            timeSlices=metadata["parameters"]["timeSlices"],
+            pumpSteps=metadata["parameters"]["pumpSteps"],
+            vtkOutputDir=tet4_dir,
+            enableASE=True,
+            prePump=metadata["parameters"]["prePump"],
+            rngSeed=metadata["random"]["rngSeed"],
+            useReflections=metadata["parameters"]["useReflections"],
+            minRays=metadata["parameters"]["minRaysPerSample"],
+            maxRays=metadata["parameters"]["maxRaysPerSample"],
+            relativeStandardErrorThreshold=0.05,
+            adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
+        )
 
-    state = laserPumpCladding.runExample(
-        backend=alpakaBackend,
-        openpmdBackend=openPmdRuntimeBackend,
-        timeSlices=metadata["parameters"]["timeSlices"],
-        pumpSteps=metadata["parameters"]["pumpSteps"],
-        vtkOutputDir=tet4_dir,
-        enableASE=True,
-        prePump=metadata["parameters"]["prePump"],
-        rngSeed=metadata["random"]["rngSeed"],
-        useReflections=metadata["parameters"]["useReflections"],
-        minRays=metadata["parameters"]["minRaysPerSample"],
-        maxRays=metadata["parameters"]["maxRaysPerSample"],
-        relativeStandardErrorThreshold=0.05,
-        adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
-    )
+        relative_standard_error = np.asarray(state.volumeRelativeStandardError, dtype=np.float64)
+        defined_relative_standard_error = relative_standard_error[np.isfinite(relative_standard_error)]
+        observed_integrals = []
+        for step in metadata["observable"]["stepNumbers"]:
+            tet4_path = tet4_dir / f"laserPumpCladding_{step:03d}.vtk"
+            tet4_points, tet4_cells, _tet4_cell_types, _tet4_point_data, tet4_cell_data, _tet4_fields = _parseVtk(
+                tet4_path
+            )
+            observed_integrals.append(
+                _tet_cell_integral(tet4_points, tet4_cells, tet4_cell_data["volumePhiASE"])
+            )
+        results[alpakaBackend] = {
+            "integrals": np.asarray(observed_integrals, dtype=np.float64),
+            "relativeStandardError": defined_relative_standard_error,
+        }
+    return results
 
-    relative_standard_error = np.asarray(state.volumeRelativeStandardError, dtype=np.float64)
-    defined_relative_standard_error = relative_standard_error[np.isfinite(relative_standard_error)]
-    assert defined_relative_standard_error.size > 0
-    assert np.max(defined_relative_standard_error) < 0.15
 
-    observed_integrals = []
-    for step in metadata["observable"]["stepNumbers"]:
-        tet4_path = tet4_dir / f"laserPumpCladding_{step:03d}.vtk"
-        tet4_points, tet4_cells, _tet4_cell_types, _tet4_point_data, tet4_cell_data, _tet4_fields = _parseVtk(tet4_path)
-        observed_integrals.append(_tet_cell_integral(tet4_points, tet4_cells, tet4_cell_data["volumePhiASE"]))
+@pytest.mark.integration
+def testCurrentTet4ForwardPhiAseMatchesLegacyWedgeReferenceIntegral(
+    laserPumpCladdingReference,
+    laserPumpCladdingBackendResults,
+):
+    for alpakaBackend, result in laserPumpCladdingBackendResults.items():
+        relative_standard_error = result["relativeStandardError"]
+        assert relative_standard_error.size > 0, alpakaBackend
+        assert np.max(relative_standard_error) < 0.15, alpakaBackend
 
     reference_integrals = _wedge_point_integrals(
         laserPumpCladdingReference["points"],
         laserPumpCladdingReference["cells"],
         laserPumpCladdingReference["phiASE"],
     )
-    np.testing.assert_allclose(np.asarray(observed_integrals), reference_integrals, rtol=rtol, atol=0.0)
+    for alpakaBackend, result in laserPumpCladdingBackendResults.items():
+        np.testing.assert_allclose(
+            result["integrals"],
+            reference_integrals,
+            rtol=INTEGRAL_RTOL,
+            atol=0.0,
+            err_msg=alpakaBackend,
+        )
+
+
+@pytest.mark.integration
+def testLaserPumpCladdingPhiAseIntegralsAgreeAcrossAlpakaBackends(laserPumpCladdingBackendResults):
+    for (left_backend, left_result), (right_backend, right_result) in itertools.combinations(
+        laserPumpCladdingBackendResults.items(),
+        2,
+    ):
+        left = left_result["integrals"]
+        right = right_result["integrals"]
+        scale = np.maximum(np.abs(left), np.abs(right))
+        relative_difference = np.divide(
+            np.abs(left - right),
+            scale,
+            out=np.zeros_like(scale),
+            where=scale > 0.0,
+        )
+        np.testing.assert_array_less(
+            relative_difference,
+            INTEGRAL_RTOL,
+            err_msg=f"{left_backend} versus {right_backend}",
+        )
 
 
 def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
@@ -405,6 +449,9 @@ def testLaserPumpCladdingExampleWritesVtkFromCompiledSnapshots(
     assert state.step == 2
     scalars = _vtkScalarNames(second)
     assert {"betaCells", "phiASE", "dndtAse", "dndtPump", "cladAbs"}.issubset(scalars)
+    assert fakeCompiledSnapshots[-1]["phiASE"].minRays == 100000
+    assert fakeCompiledSnapshots[-1]["phiASE"].maxRays == 100000
+    assert fakeCompiledSnapshots[-1]["phiASE"].relativeStandardErrorThreshold == 0.1
     assert fakeCompiledSnapshots[-1]["pumpSteps"] == 1
 
 
@@ -473,3 +520,11 @@ def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
 
     assert calls[-1]["kwargs"]["enableASE"] is False
     assert calls[-1]["kwargs"]["spectralResolution"] == 191
+
+
+@pytest.mark.parametrize("option", ("--min-sample-range", "--max-sample-range"))
+def testLaserPumpCladdingCliRejectsDeprecatedSampleRangeOptions(option):
+    with pytest.raises(SystemExit) as exc_info:
+        laserPumpCladding.main([option, "0"])
+
+    assert exc_info.value.code == 2
