@@ -12,8 +12,6 @@ from pathlib import Path
 
 import numpy as np
 
-from ..openpmd import backendFlat
-
 
 _VTK_TO_DTYPE = {
     "float": np.float64,
@@ -222,6 +220,8 @@ def topologyFromVtk(path, topologyCls):
 
 def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, thickness=None):
     """Load Tet4 topology plus material arrays from a VTK file."""
+    from ..openpmd import backendFlat
+
     if numberOfLevels is not None or thickness is not None:
         raise ValueError("Tet4 VTK gain-medium import does not use numberOfLevels or thickness")
     points, cells, cellTypes, physical = _tet4TopologyFromUnstructuredGrid(path)

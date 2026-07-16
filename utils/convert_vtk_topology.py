@@ -10,17 +10,20 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 from pathlib import Path
-import sys
 
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from pyInclude.geometry.vtk import _dtypeName, _parseVtk  # noqa: E402
+vtk_module_path = Path(__file__).resolve().parents[1] / "pyInclude" / "geometry" / "vtk.py"
+vtk_spec = importlib.util.spec_from_file_location("_hase_vtk", vtk_module_path)
+if vtk_spec is None or vtk_spec.loader is None:
+    raise RuntimeError(f"Could not load VTK helpers from '{vtk_module_path}'")
+vtk_module = importlib.util.module_from_spec(vtk_spec)
+vtk_spec.loader.exec_module(vtk_module)
+_dtypeName = vtk_module._dtypeName
+_parseVtk = vtk_module._parseVtk
 
 
 VTK_TETRA = np.uint32(10)
