@@ -8,7 +8,6 @@
 #pragma once
 
 #include <core/mesh.hpp>
-#include <kernels/forward/rayBundling.hpp>
 
 #include <cstdint>
 
@@ -81,7 +80,6 @@ namespace hase::kernels::forward
 
     [[nodiscard]] inline ALPAKA_FN_ACC unsigned sampleVolumeByBetaVolumeTarget(
         hase::core::DeviceMeshView const& mesh,
-        double const betaVolumeTotal,
         double const target)
     {
         unsigned lower = 0u;
@@ -116,7 +114,7 @@ namespace hase::kernels::forward
         }
 
         double const target = alpaka::rand::distribution::UniformReal<double>{}(rndEngine) *betaVolumeTotal;
-        return sampleVolumeByBetaVolumeTarget(mesh, betaVolumeTotal, target);
+        return sampleVolumeByBetaVolumeTarget(mesh, target);
     }
 
     // One randomized systematic CDF point per globally assigned source ray.
@@ -135,7 +133,6 @@ namespace hase::kernels::forward
         }
         return sampleVolumeByBetaVolumeTarget(
             mesh,
-            betaVolumeTotal,
             stratifiedUnitInterval(globalRayIndex, globalRayCount, shift) * betaVolumeTotal);
     }
 
@@ -159,26 +156,6 @@ namespace hase::kernels::forward
         constexpr double pi = 3.14159265358979323846;
         double const z = 2.0 * alpaka::rand::distribution::UniformReal<double>{}(rndEngine) -1.0;
         double const phi = 2.0 * pi * alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
-        double const radius = alpaka::math::sqrt(alpaka::math::max(0.0, 1.0 - z * z));
-        return hase::core::Point{radius * alpaka::math::cos(phi), radius * alpaka::math::sin(phi), z};
-    }
-
-    // Jitter uniformly inside one equal-solid-angle stratum.  Selecting every
-    // stratum equally therefore retains the original isotropic distribution.
-    [[nodiscard]] inline ALPAKA_FN_ACC hase::core::Point sampleIsotropicDirectionStratum(
-        alpaka::rand::engine::Philox4x32x10& rndEngine,
-        unsigned const stratum)
-    {
-        constexpr double pi = 3.14159265358979323846;
-        unsigned const zStratum = stratum / forwardDirectionPhiStrata;
-        unsigned const phiStratum = stratum % forwardDirectionPhiStrata;
-        double const zLower = -1.0 + 2.0 * static_cast<double>(zStratum) / forwardDirectionZStrata;
-        double const zUpper = -1.0 + 2.0 * static_cast<double>(zStratum + 1u) / forwardDirectionZStrata;
-        double const phiLower = 2.0 * pi * static_cast<double>(phiStratum) / forwardDirectionPhiStrata;
-        double const phiUpper = 2.0 * pi * static_cast<double>(phiStratum + 1u) / forwardDirectionPhiStrata;
-        double const z = zLower + (zUpper - zLower) * alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
-        double const phi
-            = phiLower + (phiUpper - phiLower) * alpaka::rand::distribution::UniformReal<double>{}(rndEngine);
         double const radius = alpaka::math::sqrt(alpaka::math::max(0.0, 1.0 - z * z));
         return hase::core::Point{radius * alpaka::math::cos(phi), radius * alpaka::math::sin(phi), z};
     }

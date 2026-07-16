@@ -172,16 +172,6 @@ def testTet4CellResultCanMapToLegacyPointBuffer(compareSerialReference):
             assert np.isfinite(point_values).all()
 
 
-def _default_backend():
-    backends = AlpakaBackends.all()
-    for backend in backends:
-        if "CpuSerial" in backend:
-            return backend
-    if backends:
-        return backends[0]
-    pytest.skip("no Alpaka backend is available")
-
-
 def _legacy_spectral_properties(metadata, name):
     spectra = metadata["spectra"][name]
     spectral_length = len(spectra["lambdaE"])
@@ -218,8 +208,10 @@ def testLegacyMonochromaticSpectralPropertiesUseFirstStoredPair(compareSerialRef
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("alpakaBackend", AlpakaBackends.all())
 def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
     compareSerialReference,
+    alpakaBackend,
     openPmdRuntimeBackend,
 ):
     if legacyWedgePointIntegral is None or tet4CellVolumeIntegral is None:
@@ -229,8 +221,7 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
     experiment = metadata["parameters"]["experiment"]
     compute = metadata["parameters"]["compute"]
     ray_count = int(os.environ.get("HASE_COMPARE_SERIAL_FORWARD_RAY_COUNT", experiment["maxRays"]))
-    rtol = float(os.environ.get("HASE_COMPARE_SERIAL_INTEGRAL_RTOL", "0.05"))
-    backend = os.environ.get("HASE_COMPARE_SERIAL_BACKEND", _default_backend())
+    rtol = 0.05
 
     for name, dataset in compareSerialReference["datasets"].items():
         if name == "cuboid":
@@ -250,7 +241,7 @@ def testCurrentTet4ForwardPhiAseVolumeIntegralMatchesCompareSerialReference(
             adaptiveSteps=int(compute["adaptiveSteps"]),
             relativeStandardErrorThreshold=relative_standard_error_threshold,
             useReflections=bool(experiment["reflection"]),
-            backend=backend,
+            backend=alpakaBackend,
             openpmdBackend=openPmdRuntimeBackend,
             parallelMode=str(compute["parallelMode"]),
             numDevices=int(compute["numDevices"]),

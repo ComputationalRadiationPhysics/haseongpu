@@ -381,8 +381,6 @@ def main(argv=None):
     )
     parser.add_argument("--tet4-input", type=Path, default=None)
     parser.add_argument("--phiase-only", action="store_true")
-    parser.add_argument("--min-sample-range", type=int, default=None)
-    parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
     parser.add_argument(
         "--spectral-resolution",
@@ -398,10 +396,6 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     aseOverrides = {}
-    if args.min_sample_range is not None:
-        aseOverrides["minSampleRange"] = args.min_sample_range
-    if args.max_sample_range is not None:
-        aseOverrides["maxSampleRange"] = args.max_sample_range
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
     if args.disable_reflections:
