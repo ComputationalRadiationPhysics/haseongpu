@@ -52,7 +52,7 @@ metadata directly, so it does not need to be reinstalled:
 ``pip install -v .`` builds the C++ extension through CMake and installs the
 Python package.  The configurator chooses compatible openPMD provider settings,
 prints the install command, and writes the optional
-``config/hase-phiase.yaml`` compute-settings file.
+``config/hase-phiase.yaml`` run-control file.
 
 If you change the compiler or C++ runtime used for the extension, rebuild and
 reinstall:
@@ -208,10 +208,10 @@ material arrays, spectra, and pump setup in Python:
 
 .. code-block:: yaml
 
-   phiASE:
-     min_rays: 100000
-     max_rays: 1000000
-     relative_standard_error_threshold: 0.05
+   experiment:
+     minRays: 100000
+     maxRays: 1000000
+     relativeStandardErrorThreshold: 0.05
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true
@@ -227,7 +227,8 @@ material arrays, spectra, and pump setup in Python:
    phi_ase = PhiASE.fromYaml("config/hase-phiase.yaml", spectralProperties=spectra)
 
 Constructor keyword arguments override YAML values.  ``hase-configure`` writes a
-small YAML file with only the compute settings.
+small YAML file with the default adaptive-ray controls and selected compute
+settings.
 
 Results
 ^^^^^^^

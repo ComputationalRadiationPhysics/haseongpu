@@ -397,6 +397,11 @@ def run_reinstall(*, break_system_packages=False, use_ccache=False):
 def yaml_config(selection: WizardSelection):
     """Render a PhiASE-compatible YAML run-control snippet."""
     lines = [
+        "experiment:",
+        "  minRays: 100000",
+        "  maxRays: 100000",
+        "  relativeStandardErrorThreshold: 0.1",
+        "",
         "compute:",
         f"  backend: {selection.compute_backend}",
         f"  openpmd_backend: {selection.openpmd_backend}",

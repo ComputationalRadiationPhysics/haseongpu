@@ -199,9 +199,9 @@ A YAML file can keep experiment and compute settings together:
 .. code-block:: yaml
 
    experiment:
-     min_rays: 100000
-     max_rays: 1000000
-     relative_standard_error_threshold: 0.05
+     minRays: 100000
+     maxRays: 1000000
+     relativeStandardErrorThreshold: 0.05
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true
