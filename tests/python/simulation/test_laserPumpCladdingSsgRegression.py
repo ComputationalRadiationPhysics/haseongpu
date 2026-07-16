@@ -13,6 +13,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from HASEonGPU import AlpakaBackends
+
 repoRoot = Path(__file__).resolve().parents[3]
 exampleScript = repoRoot / "example" / "laserPumpCladding.py"
 plotSsgScript = repoRoot / "scripts" / "plot_ssg.py"
@@ -44,7 +46,8 @@ def _readColumns(path, columns):
 
 
 @pytest.mark.integration
-def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRuntimeExecutable, alpakaRuntimeBackend):
+@pytest.mark.parametrize("alpakaBackend", AlpakaBackends.all())
+def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRuntimeExecutable, alpakaBackend):
     vtkOutputDir = tmp_path / "vtk"
     plotPrefix = tmp_path / "ssg_z_origin"
     vtkOutputDir.mkdir()
@@ -57,7 +60,7 @@ def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRunti
             sys.executable,
             str(exampleScript),
             "--backend",
-            alpakaRuntimeBackend,
+            alpakaBackend,
             "--openpmd-backend",
             openPmdRuntimeBackend,
             "--disable-ase",

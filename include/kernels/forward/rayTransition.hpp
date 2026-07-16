@@ -10,10 +10,12 @@
 #include <kernels/forward/rayWalk.hpp>
 
 #include <cstdint>
+#include <limits>
 
 namespace hase::kernels::forward
 {
     inline constexpr unsigned maxImmediateFaceTransitions = 32u;
+    inline constexpr double ownershipProbeEpsilon = 1.0e-12;
 
     enum class Tet4TransitionStatus : std::uint8_t
     {
@@ -77,6 +79,10 @@ namespace hase::kernels::forward
         hase::core::Point const direction)
     {
         Tet4FaceTransition result{cell};
+        constexpr unsigned invalidCell = std::numeric_limits<unsigned>::max();
+        unsigned recentCell0 = cell;
+        unsigned recentCell1 = invalidCell;
+        unsigned recentCell2 = invalidCell;
         for(unsigned transition = 0u; transition < maxImmediateFaceTransitions; ++transition)
         {
             int const neighbor = mesh.getCellNeighbor(cell, static_cast<unsigned>(exitFace));
@@ -99,7 +105,45 @@ namespace hase::kernels::forward
             cell = static_cast<unsigned>(neighbor);
             result.cell = cell;
             result.forbiddenFace = forbiddenFace;
-            exitFace = immediateExitFace(mesh, cell, point, direction, forbiddenFace);
+
+            int fallbackExitFace = -1;
+            int preferredExitFace = -1;
+            recentCell2 = recentCell1;
+            recentCell1 = recentCell0;
+            recentCell0 = cell;
+            for(unsigned localFace = 0u; localFace < mesh.numberOfFacesPerCell; ++localFace)
+            {
+                // Test point + epsilon * direction in barycentric space without moving the ray.
+                double coordinate = mesh.getFaceBarycentricCoordinate(cell, localFace, point);
+                if(alpaka::math::abs(coordinate) <= barycentricTraversalTolerance)
+                {
+                    coordinate = 0.0;
+                }
+                double const directionalChange = mesh.getFaceBarycentricDirection(cell, localFace, direction);
+                double const probeCoordinate = coordinate + ownershipProbeEpsilon * directionalChange;
+                if(probeCoordinate >= 0.0)
+                {
+                    continue;
+                }
+
+                if(fallbackExitFace < 0)
+                {
+                    fallbackExitFace = static_cast<int>(localFace);
+                }
+                int const candidateNeighbor = mesh.getCellNeighbor(cell, localFace);
+                if(candidateNeighbor < 0)
+                {
+                    continue;
+                }
+                unsigned const candidateCell = static_cast<unsigned>(candidateNeighbor);
+                if(candidateCell != recentCell0 && candidateCell != recentCell1 && candidateCell != recentCell2)
+                {
+                    preferredExitFace = static_cast<int>(localFace);
+                    break;
+                }
+            }
+
+            exitFace = preferredExitFace >= 0 ? preferredExitFace : fallbackExitFace;
             if(exitFace < 0)
             {
                 return result;
@@ -128,14 +172,9 @@ namespace hase::kernels::forward
         int const neighbor = mesh.getCellNeighbor(cell, static_cast<unsigned>(intersection.localFace));
         if(neighbor < 0)
         {
-            return Tet4FaceTransition{
-                cell,
-                -1,
-                intersection.localFace,
-                Tet4TransitionStatus::reachedBoundary};
+            return Tet4FaceTransition{cell, -1, intersection.localFace, Tet4TransitionStatus::reachedBoundary};
         }
-        int const forbiddenFace
-            = mesh.getCellNeighborLocalFace(cell, static_cast<unsigned>(intersection.localFace));
+        int const forbiddenFace = mesh.getCellNeighborLocalFace(cell, static_cast<unsigned>(intersection.localFace));
         if(static_cast<unsigned>(neighbor) >= mesh.numberOfCells || forbiddenFace < 0
            || static_cast<unsigned>(forbiddenFace) >= mesh.numberOfFacesPerCell)
         {

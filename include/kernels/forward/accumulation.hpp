@@ -713,8 +713,7 @@ namespace hase::kernels::forward
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                auto rndEngine
-                    = alpaka::rand::engine::Philox4x32x10{rngSeed, rayHistoryId(reflectionPass, rayNumber)};
+                auto rndEngine = alpaka::rand::engine::Philox4x32x10{rngSeed, rayHistoryId(reflectionPass, rayNumber)};
                 unsigned const faceCount = mesh.numberOfCells * mesh.numberOfFacesPerCell;
                 if(inReservoir.slotsPerFace == 0u || faceCount == 0u || samplingCdf.totalWeight[0u] <= 0.0)
                 {
