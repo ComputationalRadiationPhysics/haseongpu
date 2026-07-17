@@ -28,10 +28,6 @@ def launchCommand(openpmdBackend: str, outputDir: Path) -> list[str]:
         "1",
         "--vtk-output-dir",
         str(outputDir),
-        "--min-sample-range",
-        "0",
-        "--max-sample-range",
-        "100",
         "--rng-seed",
         "5489",
     ]

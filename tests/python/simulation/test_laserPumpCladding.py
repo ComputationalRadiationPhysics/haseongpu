@@ -35,6 +35,17 @@ _convert_vtk_topology_spec.loader.exec_module(_convert_vtk_topology)
 convertVtk = _convert_vtk_topology.convertVtk
 
 
+_laser_pump_launcher_path = repoRoot / "utils" / "testLaunchLaserPump.py"
+_laser_pump_launcher_spec = importlib.util.spec_from_file_location(
+    "_hase_test_launch_laser_pump",
+    _laser_pump_launcher_path,
+)
+if _laser_pump_launcher_spec is None or _laser_pump_launcher_spec.loader is None:
+    raise ImportError(f"cannot load laser-pump launcher from {_laser_pump_launcher_path}")
+_laser_pump_launcher = importlib.util.module_from_spec(_laser_pump_launcher_spec)
+_laser_pump_launcher_spec.loader.exec_module(_laser_pump_launcher)
+
+
 exampleDir = repoRoot / "example"
 sys.path.insert(0, str(exampleDir))
 import laserPumpCladding  # noqa: E402
@@ -520,6 +531,22 @@ def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
 
     assert calls[-1]["kwargs"]["enableASE"] is False
     assert calls[-1]["kwargs"]["spectralResolution"] == 191
+
+
+def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_example(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaCells=np.zeros((2, 3)))
+
+    monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
+    command = _laser_pump_launcher.launchCommand("hdf5", tmp_path)
+
+    laserPumpCladding.main(command[2:])
+
+    assert calls[-1]["kwargs"]["openpmdBackend"] == "hdf5"
+    assert calls[-1]["kwargs"]["rngSeed"] == 5489
 
 
 @pytest.mark.parametrize("option", ("--min-sample-range", "--max-sample-range"))
