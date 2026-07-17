@@ -15,6 +15,7 @@ repoRoot = Path(__file__).resolve().parents[3]
 
 from HASEonGPU import AlpakaBackends, PhiASE, SpectralDecomposition
 from pyInclude.geometry import GainMedium, Gmsh, GmshElement, SurfaceOptics, VolumeTopology
+import pyInclude.geometry.volume as volume_module
 import pyInclude.openpmd.transport as transport
 from pyInclude.geometry.volume import BOUND_STOP, GMSH_TET4, GMSH_TRI3, VTK_TETRA
 
@@ -206,6 +207,38 @@ def testVolumeTopologyImportsSyntheticGmshTetPhysicalGroups():
     assert topology.surfaceDomainNames == {30: "side_wall"}
 
 
+def testVolumeTopologyMapsDuplicateGmshInterfaceTrianglesToBothCells():
+    nodes = {
+        10: (0.0, 0.0, 0.0),
+        11: (1.0, 0.0, 0.0),
+        12: (0.0, 1.0, 0.0),
+        13: (0.0, 0.0, 1.0),
+        14: (1.0, 1.0, 1.0),
+        99: (2.0, 2.0, 2.0),
+    }
+    gmsh = Gmsh(
+        nodes=nodes,
+        elements=[
+            GmshElement(1, GMSH_TET4, (10, 11, 12, 13), physical_tag=4),
+            GmshElement(2, GMSH_TET4, (11, 12, 13, 14), physical_tag=4),
+            GmshElement(3, GMSH_TRI3, (11, 12, 13), physical_tag=30),
+            GmshElement(4, GMSH_TRI3, (13, 12, 11), physical_tag=31),
+            GmshElement(5, GMSH_TRI3, (10, 11, 14), physical_tag=98),
+            GmshElement(6, GMSH_TRI3, (10, 11, 99), physical_tag=99),
+        ],
+    )
+
+    topology = VolumeTopology.fromGmsh(gmsh)
+    internal = topology.neighborCells >= 0
+
+    assert np.count_nonzero(internal) == 2
+    assert np.all(topology.faceBoundaries[internal] == 31)
+    assert np.count_nonzero(topology.faceBoundaries == 30) == 0
+    assert np.count_nonzero(topology.faceBoundaries == 98) == 0
+    assert np.count_nonzero(topology.faceBoundaries == 99) == 0
+    assert np.count_nonzero(topology.faceBoundaries == BOUND_STOP) == 6
+
+
 def testVolumeTopologyAssignsCellAndSurfaceDomainsBySelector():
     topology = _slabTopology()
     assigned = topology.withDomains(
@@ -221,6 +254,36 @@ def testVolumeTopologyAssignsCellAndSurfaceDomainsBySelector():
     assert np.count_nonzero(assigned.faceBoundaries == 1) > 0
     assert np.count_nonzero(assigned.faceBoundaries == 2) > 0
     assert np.count_nonzero(topology.faceBoundaries > 0) == 0
+
+
+def testVolumeTopologyDomainAssignmentDoesNotRebuildDerivedGeometry(monkeypatch):
+    topology = _slabTopology()
+
+    def unexpectedRebuild(*args, **kwargs):
+        raise AssertionError("domain-only assignment rebuilt Tet4 geometry")
+
+    monkeypatch.setattr(volume_module, "_deriveTet4Topology", unexpectedRebuild)
+    assigned = topology.withDomains(
+        cellDomains={"where": "all", "domain": 6},
+        surfaceDomains={"where": "all_exterior", "domain": 8},
+    )
+
+    for name in (
+        "facePointIndices",
+        "neighborCells",
+        "neighborLocalFaces",
+        "faceCenters",
+        "faceNormals",
+        "faceAreas",
+        "cellCenters",
+        "cellVolumes",
+    ):
+        original = getattr(topology, name)
+        copied = getattr(assigned, name)
+        np.testing.assert_array_equal(copied, original)
+        assert not np.shares_memory(copied, original)
+    assert np.all(assigned.cellDomains == 6)
+    assert np.all(assigned.faceBoundaries[assigned.neighborCells < 0] == 8)
 
 
 def testVolumeTopologyRemapsGmshDomainsByName():
