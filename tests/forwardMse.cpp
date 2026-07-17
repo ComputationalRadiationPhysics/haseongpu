@@ -193,11 +193,7 @@ TEST_CASE("dynamic beta-volume updates rebuild the source-sampling CDF", "[forwa
     CHECK(
         mesh.betaVolumePrefix.back()
         == Catch::Approx(
-            std::inner_product(
-                mesh.betaVolume.cbegin(),
-                mesh.betaVolume.cend(),
-                mesh.cellVolumes.cbegin(),
-                0.0)));
+            std::inner_product(mesh.betaVolume.cbegin(), mesh.betaVolume.cend(), mesh.cellVolumes.cbegin(), 0.0)));
 
     hase::core::DeviceMeshView view{};
     view.numberOfCells = mesh.numberOfCells;
