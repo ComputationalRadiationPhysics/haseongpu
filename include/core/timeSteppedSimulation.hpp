@@ -210,7 +210,7 @@ namespace hase::core
             alpaka::onHost::wait(m_queue);
 
             m_hostMesh.betaCells = detail::copyToVector(m_queue, beta);
-            m_hostMesh.betaVolume = detail::copyToVector(m_queue, m_betaVolume);
+            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaVolume));
             if(refreshAse)
             {
                 initializeResult(aseEnabled ? 100000.0 : 0.0, m_hostMesh.numberOfCells);
@@ -313,7 +313,7 @@ namespace hase::core
             hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, m_betaNext, m_betaVolume);
             alpaka::onHost::wait(m_queue);
             m_hostMesh.betaCells = detail::copyToVector(m_queue, m_betaNext);
-            m_hostMesh.betaVolume = detail::copyToVector(m_queue, m_betaVolume);
+            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaVolume));
         }
 
         void stepRungeKutta4(bool pumpEnabled, bool aseEnabled)

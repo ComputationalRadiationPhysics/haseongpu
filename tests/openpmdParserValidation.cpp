@@ -823,11 +823,19 @@ TEST_CASE(
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.1});
                 REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
+                REQUIRE(context.mesh.betaVolumePrefix.size() == 1u);
+                REQUIRE(
+                    context.mesh.betaVolumePrefix.front()
+                    == Catch::Approx(context.mesh.betaVolume.front() * context.mesh.cellVolumes.front()));
             }
             else
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.9});
                 REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
+                REQUIRE(context.mesh.betaVolumePrefix.size() == 1u);
+                REQUIRE(
+                    context.mesh.betaVolumePrefix.front()
+                    == Catch::Approx(context.mesh.betaVolume.front() * context.mesh.cellVolumes.front()));
             }
             context.result.phiAse = std::vector<float>(1u, static_cast<float>(calls));
         });

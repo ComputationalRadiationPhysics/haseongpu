@@ -1267,7 +1267,7 @@ namespace hase::openpmd
     {
         std::string const prefix = m_meshGroup + "_";
         auto const numberOfCells = simulation.mesh.numberOfCells;
-        simulation.mesh.betaVolume = loadBetaVolume(
+        simulation.mesh.setBetaVolume(loadBetaVolume(
             series,
             iteration,
             prefix + "beta_volume",
@@ -1275,7 +1275,7 @@ namespace hase::openpmd
             {"cell"},
             {numberOfCells},
             true,
-            true);
+            true));
         initializeResultForMesh(simulation.result, simulation.mesh, simulation.experiment);
         iteration.close();
     }
