@@ -8,12 +8,21 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 import math
 import warnings
 
 import numpy as np
+
+try:
+    from numba import njit
+except ImportError:
+    def njit(*args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
 
 from .domains import DomainMap
 
@@ -64,6 +73,50 @@ def _faceKey(nodes):
     return tuple(sorted(int(node) for node in nodes))
 
 
+_TRIANGLE_KEY_DTYPE = np.dtype(
+    [("node0", np.uint32), ("node1", np.uint32), ("node2", np.uint32)]
+)
+
+
+def _triangleKeys(triangles):
+    rows = np.ascontiguousarray(
+        np.sort(np.asarray(triangles, dtype=np.uint32), axis=1)
+    )
+    return rows.view(_TRIANGLE_KEY_DTYPE).reshape(-1)
+
+
+def _surfaceBoundariesFromTriangles(cells, surfaceNodes, surfaceTags):
+    """Map tagged Gmsh triangles to every matching tetra-local face."""
+    flatBoundaries = np.zeros(cells.shape[0] * TET4_FACE_VERTICES.shape[0], dtype=np.int32)
+    if len(surfaceNodes) == 0:
+        return flatBoundaries.reshape((-1, TET4_FACE_VERTICES.shape[0]))
+
+    surfaceKeys = _triangleKeys(surfaceNodes)
+    surfaceTags = np.asarray(surfaceTags, dtype=np.int32)
+    # Match the former dictionary behavior: the last duplicate TRI3 tag wins.
+    _, reverseFirst = np.unique(surfaceKeys[::-1], return_index=True)
+    keep = surfaceKeys.size - 1 - reverseFirst
+    surfaceKeys = surfaceKeys[keep]
+    surfaceTags = surfaceTags[keep]
+
+    faceNodes = cells[:, TET4_FACE_VERTICES].reshape(-1, 3)
+    faceKeys = _triangleKeys(faceNodes)
+    faceOrder = np.argsort(faceKeys, kind="stable")
+    sortedFaceKeys = faceKeys[faceOrder]
+    lower = np.searchsorted(sortedFaceKeys, surfaceKeys, side="left")
+    upper = np.searchsorted(sortedFaceKeys, surfaceKeys, side="right")
+    counts = upper - lower
+    totalMatches = int(np.sum(counts))
+    if totalMatches == 0:
+        return flatBoundaries.reshape((-1, TET4_FACE_VERTICES.shape[0]))
+
+    repeatedLower = np.repeat(lower, counts)
+    repeatedOffsets = np.repeat(np.cumsum(counts) - counts, counts)
+    sortedPositions = repeatedLower + np.arange(totalMatches) - repeatedOffsets
+    flatBoundaries[faceOrder[sortedPositions]] = np.repeat(surfaceTags, counts)
+    return flatBoundaries.reshape((-1, TET4_FACE_VERTICES.shape[0]))
+
+
 def _triangleAreaNormal(a, b, c):
     raw = np.cross(b - a, c - a)
     norm = float(np.linalg.norm(raw))
@@ -83,6 +136,95 @@ def _faceGeometry(points, nodes, cellCenter):
 
 def _tetVolume(a, b, c, d):
     return abs(float(np.dot(np.cross(b - a, c - a), d - a))) / 6.0
+
+
+@njit(cache=True)
+def _tet4GeometryKernel(points, cells, localFaces):
+    """Build per-cell and per-face geometry without Python object overhead."""
+    numberOfCells = cells.shape[0]
+    numberOfFaces = localFaces.shape[0]
+    faceNodes = np.empty((numberOfCells, numberOfFaces, 3), dtype=np.int32)
+    cellCenters = np.empty((numberOfCells, 3), dtype=np.float64)
+    cellVolumes = np.empty(numberOfCells, dtype=np.float32)
+    faceCenters = np.empty((numberOfCells, numberOfFaces, 3), dtype=np.float32)
+    faceNormals = np.empty((numberOfCells, numberOfFaces, 3), dtype=np.float32)
+    faceAreas = np.empty((numberOfCells, numberOfFaces), dtype=np.float32)
+
+    for cellIndex in range(numberOfCells):
+        p0 = cells[cellIndex, 0]
+        p1 = cells[cellIndex, 1]
+        p2 = cells[cellIndex, 2]
+        p3 = cells[cellIndex, 3]
+        centerX = (points[p0, 0] + points[p1, 0] + points[p2, 0] + points[p3, 0]) * 0.25
+        centerY = (points[p0, 1] + points[p1, 1] + points[p2, 1] + points[p3, 1]) * 0.25
+        centerZ = (points[p0, 2] + points[p1, 2] + points[p2, 2] + points[p3, 2]) * 0.25
+        cellCenters[cellIndex, 0] = centerX
+        cellCenters[cellIndex, 1] = centerY
+        cellCenters[cellIndex, 2] = centerZ
+
+        abX = points[p1, 0] - points[p0, 0]
+        abY = points[p1, 1] - points[p0, 1]
+        abZ = points[p1, 2] - points[p0, 2]
+        acX = points[p2, 0] - points[p0, 0]
+        acY = points[p2, 1] - points[p0, 1]
+        acZ = points[p2, 2] - points[p0, 2]
+        adX = points[p3, 0] - points[p0, 0]
+        adY = points[p3, 1] - points[p0, 1]
+        adZ = points[p3, 2] - points[p0, 2]
+        crossX = abY * acZ - abZ * acY
+        crossY = abZ * acX - abX * acZ
+        crossZ = abX * acY - abY * acX
+        signedVolume = crossX * adX + crossY * adY + crossZ * adZ
+        cellVolumes[cellIndex] = abs(signedVolume) / 6.0
+
+        for faceIndex in range(numberOfFaces):
+            node0 = cells[cellIndex, localFaces[faceIndex, 0]]
+            node1 = cells[cellIndex, localFaces[faceIndex, 1]]
+            node2 = cells[cellIndex, localFaces[faceIndex, 2]]
+            faceNodes[cellIndex, faceIndex, 0] = node0
+            faceNodes[cellIndex, faceIndex, 1] = node1
+            faceNodes[cellIndex, faceIndex, 2] = node2
+
+            faceCenterX = (points[node0, 0] + points[node1, 0] + points[node2, 0]) / 3.0
+            faceCenterY = (points[node0, 1] + points[node1, 1] + points[node2, 1]) / 3.0
+            faceCenterZ = (points[node0, 2] + points[node1, 2] + points[node2, 2]) / 3.0
+            faceCenters[cellIndex, faceIndex, 0] = faceCenterX
+            faceCenters[cellIndex, faceIndex, 1] = faceCenterY
+            faceCenters[cellIndex, faceIndex, 2] = faceCenterZ
+
+            edge0X = points[node1, 0] - points[node0, 0]
+            edge0Y = points[node1, 1] - points[node0, 1]
+            edge0Z = points[node1, 2] - points[node0, 2]
+            edge1X = points[node2, 0] - points[node0, 0]
+            edge1Y = points[node2, 1] - points[node0, 1]
+            edge1Z = points[node2, 2] - points[node0, 2]
+            normalX = edge0Y * edge1Z - edge0Z * edge1Y
+            normalY = edge0Z * edge1X - edge0X * edge1Z
+            normalZ = edge0X * edge1Y - edge0Y * edge1X
+            normalLength = np.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ)
+            faceAreas[cellIndex, faceIndex] = 0.5 * normalLength
+            if normalLength > 0.0:
+                normalX /= normalLength
+                normalY /= normalLength
+                normalZ /= normalLength
+            else:
+                normalX = 0.0
+                normalY = 0.0
+                normalZ = 0.0
+            pointsInward = (
+                normalX * (centerX - faceCenterX)
+                + normalY * (centerY - faceCenterY)
+                + normalZ * (centerZ - faceCenterZ)
+            )
+            if pointsInward > 0.0:
+                normalX = -normalX
+                normalY = -normalY
+                normalZ = -normalZ
+            faceNormals[cellIndex, faceIndex, 0] = normalX
+            faceNormals[cellIndex, faceIndex, 1] = normalY
+            faceNormals[cellIndex, faceIndex, 2] = normalZ
+
+    return faceNodes, cellCenters, cellVolumes, faceCenters, faceNormals, faceAreas
 
 
 @dataclass
@@ -266,14 +408,33 @@ class VolumeTopology:
         return self._copyWith(faceBoundaries=faceBoundaries, metadata=metadata)
 
     def _copyWith(self, *, cellDomains=None, faceBoundaries=None, metadata=None):
-        topology = type(self)(
-            self.points.copy(),
-            self.cellPointIndices.copy(),
-            cellTypes=self.cellTypes.copy(),
-            cellDomains=np.asarray(self.cellDomains if cellDomains is None else cellDomains, dtype=np.int32).copy(),
-            faceBoundaries=np.asarray(self.faceBoundaries if faceBoundaries is None else faceBoundaries, dtype=np.int32).copy(),
-            metadata=dict(self.metadata if metadata is None else metadata),
-        )
+        # Domain reassignment does not alter connectivity or geometry.  Keep
+        # the value semantics of the previous constructor-based copy without
+        # rebuilding all Tet4 faces, neighbors, normals, and volumes.
+        topology = copy.copy(self)
+        topology.points = self.points.copy()
+        topology.cellPointIndices = self.cellPointIndices.copy()
+        topology.cellTypes = self.cellTypes.copy()
+        topology.cellDomains = np.asarray(
+            self.cellDomains if cellDomains is None else cellDomains,
+            dtype=np.int32,
+        ).copy()
+        topology.faceBoundaries = np.asarray(
+            self.faceBoundaries if faceBoundaries is None else faceBoundaries,
+            dtype=np.int32,
+        ).copy()
+        topology.metadata = dict(self.metadata if metadata is None else metadata)
+        for name in (
+            "facePointIndices",
+            "neighborCells",
+            "neighborLocalFaces",
+            "faceCenters",
+            "faceNormals",
+            "faceAreas",
+            "cellCenters",
+            "cellVolumes",
+        ):
+            setattr(topology, name, np.asarray(getattr(self, name)).copy())
         topology.samplePoints = np.asarray(self.samplePoints, dtype=np.float64).copy()
         return topology
 
@@ -299,52 +460,41 @@ class VolumeTopology:
 def _deriveTet4Topology(points, cells, faceBoundariesArg):
     numberOfCells = cells.shape[0]
     numberOfFaces = TET4_FACE_VERTICES.shape[0]
-    faceNodes = np.full((numberOfCells, numberOfFaces, 3), -1, dtype=np.int32)
+    faceNodes, cellCenters, cellVolumes, faceCenters, faceNormals, faceAreas = _tet4GeometryKernel(
+        points,
+        cells,
+        TET4_FACE_VERTICES,
+    )
     neighborCells = np.full((numberOfCells, numberOfFaces), -1, dtype=np.int32)
     neighborFaces = np.full((numberOfCells, numberOfFaces), -1, dtype=np.int32)
     boundaries = np.zeros((numberOfCells, numberOfFaces), dtype=np.int32) if faceBoundariesArg is None else np.asarray(faceBoundariesArg, dtype=np.int32).copy()
     if boundaries.shape != (numberOfCells, numberOfFaces):
         raise ValueError(f"faceBoundaries must have shape {(numberOfCells, numberOfFaces)}, got {boundaries.shape}")
 
-    owners = {}
-    for cellIndex in range(numberOfCells):
-        for faceIndex in range(numberOfFaces):
-            nodes = _faceNodes(cells[cellIndex], faceIndex)
-            faceNodes[cellIndex, faceIndex] = nodes
-            key = _faceKey(nodes)
-            owner = owners.get(key)
-            if owner is None:
-                owners[key] = (cellIndex, faceIndex)
-            else:
-                otherCell, otherFace = owner
-                neighborCells[cellIndex, faceIndex] = otherCell
-                neighborFaces[cellIndex, faceIndex] = otherFace
-                neighborCells[otherCell, otherFace] = cellIndex
-                neighborFaces[otherCell, otherFace] = faceIndex
-                if boundaries[cellIndex, faceIndex] == BOUND_INTERNAL and boundaries[otherCell, otherFace] != BOUND_INTERNAL:
-                    boundaries[cellIndex, faceIndex] = boundaries[otherCell, otherFace]
-                elif boundaries[otherCell, otherFace] == BOUND_INTERNAL and boundaries[cellIndex, faceIndex] != BOUND_INTERNAL:
-                    boundaries[otherCell, otherFace] = boundaries[cellIndex, faceIndex]
+    flatFaceKeys = np.sort(faceNodes.reshape(-1, 3), axis=1)
+    order = np.lexsort((flatFaceKeys[:, 2], flatFaceKeys[:, 1], flatFaceKeys[:, 0]))
+    sortedKeys = flatFaceKeys[order]
+    matches = np.flatnonzero(np.all(sortedKeys[1:] == sortedKeys[:-1], axis=1))
+    if matches.size:
+        left = order[matches]
+        right = order[matches + 1]
+        flatNeighborCells = neighborCells.reshape(-1)
+        flatNeighborFaces = neighborFaces.reshape(-1)
+        flatNeighborCells[left] = right // numberOfFaces
+        flatNeighborCells[right] = left // numberOfFaces
+        flatNeighborFaces[left] = right % numberOfFaces
+        flatNeighborFaces[right] = left % numberOfFaces
+
+        flatBoundaries = boundaries.reshape(-1)
+        leftBoundaries = flatBoundaries[left].copy()
+        rightBoundaries = flatBoundaries[right].copy()
+        takeRight = (leftBoundaries == BOUND_INTERNAL) & (rightBoundaries != BOUND_INTERNAL)
+        takeLeft = (rightBoundaries == BOUND_INTERNAL) & (leftBoundaries != BOUND_INTERNAL)
+        flatBoundaries[left[takeRight]] = rightBoundaries[takeRight]
+        flatBoundaries[right[takeLeft]] = leftBoundaries[takeLeft]
 
     boundaryMask = neighborCells < 0
     boundaries[boundaryMask] = np.where(boundaries[boundaryMask] == BOUND_INTERNAL, BOUND_STOP, boundaries[boundaryMask])
-
-    cellCenters = np.empty((numberOfCells, 3), dtype=np.float64)
-    cellVolumes = np.empty(numberOfCells, dtype=np.float32)
-    faceCenters = np.empty((numberOfCells, numberOfFaces, 3), dtype=np.float32)
-    faceNormals = np.empty((numberOfCells, numberOfFaces, 3), dtype=np.float32)
-    faceAreas = np.empty((numberOfCells, numberOfFaces), dtype=np.float32)
-
-    for cellIndex in range(numberOfCells):
-        nodes = cells[cellIndex]
-        coordinates = points[nodes]
-        cellCenters[cellIndex] = np.mean(coordinates, axis=0)
-        cellVolumes[cellIndex] = np.float32(_tetVolume(coordinates[0], coordinates[1], coordinates[2], coordinates[3]))
-        for faceIndex in range(numberOfFaces):
-            center, area, normal = _faceGeometry(points, faceNodes[cellIndex, faceIndex], cellCenters[cellIndex])
-            faceCenters[cellIndex, faceIndex] = center.astype(np.float32)
-            faceAreas[cellIndex, faceIndex] = area
-            faceNormals[cellIndex, faceIndex] = normal
 
     return {
         "facePointIndices": faceNodes,
@@ -414,8 +564,12 @@ def _selectCells(topology, cellDomains, spec):
 def _selectFaces(topology, faceBoundaries, spec):
     if "faceIndices" in spec:
         mask = np.zeros_like(faceBoundaries, dtype=bool)
-        for cell, face in spec["faceIndices"]:
-            mask[int(cell), int(face)] = True
+        indices = np.asarray(spec["faceIndices"], dtype=np.int64)
+        if indices.size == 0:
+            return mask
+        if indices.ndim != 2 or indices.shape[1] != 2:
+            raise ValueError("faceIndices must have shape (N, 2)")
+        mask[indices[:, 0], indices[:, 1]] = True
         return mask
     where = spec.get("where")
     if where in {"z_min", "z_max"}:
@@ -449,19 +603,17 @@ def _fromGmshVolume(gmsh, *, boundaryDefault):
     cells = np.asarray([[nodeToIndex[nodeId] for nodeId in element.node_ids[:4]] for element in tetElements], dtype=np.uint32)
     domains = np.asarray([element.physical_tag or 1 for element in tetElements], dtype=np.int32)
 
-    surfaceBoundariesArg = {}
+    surfaceNodes = []
+    surfaceTags = []
     for element in surfaceElements:
         if any(nodeId not in nodeToIndex for nodeId in element.node_ids[:3]):
             continue
-        nodes = tuple(nodeToIndex[nodeId] for nodeId in element.node_ids[:3])
-        surfaceBoundariesArg[_faceKey(nodes)] = np.int32(element.physical_tag if element.physical_tag is not None else boundaryDefault)
+        surfaceNodes.append([nodeToIndex[nodeId] for nodeId in element.node_ids[:3]])
+        surfaceTags.append(
+            element.physical_tag if element.physical_tag is not None else boundaryDefault
+        )
 
-    faceBoundariesArg = np.zeros((cells.shape[0], TET4_FACE_VERTICES.shape[0]), dtype=np.int32)
-    for cellIndex, cell in enumerate(cells):
-        for faceIndex in range(TET4_FACE_VERTICES.shape[0]):
-            key = _faceKey(_faceNodes(cell, faceIndex))
-            if key in surfaceBoundariesArg:
-                faceBoundariesArg[cellIndex, faceIndex] = surfaceBoundariesArg[key]
+    faceBoundariesArg = _surfaceBoundariesFromTriangles(cells, surfaceNodes, surfaceTags)
 
     return VolumeTopology(
         points,
