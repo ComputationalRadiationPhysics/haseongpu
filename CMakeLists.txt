@@ -469,6 +469,16 @@ if(NOT HASE_BUILD_RUNTIME)
         )
     endif()
 
+    if(
+        HASE_OPENPMD_PYTHON_PACKAGE_DIR
+        AND NOT EXISTS "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}/openpmd_api"
+    )
+        message(
+            FATAL_ERROR
+            "The shared runtime records HASE_OPENPMD_PYTHON_PACKAGE_DIR='${HASE_OPENPMD_PYTHON_PACKAGE_DIR}', but that directory does not contain openpmd_api."
+        )
+    endif()
+
     message(
         STATUS
         "Configuring Python frontend for runtime: ${HASE_RUNTIME_DIR}"
