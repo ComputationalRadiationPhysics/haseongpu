@@ -110,9 +110,90 @@ legacy laserPumpCladding.py  feb039755932939f3a5455a40616f097166a96083582a077e45
 legacy pt.mat                afab3241bb89045a2234006f4c2eca26194bef761e1265e78c5115e6898ed74a
 phiASE-no-reflections.yaml   312b269611c464fb2e35a26a2fa09380191596ec11abf2efd52441243a38a9d0
 Dockerfile                   3bd9634bdb7aa41870776ca38736065d78d47ff6048d0e294c6292915b6cf61f
+phiase_reference.npz         cfc628a32adebea97eecd742e7e04df34f61fd82976c4955fc2769073930c1a2
 ```
 
 The `.npz` metadata also records SHA-256 checksums for all six generated VTK
 snapshots. `pt.mat` is the authoritative legacy geometry input; its checksum is
 part of the fixture contract even though the packed archive stores the emitted
 wedge geometry directly.
+
+## Current Tet4 container validation and bias audit
+
+The current implementation was independently configured and built in the same
+Docker image. It used bundled openPMD 0.17.0 with its HDF5 1.14.6 provider:
+
+```bash
+current_build=/tmp/hase-no-reflection-current-build
+mkdir -p "$current_build" /tmp/hase-no-reflection-home
+docker run --rm --user "$(id -u):$(id -g)" --cpus=12 \
+    -e HOME=/tmp-home -e CMAKE_BUILD_PARALLEL_LEVEL=4 \
+    -v "$PWD":/src:ro \
+    -v "$current_build":/build \
+    -v /tmp/hase-no-reflection-home:/tmp-home \
+    hase-no-reflection-toolchain:ubuntu24.04 bash -lc '
+      cmake -S /src -B /build -G Ninja \
+        -DDISABLE_MPI=ON \
+        -DHASE_BUILD_RELEASE=ON \
+        -DHASE_NATIVE_OPTIMIZATIONS=OFF \
+        -DHASE_ENABLE_PYTHON=ON \
+        -DHASE_TESTING=ON \
+        -Dalpaka_DEP_HWLOC=OFF \
+        -DHASE_OPENPMD_PROVIDER=bundled \
+        -DHASE_OPENPMD_USE_ADIOS2=OFF \
+        -DHASE_OPENPMD_USE_HDF5=ON \
+        -DHASE_OPENPMD_FETCH_HDF5=ON \
+        -DHASE_OPENPMD_USE_SST=OFF \
+        -DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON
+      cmake --build /build --parallel 4
+    '
+
+docker run --rm --user "$(id -u):$(id -g)" --cpus=12 \
+    -e HOME=/tmp-home -e PYTHONNOUSERSITE=1 -e PYTHONPATH=/src \
+    -v "$PWD":/src:ro \
+    -v "$current_build":/build:ro \
+    -v /tmp/hase-no-reflection-home:/tmp-home \
+    -v "$current_build/python/pyInclude/_native_config.py":/src/pyInclude/_native_config.py:ro \
+    hase-no-reflection-toolchain:ubuntu24.04 \
+    pytest -q /src/tests/python/simulation/test_laserPumpCladdingNoReflection.py
+```
+
+The final test result after the fix was `3 passed in 11.87s`.
+
+Before the fix, increasing the ray count did not reduce the step-2 integral
+bias. The fixture-matched adaptive run and a fixed-count run both stayed about
+13.5% low, while four times as many rays halved the mean relative sampling
+error without changing the integral bias:
+
+| Current run | Step-2 Tet integral | Error vs legacy | Mean RSE | Maximum cell visits |
+| --- | ---: | ---: | ---: | ---: |
+| adaptive, up to 1M | `7.225260654557545e21` | `-13.5039%` | `0.07078` | `1,000,000` |
+| fixed 1M | `7.215956628810387e21` | `-13.6153%` | `0.07097` | `1,000,000` |
+| fixed 4M | `7.215963679037562e21` | `-13.6152%` | `0.03540` | `4,000,000` |
+
+The systematic error was an implementation defect, not a changed geometric
+domain. `HostMesh` built `betaVolumePrefix`, the source-sampling CDF, when its
+initial `betaVolume` was all zero. The compiled time-step runner updated
+`betaVolume` after pumping but did not rebuild the CDF. Binary search over the
+stale all-zero prefix therefore selected the final Tet for every source ray;
+the exact ray-count value in the final cell exposed the failure. Dynamic-only
+openPMD updates had the same missing refresh.
+
+A paired PhiASE-only experiment replaced every three Tet beta values with the
+corresponding legacy six-vertex wedge mean. This changed the beta-volume
+integral by `-0.04049%` and PhiASE by `-0.03956%`, ruling out intra-wedge beta
+mapping as the material source of the 13.5% error. With a correctly constructed
+CDF, the direct Tet run was already within `+0.08375%` of legacy.
+
+The fix updates `betaVolume` through one setter that immediately rebuilds the
+raw, unnormalized CDF. It is used for both time-stepped assignments and for
+dynamic openPMD iterations. Post-fix results were:
+
+| Current run | Step-2 Tet integral | Error vs legacy | Maximum cell visits |
+| --- | ---: | ---: | ---: |
+| fixture-matched adaptive | `8.360277067897611e21` | `+0.08375%` | `2,212` |
+| fixed 1M | `8.402970443687753e21` | `+0.59485%` | `2,185` |
+
+The six fixture-matched post-fix errors were `0.0000%`, `+0.0838%`,
+`+0.2689%`, `+0.4158%`, `+0.4513%`, and `+0.3963%`, all well inside the
+unchanged 5% integral tolerance.

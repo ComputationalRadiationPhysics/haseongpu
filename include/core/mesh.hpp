@@ -647,6 +647,11 @@ namespace hase::core
             cellVolumePrefix.resize(cellVolumes.size());
             std::partial_sum(cellVolumes.begin(), cellVolumes.end(), cellVolumePrefix.begin());
 
+            rebuildBetaVolumePrefix();
+        }
+
+        void rebuildBetaVolumePrefix()
+        {
             betaVolumePrefix.resize(cellVolumes.size());
             double runningBetaVolume = 0.0;
             for(std::size_t cell = 0u; cell < cellVolumes.size(); ++cell)
@@ -655,6 +660,12 @@ namespace hase::core
                 runningBetaVolume += beta * static_cast<double>(cellVolumes[cell]);
                 betaVolumePrefix[cell] = runningBetaVolume;
             }
+        }
+
+        void setBetaVolume(std::vector<double> values)
+        {
+            betaVolume = std::move(values);
+            rebuildBetaVolumePrefix();
         }
 
         void precomputeBarycentricFacePlanes()

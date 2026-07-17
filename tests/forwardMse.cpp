@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
 #include <kernels/forward/rayTransition.hpp>
+#include <kernels/forward/volumeSampling.hpp>
 
 #include <algorithm>
 #include <array>
@@ -169,6 +170,41 @@ TEST_CASE("forward source stratification places one shifted point in each CDF in
         CHECK(target > static_cast<double>(ray) / rayCount);
         CHECK(target < static_cast<double>(ray + 1u) / rayCount);
     }
+}
+
+TEST_CASE("dynamic beta-volume updates rebuild the source-sampling CDF", "[forward][sampling]")
+{
+    hase::core::HostMesh mesh;
+    mesh.numberOfCells = 3u;
+    mesh.cellVolumes = {0.5f, 1.5f, 2.0f};
+    mesh.betaVolume = {0.0, 0.0, 0.0};
+    mesh.calcCellVolumePrefix();
+
+    CHECK(mesh.betaVolumePrefix == std::vector<double>{0.0, 0.0, 0.0});
+    auto const staticVolumePrefix = mesh.cellVolumePrefix;
+
+    mesh.setBetaVolume({2.0, 1.0, 0.25});
+
+    CHECK(mesh.cellVolumePrefix == staticVolumePrefix);
+    REQUIRE(mesh.betaVolumePrefix.size() == 3u);
+    CHECK(mesh.betaVolumePrefix[0] == Catch::Approx(1.0));
+    CHECK(mesh.betaVolumePrefix[1] == Catch::Approx(2.5));
+    CHECK(mesh.betaVolumePrefix[2] == Catch::Approx(3.0));
+    CHECK(
+        mesh.betaVolumePrefix.back()
+        == Catch::Approx(
+            std::inner_product(
+                mesh.betaVolume.cbegin(),
+                mesh.betaVolume.cend(),
+                mesh.cellVolumes.cbegin(),
+                0.0)));
+
+    hase::core::DeviceMeshView view{};
+    view.numberOfCells = mesh.numberOfCells;
+    view.betaVolumePrefix = mesh.betaVolumePrefix;
+    CHECK(hase::kernels::forward::sampleVolumeByBetaVolumeTarget(view, 0.5) == 0u);
+    CHECK(hase::kernels::forward::sampleVolumeByBetaVolumeTarget(view, 1.5) == 1u);
+    CHECK(hase::kernels::forward::sampleVolumeByBetaVolumeTarget(view, 2.75) == 2u);
 }
 
 TEST_CASE("forward random histories are separated by ray, pass, and sampling domain", "[forward][sampling]")
