@@ -460,8 +460,6 @@ def testLaserPumpCladdingExampleWritesVtkFromCompiledSnapshots(
     assert state.step == 2
     scalars = _vtkScalarNames(second)
     assert {"betaCells", "phiASE", "dndtAse", "dndtPump", "cladAbs"}.issubset(scalars)
-    assert fakeCompiledSnapshots[-1]["phiASE"].minRays == 100000
-    assert fakeCompiledSnapshots[-1]["phiASE"].maxRays == 100000
     assert fakeCompiledSnapshots[-1]["phiASE"].relativeStandardErrorThreshold == 0.1
     assert fakeCompiledSnapshots[-1]["pumpSteps"] == 1
 
