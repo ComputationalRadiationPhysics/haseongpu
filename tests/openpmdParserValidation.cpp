@@ -673,6 +673,41 @@ TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[o
             iteration.setAttribute("enable_ase", false);
             iteration.setAttribute("pump_steps", 50u);
             iteration.setAttribute("time_integrator", std::string{"frozen-phi-ase-runge-kutta-4"});
+            using U64 = unsigned long long;
+            iteration.setAttribute("pump_schema_version", 1u);
+            iteration.setAttribute("pump_ray_count", 1234u);
+            iteration.setAttribute("pump_rng_seed", 99u);
+            iteration.setAttribute("pump_source_total_power", std::vector<double>{12.5});
+            iteration.setAttribute("pump_source_surface_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_source_surfaces", std::vector<U64>{11u});
+            iteration.setAttribute("pump_spectrum_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_spectrum_wavelengths", std::vector<double>{940e-9});
+            iteration.setAttribute("pump_spectrum_weights", std::vector<double>{1.0});
+            iteration.setAttribute("pump_spectrum_sigma_absorption", std::vector<double>{1e-22});
+            iteration.setAttribute("pump_spectrum_sigma_emission", std::vector<double>{2e-22});
+            iteration.setAttribute("pump_angular_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_angular_polar", std::vector<double>{0.0});
+            iteration.setAttribute("pump_angular_azimuthal", std::vector<double>{0.0});
+            iteration.setAttribute("pump_angular_weights", std::vector<double>{1.0});
+            iteration.setAttribute("pump_profile_kind", std::vector<U64>{0u});
+            iteration.setAttribute("pump_profile_radius_u", std::vector<double>{1.0});
+            iteration.setAttribute("pump_profile_radius_v", std::vector<double>{1.0});
+            iteration.setAttribute("pump_profile_exponent", std::vector<double>{2.0});
+            iteration.setAttribute("pump_profile_center", std::vector<double>{0.0, 0.0, 0.0});
+            iteration.setAttribute("pump_profile_axis_u", std::vector<double>{1.0, 0.0, 0.0});
+            iteration.setAttribute("pump_profile_axis_v", std::vector<double>{0.0, 1.0, 0.0});
+            iteration.setAttribute("pump_source_relay_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_relay_exit_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_relay_exit_surfaces", std::vector<U64>{12u});
+            iteration.setAttribute("pump_relay_entry_offsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pump_relay_entry_surfaces", std::vector<U64>{12u});
+            iteration.setAttribute("pump_relay_flip_u", std::vector<U64>{0u});
+            iteration.setAttribute("pump_relay_flip_v", std::vector<U64>{0u});
+            iteration.setAttribute("pump_relay_rotation", std::vector<double>{0.0});
+            iteration.setAttribute("pump_relay_offset", std::vector<double>{0.0, 0.0});
+            iteration.setAttribute("pump_relay_tilt", std::vector<double>{0.0, 0.0});
+            iteration.setAttribute("pump_relay_magnification", std::vector<double>{1.0});
+            iteration.setAttribute("pump_relay_transmission", std::vector<double>{0.75});
         });
     hase::openpmd::Parser parser{path, testPath("run-control-output")};
     auto context = parser.read();
@@ -682,6 +717,27 @@ TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[o
     REQUIRE(context.run.enableAse == false);
     REQUIRE(context.run.pumpSteps == 50u);
     REQUIRE(context.run.timeIntegration.method == "frozen-phi-ase-runge-kutta-4");
+    REQUIRE(context.run.pump.rayCount == 1234u);
+    REQUIRE(context.run.pump.rngSeed == 99u);
+    REQUIRE(context.run.pump.sources.size() == 1u);
+    REQUIRE(context.run.pump.sources.front().totalPower == 12.5);
+    REQUIRE(context.run.pump.sources.front().relays.front().transmission == 0.75);
+}
+
+TEST_CASE("openPMD parser rejects legacy compiled pump run control", "[openpmd][parser]")
+{
+    auto const path = writeParserInput(
+        "legacy_pump_run_control",
+        [](io::Series& series, io::Iteration& iteration)
+        {
+            (void) series;
+            iteration.setAttribute("time_step", 1.0e-5);
+            iteration.setAttribute("number_of_steps", 1u);
+            iteration.setAttribute("pump_routine", std::string{"one-dimensional-z-traversal"});
+        });
+    auto const error = parserError(path);
+    REQUIRE(error.find("pump_schema_version") != std::string::npos);
+    REQUIRE(error.find("general pump schema") != std::string::npos);
 }
 
 TEST_CASE("openPMD parser rejects malformed fields before HostMesh construction", "[openpmd][parser]")

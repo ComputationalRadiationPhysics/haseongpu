@@ -25,12 +25,13 @@ requiredHaseApi = (
     "MeshTopology",
     "OpenPmdBackends",
     "PhiASE",
+    "PumpAngularDistribution",
     "PumpProperties",
-    "PumpRadiationProfile",
+    "PumpSource",
+    "PumpSpectrum",
     "SpectralDecomposition",
+    "SuperGaussianPumpProfile",
     "VolumeTopology",
-    "Constants",
-    "oneDimensionalZTraversalPumpRate",
 )
 
 
@@ -118,7 +119,10 @@ GainMedium = _hase_api.GainMedium
 Grid = _hase_api.Grid
 MeshTopology = _hase_api.MeshTopology
 PhiASE = _hase_api.PhiASE
+PumpAngularDistribution = _hase_api.PumpAngularDistribution
 PumpProperties = _hase_api.PumpProperties
+PumpSource = _hase_api.PumpSource
+PumpSpectrum = _hase_api.PumpSpectrum
 SpectralDecomposition = _hase_api.SpectralDecomposition
 
 import numpy as np
@@ -223,10 +227,11 @@ def smallGainMedium(smallTopology):
 
 @pytest.fixture
 def pumpProperties(crossSections):
-    return PumpProperties(
-        spectralProperties=crossSections,
-        intensity=16e3,
-        pumpSubsteps=100,
-        wavelength=940e-9,
-        radiusX=1.5,
+    source = PumpSource(
+        surfaceDomains=(1,),
+        totalPower=1.0,
+        spectrum=PumpSpectrum.monochromatic(940e-9),
+        crossSections=crossSections,
+        angularDistribution=PumpAngularDistribution.collimated(),
     )
+    return PumpProperties(sources=(source,), rayCount=256, rngSeed=17)

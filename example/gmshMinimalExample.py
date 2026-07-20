@@ -18,7 +18,11 @@ from HASEonGPU import (
     GainMedium,
     MeshTopology,
     PhiASE,
+    PlanarPumpRelay,
     PumpProperties,
+    PumpSource,
+    PumpSpectrum,
+    SuperGaussianPumpProfile,
     RungeKutta4,
     Simulation,
     SpectralDecomposition,
@@ -116,16 +120,16 @@ def main():
             crossSectionEmission=[2.0e-20, 2.48e-20],
             resolution=2,
         )
-        pump = PumpProperties(
-            spectralProperties=cross_sections_data,
-            intensity=16e3,  # [W/cm^2]
-            pumpSubsteps=100,
-            wavelength=940e-9,  # [m]
-            radiusX=1.5,
-            radiusY=1.5,
-            superGaussianOrder=40,
-            myCustomVar=6,
+        pump_profile = SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.5, exponent=40)
+        pump_source = PumpSource(
+            surfaceDomains=(1,),
+            totalPower=16e3 * 16.0,
+            spectrum=PumpSpectrum.monochromatic(940e-9),
+            crossSections=cross_sections_data,
+            profile=pump_profile,
+            relays=(PlanarPumpRelay.retroreflect((2,)),),
         )
+        pump = PumpProperties(sources=(pump_source,), rayCount=100000)
 
         phi_ase = PhiASE(
             spectralProperties=cross_sections_data,

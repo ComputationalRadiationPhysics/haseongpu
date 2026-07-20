@@ -196,7 +196,7 @@ other simulations: set ``enableASE=False`` for pump-only evolution, or use
    :end-before: # docs:end: simulation
 
 Use ``runSteps(150, pumpSteps=50)`` to pump only the first 50 outer steps, or
-``runUntil(endTime=1e-3)`` for a time target. ``pumpSubsteps`` instead controls
+``runUntil(endTime=1e-3)`` for a time target. ``rayCount`` instead controls
 the internal resolution of one pumped step. ``onInit`` is available before the
 backend launch; per-step Python mutation through ``beforeStep`` is unsupported.
 

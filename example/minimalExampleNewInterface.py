@@ -17,7 +17,11 @@ from HASEonGPU import (
     PhiASE,
     PrimitiveFieldSpec,
     PrismSchema,
+    PlanarPumpRelay,
     PumpProperties,
+    PumpSource,
+    PumpSpectrum,
+    SuperGaussianPumpProfile,
     RungeKutta4,
     Simulation,
     SpectralDecomposition,
@@ -90,16 +94,16 @@ def main():
     print("spectral fields:", cross_sections_data.getFields())
     # docs:end: spectral-decomposition
     # docs:start: pump-properties
-    pump = PumpProperties(
-        spectralProperties=cross_sections_data,
-        intensity=16e3, # [W/cm^2]
-        pumpSubsteps=100,
-        wavelength=940e-9, # [m]
-        radiusX=1.5,
-        radiusY=1.5,
-        exponent=40,
-        backReflection=True,
+    pump_profile = SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.5, exponent=40)
+    pump_source = PumpSource(
+        surfaceDomains=(1,),
+        totalPower=16e3 * 16.0,
+        spectrum=PumpSpectrum.monochromatic(940e-9),
+        crossSections=cross_sections_data,
+        profile=pump_profile,
+        relays=(PlanarPumpRelay.retroreflect((2,)),),
     )
+    pump = PumpProperties(sources=(pump_source,), rayCount=100000)
     # docs:end: pump-properties
 
 

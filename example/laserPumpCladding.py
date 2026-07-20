@@ -30,6 +30,12 @@ from HASEonGPU import (  # noqa: E402
     CrossSectionData,
     FrozenPhiAseRungeKutta4,
     GainMedium,
+    integratePumpProfile,
+    PlanarPumpRelay,
+    PumpAngularDistribution,
+    PumpSource,
+    PumpSpectrum,
+    SuperGaussianPumpProfile,
     VolumeTopology,
     backendFlat,
     PhiASE,
@@ -37,7 +43,6 @@ from HASEonGPU import (  # noqa: E402
     Simulation,
     SurfaceOptics,
     vtkWedge,
-    writeParaviewState,
 )
 
 
@@ -272,6 +277,8 @@ def runExample(
     enableASE=True,
     prePump=True,
     spectralResolution=1000,
+    pumpRayCount=50000,
+    pumpRngSeed=5489,
     reportTimings=False,
     **AseOverride,
 ):
@@ -311,20 +318,27 @@ def runExample(
     if openpmdBackend != "UseConfig" : phiAse.openpmdBackend=openpmdBackend
 
 
-    pumpProperties=PumpProperties(
-                         crossSections=pumpCrossSections,
-                         intensity=16e3,
-                         pumpDuration=1e-6,
-                         pumpSubsteps=100,
-                         temporaryFluorescence=1.0,
-                         pumpSteps=pumpSteps,
-                         wavelength=pumpWavelength,
-                         radiusX=1.5,
-                         radiusY=1.5,
-                         exponent=40,
-                         backReflection=True,
-                         reflectivity=1.0,
-                         extraction=False)
+    pumpProfile = SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.5, exponent=40)
+    profileArea = (
+        integratePumpProfile(medium.topology, "ase_bottom", pumpProfile)
+        if hasattr(medium.topology, "facePointIndices")
+        else 1.0
+    )
+    pumpSource = PumpSource(
+        surfaceDomains=("ase_bottom",),
+        totalPower=16e3 * profileArea,
+        spectrum=PumpSpectrum.monochromatic(pumpWavelength),
+        crossSections=pumpCrossSections,
+        angularDistribution=PumpAngularDistribution.collimated(),
+        profile=pumpProfile,
+        relays=(PlanarPumpRelay.retroreflect("ase_top"),),
+    )
+    pumpProperties = PumpProperties(
+        sources=(pumpSource,),
+        rayCount=pumpRayCount,
+        rngSeed=pumpRngSeed,
+        pumpSteps=pumpSteps,
+    )
     print(f"Running simulation with backend {phiAse.backend}")
     print(f"Using openPMD backend {phiAse.openpmdBackend}")
     simulation = Simulation(
@@ -364,9 +378,8 @@ def main(argv=None):
         help=(
             "Number of outer simulation steps with pump contribution. "
             "Default: 100. Use a value matching --timeSteps to pump for the full run. "
-            "This is distinct from "
-            "PumpProperties.pumpSubsteps, which is the internal pump "
-            "integration resolution."
+            "This is distinct from PumpProperties.rayCount, which controls "
+            "the Monte Carlo pump sampling resolution."
         ),
     )
     parser.add_argument(
@@ -390,6 +403,11 @@ def main(argv=None):
     parser.add_argument("--tet4-input", type=Path, default=None)
     parser.add_argument("--phiase-only", action="store_true")
     parser.add_argument("--rng-seed", type=int, default=None)
+    parser.add_argument(
+        "--pump-ray-count", type=int, default=50000,
+        help="Equal-power launch rays per pump source. Default: 50000.",
+    )
+    parser.add_argument("--pump-rng-seed", type=int, default=5489)
     parser.add_argument(
         "--spectral-resolution",
         type=int,
@@ -442,6 +460,8 @@ def main(argv=None):
         prePump=not args.disable_pre_pump,
         spectralResolution=args.spectral_resolution,
         reportTimings=args.timings,
+        pumpRayCount=args.pump_ray_count,
+        pumpRngSeed=args.pump_rng_seed,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")

@@ -1,69 +1,69 @@
 PumpProperties
 ==============
 
-``PumpProperties`` defines the pump contribution to a compiled
-``Simulation``. The Python object is a compact physical description; the
-C++/Alpaka backend performs the one-dimensional z traversal and beta update.
+The compiled pump is a boundary-launched Monte Carlo transport model. Pump
+power is normalized explicitly: every source supplies total power, a normalized
+spatial profile, a normalized discrete spectrum, and a normalized angular
+distribution.
+
+A monochromatic collimated source is configured as follows:
 
 .. code-block:: python
 
-   from HASEonGPU import PumpProperties
-
-   pump = PumpProperties(
-       spectralProperties=spectra,
-       intensity=16e3,       # W / cm^2
-       wavelength=940e-9,    # m
-       radiusX=1.5,
-       radiusY=1.5,
-       exponent=40,
-       pumpSubsteps=100,
-       backReflection=True,
-       reflectivity=1.0,
+   from HASEonGPU import (
+       PumpAngularDistribution, PumpProperties, PumpSource, PumpSpectrum,
+       SuperGaussianPumpProfile,
    )
 
-Required Inputs
----------------
+   profile = SuperGaussianPumpProfile(
+       radiusU=1.5, radiusV=1.5, exponent=40,
+       center=(0, 0, 0), axisU=(1, 0, 0), axisV=(0, 1, 0),
+   )
+   source = PumpSource(
+       surfaceDomains=("pump_input",),
+       totalPower=100000.0,
+       spectrum=PumpSpectrum.monochromatic(940e-9),
+       crossSections=pump_cross_sections,
+       angularDistribution=PumpAngularDistribution.collimated(),
+       profile=profile,
+   )
+   pump = PumpProperties(
+       sources=(source,), rayCount=100000, rngSeed=5489, pumpSteps=50,
+   )
 
-``intensity`` is the incident intensity in ``W / cm^2``. Supply
-``spectralProperties`` (or ``crossSections``) for the absorption and emission
-cross sections. With spectra, the wavelength defaults to the first absorption
-wavelength; otherwise provide a wavelength and monochromatic absorption and
-emission cross sections. ``radiusX`` is required and ``radiusY`` defaults to
-``radiusX``.
+``surfaceDomains`` are tagged exterior triangle domains. Multiple independent
+sources may be supplied. ``UniformPumpProfile`` distributes power uniformly;
+``SuperGaussianPumpProfile`` defines a world-space elliptical profile.
+``PumpAngularDistribution.uniformCone`` and an explicit ``PumpSpectrum`` enable
+finite-divergence and multi-wavelength pumps. Cross sections are interpolated
+at every discrete pump wavelength before transport.
 
-The transverse inlet profile is a super-Gaussian,
-
-.. math::
-
-   I(x,y) = I_0 \exp[-r^p], \qquad
-   r = \sqrt{x^2/r_y^2 + y^2/r_x^2},
-
-where ``exponent`` is :math:`p` (default 40). ``intensityAt(points)`` evaluates
-this profile in Python for diagnostics.
-
-Compiled Pump Model
+Power normalization
 -------------------
 
-The ``one-dimensional-z-traversal`` routine evaluates the inlet profile at
-each transverse point and propagates it through the z levels using the current
-excited-state fraction. It exposes the resulting local pump rate to the compiled
-time integrator. With ``backReflection=True``, a second pass starts at the far
-end with intensity scaled by ``reflectivity``. ``extraction=True`` suppresses
-the inlet pump.
+``totalPower`` is the integral over the selected source aperture. The profile
+only changes where that power is launched; it does not change total power.
+``integratePumpProfile(topology, domains, profile)`` can convert a legacy peak
+intensity to total power on a tagged triangular aperture.
 
-``pumpSteps`` limits the number of *outer* simulation steps that receive pump
-energy; set it on the object or pass it to ``Simulation.runSteps``. The retained
-``pumpSubsteps`` setting is currently ignored by the compiled traversal and does
-not count outer simulation steps.
+Planar relays and passes
+------------------------
 
-Limits and Utilities
---------------------
+``PlanarPumpRelay`` maps rays leaving tagged, coplanar exit faces to tagged,
+coplanar entry faces. It supports flips, in-plane rotation, offset, tilt,
+magnification, and transmission. Relays are evaluated in source order and may
+represent return passes. ``PlanarPumpRelay.retroreflect("pump_output")`` is the
+unit-magnification same-aperture return used to approximate the former
+back-reflected z traversal.
 
-Compiled simulations accept the built-in routine only. A ``solver`` custom
-property is retained to detect legacy configurations, but causes a clear error
-before launch rather than running Python code between backend steps.
+Rays that miss the mapped entry aperture are vignetted. Coating physics,
+polarization, residual cavity recirculation, and arbitrary Python callbacks are
+not part of this core model.
 
-Use ``PumpProperties.superGaussian(...)`` for an explicit shaped-beam
-constructor. ``getProperty``, ``withProperty``, and ``withProperties`` manage
-additional metadata; ``toDict`` and ``modeDict`` expose the serialized
-low-level values for advanced diagnostics.
+Sampling controls
+-----------------
+
+``rayCount`` is the number of equal-power launch rays per source and is
+independent of PhiASE ray counts. ``rngSeed`` makes host-side source sampling
+reproducible. ``pumpSteps`` limits pump contribution to the first outer time
+steps; it may also be overridden by ``Simulation.runSteps(..., pumpSteps=...)``.

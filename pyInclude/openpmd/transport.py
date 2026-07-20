@@ -1594,14 +1594,8 @@ def _time_integrator_name(solver):
 
 def _simulation_run_control(simulation, *, steps, pumpSteps):
     pump = simulation.pump
-    if pump.solver is not None:
-        raise ValueError(
-            "compiled Simulation does not support custom Python pump solvers; "
-            "configure the built-in one-dimensional-z-traversal pump instead"
-        )
-    pump_dict = pump.toDict(timeFrame=simulation.timeStep)
     if pumpSteps is None:
-        pumpSteps = pump.getProperty("pumpSteps")
+        pumpSteps = pump.pumpSteps
     pump_steps_value = (2**32 - 1) if pumpSteps is None else int(pumpSteps)
     if pump_steps_value < 0:
         raise ValueError("pumpSteps must be non-negative")
@@ -1613,26 +1607,143 @@ def _simulation_run_control(simulation, *, steps, pumpSteps):
         "pre_pump": bool(getattr(simulation, "prePump", False)),
         "pump_steps": pump_steps_value,
         "time_integrator": _time_integrator_name(solver),
-        "pump_routine": "one-dimensional-z-traversal",
-        "pump_intensity": float(pump.intensity),
-        "pump_wavelength": float(pump.wavelength),
-        "pump_radius_x": float(pump.radiusX),
-        "pump_radius_y": float(pump.radiusY),
-        "pump_exponent": float(pump.exponent),
-        "pump_duration": float(pump.activeDuration(simulation.timeStep)),
-        "pump_substeps": int(pump.pumpSubsteps),
-        "pump_sigma_absorption": float(np.asarray(pump_dict["s_abs"], dtype=np.float64).reshape(-1)[0]),
-        "pump_sigma_emission": float(np.asarray(pump_dict["s_ems"], dtype=np.float64).reshape(-1)[0]),
-        "pump_back_reflection": bool(pump.backReflection),
-        "pump_reflectivity": float(pump.reflectivity),
-        "pump_extraction": bool(pump.extraction),
-        "pump_temporary_fluorescence": 0.0 if pump.temporaryFluorescence is None else float(pump.temporaryFluorescence),
+        "pump_schema_version": 1,
+        "pump_ray_count": int(pump.rayCount),
+        "pump_rng_seed": int(pump.rngSeed),
     }
+    control.update(_general_pump_attributes(simulation))
     if hasattr(solver, "iterations"):
         control["implicit_iterations"] = int(solver.iterations)
     if hasattr(solver, "tolerance"):
         control["implicit_tolerance"] = float(solver.tolerance)
     return control
+
+
+def _resolve_surface_domains(topology, domains):
+    domain_map = topology.surfaceDomainMap()
+    return [int(domain_map.resolve(domain)) if isinstance(domain, str) else int(domain) for domain in domains]
+
+
+def _append_offset(values, offsets, additions):
+    values.extend(additions)
+    offsets.append(len(values))
+
+
+def _general_pump_attributes(simulation):
+    """Flatten the general pump graph into openPMD iteration attributes."""
+    topology = simulation.gainMedium.topology
+    pump = simulation.pump
+    source_surfaces, source_surface_offsets = [], [0]
+    spectrum_wavelengths, spectrum_weights, spectrum_sigma_a, spectrum_sigma_e = [], [], [], []
+    spectrum_offsets = [0]
+    angular_polar, angular_azimuthal, angular_weights, angular_offsets = [], [], [], [0]
+    profile_kind, profile_radius_u, profile_radius_v, profile_exponent = [], [], [], []
+    profile_center, profile_axis_u, profile_axis_v = [], [], []
+    source_relay_offsets = [0]
+    relay_exit_surfaces, relay_exit_offsets = [], [0]
+    relay_entry_surfaces, relay_entry_offsets = [], [0]
+    relay_flip_u, relay_flip_v, relay_rotation = [], [], []
+    relay_offset, relay_tilt, relay_magnification, relay_transmission = [], [], [], []
+    relay_count = 0
+
+    for source in pump.sources:
+        _append_offset(
+            source_surfaces,
+            source_surface_offsets,
+            _resolve_surface_domains(topology, source.surfaceDomains),
+        )
+        wavelengths = np.asarray(source.spectrum.wavelengths, dtype=np.float64)
+        _append_offset(spectrum_wavelengths, spectrum_offsets, wavelengths.tolist())
+        spectrum_weights.extend(np.asarray(source.spectrum.weights, dtype=np.float64).tolist())
+        spectrum_sigma_a.extend(float(source.crossSections.absorptionAt(wavelength)) for wavelength in wavelengths)
+        spectrum_sigma_e.extend(float(source.crossSections.emissionAt(wavelength)) for wavelength in wavelengths)
+        _append_offset(
+            angular_polar,
+            angular_offsets,
+            np.asarray(source.angularDistribution.polarAngles, dtype=np.float64).tolist(),
+        )
+        angular_azimuthal.extend(np.asarray(source.angularDistribution.azimuthalAngles, dtype=np.float64).tolist())
+        angular_weights.extend(np.asarray(source.angularDistribution.weights, dtype=np.float64).tolist())
+
+        profile = source.profile
+        is_super_gaussian = getattr(profile, "kind", "uniform") == "super-gaussian"
+        profile_kind.append(1 if is_super_gaussian else 0)
+        profile_radius_u.append(float(profile.radiusU) if is_super_gaussian else 1.0)
+        profile_radius_v.append(float(profile.radiusV) if is_super_gaussian else 1.0)
+        profile_exponent.append(float(profile.exponent) if is_super_gaussian else 2.0)
+        profile_center.extend(profile.center if is_super_gaussian else (0.0, 0.0, 0.0))
+        profile_axis_u.extend(profile.axisU if is_super_gaussian else (1.0, 0.0, 0.0))
+        profile_axis_v.extend(profile.axisV if is_super_gaussian else (0.0, 1.0, 0.0))
+
+        for relay in source.relays:
+            _append_offset(
+                relay_exit_surfaces,
+                relay_exit_offsets,
+                _resolve_surface_domains(topology, relay.exitDomains),
+            )
+            _append_offset(
+                relay_entry_surfaces,
+                relay_entry_offsets,
+                _resolve_surface_domains(topology, relay.entryDomains),
+            )
+            relay_flip_u.append(int(relay.flipU))
+            relay_flip_v.append(int(relay.flipV))
+            relay_rotation.append(float(relay.rotation))
+            relay_offset.extend(float(value) for value in relay.offset)
+            relay_tilt.extend(float(value) for value in relay.tilt)
+            relay_magnification.append(float(relay.magnification))
+            relay_transmission.append(float(relay.transmission))
+            relay_count += 1
+        source_relay_offsets.append(relay_count)
+
+    attributes = {
+        "pump_source_total_power": [float(source.totalPower) for source in pump.sources],
+        "pump_source_surface_offsets": source_surface_offsets,
+        "pump_source_surfaces": source_surfaces,
+        "pump_spectrum_offsets": spectrum_offsets,
+        "pump_spectrum_wavelengths": spectrum_wavelengths,
+        "pump_spectrum_weights": spectrum_weights,
+        "pump_spectrum_sigma_absorption": spectrum_sigma_a,
+        "pump_spectrum_sigma_emission": spectrum_sigma_e,
+        "pump_angular_offsets": angular_offsets,
+        "pump_angular_polar": angular_polar,
+        "pump_angular_azimuthal": angular_azimuthal,
+        "pump_angular_weights": angular_weights,
+        "pump_profile_kind": profile_kind,
+        "pump_profile_radius_u": profile_radius_u,
+        "pump_profile_radius_v": profile_radius_v,
+        "pump_profile_exponent": profile_exponent,
+        "pump_profile_center": profile_center,
+        "pump_profile_axis_u": profile_axis_u,
+        "pump_profile_axis_v": profile_axis_v,
+        "pump_source_relay_offsets": source_relay_offsets,
+        "pump_relay_exit_offsets": relay_exit_offsets,
+        "pump_relay_exit_surfaces": relay_exit_surfaces,
+        "pump_relay_entry_offsets": relay_entry_offsets,
+        "pump_relay_entry_surfaces": relay_entry_surfaces,
+        "pump_relay_flip_u": relay_flip_u,
+        "pump_relay_flip_v": relay_flip_v,
+        "pump_relay_rotation": relay_rotation,
+        "pump_relay_offset": relay_offset,
+        "pump_relay_tilt": relay_tilt,
+        "pump_relay_magnification": relay_magnification,
+        "pump_relay_transmission": relay_transmission,
+    }
+    unsigned_names = {
+        "pump_source_surface_offsets", "pump_source_surfaces", "pump_spectrum_offsets",
+        "pump_angular_offsets", "pump_profile_kind", "pump_source_relay_offsets",
+        "pump_relay_exit_offsets", "pump_relay_exit_surfaces",
+        "pump_relay_entry_offsets", "pump_relay_entry_surfaces",
+        "pump_relay_flip_u", "pump_relay_flip_v",
+    }
+    for name in unsigned_names:
+        attributes[name] = np.asarray(attributes[name], dtype=np.uint64)
+    # openPMD backends do not portably represent zero-length attributes. Relay
+    # offset arrays retain the zero-relay shape; empty relay payloads are omitted.
+    for name in tuple(attributes):
+        if name.startswith("pump_relay_") and np.asarray(attributes[name]).size == 0:
+            del attributes[name]
+    return attributes
 
 
 def _write_simulation_input(input_path, spec, simulation, run_control):

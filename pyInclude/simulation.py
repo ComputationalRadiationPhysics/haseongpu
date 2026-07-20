@@ -513,10 +513,8 @@ class Simulation:
             return self.phiASE.spectralProperties
         if self.phiASE.crossSections is not None:
             return self.phiASE.crossSections
-        if self.pump.spectralProperties is not None:
-            return self.pump.spectralProperties
-        if self.pump.crossSections is not None:
-            return self.pump.crossSections
+        if self.pump.sources:
+            return self.pump.sources[0].crossSections
         raise ValueError("Simulation requires spectral properties via Simulation.crossSections, phiASE, or pump")
 
     def onStep(self, callback, *args, **kwargs):
@@ -592,7 +590,7 @@ class Simulation:
             raise ValueError("compiled Simulation does not support Python beforeStep callbacks during C++-owned steps")
         self._runInitCallbacks()
         if pumpSteps is None and hasattr(self, "pump"):
-            pumpSteps = self.pump.getProperty("pumpSteps")
+            pumpSteps = self.pump.pumpSteps
         if pumpSteps is not None and int(pumpSteps) < 0:
             raise ValueError("pumpSteps must be non-negative")
 
