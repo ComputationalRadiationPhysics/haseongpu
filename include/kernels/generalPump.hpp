@@ -409,7 +409,7 @@ namespace hase::kernels
         hase::core::HostMesh const& mesh,
         std::vector<int> const& domains)
     {
-        RelayFrame frame;
+        RelayFrame frame{};
         frame.faces = pumpBoundaryFaces(mesh, domains);
         if(frame.faces.empty())
             throw std::runtime_error("pump relay selected no exterior faces");
