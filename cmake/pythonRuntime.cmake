@@ -10,8 +10,20 @@ add_dependencies(calcPhiASE HaseAlpakaBackendNames HaseOpenPmdBackendProbe)
 # Wheels do not vendor openPMD-api runtime libraries or generated Python
 # bindings. The frontend uses the matching provider from its runtime environment.
 set(HASE_USE_SYSTEM_OPENPMD_PY True)
-string(REPLACE "\\" "\\\\" HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}")
-string(REPLACE "\"" "\\\"" HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED "${HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED}")
+string(
+    REPLACE
+    "\\"
+    "\\\\"
+    HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED
+    "${HASE_OPENPMD_PYTHON_PACKAGE_DIR}"
+)
+string(
+    REPLACE
+    "\""
+    "\\\""
+    HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED
+    "${HASE_OPENPMD_PYTHON_PACKAGE_DIR_ESCAPED}"
+)
 
 file(MAKE_DIRECTORY "${HASE_PYTHON_RUNTIME_DIR}")
 configure_file(
@@ -20,19 +32,31 @@ configure_file(
     @ONLY
 )
 
-foreach(HASE_RUNTIME_TARGET IN ITEMS calcPhiASE HaseAlpakaBackendNames HaseOpenPmdBackendProbe)
+foreach(
+    HASE_RUNTIME_TARGET
+    IN
+    ITEMS calcPhiASE HaseAlpakaBackendNames HaseOpenPmdBackendProbe
+)
     add_custom_command(
         TARGET ${HASE_RUNTIME_TARGET}
         POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:${HASE_RUNTIME_TARGET}>"
             "${HASE_PYTHON_RUNTIME_DIR}/$<TARGET_FILE_NAME:${HASE_RUNTIME_TARGET}>"
-        COMMENT "Copying ${HASE_RUNTIME_TARGET} to the private HASE Python runtime"
+        COMMENT
+            "Copying ${HASE_RUNTIME_TARGET} to the private HASE Python runtime"
         VERBATIM
     )
 endforeach()
 
 install(TARGETS calcPhiASE RUNTIME DESTINATION pyInclude/_runtime)
-install(TARGETS HaseAlpakaBackendNames HaseOpenPmdBackendProbe LIBRARY DESTINATION pyInclude/_runtime)
-install(FILES "${HASE_PYTHON_RUNTIME_DIR}/_config.py" DESTINATION pyInclude/_runtime)
+install(
+    TARGETS HaseAlpakaBackendNames HaseOpenPmdBackendProbe
+    LIBRARY DESTINATION pyInclude/_runtime
+)
+install(
+    FILES "${HASE_PYTHON_RUNTIME_DIR}/_config.py"
+    DESTINATION pyInclude/_runtime
+)
 install(FILES HASEonGPU.py DESTINATION .)

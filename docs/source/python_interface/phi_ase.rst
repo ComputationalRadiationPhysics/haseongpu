@@ -92,9 +92,8 @@ Backend and Parallel Settings
 ``parallelMode``
    Backend compute mode written to the openPMD ``parallel_mode`` metadata.
    ``"single"`` runs without MPI communication inside one launched process.
-   ``"mpi"`` is meaningful when ``calcPhiASE`` is launched under MPI, for
-   example through the transport ``command_prefix`` helper or directly with
-   ``mpiexec``. Setting this value alone does not create MPI ranks.
+   ``"mpi"`` makes the Python frontend launch ``calcPhiASE`` through
+   ``mpiexec``. The number of ranks per allocated node comes from ``nPerNode``.
 
 ``numDevices``
    Maximum number of devices made available on each node for the compute run.
@@ -102,10 +101,10 @@ Backend and Parallel Settings
    that are active on the same node.
 
 ``nPerNode``
-   Launcher setting for Python paths that explicitly call ``mpiexec``. It is
-   not serialized as a HASE openPMD transport attribute. See :doc:`../mpi` and
-   :doc:`../openpmdTransport` for the interaction between process launching,
-   ``parallelMode``, and ``numDevices``.
+   Number of MPI ranks launched per allocated node when ``parallelMode`` is
+   ``"mpi"``. It is not serialized as a HASE openPMD transport attribute. See
+   :doc:`../mpi` and :doc:`../openpmdTransport` for the interaction between
+   process launching, ``parallelMode``, and ``numDevices``.
 
 ``minSampleRange`` and ``maxSampleRange``
    Optional inclusive sample-index range.  When omitted, all beta samples

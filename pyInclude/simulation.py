@@ -86,7 +86,7 @@ class PhiASE:
     numDevices: int = 1
     """Maximum compute devices made available to the lower-level run."""
     nPerNode: int = 1
-    """MPI launcher ranks per node when ``parallelMode`` is ``mpi``."""
+    """MPI ranks per node launched automatically when ``parallelMode`` is ``mpi``."""
     writeVtk: bool = False
     """Request VTK output from lower-level compute paths when supported."""
     devices: list[int] = field(default_factory=list)
@@ -248,9 +248,27 @@ class PhiASE:
             attributes["rngSeed"] = int(self.rngSeed)
         return attributes
 
+    def _transportLaunchOptions(self):
+        if str(self.parallelMode).strip().lower() != "mpi":
+            return {}
+        if isinstance(self.nPerNode, bool) or not isinstance(self.nPerNode, (int, np.integer)):
+            raise ValueError("nPerNode must be a positive integer for MPI execution")
+        ranks_per_node = int(self.nPerNode)
+        if ranks_per_node < 1:
+            raise ValueError("nPerNode must be a positive integer for MPI execution")
+        return {
+            "command_prefix": ["mpiexec", "-npernode", str(ranks_per_node)],
+            # A scheduler allocation commonly spans nodes. Keep file-based
+            # openPMD artifacts below the launch directory instead of /tmp so
+            # they are visible when that directory is on shared storage.
+            "workspace_dir": Path.cwd() / "IO" / "phiase_mpi",
+        }
+
     def openStream(self, **kwargs):
         """Open a persistent openPMD transport session owned by this ``PhiASE``."""
         if self._openpmdSession is None:
+            for name, value in self._transportLaunchOptions().items():
+                kwargs.setdefault(name, value)
             if self.openpmdBackend is not None and "transport" not in kwargs:
                 kwargs["transport"] = self.openpmdBackend
             self._openpmdSession = transport.openStream(**kwargs)
@@ -282,12 +300,14 @@ class PhiASE:
         elif openpmdSession == "interval":
             openpmdSession = None
 
+        launch_options = {} if openpmdSession is not None else self._transportLaunchOptions()
         self._result = transport.runPhiASE(
             self,
             medium,
             cross_sections,
             transport=self.openpmdBackend,
             openpmdSession=openpmdSession,
+            **launch_options,
         )
         return self
 

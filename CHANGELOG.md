@@ -9,6 +9,8 @@ text-file compatibility paths were removed. The Python frontend now packages
 the standalone backend and discovery libraries privately, selects a compatible
 openPMD backend automatically (SST, ADIOS, then HDF5), and documents the
 provider/runtime contract, migration path, and corrected transport diagnostics.
+In MPI mode, the frontend again uses ``nPerNode`` to launch ``calcPhiASE``
+through ``mpiexec`` automatically while exchanging data through openPMD.
 The bundled openPMD-api provider is updated to 0.17.1; CI retains coverage for
 both 0.17.0 and 0.17.1 system-provider installations.
 

@@ -6,8 +6,9 @@
 
 
 import argparse
-
 from types import SimpleNamespace
+
+import pytest
 
 from pyInclude import PhiASE
 import pyInclude.simulation as simulation_module
@@ -91,11 +92,13 @@ def test_phiAseLoadsOpenPmdBackendFromConfig():
 
 def test_phiAseMpiRunMetadata(
     monkeypatch,
+    tmp_path,
     smallGainMedium,
     crossSections,
     phiAseTestConfigPath,
 ):
     captured = {}
+    monkeypatch.chdir(tmp_path)
 
     def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
         captured["nPerNode"] = phiAse.nPerNode
@@ -104,6 +107,8 @@ def test_phiAseMpiRunMetadata(
         captured["gain_medium"] = gainMedium
         captured["spectral_properties"] = spectralProperties
         captured["openpmd_session"] = kwargs.get("openpmdSession")
+        captured["command_prefix"] = kwargs.get("command_prefix")
+        captured["workspace_dir"] = kwargs.get("workspace_dir")
         return DummyResult()
 
     monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
@@ -123,6 +128,48 @@ def test_phiAseMpiRunMetadata(
     assert captured["gain_medium"] is smallGainMedium
     assert captured["spectral_properties"] is crossSections
     assert captured["openpmd_session"] is None
+    assert captured["command_prefix"] == ["mpiexec", "-npernode", "2"]
+    assert captured["workspace_dir"] == tmp_path / "IO" / "phiase_mpi"
+
+
+def test_phiAseMpiPersistentSessionUsesConfiguredRanks(monkeypatch, tmp_path):
+    captured = {}
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "openStream",
+        lambda **kwargs: captured.update(kwargs) or object(),
+    )
+
+    PhiASE(parallelMode="mpi", nPerNode=3).openStream()
+
+    assert captured["command_prefix"] == ["mpiexec", "-npernode", "3"]
+    assert captured["workspace_dir"] == tmp_path / "IO" / "phiase_mpi"
+    assert captured["transport"] == "auto"
+
+
+def test_phiAseMpiPersistentSessionAllowsLauncherOverride(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "openStream",
+        lambda **kwargs: captured.update(kwargs) or object(),
+    )
+
+    PhiASE(parallelMode="mpi", nPerNode=3).openStream(command_prefix=["srun"])
+
+    assert captured["command_prefix"] == ["srun"]
+
+
+def test_phiAseMpiRejectsInvalidRanksPerNode(monkeypatch):
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "openStream",
+        lambda **kwargs: pytest.fail("invalid MPI configuration must not open a transport"),
+    )
+
+    with pytest.raises(ValueError, match="nPerNode must be a positive integer"):
+        PhiASE(parallelMode="mpi", nPerNode=0).openStream()
 
 
 def test_phiAseRunUsesProvidedOpenPmdSession(

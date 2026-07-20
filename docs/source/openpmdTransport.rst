@@ -145,21 +145,24 @@ The standalone binary reads the same transport layout under MPI:
        --input-path=input.sst \
        --output-path=output.sst
 
-Python can also launch the binary through the transport helper:
+The high-level Python frontend launches the binary automatically when MPI mode
+is selected:
 
 .. code-block:: python
 
-   result = transport.runPhiASE(
-       phi_ase,
-       medium,
-       spectra,
-       transport="adios-sst",
-       launcher="mpi",
-       n_per_node=4,
-   )
+   import HASEonGPU
 
-The ``parallel_mode`` metadata configures backend computation.  The number of
-processes is controlled by the MPI launcher or scheduler.
+   phi_ase = HASEonGPU.PhiASE(
+       parallelMode="mpi",
+       nPerNode=4,
+       openpmdBackend="adios-sst",
+   )
+   phi_ase.run(gainMedium=medium, crossSections=spectra)
+
+The scheduler controls the node allocation, while ``nPerNode`` controls the
+number of ranks launched on each allocated node. File-based transport data is
+created below ``./IO/phiase_mpi`` so the launch directory must be shared for a
+multi-node run.
 
 Artifact Retention
 ------------------

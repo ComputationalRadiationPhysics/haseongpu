@@ -34,21 +34,24 @@ nodes.
 Runtime Settings
 ----------------
 
-These values are set through ``PhiASE`` or YAML and serialized into the openPMD
-compute metadata.  The actual process topology is controlled by ``mpiexec`` or
-your scheduler.
+These values are set through ``PhiASE`` or YAML. The scheduler supplies the
+node allocation; for ``parallelMode="mpi"``, the Python frontend starts
+``calcPhiASE`` with ``mpiexec -npernode <nPerNode>`` inside that allocation.
 
 ``parallelMode`` / ``parallel_mode``
-   ``single`` runs without MPI.  ``mpi`` expects the executable to be launched
-   under MPI and splits samples across ranks.
+   ``single`` runs without MPI. ``mpi`` launches the executable under MPI and
+   splits samples across ranks.
 
 ``numDevices``
    Maximum number of local devices one node should use.  In MPI mode,
    HASEonGPU divides those devices across ranks on the same node.
 
 ``nPerNode`` / ``n_per_node``
-   Number of MPI ranks per node for Python helper launch paths that call
-   ``mpiexec``.  Schedulers may provide the same layout directly.
+   Number of MPI ranks per allocated node passed to ``mpiexec -npernode``.
+
+The frontend places temporary file-based openPMD transport data below
+``./IO/phiase_mpi``. For multi-node runs, launch HASE from a working directory
+that is visible on every allocated node.
 
 Common Layouts
 --------------
