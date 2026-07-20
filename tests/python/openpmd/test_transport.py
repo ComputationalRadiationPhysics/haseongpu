@@ -15,7 +15,7 @@ import pyInclude.openpmd.transport as transport
 from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
 from pyInclude import AlpakaBackends
 from pyInclude.geometry import GainMedium, MeshTopology, VolumeTopology
-from pyInclude.laser import CrossSectionData
+from pyInclude.laser import (CrossSectionData, PlanarPumpRelay, PumpAngularDistribution, PumpProperties, PumpSource, PumpSpectrum, SuperGaussianPumpProfile)
 from pyInclude.openpmd import HASE_TRANSPORT_VERSION, PrimitiveFieldSpec, PrismSchema, backendFlat, backendFlatArray, fieldSpec, haseTransportAttributes, primitiveView, spectralContext, unitDimension
 from pyInclude.simulation import PhiASE
 
@@ -1671,34 +1671,23 @@ def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
     assert state.aseResult.srmDivergenceStreak == 3
 
 
-def test_simulation_run_control_serializes_compiled_solver_metadata():
-    class Pump:
-        solver = None
-        intensity = 16e3
-        wavelength = 940e-9
-        radiusX = 1.5
-        radiusY = 1.25
-        exponent = 40
-        pumpSubsteps = 12
-        backReflection = False
-        reflectivity = 0.75
-        extraction = True
-        temporaryFluorescence = 1.0e-3
-
-        def toDict(self, *, timeFrame):
-            assert timeFrame == 2.0e-6
-            return {"s_abs": np.array([1.0e-22]), "s_ems": np.array([2.0e-22])}
-
-        def getProperty(self, name):
-            assert name == "pumpSteps"
-            return 4
-
-        def activeDuration(self, time_step):
-            assert time_step == 2.0e-6
-            return 3.0e-6
-
+def test_simulation_run_control_serializes_general_pump_graph():
+    cross_sections = CrossSectionData.monochromatic(
+        wavelength=940e-9, crossSectionAbsorption=1.0e-22, crossSectionEmission=2.0e-22
+    )
+    source = PumpSource(
+        surfaceDomains=(11,),
+        totalPower=12.5,
+        spectrum=PumpSpectrum.monochromatic(940e-9),
+        crossSections=cross_sections,
+        angularDistribution=PumpAngularDistribution.collimated(),
+        profile=SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.25, exponent=40),
+        relays=(PlanarPumpRelay.retroreflect((12,), transmission=0.75),),
+    )
+    pump = PumpProperties(sources=(source,), rayCount=1234, rngSeed=99, pumpSteps=4)
     simulation = SimpleNamespace(
-        pump=Pump(),
+        pump=pump,
+        gainMedium=SimpleNamespace(topology=SimpleNamespace(surfaceDomainMap=lambda: None)),
         timeStep=2.0e-6,
         timeIntegrationSolver=SimpleNamespace(name="implicit-euler", iterations=5, tolerance=1.0e-7),
     )
@@ -1709,31 +1698,22 @@ def test_simulation_run_control_serializes_compiled_solver_metadata():
     assert control["number_of_steps"] == 7
     assert control["enable_ase"] is True
     assert control["pump_steps"] == 4
+    assert control["pump_schema_version"] == 1
+    assert control["pump_ray_count"] == 1234
+    assert control["pump_rng_seed"] == 99
+    assert control["pump_source_total_power"] == [12.5]
+    assert control["pump_source_surfaces"].tolist() == [11]
+    assert control["pump_spectrum_wavelengths"] == [940e-9]
+    assert control["pump_spectrum_sigma_absorption"] == [1.0e-22]
+    assert control["pump_source_relay_offsets"].tolist() == [0, 1]
+    assert control["pump_relay_exit_surfaces"].tolist() == [12]
+    assert control["pump_relay_transmission"] == [0.75]
     assert control["time_integrator"] == "implicit-euler"
     assert control["implicit_iterations"] == 5
     assert control["implicit_tolerance"] == 1.0e-7
-    assert control["pump_routine"] == "one-dimensional-z-traversal"
-    assert control["pump_duration"] == 3.0e-6
-    assert control["pump_substeps"] == 12
-    assert control["pump_sigma_absorption"] == 1.0e-22
-    assert control["pump_sigma_emission"] == 2.0e-22
-    assert control["pump_back_reflection"] is False
-    assert control["pump_extraction"] is True
 
     simulation.enableASE = False
-    disabled_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
-    assert disabled_control["enable_ase"] is False
-
-    simulation.timeIntegrationSolver = SimpleNamespace(name="frozen-phi-ase-runge-kutta-4")
-    frozen_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
-    assert frozen_control["time_integrator"] == "frozen-phi-ase-runge-kutta-4"
-
-
-def test_simulation_run_control_rejects_custom_python_pump_solver():
-    simulation = SimpleNamespace(pump=SimpleNamespace(solver=object()))
-
-    with pytest.raises(ValueError, match="custom Python pump solvers"):
-        transport._simulation_run_control(simulation, steps=1, pumpSteps=None)
+    assert transport._simulation_run_control(simulation, steps=7, pumpSteps=None)["enable_ase"] is False
 
 
 def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypatch, tmp_path):

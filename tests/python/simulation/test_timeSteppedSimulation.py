@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -197,7 +198,7 @@ def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
     pumpProperties,
     crossSections,
 ):
-    pumpProperties.customProperties["pumpSteps"] = 1
+    pumpProperties = replace(pumpProperties, pumpSteps=1)
     simulation = Simulation(
         gainMedium=smallGainMedium,
         pump=pumpProperties,
@@ -262,7 +263,7 @@ def testInitCallbacksRunBeforeCompiledTransport(
 
     def init(simulation, label, enabled=False):
         events.append(("init", label, enabled, simulation.stepIndex))
-        simulation.pump.withProperty("initialized", True)
+        simulation._testInitialized = True
 
     simulation = Simulation(
         gainMedium=smallGainMedium,
@@ -276,7 +277,7 @@ def testInitCallbacksRunBeforeCompiledTransport(
     simulation.runSteps(1)
 
     assert events == [("init", "setup", True, 0)]
-    assert simulation.pump.getProperty("initialized") is True
+    assert simulation._testInitialized is True
     assert simulation.stepIndex == 3
     assert simulation.time == 3.0000000000000004e-5
 
@@ -315,66 +316,23 @@ def testCompiledSimulationRejectsExternalOpenPmdSessionOwnership(
         simulation.runSteps(1, openpmdSession="persistent")
 
 
-def testCompiledSimulationRejectsCustomPythonPumpSolver(
-    monkeypatch,
-    smallGainMedium,
-    crossSections,
-):
-    class ConstantPumpSolver:
-        def step(self, input, pump):
-            return input["betaCell"] + 0.25
-
-    monkeypatch.setattr(transport, "_ensure_backend_available", lambda backend: None)
-    monkeypatch.setattr(transport, "findCalcPhiAse", lambda: "calcPhiASE")
-    pump = PumpProperties(
-        spectralProperties=crossSections,
-        intensity=16e3,
-        pumpSubsteps=100,
-        solver=ConstantPumpSolver(),
-        wavelength=940e-9,
-    )
-
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pump,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
-    )
-
-    with pytest.raises(ValueError, match="custom Python pump solvers"):
-        simulation.step()
+def testPumpPropertiesRejectsEmptySources():
+    with pytest.raises(ValueError, match="at least one PumpSource"):
+        PumpProperties(sources=())
 
 
-def testDefaultPumpSolverRequiresGaussianRadius(crossSections):
-    try:
-        PumpProperties(
-            spectralProperties=crossSections,
-            intensity=16e3,
-            wavelength=940e-9,
-        )
-    except ValueError as exc:
-        assert "radiusX" in str(exc)
-    else:
-        raise AssertionError("default Gaussian pump accepted missing radiusX")
+def testPumpPropertiesValidatesDedicatedRayControls(pumpProperties):
+    with pytest.raises(ValueError, match="rayCount"):
+        replace(pumpProperties, rayCount=0)
+    with pytest.raises(ValueError, match="uint32"):
+        replace(pumpProperties, rngSeed=2**32)
 
 
-def testPumpPropertiesAcceptsArbitraryDirectKeywords(crossSections):
-    pump = PumpProperties(
-        spectralProperties=crossSections,
-        intensity=16e3,
-        pumpSubsteps=100,
-        wavelength=940e-9,
-        radiusX=1.5,
-        radiusY=1.5,
-        superGaussianOrder=40,
-        ji=3,
-    )
-
-    assert pump.getProperty("ji") == 3
-    assert pump.ji == 3
-    assert pump.radiusX == 1.5
-    assert pump.superGaussianOrder == 40
+def testPumpSourceHasExplicitNormalizedModel(pumpProperties):
+    source = pumpProperties.sources[0]
+    assert source.totalPower == 1.0
+    assert source.spectrum.weights.tolist() == [1.0]
+    assert source.angularDistribution.weights.tolist() == [1.0]
 
 
 def testTimeIntegrationSolverIsMandatory(

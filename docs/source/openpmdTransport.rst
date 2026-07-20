@@ -180,12 +180,8 @@ metadata:
   ``runge-kutta-4``, ``frozen-phi-ase-runge-kutta-4``,
   ``implicit-euler``, or ``exponential-euler``)
 * ``implicit_iterations`` and ``implicit_tolerance`` for implicit Euler
-* ``pump_routine`` (currently ``one-dimensional-z-traversal``)
-* pump parameters ``pump_intensity``, ``pump_wavelength``, ``pump_radius_x``,
-  ``pump_radius_y``, ``pump_exponent``, ``pump_duration``, ``pump_substeps``,
-  ``pump_sigma_absorption``, ``pump_sigma_emission``,
-  ``pump_back_reflection``, ``pump_reflectivity``, ``pump_extraction``, and
-  ``pump_temporary_fluorescence``
+* ``pump_schema_version`` (currently ``1``), ``pump_ray_count``, and ``pump_rng_seed``
+* flattened source, spectrum, angular, profile, and planar-relay arrays
 
 The C++ backend writes one output iteration per completed step. Snapshot
 iterations contain dynamic beta records plus ``core_result_phi_ase``,

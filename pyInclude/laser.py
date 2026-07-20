@@ -323,100 +323,232 @@ class CrossSectionData:
 SpectralDecomposition = CrossSectionData
 
 
+def _positive_normalized(values, name):
+    values = np.asarray(values, dtype=np.float64).reshape(-1)
+    if values.size == 0 or np.any(~np.isfinite(values)) or np.any(values < 0.0):
+        raise ValueError(f"{name} must contain finite non-negative values")
+    total = float(values.sum())
+    if total <= 0.0:
+        raise ValueError(f"{name} must have positive total weight")
+    return values / total
+
+
+def _unit_vector(value, name):
+    value = np.asarray(value, dtype=np.float64).reshape(-1)
+    if value.shape != (3,) or not np.all(np.isfinite(value)):
+        raise ValueError(f"{name} must be a finite three-vector")
+    length = float(np.linalg.norm(value))
+    if length <= 0.0:
+        raise ValueError(f"{name} must be non-zero")
+    return tuple(value / length)
+
+
 @dataclass(frozen=True)
-class Constants:
-    """Physical constants used by Python pump helper routines."""
+class PumpSpectrum:
+    """Discrete pump-power spectrum sampled by the compiled pump tracer."""
 
-    c: float = 299792458.0
-    h: float = 6.62607015e-34
-
-
-@dataclass(frozen=True)
-class PumpRadiationProfile:
-    """Beam profile used by the one-dimensional z-traversal pump helper."""
-
-    intensity: float
     wavelengths: object
-    waist: tuple[float, float]
+    weights: object
+
+    def __post_init__(self):
+        wavelengths = np.asarray(self.wavelengths, dtype=np.float64).reshape(-1)
+        weights = _positive_normalized(self.weights, "pump spectrum weights")
+        if wavelengths.size != weights.size:
+            raise ValueError("pump spectrum wavelengths and weights must have the same length")
+        if np.any(~np.isfinite(wavelengths)) or np.any(wavelengths <= 0.0):
+            raise ValueError("pump spectrum wavelengths must be finite and positive")
+        object.__setattr__(self, "wavelengths", wavelengths)
+        object.__setattr__(self, "weights", weights)
+
+    @classmethod
+    def monochromatic(cls, wavelength):
+        return cls([wavelength], [1.0])
+
+
+@dataclass(frozen=True)
+class PumpAngularDistribution:
+    """Discrete directions in a source face's inward-local frame."""
+
+    polarAngles: object
+    azimuthalAngles: object
+    weights: object
+
+    def __post_init__(self):
+        polar = np.asarray(self.polarAngles, dtype=np.float64).reshape(-1)
+        azimuthal = np.asarray(self.azimuthalAngles, dtype=np.float64).reshape(-1)
+        weights = _positive_normalized(self.weights, "pump angular weights")
+        if polar.size != azimuthal.size or polar.size != weights.size:
+            raise ValueError("pump angular angles and weights must have the same length")
+        if np.any(~np.isfinite(polar)) or np.any((polar < 0.0) | (polar >= 0.5 * np.pi)):
+            raise ValueError("pump polar angles must be finite and in [0, pi/2)")
+        if np.any(~np.isfinite(azimuthal)):
+            raise ValueError("pump azimuthal angles must be finite")
+        object.__setattr__(self, "polarAngles", polar)
+        object.__setattr__(self, "azimuthalAngles", azimuthal)
+        object.__setattr__(self, "weights", weights)
+
+    @classmethod
+    def collimated(cls):
+        return cls([0.0], [0.0], [1.0])
+
+    @classmethod
+    def uniformCone(cls, halfAngle, *, polarSamples=8, azimuthalSamples=16):
+        if halfAngle <= 0.0 or halfAngle >= 0.5 * np.pi:
+            raise ValueError("halfAngle must be in (0, pi/2)")
+        cos_edges = np.linspace(1.0, np.cos(float(halfAngle)), int(polarSamples) + 1)
+        polar = np.arccos(0.5 * (cos_edges[:-1] + cos_edges[1:]))
+        azimuthal = (np.arange(int(azimuthalSamples)) + 0.5) * (2.0 * np.pi / int(azimuthalSamples))
+        theta, phi = np.meshgrid(polar, azimuthal, indexing="ij")
+        return cls(theta.reshape(-1), phi.reshape(-1), np.ones(theta.size))
+
+
+@dataclass(frozen=True)
+class UniformPumpProfile:
+    """Uniform power density over every selected source face."""
+
+    kind: str = field(default="uniform", init=False)
+
+
+@dataclass(frozen=True)
+class SuperGaussianPumpProfile:
+    """Normalized world-space super-Gaussian source profile."""
+
+    radiusU: float
+    radiusV: float | None = None
+    exponent: float = 40.0
     center: object = (0.0, 0.0, 0.0)
-    propagationDirection: object = (0.0, 0.0, 1.0)
-    backReflection: bool = True
-    reflectivity: float = 1.0
-    superGaussianOrder: float = 40.0
-    spectralWeights: object | None = None
-    extraction: bool = False
+    axisU: object = (1.0, 0.0, 0.0)
+    axisV: object = (0.0, 1.0, 0.0)
+    kind: str = field(default="super-gaussian", init=False)
 
-    def intensityAt(self, points):
-        points = np.asarray(points, dtype=np.float64)
+    def __post_init__(self):
+        radius_v = self.radiusU if self.radiusV is None else self.radiusV
+        if self.radiusU <= 0.0 or radius_v <= 0.0 or self.exponent <= 0.0:
+            raise ValueError("super-Gaussian radii and exponent must be positive")
         center = np.asarray(self.center, dtype=np.float64).reshape(-1)
-        center_x = center[0] if center.size > 0 else 0.0
-        center_y = center[1] if center.size > 1 else 0.0
-        waist_x, waist_y = self.waist
-        if waist_x <= 0.0 or waist_y <= 0.0:
-            raise ValueError("pump waist values must be positive")
-        radius_squared = (
-            ((points[:, 0] - center_x) ** 2) / (waist_x**2)
-            + ((points[:, 1] - center_y) ** 2) / (waist_y**2)
-        )
-        return float(self.intensity) * np.exp(-(radius_squared ** (0.5 * float(self.superGaussianOrder))))
+        if center.shape != (3,) or np.any(~np.isfinite(center)):
+            raise ValueError("pump profile center must be a finite three-vector")
+        axis_u = np.asarray(_unit_vector(self.axisU, "axisU"))
+        axis_v = np.asarray(_unit_vector(self.axisV, "axisV"))
+        if abs(float(np.dot(axis_u, axis_v))) > 1.0e-10:
+            raise ValueError("axisU and axisV must be orthogonal")
+        object.__setattr__(self, "radiusV", float(radius_v))
+        object.__setattr__(self, "center", tuple(center))
+        object.__setattr__(self, "axisU", tuple(axis_u))
+        object.__setattr__(self, "axisV", tuple(axis_v))
+
+    def weightAt(self, points):
+        points = np.asarray(points, dtype=np.float64)
+        relative = points - np.asarray(self.center)
+        u = relative @ np.asarray(self.axisU) / self.radiusU
+        v = relative @ np.asarray(self.axisV) / self.radiusV
+        return np.exp(-((u * u + v * v) ** (0.5 * self.exponent)))
 
 
-def _profile_from_pump(pump):
-    profile = pump.getProperty("profile")
-    if profile is not None:
-        return profile
-    return PumpRadiationProfile(
-        intensity=pump.intensity,
-        wavelengths=np.asarray(pump.crossSections.wavelengthsAbsorption, dtype=np.float64),
-        waist=(pump.radiusX, pump.radiusY),
-        propagationDirection=pump.getProperty("propagationDirection", (0.0, 0.0, 1.0)),
-        backReflection=pump.backReflection,
-        reflectivity=pump.reflectivity,
-        superGaussianOrder=pump.getProperty("superGaussianOrder", pump.exponent),
-        spectralWeights=pump.getProperty("spectralWeights"),
-        extraction=pump.extraction,
+@dataclass(frozen=True)
+class PlanarPumpRelay:
+    """Affine re-imaging link between tagged planar boundary surfaces."""
+
+    exitDomains: object
+    entryDomains: object
+    flipU: bool = False
+    flipV: bool = False
+    rotation: float = 0.0
+    offset: tuple[float, float] = (0.0, 0.0)
+    tilt: tuple[float, float] = (0.0, 0.0)
+    magnification: float = 1.0
+    transmission: float = 1.0
+
+    def __post_init__(self):
+        exit_domains = (self.exitDomains,) if isinstance(self.exitDomains, (str, int)) else tuple(self.exitDomains)
+        entry_domains = (self.entryDomains,) if isinstance(self.entryDomains, (str, int)) else tuple(self.entryDomains)
+        if not exit_domains or not entry_domains:
+            raise ValueError("relay requires exit and entry surface domains")
+        object.__setattr__(self, "exitDomains", exit_domains)
+        object.__setattr__(self, "entryDomains", entry_domains)
+        if self.magnification <= 0.0:
+            raise ValueError("relay magnification must be positive")
+        if self.transmission < 0.0 or self.transmission > 1.0:
+            raise ValueError("relay transmission must be in [0, 1]")
+        if len(tuple(self.offset)) != 2 or len(tuple(self.tilt)) != 2:
+            raise ValueError("relay offset and tilt must be two-vectors")
+
+    @classmethod
+    def retroreflect(cls, domains, *, transmission=1.0):
+        return cls(domains, domains, transmission=transmission)
+
+
+@dataclass(frozen=True)
+class PumpSource:
+    """One independently normalized boundary-launched pump source."""
+
+    surfaceDomains: object
+    totalPower: float
+    spectrum: PumpSpectrum
+    crossSections: CrossSectionData
+    angularDistribution: PumpAngularDistribution = field(default_factory=PumpAngularDistribution.collimated)
+    profile: object = field(default_factory=UniformPumpProfile)
+    relays: tuple[PlanarPumpRelay, ...] = ()
+
+    def __post_init__(self):
+        domains = tuple(self.surfaceDomains) if not isinstance(self.surfaceDomains, (str, int)) else (self.surfaceDomains,)
+        if not domains:
+            raise ValueError("pump source requires at least one surface domain")
+        if not np.isfinite(self.totalPower) or self.totalPower <= 0.0:
+            raise ValueError("pump source totalPower must be finite and positive")
+        if not isinstance(self.spectrum, PumpSpectrum):
+            raise TypeError("pump source spectrum must be PumpSpectrum")
+        if not isinstance(self.crossSections, CrossSectionData):
+            raise TypeError("pump source crossSections must be CrossSectionData")
+        if not isinstance(self.angularDistribution, PumpAngularDistribution):
+            raise TypeError("pump source angularDistribution must be PumpAngularDistribution")
+        if not isinstance(self.profile, (UniformPumpProfile, SuperGaussianPumpProfile)):
+            raise TypeError("pump source profile must be UniformPumpProfile or SuperGaussianPumpProfile")
+        relays = tuple(self.relays)
+        if not all(isinstance(relay, PlanarPumpRelay) for relay in relays):
+            raise TypeError("pump source relays must contain PlanarPumpRelay values")
+        object.__setattr__(self, "surfaceDomains", domains)
+        object.__setattr__(self, "relays", relays)
+
+
+def integratePumpProfile(topology, surfaceDomains, profile):
+    """Integrate a pump profile over tagged triangular boundary faces.
+
+    The result has area units matching the topology coordinates and converts a
+    peak intensity into the ``PumpSource.totalPower`` normalization.
+    """
+    domains = (surfaceDomains,) if isinstance(surfaceDomains, (str, int)) else tuple(surfaceDomains)
+    domain_map = topology.surfaceDomainMap()
+    domain_ids = {domain_map.resolve(value) if isinstance(value, str) else int(value) for value in domains}
+    mask = (np.asarray(topology.neighborCells) < 0) & np.isin(
+        np.asarray(topology.faceBoundaries), list(domain_ids)
     )
-
-
-def oneDimensionalZTraversalPumpRate(points, betaCells, pump, gainMedium, constants=Constants()):
-    """Evaluate the frozen-state pump rate used by one-dimensional z traversal."""
-
-    points = np.asarray(points, dtype=np.float64)
-    beta = np.asarray(betaCells, dtype=np.float64)
-    if beta.ndim == 1:
-        topology = getattr(gainMedium, "topology", None)
-        levels = getattr(topology, "levels", 1)
-        beta = beta.reshape((points.shape[0], int(levels)), order="F")
-    if beta.shape[0] != points.shape[0]:
-        raise ValueError("betaCells first dimension must match number of points")
-
-    profile = _profile_from_pump(pump)
-    spectra = pump.crossSections
-    wavelengths = np.asarray(profile.wavelengths, dtype=np.float64).reshape(-1)
-    if wavelengths.size == 0:
-        wavelengths = np.asarray(spectra.wavelengthsAbsorption, dtype=np.float64).reshape(-1)
-
-    weights = profile.spectralWeights
-    if weights is None:
-        weights = pump.getProperty("spectralWeights")
-    if weights is None:
-        weights = np.ones(wavelengths.size, dtype=np.float64)
-    else:
-        weights = np.asarray(weights, dtype=np.float64).reshape(-1)
-    if weights.size != wavelengths.size:
-        raise ValueError("spectralWeights must match the number of pump wavelengths")
-
-    local_intensity = np.zeros(points.shape[0], dtype=np.float64) if profile.extraction else profile.intensityAt(points)
-    if profile.backReflection:
-        local_intensity = local_intensity * (1.0 + float(profile.reflectivity))
-
-    rate = np.zeros_like(beta, dtype=np.float64)
-    for wavelength, weight in zip(wavelengths, weights):
-        sigma_absorption = spectra.absorptionAt(wavelength)
-        sigma_emission = spectra.emissionAt(wavelength)
-        photon_flux = local_intensity[:, None] * float(wavelength) / (float(constants.h) * float(constants.c))
-        rate += float(weight) * (sigma_absorption - beta * (sigma_absorption + sigma_emission)) * photon_flux
-    return rate
+    cell_faces = np.argwhere(mask)
+    if cell_faces.size == 0:
+        raise ValueError("pump profile integration selected no exterior faces")
+    indices = np.asarray(topology.facePointIndices)[mask]
+    triangles = np.asarray(topology.points, dtype=np.float64)[indices]
+    area = 0.5 * np.linalg.norm(
+        np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]), axis=1
+    )
+    # Degree-five Dunavant rule; weights below sum to one on each triangle.
+    barycentric = np.asarray([
+        [1 / 3, 1 / 3, 1 / 3],
+        [0.059715871789770, 0.470142064105115, 0.470142064105115],
+        [0.470142064105115, 0.059715871789770, 0.470142064105115],
+        [0.470142064105115, 0.470142064105115, 0.059715871789770],
+        [0.797426985353087, 0.101286507323456, 0.101286507323456],
+        [0.101286507323456, 0.797426985353087, 0.101286507323456],
+        [0.101286507323456, 0.101286507323456, 0.797426985353087],
+    ])
+    weights = np.asarray([
+        0.225,
+        0.132394152788506, 0.132394152788506, 0.132394152788506,
+        0.125939180544827, 0.125939180544827, 0.125939180544827,
+    ])
+    points = np.einsum("qb,tbc->tqc", barycentric, triangles)
+    values = np.ones(points.shape[:2]) if isinstance(profile, UniformPumpProfile) else profile.weightAt(points)
+    return float(np.sum(area * (values @ weights)))
 
 
 @dataclass
@@ -553,221 +685,23 @@ class LaserProperties:
                 raise ValueError("l_ems and s_ems must have the same length")
 
 
-@dataclass(init=False)
+@dataclass(frozen=True)
 class PumpProperties:
-    r"""Pump-beam settings used to raise the excited-state fraction ``beta``.
+    """General compiled pump configuration."""
 
-    ``intensity`` is pump intensity :math:`I` in ``W / cm^2``. ``wavelength``
-    is the pump wavelength :math:`\lambda`. Built-in Gaussian pumping also
-    uses ``radiusX``, ``radiusY``, and ``exponent`` from ``customProperties``.
-    A custom ``solver`` value is retained only so compiled ``Simulation`` runs
-    can reject unsupported Python pump solvers explicitly.
-    """
+    sources: tuple[PumpSource, ...]
+    rayCount: int = 100_000
+    rngSeed: int = 5489
+    pumpSteps: int | None = None
 
-    intensity: float
-    """Pump intensity :math:`I` in ``W / cm^2``."""
-    wavelength: float | None
-    r"""Pump wavelength :math:`\lambda`; required for monochromatic data."""
-    pumpSubsteps: int
-    """Reserved substep count for pump routines that perform inner integration."""
-    customProperties: dict
-    """Extensible store for beam shape, reflection, spectra, and solver handles."""
-
-    def __init__(self, *, intensity=None, pumpSubsteps=100, wavelength=None, customProperties=None, **properties):
-        """Create pump settings from core fields plus arbitrary custom properties."""
-        profile = properties.get("profile")
-        if intensity is None and profile is not None:
-            intensity = profile.intensity
-        if intensity is None:
-            raise TypeError("PumpProperties requires intensity or profile")
-        self.intensity = float(intensity)
-        self.wavelength = None if wavelength is None else float(wavelength)
-        self.pumpSubsteps = int(pumpSubsteps)
-        self.customProperties = dict(customProperties or {})
-        self.customProperties.update(properties)
-        self._normalizeProperties()
-
-    @classmethod
-    def superGaussian(
-        cls,
-        *,
-        intensity,
-        wavelength,
-        radiusX,
-        pumpDuration=None,
-        duration=None,
-        pumpSubsteps=100,
-        temporaryFluorescence=None,
-        solver=None,
-        crossSections=None,
-        spectralProperties=None,
-        gainMedium=None,
-        crossSectionAbsorption=None,
-        crossSectionEmission=None,
-        absorption=None,
-        emission=None,
-        radiusY=None,
-        exponent=40.0,
-        backReflection=True,
-        reflectivity=1.0,
-        customProperties=None,
-        **extraProperties,
-    ):
-        """Create settings for the built-in super-Gaussian pump profile.
-
-        The transverse profile is ``intensity * exp(-r ** exponent)`` with
-        radii ``radiusX`` and ``radiusY``. ``backReflection`` and
-        ``reflectivity`` control the backward pump pass.
-        """
-        custom = dict(customProperties or {})
-        custom.update(extraProperties)
-        custom.update(
-            {
-                "radiusX": radiusX,
-                "radiusY": radiusX if radiusY is None else radiusY,
-                "exponent": exponent,
-                "pumpDuration": pumpDuration if pumpDuration is not None else duration,
-                "temporaryFluorescence": temporaryFluorescence,
-                "solver": solver,
-                "crossSections": crossSections,
-                "spectralProperties": spectralProperties,
-                "gainMedium": gainMedium,
-                "crossSectionAbsorption": crossSectionAbsorption if crossSectionAbsorption is not None else absorption,
-                "crossSectionEmission": crossSectionEmission if crossSectionEmission is not None else emission,
-                "backReflection": backReflection,
-                "reflectivity": reflectivity,
-            }
-        )
-        return cls(
-            intensity=intensity,
-            wavelength=wavelength,
-            pumpSubsteps=pumpSubsteps,
-            customProperties=custom,
-        )
-
-    def _normalizeProperties(self):
-        profile = self.customProperties.get("profile")
-        if profile is not None:
-            self.customProperties.setdefault("radiusX", profile.waist[0])
-            self.customProperties.setdefault("radiusY", profile.waist[1])
-            self.customProperties.setdefault("superGaussianOrder", profile.superGaussianOrder)
-            self.customProperties.setdefault("exponent", profile.superGaussianOrder)
-            self.customProperties.setdefault("backReflection", profile.backReflection)
-            self.customProperties.setdefault("reflectivity", profile.reflectivity)
-            self.customProperties.setdefault("extraction", profile.extraction)
-            self.customProperties.setdefault("propagationDirection", profile.propagationDirection)
-            if profile.spectralWeights is not None:
-                self.customProperties.setdefault("spectralWeights", profile.spectralWeights)
-        if "pumpDuration" not in self.customProperties and self.customProperties.get("duration") is not None:
-            self.customProperties["pumpDuration"] = self.customProperties["duration"]
-        if self.crossSections is None and self.spectralProperties is not None:
-            self.customProperties["crossSections"] = self.spectralProperties
-        if self.spectralProperties is None and self.crossSections is not None:
-            self.customProperties["spectralProperties"] = self.crossSections
-        if self.crossSections is None:
-            if self.crossSectionAbsorption is None or self.crossSectionEmission is None:
-                raise ValueError("PumpProperties requires crossSections or monochromatic cross-section values")
-            if self.wavelength is None:
-                raise ValueError("PumpProperties requires wavelength when crossSections is not provided")
-            self.customProperties["crossSections"] = CrossSectionData(
-                wavelengthsAbsorption=[self.wavelength],
-                crossSectionAbsorption=[self.crossSectionAbsorption],
-                wavelengthsEmission=[self.wavelength],
-                crossSectionEmission=[self.crossSectionEmission],
-                resolution=1,
-            )
-            self.customProperties["spectralProperties"] = self.crossSections
-        if self.wavelength is None:
-            self.wavelength = float(self.crossSections.wavelengthsAbsorption[0])
-        if self.solver is None:
-            self._validateGaussianPumpParameters()
-        if self.pumpDuration is not None and self.pumpDuration <= 0.0:
-            raise ValueError("pumpDuration must be positive")
-        if self.pumpSubsteps < 2:
-            raise ValueError("pumpSubsteps must be at least 2")
-        if self.temporaryFluorescence is not None and self.temporaryFluorescence <= 0.0:
-            raise ValueError("temporaryFluorescence must be positive")
-
-    def _validateGaussianPumpParameters(self):
-        radius_x = self.getProperty("radiusX")
-        radius_y = self.radiusY
-        if radius_x is None:
-            raise ValueError("default Gaussian pump solver requires radiusX")
-        if radius_y is None:
-            raise ValueError("default Gaussian pump solver requires radiusY or radiusX")
-        if float(radius_x) <= 0.0 or float(radius_y) <= 0.0:
-            raise ValueError("pump radii must be positive")
-
-    def __getattr__(self, name):
-        if "customProperties" in self.__dict__ and name in self.customProperties:
-            return self.customProperties[name]
-        if name == "crossSections":
-            return self.customProperties.get("crossSections")
-        if name == "spectralProperties":
-            return self.customProperties.get("spectralProperties")
-        if name == "radiusY":
-            return self.customProperties.get("radiusY", self.customProperties.get("radiusX"))
-        if name == "exponent":
-            return self.customProperties.get("exponent", 40.0)
-        if name == "backReflection":
-            return self.customProperties.get("backReflection", True)
-        if name == "reflectivity":
-            return self.customProperties.get("reflectivity", 1.0)
-        if name == "extraction":
-            return self.customProperties.get("extraction", False)
-        if name in {"pumpDuration", "temporaryFluorescence", "solver", "gainMedium", "duration", "crossSectionAbsorption", "crossSectionEmission"}:
-            return self.customProperties.get(name)
-        raise AttributeError(name)
-
-    def withProperty(self, name, value):
-        """Set one custom pump property and return ``self``."""
-        self.customProperties[name] = value
-        return self
-
-    def withProperties(self, **properties):
-        """Set several custom pump properties and return ``self``."""
-        self.customProperties.update(properties)
-        return self
-
-    def getProperty(self, name, default=None):
-        """Read a custom pump property without raising ``AttributeError``."""
-        return self.customProperties.get(name, default)
-
-    def activeDuration(self, timeFrame):
-        """Return the pump duration used for one integration frame."""
-        if self.pumpDuration is not None:
-            return float(self.pumpDuration)
-        if timeFrame is None:
-            raise ValueError("timeFrame is required when PumpProperties.pumpDuration is not set")
-        return float(timeFrame)
-
-    def intensityAt(self, points):
-        """Evaluate the super-Gaussian intensity profile at ``(x, y)`` points."""
-        self._validateGaussianPumpParameters()
-        points = np.asarray(points, dtype=np.float64)
-        r = np.sqrt((points[:, 0] ** 2) / (self.radiusY ** 2) + (points[:, 1] ** 2) / (self.radiusX ** 2))
-        return self.intensity * np.exp(-(r ** self.exponent))
-
-    def toDict(self, timeFrame=None):
-        """Return the pump dictionary serialized to compiled run control."""
-        self._validateGaussianPumpParameters()
-        sigma_abs = self.crossSections.absorptionAt(self.wavelength)
-        sigma_ems = self.crossSections.emissionAt(self.wavelength)
-        return {
-            "s_abs": np.asarray([sigma_abs], dtype=np.float64),
-            "s_ems": np.asarray([sigma_ems], dtype=np.float64),
-            "I": float(self.intensity),
-            "T": self.activeDuration(timeFrame),
-            "wavelength": float(self.wavelength),
-            "rx": float(self.radiusX),
-            "ry": float(self.radiusY),
-            "exp": float(self.exponent),
-        }
-
-    def modeDict(self):
-        """Return low-level flags for extraction and backward reflection."""
-        return {
-            "BRM": int(self.backReflection),
-            "R": float(self.reflectivity),
-            "extr": int(self.extraction),
-        }
+    def __post_init__(self):
+        sources = tuple(self.sources)
+        if not sources or not all(isinstance(source, PumpSource) for source in sources):
+            raise ValueError("PumpProperties.sources must contain at least one PumpSource")
+        if self.rayCount <= 0:
+            raise ValueError("PumpProperties.rayCount must be positive")
+        if self.rngSeed < 0 or self.rngSeed >= 2**32:
+            raise ValueError("PumpProperties.rngSeed must fit uint32")
+        if self.pumpSteps is not None and self.pumpSteps < 0:
+            raise ValueError("PumpProperties.pumpSteps must be non-negative")
+        object.__setattr__(self, "sources", sources)

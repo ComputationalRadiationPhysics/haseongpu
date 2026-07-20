@@ -105,7 +105,7 @@ read independently.
 
 Run-control attributes include ``time_step``, ``number_of_steps``,
 ``pump_steps``, ``time_integrator``, optional implicit-Euler controls
-``implicit_iterations`` and ``implicit_tolerance``, and pump attributes such as
-``pump_routine``, ``pump_intensity``, ``pump_wavelength``, ``pump_radius_x``,
-``pump_radius_y``, ``pump_duration``, and ``pump_substeps``. The supported pump
-routine is ``one-dimensional-z-traversal``.
+``implicit_iterations`` and ``implicit_tolerance``, and general-pump attributes: ``pump_schema_version``, ``pump_ray_count``,
+``pump_rng_seed``, plus flattened source, spectrum, angular-distribution,
+spatial-profile, and planar-relay arrays. Schema version 1 replaces the legacy
+one-dimensional pump attributes.

@@ -73,20 +73,40 @@ namespace
         constexpr char const* timeIntegrator = "time_integrator";
         constexpr char const* implicitIterations = "implicit_iterations";
         constexpr char const* implicitTolerance = "implicit_tolerance";
-        constexpr char const* pumpRoutine = "pump_routine";
-        constexpr char const* pumpIntensity = "pump_intensity";
-        constexpr char const* pumpWavelength = "pump_wavelength";
-        constexpr char const* pumpRadiusX = "pump_radius_x";
-        constexpr char const* pumpRadiusY = "pump_radius_y";
-        constexpr char const* pumpExponent = "pump_exponent";
-        constexpr char const* pumpDuration = "pump_duration";
-        constexpr char const* pumpSubsteps = "pump_substeps";
-        constexpr char const* pumpSigmaAbsorption = "pump_sigma_absorption";
-        constexpr char const* pumpSigmaEmission = "pump_sigma_emission";
-        constexpr char const* pumpBackReflection = "pump_back_reflection";
-        constexpr char const* pumpReflectivity = "pump_reflectivity";
-        constexpr char const* pumpExtraction = "pump_extraction";
-        constexpr char const* pumpTemporaryFluorescence = "pump_temporary_fluorescence";
+        constexpr char const* pumpSchemaVersion = "pump_schema_version";
+        constexpr char const* pumpRayCount = "pump_ray_count";
+        constexpr char const* pumpRngSeed = "pump_rng_seed";
+        constexpr char const* pumpSourceTotalPower = "pump_source_total_power";
+        constexpr char const* pumpSourceSurfaceOffsets = "pump_source_surface_offsets";
+        constexpr char const* pumpSourceSurfaces = "pump_source_surfaces";
+        constexpr char const* pumpSpectrumOffsets = "pump_spectrum_offsets";
+        constexpr char const* pumpSpectrumWavelengths = "pump_spectrum_wavelengths";
+        constexpr char const* pumpSpectrumWeights = "pump_spectrum_weights";
+        constexpr char const* pumpSpectrumSigmaAbsorption = "pump_spectrum_sigma_absorption";
+        constexpr char const* pumpSpectrumSigmaEmission = "pump_spectrum_sigma_emission";
+        constexpr char const* pumpAngularOffsets = "pump_angular_offsets";
+        constexpr char const* pumpAngularPolar = "pump_angular_polar";
+        constexpr char const* pumpAngularAzimuthal = "pump_angular_azimuthal";
+        constexpr char const* pumpAngularWeights = "pump_angular_weights";
+        constexpr char const* pumpProfileKind = "pump_profile_kind";
+        constexpr char const* pumpProfileRadiusU = "pump_profile_radius_u";
+        constexpr char const* pumpProfileRadiusV = "pump_profile_radius_v";
+        constexpr char const* pumpProfileExponent = "pump_profile_exponent";
+        constexpr char const* pumpProfileCenter = "pump_profile_center";
+        constexpr char const* pumpProfileAxisU = "pump_profile_axis_u";
+        constexpr char const* pumpProfileAxisV = "pump_profile_axis_v";
+        constexpr char const* pumpSourceRelayOffsets = "pump_source_relay_offsets";
+        constexpr char const* pumpRelayExitOffsets = "pump_relay_exit_offsets";
+        constexpr char const* pumpRelayExitSurfaces = "pump_relay_exit_surfaces";
+        constexpr char const* pumpRelayEntryOffsets = "pump_relay_entry_offsets";
+        constexpr char const* pumpRelayEntrySurfaces = "pump_relay_entry_surfaces";
+        constexpr char const* pumpRelayFlipU = "pump_relay_flip_u";
+        constexpr char const* pumpRelayFlipV = "pump_relay_flip_v";
+        constexpr char const* pumpRelayRotation = "pump_relay_rotation";
+        constexpr char const* pumpRelayOffset = "pump_relay_offset";
+        constexpr char const* pumpRelayTilt = "pump_relay_tilt";
+        constexpr char const* pumpRelayMagnification = "pump_relay_magnification";
+        constexpr char const* pumpRelayTransmission = "pump_relay_transmission";
     } // namespace field
 
     constexpr char const* OPENPMD_SST_CONFIG = R"(
@@ -139,6 +159,45 @@ namespace
             return attribute<T>(obj, name);
         }
         return fallback;
+    }
+
+    std::vector<unsigned> unsignedVectorAttribute(io::Attributable const& obj, std::string const& name)
+    {
+        auto const values = attribute<std::vector<unsigned long long>>(obj, name);
+        std::vector<unsigned> result;
+        result.reserve(values.size());
+        for(auto const value : values)
+        {
+            if(value > std::numeric_limits<unsigned>::max())
+            {
+                throw std::runtime_error("openPMD pump attribute '" + name + "' exceeds uint32");
+            }
+            result.push_back(static_cast<unsigned>(value));
+        }
+        return result;
+    }
+
+    std::vector<unsigned> optionalUnsignedVectorAttribute(
+        io::Attributable const& obj,
+        std::string const& name)
+    {
+        if(!obj.containsAttribute(name))
+            return {};
+        return unsignedVectorAttribute(obj, name);
+    }
+
+    template<typename T>
+    std::vector<T> offsetSlice(
+        std::vector<T> const& values,
+        std::vector<unsigned> const& offsets,
+        std::size_t const index,
+        std::string const& name)
+    {
+        if(index + 1u >= offsets.size() || offsets[index] > offsets[index + 1u] || offsets[index + 1u] > values.size())
+        {
+            throw std::runtime_error("invalid flattened pump offsets for '" + name + "'");
+        }
+        return {values.begin() + offsets[index], values.begin() + offsets[index + 1u]};
     }
 
     std::size_t elementCount(io::Extent const& extent)
@@ -1236,21 +1295,116 @@ namespace hase::openpmd
             = attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
         run.timeIntegration.implicitIterations = attributeOr<unsigned>(iteration, field::implicitIterations, 8u);
         run.timeIntegration.implicitTolerance = attributeOr<double>(iteration, field::implicitTolerance, 1.0e-10);
-        run.pump.routine
-            = attributeOr<std::string>(iteration, field::pumpRoutine, core::PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL);
-        run.pump.intensity = attributeOr<double>(iteration, field::pumpIntensity, 0.0);
-        run.pump.wavelength = attributeOr<double>(iteration, field::pumpWavelength, 0.0);
-        run.pump.radiusX = attributeOr<double>(iteration, field::pumpRadiusX, 0.0);
-        run.pump.radiusY = attributeOr<double>(iteration, field::pumpRadiusY, run.pump.radiusX);
-        run.pump.exponent = attributeOr<double>(iteration, field::pumpExponent, 40.0);
-        run.pump.duration = attributeOr<double>(iteration, field::pumpDuration, run.timeStep);
-        run.pump.substeps = attributeOr<unsigned>(iteration, field::pumpSubsteps, 100u);
-        run.pump.sigmaAbsorption = attributeOr<double>(iteration, field::pumpSigmaAbsorption, experiment.maxSigmaA);
-        run.pump.sigmaEmission = attributeOr<double>(iteration, field::pumpSigmaEmission, experiment.maxSigmaE);
-        run.pump.backReflection = attributeOr<bool>(iteration, field::pumpBackReflection, true);
-        run.pump.reflectivity = attributeOr<double>(iteration, field::pumpReflectivity, 1.0);
-        run.pump.extraction = attributeOr<bool>(iteration, field::pumpExtraction, false);
-        run.pump.temporaryFluorescence = attributeOr<double>(iteration, field::pumpTemporaryFluorescence, 0.0);
+        if(run.numberOfSteps > 0u && !iteration.containsAttribute(field::pumpSchemaVersion))
+            validationError(field::pumpSchemaVersion, "missing general pump schema for compiled simulation");
+        if(iteration.containsAttribute(field::pumpSchemaVersion))
+        {
+            run.pump.schemaVersion = attributeOr<unsigned>(iteration, field::pumpSchemaVersion, 0u);
+            if(run.pump.schemaVersion != 1u)
+            {
+                validationError(
+                    field::pumpSchemaVersion,
+                    "expected general pump schema version 1; legacy one-dimensional pump attributes are unsupported");
+            }
+            run.pump.rayCount = attribute<unsigned>(iteration, field::pumpRayCount);
+            run.pump.rngSeed = attribute<unsigned>(iteration, field::pumpRngSeed);
+
+            auto const sourcePower = attribute<std::vector<double>>(iteration, field::pumpSourceTotalPower);
+            auto const sourceSurfaceOffsets = unsignedVectorAttribute(iteration, field::pumpSourceSurfaceOffsets);
+            auto const sourceSurfacesFlat = unsignedVectorAttribute(iteration, field::pumpSourceSurfaces);
+            auto const spectrumOffsets = unsignedVectorAttribute(iteration, field::pumpSpectrumOffsets);
+            auto const spectrumWavelengths = attribute<std::vector<double>>(iteration, field::pumpSpectrumWavelengths);
+            auto const spectrumWeights = attribute<std::vector<double>>(iteration, field::pumpSpectrumWeights);
+            auto const spectrumSigmaA = attribute<std::vector<double>>(iteration, field::pumpSpectrumSigmaAbsorption);
+            auto const spectrumSigmaE = attribute<std::vector<double>>(iteration, field::pumpSpectrumSigmaEmission);
+            auto const angularOffsets = unsignedVectorAttribute(iteration, field::pumpAngularOffsets);
+            auto const angularPolar = attribute<std::vector<double>>(iteration, field::pumpAngularPolar);
+            auto const angularAzimuthal = attribute<std::vector<double>>(iteration, field::pumpAngularAzimuthal);
+            auto const angularWeights = attribute<std::vector<double>>(iteration, field::pumpAngularWeights);
+            auto const profileKind = unsignedVectorAttribute(iteration, field::pumpProfileKind);
+            auto const profileRadiusU = attribute<std::vector<double>>(iteration, field::pumpProfileRadiusU);
+            auto const profileRadiusV = attribute<std::vector<double>>(iteration, field::pumpProfileRadiusV);
+            auto const profileExponent = attribute<std::vector<double>>(iteration, field::pumpProfileExponent);
+            auto const profileCenter = attribute<std::vector<double>>(iteration, field::pumpProfileCenter);
+            auto const profileAxisU = attribute<std::vector<double>>(iteration, field::pumpProfileAxisU);
+            auto const profileAxisV = attribute<std::vector<double>>(iteration, field::pumpProfileAxisV);
+            auto const sourceRelayOffsets = unsignedVectorAttribute(iteration, field::pumpSourceRelayOffsets);
+            auto const relayExitOffsets = unsignedVectorAttribute(iteration, field::pumpRelayExitOffsets);
+            auto const relayEntryOffsets = unsignedVectorAttribute(iteration, field::pumpRelayEntryOffsets);
+            auto const relayExitSurfacesFlat = optionalUnsignedVectorAttribute(iteration, field::pumpRelayExitSurfaces);
+            auto const relayEntrySurfacesFlat = optionalUnsignedVectorAttribute(iteration, field::pumpRelayEntrySurfaces);
+            auto const relayFlipU = optionalUnsignedVectorAttribute(iteration, field::pumpRelayFlipU);
+            auto const relayFlipV = optionalUnsignedVectorAttribute(iteration, field::pumpRelayFlipV);
+            auto const relayRotation = attributeOr<std::vector<double>>(iteration, field::pumpRelayRotation, {});
+            auto const relayOffset = attributeOr<std::vector<double>>(iteration, field::pumpRelayOffset, {});
+            auto const relayTilt = attributeOr<std::vector<double>>(iteration, field::pumpRelayTilt, {});
+            auto const relayMagnification = attributeOr<std::vector<double>>(iteration, field::pumpRelayMagnification, {});
+            auto const relayTransmission = attributeOr<std::vector<double>>(iteration, field::pumpRelayTransmission, {});
+
+            if(sourcePower.empty() || sourceSurfaceOffsets.size() != sourcePower.size() + 1u
+               || spectrumOffsets.size() != sourcePower.size() + 1u || angularOffsets.size() != sourcePower.size() + 1u
+               || sourceRelayOffsets.size() != sourcePower.size() + 1u || profileKind.size() != sourcePower.size()
+               || profileRadiusU.size() != sourcePower.size() || profileRadiusV.size() != sourcePower.size()
+               || profileExponent.size() != sourcePower.size() || profileCenter.size() != 3u * sourcePower.size()
+               || profileAxisU.size() != 3u * sourcePower.size() || profileAxisV.size() != 3u * sourcePower.size())
+            {
+                validationError(field::pumpSourceTotalPower, "inconsistent general pump source array lengths");
+            }
+
+            unsigned const relayCount = sourceRelayOffsets.back();
+            if(relayExitOffsets.size() != relayCount + 1u || relayEntryOffsets.size() != relayCount + 1u
+               || relayFlipU.size() != relayCount || relayFlipV.size() != relayCount || relayRotation.size() != relayCount
+               || relayOffset.size() != 2u * relayCount || relayTilt.size() != 2u * relayCount
+               || relayMagnification.size() != relayCount || relayTransmission.size() != relayCount)
+            {
+                validationError(field::pumpSourceRelayOffsets, "inconsistent general pump relay array lengths");
+            }
+
+            run.pump.sources.resize(sourcePower.size());
+            for(std::size_t sourceIndex = 0u; sourceIndex < sourcePower.size(); ++sourceIndex)
+            {
+                auto& source = run.pump.sources[sourceIndex];
+                source.totalPower = sourcePower[sourceIndex];
+                for(auto value : offsetSlice(sourceSurfacesFlat, sourceSurfaceOffsets, sourceIndex, field::pumpSourceSurfaces))
+                    source.surfaces.push_back(static_cast<int>(value));
+                source.wavelengths = offsetSlice(spectrumWavelengths, spectrumOffsets, sourceIndex, field::pumpSpectrumWavelengths);
+                source.spectralWeights = offsetSlice(spectrumWeights, spectrumOffsets, sourceIndex, field::pumpSpectrumWeights);
+                source.sigmaAbsorption = offsetSlice(spectrumSigmaA, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaAbsorption);
+                source.sigmaEmission = offsetSlice(spectrumSigmaE, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaEmission);
+                source.polarAngles = offsetSlice(angularPolar, angularOffsets, sourceIndex, field::pumpAngularPolar);
+                source.azimuthalAngles = offsetSlice(angularAzimuthal, angularOffsets, sourceIndex, field::pumpAngularAzimuthal);
+                source.angularWeights = offsetSlice(angularWeights, angularOffsets, sourceIndex, field::pumpAngularWeights);
+                source.profile.kind = profileKind[sourceIndex];
+                source.profile.radiusU = profileRadiusU[sourceIndex];
+                source.profile.radiusV = profileRadiusV[sourceIndex];
+                source.profile.exponent = profileExponent[sourceIndex];
+                for(unsigned component = 0u; component < 3u; ++component)
+                {
+                    source.profile.center[component] = profileCenter[3u * sourceIndex + component];
+                    source.profile.axisU[component] = profileAxisU[3u * sourceIndex + component];
+                    source.profile.axisV[component] = profileAxisV[3u * sourceIndex + component];
+                }
+                for(unsigned relayIndex = sourceRelayOffsets[sourceIndex]; relayIndex < sourceRelayOffsets[sourceIndex + 1u]; ++relayIndex)
+                {
+                    core::PumpRelayParameters relay;
+                    for(auto value : offsetSlice(relayExitSurfacesFlat, relayExitOffsets, relayIndex, field::pumpRelayExitSurfaces))
+                        relay.exitSurfaces.push_back(static_cast<int>(value));
+                    for(auto value : offsetSlice(relayEntrySurfacesFlat, relayEntryOffsets, relayIndex, field::pumpRelayEntrySurfaces))
+                        relay.entrySurfaces.push_back(static_cast<int>(value));
+                    relay.flipU = relayFlipU[relayIndex] != 0u;
+                    relay.flipV = relayFlipV[relayIndex] != 0u;
+                    relay.rotation = relayRotation[relayIndex];
+                    relay.offset[0] = relayOffset[2u * relayIndex];
+                    relay.offset[1] = relayOffset[2u * relayIndex + 1u];
+                    relay.tilt[0] = relayTilt[2u * relayIndex];
+                    relay.tilt[1] = relayTilt[2u * relayIndex + 1u];
+                    relay.magnification = relayMagnification[relayIndex];
+                    relay.transmission = relayTransmission[relayIndex];
+                    source.relays.push_back(std::move(relay));
+                }
+            }
+
+        }
 
         mesh.resultAtVolumes = true;
 

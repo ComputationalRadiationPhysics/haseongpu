@@ -198,56 +198,38 @@ excitation, ASE depletion, and fluorescence decay:
    \left.\frac{d\beta}{dt}\right|_{\mathrm{ASE}}
    - \frac{\beta}{\tau}.
 
-The compiled pump is ``one-dimensional-z-traversal``. At each transverse mesh
-point it uses the super-Gaussian inlet profile
+The compiled pump traces equal-power rays from tagged exterior Tet4 faces.
+Each ray samples a normalized spatial profile, discrete wavelength spectrum,
+and angular distribution. Within each tetrahedron, power changes according to
 
 .. math::
 
-   I_0(x,y) = I_{\mathrm{peak}}
-   \exp\left[-\left(\sqrt{\frac{x^2}{r_y^2} + \frac{y^2}{r_x^2}}\right)^q\right].
+   P_{out} = P_{in} \exp(g_p \ell), \qquad
+   g_p = N_{tot}[\beta(\sigma_a+\sigma_e)-\sigma_a].
 
-For the configured pump wavelength, it propagates intensity through adjacent z
-levels using the mean population :math:`\bar\beta_z`:
+The absorbed photon rate is deposited conservatively into the traversed cell
+and mapped to the inversion samples. Tagged planar affine relays provide
+finite return passes with explicit transmission and aperture vignetting. Pump
+power is specified as aperture-integrated total power rather than peak
+intensity.
 
-.. math::
-
-   I_{z+\Delta z} = I_z
-   \exp\left[-\left(\sigma_a
-   - \bar\beta_z(\sigma_a+\sigma_e)\right)
-   N_{\mathrm{tot}}\Delta z\right].
-
-The local pump rate is
-
-.. math::
-
-   \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
-   = \left[\sigma_a - \beta(\sigma_a+\sigma_e)\right]
-   I\frac{\lambda}{hc}.
-
-With back reflection, the transmitted far-end intensity is scaled by the chosen
-reflectivity and propagated in the reverse direction before both intensities
-are added. ``extraction`` suppresses the inlet pump. The configured
-``pumpSubsteps`` value is retained in the transport format for compatibility;
-the current compiled traversal evaluates this rate directly and does not use it
-to subdivide a time step.
-
-The compiled integrator then advances the combined derivative. Standard RK4
-re-evaluates ASE at each stage; ``FrozenPhiAseRungeKutta4`` reuses its first ASE
-calculation for the remaining stages when that approximation is appropriate.
-``Simulation(enableASE=False, ...)`` disables ASE and advances only pump and
-fluorescence. Custom Python pump or time-integration functions cannot run
-inside the compiled loop.
+The compiled integrator advances the combined derivative. Standard RK4
+re-evaluates ASE and pump transport at each stage;
+``FrozenPhiAseRungeKutta4`` reuses its first ASE calculation for the remaining
+stages. ``Simulation(enableASE=False, ...)`` advances only pump and
+fluorescence.
 
 Restrictions
 ------------
 
-The number of rays used for the Monte Carlo integration of a single sampling
-point is limited by the available GPU memory.
+Pump polarization, coating interactions, residual cavity recirculation, and
+custom Python transport callbacks are not included in the general pump core.
+The pump ray count is limited by runtime and available device memory.
 
 User-Relevant Features
-----------------------
+-----------------------
 
-HASEonGPU can run on a single workstation or on GPU clusters with MPI.  The
+HASEonGPU can run on a single workstation or on GPU clusters with MPI.
 ASE setup can include polychromatic spectra, cladding, surface coatings,
 refractive-index changes, upper/lower-surface reflections, and adaptive
 sampling up to the configured ray limit.

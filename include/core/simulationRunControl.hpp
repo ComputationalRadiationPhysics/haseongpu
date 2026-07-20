@@ -8,31 +8,57 @@
 #pragma once
 
 #include <limits>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 namespace hase::core
 {
-    struct PumpRoutine
+    struct PumpProfileParameters
     {
-        static inline std::string const ONE_DIMENSIONAL_Z_TRAVERSAL = "one-dimensional-z-traversal";
+        unsigned kind = 0u;
+        double radiusU = 1.0;
+        double radiusV = 1.0;
+        double exponent = 2.0;
+        double center[3] = {0.0, 0.0, 0.0};
+        double axisU[3] = {1.0, 0.0, 0.0};
+        double axisV[3] = {0.0, 1.0, 0.0};
+    };
+
+    struct PumpRelayParameters
+    {
+        std::vector<int> exitSurfaces;
+        std::vector<int> entrySurfaces;
+        bool flipU = false;
+        bool flipV = false;
+        double rotation = 0.0;
+        double offset[2] = {0.0, 0.0};
+        double tilt[2] = {0.0, 0.0};
+        double magnification = 1.0;
+        double transmission = 1.0;
+    };
+
+    struct PumpSourceParameters
+    {
+        std::vector<int> surfaces;
+        double totalPower = 0.0;
+        std::vector<double> wavelengths;
+        std::vector<double> spectralWeights;
+        std::vector<double> sigmaAbsorption;
+        std::vector<double> sigmaEmission;
+        std::vector<double> polarAngles;
+        std::vector<double> azimuthalAngles;
+        std::vector<double> angularWeights;
+        PumpProfileParameters profile;
+        std::vector<PumpRelayParameters> relays;
     };
 
     struct PumpParameters
     {
-        std::string routine = PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL;
-        double intensity = 0.0;
-        double wavelength = 0.0;
-        double radiusX = 0.0;
-        double radiusY = 0.0;
-        double exponent = 40.0;
-        double duration = 0.0;
-        double sigmaAbsorption = 0.0;
-        double sigmaEmission = 0.0;
-        double temporaryFluorescence = 0.0;
-        unsigned substeps = 100u;
-        bool backReflection = true;
-        bool extraction = false;
-        double reflectivity = 1.0;
+        unsigned schemaVersion = 1u;
+        unsigned rayCount = 100000u;
+        std::uint32_t rngSeed = 5489u;
+        std::vector<PumpSourceParameters> sources;
     };
 
     struct TimeIntegrator

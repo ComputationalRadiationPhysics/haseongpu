@@ -18,7 +18,7 @@
 #include <core/types.hpp>
 #include <kernels/activePointMasks.hpp>
 #include <kernels/derivativeComposition.hpp>
-#include <kernels/oneDimensionalPump.hpp>
+#include <kernels/generalPump.hpp>
 #include <kernels/pointBetaMapping.hpp>
 #include <kernels/timeIntegrationUpdateKernels.hpp>
 
@@ -97,6 +97,25 @@ namespace hase::core
             return experiment.sigmaA.at(std::min(index, experiment.sigmaA.size() - 1u));
         }
 
+        std::vector<double> makeLumpedSampleVolumes(HostMesh const& mesh)
+        {
+            std::vector<double> volumes(mesh.numberOfSamples, 0.0);
+            if(!mesh.samplePointsAreMeshPoints)
+            {
+                for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
+                    volumes[cell] = static_cast<double>(mesh.cellVolumes[cell]);
+                return volumes;
+            }
+            for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
+            {
+                double const share = static_cast<double>(mesh.cellVolumes[cell])
+                                     / static_cast<double>(mesh.numberOfCellVertices);
+                for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
+                    volumes[mesh.cellPointIndices[cell * mesh.numberOfCellVertices + vertex]] += share;
+            }
+            return volumes;
+        }
+
         void validateRunParameters(SimulationRunControl const& run)
         {
             if(run.timeStep <= 0.0)
@@ -107,22 +126,16 @@ namespace hase::core
             {
                 throw std::runtime_error("simulation number_of_steps must be positive");
             }
-            if(run.pump.routine != PumpRoutine::ONE_DIMENSIONAL_Z_TRAVERSAL)
-            {
-                throw std::runtime_error("unsupported pump routine '" + run.pump.routine + "'");
-            }
-            if(run.pump.substeps < 2u)
-            {
-                throw std::runtime_error("pump_substeps must be at least 2");
-            }
-            if(run.pump.duration <= 0.0)
-            {
-                throw std::runtime_error("pump_duration must be positive");
-            }
-            if(run.pump.radiusX <= 0.0 || run.pump.radiusY <= 0.0)
-            {
-                throw std::runtime_error("pump radii must be positive");
-            }
+            if(run.pump.schemaVersion != 1u || run.pump.rayCount == 0u || run.pump.sources.empty())
+                throw std::runtime_error("invalid general pump configuration");
+            for(auto const& source : run.pump.sources)
+                if(source.totalPower <= 0.0 || source.surfaces.empty() || source.wavelengths.empty()
+                   || source.wavelengths.size() != source.spectralWeights.size()
+                   || source.wavelengths.size() != source.sigmaAbsorption.size()
+                   || source.wavelengths.size() != source.sigmaEmission.size()
+                   || source.polarAngles.empty() || source.polarAngles.size() != source.azimuthalAngles.size()
+                   || source.polarAngles.size() != source.angularWeights.size())
+                    throw std::runtime_error("invalid general pump source configuration");
         }
     } // namespace detail
 
@@ -155,7 +168,6 @@ namespace hase::core
             , m_beta(hase::alpakaUtils::toDevice(m_queue, hostMesh.betaCells))
             , m_betaNext(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_stage(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_pumpedBeta(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_betaVolume(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfPrisms)))
             , m_phiAse(alpaka::onHost::alloc<float>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_activeMask(alpaka::onHost::alloc<unsigned>(device, static_cast<std::size_t>(m_mesh.numberOfPoints)))
@@ -166,14 +178,8 @@ namespace hase::core
             , m_k2(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_k3(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
             , m_k4(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_pumpForward(
-                  alpaka::onHost::alloc<double>(
-                      device,
-                      static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
-            , m_pumpBackward(
-                  alpaka::onHost::alloc<double>(
-                      device,
-                      static_cast<std::size_t>(m_mesh.numberOfPoints * m_mesh.numberOfLevels)))
+            , m_cellPumpIntegral(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_lumpedSampleVolume(hase::alpakaUtils::toDevice(m_queue, detail::makeLumpedSampleVolumes(hostMesh)))
         {
             hase::kernels::enqueueBuildActivePointMask(m_devBundle, m_queue, m_mesh, m_activeMask);
             alpaka::onHost::wait(m_queue);
@@ -196,7 +202,6 @@ namespace hase::core
         struct DerivativeBuffers
         {
             T_DoubleBuffer& betaCells;
-            T_DoubleBuffer& pumpedBeta;
             T_FloatBuffer& phiAse;
             T_UnsignedBuffer& activeMask;
             T_DoubleBuffer& dndtPump;
@@ -238,19 +243,20 @@ namespace hase::core
 
             if(pumpEnabled)
             {
-                hase::kernels::enqueueOneDimensionalPump(
+                hase::kernels::enqueueGeneralPump(
                     m_devBundle,
                     m_queue,
+                    m_hostMesh,
                     m_mesh,
                     m_run.pump,
-                    beta,
-                    m_pumpedBeta,
-                    m_pumpForward,
-                    m_pumpBackward);
+                    m_betaVolume,
+                    m_cellPumpIntegral,
+                    m_lumpedSampleVolume,
+                    m_dndtPump);
             }
 
             DerivativeBuffers
-                derivativeBuffers{beta, m_pumpedBeta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
+                derivativeBuffers{beta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
                 m_queue,
@@ -258,7 +264,6 @@ namespace hase::core
                 detail::absorptionAtEmissionPeak(m_experiment),
                 m_experiment.maxSigmaE,
                 std::max(static_cast<double>(m_hostMesh.crystalTFluo), std::numeric_limits<double>::min()),
-                m_run.pump.duration,
                 pumpEnabled,
                 derivativeBuffers);
             alpaka::onHost::wait(m_queue);
@@ -479,7 +484,6 @@ namespace hase::core
         T_DoubleBuffer m_beta;
         T_DoubleBuffer m_betaNext;
         T_DoubleBuffer m_stage;
-        T_DoubleBuffer m_pumpedBeta;
         T_DoubleBuffer m_betaVolume;
         T_FloatBuffer m_phiAse;
         Result m_lastVolumeAseResult;
@@ -491,8 +495,8 @@ namespace hase::core
         T_DoubleBuffer m_k2;
         T_DoubleBuffer m_k3;
         T_DoubleBuffer m_k4;
-        T_DoubleBuffer m_pumpForward;
-        T_DoubleBuffer m_pumpBackward;
+        T_DoubleBuffer m_cellPumpIntegral;
+        T_DoubleBuffer m_lumpedSampleVolume;
         Result m_lastAseResult;
     };
 

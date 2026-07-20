@@ -21,7 +21,6 @@ namespace hase::kernels
     template<typename T>
     concept ComposeDerivativeBufferHandle = requires(T buffers) {
         buffers.betaCells;
-        buffers.pumpedBeta;
         buffers.phiAse;
         buffers.activeMask;
         buffers.dndtPump;
@@ -34,14 +33,12 @@ namespace hase::kernels
         double sigmaAbsorption = 0.0;
         double sigmaEmission = 0.0;
         double tau = 1.0;
-        double pumpDuration = 1.0;
         bool pumpEnabled = true;
 
         ALPAKA_FN_ACC void operator()(
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             auto betaCells,
-            auto pumpedBeta,
             auto phiAse,
             auto activeMask,
             auto dndtPump,
@@ -55,12 +52,13 @@ namespace hase::kernels
             {
                 unsigned const point = sample % mesh.numberOfPoints;
                 double const beta = betaCells[sample];
-                double const pumpTerm = pumpEnabled ? (pumpedBeta[sample] - beta) / pumpDuration : 0.0;
+                double const pumpTerm = pumpEnabled ? dndtPump[sample] : 0.0;
                 double const gainPerDensity = beta * (sigmaEmission + sigmaAbsorption) - sigmaAbsorption;
                 double const aseTerm
                     = activeMask[point] != 0u ? gainPerDensity * static_cast<double>(phiAse[sample]) : 0.0;
 
-                dndtPump[sample] = pumpTerm;
+                if(!pumpEnabled)
+                    dndtPump[sample] = 0.0;
                 dndtAse[sample] = aseTerm;
                 derivative[sample] = pumpTerm - aseTerm - beta / tau;
             }
@@ -74,7 +72,6 @@ namespace hase::kernels
         double sigmaAbsorption,
         double sigmaEmission,
         double tau,
-        double pumpDuration,
         bool pumpEnabled,
         ComposeDerivativeBufferHandle auto& buffers)
     {
@@ -85,10 +82,9 @@ namespace hase::kernels
         queue.enqueue(
             frameSpec,
             alpaka::KernelBundle{
-                ComposeDerivative{sigmaAbsorption, sigmaEmission, tau, pumpDuration, pumpEnabled},
+                ComposeDerivative{sigmaAbsorption, sigmaEmission, tau, pumpEnabled},
                 mesh,
                 buffers.betaCells,
-                buffers.pumpedBeta,
                 buffers.phiAse,
                 buffers.activeMask,
                 buffers.dndtPump,

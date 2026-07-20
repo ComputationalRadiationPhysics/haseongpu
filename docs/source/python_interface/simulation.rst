@@ -38,9 +38,8 @@ continue for the full run:
 to ``runSteps`` or store it on ``PumpProperties`` and then call
 ``simulation.runSteps(150)``.  When neither location provides ``pumpSteps``, the
 pump is active for every step passed to ``runSteps``.  This is different from
-``PumpProperties.pumpSubsteps``, which is a compatibility field for pump
-routines with inner time integration and does not count outer simulation
-steps.
+``PumpProperties.rayCount``, which controls the Monte Carlo sampling
+resolution of each pump evaluation and does not count outer simulation steps.
 
 Run until a target time:
 
@@ -71,7 +70,7 @@ evaluation, derivative composition, time integration, clipping, and prism beta
 mapping all run in C++/Alpaka.  Python only runs ``onInit`` before launch and
 ``onStep`` callbacks as snapshots arrive.
 
-The supported compiled pump routine is ``one-dimensional-z-traversal``.
+The compiled pump uses tagged boundary sources and optional planar relays.
 Set ``enableASE=False`` to run the same pump, fluorescence, and integration
 path while omitting ASE depletion; ASE result fields remain present and are
 filled with zeros.
