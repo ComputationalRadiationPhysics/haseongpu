@@ -343,11 +343,7 @@ namespace hase::core
         }
 
 #ifdef HASE_ENABLE_BENCHMARK
-        hase::benchmark::ScopedRunContext benchmarkContext{
-            meshes.at(firstDevice).m_device,
-            exec,
-            compute,
-            experiment};
+        hase::benchmark::ScopedRunContext benchmarkContext{meshes.at(firstDevice).m_device, exec, compute, experiment};
 #endif
         BENCH(ForwardPhiAseBatch);
 

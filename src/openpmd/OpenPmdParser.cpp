@@ -1201,7 +1201,7 @@ namespace hase::openpmd
         {
             validationError("forward_ray_length", "is retired; forward rays now propagate to their physical boundary");
         }
-        experiment.reflectionMaxIterations = attributeOr<unsigned>(iteration, field::reflectionMaxIterations, 8u);
+        experiment.reflectionMaxIterations = attributeOr<unsigned>(iteration, field::reflectionMaxIterations, 40u);
         experiment.reflectionTolerance = attributeOr<double>(iteration, field::reflectionTolerance, 1.0e-4);
         experiment.surfaceReservoirSize = attributeOr<unsigned>(iteration, field::surfaceReservoirSize, 32u);
         if(experiment.reflectionTolerance < 0.0)

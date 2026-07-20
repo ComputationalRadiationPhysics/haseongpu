@@ -101,7 +101,7 @@ explicitly validated proposal model.
 ``reflectionMaxIterations``
    Hard cap on reflected SRM passes after the direct pass. It is serialized as
    the openPMD ``reflection_max_iterations`` request attribute and defaults to
-   ``8``. ``HASE_SRM_MAX_ITERATIONS`` overrides it at runtime and must be a
+   ``40``. ``HASE_SRM_MAX_ITERATIONS`` overrides it at runtime and must be a
    positive integer.
 
 ``reflectionTolerance``
@@ -205,7 +205,7 @@ A YAML file can keep experiment and compute settings together:
      repetitions: 2
      adaptive_steps: 4
      use_reflections: true
-     reflection_max_iterations: 8
+     reflection_max_iterations: 40
      reflection_tolerance: 1.0e-4
      surface_reservoir_size: 32
      monochromatic: false
