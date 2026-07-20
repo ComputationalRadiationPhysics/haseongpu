@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -27,8 +26,10 @@ def _library_names():
     return ("libHaseOpenPmdBackendProbe.so",)
 
 
-def _binding_package_dirs():
-    spec = importlib.util.find_spec("HASEonGPU_Bindings")
+def _runtime_package_dirs():
+    from importlib.util import find_spec
+
+    spec = find_spec("pyInclude._runtime")
     if spec is None or spec.submodule_search_locations is None:
         return ()
     return tuple(Path(path) for path in spec.submodule_search_locations)
@@ -57,7 +58,7 @@ def _candidate_paths(extra_dirs=()):
             if candidate is not None:
                 yield candidate
 
-    for package_dir in _binding_package_dirs():
+    for package_dir in _runtime_package_dirs():
         for name in _library_names():
             candidate = yield_path(package_dir / name)
             if candidate is not None:
@@ -65,17 +66,17 @@ def _candidate_paths(extra_dirs=()):
 
     for parent in module_dir.parents:
         for name in _library_names():
-            candidate = yield_path(parent / "build" / "python" / "HASEonGPU_Bindings" / name)
+            candidate = yield_path(parent / "build" / "python" / "pyInclude" / "_runtime" / name)
             if candidate is not None:
                 yield candidate
-            candidate = yield_path(parent / "build" / "ci" / "python" / "HASEonGPU_Bindings" / name)
+            candidate = yield_path(parent / "build" / "ci" / "python" / "pyInclude" / "_runtime" / name)
             if candidate is not None:
                 yield candidate
 
         build_root = parent / "build"
         if not build_root.is_dir():
             continue
-        for binding_dir in sorted(build_root.glob("*/python/HASEonGPU_Bindings")):
+        for binding_dir in sorted(build_root.glob("*/python/pyInclude/_runtime")):
             for name in _library_names():
                 candidate = yield_path(binding_dir / name)
                 if candidate is not None:

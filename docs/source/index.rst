@@ -10,10 +10,11 @@ HASEonGPU (**H**\ igh performance **A**\ mplified **S**\ pontaneous **E**\ missi
 open-source HPC software for calculating amplified spontaneous emission (ASE)
 flux in laser gain media.
 
-HASEonGPU 2.x releases ship the Python frontend and compiled C++ backend together. The
-Python package is the primary user-facing interface, and the C++ backend,
-headers, command-line executable, and CMake package export use the same release
-version for downstream integration.
+HASEonGPU 2.1 ships the Python frontend and compiled C++ backend together. The
+frontend uses openPMD to communicate with the standalone backend; legacy
+in-process Python bindings are not supported. The C++ backend, headers,
+command-line executable, and CMake package export use the same release version
+for downstream integration.
 
 It is intended to support the design and analysis of high-power laser systems,
 where ASE is an important limiting effect for stored energy, gain distribution,
@@ -42,4 +43,3 @@ Contents
    mpi
    pythonInterface
    pythonAPI
-   pythonInterfaceLegacy

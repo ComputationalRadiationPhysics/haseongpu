@@ -293,7 +293,7 @@ def _io():
     try:
         return transport._io()
     except RuntimeError as exc:
-        if "CMake-built openpmd_api" in str(exc):
+        if "openpmd_api" in str(exc):
             pytest.skip(str(exc))
         raise
 
@@ -430,7 +430,6 @@ def test_layoutHelpersDefineExactBackendFlatContract():
 
 
 def test_backendNamesMapToConfigs(monkeypatch):
-    assert transport._backend_spec().name == "adios-sst"
     assert transport._backend_spec("adios").suffix == ".bp"
     assert transport._backend_spec("adios").config == {"backend": "adios2"}
     assert transport._backend_spec("adios-sst").suffix == ".sst"
@@ -453,6 +452,28 @@ def test_backendNamesMapToConfigs(monkeypatch):
             transport._backend_spec(backend)
 
 
+def test_autoBackendPrefersSstThenAdiosThenHdf5(monkeypatch, tmp_path):
+    executable = tmp_path / "calcPhiASE"
+    executable.write_text("", encoding="utf-8")
+    io = SimpleNamespace(
+        variants={"adios2": True, "hdf5": True},
+        file_extensions=("sst", "bp", "h5"),
+    )
+    monkeypatch.setattr(transport, "_io", lambda executable=None: io)
+    monkeypatch.setattr(
+        transport,
+        "_probed_openpmd_backends",
+        lambda executable: (("adios-sst", "adios", "hdf5"), tmp_path / "probe"),
+    )
+    assert transport._ensure_backend_available("auto", executable).name == "adios-sst"
+    monkeypatch.setattr(
+        transport,
+        "_probed_openpmd_backends",
+        lambda executable: (("hdf5",), tmp_path / "probe"),
+    )
+    assert transport._ensure_backend_available("auto", executable).name == "hdf5"
+
+
 def test_openPmdBackendProbeIsCachedPerExecutable(monkeypatch, tmp_path):
     transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
     executable = tmp_path / "calcPhiASE"
@@ -467,7 +488,7 @@ def test_openPmdBackendProbeIsCachedPerExecutable(monkeypatch, tmp_path):
 
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
     assert transport._probed_openpmd_backends(executable)[0] == ("adios",)
-    assert calls == [(executable.resolve().parent, executable.resolve().parent / "python" / "HASEonGPU_Bindings")]
+    assert calls == [(executable.resolve().parent, executable.resolve().parent / "python" / "pyInclude" / "_runtime")]
 
 
 def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path):
@@ -483,10 +504,10 @@ def test_openPmdBackendProbeRejectsUnavailableYamlBackend(monkeypatch, tmp_path)
     monkeypatch.setattr(
         transport,
         "_io",
-        lambda executable=None: (_ for _ in ()).throw(AssertionError("openpmd_api should not be imported")),
+        lambda executable=None: SimpleNamespace(variants={"adios2": True, "hdf5": True}, file_extensions=("bp", "h5")),
     )
 
-    with pytest.raises(RuntimeError, match="YAML 'openpmd_backend'.*available backends: adios"):
+    with pytest.raises(RuntimeError, match="available backends: adios"):
         transport._ensure_backend_available("hdf5")
 
 
@@ -958,7 +979,11 @@ def test_openPmdSessionAssignsMonotonicRequestIterations(monkeypatch):
     calls = []
 
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: Path("calcPhiASE"))
-    monkeypatch.setattr(transport, "_ensure_backend_available", lambda backend, executable=None: None)
+    monkeypatch.setattr(
+        transport,
+        "_ensure_backend_available",
+        lambda backend, executable=None: transport.OPENPMD_BACKENDS["adios"],
+    )
 
     def fake_run_file_iteration(self, iteration_index, phi_ase, gain_medium, cross_sections):
         calls.append((iteration_index, phi_ase, gain_medium, cross_sections))
@@ -1011,7 +1036,7 @@ def test_openPmdApiRejectsMissingModule(monkeypatch, tmp_path):
     monkeypatch.setattr(transport, "_candidate_python_paths", lambda executable: iter([tmp_path / "missing"]))
     monkeypatch.setattr(
         transport,
-        "_binding_config",
+        "_runtime_config",
         lambda: SimpleNamespace(HASE_USE_SYSTEM_OPENPMD=False),
     )
 
@@ -1023,7 +1048,7 @@ def test_openPmdApiAllowsExternalImport(monkeypatch):
     monkeypatch.setattr(transport, "_candidate_python_paths", lambda executable: iter([]))
     monkeypatch.setattr(
         transport,
-        "_binding_config",
+        "_runtime_config",
         lambda: SimpleNamespace(HASE_USE_SYSTEM_OPENPMD=True),
     )
 
@@ -1037,7 +1062,7 @@ def test_openPmdApiCandidatePathsIncludeConfiguredProvider(monkeypatch, tmp_path
     monkeypatch.delenv("HASE_OPENPMD_PYTHON_PACKAGE_DIR", raising=False)
     monkeypatch.setattr(
         transport,
-        "_binding_config",
+        "_runtime_config",
         lambda: SimpleNamespace(HASE_OPENPMD_PYTHON_PACKAGE_DIR=str(configured)),
     )
 
@@ -1053,7 +1078,7 @@ def test_openPmdApiUsesRuntimeOverride(monkeypatch, tmp_path):
     monkeypatch.setenv("HASE_OPENPMD_PYTHONPATH", str(runtime_package))
     monkeypatch.setattr(
         transport,
-        "_binding_config",
+        "_runtime_config",
         lambda: SimpleNamespace(HASE_OPENPMD_PYTHON_PACKAGE_DIR=str(configured)),
     )
 
@@ -1305,11 +1330,14 @@ def _target_uses_openpmd_main(build_dir):
 
 def _installed_calc_phi_ase_candidates():
     try:
-        import HASEonGPU_Bindings
+        from importlib.util import find_spec
+
+        spec = find_spec("pyInclude._runtime")
     except ImportError:
         return []
-
-    return [Path(path) / "calcPhiASE" for path in HASEonGPU_Bindings.__path__]
+    if spec is None or spec.submodule_search_locations is None:
+        return []
+    return [Path(path) / "calcPhiASE" for path in spec.submodule_search_locations]
 
 
 def _calc_phi_ase_candidates():
@@ -1318,7 +1346,7 @@ def _calc_phi_ase_candidates():
         yield Path(env)
     yield from _installed_calc_phi_ase_candidates()
     for build_dir in _build_dir_candidates():
-        yield build_dir / "python" / "HASEonGPU_Bindings" / "calcPhiASE"
+        yield build_dir / "python" / "pyInclude" / "_runtime" / "calcPhiASE"
         yield build_dir / "calcPhiASE"
 
 

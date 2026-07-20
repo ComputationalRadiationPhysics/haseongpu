@@ -6,9 +6,9 @@
 TEST_CASE("HASEonGPU version macros expose string and comparable numeric version", "[version]")
 {
     static_assert(HASEONGPU_VERSION_MAJOR == 2);
-    static_assert(HASEONGPU_VERSION_MINOR == 0);
-    static_assert(HASEONGPU_VERSION_PATCH == 2);
-    static_assert(HASEONGPU_VERSION == HASEONGPU_VERSION_NUMBER(2, 0, 2));
+    static_assert(HASEONGPU_VERSION_MINOR == 1);
+    static_assert(HASEONGPU_VERSION_PATCH == 0);
+    static_assert(HASEONGPU_VERSION == HASEONGPU_VERSION_NUMBER(2, 1, 0));
 
-    CHECK(std::string{HASEONGPU_VERSION_STRING} == "2.0.2");
+    CHECK(std::string{HASEONGPU_VERSION_STRING} == "2.1.0");
 }

@@ -79,7 +79,7 @@ option(
 )
 option(
     HASE_ENABLE_PYTHON
-    "Build the HASEonGPU Python extension and installable Python package artifacts"
+    "Install the HASEonGPU Python frontend and its private runtime artifacts"
     ON
 )
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
@@ -567,7 +567,7 @@ endforeach()
 alpaka_finalize(calcPhiASE)
 
 if(HASE_ENABLE_PYTHON)
-    include(cmake/pythonBindings.cmake)
+    include(cmake/pythonRuntime.cmake)
 endif()
 
 # Testing

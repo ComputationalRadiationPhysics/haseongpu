@@ -31,11 +31,7 @@ def ensure_hase_importable():
         importlib.import_module("HASEonGPU")
         return
     except ModuleNotFoundError as err:
-        if err.name not in {
-            "HASEonGPU",
-            "HASEonGPU_Bindings",
-            "HASEonGPU_Bindings.HASEonGPU",
-        }:
+        if err.name != "HASEonGPU":
             raise
     finally:
         sys.path[:] = original_path

@@ -131,7 +131,7 @@ else()
 endif()
 
 set(HASE_OPENPMD_GIT_REPOSITORY "https://github.com/openPMD/openPMD-api.git")
-set(HASE_OPENPMD_GIT_TAG "0.17.0")
+set(HASE_OPENPMD_GIT_TAG "0.17.1")
 set(HASE_ADIOS2_GIT_REPOSITORY "https://github.com/ornladios/ADIOS2.git")
 set(HASE_ADIOS2_GIT_TAG "v2.12.1")
 set(HASE_HDF5_GIT_REPOSITORY "https://github.com/HDFGroup/hdf5.git")

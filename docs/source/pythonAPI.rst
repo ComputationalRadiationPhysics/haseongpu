@@ -83,6 +83,7 @@ Pump solvers, field helpers, and utilities
    backendFlat
    vtkWedge
    writeGainMediumVtk
+   writeParaviewState
 
 The ``unitDimension`` namespace is exported from ``HASEonGPU`` and contains
 predefined openPMD unit-dimension tuples for HASE transport variables and common

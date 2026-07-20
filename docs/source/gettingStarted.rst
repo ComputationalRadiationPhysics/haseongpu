@@ -72,7 +72,7 @@ selection:
 
 * openPMD provider: auto, bundled, or system
 * ADIOS2/HDF5 handling for the selected provider
-* runtime openPMD backend: ``adios-sst``, ``adios``, or ``hdf5``
+* runtime openPMD backend: automatic selection, or ``adios-sst``, ``adios``, or ``hdf5``
 * Alpaka compute backend
 * single-process or MPI mode
 * native CPU optimizations for the local machine
@@ -99,9 +99,9 @@ The configurator prints a command of this form:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
 Run the printed command if you did not let the configurator install
-immediately.  ``python3 -m pip install -v .`` builds the C++ extension through
-scikit-build/CMake, installs the Python package, and shows the CMake/build
-output.  ``CMAKE_ARGS`` is how you pass build options such as the openPMD
+immediately.  ``python3 -m pip install -v .`` builds the standalone C++ backend
+and private runtime helpers through scikit-build/CMake, installs the Python
+frontend, and shows the CMake/build output.  ``CMAKE_ARGS`` is how you pass build options such as the openPMD
 provider, MPI mode, Alpaka choices, and native CPU optimization setting.
 
 If pip reports an externally managed Python environment, prefer a virtual

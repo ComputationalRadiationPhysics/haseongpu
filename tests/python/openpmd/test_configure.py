@@ -45,6 +45,7 @@ def test_externalBackendsIntersectSupport():
 
 def test_preferredBackendValidatesRequest():
     assert preferred_openpmd_backend(["adios", "hdf5"]) == "adios"
+    assert preferred_openpmd_backend(["adios", "hdf5"], "auto") == "adios"
     assert preferred_openpmd_backend(["adios", "hdf5"], "hdf5") == "hdf5"
 
 

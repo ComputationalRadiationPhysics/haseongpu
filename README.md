@@ -22,7 +22,7 @@ HASEonGPU is an open-source HPC software for calculating amplified spontaneous e
 Release Scope
 -------------
 
-HASEonGPU 2.x releases ship the Python frontend and the compiled C++ backend as one supported release unit. The Python package is the primary user-facing interface, while the C++ backend, command-line executable, headers, and CMake package export are versioned with the same release number for downstream builds and reproducible integration.
+HASEonGPU 2.1 ships the Python frontend and compiled C++ backend as one supported release unit. Python communicates with the standalone backend through openPMD; the former in-process Python bindings are no longer part of the supported interface. The backend executable, headers, and CMake package export use the same release number for downstream builds and reproducible integration.
 
 Documentation
 ----------------

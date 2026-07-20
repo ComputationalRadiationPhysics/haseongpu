@@ -4,14 +4,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Public Python convenience exports for HASEonGPU."""
+"""Public Python convenience exports for HASEonGPU's openPMD frontend."""
 
-import HASEonGPU_Bindings
-
-__version__ = "2.0.2"
+__version__ = "2.1.0"
 
 from .alpakaUtils import AlpakaBackends
-from .calcPhiASE import calcPhiASE
 from .openpmd import (
     BaseGroup,
     BaseSchema,
@@ -45,7 +42,7 @@ from .simulation import (
     TimeSteppedSimulation,
 )
 from .gainMap import calcGainFromState
-from .structures import Result as TransportResult
+from .openpmd.paraview import writeParaviewState
 from .vtkWedge import vtkWedge
 from .timeIntegration import (
     ExplicitEuler,
@@ -59,5 +56,3 @@ from .timeIntegration import (
     TimeIntegrationResult,
     TimeIntegrationSolver,
 )
-
-Mesh = HASEonGPU_Bindings.HostMesh

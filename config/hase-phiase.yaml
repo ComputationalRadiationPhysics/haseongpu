@@ -8,7 +8,7 @@ experiment:
 compute:
   repetitions: 1
   backend: Host_Cpu_CpuSerial
-  openpmd_backend: adios
+  openpmd_backend: auto
   parallelMode: single
   numDevices: 4
   nPerNode: 1

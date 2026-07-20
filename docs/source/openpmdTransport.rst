@@ -10,7 +10,9 @@ Storage Backends
 ----------------
 
 The openPMD storage backend is independent from the Alpaka compute backend.
-Accepted runtime values are:
+``auto`` is the default: it chooses the first backend supported by both the
+compiled and Python openPMD providers in this order: ``adios-sst``, ``adios``,
+then ``hdf5``. Explicit runtime values are:
 
 ``adios-sst``
    ADIOS2 SST streaming series.  This is the default when supported.
@@ -26,21 +28,16 @@ Select it in Python or YAML:
 
 .. code-block:: python
 
-   phi_ase = PhiASE(..., openpmdBackend="adios-sst")
+   phi_ase = PhiASE(..., openpmdBackend="auto")
 
 .. code-block:: yaml
 
    compute:
      backend: Host_Cpu_CpuSerial       # Alpaka compute backend
-     openpmd_backend: adios-sst        # openPMD storage/streaming backend
+     openpmd_backend: auto              # choose a compatible backend
 
-For direct helper calls, pass ``transport=``:
-
-.. code-block:: python
-
-   import pyInclude.openpmd.transport as transport
-
-   result = transport.runPhiASE(phi_ase, medium, spectra, transport="adios-sst")
+Set ``PhiASE.openpmdBackend`` or the YAML ``openpmd_backend`` value to override
+automatic selection for a particular run.
 
 Streaming Sessions
 ------------------
@@ -170,7 +167,7 @@ Artifact Retention
 Temporary transport artifacts are normally removed when a session exits.  These
 environment variables help with debugging:
 
-``HASE_OPENPMD_ARTIFACTS=1``
+``HASE_OPENPMD_KEEP_ARTIFACTS=1``
    Keep artifacts below ``./hase-openpmd-artifacts``.
 
 ``HASE_OPENPMD_ARTIFACT_DIR=/path``
@@ -179,15 +176,15 @@ environment variables help with debugging:
 ``HASE_OPENPMD_ARTIFACT_PREFIX=name``
    Prefix generated artifact names.
 
-``HASE_OPENPMD_RUN_ID=id``
+``HASE_OPENPMD_ARTIFACT_RUN_ID=id``
    Use a stable run id instead of a timestamped id.
 
-``HASE_OPENPMD_WATCHDOG_INTERVAL_SECONDS=30``
+``HASE_OPENPMD_WATCHDOG_INTERVAL=30``
    Watchdog interval while the result receiver waits.  Use ``0`` or ``none`` to
    disable the watchdog.
 
-``HASE_OPENPMD_CLOSE_TIMEOUT_SECONDS=10``
+``HASE_OPENPMD_THREAD_JOIN_TIMEOUT=10``
    Time allowed for streaming helper threads to stop during session close.
 
-``HASE_OPENPMD_CALC_BINARY=/path/to/calcPhiASE``
+``HASE_CALCPHIASE=/path/to/calcPhiASE``
    Force the Python transport to use a specific binary.

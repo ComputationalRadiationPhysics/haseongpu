@@ -17,9 +17,8 @@ Recommended validation flow:
    `-DHASE_TESTING=ON`, and `-DHASE_ENABLE_PYTHON=ON`.
 3. Use `-DHASE_NATIVE_OPTIMIZATIONS=OFF` for redistributable binaries or wheels.
 4. Build the tree and run `ctest --output-on-failure`.
-5. Install the Python package before running Python tests; `pytest` from a raw
-   checkout is expected to fail because `HASEonGPU_Bindings.HASEonGPU` is a
-   compiled extension.
+5. Install the Python package before running Python tests; `pytest` requires
+   the packaged `calcPhiASE` executable and backend-probe library.
 6. Validate `import HASEonGPU`, then run `pytest tests`.
 7. Run `git diff --check` and pre-commit before merging or tagging.
 

@@ -89,7 +89,8 @@ Core HASE Options
    disable for redistributable wheels or unknown target CPUs.
 
 ``HASE_ENABLE_PYTHON``
-   Default ``ON``.  Builds the Python extension and package artifacts.  Set
+   Default ``ON``.  Installs the Python frontend and its private backend runtime
+   artifacts. Set
    ``OFF`` for command-line-only C++ builds.
 
 ``HASE_TESTING``
@@ -213,13 +214,13 @@ Runtime selection is still done through user configuration:
 
 .. code-block:: python
 
-   phi_ase = PhiASE(..., backend="Host_Cpu_CpuSerial", openpmdBackend="adios-sst")
+   phi_ase = PhiASE(..., backend="Host_Cpu_CpuSerial", openpmdBackend="auto")
 
 .. code-block:: yaml
 
    compute:
      backend: Host_Cpu_CpuSerial
-     openpmd_backend: adios-sst
+     openpmd_backend: auto
 
 Use ``python3 utils/configure_hase.py`` or ``hase-configure`` to generate a
 matching YAML snippet and install command for common setups.

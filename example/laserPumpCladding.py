@@ -30,8 +30,10 @@ from HASEonGPU import (  # noqa: E402
     Simulation,
     PumpRadiationProfile,
     vtkWedge,
+    writeParaviewState,
 )
-from pyInclude.openpmd.paraview import writeParaviewState  # noqa: E402
+
+
 def printState(state):
     print(
         f"step={state.step:03d} "

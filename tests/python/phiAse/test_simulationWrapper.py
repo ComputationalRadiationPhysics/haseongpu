@@ -84,7 +84,7 @@ def test_phiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
 
 
 def test_phiAseLoadsOpenPmdBackendFromConfig():
-    assert PhiASE().openpmdBackend == "adios-sst"
+    assert PhiASE().openpmdBackend == "auto"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
     assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
 
@@ -283,11 +283,6 @@ def test_runStepsDefaultsToPersistentSession(monkeypatch):
     def fakeStep(self, *, openpmdSession=None):
         events.append(("step", openpmdSession))
 
-    monkeypatch.setattr(
-        simulation_module.transport,
-        "_backend_spec",
-        lambda backend=None: captured.update({"backend": backend}) or SimpleNamespace(streaming=True),
-    )
     monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
 
     simulation_module.Simulation.runSteps(simulation, 1)
@@ -297,7 +292,6 @@ def test_runStepsDefaultsToPersistentSession(monkeypatch):
         ("step", openpmdSession),
         ("closeStream",),
     ]
-    assert captured["backend"] == "adios-sst"
 
 
 def test_phiAseNPerNodeLoadsConfig():

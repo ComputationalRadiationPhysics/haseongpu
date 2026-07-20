@@ -29,8 +29,8 @@ Install from the repository root after following
    # run the printed command, typically:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
-``pip install -v .`` builds the C++ extension through CMake and installs the
-Python package.  The configurator chooses compatible openPMD provider settings,
+``pip install -v .`` builds the standalone C++ backend and installs the Python
+frontend with private runtime helpers. The configurator chooses compatible openPMD provider settings,
 prints the install command, and writes the optional
 ``config/hase-phiase.yaml`` compute-settings file.
 
@@ -202,7 +202,7 @@ material arrays, spectra, and pump setup in Python:
 
    compute:
      backend: Host_Cpu_CpuSerial
-     openpmd_backend: adios-sst
+     openpmd_backend: auto
      parallel_mode: single
      numDevices: 1
 

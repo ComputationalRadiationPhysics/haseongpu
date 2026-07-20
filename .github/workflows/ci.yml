@@ -373,9 +373,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
+          cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
           cd /tmp
-          python hase_bindings_smoketest.py
+          python hase_runtime_smoketest.py
 
       - name: Run laserPumpCladding example from installed package
         shell: bash
@@ -532,10 +532,10 @@ jobs:
             CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix;$adios2_prefix -DHASE_OPENPMD_RUNTIME_RPATH=$openpmd_prefix/lib;$openpmd_prefix/lib64;$adios2_prefix/lib;$adios2_prefix/lib64 -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
               python -m pip install ".[test]"
 
-            cp tests/python/imports/hase_bindings_smoketest.py /tmp/hase_bindings_smoketest.py
+            cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
             (
               cd /tmp
-              python hase_bindings_smoketest.py
+              python hase_runtime_smoketest.py
             )
 
             for backend in $OPENPMD_BACKENDS; do
