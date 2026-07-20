@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 
@@ -474,6 +475,8 @@ class Simulation:
     """Whether compiled time-stepped runs include ASE depletion."""
     prePump: bool = False
     """When true, the first compiled time step advances without ASE so pump can seed beta."""
+    reportTimings: bool = False
+    """Print a frontend timing breakdown for each ``runSteps`` call when enabled."""
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
     _initialized: bool = field(default=False, init=False, repr=False)
@@ -587,13 +590,19 @@ class Simulation:
 
         previous_step = self._step
         previous_time = self._time
+        run_started = perf_counter() if self.reportTimings else None
+        transport_started = perf_counter() if self.reportTimings else None
         states = transport.runSimulation(
             self,
             steps=steps,
             pumpSteps=pumpSteps,
             transport=self.phiASE.openpmdBackend,
         )
+        transport_seconds = perf_counter() - transport_started if self.reportTimings else 0.0
+        state_materialization_seconds = 0.0
+        callback_seconds = {}
         for raw_state in states:
+            state_started = perf_counter() if self.reportTimings else None
             state = TimeStepState(
                 step=previous_step + int(raw_state.step),
                 time=previous_time + float(raw_state.time),
@@ -634,8 +643,28 @@ class Simulation:
             self._lastState = state
             self._step = state.step
             self._time = state.time
+            if self.reportTimings:
+                state_materialization_seconds += perf_counter() - state_started
             for callback, args, kwargs in self._callbacks:
+                callback_started = perf_counter() if self.reportTimings else None
                 callback(state, *args, **kwargs)
+                if self.reportTimings:
+                    callback_name = getattr(callback, "__qualname__", getattr(callback, "__name__", type(callback).__name__))
+                    callback_seconds[callback_name] = callback_seconds.get(callback_name, 0.0) + (
+                        perf_counter() - callback_started
+                    )
+        if self.reportTimings:
+            total_seconds = perf_counter() - run_started
+            callbacks_total = sum(callback_seconds.values())
+            print(
+                "HASE frontend timing: "
+                f"steps={len(states)} total={total_seconds:.6f}s "
+                f"compiled_transport_and_decode={transport_seconds:.6f}s "
+                f"snapshot_materialization={state_materialization_seconds:.6f}s "
+                f"callbacks={callbacks_total:.6f}s"
+            )
+            for callback_name, seconds in sorted(callback_seconds.items(), key=lambda item: item[1], reverse=True):
+                print(f"HASE frontend callback timing: {callback_name}={seconds:.6f}s")
         return self
 
     def step(self, *, openpmdSession=None):

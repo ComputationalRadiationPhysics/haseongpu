@@ -266,6 +266,7 @@ def runExample(
     enableASE=True,
     prePump=True,
     spectralResolution=1000,
+    reportTimings=False,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -329,6 +330,7 @@ def runExample(
         crossSections=spectralProperties,
         enableASE=enableASE,
         prePump=prePump,
+        reportTimings=reportTimings,
     )
     simulation.onStep(printState)
     simulation.onStep(
@@ -393,6 +395,11 @@ def main(argv=None):
         action="store_true",
         help="Disable ASE surface reflections.",
     )
+    parser.add_argument(
+        "--timings",
+        action="store_true",
+        help="Print frontend timing split for compiled transport, snapshots, and callbacks.",
+    )
     args = parser.parse_args(argv)
 
     aseOverrides = {}
@@ -428,6 +435,7 @@ def main(argv=None):
         enableASE=not args.disable_ase,
         prePump=not args.disable_pre_pump,
         spectralResolution=args.spectral_resolution,
+        reportTimings=args.timings,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")
