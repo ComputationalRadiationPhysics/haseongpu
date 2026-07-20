@@ -90,8 +90,9 @@ Core HASE Options
 
 ``HASE_BUILD_RELEASE``
    Default ``ON``.  Forces the project release configuration, including
-   ``CMAKE_BUILD_TYPE=Release`` and release optimization flags.  Set ``OFF``
-   when you need a custom debug or profiling build type.
+   ``CMAKE_BUILD_TYPE=Release`` and release optimization flags. Fast-math
+   remains disabled so backends preserve deterministic handling of infinities
+   and NaNs. Set ``OFF`` when you need a custom debug or profiling build type.
 
 ``HASE_NATIVE_OPTIMIZATIONS``
    Default ``OFF``. Adds host-specific

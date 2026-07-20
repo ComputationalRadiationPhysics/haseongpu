@@ -649,10 +649,6 @@ else()
     list(APPEND HASE_NVCC_FLAGS --ftz=false)
 endif()
 
-if(HASE_BUILD_RELEASE)
-    list(APPEND HASE_NVCC_FLAGS --use_fast_math)
-    list(APPEND HASE_CLANG_CUDA_FLAGS -ffast-math -ffp-contract=fast)
-endif()
 if(HASE_BUILD_RELEASE AND HASE_NATIVE_OPTIMIZATIONS AND alpaka_DEP_CUDA)
     list(
         APPEND
