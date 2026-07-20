@@ -90,8 +90,6 @@ cmake-build-debug/
 !.github/workflows/ci.yml
 __pycache__/
 *.pyc
-HASEonGPU_Bindings/*.so
-HASEonGPU_Bindings/calcPhiASE
 utils/validity_checking/difference_plots/*
 tests/*.txt
 tests/data/*_results.csv

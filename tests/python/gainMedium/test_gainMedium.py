@@ -110,12 +110,12 @@ def test_gainMediumOwnsPhysicalProperties():
     assert not hasattr(gainMedium, "toHostMesh")
 
 
-def test_frontendHidesLegacyAdapters():
+def test_frontendExportsOnlyOpenPmdApi():
     import HASEonGPU
 
     for name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh"):
         assert not hasattr(HASEonGPU, name)
-    assert hasattr(HASEonGPU, "calcPhiASE")
+    assert not hasattr(HASEonGPU, "calcPhiASE")
 
 
 def test_gainMediumPhysicalPropertiesAreDiscoverableAndAssignable():

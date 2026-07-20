@@ -8,7 +8,6 @@
 
 import ctypes
 import ctypes.util
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -21,8 +20,10 @@ def _libraryNames():
     return ("libHaseAlpakaBackendNames.so",)
 
 
-def _bindingPackageDirs():
-    spec = importlib.util.find_spec("HASEonGPU_Bindings")
+def _runtimePackageDirs():
+    from importlib.util import find_spec
+
+    spec = find_spec("pyInclude._runtime")
     if spec is None or spec.submodule_search_locations is None:
         return ()
     return tuple(Path(path) for path in spec.submodule_search_locations)
@@ -39,7 +40,7 @@ def _candidatePaths():
         seen.add(normalized)
         return path
 
-    for packageDir in _bindingPackageDirs():
+    for packageDir in _runtimePackageDirs():
         for name in _libraryNames():
             candidate = yieldPath(packageDir / name)
             if candidate is not None:
@@ -52,13 +53,13 @@ def _candidatePaths():
 
     for parent in moduleDir.parents:
         for name in _libraryNames():
-            candidate = yieldPath(parent / "build" / "python" / "HASEonGPU_Bindings" / name)
+            candidate = yieldPath(parent / "build" / "python" / "pyInclude" / "_runtime" / name)
             if candidate is not None:
                 yield candidate
         buildRoot = parent / "build"
         if not buildRoot.is_dir():
             continue
-        for bindingDir in sorted(buildRoot.glob("*/python/HASEonGPU_Bindings")):
+        for bindingDir in sorted(buildRoot.glob("*/python/pyInclude/_runtime")):
             for name in _libraryNames():
                 candidate = yieldPath(bindingDir / name)
                 if candidate is not None:
@@ -111,19 +112,19 @@ class AlpakaBackends:
     ``AlpakaBackends.all()`` to inspect the strings for this environment.
     """
 
-    _known = _loadBackendNames()
+    _known = None
 
     @classmethod
     def all(cls):
         """Return all backend names reported by the compiled helper library."""
+        if cls._known is None:
+            cls._known = _loadBackendNames()
+            for backendName in cls._known:
+                if backendName.isidentifier():
+                    setattr(cls, backendName, backendName)
         return list(cls._known)
 
     @classmethod
     def known(cls):
         """Alias for ``all()`` kept for discoverability."""
         return cls.all()
-
-
-for backendName in AlpakaBackends._known:
-    if backendName.isidentifier():
-        setattr(AlpakaBackends, backendName, backendName)

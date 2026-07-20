@@ -79,10 +79,10 @@ class PhiASE:
 
     backend: str = None
     """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
-    openpmdBackend: str | None = "adios-sst"
-    """openPMD storage backend name: ``adios-sst``, ``adios``, or ``hdf5``."""
+    openpmdBackend: str | None = "auto"
+    """openPMD backend; ``auto`` prefers SST, ADIOS, then HDF5 when supported."""
     parallelMode: str = "single"
-    """Execution mode: direct binding ``single`` or MPI launcher ``mpi``."""
+    """Execution mode: local ``single`` execution or the MPI launcher ``mpi``."""
     numDevices: int = 1
     """Maximum compute devices made available to the lower-level run."""
     nPerNode: int = 1
@@ -494,7 +494,8 @@ class Simulation:
 
     def _withOpenPmdSession(self, openpmdSession):
         if openpmdSession is None:
-            if transport._backend_spec(self.phiASE.openpmdBackend).streaming:
+            selected = "auto" if self.phiASE.openpmdBackend is None else str(self.phiASE.openpmdBackend).strip().lower()
+            if selected in {"auto", "adios-sst"}:
                 return self.phiASE.openStream(), True
             return None, False
         if openpmdSession == "interval":

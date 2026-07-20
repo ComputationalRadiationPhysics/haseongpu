@@ -6,10 +6,9 @@
 
 import json
 import os
-import shutil
 import subprocess
 import sys
-from importlib.machinery import PathFinder
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
 import pytest
@@ -18,64 +17,36 @@ import pytest
 repoRoot = Path(__file__).resolve().parents[3]
 
 
-def _installedBindingsDirs():
-    filtered = []
-    for entry in sys.path:
-        entryPath = Path(entry or ".").resolve()
-        if entryPath == repoRoot:
-            continue
-        filtered.append(entry)
-
-    spec = PathFinder.find_spec("HASEonGPU_Bindings", filtered)
-    if spec is None:
-        return []
-
-    return [Path(location).resolve() for location in spec.submodule_search_locations or ()]
-
-
 @pytest.mark.integration
-def test_repoRootUsesInstalledBindings(tmp_path):
-    installedBindings = _installedBindingsDirs()
-    if not installedBindings:
-        pytest.skip("installed HASEonGPU_Bindings package is not available for this interpreter")
+def test_installedFrontendHasPrivateOpenPmdRuntime(tmp_path):
+    try:
+        distribution("HASEonGPU")
+    except PackageNotFoundError:
+        pytest.skip("HASEonGPU wheel is not installed for this interpreter")
 
-    checkout = tmp_path / "checkout"
-    checkout.mkdir()
-    shutil.copy2(repoRoot / "HASEonGPU.py", checkout / "HASEonGPU.py")
-    shutil.copytree(repoRoot / "HASEonGPU_Bindings", checkout / "HASEonGPU_Bindings")
-    shutil.copytree(repoRoot / "pyInclude", checkout / "pyInclude")
-    runner = checkout / "smoke.py"
+    runner = tmp_path / "smoke.py"
     runner.write_text(
+        "import importlib.util\n"
         "import json\n"
         "from pathlib import Path\n"
         "import HASEonGPU\n"
-        "import HASEonGPU_Bindings\n"
-        "from HASEonGPU import Result\n"
-        "from HASEonGPU_Bindings import ExperimentParameters\n"
+        "import pyInclude._runtime\n"
+        "runtime = Path(next(iter(pyInclude._runtime.__path__))).resolve()\n"
         "payload = {\n"
-        "    'module': str(Path(HASEonGPU.__file__).resolve()),\n"
-        "    'binding_paths': [str(Path(p).resolve()) for p in HASEonGPU_Bindings.__path__],\n"
-        "    'result_module': type(Result()).__module__,\n"
-        "    'min_rays': ExperimentParameters().minRaysPerSample,\n"
+        "  'module': str(Path(HASEonGPU.__file__).resolve()),\n"
+        "  'runtime': str(runtime),\n"
+        "  'calc_exists': (runtime / 'calcPhiASE').is_file(),\n"
+        "  'legacy_bindings': importlib.util.find_spec('HASEonGPU_Bindings') is not None,\n"
         "}\n"
         "print(json.dumps(payload))\n",
         encoding="utf-8",
     )
-
-    command = [
-        sys.executable,
-        str(runner),
-    ]
-    installedParents = {
-        str(path.parent)
-        for path in installedBindings
-    }
     env = os.environ.copy()
     env["PYTHONNOUSERSITE"] = "1"
-    env["PYTHONPATH"] = os.pathsep.join(sorted(installedParents))
+    env.pop("PYTHONPATH", None)
     completed = subprocess.run(
-        command,
-        cwd=checkout,
+        [sys.executable, str(runner)],
+        cwd=tmp_path,
         env=env,
         text=True,
         stdout=subprocess.PIPE,
@@ -86,11 +57,6 @@ def test_repoRootUsesInstalledBindings(tmp_path):
         pytest.fail(completed.stdout)
 
     payload = json.loads(completed.stdout)
-    localBindings = (checkout / "HASEonGPU_Bindings").resolve()
-    bindingPaths = [Path(path).resolve() for path in payload["binding_paths"]]
-
-    assert Path(payload["module"]).resolve() == (checkout / "HASEonGPU.py").resolve()
-    assert bindingPaths[0] == localBindings
-    assert any(path != localBindings for path in bindingPaths)
-    assert payload["result_module"] == "HASEonGPU_Bindings.HASEonGPU"
-    assert payload["min_rays"] == 100000
+    assert "site-packages" in payload["module"] or "dist-packages" in payload["module"]
+    assert payload["calc_exists"]
+    assert not payload["legacy_bindings"]

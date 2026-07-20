@@ -119,13 +119,14 @@ def preferred_openpmd_backend(supported, requested=None):
     supported = list(supported)
     if requested is not None:
         normalized = requested.strip().lower()
-        if normalized not in OPENPMD_BACKEND_PRIORITY:
-            raise ValueError(f"unsupported openPMD backend '{requested}'")
-        if normalized not in supported:
-            raise ValueError(
-                f"openPMD backend '{requested}' was requested but supported backends are: {_csv(supported)}"
-            )
-        return normalized
+        if normalized != "auto":
+            if normalized not in OPENPMD_BACKEND_PRIORITY:
+                raise ValueError(f"unsupported openPMD backend '{requested}'")
+            if normalized not in supported:
+                raise ValueError(
+                    f"openPMD backend '{requested}' was requested but supported backends are: {_csv(supported)}"
+                )
+            return normalized
     for backend in OPENPMD_BACKEND_PRIORITY:
         if backend in supported:
             return backend
@@ -779,7 +780,7 @@ def _parse_args(argv=None):
         action="store_true",
         help="Do not build matching openPMD Python bindings for bundled-provider installs.",
     )
-    parser.add_argument("--openpmd-backend", choices=OPENPMD_BACKEND_PRIORITY, default=None)
+    parser.add_argument("--openpmd-backend", choices=("auto", *OPENPMD_BACKEND_PRIORITY), default=None)
     parser.add_argument("--compute-backend", default=None)
     parser.add_argument("--parallel-mode", choices=("single", "mpi"), default="single")
     parser.add_argument(

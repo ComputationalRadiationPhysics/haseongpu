@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "HASEonGPU"
-version = "2.0.2"
+version = "2.1.0"
 description = "Python frontend and compiled C++ backend for HASEonGPU ASE simulations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: C++",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -63,20 +64,13 @@ Changelog = "https://github.com/computationalradiationphysics/haseongpu/releases
 
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
-wheel.packages = ["HASEonGPU_Bindings", "pyInclude"]
+wheel.packages = ["pyInclude"]
 
 [[tool.scikit-build.generate]]
 path = "HASEonGPU.py"
 template = """
-__version__ = "2.0.2"
-import HASEonGPU_Bindings
-from HASEonGPU_Bindings import *
+__version__ = "2.1.0"
 from pyInclude import *
-for _name in ("HostMesh", "ExperimentParameters", "ComputeParameters", "Mesh"):
-    globals().pop(_name, None)
-del _name
-if hasattr(HASEonGPU_Bindings, "HostMesh"):
-    del HASEonGPU_Bindings.HostMesh
 """
 
 [tool.scikit-build.cmake]

@@ -68,8 +68,6 @@ def _clear_hase_modules():
     for name in list(sys.modules):
         if name == "HASEonGPU" or name.startswith("HASEonGPU."):
             del sys.modules[name]
-        elif name == "HASEonGPU_Bindings" or name.startswith("HASEonGPU_Bindings."):
-            del sys.modules[name]
         elif name == "pyInclude" or name.startswith("pyInclude."):
             del sys.modules[name]
 
@@ -86,7 +84,7 @@ def _import_hase_api():
         if _has_required_api(module):
             return module
     except ModuleNotFoundError as err:
-        if err.name not in {"HASEonGPU", "HASEonGPU_Bindings", "HASEonGPU_Bindings.HASEonGPU"}:
+        if err.name != "HASEonGPU":
             raise
     _clear_hase_modules()
     sys.path[:0] = [str(repoRoot), *(str(path) for path in _build_python_roots())]
