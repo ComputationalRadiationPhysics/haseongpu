@@ -316,6 +316,7 @@ namespace hase::core
                 localResult = calcForwardPhiAseOnDevices(
                     exec,
                     experiment,
+                    compute,
                     hostMesh,
                     meshes,
                     static_cast<unsigned>(firstDevice),

@@ -251,6 +251,7 @@ namespace hase::core
                         ForwardPhiAseRawResult const batchResult = calcForwardPhiAseOnDevices(
                             exec,
                             experiment,
+                            compute,
                             hostMesh,
                             meshes,
                             0u,

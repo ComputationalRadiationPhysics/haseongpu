@@ -118,7 +118,10 @@ Core HASE Options
    Default ``OFF``.  Enables test targets.
 
 ``HASE_BENCHMARK``
-   Default ``OFF``.  Enables scoped PhiASE benchmark CSV output.
+   Default ``OFF``. Enables timing scopes around forward PhiASE batches,
+   individual device work, and synchronized propagation kernels. Rows are
+   appended to ``hase_benchmark.csv``. Because the required synchronization
+   changes execution timing, use this only for benchmark builds.
 
 ``HASE_FORWARD_LOGGING``
    Default ``OFF``.  Forwards captured ``calcPhiASE`` stdout/stderr through the

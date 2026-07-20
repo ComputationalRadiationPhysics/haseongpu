@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <benchmark.hpp>
 #include <core/calcForwardPhiAse.hpp>
 #include <core/forwardSrmDeviceState.hpp>
 #include <core/logging.hpp>
@@ -75,6 +76,7 @@ namespace hase::core
     void calcForwardPhiAseThreaded(
         auto& devBundle,
         ExperimentParameters const& experiment,
+        ComputeParameters const& compute,
         HostMesh const& hostMesh,
         DeviceMeshContainer<T_Device> const& mesh,
         ForwardPhiAseRawResult& result,
@@ -89,6 +91,7 @@ namespace hase::core
         threadIds.emplace_back(
             std::thread(
                 [&experiment,
+                 &compute,
                  &hostMesh,
                  &mesh,
                  &result,
@@ -103,6 +106,14 @@ namespace hase::core
                 {
                     try
                     {
+#ifdef HASE_ENABLE_BENCHMARK
+                        hase::benchmark::ScopedRunContext benchmarkContext{
+                            devBundle.device,
+                            devBundle.executor,
+                            compute,
+                            experiment};
+#endif
+                        BENCH(ForwardPhiAseDevice);
                         calcForwardPhiAseRaw(
                             devBundle,
                             experiment,
@@ -310,6 +321,7 @@ namespace hase::core
     ForwardPhiAseRawResult calcForwardPhiAseOnDevices(
         T_Exec exec,
         ExperimentParameters const& experiment,
+        ComputeParameters const& compute,
         HostMesh const& hostMesh,
         std::vector<DeviceMeshContainer<T_Device>> const& meshes,
         unsigned const firstDevice,
@@ -329,6 +341,15 @@ namespace hase::core
         {
             return combined;
         }
+
+#ifdef HASE_ENABLE_BENCHMARK
+        hase::benchmark::ScopedRunContext benchmarkContext{
+            meshes.at(firstDevice).m_device,
+            exec,
+            compute,
+            experiment};
+#endif
+        BENCH(ForwardPhiAseBatch);
 
         double const sourceStratificationOffset = random::stratifiedUnitOffset(baseSeed);
         unsigned const spectrumStratificationPhase
@@ -369,6 +390,7 @@ namespace hase::core
             calcForwardPhiAseThreaded(
                 devBundle,
                 experiment,
+                compute,
                 hostMesh,
                 meshes.at(deviceIndex),
                 partials.at(localDeviceIndex),
