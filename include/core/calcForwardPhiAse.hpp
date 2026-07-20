@@ -7,6 +7,7 @@
  */
 #pragma once
 
+#include <benchmark.hpp>
 #include <core/forwardSrm.hpp>
 #include <core/mesh.hpp>
 #include <random/random.hpp>
@@ -119,6 +120,7 @@ namespace hase::core
                 devBundle.device,
                 devBundle.executor,
                 alpaka::Vec{static_cast<unsigned int>(rayCount)});
+            BENCH_SYNC(queue, AccumulateForwardPhiAse);
             queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{

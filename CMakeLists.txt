@@ -161,7 +161,7 @@ if(NOT DISABLE_MPI MATCHES "^(AUTO|ON|OFF)$")
     )
 endif()
 option(HASE_TESTING "Build unit tests" OFF)
-option(HASE_BENCHMARK "Enable scoped PhiASE benchmark CSV output" OFF)
+option(HASE_BENCHMARK "Enable backend timing scopes and benchmark CSV output" OFF)
 option(
     HASE_FORWARD_LOGGING
     "Forward captured calcPhiASE stdout and stderr through the Python openPMD launcher."
