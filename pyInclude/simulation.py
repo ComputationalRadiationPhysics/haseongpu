@@ -78,7 +78,7 @@ class PhiASE:
     """Maximum geometric ray-count increases from ``minRays`` to ``maxRays``."""
     useReflections: bool = False
     """Whether surface reflectivities affect forward propagation."""
-    reflectionMaxIterations: int = 8
+    reflectionMaxIterations: int = 40
     """Maximum reflected-source passes after the direct volume-source pass."""
     reflectionTolerance: float = 1e-4
     """Stop reflected passes when their source-weight fraction is below this value."""
