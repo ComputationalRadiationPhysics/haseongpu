@@ -55,6 +55,11 @@ provider.
 4. Run the Guided Configurator
 ------------------------------
 
+This step is optional for the default host build. A plain
+``python3 -m pip install -v .`` needs no prior CMake command or generated
+configuration. Use the configurator when you want to select providers, MPI,
+GPU backends, or other non-default build settings.
+
 From the source checkout, run:
 
 .. code-block:: bash
@@ -111,7 +116,11 @@ The configurator prints a command of this form when options are selected:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
 Run the printed command if you did not let the configurator install
-immediately. ``CMAKE_ARGS`` is how you pass build options such as the openPMD
+immediately. The pip build updates the durable runtime and installs only the
+thin frontend; it does not install the public C++ headers or library. Those
+artifacts require an explicit source CMake installation, and a downstream
+``find_package(HASEonGPU)`` export is not currently provided. ``CMAKE_ARGS`` is
+how you pass build options such as the openPMD
 provider, MPI mode, Alpaka choices, and native CPU optimization setting.
 
 To keep the runtime somewhere other than ``build/``, let the configurator

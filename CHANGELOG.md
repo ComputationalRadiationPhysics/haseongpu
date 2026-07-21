@@ -1,5 +1,16 @@
 # Changelog
 
+## HASEonGPU 2.1.1
+
+Patch release that moves pump time stepping and frozen-RK4 integration into the
+compiled C++/Alpaka backend, exposes compiled ASE controls, consumes all pending
+openPMD simulation output streams, and expands runtime-backend regression
+coverage. Python-side fallback stepping and its retired compatibility surfaces
+are removed. A plain ``python3 -m pip install -v .`` continues to build and
+update the durable native runtime without preliminary CMake configuration,
+while installing only the thin Python frontend. Direct CMake builds retain an
+explicit option for installing the public C++ artifacts.
+
 ## HASEonGPU 2.1.0
 
 Breaking release following 2.0.2 (released 2026-07-03) that makes openPMD the
