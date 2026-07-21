@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use HASEonGPU, please cite the software and the associated publication."
 title: "HASEonGPU"
-version: "2.1.0"
+version: "2.1.1"
 type: software
 abstract: "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media."
 license: GPL-3.0-or-later

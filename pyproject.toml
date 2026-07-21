@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "HASEonGPU"
-version = "2.1.0"
+version = "2.1.1"
 description = "Python frontend and compiled C++ backend for HASEonGPU ASE simulations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -69,7 +69,7 @@ install.components = ["python"]
 [[tool.scikit-build.generate]]
 path = "HASEonGPU.py"
 template = """
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 from pyInclude import *
 """
 
@@ -78,6 +78,7 @@ build-type = "Release"
 [tool.scikit-build.cmake.define]
 HASE_ENABLE_PYTHON = "ON"
 HASE_BUILD_RUNTIME = "OFF"
+HASE_INSTALL_CPP_INTERFACE = "OFF"
 HASE_NATIVE_OPTIMIZATIONS = "OFF"
 
 [tool.pytest.ini_options]
