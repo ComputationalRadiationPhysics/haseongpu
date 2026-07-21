@@ -214,8 +214,7 @@ TEMPLATE_LIST_TEST_CASE(
 
     constexpr double pathLength = 0.6;
     double const expectedPower = 10.0 * std::exp(-pathLength);
-    double const expectedIntegral
-        = (10.0 - expectedPower) * 940e-9 / (6.62607015e-34 * 299792458.0 * 1.0e20);
+    double const expectedIntegral = (10.0 - expectedPower) * 940e-9 / (6.62607015e-34 * 299792458.0 * 1.0e20);
     REQUIRE(traced.size() == 1u);
     CHECK(traced.power[0] == Catch::Approx(expectedPower).epsilon(2.0e-6));
     CHECK(traced.exitFace[0] == 0);
@@ -224,8 +223,9 @@ TEMPLATE_LIST_TEST_CASE(
     auto const sampleValues = copyDoubleBuffer(queue, sampleIntegral);
     REQUIRE(cellValues.size() == 1u);
     CHECK(cellValues[0] == Catch::Approx(expectedIntegral).epsilon(2.0e-6));
-    CHECK(std::accumulate(sampleValues.begin(), sampleValues.end(), 0.0)
-          == Catch::Approx(cellValues[0]).epsilon(2.0e-6));
+    CHECK(
+        std::accumulate(sampleValues.begin(), sampleValues.end(), 0.0)
+        == Catch::Approx(cellValues[0]).epsilon(2.0e-6));
     CHECK(std::ranges::all_of(sampleValues, [](double const value) { return value >= 0.0; }));
 }
 

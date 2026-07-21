@@ -19,9 +19,12 @@ from HASEonGPU import (
     Heun,
     ImplicitEuler,
     Midpoint,
+    MonteCarloPumpSolver,
     PhiASE,
-    PumpProperties,
+    Pump,
+    PumpSpectrum,
     RungeKutta4,
+    SurfacePumpInjector,
     Simulation,
 )
 from pyInclude.openpmd import transport
@@ -76,6 +79,12 @@ def realPhiAse(crossSections, *, openpmdBackend="adios"):
     return PhiASE(spectralProperties=crossSections, openpmdBackend=openpmdBackend)
 
 
+def configuredSimulation(pumpSetup, **kwargs):
+    return Simulation(pump_solver=pumpSetup.solver, **kwargs).add_pump(
+        pumpSetup.physical, injection_method=pumpSetup.injector
+    )
+
+
 def testCompiledSimulationDelegatesRunStepsToCppTransport(
     fakeCppSimulation,
     smallGainMedium,
@@ -83,12 +92,11 @@ def testCompiledSimulationDelegatesRunStepsToCppTransport(
     crossSections,
 ):
     phi_ase = realPhiAse(crossSections)
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=phi_ase,
-        timeIntegrationSolver="heun",
-        timeStep=1e-5,
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=phi_ase,
+        time_integrator="heun",
+        time_step_size=1e-5,
     )
 
     simulation.runSteps(1, pumpSteps=0)
@@ -149,12 +157,11 @@ def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
     crossSections,
 ):
     seen = []
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
     ).onStep(seen.append)
 
     simulation.runSteps(2)
@@ -169,42 +176,40 @@ def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
     assert seen[-1].betaVolume.shape == (2, 2)
 
 
-def testRunStepsCanLimitPumpContribution(
+def testPublicStepCanLimitPumpContribution(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
     crossSections,
 ):
     seen = []
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
-    ).onStep(seen.append)
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    ).on_step(seen.append)
 
-    simulation.runSteps(3, pumpSteps=1)
+    simulation.step(3, pump_steps=1)
 
     assert fakeCppSimulation[-1]["pumpSteps"] == 1
-    assert np.any(seen[0].dndtPump > 0.0)
-    assert np.allclose(seen[1].dndtPump, 0.0)
-    assert np.allclose(seen[2].dndtPump, 0.0)
+    assert np.any(seen[0].dndt_pump > 0.0)
+    assert np.allclose(seen[1].dndt_pump, 0.0)
+    assert np.allclose(seen[2].dndt_pump, 0.0)
 
 
-def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
+def testInternalRunUsesPumpSolverMaxStepsByDefault(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
     crossSections,
 ):
-    pumpProperties = replace(pumpProperties, pumpSteps=1)
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
+    pumpProperties.solver = replace(pumpProperties.solver, max_steps=1)
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
     )
 
     simulation.runSteps(3)
@@ -212,21 +217,20 @@ def testRunStepsUsesPumpPropertiesPumpStepsByDefault(
     assert fakeCppSimulation[-1]["pumpSteps"] == 1
 
 
-def testRunStepsRejectsNegativePumpSteps(
+def testPublicStepRejectsNegativePumpSteps(
     smallGainMedium,
     pumpProperties,
     crossSections,
 ):
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
     )
 
-    with pytest.raises(ValueError, match="pumpSteps"):
-        simulation.runSteps(1, pumpSteps=-1)
+    with pytest.raises(ValueError, match="pump_steps"):
+        simulation.step(1, pump_steps=-1)
 
 
 def testOnStepPassesStateBeforeUserArguments(
@@ -238,17 +242,16 @@ def testOnStepPassesStateBeforeUserArguments(
     seen = []
 
     def record(state, label, scale=1.0):
-        seen.append((label, state.step, scale, state.phiAse.shape))
+        seen.append((label, state.step, scale, state.phi_ase.shape))
 
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
-    ).onStep(record, "vtk", scale=2.0)
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    ).on_step(record, "vtk", scale=2.0)
 
-    simulation.runSteps(2)
+    simulation.step(2)
 
     assert seen == [("vtk", 1, 2.0, (4, 3)), ("vtk", 2, 2.0, (4, 3))]
 
@@ -262,24 +265,23 @@ def testInitCallbacksRunBeforeCompiledTransport(
     events = []
 
     def init(simulation, label, enabled=False):
-        events.append(("init", label, enabled, simulation.stepIndex))
+        events.append(("init", label, enabled, simulation.current_step))
         simulation._testInitialized = True
 
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
-    ).onInit(init, "setup", enabled=True)
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    ).on_init(init, "setup", enabled=True)
 
-    simulation.runSteps(2)
-    simulation.runSteps(1)
+    simulation.step(2)
+    simulation.step(1)
 
     assert events == [("init", "setup", True, 0)]
     assert simulation._testInitialized is True
-    assert simulation.stepIndex == 3
-    assert simulation.time == 3.0000000000000004e-5
+    assert simulation.current_step == 3
+    assert simulation.current_time == 3.0000000000000004e-5
 
 
 def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
@@ -287,12 +289,11 @@ def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
     pumpProperties,
     crossSections,
 ):
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver="explicit-euler",
-        timeStep=1e-5,
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator="explicit-euler",
+        time_step_size=1e-5,
     ).beforeStep(lambda simulation: None)
 
     with pytest.raises(ValueError, match="beforeStep"):
@@ -304,35 +305,35 @@ def testCompiledSimulationRejectsExternalOpenPmdSessionOwnership(
     pumpProperties,
     crossSections,
 ):
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=realPhiAse(crossSections),
-        timeIntegrationSolver=ExponentialEuler(),
-        timeStep=1e-5,
+    simulation = configuredSimulation(pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
     )
 
     with pytest.raises(ValueError, match=r"owns its C\+\+ openPMD lifetime"):
         simulation.runSteps(1, openpmdSession="persistent")
 
 
-def testPumpPropertiesRejectsEmptySources():
-    with pytest.raises(ValueError, match="at least one PumpSource"):
-        PumpProperties(sources=())
+def testSurfacePumpInjectorRejectsEmptyDomains():
+    with pytest.raises(ValueError, match="at least one surface domain"):
+        SurfacePumpInjector(())
 
 
-def testPumpPropertiesValidatesDedicatedRayControls(pumpProperties):
-    with pytest.raises(ValueError, match="rayCount"):
-        replace(pumpProperties, rayCount=0)
+def testMonteCarloPumpSolverValidatesDedicatedRayControls(pumpProperties):
+    with pytest.raises(ValueError, match="ray_count"):
+        replace(pumpProperties.solver, ray_count=0)
     with pytest.raises(ValueError, match="uint32"):
-        replace(pumpProperties, rngSeed=2**32)
+        replace(pumpProperties.solver, seed=2**32)
 
 
-def testPumpSourceHasExplicitNormalizedModel(pumpProperties):
-    source = pumpProperties.sources[0]
-    assert source.totalPower == 1.0
-    assert source.spectrum.weights.tolist() == [1.0]
-    assert source.angularDistribution.weights.tolist() == [1.0]
+def testPhysicalPumpIsSeparateFromInjectionAndSolver(pumpProperties):
+    assert pumpProperties.physical.total_power == 1.0
+    assert pumpProperties.physical.spectrum.weights.tolist() == [1.0]
+    assert pumpProperties.physical.angular_distribution.weights.tolist() == [1.0]
+    assert pumpProperties.injector.surface_domains == (1,)
+    assert pumpProperties.solver.ray_count == 256
 
 
 def testTimeIntegrationSolverIsMandatory(
@@ -341,15 +342,14 @@ def testTimeIntegrationSolverIsMandatory(
     crossSections,
 ):
     try:
-        Simulation(
-            gainMedium=smallGainMedium,
-            pump=pumpProperties,
-            phiASE=realPhiAse(crossSections),
-            timeIntegrationSolver=None,
-            timeStep=1e-5,
+        configuredSimulation(pumpProperties,
+            gain_medium=smallGainMedium,
+            phi_ase=realPhiAse(crossSections),
+            time_integrator=None,
+            time_step_size=1e-5,
         )
     except ValueError as exc:
-        assert "timeIntegrationSolver" in str(exc)
+        assert "time_integrator" in str(exc)
     else:
         raise AssertionError("Simulation accepted a missing timeIntegrationSolver")
 
@@ -381,13 +381,56 @@ def testTimeIntegrationSolversCanStepSimulation(
             claddingNumber=1,
             claddingAbsorption=0.0,
         )
-        state = Simulation(
-            gainMedium=medium,
-            pump=pumpProperties,
-            phiASE=realPhiAse(crossSections),
-            timeIntegrationSolver=solver,
-            timeStep=1e-5,
+        simulation = configuredSimulation(
+            pumpProperties,
+            gain_medium=medium,
+            phi_ase=realPhiAse(crossSections),
+            time_integrator=solver,
+            time_step_size=1e-5,
         ).step()
+        state = simulation.get_last_state()
 
-        assert state.betaCells.shape == (smallTopology.numberOfPoints, smallTopology.levels)
-        assert np.all(np.isfinite(state.betaCells))
+        assert state.beta_cells.shape == (smallTopology.numberOfPoints, smallTopology.levels)
+        assert np.all(np.isfinite(state.beta_cells))
+
+
+def testPicmiStyleStepDefaultsToOneStep(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+        max_steps=2,
+    )
+
+    assert simulation.step() is simulation
+    assert simulation.current_step == 1
+    assert fakeCppSimulation[-1]["steps"] == 1
+    assert simulation.get_last_state().step == 1
+
+
+def testSimulationCanRegisterMultiplePhysicalPumps(
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    )
+    second = replace(pumpProperties.physical, total_power=2.0, name="second")
+
+    returned = simulation.add_pump(second, injection_method=pumpProperties.injector)
+
+    assert returned is simulation
+    assert len(simulation.pump.sources) == 2
+    assert [source.totalPower for source in simulation.pump.sources] == [1.0, 2.0]

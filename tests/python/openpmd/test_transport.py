@@ -15,7 +15,15 @@ import pyInclude.openpmd.transport as transport
 from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
 from pyInclude import AlpakaBackends
 from pyInclude.geometry import GainMedium, MeshTopology, VolumeTopology
-from pyInclude.laser import (CrossSectionData, PlanarPumpRelay, PumpAngularDistribution, PumpProperties, PumpSource, PumpSpectrum, SuperGaussianPumpProfile)
+from pyInclude.laser import (
+    CrossSectionData,
+    PlanarPumpRelay,
+    PumpAngularDistribution,
+    PumpSpectrum,
+    SuperGaussianPumpProfile,
+    _PumpProperties,
+    _PumpSource,
+)
 from pyInclude.openpmd import HASE_TRANSPORT_VERSION, PrimitiveFieldSpec, PrismSchema, backendFlat, backendFlatArray, fieldSpec, haseTransportAttributes, primitiveView, spectralContext, unitDimension
 from pyInclude.simulation import PhiASE
 
@@ -1675,16 +1683,16 @@ def test_simulation_run_control_serializes_general_pump_graph():
     cross_sections = CrossSectionData.monochromatic(
         wavelength=940e-9, crossSectionAbsorption=1.0e-22, crossSectionEmission=2.0e-22
     )
-    source = PumpSource(
+    source = _PumpSource(
         surfaceDomains=(11,),
         totalPower=12.5,
         spectrum=PumpSpectrum.monochromatic(940e-9),
         crossSections=cross_sections,
         angularDistribution=PumpAngularDistribution.collimated(),
-        profile=SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.25, exponent=40),
+        profile=SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.25, exponent=40),
         relays=(PlanarPumpRelay.retroreflect((12,), transmission=0.75),),
     )
-    pump = PumpProperties(sources=(source,), rayCount=1234, rngSeed=99, pumpSteps=4)
+    pump = _PumpProperties(sources=(source,), rayCount=1234, rngSeed=99, pumpSteps=4)
     simulation = SimpleNamespace(
         pump=pump,
         gainMedium=SimpleNamespace(topology=SimpleNamespace(surfaceDomainMap=lambda: None)),

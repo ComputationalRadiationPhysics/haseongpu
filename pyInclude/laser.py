@@ -345,7 +345,7 @@ def _unit_vector(value, name):
 
 @dataclass(frozen=True)
 class PumpSpectrum:
-    """Discrete pump-power spectrum sampled by the compiled pump tracer."""
+    """Normalized discrete spectrum for a physical pump."""
 
     wavelengths: object
     weights: object
@@ -367,15 +367,15 @@ class PumpSpectrum:
 
 @dataclass(frozen=True)
 class PumpAngularDistribution:
-    """Discrete directions in a source face's inward-local frame."""
+    """Normalized discrete directions in the injector's inward-local frame."""
 
-    polarAngles: object
-    azimuthalAngles: object
+    polar_angles: object
+    azimuthal_angles: object
     weights: object
 
     def __post_init__(self):
-        polar = np.asarray(self.polarAngles, dtype=np.float64).reshape(-1)
-        azimuthal = np.asarray(self.azimuthalAngles, dtype=np.float64).reshape(-1)
+        polar = np.asarray(self.polar_angles, dtype=np.float64).reshape(-1)
+        azimuthal = np.asarray(self.azimuthal_angles, dtype=np.float64).reshape(-1)
         weights = _positive_normalized(self.weights, "pump angular weights")
         if polar.size != azimuthal.size or polar.size != weights.size:
             raise ValueError("pump angular angles and weights must have the same length")
@@ -383,76 +383,186 @@ class PumpAngularDistribution:
             raise ValueError("pump polar angles must be finite and in [0, pi/2)")
         if np.any(~np.isfinite(azimuthal)):
             raise ValueError("pump azimuthal angles must be finite")
-        object.__setattr__(self, "polarAngles", polar)
-        object.__setattr__(self, "azimuthalAngles", azimuthal)
+        object.__setattr__(self, "polar_angles", polar)
+        object.__setattr__(self, "azimuthal_angles", azimuthal)
         object.__setattr__(self, "weights", weights)
+
+    @property
+    def polarAngles(self):
+        return self.polar_angles
+
+    @property
+    def azimuthalAngles(self):
+        return self.azimuthal_angles
 
     @classmethod
     def collimated(cls):
         return cls([0.0], [0.0], [1.0])
 
     @classmethod
-    def uniformCone(cls, halfAngle, *, polarSamples=8, azimuthalSamples=16):
-        if halfAngle <= 0.0 or halfAngle >= 0.5 * np.pi:
-            raise ValueError("halfAngle must be in (0, pi/2)")
-        cos_edges = np.linspace(1.0, np.cos(float(halfAngle)), int(polarSamples) + 1)
+    def uniform_cone(cls, half_angle, *, polar_samples=8, azimuthal_samples=16):
+        if half_angle <= 0.0 or half_angle >= 0.5 * np.pi:
+            raise ValueError("half_angle must be in (0, pi/2)")
+        cos_edges = np.linspace(1.0, np.cos(float(half_angle)), int(polar_samples) + 1)
         polar = np.arccos(0.5 * (cos_edges[:-1] + cos_edges[1:]))
-        azimuthal = (np.arange(int(azimuthalSamples)) + 0.5) * (2.0 * np.pi / int(azimuthalSamples))
+        azimuthal = (np.arange(int(azimuthal_samples)) + 0.5) * (2.0 * np.pi / int(azimuthal_samples))
         theta, phi = np.meshgrid(polar, azimuthal, indexing="ij")
         return cls(theta.reshape(-1), phi.reshape(-1), np.ones(theta.size))
 
 
 @dataclass(frozen=True)
 class UniformPumpProfile:
-    """Uniform power density over every selected source face."""
+    """Uniform power density over the selected injector aperture."""
 
     kind: str = field(default="uniform", init=False)
 
 
 @dataclass(frozen=True)
 class SuperGaussianPumpProfile:
-    """Normalized world-space super-Gaussian source profile."""
+    """Normalized world-space elliptical super-Gaussian profile."""
 
-    radiusU: float
-    radiusV: float | None = None
+    radius_u: float
+    radius_v: float | None = None
     exponent: float = 40.0
     center: object = (0.0, 0.0, 0.0)
-    axisU: object = (1.0, 0.0, 0.0)
-    axisV: object = (0.0, 1.0, 0.0)
+    axis_u: object = (1.0, 0.0, 0.0)
+    axis_v: object = (0.0, 1.0, 0.0)
     kind: str = field(default="super-gaussian", init=False)
 
     def __post_init__(self):
-        radius_v = self.radiusU if self.radiusV is None else self.radiusV
-        if self.radiusU <= 0.0 or radius_v <= 0.0 or self.exponent <= 0.0:
+        radius_v = self.radius_u if self.radius_v is None else self.radius_v
+        if self.radius_u <= 0.0 or radius_v <= 0.0 or self.exponent <= 0.0:
             raise ValueError("super-Gaussian radii and exponent must be positive")
         center = np.asarray(self.center, dtype=np.float64).reshape(-1)
         if center.shape != (3,) or np.any(~np.isfinite(center)):
             raise ValueError("pump profile center must be a finite three-vector")
-        axis_u = np.asarray(_unit_vector(self.axisU, "axisU"))
-        axis_v = np.asarray(_unit_vector(self.axisV, "axisV"))
+        axis_u = np.asarray(_unit_vector(self.axis_u, "axis_u"))
+        axis_v = np.asarray(_unit_vector(self.axis_v, "axis_v"))
         if abs(float(np.dot(axis_u, axis_v))) > 1.0e-10:
-            raise ValueError("axisU and axisV must be orthogonal")
-        object.__setattr__(self, "radiusV", float(radius_v))
+            raise ValueError("axis_u and axis_v must be orthogonal")
+        object.__setattr__(self, "radius_v", float(radius_v))
         object.__setattr__(self, "center", tuple(center))
-        object.__setattr__(self, "axisU", tuple(axis_u))
-        object.__setattr__(self, "axisV", tuple(axis_v))
+        object.__setattr__(self, "axis_u", tuple(axis_u))
+        object.__setattr__(self, "axis_v", tuple(axis_v))
+
+    @property
+    def radiusU(self):
+        return self.radius_u
+
+    @property
+    def radiusV(self):
+        return self.radius_v
+
+    @property
+    def axisU(self):
+        return self.axis_u
+
+    @property
+    def axisV(self):
+        return self.axis_v
 
     def weightAt(self, points):
         points = np.asarray(points, dtype=np.float64)
         relative = points - np.asarray(self.center)
-        u = relative @ np.asarray(self.axisU) / self.radiusU
-        v = relative @ np.asarray(self.axisV) / self.radiusV
+        u = relative @ np.asarray(self.axis_u) / self.radius_u
+        v = relative @ np.asarray(self.axis_v) / self.radius_v
         return np.exp(-((u * u + v * v) ** (0.5 * self.exponent)))
+
+    def weight_at(self, points):
+        """Evaluate the dimensionless spatial profile at world coordinates."""
+        return self.weightAt(points)
+
+
+@dataclass(frozen=True)
+class Pump:
+    """Physical pump definition, independent of its numerical injection method."""
+
+    total_power: float
+    spectrum: PumpSpectrum
+    cross_sections: CrossSectionData
+    profile: object = field(default_factory=UniformPumpProfile)
+    angular_distribution: PumpAngularDistribution = field(default_factory=PumpAngularDistribution.collimated)
+    name: str | None = None
+
+    def __post_init__(self):
+        if not np.isfinite(self.total_power) or self.total_power <= 0.0:
+            raise ValueError("pump total_power must be finite and positive")
+        if not isinstance(self.spectrum, PumpSpectrum):
+            raise TypeError("pump spectrum must be PumpSpectrum")
+        if not isinstance(self.cross_sections, CrossSectionData):
+            raise TypeError("pump cross_sections must be CrossSectionData")
+        if not isinstance(self.angular_distribution, PumpAngularDistribution):
+            raise TypeError("pump angular_distribution must be PumpAngularDistribution")
+        if not isinstance(self.profile, (UniformPumpProfile, SuperGaussianPumpProfile)):
+            raise TypeError("pump profile must be UniformPumpProfile or SuperGaussianPumpProfile")
+
+
+class GaussianPump(Pump):
+    """Convenience physical pump with an elliptical super-Gaussian profile."""
+
+    def __init__(
+        self,
+        *,
+        total_power,
+        spectrum,
+        cross_sections,
+        waist,
+        exponent=2.0,
+        center=(0.0, 0.0, 0.0),
+        axis_u=(1.0, 0.0, 0.0),
+        axis_v=(0.0, 1.0, 0.0),
+        angular_distribution=None,
+        name=None,
+    ):
+        radii = (float(waist), float(waist)) if np.isscalar(waist) else tuple(waist)
+        if len(radii) != 2:
+            raise ValueError("waist must be a scalar or a two-vector")
+        super().__init__(
+            total_power=total_power,
+            spectrum=spectrum,
+            cross_sections=cross_sections,
+            profile=SuperGaussianPumpProfile(
+                radius_u=radii[0],
+                radius_v=radii[1],
+                exponent=exponent,
+                center=center,
+                axis_u=axis_u,
+                axis_v=axis_v,
+            ),
+            angular_distribution=(
+                PumpAngularDistribution.collimated()
+                if angular_distribution is None
+                else angular_distribution
+            ),
+            name=name,
+        )
+
+
+@dataclass(frozen=True)
+class SurfacePumpInjector:
+    """Numerical injection method that launches a pump from tagged surfaces."""
+
+    surface_domains: object
+
+    def __post_init__(self):
+        domains = (
+            (self.surface_domains,)
+            if isinstance(self.surface_domains, (str, int))
+            else tuple(self.surface_domains)
+        )
+        if not domains:
+            raise ValueError("SurfacePumpInjector requires at least one surface domain")
+        object.__setattr__(self, "surface_domains", domains)
 
 
 @dataclass(frozen=True)
 class PlanarPumpRelay:
     """Affine re-imaging link between tagged planar boundary surfaces."""
 
-    exitDomains: object
-    entryDomains: object
-    flipU: bool = False
-    flipV: bool = False
+    exit_domains: object
+    entry_domains: object
+    flip_u: bool = False
+    flip_v: bool = False
     rotation: float = 0.0
     offset: tuple[float, float] = (0.0, 0.0)
     tilt: tuple[float, float] = (0.0, 0.0)
@@ -460,12 +570,16 @@ class PlanarPumpRelay:
     transmission: float = 1.0
 
     def __post_init__(self):
-        exit_domains = (self.exitDomains,) if isinstance(self.exitDomains, (str, int)) else tuple(self.exitDomains)
-        entry_domains = (self.entryDomains,) if isinstance(self.entryDomains, (str, int)) else tuple(self.entryDomains)
+        exit_domains = (self.exit_domains,) if isinstance(self.exit_domains, (str, int)) else tuple(self.exit_domains)
+        entry_domains = (
+            (self.entry_domains,)
+            if isinstance(self.entry_domains, (str, int))
+            else tuple(self.entry_domains)
+        )
         if not exit_domains or not entry_domains:
             raise ValueError("relay requires exit and entry surface domains")
-        object.__setattr__(self, "exitDomains", exit_domains)
-        object.__setattr__(self, "entryDomains", entry_domains)
+        object.__setattr__(self, "exit_domains", exit_domains)
+        object.__setattr__(self, "entry_domains", entry_domains)
         if self.magnification <= 0.0:
             raise ValueError("relay magnification must be positive")
         if self.transmission < 0.0 or self.transmission > 1.0:
@@ -473,51 +587,70 @@ class PlanarPumpRelay:
         if len(tuple(self.offset)) != 2 or len(tuple(self.tilt)) != 2:
             raise ValueError("relay offset and tilt must be two-vectors")
 
+    @property
+    def exitDomains(self):
+        return self.exit_domains
+
+    @property
+    def entryDomains(self):
+        return self.entry_domains
+
+    @property
+    def flipU(self):
+        return self.flip_u
+
+    @property
+    def flipV(self):
+        return self.flip_v
+
     @classmethod
     def retroreflect(cls, domains, *, transmission=1.0):
         return cls(domains, domains, transmission=transmission)
 
 
 @dataclass(frozen=True)
-class PumpSource:
-    """One independently normalized boundary-launched pump source."""
+class MonteCarloPumpSolver:
+    """Numerical controls shared by pumps registered on a simulation."""
 
-    surfaceDomains: object
+    ray_count: int = 100_000
+    seed: int = 5489
+    max_steps: int | None = None
+
+    def __post_init__(self):
+        if self.ray_count <= 0:
+            raise ValueError("MonteCarloPumpSolver.ray_count must be positive")
+        if self.seed < 0 or self.seed >= 2**32:
+            raise ValueError("MonteCarloPumpSolver.seed must fit uint32")
+        if self.max_steps is not None and self.max_steps < 0:
+            raise ValueError("MonteCarloPumpSolver.max_steps must be non-negative")
+
+
+@dataclass(frozen=True)
+class _PumpSource:
+    """CamelCase transport adapter assembled by ``Simulation.add_pump``."""
+
+    surfaceDomains: tuple
     totalPower: float
     spectrum: PumpSpectrum
     crossSections: CrossSectionData
-    angularDistribution: PumpAngularDistribution = field(default_factory=PumpAngularDistribution.collimated)
-    profile: object = field(default_factory=UniformPumpProfile)
-    relays: tuple[PlanarPumpRelay, ...] = ()
-
-    def __post_init__(self):
-        domains = tuple(self.surfaceDomains) if not isinstance(self.surfaceDomains, (str, int)) else (self.surfaceDomains,)
-        if not domains:
-            raise ValueError("pump source requires at least one surface domain")
-        if not np.isfinite(self.totalPower) or self.totalPower <= 0.0:
-            raise ValueError("pump source totalPower must be finite and positive")
-        if not isinstance(self.spectrum, PumpSpectrum):
-            raise TypeError("pump source spectrum must be PumpSpectrum")
-        if not isinstance(self.crossSections, CrossSectionData):
-            raise TypeError("pump source crossSections must be CrossSectionData")
-        if not isinstance(self.angularDistribution, PumpAngularDistribution):
-            raise TypeError("pump source angularDistribution must be PumpAngularDistribution")
-        if not isinstance(self.profile, (UniformPumpProfile, SuperGaussianPumpProfile)):
-            raise TypeError("pump source profile must be UniformPumpProfile or SuperGaussianPumpProfile")
-        relays = tuple(self.relays)
-        if not all(isinstance(relay, PlanarPumpRelay) for relay in relays):
-            raise TypeError("pump source relays must contain PlanarPumpRelay values")
-        object.__setattr__(self, "surfaceDomains", domains)
-        object.__setattr__(self, "relays", relays)
+    angularDistribution: PumpAngularDistribution
+    profile: object
+    relays: tuple[PlanarPumpRelay, ...]
 
 
-def integratePumpProfile(topology, surfaceDomains, profile):
-    """Integrate a pump profile over tagged triangular boundary faces.
+@dataclass(frozen=True)
+class _PumpProperties:
+    """CamelCase compiled-transport pump graph."""
 
-    The result has area units matching the topology coordinates and converts a
-    peak intensity into the ``PumpSource.totalPower`` normalization.
-    """
-    domains = (surfaceDomains,) if isinstance(surfaceDomains, (str, int)) else tuple(surfaceDomains)
+    sources: tuple[_PumpSource, ...]
+    rayCount: int
+    rngSeed: int
+    pumpSteps: int | None
+
+
+def integrate_pump_profile(topology, surface_domains, profile):
+    """Integrate a normalized profile over tagged triangular boundary faces."""
+    domains = (surface_domains,) if isinstance(surface_domains, (str, int)) else tuple(surface_domains)
     domain_map = topology.surfaceDomainMap()
     domain_ids = {domain_map.resolve(value) if isinstance(value, str) else int(value) for value in domains}
     mask = (np.asarray(topology.neighborCells) < 0) & np.isin(
@@ -531,7 +664,6 @@ def integratePumpProfile(topology, surfaceDomains, profile):
     area = 0.5 * np.linalg.norm(
         np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]), axis=1
     )
-    # Degree-five Dunavant rule; weights below sum to one on each triangle.
     barycentric = np.asarray([
         [1 / 3, 1 / 3, 1 / 3],
         [0.059715871789770, 0.470142064105115, 0.470142064105115],
@@ -683,25 +815,3 @@ class LaserProperties:
         if "l_ems" in self.values and "s_ems" in self.values:
             if len(self.values["l_ems"]) != len(self.values["s_ems"]):
                 raise ValueError("l_ems and s_ems must have the same length")
-
-
-@dataclass(frozen=True)
-class PumpProperties:
-    """General compiled pump configuration."""
-
-    sources: tuple[PumpSource, ...]
-    rayCount: int = 100_000
-    rngSeed: int = 5489
-    pumpSteps: int | None = None
-
-    def __post_init__(self):
-        sources = tuple(self.sources)
-        if not sources or not all(isinstance(source, PumpSource) for source in sources):
-            raise ValueError("PumpProperties.sources must contain at least one PumpSource")
-        if self.rayCount <= 0:
-            raise ValueError("PumpProperties.rayCount must be positive")
-        if self.rngSeed < 0 or self.rngSeed >= 2**32:
-            raise ValueError("PumpProperties.rngSeed must fit uint32")
-        if self.pumpSteps is not None and self.pumpSteps < 0:
-            raise ValueError("PumpProperties.pumpSteps must be non-negative")
-        object.__setattr__(self, "sources", sources)

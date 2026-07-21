@@ -1,69 +1,91 @@
-PumpProperties
-==============
+PICMI-style pump configuration
+==============================
 
-The compiled pump is a boundary-launched Monte Carlo transport model. Pump
-power is normalized explicitly: every source supplies total power, a normalized
-spatial profile, a normalized discrete spectrum, and a normalized angular
-distribution.
-
-A monochromatic collimated source is configured as follows:
+The public pump API separates the physical pump, numerical injection method,
+and Monte Carlo solver controls. This follows the composition used by PICMI's
+laser and injection objects without claiming that HASEonGPU implements the PIC
+model itself.
 
 .. code-block:: python
 
    from HASEonGPU import (
-       PumpAngularDistribution, PumpProperties, PumpSource, PumpSpectrum,
+       MonteCarloPumpSolver,
+       PlanarPumpRelay,
+       Pump,
+       PumpAngularDistribution,
+       PumpSpectrum,
        SuperGaussianPumpProfile,
+       SurfacePumpInjector,
    )
 
    profile = SuperGaussianPumpProfile(
-       radiusU=1.5, radiusV=1.5, exponent=40,
-       center=(0, 0, 0), axisU=(1, 0, 0), axisV=(0, 1, 0),
+       radius_u=1.5,
+       radius_v=1.5,
+       exponent=40,
+       center=(0, 0, 0),
+       axis_u=(1, 0, 0),
+       axis_v=(0, 1, 0),
    )
-   source = PumpSource(
-       surfaceDomains=("pump_input",),
-       totalPower=100000.0,
+   pump = Pump(
+       total_power=100000.0,
        spectrum=PumpSpectrum.monochromatic(940e-9),
-       crossSections=pump_cross_sections,
-       angularDistribution=PumpAngularDistribution.collimated(),
+       cross_sections=pump_cross_sections,
+       angular_distribution=PumpAngularDistribution.collimated(),
        profile=profile,
    )
-   pump = PumpProperties(
-       sources=(source,), rayCount=100000, rngSeed=5489, pumpSteps=50,
+   injector = SurfacePumpInjector(surface_domains=("pump_input",))
+   pump_solver = MonteCarloPumpSolver(
+       ray_count=100000,
+       seed=5489,
+       max_steps=50,
    )
 
-``surfaceDomains`` are tagged exterior triangle domains. Multiple independent
-sources may be supplied. ``UniformPumpProfile`` distributes power uniformly;
-``SuperGaussianPumpProfile`` defines a world-space elliptical profile.
-``PumpAngularDistribution.uniformCone`` and an explicit ``PumpSpectrum`` enable
-finite-divergence and multi-wavelength pumps. Cross sections are interpolated
-at every discrete pump wavelength before transport.
+   simulation = Simulation(
+       gain_medium=medium,
+       phi_ase=phi_ase,
+       time_integrator=FrozenPhiAseRungeKutta4(),
+       time_step_size=2e-5,
+       pump_solver=pump_solver,
+   )
+   simulation.add_pump(
+       pump,
+       injection_method=injector,
+       relays=(PlanarPumpRelay.retroreflect("pump_output"),),
+   )
+   simulation.step(150)
+
+Physical and numerical objects
+------------------------------
+
+``Pump`` contains total power, spectrum, material cross sections, spatial
+profile, and angular distribution. ``GaussianPump`` is a convenience class
+that creates a super-Gaussian physical pump from a scalar or two-component
+``waist``.
+
+``SurfacePumpInjector`` selects tagged exterior triangle domains. It describes
+where the physical pump is introduced, rather than duplicating those domains
+inside the pump itself. Multiple pumps can be registered through repeated
+``Simulation.add_pump`` calls.
+
+``MonteCarloPumpSolver`` owns the numerical ``ray_count`` and reproducibility
+``seed``. Its optional ``max_steps`` limits the pump contribution while the
+outer simulation may continue.
 
 Power normalization
 -------------------
 
-``totalPower`` is the integral over the selected source aperture. The profile
-only changes where that power is launched; it does not change total power.
-``integratePumpProfile(topology, domains, profile)`` can convert a legacy peak
-intensity to total power on a tagged triangular aperture.
+``total_power`` is integrated over the selected injector aperture. The profile
+changes the launch distribution but not total power.
+``integrate_pump_profile(topology, domains, profile)`` converts a legacy peak
+intensity into total power on a tagged triangular aperture.
 
-Planar relays and passes
-------------------------
+Planar relays
+-------------
 
-``PlanarPumpRelay`` maps rays leaving tagged, coplanar exit faces to tagged,
-coplanar entry faces. It supports flips, in-plane rotation, offset, tilt,
-magnification, and transmission. Relays are evaluated in source order and may
-represent return passes. ``PlanarPumpRelay.retroreflect("pump_output")`` is the
-unit-magnification same-aperture return used to approximate the former
-back-reflected z traversal.
+``PlanarPumpRelay`` maps rays leaving tagged, coplanar ``exit_domains`` to
+``entry_domains``. It supports ``flip_u``, ``flip_v``, in-plane rotation,
+offset, tilt, magnification, transmission, and aperture vignetting. Ordered
+relays passed to ``add_pump`` represent finite return passes.
 
-Rays that miss the mapped entry aperture are vignetted. Coating physics,
-polarization, residual cavity recirculation, and arbitrary Python callbacks are
-not part of this core model.
-
-Sampling controls
------------------
-
-``rayCount`` is the number of equal-power launch rays per source and is
-independent of PhiASE ray counts. ``rngSeed`` makes host-side source sampling
-reproducible. ``pumpSteps`` limits pump contribution to the first outer time
-steps; it may also be overridden by ``Simulation.runSteps(..., pumpSteps=...)``.
+Pump polarization, coating interactions, residual cavity recirculation, and
+arbitrary Python transport callbacks are outside the general pump core.

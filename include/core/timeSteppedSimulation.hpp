@@ -108,8 +108,8 @@ namespace hase::core
             }
             for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
             {
-                double const share = static_cast<double>(mesh.cellVolumes[cell])
-                                     / static_cast<double>(mesh.numberOfCellVertices);
+                double const share
+                    = static_cast<double>(mesh.cellVolumes[cell]) / static_cast<double>(mesh.numberOfCellVertices);
                 for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
                     volumes[mesh.cellPointIndices[cell * mesh.numberOfCellVertices + vertex]] += share;
             }
@@ -132,8 +132,8 @@ namespace hase::core
                 if(source.totalPower <= 0.0 || source.surfaces.empty() || source.wavelengths.empty()
                    || source.wavelengths.size() != source.spectralWeights.size()
                    || source.wavelengths.size() != source.sigmaAbsorption.size()
-                   || source.wavelengths.size() != source.sigmaEmission.size()
-                   || source.polarAngles.empty() || source.polarAngles.size() != source.azimuthalAngles.size()
+                   || source.wavelengths.size() != source.sigmaEmission.size() || source.polarAngles.empty()
+                   || source.polarAngles.size() != source.azimuthalAngles.size()
                    || source.polarAngles.size() != source.angularWeights.size())
                     throw std::runtime_error("invalid general pump source configuration");
         }
@@ -255,8 +255,7 @@ namespace hase::core
                     m_dndtPump);
             }
 
-            DerivativeBuffers
-                derivativeBuffers{beta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
+            DerivativeBuffers derivativeBuffers{beta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
                 m_queue,

@@ -65,7 +65,7 @@ iteration with run-control attributes, then reads the snapshot series produced
 by the C++ time loop. For streaming backends, Python starts a dedicated
 snapshot receiver thread before sending the input iteration, so the C++ backend
 can drain its output stream and finish independently of slower Python
-``onStep`` callbacks such as VTK file writers. Caller-managed simulation
+``on_step`` callbacks such as VTK file writers. Caller-managed simulation
 openPMD sessions are not supported; the compiled run owns its transport
 lifetime.
 
@@ -190,9 +190,6 @@ iterations contain dynamic beta records plus ``core_result_phi_ase``,
 ``core_result_dndt_pump``. The first snapshot also includes the static canonical
 mesh/material/spectral records.
 
-For streaming backends, a dedicated receiver drains snapshots while the backend
-runs, so slow Python ``onStep`` work (such as file output) does not prevent the
-backend from completing its output stream.
 
 Iteration Updates
 -----------------

@@ -37,10 +37,12 @@ Spectra, pump, and ASE
    PumpAngularDistribution
    UniformPumpProfile
    SuperGaussianPumpProfile
-   PumpSource
+   Pump
+   GaussianPump
+   SurfacePumpInjector
    PlanarPumpRelay
-   PumpProperties
-   integratePumpProfile
+   MonteCarloPumpSolver
+   integrate_pump_profile
    PhiASE
 
 Simulation and time integration

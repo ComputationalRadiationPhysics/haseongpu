@@ -147,7 +147,7 @@ def testCurrentTet4WithoutReflectionsMatchesLegacyWedgeIntegral(
     assert state.aseResult.srmMaxIterations == 0
     # A stale all-zero beta-volume CDF sends every source history to the final
     # Tet. Keep the source visits dispersed as beta evolves from its zero state.
-    assert np.max(state.volumeTotalRays) < metadata["parameters"]["maxRaysPerSample"] // 20
+    assert np.max(state.volume_total_rays) < metadata["parameters"]["maxRaysPerSample"] // 20
 
     observed_integrals = []
     for step in metadata["observable"]["stepNumbers"]:

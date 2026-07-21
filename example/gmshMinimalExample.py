@@ -19,10 +19,11 @@ from HASEonGPU import (
     MeshTopology,
     PhiASE,
     PlanarPumpRelay,
-    PumpProperties,
-    PumpSource,
+    MonteCarloPumpSolver,
+    Pump,
     PumpSpectrum,
     SuperGaussianPumpProfile,
+    SurfacePumpInjector,
     RungeKutta4,
     Simulation,
     SpectralDecomposition,
@@ -39,8 +40,8 @@ def printState(state):
     print(
         f"step={state.step:03d} "
         f"time={state.time:.3e}s "
-        f"mean_beta={state.betaCells.mean():.6e} "
-        f"mean_phi={state.phiAse.mean():.6e}"
+        f"mean_beta={state.beta_cells.mean():.6e} "
+        f"mean_phi={state.phi_ase.mean():.6e}"
     )
 
 
@@ -120,16 +121,14 @@ def main():
             crossSectionEmission=[2.0e-20, 2.48e-20],
             resolution=2,
         )
-        pump_profile = SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.5, exponent=40)
-        pump_source = PumpSource(
-            surfaceDomains=(1,),
-            totalPower=16e3 * 16.0,
+        pump_profile = SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.5, exponent=40)
+        pump = Pump(
+            total_power=16e3 * 16.0,
             spectrum=PumpSpectrum.monochromatic(940e-9),
-            crossSections=cross_sections_data,
+            cross_sections=cross_sections_data,
             profile=pump_profile,
-            relays=(PlanarPumpRelay.retroreflect((2,)),),
         )
-        pump = PumpProperties(sources=(pump_source,), rayCount=100000)
+        pump_solver = MonteCarloPumpSolver(ray_count=100000)
 
         phi_ase = PhiASE(
             spectralProperties=cross_sections_data,
@@ -143,19 +142,23 @@ def main():
         )
 
         simulation = Simulation(
-            gainMedium=medium,
-            pump=pump,
-            phiASE=phi_ase,
-            timeIntegrationSolver=RungeKutta4(),
-            timeStep=1e-5,
-            endTime=1e-3,
+            gain_medium=medium,
+            phi_ase=phi_ase,
+            time_integrator=RungeKutta4(),
+            time_step_size=1e-5,
+            pump_solver=pump_solver,
+            max_time=1e-3,
+        ).add_pump(
+            pump,
+            injection_method=SurfacePumpInjector(surface_domains=(1,)),
+            relays=(PlanarPumpRelay.retroreflect((2,)),),
         )
-        simulation.onInit(initFunc)
-        simulation.onStep(printState)
-        simulation.onStep(writeVtkState, "gmsh_minimal_phi_ase_{step:03d}.vtk")
-        simulation.runSteps(3)
+        simulation.on_init(initFunc)
+        simulation.on_step(printState)
+        simulation.on_step(writeVtkState, "gmsh_minimal_phi_ase_{step:03d}.vtk")
+        simulation.step(3)
 
-        last_state = simulation.getLastState()
+        last_state = simulation.get_last_state()
         print(f"last completed step: {last_state.step}")
 
 

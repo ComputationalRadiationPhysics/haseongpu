@@ -82,4 +82,4 @@ Conversion Utilities
 
 ``LaserProperties`` remains available for compatibility workflows, but normal
 simulation code passes ``SpectralDecomposition`` directly to
-``PumpProperties``, ``PhiASE``, or ``Simulation``.
+``Pump``, ``PhiASE``, or ``Simulation``.

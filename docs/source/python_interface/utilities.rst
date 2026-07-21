@@ -44,7 +44,7 @@ VTK Export
 ----------
 
 ``vtkWedge`` writes point or cell data on the wedge mesh to a legacy ASCII
-VTK file. In a ``Simulation.onStep`` callback, pass the ``TimeStepState`` to
+VTK file. In a ``Simulation.on_step`` callback, pass the ``TimeStepState`` to
 ``vtkWedge``; the state carries the static topology and the dynamic arrays.
 
 Callback use:
@@ -56,20 +56,21 @@ Callback use:
            output_dir / "fields_{step:03d}.vtk",
            state,
            fields={
-               "betaCells": state.betaCells,
-               "phiASE": state.phiAse,
-               "dndtAse": state.dndtAse,
-               "cladAbs": state.phiAse * cladding_absorption,
+               "betaCells": state.beta_cells,
+               "phiASE": state.phi_ase,
+               "dndtAse": state.dndt_ase,
+               "cladAbs": state.phi_ase * cladding_absorption,
            },
        )
 
-   simulation.onStep(write_vtk, output_dir, 5.5)
+   simulation.on_step(write_vtk, output_dir, 5.5)
 
 Direct use after one step:
 
 .. code-block:: python
 
-   state = simulation.step()
+   simulation.step()
+   state = simulation.get_last_state()
    vtkWedge("phi.vtk", state)
    vtkWedge("fields.vtk", state, field=["phiAse", "dndtAse"])
    vtkWedge("named.vtk", state, field={"phi": "phiAse", "dn": "dndtAse"})
@@ -86,7 +87,7 @@ reduce output frequency:
 
 .. code-block:: python
 
-   simulation.onStep(vtkWedge("phi_{step:03d}.vtk", medium, every=10))
+   simulation.on_step(vtkWedge("phi_{step:03d}.vtk", medium, every=10))
 
 For new code, prefer an explicit callback when output frequency or derived
 fields are needed:
@@ -97,7 +98,7 @@ fields are needed:
        if state.step % 10 == 0:
            vtkWedge(output_dir / "phi_{step:03d}.vtk", state)
 
-   simulation.onStep(write_every_tenth, output_dir)
+   simulation.on_step(write_every_tenth, output_dir)
 
 The data shape must match either:
 
