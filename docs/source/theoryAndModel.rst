@@ -216,7 +216,7 @@ intensity.
 The compiled integrator advances the combined derivative. Standard RK4
 re-evaluates ASE and pump transport at each stage;
 ``FrozenPhiAseRungeKutta4`` reuses its first ASE calculation for the remaining
-stages. ``Simulation(enableASE=False, ...)`` advances only pump and
+stages. ``Simulation(enable_ase=False, ...)`` advances only pump and
 fluorescence.
 
 Restrictions

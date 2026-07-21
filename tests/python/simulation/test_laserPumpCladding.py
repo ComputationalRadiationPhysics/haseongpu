@@ -328,7 +328,7 @@ def laserPumpCladdingBackendResults(
             adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
         )
 
-        relative_standard_error = np.asarray(state.volumeRelativeStandardError, dtype=np.float64)
+        relative_standard_error = np.asarray(state.volume_relative_standard_error, dtype=np.float64)
         defined_relative_standard_error = relative_standard_error[np.isfinite(relative_standard_error)]
         observed_integrals = []
         for step in metadata["observable"]["stepNumbers"]:
@@ -519,7 +519,7 @@ def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
 
     def fake_run_example(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
-        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaCells=np.zeros((2, 3)))
+        return SimpleNamespace(phi_ase=np.zeros((2, 3)), beta_cells=np.zeros((2, 3)))
 
     monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
 
@@ -548,7 +548,7 @@ def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
 
     def fake_run_example(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
-        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaCells=np.zeros((2, 3)))
+        return SimpleNamespace(phi_ase=np.zeros((2, 3)), beta_cells=np.zeros((2, 3)))
 
     monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
     command = _laser_pump_launcher.launchCommand("hdf5", tmp_path)

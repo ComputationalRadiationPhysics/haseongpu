@@ -40,16 +40,18 @@ from .geometry import (
 )
 from .laser import (
     CrossSectionData,
-    integratePumpProfile,
+    GaussianPump,
     LaserProperties,
+    MonteCarloPumpSolver,
     PlanarPumpRelay,
+    Pump,
     PumpAngularDistribution,
-    PumpProperties,
-    PumpSource,
     PumpSpectrum,
     SpectralDecomposition,
     SuperGaussianPumpProfile,
+    SurfacePumpInjector,
     UniformPumpProfile,
+    integrate_pump_profile,
 )
 from .simulation import (
     ConnectivityAverageBetaVolumeMapper,

@@ -61,7 +61,10 @@ namespace hase::kernels
 
     [[nodiscard]] inline hase::core::Point hostPoint(hase::core::HostMesh const& mesh, unsigned const point)
     {
-        return {mesh.points[point], mesh.points[point + mesh.numberOfMeshPoints], mesh.points[point + 2u * mesh.numberOfMeshPoints]};
+        return {
+            mesh.points[point],
+            mesh.points[point + mesh.numberOfMeshPoints],
+            mesh.points[point + 2u * mesh.numberOfMeshPoints]};
     }
 
     [[nodiscard]] inline std::vector<PumpBoundaryFace> pumpBoundaryFaces(
@@ -89,7 +92,8 @@ namespace hase::kernels
                     info.vertices[vertex] = hostPoint(mesh, static_cast<unsigned>(point));
                 }
                 info.centroid = (info.vertices[0] + info.vertices[1] + info.vertices[2]) * (1.0 / 3.0);
-                auto normal = hase::core::cross(info.vertices[1] - info.vertices[0], info.vertices[2] - info.vertices[0]);
+                auto normal
+                    = hase::core::cross(info.vertices[1] - info.vertices[0], info.vertices[2] - info.vertices[0]);
                 double const twiceArea = normal.euclidLength();
                 if(twiceArea <= 0.0)
                     continue;
@@ -117,8 +121,8 @@ namespace hase::kernels
 
     [[nodiscard]] inline hase::core::Point perpendicular(hase::core::Point const normal)
     {
-        hase::core::Point reference = std::abs(normal.x) < 0.9 ? hase::core::Point{1.0, 0.0, 0.0}
-                                                               : hase::core::Point{0.0, 1.0, 0.0};
+        hase::core::Point reference
+            = std::abs(normal.x) < 0.9 ? hase::core::Point{1.0, 0.0, 0.0} : hase::core::Point{0.0, 1.0, 0.0};
         return hostNormalize(hase::core::cross(normal, reference));
     }
 
@@ -130,10 +134,12 @@ namespace hase::kernels
             return 1.0;
         hase::core::Point const relative
             = point - hase::core::Point{profile.center[0], profile.center[1], profile.center[2]};
-        double const u = hase::core::dot(relative, hase::core::Point{profile.axisU[0], profile.axisU[1], profile.axisU[2]})
-                         / profile.radiusU;
-        double const v = hase::core::dot(relative, hase::core::Point{profile.axisV[0], profile.axisV[1], profile.axisV[2]})
-                         / profile.radiusV;
+        double const u
+            = hase::core::dot(relative, hase::core::Point{profile.axisU[0], profile.axisU[1], profile.axisU[2]})
+              / profile.radiusU;
+        double const v
+            = hase::core::dot(relative, hase::core::Point{profile.axisV[0], profile.axisV[1], profile.axisV[2]})
+              / profile.radiusV;
         return std::exp(-std::pow(std::sqrt(u * u + v * v), profile.exponent));
     }
 
@@ -177,10 +183,19 @@ namespace hase::kernels
 
         PumpRayBatch batch;
         auto reserve = [rayCount](auto& values) { values.reserve(rayCount); };
-        reserve(batch.originX); reserve(batch.originY); reserve(batch.originZ);
-        reserve(batch.directionX); reserve(batch.directionY); reserve(batch.directionZ);
-        reserve(batch.power); reserve(batch.wavelength); reserve(batch.sigmaAbsorption); reserve(batch.sigmaEmission);
-        reserve(batch.cell); reserve(batch.forbiddenFace); reserve(batch.exitFace);
+        reserve(batch.originX);
+        reserve(batch.originY);
+        reserve(batch.originZ);
+        reserve(batch.directionX);
+        reserve(batch.directionY);
+        reserve(batch.directionZ);
+        reserve(batch.power);
+        reserve(batch.wavelength);
+        reserve(batch.sigmaAbsorption);
+        reserve(batch.sigmaEmission);
+        reserve(batch.cell);
+        reserve(batch.forbiddenFace);
+        reserve(batch.exitFace);
         for(unsigned ray = 0u; ray < rayCount; ++ray)
         {
             PumpBoundaryFace const* face = nullptr;
@@ -210,8 +225,12 @@ namespace hase::kernels
                 + v * (std::sin(theta) * std::sin(phi)));
             std::size_t const spectrum = spectrumDistribution(rng);
 
-            batch.originX.push_back(origin.x); batch.originY.push_back(origin.y); batch.originZ.push_back(origin.z);
-            batch.directionX.push_back(direction.x); batch.directionY.push_back(direction.y); batch.directionZ.push_back(direction.z);
+            batch.originX.push_back(origin.x);
+            batch.originY.push_back(origin.y);
+            batch.originZ.push_back(origin.z);
+            batch.directionX.push_back(direction.x);
+            batch.directionY.push_back(direction.y);
+            batch.directionZ.push_back(direction.z);
             batch.power.push_back(source.totalPower / static_cast<double>(rayCount));
             batch.wavelength.push_back(source.wavelengths[spectrum]);
             batch.sigmaAbsorption.push_back(source.sigmaAbsorption[spectrum]);
@@ -249,10 +268,8 @@ namespace hase::kernels
             auto samplePumpIntegral,
             unsigned const rayCount) const
         {
-            for(auto [ray] : alpaka::onAcc::makeIdxMap(
-                    acc,
-                    alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{rayCount}))
+            for(auto [ray] :
+                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{rayCount}))
             {
                 hase::core::Point origin{originX[ray], originY[ray], originZ[ray]};
                 hase::core::Point const direction{directionX[ray], directionY[ray], directionZ[ray]};
@@ -263,23 +280,18 @@ namespace hase::kernels
                 constexpr unsigned maxSteps = 10000u;
                 for(unsigned step = 0u; step < maxSteps && rayPower != 0.0; ++step)
                 {
-                    auto const intersection = hase::kernels::forward::nextFaceIntersection(
-                        mesh,
-                        tet,
-                        origin,
-                        direction,
-                        forbidden);
+                    auto const intersection
+                        = hase::kernels::forward::nextFaceIntersection(mesh, tet, origin, direction, forbidden);
                     if(intersection.localFace < 0)
                     {
                         rayPower = 0.0;
                         break;
                     }
                     bool const gainCell = mesh.getCellType(tet) != mesh.claddingNumber;
-                    double const gain = gainCell
-                                            ? static_cast<double>(mesh.nTot)
-                                                  * (betaVolume[tet] * (sigmaAbsorption[ray] + sigmaEmission[ray])
-                                                     - sigmaAbsorption[ray])
-                                            : -mesh.claddingAbsorption;
+                    double const gain = gainCell ? static_cast<double>(mesh.nTot)
+                                                       * (betaVolume[tet] * (sigmaAbsorption[ray] + sigmaEmission[ray])
+                                                          - sigmaAbsorption[ray])
+                                                 : -mesh.claddingAbsorption;
                     double const exponent = gain * intersection.length;
                     if(!alpaka::math::isfinite(exponent) || exponent > 700.0)
                     {
@@ -300,8 +312,8 @@ namespace hase::kernels
                             for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
                                 alpaka::onAcc::atomicAdd(
                                     acc,
-                                    &samplePumpIntegral[
-                                        mesh.cellPointIndices[tet * mesh.numberOfCellVertices + vertex]],
+                                    &samplePumpIntegral
+                                        [mesh.cellPointIndices[tet * mesh.numberOfCellVertices + vertex]],
                                     integral * barycentric[vertex]);
                         }
                     }
@@ -326,13 +338,22 @@ namespace hase::kernels
                     tet = transition.cell;
                     forbidden = transition.forbiddenFace;
                 }
-                originX[ray] = origin.x; originY[ray] = origin.y; originZ[ray] = origin.z;
-                power[ray] = rayPower; cell[ray] = tet; forbiddenFace[ray] = forbidden;
+                originX[ray] = origin.x;
+                originY[ray] = origin.y;
+                originZ[ray] = origin.z;
+                power[ray] = rayPower;
+                cell[ray] = tet;
+                forbiddenFace[ray] = forbidden;
             }
         }
     };
 
-    template<typename T_Device, typename T_Executor, typename T_BetaBuffer, typename T_CellBuffer, typename T_SampleBuffer>
+    template<
+        typename T_Device,
+        typename T_Executor,
+        typename T_BetaBuffer,
+        typename T_CellBuffer,
+        typename T_SampleBuffer>
     PumpRayBatch tracePumpBatch(
         hase::alpakaUtils::DevBundle<T_Device, T_Executor>& devBundle,
         auto const& queue,
@@ -358,10 +379,8 @@ namespace hase::kernels
         auto cell = hase::alpakaUtils::toDevice(queue, batch.cell);
         auto forbiddenFace = hase::alpakaUtils::toDevice(queue, batch.forbiddenFace);
         auto exitFace = hase::alpakaUtils::toDevice(queue, batch.exitFace);
-        auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-            devBundle.device,
-            devBundle.executor,
-            alpaka::Vec{count});
+        auto frameSpec
+            = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{count});
         queue.enqueue(
             frameSpec,
             alpaka::KernelBundle{
@@ -392,9 +411,15 @@ namespace hase::kernels
             alpaka::onHost::wait(queue);
             std::copy_n(alpaka::onHost::data(host), values.size(), values.begin());
         };
-        copyBack(originX, batch.originX); copyBack(originY, batch.originY); copyBack(originZ, batch.originZ);
-        copyBack(directionX, batch.directionX); copyBack(directionY, batch.directionY); copyBack(directionZ, batch.directionZ);
-        copyBack(power, batch.power); copyBack(cell, batch.cell); copyBack(forbiddenFace, batch.forbiddenFace);
+        copyBack(originX, batch.originX);
+        copyBack(originY, batch.originY);
+        copyBack(originZ, batch.originZ);
+        copyBack(directionX, batch.directionX);
+        copyBack(directionY, batch.directionY);
+        copyBack(directionZ, batch.directionZ);
+        copyBack(power, batch.power);
+        copyBack(cell, batch.cell);
+        copyBack(forbiddenFace, batch.forbiddenFace);
         copyBack(exitFace, batch.exitFace);
         return batch;
     }
@@ -405,9 +430,7 @@ namespace hase::kernels
         std::vector<PumpBoundaryFace> faces;
     };
 
-    [[nodiscard]] inline RelayFrame makeRelayFrame(
-        hase::core::HostMesh const& mesh,
-        std::vector<int> const& domains)
+    [[nodiscard]] inline RelayFrame makeRelayFrame(hase::core::HostMesh const& mesh, std::vector<int> const& domains)
     {
         RelayFrame frame{};
         frame.faces = pumpBoundaryFaces(mesh, domains);
@@ -448,9 +471,7 @@ namespace hase::kernels
         hase::core::Point const v)
     {
         auto project = [&](hase::core::Point const p)
-        {
-            return std::array<double, 2u>{hase::core::dot(p, u), hase::core::dot(p, v)};
-        };
+        { return std::array<double, 2u>{hase::core::dot(p, u), hase::core::dot(p, v)}; };
         auto const p = project(point);
         auto const a = project(face.vertices[0]);
         auto const b = project(face.vertices[1]);
@@ -478,8 +499,8 @@ namespace hase::kernels
         {
             if(exits.exitFace[ray] < 0 || exits.power[ray] == 0.0)
                 continue;
-            unsigned const faceIndex = exits.cell[ray] * mesh.numberOfFacesPerCell
-                                       + static_cast<unsigned>(exits.exitFace[ray]);
+            unsigned const faceIndex
+                = exits.cell[ray] * mesh.numberOfFacesPerCell + static_cast<unsigned>(exits.exitFace[ray]);
             int const domain = mesh.cellFaceBoundaries[faceIndex];
             if(!containsDomain(relay.exitSurfaces, domain))
                 continue;
@@ -506,8 +527,7 @@ namespace hase::kernels
             if(entryFace == nullptr)
                 continue;
 
-            hase::core::Point const oldDirection{
-                exits.directionX[ray], exits.directionY[ray], exits.directionZ[ray]};
+            hase::core::Point const oldDirection{exits.directionX[ray], exits.directionY[ray], exits.directionZ[ray]};
             double du = hase::core::dot(oldDirection, exitFrame.u) * (relay.flipU ? -1.0 : 1.0);
             double dv = hase::core::dot(oldDirection, exitFrame.v) * (relay.flipV ? -1.0 : 1.0);
             double const mappedDu = cosine * du - sine * dv + relay.tilt[0];
@@ -516,8 +536,12 @@ namespace hase::kernels
             hase::core::Point const direction = hostNormalize(
                 entryFrame.u * mappedDu + entryFrame.v * mappedDv - entryFrame.normal * normalMagnitude);
 
-            result.originX.push_back(mappedPosition.x); result.originY.push_back(mappedPosition.y); result.originZ.push_back(mappedPosition.z);
-            result.directionX.push_back(direction.x); result.directionY.push_back(direction.y); result.directionZ.push_back(direction.z);
+            result.originX.push_back(mappedPosition.x);
+            result.originY.push_back(mappedPosition.y);
+            result.originZ.push_back(mappedPosition.z);
+            result.directionX.push_back(direction.x);
+            result.directionY.push_back(direction.y);
+            result.directionZ.push_back(direction.z);
             result.power.push_back(exits.power[ray] * relay.transmission);
             result.wavelength.push_back(exits.wavelength[ray]);
             result.sigmaAbsorption.push_back(exits.sigmaAbsorption[ray]);
@@ -531,7 +555,12 @@ namespace hase::kernels
 
     struct NormalizePumpRate
     {
-        ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto cellIntegral, auto lumpedVolume, auto sampleRate) const
+        ALPAKA_FN_ACC void operator()(
+            auto const& acc,
+            hase::core::DeviceMeshView const mesh,
+            auto cellIntegral,
+            auto lumpedVolume,
+            auto sampleRate) const
         {
             for(auto [sample] : alpaka::onAcc::makeIdxMap(
                     acc,
@@ -546,7 +575,13 @@ namespace hase::kernels
         }
     };
 
-    template<typename T_Device, typename T_Executor, typename T_BetaBuffer, typename T_CellBuffer, typename T_LumpedBuffer, typename T_SampleBuffer>
+    template<
+        typename T_Device,
+        typename T_Executor,
+        typename T_BetaBuffer,
+        typename T_CellBuffer,
+        typename T_LumpedBuffer,
+        typename T_SampleBuffer>
     void enqueueGeneralPump(
         hase::alpakaUtils::DevBundle<T_Device, T_Executor>& devBundle,
         auto const& queue,
@@ -558,8 +593,8 @@ namespace hase::kernels
         T_LumpedBuffer& lumpedVolume,
         T_SampleBuffer& sampleRate)
     {
-        alpaka::onHost::fill(queue, cellPumpIntegral, 0.0);
-        alpaka::onHost::fill(queue, sampleRate, 0.0);
+        alpaka::onHost::fill(queue, cellPumpIntegral, 0.0, alpaka::Vec{static_cast<std::size_t>(mesh.numberOfCells)});
+        alpaka::onHost::fill(queue, sampleRate, 0.0, alpaka::Vec{static_cast<std::size_t>(mesh.numberOfSamples)});
         alpaka::onHost::wait(queue);
         for(std::size_t sourceIndex = 0u; sourceIndex < pump.sources.size(); ++sourceIndex)
         {
@@ -573,14 +608,23 @@ namespace hase::kernels
             for(auto const& relay : source.relays)
             {
                 rays = applyPumpRelay(hostMesh, rays, relay);
-                rays = tracePumpBatch(devBundle, queue, mesh, betaVolume, cellPumpIntegral, sampleRate, std::move(rays));
+                rays = tracePumpBatch(
+                    devBundle,
+                    queue,
+                    mesh,
+                    betaVolume,
+                    cellPumpIntegral,
+                    sampleRate,
+                    std::move(rays));
             }
         }
         auto sampleFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
             devBundle.device,
             devBundle.executor,
             alpaka::Vec{mesh.numberOfSamples});
-        queue.enqueue(sampleFrameSpec, alpaka::KernelBundle{NormalizePumpRate{}, mesh, cellPumpIntegral, lumpedVolume, sampleRate});
+        queue.enqueue(
+            sampleFrameSpec,
+            alpaka::KernelBundle{NormalizePumpRate{}, mesh, cellPumpIntegral, lumpedVolume, sampleRate});
         alpaka::onHost::wait(queue);
     }
 } // namespace hase::kernels

@@ -30,20 +30,22 @@ from HASEonGPU import (  # noqa: E402
     CrossSectionData,
     FrozenPhiAseRungeKutta4,
     GainMedium,
-    integratePumpProfile,
+    integrate_pump_profile,
     PlanarPumpRelay,
     PumpAngularDistribution,
-    PumpSource,
+    Pump,
     PumpSpectrum,
     SuperGaussianPumpProfile,
+    SurfacePumpInjector,
     VolumeTopology,
     backendFlat,
     PhiASE,
-    PumpProperties,
+    MonteCarloPumpSolver,
     Simulation,
     SurfaceOptics,
     vtkWedge,
 )
+from pyInclude.openpmd.paraview import writeParaviewState  # noqa: E402
 
 
 def _loadLaserPumpCladdingRawSpectra():
@@ -106,8 +108,8 @@ def printState(state):
     print(
         f"step={state.step:03d} "
         f"time={state.time:.3e}s "
-        f"mean_beta={state.betaCells.mean():.6e} "
-        f"mean_phi={state.phiAse.mean():.6e}"
+        f"mean_beta={state.beta_cells.mean():.6e} "
+        f"mean_phi={state.phi_ase.mean():.6e}"
     )
 
 
@@ -156,26 +158,26 @@ def _writeTet4StateVtk(path, state, fields):
 
 
 def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossSections=None, nTot=None):
-    if state.phiAse is None:
-        raise ValueError("VTK export requires state.phiAse")
+    if state.phi_ase is None:
+        raise ValueError("VTK export requires state.phi_ase")
     if crossSections is None:
         raise ValueError("VTK export requires crossSections for gain")
     if nTot is None:
         raise ValueError("VTK export requires nTot for gain")
 
     fields = {
-        "betaCells": state.betaCells,
-        "betaVolume": state.betaVolume,
-        "phiASE": state.phiAse,
-        "dndtAse": state.dndtAse,
-        "dndtPump": state.dndtPump,
-        "cladAbs": state.phiAse * np.float64(claddingAbsorption),
+        "betaCells": state.beta_cells,
+        "betaVolume": state.beta_volume,
+        "phiASE": state.phi_ase,
+        "dndtAse": state.dndt_ase,
+        "dndtPump": state.dndt_pump,
+        "cladAbs": state.phi_ase * np.float64(claddingAbsorption),
         "localGain": calcGainFromState(state, crossSections, nTot),
     }
-    if getattr(state, "volumePhiAse", None) is not None:
-        fields["volumePhiASE"] = state.volumePhiAse
-    if getattr(state, "volumeDndtAse", None) is not None:
-        fields["volumeDndtAse"] = state.volumeDndtAse
+    if state.volume_phi_ase is not None:
+        fields["volumePhiASE"] = state.volume_phi_ase
+    if state.volume_dndt_ase is not None:
+        fields["volumeDndtAse"] = state.volume_dndt_ase
     path = Path(vtkOutputDir) / f"laserPumpCladding_{state.step:03d}.vtk"
     if hasattr(state.topology, "cellPointIndices"):
         return _writeTet4StateVtk(path, state, fields)
@@ -318,42 +320,41 @@ def runExample(
     if openpmdBackend != "UseConfig" : phiAse.openpmdBackend=openpmdBackend
 
 
-    pumpProfile = SuperGaussianPumpProfile(radiusU=1.5, radiusV=1.5, exponent=40)
+    pumpProfile = SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.5, exponent=40)
     profileArea = (
-        integratePumpProfile(medium.topology, "ase_bottom", pumpProfile)
+        integrate_pump_profile(medium.topology, "ase_bottom", pumpProfile)
         if hasattr(medium.topology, "facePointIndices")
         else 1.0
     )
-    pumpSource = PumpSource(
-        surfaceDomains=("ase_bottom",),
-        totalPower=16e3 * profileArea,
+    pump = Pump(
+        total_power=16e3 * profileArea,
         spectrum=PumpSpectrum.monochromatic(pumpWavelength),
-        crossSections=pumpCrossSections,
-        angularDistribution=PumpAngularDistribution.collimated(),
+        cross_sections=pumpCrossSections,
+        angular_distribution=PumpAngularDistribution.collimated(),
         profile=pumpProfile,
-        relays=(PlanarPumpRelay.retroreflect("ase_top"),),
     )
-    pumpProperties = PumpProperties(
-        sources=(pumpSource,),
-        rayCount=pumpRayCount,
-        rngSeed=pumpRngSeed,
-        pumpSteps=pumpSteps,
+    pumpSolver = MonteCarloPumpSolver(
+        ray_count=pumpRayCount, seed=pumpRngSeed, max_steps=pumpSteps
     )
     print(f"Running simulation with backend {phiAse.backend}")
     print(f"Using openPMD backend {phiAse.openpmdBackend}")
     simulation = Simulation(
-        gainMedium=medium,
-        pump=pumpProperties,
-        phiASE=phiAse,
-        timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
-        timeStep=2e-5,
-        crossSections=spectralProperties,
-        enableASE=enableASE,
-        prePump=prePump,
-        reportTimings=reportTimings,
+        gain_medium=medium,
+        phi_ase=phiAse,
+        time_integrator=FrozenPhiAseRungeKutta4(),
+        time_step_size=2e-5,
+        pump_solver=pumpSolver,
+        cross_sections=spectralProperties,
+        enable_ase=enableASE,
+        pre_pump=prePump,
+        report_timings=reportTimings,
+    ).add_pump(
+        pump,
+        injection_method=SurfacePumpInjector(surface_domains="ase_bottom"),
+        relays=(PlanarPumpRelay.retroreflect("ase_top"),),
     )
-    simulation.onStep(printState)
-    simulation.onStep(
+    simulation.on_step(printState)
+    simulation.on_step(
         writeVtkFields,
         vtkOutputDir,
         absorption,
@@ -361,9 +362,9 @@ def runExample(
         medium.get("nTot").value,
     )
     if openPmdOutputDir is not None:
-        simulation.onStep(writeParaviewState, openPmdOutputDir, absorption)
-    simulation.runSteps(timeSlices) # adjust this by number of steps
-    return simulation.getLastState() # return the last state to confirm shape.
+        simulation.on_step(writeParaviewState, openPmdOutputDir, absorption)
+    simulation.step(timeSlices)  # adjust this by number of steps
+    return simulation.get_last_state()  # return the last state to confirm shape.
 
     # dndt_ASE, flux_clad
 def main(argv=None):
@@ -378,7 +379,7 @@ def main(argv=None):
         help=(
             "Number of outer simulation steps with pump contribution. "
             "Default: 100. Use a value matching --timeSteps to pump for the full run. "
-            "This is distinct from PumpProperties.rayCount, which controls "
+            "This is distinct from MonteCarloPumpSolver.ray_count, which controls "
             "the Monte Carlo pump sampling resolution."
         ),
     )
@@ -464,8 +465,8 @@ def main(argv=None):
         pumpRngSeed=args.pump_rng_seed,
         **aseOverrides,
     )
-    print(f"phiAse shape: {state.phiAse.shape}")
-    print(f"betaCells shape: {state.betaCells.shape}")
+    print(f"phiAse shape: {state.phi_ase.shape}")
+    print(f"betaCells shape: {state.beta_cells.shape}")
 
 
 if __name__ == "__main__":

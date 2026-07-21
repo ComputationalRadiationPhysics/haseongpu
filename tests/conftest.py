@@ -6,6 +6,7 @@
 
 import os
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 import copy
 import importlib
@@ -25,12 +26,13 @@ requiredHaseApi = (
     "MeshTopology",
     "OpenPmdBackends",
     "PhiASE",
+    "MonteCarloPumpSolver",
+    "Pump",
     "PumpAngularDistribution",
-    "PumpProperties",
-    "PumpSource",
     "PumpSpectrum",
     "SpectralDecomposition",
     "SuperGaussianPumpProfile",
+    "SurfacePumpInjector",
     "VolumeTopology",
 )
 
@@ -119,10 +121,11 @@ GainMedium = _hase_api.GainMedium
 Grid = _hase_api.Grid
 MeshTopology = _hase_api.MeshTopology
 PhiASE = _hase_api.PhiASE
+MonteCarloPumpSolver = _hase_api.MonteCarloPumpSolver
+Pump = _hase_api.Pump
 PumpAngularDistribution = _hase_api.PumpAngularDistribution
-PumpProperties = _hase_api.PumpProperties
-PumpSource = _hase_api.PumpSource
 PumpSpectrum = _hase_api.PumpSpectrum
+SurfacePumpInjector = _hase_api.SurfacePumpInjector
 SpectralDecomposition = _hase_api.SpectralDecomposition
 
 import numpy as np
@@ -227,11 +230,13 @@ def smallGainMedium(smallTopology):
 
 @pytest.fixture
 def pumpProperties(crossSections):
-    source = PumpSource(
-        surfaceDomains=(1,),
-        totalPower=1.0,
-        spectrum=PumpSpectrum.monochromatic(940e-9),
-        crossSections=crossSections,
-        angularDistribution=PumpAngularDistribution.collimated(),
+    return SimpleNamespace(
+        physical=Pump(
+            total_power=1.0,
+            spectrum=PumpSpectrum.monochromatic(940e-9),
+            cross_sections=crossSections,
+            angular_distribution=PumpAngularDistribution.collimated(),
+        ),
+        injector=SurfacePumpInjector((1,)),
+        solver=MonteCarloPumpSolver(ray_count=256, seed=17),
     )
-    return PumpProperties(sources=(source,), rayCount=256, rngSeed=17)

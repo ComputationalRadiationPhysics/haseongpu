@@ -143,10 +143,11 @@ resolution.
 Pump
 ^^^^
 
-``PumpProperties`` describes the physical pump sent to the compiled simulation:
-intensity, wavelength, cross sections, transverse radii, super-Gaussian
-exponent, and optional reflected pass. The backend implements the pump; a
-custom Python pump solver is not supported.
+Physical pumps and numerical injectors are registered separately on the
+simulation. The physical object describes total power, spectrum, cross
+sections, and beam distributions; the injector selects tagged launch surfaces.
+The compiled backend implements transport and does not accept custom Python
+pump solvers.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
    :language: python
@@ -184,10 +185,10 @@ Simulation
 
 ``Simulation`` sends the setup to the C++/Alpaka backend, which owns the pump,
 ASE, and time-integration loop. Python receives one ``TimeStepState`` snapshot
-per completed step and invokes ``onStep`` callbacks for each snapshot.
+per completed step and invokes ``on_step`` callbacks for each snapshot.
 
 Forward Tet4 runs support surface reflections and the same compiled controls as
-other simulations: set ``enableASE=False`` for pump-only evolution, or use
+other simulations: set ``enable_ase=False`` for pump-only evolution, or use
 ``FrozenPhiAseRungeKutta4`` when one ASE evaluation per RK4 step is sufficient.
 
 .. literalinclude:: ../../example/minimalExampleNewInterface.py
@@ -195,10 +196,10 @@ other simulations: set ``enableASE=False`` for pump-only evolution, or use
    :start-after: # docs:start: simulation
    :end-before: # docs:end: simulation
 
-Use ``runSteps(150, pumpSteps=50)`` to pump only the first 50 outer steps, or
-``runUntil(endTime=1e-3)`` for a time target. ``rayCount`` instead controls
-the internal resolution of one pumped step. ``onInit`` is available before the
-backend launch; per-step Python mutation through ``beforeStep`` is unsupported.
+Use ``simulation.step(150, pump_steps=50)`` to pump only the first 50 outer
+steps. ``MonteCarloPumpSolver.ray_count`` controls the sampling resolution of
+each pump evaluation. ``on_init`` is available before the backend launch;
+per-step Python mutation through pre-step callbacks is unsupported.
 
 YAML Compute Settings
 ^^^^^^^^^^^^^^^^^^^^^
@@ -238,7 +239,7 @@ Results
    :start-after: # docs:start: results
    :end-before: # docs:end: results
 
-``simulation.getLastState()`` returns the latest ``TimeStepState`` with step,
-time, ``betaCells``, ``betaVolume``, ``phiAse``, pump derivative, ASE
+``simulation.get_last_state()`` returns the latest ``TimeStepState`` with step,
+time, ``beta_cells``, ``beta_volume``, ``phi_ase``, pump derivative, ASE
 derivative, and the raw ASE result object.  Use callbacks to store or export
 every step.

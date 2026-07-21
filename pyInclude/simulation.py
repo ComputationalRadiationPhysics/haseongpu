@@ -18,7 +18,17 @@ import numpy as np
 
 from .alpakaUtils import AlpakaBackends
 from .geometry import GainMedium
-from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
+from .laser import (
+    CrossSectionData,
+    LaserProperties,
+    MonteCarloPumpSolver,
+    PlanarPumpRelay,
+    Pump,
+    SpectralDecomposition,
+    SurfacePumpInjector,
+    _PumpProperties,
+    _PumpSource,
+)
 from .openpmd import backendFlat, transport
 from .timeIntegration import TimeIntegrationSolver
 
@@ -453,58 +463,138 @@ class TimeStepState:
     volumeTotalRays: np.ndarray | None = None
     """Native volume-centered ray visit counts, when available."""
 
+    @property
+    def beta_cells(self):
+        return self.betaCells
 
-@dataclass
+    @property
+    def beta_volume(self):
+        return self.betaVolume
+
+    @property
+    def phi_ase(self):
+        return self.phiAse
+
+    @property
+    def dndt_ase(self):
+        return self.dndtAse
+
+    @property
+    def dndt_pump(self):
+        return self.dndtPump
+
+    @property
+    def ase_result(self):
+        return self.aseResult
+
+    @property
+    def volume_phi_ase(self):
+        return self.volumePhiAse
+
+    @property
+    def volume_dndt_ase(self):
+        return self.volumeDndtAse
+
+    @property
+    def volume_standard_error(self):
+        return self.volumeStandardError
+
+    @property
+    def volume_relative_standard_error(self):
+        return self.volumeRelativeStandardError
+
+    @property
+    def volume_total_rays(self):
+        return self.volumeTotalRays
+
+
+@dataclass(init=False)
 class Simulation:
     """High-level Python wrapper for compiled C++/Alpaka simulation runs.
 
     Python sends the initial setup to the compiled backend and receives
-    ``TimeStepState`` snapshots after completed steps. Register ``onInit`` for
-    one-time Python setup before launch and ``onStep`` for snapshot consumers.
+    ``TimeStepState`` snapshots after completed steps. Register ``on_init`` for
+    one-time Python setup before launch and ``on_step`` for snapshot consumers.
     ``beforeStep`` is retained only to report that per-step Python mutation is
     unsupported by compiled runs.
     """
 
     gainMedium: GainMedium
-    """Geometry, material data, and current beta arrays."""
-    pump: PumpProperties
-    """Pump model that adds population to ``betaCells``."""
+    pump: _PumpProperties | None
     phiASE: PhiASE
-    """ASE configuration and execution handle."""
     timeIntegrationSolver: TimeIntegrationSolver | str
-    """Compiled integrator name or descriptor with a ``name`` attribute."""
     timeStep: float
-    """Physical time increment per step, in seconds."""
-    crossSections: CrossSectionData | None = None
-    """Shared spectra used by pump and ASE when not set on either object."""
-    endTime: float | None = None
-    """Optional target physical time for ``runUntil()``."""
-    enableASE: bool = True
-    """Whether compiled time-stepped runs include ASE depletion."""
-    prePump: bool = False
-    """When true, the first compiled time step advances without ASE so pump can seed beta."""
-    reportTimings: bool = False
-    """Print a frontend timing breakdown for each ``runSteps`` call when enabled."""
-    _time: float = field(default=0.0, init=False, repr=False)
-    _step: int = field(default=0, init=False, repr=False)
-    _initialized: bool = field(default=False, init=False, repr=False)
-    _initCallbacks: list = field(default_factory=list, init=False, repr=False)
-    _beforeStepCallbacks: list = field(default_factory=list, init=False, repr=False)
-    _callbacks: list = field(default_factory=list, init=False, repr=False)
-    _lastState: TimeStepState | None = field(default=None, init=False, repr=False)
+    crossSections: CrossSectionData | None
+    endTime: float | None
+    enableASE: bool
+    prePump: bool
+    pumpSolver: MonteCarloPumpSolver
+    maxSteps: int | None
+    reportTimings: bool
+    _pumpRegistrations: list
+    _time: float
+    _step: int
+    _initialized: bool
+    _initCallbacks: list
+    _beforeStepCallbacks: list
+    _callbacks: list
+    _lastState: TimeStepState | None
+
+    def __init__(
+        self,
+        *,
+        gain_medium,
+        phi_ase,
+        time_integrator,
+        time_step_size,
+        pump_solver=None,
+        cross_sections=None,
+        max_steps=None,
+        max_time=None,
+        enable_ase=True,
+        pre_pump=False,
+        report_timings=False,
+    ):
+        self.gainMedium = gain_medium
+        self.pump = None
+        self.phiASE = phi_ase
+        self.timeIntegrationSolver = time_integrator
+        self.timeStep = float(time_step_size)
+        self.crossSections = cross_sections
+        self.endTime = max_time
+        self.enableASE = bool(enable_ase)
+        self.prePump = bool(pre_pump)
+        self.pumpSolver = MonteCarloPumpSolver() if pump_solver is None else pump_solver
+        self.maxSteps = None if max_steps is None else int(max_steps)
+        self.reportTimings = bool(report_timings)
+        self._pumpRegistrations = []
+        self._time = 0.0
+        self._step = 0
+        self._initialized = False
+        self._initCallbacks = []
+        self._beforeStepCallbacks = []
+        self._callbacks = []
+        self._lastState = None
+        self.__post_init__()
 
     def __post_init__(self):
         if self.timeIntegrationSolver is None:
-            raise ValueError("Simulation requires a timeIntegrationSolver")
+            raise ValueError("Simulation requires a time_integrator")
         if not isinstance(self.timeIntegrationSolver, str) and not hasattr(self.timeIntegrationSolver, "name"):
             raise ValueError("Simulation requires a compiled time integrator name or descriptor with a .name attribute")
         if self.timeStep <= 0.0:
-            raise ValueError("timeStep must be positive")
-        if self.crossSections is None:
+            raise ValueError("time_step_size must be positive")
+        if not isinstance(self.pumpSolver, MonteCarloPumpSolver):
+            raise TypeError("pump_solver must be MonteCarloPumpSolver")
+        if self.maxSteps is not None and self.maxSteps <= 0:
+            raise ValueError("max_steps must be positive")
+        if self.crossSections is None and (
+            self.phiASE.spectralProperties is not None or self.phiASE.crossSections is not None
+        ):
             self.crossSections = self._resolveSpectralProperties()
-        if self.phiASE.crossSections is None:
+        if self.phiASE.crossSections is None and self.crossSections is not None:
             self.phiASE.crossSections = self.crossSections
-        if self.phiASE.spectralProperties is None:
+        if self.phiASE.spectralProperties is None and self.crossSections is not None:
             self.phiASE.spectralProperties = self.crossSections
         self._ensureStateArrays()
 
@@ -513,9 +603,54 @@ class Simulation:
             return self.phiASE.spectralProperties
         if self.phiASE.crossSections is not None:
             return self.phiASE.crossSections
-        if self.pump.sources:
+        if self.pump is not None and self.pump.sources:
             return self.pump.sources[0].crossSections
         raise ValueError("Simulation requires spectral properties via Simulation.crossSections, phiASE, or pump")
+
+    def add_pump(self, pump, injection_method, *, relays=()):
+        """Register a physical pump and its numerical injection method."""
+        if self._initialized:
+            raise RuntimeError("pumps must be added before the simulation is initialized")
+        if not isinstance(pump, Pump):
+            raise TypeError("pump must be a Pump")
+        if not isinstance(injection_method, SurfacePumpInjector):
+            raise TypeError("injection_method must be SurfacePumpInjector")
+        relays = tuple(relays)
+        if not all(isinstance(relay, PlanarPumpRelay) for relay in relays):
+            raise TypeError("relays must contain PlanarPumpRelay values")
+        self._pumpRegistrations.append((pump, injection_method, relays))
+        self.pump = _PumpProperties(
+            sources=tuple(
+                _PumpSource(
+                    surfaceDomains=injector.surface_domains,
+                    totalPower=physical.total_power,
+                    spectrum=physical.spectrum,
+                    crossSections=physical.cross_sections,
+                    angularDistribution=physical.angular_distribution,
+                    profile=physical.profile,
+                    relays=registered_relays,
+                )
+                for physical, injector, registered_relays in self._pumpRegistrations
+            ),
+            rayCount=self.pumpSolver.ray_count,
+            rngSeed=self.pumpSolver.seed,
+            pumpSteps=self.pumpSolver.max_steps,
+        )
+        if self.crossSections is None:
+            self.crossSections = self._resolveSpectralProperties()
+        if self.phiASE.crossSections is None:
+            self.phiASE.crossSections = self.crossSections
+        if self.phiASE.spectralProperties is None:
+            self.phiASE.spectralProperties = self.crossSections
+        return self
+
+    def on_step(self, callback, *args, **kwargs):
+        """Register a callback that receives each completed state snapshot."""
+        return self.onStep(callback, *args, **kwargs)
+
+    def on_init(self, callback, *args, **kwargs):
+        """Register a callback that runs once before compiled execution."""
+        return self.onInit(callback, *args, **kwargs)
 
     def onStep(self, callback, *args, **kwargs):
         """Register a post-step callback.
@@ -560,6 +695,18 @@ class Simulation:
         self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
 
+    def run_until(self, max_time=None):
+        """Advance to ``max_time`` or the constructor's configured maximum."""
+        target = self.endTime if max_time is None else max_time
+        if target is None:
+            raise ValueError("run_until requires max_time or a configured max_time")
+        steps = 0
+        while self._time + steps * self.timeStep < float(target) - 0.5 * self.timeStep:
+            steps += 1
+        if steps:
+            self.step(steps)
+        return self
+
     def runUntil(self, endtime=None, endTime=None, *, openpmdSession=None):
         """Advance steps until the configured or supplied end time is reached."""
         target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
@@ -575,9 +722,8 @@ class Simulation:
     def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
         """Run exactly ``steps`` compiled C++/Alpaka time steps and return ``self``.
 
-        ``pumpSteps`` optionally limits the pump contribution to the first
-        ``pumpSteps`` calls in this run. When omitted, ``PumpProperties`` may
-        provide a ``pumpSteps`` custom property. The complete time loop is
+        Internal transport helper. ``pumpSteps`` limits pump contribution to
+        the first compiled steps and defaults to the registered pump solver. The complete time loop is
         executed by the C++ backend; Python only sends the initial setup and
         receives streamed snapshots.
         """
@@ -588,9 +734,11 @@ class Simulation:
             raise ValueError("steps must be positive")
         if self._beforeStepCallbacks:
             raise ValueError("compiled Simulation does not support Python beforeStep callbacks during C++-owned steps")
+        if self.pump is None:
+            raise ValueError("Simulation requires at least one pump registered with add_pump")
         self._runInitCallbacks()
-        if pumpSteps is None and hasattr(self, "pump"):
-            pumpSteps = self.pump.pumpSteps
+        if pumpSteps is None:
+            pumpSteps = getattr(self.pump, "pumpSteps", None)
         if pumpSteps is not None and int(pumpSteps) < 0:
             raise ValueError("pumpSteps must be non-negative")
 
@@ -674,9 +822,69 @@ class Simulation:
                 print(f"HASE frontend callback timing: {callback_name}={seconds:.6f}s")
         return self
 
-    def step(self, *, openpmdSession=None):
-        """Advance one compiled C++/Alpaka time step and return the completed state."""
-        return self.runSteps(1, openpmdSession=openpmdSession).getLastState()
+    def step(self, nsteps=1, *, pump_steps=None):
+        """Advance ``nsteps`` time steps, following the PICMI call pattern."""
+        if int(nsteps) <= 0:
+            raise ValueError("nsteps must be positive")
+        if pump_steps is not None and int(pump_steps) < 0:
+            raise ValueError("pump_steps must be non-negative")
+        self.runSteps(int(nsteps), pumpSteps=pump_steps)
+        return self
+
+    def get_last_state(self):
+        return self.getLastState()
+
+    @property
+    def current_step(self):
+        return self._step
+
+    @property
+    def current_time(self):
+        return self._time
+
+    @property
+    def gain_medium(self):
+        return self.gainMedium
+
+    @property
+    def phi_ase(self):
+        return self.phiASE
+
+    @property
+    def time_integrator(self):
+        return self.timeIntegrationSolver
+
+    @property
+    def time_step_size(self):
+        return self.timeStep
+
+    @property
+    def pump_solver(self):
+        return self.pumpSolver
+
+    @property
+    def cross_sections(self):
+        return self.crossSections
+
+    @property
+    def enable_ase(self):
+        return self.enableASE
+
+    @property
+    def pre_pump(self):
+        return self.prePump
+
+    @property
+    def max_steps(self):
+        return self.maxSteps
+
+    @property
+    def max_time(self):
+        return self.endTime
+
+    @property
+    def pumps(self):
+        return tuple(physical for physical, _injector, _relays in self._pumpRegistrations)
 
     def getLastState(self):
         """Return the most recent completed ``TimeStepState`` snapshot."""

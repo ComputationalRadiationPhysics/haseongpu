@@ -177,9 +177,7 @@ namespace
         return result;
     }
 
-    std::vector<unsigned> optionalUnsignedVectorAttribute(
-        io::Attributable const& obj,
-        std::string const& name)
+    std::vector<unsigned> optionalUnsignedVectorAttribute(io::Attributable const& obj, std::string const& name)
     {
         if(!obj.containsAttribute(name))
             return {};
@@ -1331,15 +1329,19 @@ namespace hase::openpmd
             auto const sourceRelayOffsets = unsignedVectorAttribute(iteration, field::pumpSourceRelayOffsets);
             auto const relayExitOffsets = unsignedVectorAttribute(iteration, field::pumpRelayExitOffsets);
             auto const relayEntryOffsets = unsignedVectorAttribute(iteration, field::pumpRelayEntryOffsets);
-            auto const relayExitSurfacesFlat = optionalUnsignedVectorAttribute(iteration, field::pumpRelayExitSurfaces);
-            auto const relayEntrySurfacesFlat = optionalUnsignedVectorAttribute(iteration, field::pumpRelayEntrySurfaces);
+            auto const relayExitSurfacesFlat
+                = optionalUnsignedVectorAttribute(iteration, field::pumpRelayExitSurfaces);
+            auto const relayEntrySurfacesFlat
+                = optionalUnsignedVectorAttribute(iteration, field::pumpRelayEntrySurfaces);
             auto const relayFlipU = optionalUnsignedVectorAttribute(iteration, field::pumpRelayFlipU);
             auto const relayFlipV = optionalUnsignedVectorAttribute(iteration, field::pumpRelayFlipV);
             auto const relayRotation = attributeOr<std::vector<double>>(iteration, field::pumpRelayRotation, {});
             auto const relayOffset = attributeOr<std::vector<double>>(iteration, field::pumpRelayOffset, {});
             auto const relayTilt = attributeOr<std::vector<double>>(iteration, field::pumpRelayTilt, {});
-            auto const relayMagnification = attributeOr<std::vector<double>>(iteration, field::pumpRelayMagnification, {});
-            auto const relayTransmission = attributeOr<std::vector<double>>(iteration, field::pumpRelayTransmission, {});
+            auto const relayMagnification
+                = attributeOr<std::vector<double>>(iteration, field::pumpRelayMagnification, {});
+            auto const relayTransmission
+                = attributeOr<std::vector<double>>(iteration, field::pumpRelayTransmission, {});
 
             if(sourcePower.empty() || sourceSurfaceOffsets.size() != sourcePower.size() + 1u
                || spectrumOffsets.size() != sourcePower.size() + 1u || angularOffsets.size() != sourcePower.size() + 1u
@@ -1353,9 +1355,10 @@ namespace hase::openpmd
 
             unsigned const relayCount = sourceRelayOffsets.back();
             if(relayExitOffsets.size() != relayCount + 1u || relayEntryOffsets.size() != relayCount + 1u
-               || relayFlipU.size() != relayCount || relayFlipV.size() != relayCount || relayRotation.size() != relayCount
-               || relayOffset.size() != 2u * relayCount || relayTilt.size() != 2u * relayCount
-               || relayMagnification.size() != relayCount || relayTransmission.size() != relayCount)
+               || relayFlipU.size() != relayCount || relayFlipV.size() != relayCount
+               || relayRotation.size() != relayCount || relayOffset.size() != 2u * relayCount
+               || relayTilt.size() != 2u * relayCount || relayMagnification.size() != relayCount
+               || relayTransmission.size() != relayCount)
             {
                 validationError(field::pumpSourceRelayOffsets, "inconsistent general pump relay array lengths");
             }
@@ -1365,15 +1368,22 @@ namespace hase::openpmd
             {
                 auto& source = run.pump.sources[sourceIndex];
                 source.totalPower = sourcePower[sourceIndex];
-                for(auto value : offsetSlice(sourceSurfacesFlat, sourceSurfaceOffsets, sourceIndex, field::pumpSourceSurfaces))
+                for(auto value :
+                    offsetSlice(sourceSurfacesFlat, sourceSurfaceOffsets, sourceIndex, field::pumpSourceSurfaces))
                     source.surfaces.push_back(static_cast<int>(value));
-                source.wavelengths = offsetSlice(spectrumWavelengths, spectrumOffsets, sourceIndex, field::pumpSpectrumWavelengths);
-                source.spectralWeights = offsetSlice(spectrumWeights, spectrumOffsets, sourceIndex, field::pumpSpectrumWeights);
-                source.sigmaAbsorption = offsetSlice(spectrumSigmaA, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaAbsorption);
-                source.sigmaEmission = offsetSlice(spectrumSigmaE, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaEmission);
+                source.wavelengths
+                    = offsetSlice(spectrumWavelengths, spectrumOffsets, sourceIndex, field::pumpSpectrumWavelengths);
+                source.spectralWeights
+                    = offsetSlice(spectrumWeights, spectrumOffsets, sourceIndex, field::pumpSpectrumWeights);
+                source.sigmaAbsorption
+                    = offsetSlice(spectrumSigmaA, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaAbsorption);
+                source.sigmaEmission
+                    = offsetSlice(spectrumSigmaE, spectrumOffsets, sourceIndex, field::pumpSpectrumSigmaEmission);
                 source.polarAngles = offsetSlice(angularPolar, angularOffsets, sourceIndex, field::pumpAngularPolar);
-                source.azimuthalAngles = offsetSlice(angularAzimuthal, angularOffsets, sourceIndex, field::pumpAngularAzimuthal);
-                source.angularWeights = offsetSlice(angularWeights, angularOffsets, sourceIndex, field::pumpAngularWeights);
+                source.azimuthalAngles
+                    = offsetSlice(angularAzimuthal, angularOffsets, sourceIndex, field::pumpAngularAzimuthal);
+                source.angularWeights
+                    = offsetSlice(angularWeights, angularOffsets, sourceIndex, field::pumpAngularWeights);
                 source.profile.kind = profileKind[sourceIndex];
                 source.profile.radiusU = profileRadiusU[sourceIndex];
                 source.profile.radiusV = profileRadiusV[sourceIndex];
@@ -1384,12 +1394,19 @@ namespace hase::openpmd
                     source.profile.axisU[component] = profileAxisU[3u * sourceIndex + component];
                     source.profile.axisV[component] = profileAxisV[3u * sourceIndex + component];
                 }
-                for(unsigned relayIndex = sourceRelayOffsets[sourceIndex]; relayIndex < sourceRelayOffsets[sourceIndex + 1u]; ++relayIndex)
+                for(unsigned relayIndex = sourceRelayOffsets[sourceIndex];
+                    relayIndex < sourceRelayOffsets[sourceIndex + 1u];
+                    ++relayIndex)
                 {
                     core::PumpRelayParameters relay;
-                    for(auto value : offsetSlice(relayExitSurfacesFlat, relayExitOffsets, relayIndex, field::pumpRelayExitSurfaces))
+                    for(auto value :
+                        offsetSlice(relayExitSurfacesFlat, relayExitOffsets, relayIndex, field::pumpRelayExitSurfaces))
                         relay.exitSurfaces.push_back(static_cast<int>(value));
-                    for(auto value : offsetSlice(relayEntrySurfacesFlat, relayEntryOffsets, relayIndex, field::pumpRelayEntrySurfaces))
+                    for(auto value : offsetSlice(
+                            relayEntrySurfacesFlat,
+                            relayEntryOffsets,
+                            relayIndex,
+                            field::pumpRelayEntrySurfaces))
                         relay.entrySurfaces.push_back(static_cast<int>(value));
                     relay.flipU = relayFlipU[relayIndex] != 0u;
                     relay.flipV = relayFlipV[relayIndex] != 0u;
@@ -1403,7 +1420,6 @@ namespace hase::openpmd
                     source.relays.push_back(std::move(relay));
                 }
             }
-
         }
 
         mesh.resultAtVolumes = true;
