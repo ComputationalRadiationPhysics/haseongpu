@@ -153,7 +153,7 @@ docker run --rm --user "$(id -u):$(id -g)" --cpus=12 \
     -v "$PWD":/src:ro \
     -v "$current_build":/build:ro \
     -v /tmp/hase-no-reflection-home:/tmp-home \
-    -v "$current_build/python/pyInclude/_native_config.py":/src/pyInclude/_native_config.py:ro \
+    -v "$current_build/python/pyInclude/_runtime/_config.py":/src/pyInclude/_runtime/_config.py:ro \
     hase-no-reflection-toolchain:ubuntu24.04 \
     pytest -q /src/tests/python/simulation/test_laserPumpCladdingNoReflection.py
 ```

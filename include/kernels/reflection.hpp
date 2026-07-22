@@ -16,7 +16,7 @@ namespace hase::kernels::forward
      * @brief Return the SRM reflection weight for an outward boundary hit.
      *
      * The forward surface-reservoir method relaunches reflected rays from
-     * this boundary; it does not construct a backward propagation path.
+     * this boundary and continues along the reflected forward direction.
      */
     [[nodiscard]] inline ALPAKA_FN_HOST_ACC double boundaryReflectance(
         hase::core::DeviceMeshView const& mesh,

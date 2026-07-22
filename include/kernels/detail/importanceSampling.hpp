@@ -8,5 +8,5 @@
 #pragma once
 
 // Sampling a source position, spectrum, and direction is now direct forward
-// volume sampling rather than a backward gain estimate from sample points.
+// Direct ASE sources are sampled from emitting volumes.
 #include <kernels/forward/volumeSampling.hpp>
