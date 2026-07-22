@@ -18,7 +18,7 @@ repoRoot = Path(__file__).resolve().parents[3]
 
 
 @pytest.mark.integration
-def test_installedFrontendHasPrivateOpenPmdRuntime(tmp_path):
+def test_installedFrontendUsesDurableOpenPmdRuntime(tmp_path):
     try:
         distribution("HASEonGPU")
     except PackageNotFoundError:
@@ -31,11 +31,15 @@ def test_installedFrontendHasPrivateOpenPmdRuntime(tmp_path):
         "from pathlib import Path\n"
         "import HASEonGPU\n"
         "import pyInclude._runtime\n"
-        "runtime = Path(next(iter(pyInclude._runtime.__path__))).resolve()\n"
+        "frontend_runtime = Path(next(iter(pyInclude._runtime.__path__))).resolve()\n"
+        "runtime = pyInclude._runtime.runtime_root()\n"
         "payload = {\n"
         "  'module': str(Path(HASEonGPU.__file__).resolve()),\n"
         "  'runtime': str(runtime),\n"
-        "  'calc_exists': (runtime / 'calcPhiASE').is_file(),\n"
+        "  'frontend_vendored_calc': (frontend_runtime / 'calcPhiASE').is_file(),\n"
+        "  'calc_exists': (runtime / 'calcPhiASE').is_file() or "
+        "(runtime / 'python/pyInclude/_runtime/calcPhiASE').is_file(),\n"
+        "  'metadata_runtime': pyInclude._runtime.runtime_config().HASE_RUNTIME_DIR,\n"
         "  'legacy_bindings': importlib.util.find_spec('HASEonGPU_Bindings') is not None,\n"
         "}\n"
         "print(json.dumps(payload))\n",
@@ -59,4 +63,6 @@ def test_installedFrontendHasPrivateOpenPmdRuntime(tmp_path):
     payload = json.loads(completed.stdout)
     assert "site-packages" in payload["module"] or "dist-packages" in payload["module"]
     assert payload["calc_exists"]
+    assert not payload["frontend_vendored_calc"]
+    assert Path(payload["metadata_runtime"]).resolve() == Path(payload["runtime"]).resolve()
     assert not payload["legacy_bindings"]

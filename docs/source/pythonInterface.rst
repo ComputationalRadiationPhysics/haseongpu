@@ -29,17 +29,19 @@ Install from the repository root after following
    # run the printed command, typically:
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
-``pip install -v .`` builds the standalone C++ backend and installs the Python
-frontend with private runtime helpers. The configurator chooses compatible openPMD provider settings,
-prints the install command, and writes the optional
+``pip install -v .`` configures or reuses the native runtime in ``build/`` and
+installs a thin Python frontend that remembers it. The configurator chooses
+compatible openPMD provider settings, prints the install command, and writes the optional
 ``config/hase-phiase.yaml`` compute-settings file.
 
-If you change the compiler or C++ runtime used for the extension, rebuild and
-reinstall:
+If you change CMake options or native sources, reconfigure or rebuild the
+durable runtime. The installed frontend uses the updated binary and provider
+metadata directly, so it does not need to be reinstalled:
 
 .. code-block:: bash
 
-   python3 -m pip install --force-reinstall --no-cache-dir -v .
+   cmake -S . -B build <updated options>
+   cmake --build build
 
 Concept Pages
 -------------

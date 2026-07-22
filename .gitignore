@@ -1,4 +1,5 @@
 build
+/.hase-python-build/
 bin/*
 *.~lock.*
 *.swp

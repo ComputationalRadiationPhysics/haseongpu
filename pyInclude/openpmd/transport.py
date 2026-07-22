@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from ..geometry import OpenPmdComponentField, OpenPmdScalarField
+from .._runtime import runtime_config, runtime_executable_candidates, runtime_root
 from .backends import _clean_backend_names, _load_backend_names
 from . import HASE_TRANSPORT_VERSION, FieldSpec, backendFlatArray, fieldSpec, flatEntityLabel, haseTransportAttributes, resultFieldSpecs, simulationAttributeSpecs, spectralContext, unitDimension
 from ..structures import Result
@@ -69,11 +70,7 @@ def _env_flag(name):
 
 
 def _runtime_config():
-    try:
-        from .._runtime import _config
-    except ImportError:
-        return SimpleNamespace()
-    return _config
+    return runtime_config()
 
 
 def _forward_backend_logging_enabled():
@@ -743,28 +740,6 @@ def _is_openpmd_calc_phi_ase(executable: Path):
     return executable.is_file() and _target_uses_openpmd_main(_build_dir_for_executable(executable))
 
 
-def _installed_calc_phi_ase_candidates():
-    try:
-        from importlib.util import find_spec
-
-        spec = find_spec("pyInclude._runtime")
-    except (ImportError, ModuleNotFoundError):
-        return []
-    if spec is None or spec.submodule_search_locations is None:
-        return []
-    return [Path(path) / "calcPhiASE" for path in spec.submodule_search_locations]
-
-
-def _build_dir_candidates(root: Path):
-    env = os.environ.get("BUILD_DIR")
-    if env:
-        yield Path(env) if Path(env).is_absolute() else root / env
-
-    yield from sorted(root.glob("build/cp*"))
-    yield root / "build"
-    yield root / "build" / "ci"
-
-
 def findCalcPhiAse():
     env = os.environ.get("HASE_CALCPHIASE")
     if env:
@@ -773,19 +748,15 @@ def findCalcPhiAse():
             return path
         raise RuntimeError(f"HASE_CALCPHIASE does not point to an openPMD calcPhiASE binary: {path}")
 
-    root = Path(__file__).resolve().parents[2]
-    candidates = list(_installed_calc_phi_ase_candidates())
-    for build_dir in _build_dir_candidates(root):
-        candidates.append(build_dir / "python" / "pyInclude" / "_runtime" / "calcPhiASE")
-        candidates.append(build_dir / "calcPhiASE")
-
-    for candidate in candidates:
+    root = runtime_root()
+    for candidate in runtime_executable_candidates(("calcPhiASE",)):
         if _is_openpmd_calc_phi_ase(candidate):
             return candidate
 
     raise FileNotFoundError(
-        "Could not find an openPMD calcPhiASE binary in the installed package or HASE build tree. "
-        "Build the Python package or set HASE_CALCPHIASE. " + HASE_CONFIGURE_HINT
+        f"Could not find an openPMD calcPhiASE binary in the selected HASE runtime '{root}'. "
+        "Build that runtime, set HASE_RUNTIME_DIR, or override the executable with "
+        "HASE_CALCPHIASE. " + HASE_CONFIGURE_HINT
     )
 
 

@@ -9,8 +9,6 @@
 import ctypes
 import ctypes.util
 import sys
-from pathlib import Path
-
 
 def _libraryNames():
     if sys.platform == "win32":
@@ -20,55 +18,10 @@ def _libraryNames():
     return ("libHaseAlpakaBackendNames.so",)
 
 
-def _runtimePackageDirs():
-    from importlib.util import find_spec
-
-    spec = find_spec("pyInclude._runtime")
-    if spec is None or spec.submodule_search_locations is None:
-        return ()
-    return tuple(Path(path) for path in spec.submodule_search_locations)
-
-
 def _candidatePaths():
-    moduleDir = Path(__file__).resolve().parent
-    seen = set()
+    from pyInclude._runtime import runtime_library_candidates
 
-    def yieldPath(path):
-        normalized = str(path.resolve())
-        if normalized in seen:
-            return
-        seen.add(normalized)
-        return path
-
-    for packageDir in _runtimePackageDirs():
-        for name in _libraryNames():
-            candidate = yieldPath(packageDir / name)
-            if candidate is not None:
-                yield candidate
-
-    for name in _libraryNames():
-        candidate = yieldPath(moduleDir / name)
-        if candidate is not None:
-            yield candidate
-
-    for parent in moduleDir.parents:
-        for name in _libraryNames():
-            candidate = yieldPath(parent / "build" / "python" / "pyInclude" / "_runtime" / name)
-            if candidate is not None:
-                yield candidate
-        buildRoot = parent / "build"
-        if not buildRoot.is_dir():
-            continue
-        for bindingDir in sorted(buildRoot.glob("*/python/pyInclude/_runtime")):
-            for name in _libraryNames():
-                candidate = yieldPath(bindingDir / name)
-                if candidate is not None:
-                    yield candidate
-        for buildDir in sorted(buildRoot.glob("cp*")):
-            for name in _libraryNames():
-                candidate = yieldPath(buildDir / name)
-                if candidate is not None:
-                    yield candidate
+    yield from runtime_library_candidates(_libraryNames())
 
 
 def _loadLibrary():

@@ -63,8 +63,9 @@ Issues = "https://github.com/computationalradiationphysics/haseongpu/issues"
 Changelog = "https://github.com/computationalradiationphysics/haseongpu/releases"
 
 [tool.scikit-build]
-build-dir = "build/{wheel_tag}"
+build-dir = ".hase-python-build/{wheel_tag}"
 wheel.packages = ["pyInclude"]
+install.components = ["python"]
 
 [[tool.scikit-build.generate]]
 path = "HASEonGPU.py"
@@ -77,12 +78,8 @@ from pyInclude import *
 build-type = "Release"
 [tool.scikit-build.cmake.define]
 HASE_ENABLE_PYTHON = "ON"
-HASE_BUILD_RELEASE = "ON"
+HASE_BUILD_RUNTIME = "OFF"
 HASE_NATIVE_OPTIMIZATIONS = "OFF"
-CMAKE_INTERPROCEDURAL_OPTIMIZATION = "OFF"
-CMAKE_BUILD_RPATH_USE_ORIGIN = "ON"
-CMAKE_INSTALL_RPATH = "$ORIGIN;$ORIGIN/../lib"
-CMAKE_INSTALL_RPATH_USE_LINK_PATH = "ON"
 
 [tool.pytest.ini_options]
 markers = [

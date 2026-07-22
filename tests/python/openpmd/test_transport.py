@@ -1197,11 +1197,6 @@ def test_inputSeriesWritesContract(contract_input):
 
 def _build_dir_candidates():
     root = Path(__file__).resolve().parents[3]
-    env = os.environ.get("BUILD_DIR")
-    if env:
-        path = Path(env)
-        yield path if path.is_absolute() else root / path
-
     yield from sorted(root.glob("build/cp*"))
     yield root / "build"
     yield root / "build" / "ci"

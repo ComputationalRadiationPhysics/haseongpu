@@ -45,7 +45,10 @@ CCACHE_LAUNCHER_DEFINES = (
     "CMAKE_CUDA_COMPILER_LAUNCHER",
 )
 REINSTALL_CACHE_DEFINES = (
+    "HASE_BUILD_RUNTIME",
+    "HASE_RUNTIME_DIR",
     "HASE_OPENPMD_PROVIDER",
+    "HASE_OPENPMD_PYTHON_PACKAGE_DIR",
     "HASE_OPENPMD_USE_ADIOS2",
     "HASE_OPENPMD_FETCH_ADIOS2",
     "HASE_OPENPMD_USE_HDF5",
@@ -77,6 +80,7 @@ class WizardSelection:
     n_per_node: int = 1
     cmake_prefix_path: str | None = None
     openpmd_dir: str | None = None
+    openpmd_python_package_dir: str | None = None
     bundled_adios2: str = BUNDLED_ADIOS2_FETCH
     bundled_hdf5: str = BUNDLED_HDF5_OFF
     openpmd_adios2: str = OPENPMD_ADIOS2_AUTO
@@ -87,6 +91,7 @@ class WizardSelection:
     adios2_dir: str | None = None
     hdf5_prefix: str | None = None
     hdf5_dir: str | None = None
+    runtime_dir: str | None = None
 
 
 def _csv(values):
@@ -232,6 +237,16 @@ def cmake_args(selection: WizardSelection, *, use_ccache=False):
         if selection.hdf5_dir:
             args.append(f"-DHDF5_DIR={selection.hdf5_dir}")
 
+    if selection.openpmd_python_package_dir:
+        args.append(
+            "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR="
+            f"{selection.openpmd_python_package_dir}"
+        )
+
+    args.append("-DHASE_BUILD_RUNTIME=OFF")
+    if selection.runtime_dir:
+        args.append(f"-DHASE_RUNTIME_DIR={selection.runtime_dir}")
+
     disable_mpi = {
         MPI_MODE_ON: "OFF",
         MPI_MODE_OFF: "ON",
@@ -295,7 +310,10 @@ def _read_last_install_state():
 
 
 def _latest_cmake_cache():
-    caches = [path for path in Path("build").glob("*/CMakeCache.txt") if path.is_file()]
+    default_runtime_cache = Path("build") / "CMakeCache.txt"
+    if default_runtime_cache.is_file():
+        return default_runtime_cache
+    caches = [path for path in Path("build").glob("cp*/CMakeCache.txt") if path.is_file()]
     if not caches:
         return None
     return max(caches, key=lambda path: path.stat().st_mtime)
@@ -533,6 +551,35 @@ def _interactive_bundled_hdf5(adios2_mode=BUNDLED_ADIOS2_FETCH):
     }.get(str(choice).strip(), choice)
 
 
+def _python_info_from_package_dir(package_dir, errors):
+    if not package_dir:
+        return preflight._python_info(errors)
+
+    package_path = Path(package_dir).expanduser().resolve()
+    if not (package_path / "openpmd_api").is_dir():
+        errors.append(
+            f"Python provider directory '{package_path}' does not contain openpmd_api."
+        )
+        return {}
+
+    saved_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "openpmd_api" or name.startswith("openpmd_api.")
+    }
+    for name in saved_modules:
+        del sys.modules[name]
+    sys.path.insert(0, str(package_path))
+    try:
+        return preflight._python_info(errors)
+    finally:
+        sys.path.remove(str(package_path))
+        for name in list(sys.modules):
+            if name == "openpmd_api" or name.startswith("openpmd_api."):
+                del sys.modules[name]
+        sys.modules.update(saved_modules)
+
+
 def _probe_external(args, *, backend=None):
     probe_args = SimpleNamespace(
         backend=backend or args.openpmd_backend or "adios-sst",
@@ -543,7 +590,10 @@ def _probe_external(args, *, backend=None):
     )
     errors: list[str] = []
     warnings: list[str] = []
-    python_info = preflight._python_info(errors)
+    python_info = _python_info_from_package_dir(
+        args.openpmd_python_package_dir,
+        errors,
+    )
     cmake_info = preflight._cmake_probe(probe_args, errors)
     preflight._check_versions(python_info, cmake_info, warnings)
     return probe_args, python_info, cmake_info, errors, warnings
@@ -605,6 +655,11 @@ def _build_selection(args):
 
     cmake_prefix_path = args.cmake_prefix_path
     openpmd_dir = args.openpmd_dir
+    openpmd_python_package_dir = (
+        str(Path(args.openpmd_python_package_dir).expanduser().resolve())
+        if args.openpmd_python_package_dir
+        else None
+    )
     adios2_prefix = args.adios2_prefix
     adios2_dir = args.adios2_dir
     hdf5_prefix = args.hdf5_prefix
@@ -615,6 +670,7 @@ def _build_selection(args):
     bundled_python_bindings = not args.no_bundled_python_bindings
     native_optimizations = args.native_optimizations == "on"
     mpi_mode = args.mpi
+    runtime_dir = str(Path(args.runtime_dir).expanduser().resolve()) if args.runtime_dir else None
     probe_report = None
 
     if provider == PROVIDER_AUTO:
@@ -733,6 +789,7 @@ def _build_selection(args):
         n_per_node=int(args.n_per_node),
         cmake_prefix_path=cmake_prefix_path,
         openpmd_dir=openpmd_dir,
+        openpmd_python_package_dir=openpmd_python_package_dir,
         bundled_adios2=bundled_adios2,
         bundled_hdf5=bundled_hdf5,
         openpmd_adios2=openpmd_adios2,
@@ -743,6 +800,7 @@ def _build_selection(args):
         adios2_dir=adios2_dir,
         hdf5_prefix=hdf5_prefix,
         hdf5_dir=hdf5_dir,
+        runtime_dir=runtime_dir,
     )
     return selection, alpaka_backends, alpaka_error, probe_report
 
@@ -799,10 +857,26 @@ def _parse_args(argv=None):
     parser.add_argument("--n-per-node", type=int, default=1)
     parser.add_argument("--cmake-prefix-path", default=None)
     parser.add_argument("--openpmd-dir", default=None)
+    parser.add_argument(
+        "--openpmd-python-package-dir",
+        default=None,
+        help=(
+            "Directory containing the openpmd_api package paired with the "
+            "selected C++ provider or runtime."
+        ),
+    )
     parser.add_argument("--adios2-prefix", default=None)
     parser.add_argument("--adios2-dir", default=None)
     parser.add_argument("--hdf5-prefix", default=None)
     parser.add_argument("--hdf5-dir", default=None)
+    parser.add_argument(
+        "--runtime-dir",
+        default=None,
+        help=(
+            "Durable native HASE build directory used by the Python frontend. "
+            "Defaults to build/ and is configured and built automatically."
+        ),
+    )
     parser.add_argument("--cmake", default="cmake")
     parser.add_argument("--cmake-generator", default=preflight._default_cmake_generator())
     parser.add_argument(
