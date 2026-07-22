@@ -9,6 +9,7 @@ import HASEonGPU
 import openpmd_api
 import pyInclude._runtime
 from pyInclude._runtime import runtime_config, runtime_root
+from pyInclude.openpmd import transport
 
 
 module_path = Path(HASEonGPU.__file__).resolve()
@@ -30,3 +31,9 @@ assert Path(runtime_config().HASE_RUNTIME_DIR).resolve() == native_runtime
 if provider_path:
     openpmd_path.relative_to(Path(provider_path).resolve())
 assert importlib.util.find_spec("HASEonGPU_Bindings") is None
+
+provider_dir = Path(runtime_config().HASE_OPENPMD_PYTHON_PACKAGE_DIR).resolve()
+if str(runtime_config().HASE_OPENPMD_PYTHON_PACKAGE_DIR):
+    active_provider = Path(transport._io().__file__).resolve()
+    print("openPMD provider:", active_provider)
+    assert active_provider.is_relative_to(provider_dir)
