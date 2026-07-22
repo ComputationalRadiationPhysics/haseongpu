@@ -201,6 +201,6 @@ docker exec hase-true-clad-current bash -lc \
 
 An import preflight resolved the frontend at `/src/HASEonGPU.py`, openPMD at
 the container provider path, and the executable at
-`/src/build-true-clad/bin/hase-cpp`. The test asserts that all three Tet
+`/src/build-true-clad/calcPhiASE`. The test asserts that all three Tet
 children inherit each wedge tag, classified volumes agree, and cladding cells
 have zero source beta.

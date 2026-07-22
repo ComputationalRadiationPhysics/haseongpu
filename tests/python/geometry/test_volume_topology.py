@@ -138,7 +138,7 @@ def _requireRuntimeBackendExecutable(monkeypatch):
         executable = transport.findCalcPhiAse()
     except FileNotFoundError as exc:
         pytest.skip(str(exc))
-    monkeypatch.setenv("HASE_CPP_EXECUTABLE", str(executable))
+    monkeypatch.setenv("HASE_CALCPHIASE", str(executable))
 
 
 def _requireOpenPmdTransportBackend(backend):
