@@ -1,4 +1,6 @@
 from pathlib import Path
+import sys
+from types import ModuleType
 
 import pytest
 
@@ -64,3 +66,34 @@ def test_sourceFrontendUsesProviderMetadataFromSelectedRuntime(tmp_path, monkeyp
     candidates = list(transport._candidate_python_paths(runtime_dir / "calcPhiASE"))
 
     assert provider_dir in candidates
+
+
+def test_runtimeActivatesConfiguredOpenPmdProviderBeforeImport(tmp_path, monkeypatch):
+    runtime_dir = tmp_path / "build"
+    provider_dir = tmp_path / "provider" / "site-packages"
+    (provider_dir / "openpmd_api").mkdir(parents=True)
+    _write_runtime_config(runtime_dir, provider_dir=str(provider_dir))
+    monkeypatch.setenv("HASE_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.delenv("HASE_OPENPMD_PYTHONPATH", raising=False)
+    monkeypatch.delenv("HASE_OPENPMD_PYTHON_PACKAGE_DIR", raising=False)
+    monkeypatch.delitem(sys.modules, "openpmd_api", raising=False)
+    monkeypatch.setattr(sys, "path", sys.path.copy())
+
+    selected = _runtime.activate_openpmd_python_provider()
+
+    assert selected == provider_dir
+    assert Path(sys.path[0]).resolve() == provider_dir
+
+
+def test_runtimeRejectsAlreadyImportedDifferentOpenPmdProvider(tmp_path, monkeypatch):
+    runtime_dir = tmp_path / "build"
+    provider_dir = tmp_path / "provider" / "site-packages"
+    (provider_dir / "openpmd_api").mkdir(parents=True)
+    _write_runtime_config(runtime_dir, provider_dir=str(provider_dir))
+    monkeypatch.setenv("HASE_RUNTIME_DIR", str(runtime_dir))
+    active = ModuleType("openpmd_api")
+    active.__file__ = str(tmp_path / "other" / "openpmd_api" / "__init__.py")
+    monkeypatch.setitem(sys.modules, "openpmd_api", active)
+
+    with pytest.raises(RuntimeError, match="already-imported openpmd_api"):
+        _runtime.activate_openpmd_python_provider()

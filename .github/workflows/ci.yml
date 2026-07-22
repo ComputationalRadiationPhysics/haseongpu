@@ -287,9 +287,8 @@ jobs:
 
           pip_cmake_args=(
             $HASE_CMAKE_ARGS
-            -DBUILD_TESTING=OFF
-            -DHASE_TESTING=OFF
             -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
+            "-DHASE_RUNTIME_DIR=$GITHUB_WORKSPACE/$HASE_CI_BUILD_DIR"
           )
           if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
             pip_cmake_args+=(
