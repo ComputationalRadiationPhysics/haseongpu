@@ -14,7 +14,6 @@ import os
 import sys
 from pathlib import Path
 
-
 BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
 
 
@@ -26,17 +25,9 @@ def _library_names():
     return ("libHaseOpenPmdBackendProbe.so",)
 
 
-def _runtime_package_dirs():
-    from importlib.util import find_spec
-
-    spec = find_spec("pyInclude._runtime")
-    if spec is None or spec.submodule_search_locations is None:
-        return ()
-    return tuple(Path(path) for path in spec.submodule_search_locations)
-
-
 def _candidate_paths(extra_dirs=()):
-    module_dir = Path(__file__).resolve().parent
+    from pyInclude._runtime import runtime_library_candidates
+
     seen = set()
 
     def yield_path(path):
@@ -58,34 +49,10 @@ def _candidate_paths(extra_dirs=()):
             if candidate is not None:
                 yield candidate
 
-    for package_dir in _runtime_package_dirs():
-        for name in _library_names():
-            candidate = yield_path(package_dir / name)
-            if candidate is not None:
-                yield candidate
-
-    for parent in module_dir.parents:
-        for name in _library_names():
-            candidate = yield_path(parent / "build" / "python" / "pyInclude" / "_runtime" / name)
-            if candidate is not None:
-                yield candidate
-            candidate = yield_path(parent / "build" / "ci" / "python" / "pyInclude" / "_runtime" / name)
-            if candidate is not None:
-                yield candidate
-
-        build_root = parent / "build"
-        if not build_root.is_dir():
-            continue
-        for binding_dir in sorted(build_root.glob("*/python/pyInclude/_runtime")):
-            for name in _library_names():
-                candidate = yield_path(binding_dir / name)
-                if candidate is not None:
-                    yield candidate
-        for build_dir in sorted(build_root.glob("cp*")):
-            for name in _library_names():
-                candidate = yield_path(build_dir / name)
-                if candidate is not None:
-                    yield candidate
+    for runtime_candidate in runtime_library_candidates(_library_names()):
+        candidate = yield_path(runtime_candidate)
+        if candidate is not None:
+            yield candidate
 
 
 def _load_probe_library(extra_dirs=()):

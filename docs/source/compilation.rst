@@ -25,8 +25,9 @@ The standalone binary is then available as:
 
    ./build/calcPhiASE
 
-For Python source installs, pass the same CMake cache options through
-``CMAKE_ARGS``:
+For Python source installs, ``python3 -m pip install .`` configures or reuses
+this same ``build/`` directory and installs only the thin frontend. Pass custom
+CMake cache options through ``CMAKE_ARGS``:
 
 .. code-block:: bash
 
@@ -84,14 +85,24 @@ Core HASE Options
    when you need a custom debug or profiling build type.
 
 ``HASE_NATIVE_OPTIMIZATIONS``
-   CMake default ``ON``; Python package default ``OFF``.  Adds host-specific
+   Default ``OFF``. Adds host-specific
    CPU tuning such as ``-march=native``.  Enable for local performance builds;
    disable for redistributable wheels or unknown target CPUs.
 
 ``HASE_ENABLE_PYTHON``
-   Default ``ON``.  Installs the Python frontend and its private backend runtime
-   artifacts. Set
-   ``OFF`` for command-line-only C++ builds.
+   Default ``ON``. Generates the Python frontend metadata describing the
+   matching native runtime. Set ``OFF`` for command-line-only C++ builds.
+
+``HASE_BUILD_RUNTIME``
+   Default ``ON`` for ordinary CMake builds. The thin-wheel build sets this to
+   ``OFF`` and builds the runtime separately in the durable directory selected
+   by ``HASE_RUNTIME_DIR``.
+
+``HASE_RUNTIME_DIR``
+   Default ``<source>/build`` for a thin frontend install. It is the single
+   root used for the executable, probe libraries, and generated openPMD Python
+   provider metadata. Prefer ``hase-configure --runtime-dir <path>`` when
+   selecting a nonstandard location.
 
 ``HASE_TESTING``
    Default ``OFF``.  Enables test targets.

@@ -48,6 +48,7 @@ project(
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
+include(GNUInstallDirs)
 
 # dependencies
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
@@ -55,6 +56,25 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
 endif()
 
 find_package(Threads REQUIRED)
+
+# A thin frontend must not mistake scikit-build's temporary compiler/prefix
+# cache entries for deliberate changes to an existing native runtime. Forward
+# only definitions the caller explicitly supplied through CMAKE_ARGS (the same
+# interface used by hase-configure).
+set(HASE_INITIAL_CACHE_VARIABLES "")
+if(DEFINED ENV{CMAKE_ARGS} AND NOT "$ENV{CMAKE_ARGS}" STREQUAL "")
+    separate_arguments(
+        HASE_EXPLICIT_CMAKE_ARGUMENTS
+        NATIVE_COMMAND
+        "$ENV{CMAKE_ARGS}"
+    )
+    foreach(HASE_EXPLICIT_CMAKE_ARGUMENT IN LISTS HASE_EXPLICIT_CMAKE_ARGUMENTS)
+        if(HASE_EXPLICIT_CMAKE_ARGUMENT MATCHES "^-D([^:=]+)(:[^=]+)?=")
+            list(APPEND HASE_INITIAL_CACHE_VARIABLES "${CMAKE_MATCH_1}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES HASE_INITIAL_CACHE_VARIABLES)
+endif()
 
 # build options
 option(
@@ -65,7 +85,7 @@ option(
 option(
     HASE_NATIVE_OPTIMIZATIONS
     "Enable -march=native/-mtune=native for host-tuned source builds. Disable for redistributable binaries."
-    ON
+    OFF
 )
 option(
     HASE_SELECT_BACKEND_ALPAKA
@@ -79,7 +99,7 @@ option(
 )
 option(
     HASE_ENABLE_PYTHON
-    "Install the HASEonGPU Python frontend and its private runtime artifacts"
+    "Generate/install the HASEonGPU Python frontend and runtime metadata"
     ON
 )
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
@@ -116,6 +136,231 @@ option(
     "Forward captured calcPhiASE stdout and stderr through the Python openPMD launcher."
     OFF
 )
+set(HASE_RUNTIME_DIR
+    "${CMAKE_SOURCE_DIR}/build"
+    CACHE PATH
+    "Shared HASE native runtime build used by the installed Python frontend"
+)
+if(NOT HASE_RUNTIME_DIR)
+    set(HASE_RUNTIME_DIR
+        "${CMAKE_SOURCE_DIR}/build"
+        CACHE PATH
+        "Shared HASE native runtime build"
+        FORCE
+    )
+endif()
+option(HASE_BUILD_RUNTIME "Build the native HASE runtime in this CMake tree" ON)
+if(HASE_BUILD_RUNTIME)
+    set(HASE_RUNTIME_DIR
+        "${CMAKE_BINARY_DIR}"
+        CACHE PATH
+        "Native HASE runtime build"
+        FORCE
+    )
+endif()
+
+if(NOT HASE_BUILD_RUNTIME)
+    if(NOT HASE_ENABLE_PYTHON)
+        message(
+            FATAL_ERROR
+            "HASE_BUILD_RUNTIME=OFF requires HASE_ENABLE_PYTHON=ON because this mode only exports the Python frontend."
+        )
+    endif()
+    get_filename_component(
+        HASE_RUNTIME_DIR
+        "${HASE_RUNTIME_DIR}"
+        ABSOLUTE
+        BASE_DIR "${CMAKE_SOURCE_DIR}"
+    )
+    set(HASE_RUNTIME_DIR
+        "${HASE_RUNTIME_DIR}"
+        CACHE PATH
+        "External HASE native runtime root recorded for the installed Python frontend"
+        FORCE
+    )
+    if(HASE_RUNTIME_DIR STREQUAL CMAKE_BINARY_DIR)
+        message(
+            FATAL_ERROR
+            "HASE_BUILD_RUNTIME=OFF requires HASE_RUNTIME_DIR to differ from the Python frontend build directory."
+        )
+    endif()
+
+    set(HASE_RUNTIME_FORWARDED_VARIABLES "")
+    foreach(HASE_CACHE_VARIABLE IN LISTS HASE_INITIAL_CACHE_VARIABLES)
+        if(
+            HASE_CACHE_VARIABLE MATCHES "^HASE_"
+            OR HASE_CACHE_VARIABLE MATCHES "^alpaka_"
+            OR HASE_CACHE_VARIABLE
+                MATCHES
+                "^CMAKE_(BUILD_TYPE|INTERPROCEDURAL_OPTIMIZATION|BUILD_RPATH_USE_ORIGIN|INSTALL_RPATH|INSTALL_RPATH_USE_LINK_PATH|PREFIX_PATH|TOOLCHAIN_FILE)$"
+            OR HASE_CACHE_VARIABLE
+                MATCHES
+                "^CMAKE_(C|CXX|CUDA|HIP)_(COMPILER|COMPILER_LAUNCHER|FLAGS|FLAGS_[A-Z]+|ARCHITECTURES)$"
+            OR HASE_CACHE_VARIABLE MATCHES "^(ADIOS2|HDF5|CUDAToolkit)_DIR$"
+            OR HASE_CACHE_VARIABLE MATCHES "^(openPMD|CUDAToolkit)_ROOT$"
+            OR HASE_CACHE_VARIABLE MATCHES "^(BUILD_TESTING|DISABLE_MPI)$"
+        )
+            list(
+                APPEND
+                HASE_RUNTIME_FORWARDED_VARIABLES
+                "${HASE_CACHE_VARIABLE}"
+            )
+        endif()
+    endforeach()
+    list(
+        REMOVE_ITEM
+        HASE_RUNTIME_FORWARDED_VARIABLES
+        HASE_BUILD_RUNTIME
+        HASE_RUNTIME_DIR
+        HASE_FRONTEND_EXPLICIT_CACHE_VARIABLES
+    )
+    list(REMOVE_DUPLICATES HASE_RUNTIME_FORWARDED_VARIABLES)
+    list(SORT HASE_RUNTIME_FORWARDED_VARIABLES)
+
+    set(HASE_RUNTIME_NEEDS_CONFIGURE FALSE)
+    if(EXISTS "${HASE_RUNTIME_DIR}/CMakeCache.txt")
+        if(HASE_RUNTIME_FORWARDED_VARIABLES)
+            load_cache(
+                "${HASE_RUNTIME_DIR}"
+                READ_WITH_PREFIX HASE_RUNTIME_CACHE_
+                ${HASE_RUNTIME_FORWARDED_VARIABLES}
+            )
+        endif()
+        foreach(HASE_CACHE_VARIABLE IN LISTS HASE_RUNTIME_FORWARDED_VARIABLES)
+            set(HASE_RUNTIME_CACHE_VARIABLE
+                "HASE_RUNTIME_CACHE_${HASE_CACHE_VARIABLE}"
+            )
+            set(HASE_RUNTIME_OPTION_CHANGED FALSE)
+            if(DEFINED ${HASE_RUNTIME_CACHE_VARIABLE})
+                if(
+                    NOT "${${HASE_RUNTIME_CACHE_VARIABLE}}"
+                        STREQUAL
+                        "${${HASE_CACHE_VARIABLE}}"
+                )
+                    set(HASE_RUNTIME_OPTION_CHANGED TRUE)
+                endif()
+            elseif(NOT "${${HASE_CACHE_VARIABLE}}" STREQUAL "")
+                set(HASE_RUNTIME_OPTION_CHANGED TRUE)
+            endif()
+            if(HASE_RUNTIME_OPTION_CHANGED)
+                message(
+                    STATUS
+                    "Shared runtime option changed: ${HASE_CACHE_VARIABLE}='${${HASE_CACHE_VARIABLE}}'"
+                )
+                set(HASE_RUNTIME_NEEDS_CONFIGURE TRUE)
+                break()
+            endif()
+        endforeach()
+    else()
+        set(HASE_RUNTIME_NEEDS_CONFIGURE TRUE)
+    endif()
+
+    if(HASE_RUNTIME_NEEDS_CONFIGURE)
+        set(HASE_RUNTIME_INITIAL_CACHE
+            "${CMAKE_BINARY_DIR}/hase-runtime-initial-cache.cmake"
+        )
+        file(
+            WRITE
+            "${HASE_RUNTIME_INITIAL_CACHE}"
+            "# Generated by the HASE Python frontend configuration.\n"
+        )
+        foreach(HASE_CACHE_VARIABLE IN LISTS HASE_RUNTIME_FORWARDED_VARIABLES)
+            get_property(
+                HASE_CACHE_TYPE
+                CACHE "${HASE_CACHE_VARIABLE}"
+                PROPERTY TYPE
+            )
+            if(
+                NOT HASE_CACHE_TYPE
+                OR HASE_CACHE_TYPE STREQUAL "UNINITIALIZED"
+                OR HASE_CACHE_TYPE STREQUAL "INTERNAL"
+            )
+                set(HASE_CACHE_TYPE STRING)
+            endif()
+            file(
+                APPEND
+                "${HASE_RUNTIME_INITIAL_CACHE}"
+                "set(${HASE_CACHE_VARIABLE} [==[${${HASE_CACHE_VARIABLE}}]==] CACHE ${HASE_CACHE_TYPE} \"Forwarded by the HASE Python frontend\" FORCE)\n"
+            )
+        endforeach()
+        file(
+            APPEND
+            "${HASE_RUNTIME_INITIAL_CACHE}"
+            "set(HASE_BUILD_RUNTIME ON CACHE BOOL \"Build the shared native HASE runtime\" FORCE)\n"
+            "set(HASE_ENABLE_PYTHON ON CACHE BOOL \"Build matching Python runtime helpers\" FORCE)\n"
+        )
+
+        set(HASE_RUNTIME_CONFIGURE_COMMAND
+            "${CMAKE_COMMAND}"
+            -S
+            "${CMAKE_SOURCE_DIR}"
+            -B
+            "${HASE_RUNTIME_DIR}"
+            -C
+            "${HASE_RUNTIME_INITIAL_CACHE}"
+        )
+        if(NOT EXISTS "${HASE_RUNTIME_DIR}/CMakeCache.txt")
+            list(APPEND HASE_RUNTIME_CONFIGURE_COMMAND -G "${CMAKE_GENERATOR}")
+            if(CMAKE_GENERATOR_PLATFORM)
+                list(
+                    APPEND
+                    HASE_RUNTIME_CONFIGURE_COMMAND
+                    -A
+                    "${CMAKE_GENERATOR_PLATFORM}"
+                )
+            endif()
+            if(CMAKE_GENERATOR_TOOLSET)
+                list(
+                    APPEND
+                    HASE_RUNTIME_CONFIGURE_COMMAND
+                    -T
+                    "${CMAKE_GENERATOR_TOOLSET}"
+                )
+            endif()
+        endif()
+        message(
+            STATUS
+            "Configuring shared native HASE runtime: ${HASE_RUNTIME_DIR}"
+        )
+        execute_process(
+            COMMAND ${HASE_RUNTIME_CONFIGURE_COMMAND}
+            RESULT_VARIABLE HASE_RUNTIME_CONFIGURE_RESULT
+            COMMAND_ECHO STDOUT
+        )
+        if(NOT HASE_RUNTIME_CONFIGURE_RESULT EQUAL 0)
+            message(
+                FATAL_ERROR
+                "Failed to configure the shared native HASE runtime."
+            )
+        endif()
+    endif()
+
+    message(STATUS "Building shared native HASE runtime: ${HASE_RUNTIME_DIR}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" --build "${HASE_RUNTIME_DIR}"
+        RESULT_VARIABLE HASE_RUNTIME_BUILD_RESULT
+        COMMAND_ECHO STDOUT
+    )
+    if(NOT HASE_RUNTIME_BUILD_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to build the shared native HASE runtime.")
+    endif()
+    if(
+        NOT EXISTS "${HASE_RUNTIME_DIR}/calcPhiASE"
+        AND NOT EXISTS "${HASE_RUNTIME_DIR}/python/pyInclude/_runtime/calcPhiASE"
+    )
+        message(
+            FATAL_ERROR
+            "The shared runtime '${HASE_RUNTIME_DIR}' did not produce calcPhiASE."
+        )
+    endif()
+
+    message(
+        STATUS
+        "Configuring Python frontend for runtime: ${HASE_RUNTIME_DIR}"
+    )
+    include(cmake/pythonRuntime.cmake)
+    return()
+endif()
 
 set(HASE_CUDA_ARCHITECTURES native CACHE STRING "CUDA Architectures")
 if(

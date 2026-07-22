@@ -67,7 +67,7 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
-      BUILD_DIR: build/ci
+      HASE_CI_BUILD_DIR: build/ci
       HASE_MPI: ${{ matrix.config.mpi }}
       HASE_MPI_TEST_RANKS: ${{ matrix.config.mpi_ranks || '' }}
       HASE_CMAKE_ARGS_BASE: >-
@@ -271,14 +271,14 @@ jobs:
             )
           fi
 
-          cmake -S . -B "$BUILD_DIR" -G Ninja \
+          cmake -S . -B "$HASE_CI_BUILD_DIR" -G Ninja \
             "${cmake_args[@]}"
 
       - name: Build
         shell: bash
         run: |
           set -euxo pipefail
-          cmake --build "$BUILD_DIR" --parallel "$(nproc)"
+          cmake --build "$HASE_CI_BUILD_DIR" --parallel "$(nproc)"
 
       - name: Install Python package
         shell: bash
@@ -390,7 +390,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          ctest --test-dir "$BUILD_DIR" --output-on-failure
+          ctest --test-dir "$HASE_CI_BUILD_DIR" --output-on-failure
 
       - name: Run pytest
         shell: bash

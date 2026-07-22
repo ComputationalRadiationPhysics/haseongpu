@@ -150,7 +150,7 @@ option(
 option(
     HASE_OPENPMD_BUILD_PYTHON_BINDINGS
     "Build and install openPMD-api Python bindings with the HASE-managed provider"
-    OFF
+    ${HASE_ENABLE_PYTHON}
 )
 set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
     ""
@@ -172,6 +172,35 @@ option(
     "Force rebuilding the HASE-managed bundled openPMD-api provider"
     OFF
 )
+
+function(hase_openpmd_configure_parallel_level)
+    if(
+        NOT DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL}
+        OR "$ENV{CMAKE_BUILD_PARALLEL_LEVEL}" STREQUAL ""
+    )
+        include(ProcessorCount)
+        ProcessorCount(HASE_OPENPMD_PROCESSOR_COUNT)
+        if(
+            NOT HASE_OPENPMD_PROCESSOR_COUNT
+            OR HASE_OPENPMD_PROCESSOR_COUNT LESS 2
+        )
+            set(HASE_OPENPMD_DEFAULT_PARALLEL_LEVEL 1)
+        else()
+            math(
+                EXPR
+                HASE_OPENPMD_DEFAULT_PARALLEL_LEVEL
+                "${HASE_OPENPMD_PROCESSOR_COUNT} - 1"
+            )
+        endif()
+        set(ENV{CMAKE_BUILD_PARALLEL_LEVEL}
+            "${HASE_OPENPMD_DEFAULT_PARALLEL_LEVEL}"
+        )
+    endif()
+    message(
+        STATUS
+        "HASE bundled provider parallel build level: $ENV{CMAKE_BUILD_PARALLEL_LEVEL}"
+    )
+endfunction()
 
 function(hase_openpmd_validate_found provider_kind)
     if(NOT openPMD_FOUND)
@@ -261,10 +290,12 @@ endfunction()
 
 function(hase_openpmd_find_bundled_python out_var)
     file(
-        GLOB_RECURSE HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
+        GLOB HASE_OPENPMD_BUNDLED_PYTHON_MARKERS
         LIST_DIRECTORIES FALSE
         "${HASE_OPENPMD_BUNDLED_PREFIX}/openpmd_api/__init__.py"
-        "${HASE_OPENPMD_BUNDLED_PREFIX}/*/openpmd_api/__init__.py"
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/lib/python*/site-packages/openpmd_api/__init__.py"
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/lib64/python*/site-packages/openpmd_api/__init__.py"
+        "${HASE_OPENPMD_BUNDLED_PREFIX}/Lib/site-packages/openpmd_api/__init__.py"
     )
     list(SORT HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
     if(HASE_OPENPMD_BUNDLED_PYTHON_MARKERS)
@@ -458,6 +489,7 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
 endfunction()
 
 function(hase_openpmd_bootstrap_bundled_provider)
+    hase_openpmd_configure_parallel_level()
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hase-openpmd-provider")
     set(HASE_OPENPMD_BUNDLED_STAMP
         "${HASE_OPENPMD_BUNDLED_PREFIX}/hase-openpmd-provider.stamp"
@@ -576,26 +608,37 @@ if(HASE_OPENPMD_PROVIDER STREQUAL "system")
     hase_openpmd_validate_found("system")
     set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
 elseif(HASE_OPENPMD_PROVIDER STREQUAL "auto")
-    message(
-        STATUS
-        "HASE_OPENPMD_PROVIDER=auto: probing for a system openPMD-api provider"
-    )
-    find_package(openPMD CONFIG QUIET)
-    if(openPMD_FOUND AND TARGET openPMD::openPMD)
+    if(EXISTS "${HASE_OPENPMD_BUNDLED_PREFIX}/hase-openpmd-provider.stamp")
         message(
             STATUS
-            "HASE_OPENPMD_PROVIDER=auto: using system openPMD-api provider"
-        )
-        set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
-    else()
-        message(
-            STATUS
-            "HASE_OPENPMD_PROVIDER=auto: no system provider found; using bundled provider"
+            "HASE_OPENPMD_PROVIDER=auto: reusing the managed bundled provider"
         )
         hase_openpmd_bootstrap_bundled_provider()
         find_package(openPMD CONFIG REQUIRED)
         hase_openpmd_validate_found("bundled")
         set(HASE_OPENPMD_ACTUAL_PROVIDER "bundled")
+    else()
+        message(
+            STATUS
+            "HASE_OPENPMD_PROVIDER=auto: probing for a system openPMD-api provider"
+        )
+        find_package(openPMD CONFIG QUIET)
+        if(openPMD_FOUND AND TARGET openPMD::openPMD)
+            message(
+                STATUS
+                "HASE_OPENPMD_PROVIDER=auto: using system openPMD-api provider"
+            )
+            set(HASE_OPENPMD_ACTUAL_PROVIDER "system")
+        else()
+            message(
+                STATUS
+                "HASE_OPENPMD_PROVIDER=auto: no system provider found; using bundled provider"
+            )
+            hase_openpmd_bootstrap_bundled_provider()
+            find_package(openPMD CONFIG REQUIRED)
+            hase_openpmd_validate_found("bundled")
+            set(HASE_OPENPMD_ACTUAL_PROVIDER "bundled")
+        endif()
     endif()
 else()
     hase_openpmd_bootstrap_bundled_provider()

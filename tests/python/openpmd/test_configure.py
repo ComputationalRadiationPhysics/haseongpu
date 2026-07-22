@@ -175,6 +175,7 @@ def test_systemOpenPmdCarriesProviderPaths():
         openpmd_backend="adios-sst",
         compute_backend="Host_Cpu_CpuSerial",
         cmake_prefix_path="/opt/openpmd",
+        openpmd_python_package_dir="/opt/openpmd/lib/python/site-packages",
         adios2_prefix="/opt/adios2",
         adios2_dir="/opt/adios2/lib/cmake/adios2",
     )
@@ -183,6 +184,10 @@ def test_systemOpenPmdCarriesProviderPaths():
 
     assert "-DHASE_OPENPMD_PROVIDER=system" in command
     assert "-DCMAKE_PREFIX_PATH=/opt/adios2;/opt/openpmd" in command
+    assert (
+        "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR="
+        "/opt/openpmd/lib/python/site-packages"
+    ) in command
     assert "-DADIOS2_DIR=/opt/adios2/lib/cmake/adios2" in command
 
 
@@ -241,6 +246,41 @@ def test_installCommandUsesEnvVarAndSafeDefaults():
     assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install -v .' in command
     assert "-DDISABLE_MPI=AUTO" in command
     assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in command
+    assert "-DHASE_BUILD_RUNTIME=OFF" in command
+
+
+def test_configuratorDefaultsAreExplicitNativeRuntimeArguments():
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios-sst",
+        compute_backend="Host_Cpu_CpuSerial",
+    )
+
+    arguments = configure_module.cmake_args(selection)
+
+    assert "-DHASE_OPENPMD_PROVIDER=bundled" in arguments
+    assert "-DHASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON" in arguments
+    assert "-DHASE_OPENPMD_USE_ADIOS2=ON" in arguments
+    assert "-DHASE_OPENPMD_FETCH_ADIOS2=ON" in arguments
+    assert "-DHASE_OPENPMD_USE_HDF5=OFF" in arguments
+    assert "-DHASE_BUILD_RUNTIME=OFF" in arguments
+    assert "-DDISABLE_MPI=AUTO" in arguments
+    assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in arguments
+
+
+def test_installCommandSelectsDurableRuntimeDirectory(tmp_path):
+    runtime_dir = tmp_path / "custom-runtime"
+    selection = WizardSelection(
+        provider=PROVIDER_BUNDLED,
+        openpmd_backend="adios-sst",
+        compute_backend="Host_Cpu_CpuSerial",
+        runtime_dir=str(runtime_dir),
+    )
+
+    command = install_command(selection)
+
+    assert f"-DHASE_RUNTIME_DIR={runtime_dir}" in command
+    assert "-DHASE_BUILD_RUNTIME=OFF" in command
 
 
 def test_installCommandCanPassBreakSystemPackages():
@@ -337,6 +377,11 @@ def test_bundledProviderStagesFetchedDependenciesBeforeOpenPmd():
     assert "HASE_OPENPMD_USE_HDF5\n    \"Enable HDF5 support in the HASE-managed openPMD provider\"\n    OFF" in script
     assert "stage_name STREQUAL \"openpmd\" AND HASE_OPENPMD_USE_HDF5 AND HASE_OPENPMD_FETCH_HDF5" in normalized_script
     assert "-DHDF5_DIR=${HASE_OPENPMD_BUNDLED_PREFIX}/lib/cmake/hdf5" in script
+    assert (
+        '"${HASE_OPENPMD_BUNDLED_PREFIX}/lib/python*/site-packages/'
+        'openpmd_api/__init__.py"'
+    ) in script
+    assert "HASE_OPENPMD_PROVIDER=auto: reusing the managed bundled provider" in script
     assert script.index(hdf5_stage) < script.index(openpmd_stage)
     assert script.index(adios2_stage) < script.index(openpmd_stage)
 
@@ -472,6 +517,38 @@ def test_autoinstallUsesDefaultsAndRunsInstall(tmp_path, monkeypatch):
 
     assert configure_module.main(["--autoinstall"]) == 19
     assert seen == {"selected": selection, "break_system_packages": False, "use_ccache": False}
+
+
+def test_runtimeDirOptionReachesAutoinstallSelection(tmp_path, monkeypatch):
+    runtime_dir = tmp_path / "runtime-with-a-nonstandard-name"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(configure_module, "available_alpaka_backends", lambda: ([], None))
+    seen = {}
+
+    def fake_run_install(selection, **kwargs):
+        seen["selection"] = selection
+        seen.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(configure_module, "run_install", fake_run_install)
+
+    assert configure_module.main(
+        [
+            "--autoinstall",
+            "--provider",
+            PROVIDER_BUNDLED,
+            "--runtime-dir",
+            str(runtime_dir),
+            "--mpi",
+            MPI_MODE_OFF,
+            "--openpmd-backend",
+            "adios",
+        ]
+    ) == 0
+    assert seen["selection"].runtime_dir == str(runtime_dir.resolve())
+    assert seen["selection"].mpi_mode == MPI_MODE_OFF
+    assert seen["selection"].openpmd_backend == "adios"
+    assert seen["break_system_packages"] is False
 
 
 def test_generatedYamlLoadsAsPhiAseConfig():

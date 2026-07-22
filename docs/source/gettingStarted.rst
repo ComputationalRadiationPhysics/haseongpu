@@ -86,23 +86,43 @@ physics inputs such as geometry, spectra, pump settings, and material state are
 still constructed in Python.
 
 Useful non-interactive options include ``--autoinstall``, ``--reinstall``,
-``--use-ccache``, ``--provider``, ``--openpmd-backend``, and ``--output``.  Run
+``--use-ccache``, ``--provider``, ``--openpmd-backend``, ``--runtime-dir``, and
+``--output``.  Run
 ``python3 utils/configure_hase.py --help`` for the complete list.
 
 5. Install
 ----------
 
-The configurator prints a command of this form:
+For the default configuration, installation remains one command:
+
+.. code-block:: bash
+
+   python3 -m pip install .
+
+This configures or reuses the durable native runtime under ``build/``, builds
+it, and installs a thin Python frontend that remembers that runtime.  Rebuilding
+``build/`` later changes the binary and provider metadata used by the installed
+frontend without reinstalling the wheel.
+
+The configurator prints a command of this form when options are selected:
 
 .. code-block:: bash
 
    CMAKE_ARGS="<selected CMake options>" python3 -m pip install -v .
 
 Run the printed command if you did not let the configurator install
-immediately.  ``python3 -m pip install -v .`` builds the standalone C++ backend
-and private runtime helpers through scikit-build/CMake, installs the Python
-frontend, and shows the CMake/build output.  ``CMAKE_ARGS`` is how you pass build options such as the openPMD
+immediately. ``CMAKE_ARGS`` is how you pass build options such as the openPMD
 provider, MPI mode, Alpaka choices, and native CPU optimization setting.
+
+To keep the runtime somewhere other than ``build/``, let the configurator
+select and remember it:
+
+.. code-block:: bash
+
+   python3 utils/configure_hase.py --runtime-dir /opt/hase/runtime-2.1 --autoinstall
+
+Simulation scripts still use ``import HASEonGPU``; they do not need to set the
+runtime path themselves.
 
 If pip reports an externally managed Python environment, prefer a virtual
 environment.  Use ``--break-system-packages`` with the configurator only when
