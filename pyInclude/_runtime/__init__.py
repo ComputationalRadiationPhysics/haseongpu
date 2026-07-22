@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -89,6 +90,63 @@ def runtime_config():
             "Reconfigure that runtime before launching HASE."
         )
     return module
+
+
+def _openpmd_python_package_parent(path):
+    path = Path(path).expanduser()
+    return path.parent if path.name == "openpmd_api" else path
+
+
+def _openpmd_python_paths():
+    for name in ("HASE_OPENPMD_PYTHONPATH", "HASE_OPENPMD_PYTHON_PACKAGE_DIR"):
+        for entry in _path_entries(os.environ.get(name)):
+            yield _openpmd_python_package_parent(entry)
+
+    try:
+        configured = getattr(runtime_config(), "HASE_OPENPMD_PYTHON_PACKAGE_DIR", "")
+    except RuntimeError:
+        # Importing pyInclude.config must remain possible before a runtime has
+        # been configured. Runtime consumers report the missing metadata later.
+        return
+    if configured:
+        yield _openpmd_python_package_parent(configured)
+
+
+def activate_openpmd_python_provider():
+    """Prefer the Python provider selected for the durable C++ runtime.
+
+    This runs while :mod:`pyInclude` is imported, before any HASE module can
+    import a generic openpmd_api wheel from the active environment.
+    """
+    candidates = []
+    for path in _unique(_openpmd_python_paths()):
+        if (path / "openpmd_api").is_dir():
+            candidates.append(path)
+    if not candidates:
+        return None
+
+    selected = candidates[0]
+    active_module = sys.modules.get("openpmd_api")
+    if active_module is not None:
+        active_path = Path(getattr(active_module, "__file__", "")).resolve()
+        try:
+            active_path.relative_to(selected)
+        except ValueError as exc:
+            raise RuntimeError(
+                "HASEonGPU cannot use the already-imported openpmd_api module at "
+                f"'{active_path}': its native runtime uses the provider at '{selected}'. "
+                "Start a fresh Python process and import HASEonGPU before openpmd_api."
+            ) from exc
+        return selected
+
+    selected_text = str(selected)
+    sys.path[:] = [
+        entry
+        for entry in sys.path
+        if Path(entry or os.curdir).expanduser().resolve() != selected
+    ]
+    sys.path.insert(0, selected_text)
+    return selected
 
 
 def native_dirs_from_root(root):

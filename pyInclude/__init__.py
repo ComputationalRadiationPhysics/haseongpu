@@ -8,6 +8,11 @@
 
 __version__ = "2.1.0"
 
+from ._runtime import activate_openpmd_python_provider as _activate_openpmd_python_provider
+
+_activate_openpmd_python_provider()
+del _activate_openpmd_python_provider
+
 from .alpakaUtils import AlpakaBackends
 from .openpmd import (
     BaseGroup,

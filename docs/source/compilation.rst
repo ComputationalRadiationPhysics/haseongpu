@@ -167,9 +167,11 @@ backend used by a simulation is selected at runtime with
    * ``auto``: use a system openPMD-api C++ package if found, otherwise build a
      bundled provider
    * ``system``: require an installed ``openPMD::openPMD`` package; the runtime
-     Python environment must provide a compatible ``openpmd_api`` module
+     Python environment must separately provide the matching ``openpmd_api``
+     module (it is intentionally not an unconditional Python dependency)
    * ``bundled``: build the pinned openPMD-api provider and selected
-     dependencies into a build-local prefix
+     dependencies and matching Python bindings into a build-local prefix; the
+     HASE frontend selects those bindings automatically at process startup
 
 ``HASE_OPENPMD_USE_ADIOS2``
    Default ``ON`` for the bundled provider.  Enables ADIOS2-backed runtime
