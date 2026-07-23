@@ -26,10 +26,10 @@ The binary reads one openPMD input series and writes one openPMD result series:
        --input-path=<openPMD-input-series> \
        --output-path=<openPMD-output-series>
 
-The input series contains mesh topology, material fields, dynamic beta fields,
-backend settings, parallel mode, sample range, and optional RNG seed.  This is
-the same transport layout written by the Python interface; see
-:doc:`openpmdTransport`.
+The input series contains mesh topology, material fields, the dynamic
+``core_beta_volume`` field, backend settings, parallel mode, sample range, and
+optional RNG seed.  This is the same transport layout written by the Python
+interface; see :doc:`openpmdTransport`.
 
 For forward reflections, the request uses the schema-defined iteration
 attributes ``use_reflections``, ``reflection_max_iterations``,
