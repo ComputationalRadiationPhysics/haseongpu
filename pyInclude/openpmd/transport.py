@@ -119,17 +119,7 @@ EXPLICIT_CELL_DOMAINS_SPEC = FieldSpec(
     lambda context: (context.numberOfCells,),
     backendRequired=False,
 )
-EXPLICIT_SAMPLE_POINTS_SPEC = FieldSpec(
-    "explicitSamplePoints",
-    "sample_points",
-    ("coordinate", "sample_point"),
-    np.float64,
-    lambda context: (3, context.numberOfSamplePoints),
-    unit="m",
-    unitDimension=(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    backendRequired=False,
-)
-DYNAMIC_FIELD_NAMES = {"betaVolume", "pointBeta"}
+DYNAMIC_FIELD_NAMES = {"betaVolume"}
 EXPLICIT_BETA_VOLUME_SPEC = FieldSpec(
     "betaVolume",
     "beta_volume",
@@ -138,16 +128,6 @@ EXPLICIT_BETA_VOLUME_SPEC = FieldSpec(
     lambda context: (context.numberOfCells,),
     dynamic=True,
 )
-EXPLICIT_POINT_BETA_SPEC = FieldSpec(
-    "pointBeta",
-    "point_beta",
-    ("sample_point",),
-    np.float64,
-    lambda context: (context.numberOfSamplePoints,),
-    dynamic=True,
-)
-
-
 def _env_flag(name):
     value = os.environ.get(name)
     if value is None:
@@ -766,16 +746,7 @@ def _explicit_point_components(topology):
     }
 
 
-def _explicit_sample_point_components(topology):
-    points = np.asarray(topology.samplePoints, dtype=np.float64)
-    return {
-        "x": points[:, 0],
-        "y": points[:, 1],
-        "z": points[:, 2],
-    }
-
-
-def _write_explicit_static_topology(iteration, topology, *, include_sample_points=True):
+def _write_explicit_static_topology(iteration, topology):
     context = _explicit_topology_context(topology)
     record = iteration.meshes["core_" + CANONICAL_POINTS_SPEC.recordName]
     for component_name, values in _explicit_point_components(topology).items():
@@ -790,21 +761,6 @@ def _write_explicit_static_topology(iteration, topology, *, include_sample_point
     _record_metadata(record, CANONICAL_POINTS_SPEC)
     record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
     record.set_attribute("hasePrimitiveShape", list(CANONICAL_POINTS_SPEC.expectedShape(context)))
-
-    if include_sample_points:
-        sample_record = iteration.meshes["core_" + EXPLICIT_SAMPLE_POINTS_SPEC.recordName]
-        for component_name, values in _explicit_sample_point_components(topology).items():
-            _resetComponent(
-                sample_record,
-                component_name,
-                np.ascontiguousarray(values),
-                ["sample_point"],
-                _unit_dimension(_io(), EXPLICIT_SAMPLE_POINTS_SPEC.unitDimension),
-                EXPLICIT_SAMPLE_POINTS_SPEC.unitSI,
-            )
-        _record_metadata(sample_record, EXPLICIT_SAMPLE_POINTS_SPEC)
-        sample_record.set_attribute("geometryParameters", "topology=explicit_tet4_volume")
-        sample_record.set_attribute("hasePrimitiveShape", list(EXPLICIT_SAMPLE_POINTS_SPEC.expectedShape(context)))
 
     def backend_flat(values):
         return np.asarray(values).reshape(-1)
@@ -906,7 +862,7 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
         topology = gainMedium.topology
         if not (hasattr(topology, "cellPointIndices") and hasattr(topology, "neighborCells")):
             raise TypeError("PhiASE openPMD transport requires a Tet4 VolumeTopology")
-        _write_explicit_static_topology(iteration, topology, include_sample_points=True)
+        _write_explicit_static_topology(iteration, topology)
     else:
         iteration.set_attribute("haseStaticUpdate", False)
 

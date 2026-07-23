@@ -461,14 +461,15 @@ namespace
         iteration.setDt(1.0);
         iteration.setTimeUnitSI(1.0);
 
-        constexpr unsigned numberOfPoints = 5u;
+        constexpr unsigned numberOfMeshPoints = 5u;
+        constexpr unsigned numberOfStatePoints = 3u;
         constexpr unsigned numberOfCells = 3u;
         constexpr unsigned numberOfLevels = 1u;
-        std::array<double, numberOfPoints> const x{0.0, 1.5, 0.25, 2.25, -0.75};
-        std::array<double, numberOfPoints> const y{0.0, -0.5, 1.25, 2.5, 3.75};
-        std::array<double, numberOfPoints> const z{0.0, 0.0, 0.0, 1.0, 1.0};
+        std::array<double, numberOfMeshPoints> const x{0.0, 1.5, 0.25, 2.25, -0.75};
+        std::array<double, numberOfMeshPoints> const y{0.0, -0.5, 1.25, 2.5, 3.75};
+        std::array<double, numberOfMeshPoints> const z{0.0, 0.0, 0.0, 1.0, 1.0};
 
-        iteration.setAttribute("number_of_points", numberOfPoints);
+        iteration.setAttribute("number_of_points", numberOfStatePoints);
         iteration.setAttribute("number_of_cells", numberOfCells);
         iteration.setAttribute("number_of_levels", numberOfLevels);
         iteration.setAttribute("thickness", 0.0f);
@@ -962,14 +963,15 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
 
     REQUIRE(context.mesh.numberOfCells == 3u);
     REQUIRE(context.mesh.numberOfLevels == 1u);
-    REQUIRE(context.mesh.numberOfPoints == 5u);
+    REQUIRE(context.mesh.numberOfPoints == 3u);
+    REQUIRE(context.mesh.numberOfMeshPoints == 5u);
     REQUIRE(context.mesh.resultAtVolumes);
     REQUIRE(context.mesh.cellPointIndices == std::vector<unsigned>{0u, 1u, 2u, 3u, 0u, 2u, 3u, 4u, 1u, 2u, 3u, 4u});
     REQUIRE(
         context.mesh.points
         == std::vector<double>{0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75, 0.0, 0.0, 0.0, 1.0, 1.0});
     REQUIRE(context.mesh.betaVolume == std::vector<double>{0.11, 0.21, 0.31});
-    REQUIRE(context.mesh.betaCells == std::vector<double>(5u, 0.0));
+    REQUIRE(context.mesh.betaCells == std::vector<double>(3u, 0.0));
     REQUIRE(context.mesh.claddingCellTypes == std::vector<unsigned>{0u, 2u, 1u});
     REQUIRE(context.mesh.refractiveIndices == std::vector<float>{1.80f, 1.20f, 1.65f, 1.05f});
     REQUIRE(context.mesh.reflectivities == std::vector<float>{0.01f, 0.03f, 0.05f, 0.02f, 0.04f, 0.06f});

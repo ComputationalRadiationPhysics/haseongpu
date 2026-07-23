@@ -132,18 +132,18 @@ and ``HASE_SRM_DIVERGENCE_STREAK`` are deliberately not serialized because
 they are local execution policy rather than portable request data.
 
 The topology convention inside ``/meshes`` follows VTK's unstructured-grid
-model and ``vtkWedge`` cell. openPMD provides the mesh-record model, but it
-does not standardize VTK-style wedge connectivity itself. HASEonGPU therefore
+model and tetrahedral cell. openPMD provides the mesh-record model, but it
+does not standardize VTK-style Tet4 connectivity itself. HASEonGPU therefore
 stores a VTK-compatible unstructured-cell layout in openPMD records:
 
 * ``core_points`` stores VTK ``POINTS`` as ``x``, ``y``, and ``z`` components.
 * ``core_cells_connectivity`` stores the VTK cell connectivity point ids.
 * ``core_cells_offsets`` stores offsets into the connectivity array.
-* ``core_cells_types`` stores the VTK cell type id; wedge cells use type ``13``.
+* ``core_cells_types`` stores the VTK cell type id; Tet4 cells use type ``10``.
 
 Main input field records are:
 
-* ``core_beta_volume`` and ``core_point_beta`` for dynamic excited-state data
+* ``core_beta_volume`` for dynamic excited-state data
 * ``core_cladding_cell_type``, ``core_refractive_index``, and
   ``core_reflectivity`` for static material/surface data
 * ``core_lambda_absorption``, ``core_lambda_emission``,
@@ -202,9 +202,9 @@ Iteration Updates
 -----------------
 
 The first Python-written iteration contains the full static context: topology,
-material records, spectra, compute attributes, and dynamic beta fields.  Later
-iterations normally contain only ``core_beta_volume`` and ``core_point_beta``
-and reuse the cached static context from iteration 0.
+material records, spectra, compute attributes, and the dynamic
+``core_beta_volume`` field. Later iterations normally contain only
+``core_beta_volume`` and reuse the cached static context from iteration 0.
 
 Changing topology, spectra, material constants, or compute settings requires a
 new input series whose first iteration carries a complete static update.  This

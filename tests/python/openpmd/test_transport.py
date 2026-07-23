@@ -278,7 +278,6 @@ def _mesh_field_values(mesh):
         "cellNormalY": np.asarray(mesh.triangleNormalsY),
         "surface": np.asarray(mesh.triangleSurfaces),
         "betaVolume": np.asarray(mesh.betaVolume),
-        "pointBeta": np.asarray(mesh.betaCells),
         "claddingCellType": np.asarray(mesh.claddingCellTypes),
         "refractiveIndex": np.asarray(mesh.refractiveIndices),
         "reflectivity": np.asarray(mesh.reflectivities),
@@ -296,7 +295,6 @@ def _scalar_record_values(mesh):
         "cell_normal_y": values["cellNormalY"],
         "surface": values["surface"],
         "beta_volume": values["betaVolume"],
-        "point_beta": values["pointBeta"],
         "cladding_cell_type": values["claddingCellType"],
         "refractive_index": values["refractiveIndex"],
         "reflectivity": values["reflectivity"],
@@ -1186,14 +1184,11 @@ def test_inputSeriesWritesContract(contract_input):
         np.testing.assert_array_equal(values, expected.astype(spec.dtypeObject, copy=False))
         _assert_hase_metadata(record, spec, explicit_context)
 
-    sample_points = iteration.meshes["core_sample_points"]
-    np.testing.assert_array_equal(_read_component(series, sample_points["x"]), topology.samplePoints[:, 0])
-    np.testing.assert_array_equal(_read_component(series, sample_points["y"]), topology.samplePoints[:, 1])
-    np.testing.assert_array_equal(_read_component(series, sample_points["z"]), topology.samplePoints[:, 2])
+    assert "core_sample_points" not in iteration.meshes
+    assert "core_point_beta" not in iteration.meshes
 
     dynamic_specs = {
         "beta_volume": (transport.EXPLICIT_BETA_VOLUME_SPEC, VOLUME_BETA),
-        "point_beta": (transport.EXPLICIT_POINT_BETA_SPEC, VOLUME_POINT_BETA),
         "cladding_cell_type": (fieldSpec("claddingCellType"), MESH_FIELD_VALUES["claddingCellType"]),
         "refractive_index": (fieldSpec("refractiveIndex"), MESH_FIELD_VALUES["refractiveIndex"]),
         "reflectivity": (fieldSpec("reflectivity"), MESH_FIELD_VALUES["reflectivity"]),
@@ -1263,7 +1258,8 @@ def test_inputSeriesOmitsStaticTopology(tmp_path):
     assert "core_cells_connectivity" in first.meshes
     assert "core_points" not in second.meshes
     assert "core_cells_connectivity" not in second.meshes
-    assert sorted(second.meshes) == ["core_beta_volume", "core_point_beta"]
+    assert "core_point_beta" not in first.meshes
+    assert sorted(second.meshes) == ["core_beta_volume"]
     series.close()
 
 
