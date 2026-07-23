@@ -55,6 +55,7 @@ from .simulation import (
     TimeStepState,
     TimeSteppedSimulation,
 )
+from .structures import Result as TransportResult
 from .gainMap import calcGainFromState
 from .openpmd.paraview import writeParaviewState
 from .vtkWedge import vtkWedge

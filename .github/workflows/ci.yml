@@ -103,6 +103,7 @@ jobs:
         run: |
           set -euxo pipefail
 
+          printf 'Acquire::Retries "3";\n' > /etc/apt/apt.conf.d/80-hase-retries
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates \
@@ -144,9 +145,20 @@ jobs:
 
 
           if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
-            apt-get install -y --no-install-recommends \
-              "gcc-${{ matrix.config.version }}" \
-              "g++-${{ matrix.config.version }}" || true
+            requested_version="${{ matrix.config.version }}"
+            if command -v "gcc-$requested_version" >/dev/null 2>&1 \
+                && command -v "g++-$requested_version" >/dev/null 2>&1; then
+              :
+            elif command -v gcc >/dev/null 2>&1 \
+                && command -v g++ >/dev/null 2>&1 \
+                && [[ "$(gcc -dumpversion)" == "$requested_version"* ]] \
+                && [[ "$(g++ -dumpversion)" == "$requested_version"* ]]; then
+              :
+            else
+              apt-get install -y --no-install-recommends \
+                "gcc-$requested_version" \
+                "g++-$requested_version"
+            fi
           fi
 
           if [[ "${{ matrix.config.compiler }}" == "clang" && "${{ matrix.config.hip }}" == "no" ]]; then
@@ -157,7 +169,7 @@ jobs:
             fi
             apt-get install -y --no-install-recommends \
               "clang-${{ matrix.config.version }}" \
-              "lld-${{ matrix.config.version }}" || true
+              "lld-${{ matrix.config.version }}"
           fi
 
       - name: Install Python dependencies
@@ -175,36 +187,72 @@ jobs:
         run: |
           set -euxo pipefail
 
+          cc=
+          cxx=
+          cudacxx=
           if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
-            if command -v "gcc-${{ matrix.config.version }}" >/dev/null 2>&1; then
-              echo "CC=$(command -v gcc-${{ matrix.config.version }})" >> "$GITHUB_ENV"
-              echo "CXX=$(command -v g++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+            requested_version="${{ matrix.config.version }}"
+            if command -v "gcc-$requested_version" >/dev/null 2>&1 \
+                && command -v "g++-$requested_version" >/dev/null 2>&1; then
+              cc="$(command -v "gcc-$requested_version")"
+              cxx="$(command -v "g++-$requested_version")"
+            elif command -v gcc >/dev/null 2>&1 && command -v g++ >/dev/null 2>&1; then
+              cc="$(command -v gcc)"
+              cxx="$(command -v g++)"
             else
-              echo "CC=$(command -v gcc)" >> "$GITHUB_ENV"
-              echo "CXX=$(command -v g++)" >> "$GITHUB_ENV"
+              echo "::error::GCC $requested_version C and C++ compilers were not installed" >&2
+              exit 1
+            fi
+            if [[ "$("$cc" -dumpversion)" != "$requested_version"* ]] \
+                || [[ "$("$cxx" -dumpversion)" != "$requested_version"* ]]; then
+              echo "::error::Selected compilers do not provide GCC $requested_version: $cc, $cxx" >&2
+              exit 1
             fi
           elif [[ "${{ matrix.config.compiler }}" == "clang" ]]; then
-            if [[ "${{ matrix.config.hip }}" != "no" && -x /opt/rocm/llvm/bin/clang ]]; then
-              echo "CC=/opt/rocm/llvm/bin/clang" >> "$GITHUB_ENV"
-              echo "CXX=/opt/rocm/llvm/bin/clang++" >> "$GITHUB_ENV"
-            elif command -v "clang-${{ matrix.config.version }}" >/dev/null 2>&1; then
-              echo "CC=$(command -v clang-${{ matrix.config.version }})" >> "$GITHUB_ENV"
-              echo "CXX=$(command -v clang++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+            requested_version="${{ matrix.config.version }}"
+            if [[ "${{ matrix.config.hip }}" != "no" \
+                && -x /opt/rocm/llvm/bin/clang \
+                && -x /opt/rocm/llvm/bin/clang++ ]]; then
+              cc=/opt/rocm/llvm/bin/clang
+              cxx=/opt/rocm/llvm/bin/clang++
+            elif command -v "clang-$requested_version" >/dev/null 2>&1 \
+                && command -v "clang++-$requested_version" >/dev/null 2>&1; then
+              cc="$(command -v "clang-$requested_version")"
+              cxx="$(command -v "clang++-$requested_version")"
               if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
-                echo "CUDACXX=$(command -v clang++-${{ matrix.config.version }})" >> "$GITHUB_ENV"
+                cudacxx="$cxx"
+              fi
+            elif command -v clang >/dev/null 2>&1 && command -v clang++ >/dev/null 2>&1; then
+              cc="$(command -v clang)"
+              cxx="$(command -v clang++)"
+              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
+                cudacxx="$cxx"
               fi
             else
-              echo "CC=$(command -v clang)" >> "$GITHUB_ENV"
-              echo "CXX=$(command -v clang++)" >> "$GITHUB_ENV"
-              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
-                echo "CUDACXX=$(command -v clang++)" >> "$GITHUB_ENV"
-              fi
+              echo "::error::Clang $requested_version C and C++ compilers were not installed" >&2
+              exit 1
+            fi
+            if [[ "$("$cc" -dumpversion)" != "$requested_version"* ]] \
+                || [[ "$("$cxx" -dumpversion)" != "$requested_version"* ]]; then
+              echo "::error::Selected compilers do not provide Clang $requested_version: $cc, $cxx" >&2
+              exit 1
             fi
           elif [[ "${{ matrix.config.compiler }}" == "nvcc" ]]; then
-            echo "CUDACXX=$(command -v nvcc)" >> "$GITHUB_ENV"
-            echo "CC=$(command -v gcc)" >> "$GITHUB_ENV"
-            echo "CXX=$(command -v g++)" >> "$GITHUB_ENV"
+            cudacxx="$(command -v nvcc)"
+            cc="$(command -v gcc)"
+            cxx="$(command -v g++)"
+          else
+            echo "::error::Unsupported compiler '${{ matrix.config.compiler }}'" >&2
+            exit 1
           fi
+
+          {
+            echo "CC=$cc"
+            echo "CXX=$cxx"
+            if [[ -n "$cudacxx" ]]; then
+              echo "CUDACXX=$cudacxx"
+            fi
+          } >> "$GITHUB_ENV"
 
           if [[ "${{ matrix.config.hip }}" != "no" ]]; then
             echo "ROCM_PATH=${ROCM_PATH:-/opt/rocm}" >> "$GITHUB_ENV"
@@ -212,6 +260,9 @@ jobs:
               echo "HIPCXX=/opt/rocm/llvm/bin/clang++" >> "$GITHUB_ENV"
             elif [[ -x /opt/rocm/bin/hipcc ]]; then
               echo "HIPCXX=/opt/rocm/bin/hipcc" >> "$GITHUB_ENV"
+            else
+              echo "::error::No HIP C++ compiler was found under /opt/rocm" >&2
+              exit 1
             fi
           fi
 
