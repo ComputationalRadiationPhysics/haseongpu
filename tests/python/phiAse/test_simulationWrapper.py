@@ -372,6 +372,7 @@ def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch)
     simulation._callbacks = []
     simulation._step = 0
     simulation._time = 0.0
+    simulation.reportTimings = False
 
     def fake_run_simulation(simulation_arg, *, steps, pumpSteps=None, transport=None):
         captured["simulation"] = simulation_arg
