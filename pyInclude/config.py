@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -258,7 +259,7 @@ def cmake_args(selection: WizardSelection, *, use_ccache=False):
 
 
 def _cmake_args_string(args):
-    return " ".join(args)
+    return shlex.join(args)
 
 
 def cmake_args_string(selection: WizardSelection, *, use_ccache=False):
@@ -276,9 +277,9 @@ def _pip_install_args(*, break_system_packages=False):
 
 def _install_command_from_cmake_args(cmake_arg_list, *, break_system_packages=False):
     args = _cmake_args_string(cmake_arg_list)
-    pip_args = " ".join(_pip_install_args(break_system_packages=break_system_packages))
+    pip_args = shlex.join(_pip_install_args(break_system_packages=break_system_packages))
     return (
-        f'HASE_CONFIGURE_CMAKE_ARGS="{args}"\n'
+        f"HASE_CONFIGURE_CMAKE_ARGS={shlex.quote(args)}\n"
         f'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 {pip_args}'
     )
 

@@ -34,6 +34,15 @@ CMake cache options through ``CMAKE_ARGS``:
    CMAKE_ARGS="-DHASE_OPENPMD_PROVIDER=system -DCMAKE_PREFIX_PATH=/path/to/openpmd" \
      python3 -m pip install -v .
 
+The resulting wheel is a source-coupled frontend, not a relocatable binary
+distribution: it records the absolute resident runtime selected by
+``HASE_RUNTIME_DIR``. Keep that runtime available for as long as the frontend
+is installed. Do not publish or move the generated wheel to another machine,
+and do not install it from an sdist whose temporary source tree will be
+discarded. Choose an explicitly retained runtime directory with
+``hase-configure --runtime-dir`` when the checkout's ``build/`` directory is
+not suitable.
+
 Common Configurations
 ---------------------
 

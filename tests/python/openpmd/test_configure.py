@@ -242,7 +242,7 @@ def test_installCommandUsesEnvVarAndSafeDefaults():
 
     command = install_command(selection)
 
-    assert 'HASE_CONFIGURE_CMAKE_ARGS="' in command
+    assert command.startswith("HASE_CONFIGURE_CMAKE_ARGS=")
     assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install -v .' in command
     assert "-DDISABLE_MPI=AUTO" in command
     assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in command
