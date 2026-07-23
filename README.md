@@ -19,11 +19,6 @@ Description
 
 HASEonGPU is an open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It is intended to support the design and analysis of high-power laser systems by providing guidance on the expected ASE flux for a given gain-medium geometry, pumping configuration, and material setup. The code implements an adaptive Monte Carlo ray-tracing approach and was developed to accelerate ASE simulations using GPU hardware and distributed execution.
 
-Release Scope
--------------
-
-HASEonGPU 2.1 ships the Python frontend and compiled C++ backend as one supported release unit. Python communicates with the standalone backend through openPMD; the former in-process Python bindings are no longer part of the supported interface. The backend executable, headers, and CMake package export use the same release number for downstream builds and reproducible integration.
-
 Documentation
 ----------------
 

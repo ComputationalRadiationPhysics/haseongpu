@@ -228,12 +228,6 @@ function(hase_openpmd_configure_python provider_kind)
             "HASE_OPENPMD_BUILD_PYTHON_BINDINGS is ignored with HASE_OPENPMD_PROVIDER=system; "
             "the Python openpmd_api module must come from the same system installation."
         )
-        set(HASE_OPENPMD_BUILD_PYTHON_BINDINGS
-            OFF
-            CACHE BOOL
-            "Build and install openPMD-api Python bindings with the HASE-managed provider"
-            FORCE
-        )
     endif()
 
     if(NOT HASE_ENABLE_PYTHON)
@@ -264,6 +258,52 @@ function(hase_openpmd_configure_python provider_kind)
             "-DHASE_OPENPMD_PYTHON_PACKAGE_DIR=<site-packages directory containing openpmd_api> "
             "only when you need HASEonGPU to prefer a specific provider path."
         )
+    endif()
+endfunction()
+
+function(hase_openpmd_clear_managed_cache_path variable_name managed_value_name)
+    get_property(
+        HASE_OPENPMD_CACHE_PATH_IS_SET
+        CACHE "${variable_name}"
+        PROPERTY TYPE
+        SET
+    )
+    if(NOT HASE_OPENPMD_CACHE_PATH_IS_SET OR "${${variable_name}}" STREQUAL "")
+        return()
+    endif()
+
+    get_property(
+        HASE_OPENPMD_MANAGED_VALUE_IS_SET
+        CACHE "${managed_value_name}"
+        PROPERTY TYPE
+        SET
+    )
+    set(HASE_OPENPMD_PATH_IS_MANAGED FALSE)
+    if(
+        HASE_OPENPMD_MANAGED_VALUE_IS_SET
+        AND "${${variable_name}}" STREQUAL "${${managed_value_name}}"
+    )
+        set(HASE_OPENPMD_PATH_IS_MANAGED TRUE)
+    elseif(NOT HASE_OPENPMD_MANAGED_VALUE_IS_SET)
+        # Compatibility for build trees configured before exact managed values
+        # were recorded.
+        cmake_path(
+            IS_PREFIX
+            HASE_OPENPMD_BUNDLED_PREFIX
+            "${${variable_name}}"
+            NORMALIZE
+            HASE_OPENPMD_PATH_IS_MANAGED
+        )
+    endif()
+    if(HASE_OPENPMD_PATH_IS_MANAGED)
+        message(
+            STATUS
+            "Clearing bundled-provider cache entry ${variable_name}='${${variable_name}}'"
+        )
+        unset(${variable_name} CACHE)
+        unset(${managed_value_name} CACHE)
+    elseif(HASE_OPENPMD_MANAGED_VALUE_IS_SET)
+        unset(${managed_value_name} CACHE)
     endif()
 endfunction()
 
@@ -341,9 +381,54 @@ function(hase_openpmd_provider_stamp out_var)
         "MPI=${HASE_OPENPMD_PROVIDER_MPI}\n"
         "STAGING=separate-dependency-installs-v1\n"
         "CMAKE=${CMAKE_VERSION}\n"
+        "GENERATOR=${CMAKE_GENERATOR}|${CMAKE_GENERATOR_PLATFORM}|${CMAKE_GENERATOR_TOOLSET}\n"
+        "BUILD_TYPE=${CMAKE_BUILD_TYPE}\n"
+        "CONFIGURATION_TYPES=${CMAKE_CONFIGURATION_TYPES}\n"
         "C_COMPILER=${CMAKE_C_COMPILER}|${CMAKE_C_COMPILER_ID}|${CMAKE_C_COMPILER_VERSION}\n"
         "CXX_COMPILER=${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_ID}|${CMAKE_CXX_COMPILER_VERSION}\n"
     )
+    if(CMAKE_TOOLCHAIN_FILE AND EXISTS "${CMAKE_TOOLCHAIN_FILE}")
+        file(SHA256 "${CMAKE_TOOLCHAIN_FILE}" HASE_OPENPMD_TOOLCHAIN_FILE_HASH)
+        string(
+            APPEND
+            HASE_OPENPMD_PROVIDER_STAMP_CONTENT
+            "TOOLCHAIN_FILE_HASH=${HASE_OPENPMD_TOOLCHAIN_FILE_HASH}\n"
+        )
+    endif()
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
+        string(
+            APPEND
+            HASE_OPENPMD_PROVIDER_STAMP_CONTENT
+            "PYTHON_EXECUTABLE=${HASE_OPENPMD_PROVIDER_PYTHON_EXECUTABLE}\n"
+            "PYTHON_VERSION=${HASE_OPENPMD_PROVIDER_PYTHON_VERSION}\n"
+            "PYTHON_SOABI=${HASE_OPENPMD_PROVIDER_PYTHON_SOABI}\n"
+        )
+    endif()
+    if(
+        (HASE_OPENPMD_USE_ADIOS2 AND NOT HASE_OPENPMD_FETCH_ADIOS2)
+        OR (HASE_OPENPMD_USE_HDF5 AND NOT HASE_OPENPMD_FETCH_HDF5)
+    )
+        string(
+            APPEND
+            HASE_OPENPMD_PROVIDER_STAMP_CONTENT
+            "SYSTEM_DEPENDENCY_PREFIX_PATH=${CMAKE_PREFIX_PATH}\n"
+            "ADIOS2_DIR=${ADIOS2_DIR}\n"
+            "HDF5_DIR=${HDF5_DIR}\n"
+        )
+    endif()
+    foreach(
+        HASE_OPENPMD_TOOLCHAIN_VARIABLE
+        IN
+        LISTS HASE_FORWARDED_TARGET_TOOLCHAIN_VARIABLES
+    )
+        if(DEFINED ${HASE_OPENPMD_TOOLCHAIN_VARIABLE})
+            string(
+                APPEND
+                HASE_OPENPMD_PROVIDER_STAMP_CONTENT
+                "${HASE_OPENPMD_TOOLCHAIN_VARIABLE}=${${HASE_OPENPMD_TOOLCHAIN_VARIABLE}}\n"
+            )
+        endif()
+    endforeach()
     string(
         SHA256
         HASE_OPENPMD_PROVIDER_STAMP_HASH
@@ -373,6 +458,13 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
     if(CMAKE_PREFIX_PATH)
         string(APPEND HASE_OPENPMD_STAGE_PREFIX_PATH ";${CMAKE_PREFIX_PATH}")
     endif()
+    string(
+        REPLACE
+        ";"
+        "\\;"
+        HASE_OPENPMD_STAGE_PREFIX_PATH
+        "${HASE_OPENPMD_STAGE_PREFIX_PATH}"
+    )
 
     set(HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
         "${CMAKE_COMMAND}"
@@ -382,10 +474,45 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
         "${HASE_OPENPMD_STAGE_BUILD_DIR}"
         "-DCMAKE_INSTALL_PREFIX=${HASE_OPENPMD_BUNDLED_PREFIX}"
         "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
-        "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-        "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
         "-DCMAKE_PREFIX_PATH=${HASE_OPENPMD_STAGE_PREFIX_PATH}"
     )
+    foreach(
+        HASE_OPENPMD_TOOLCHAIN_VARIABLE
+        IN
+        LISTS HASE_FORWARDED_TARGET_TOOLCHAIN_VARIABLES
+    )
+        get_property(
+            HASE_OPENPMD_TOOLCHAIN_VARIABLE_IS_CACHED
+            CACHE "${HASE_OPENPMD_TOOLCHAIN_VARIABLE}"
+            PROPERTY TYPE
+            SET
+        )
+        if(
+            HASE_OPENPMD_TOOLCHAIN_VARIABLE_IS_CACHED
+            AND NOT "${${HASE_OPENPMD_TOOLCHAIN_VARIABLE}}" STREQUAL ""
+        )
+            string(
+                REPLACE
+                ";"
+                "\\;"
+                HASE_OPENPMD_TOOLCHAIN_VALUE
+                "${${HASE_OPENPMD_TOOLCHAIN_VARIABLE}}"
+            )
+            list(
+                APPEND
+                HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+                "-D${HASE_OPENPMD_TOOLCHAIN_VARIABLE}=${HASE_OPENPMD_TOOLCHAIN_VALUE}"
+            )
+        endif()
+    endforeach()
+    if(stage_name STREQUAL "openpmd" AND HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
+        list(
+            APPEND
+            HASE_OPENPMD_STAGE_CONFIGURE_COMMAND
+            "-DPython_EXECUTABLE=${HASE_OPENPMD_PROVIDER_PYTHON_EXECUTABLE}"
+            "-DPython3_EXECUTABLE=${HASE_OPENPMD_PROVIDER_PYTHON_EXECUTABLE}"
+        )
+    endif()
     if(CMAKE_GENERATOR)
         list(
             APPEND
@@ -464,12 +591,25 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
         "--target"
         "install"
     )
-    if(CMAKE_BUILD_TYPE)
+    set(HASE_OPENPMD_STAGE_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
+    if(NOT HASE_OPENPMD_STAGE_BUILD_CONFIG AND CMAKE_CONFIGURATION_TYPES)
+        if("Release" IN_LIST CMAKE_CONFIGURATION_TYPES)
+            set(HASE_OPENPMD_STAGE_BUILD_CONFIG Release)
+        else()
+            list(
+                GET
+                CMAKE_CONFIGURATION_TYPES
+                0
+                HASE_OPENPMD_STAGE_BUILD_CONFIG
+            )
+        endif()
+    endif()
+    if(HASE_OPENPMD_STAGE_BUILD_CONFIG)
         list(
             APPEND
             HASE_OPENPMD_STAGE_BUILD_COMMAND
             "--config"
-            "${CMAKE_BUILD_TYPE}"
+            "${HASE_OPENPMD_STAGE_BUILD_CONFIG}"
         )
     endif()
     message(
@@ -489,6 +629,28 @@ function(hase_openpmd_run_provider_stage stage_name template_file)
 endfunction()
 
 function(hase_openpmd_bootstrap_bundled_provider)
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        set(HASE_OPENPMD_PROVIDER_PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
+        set(HASE_OPENPMD_PROVIDER_PYTHON_VERSION "${Python3_VERSION}")
+        set(HASE_OPENPMD_PROVIDER_PYTHON_SOABI "${Python3_SOABI}")
+        if(NOT HASE_OPENPMD_PROVIDER_PYTHON_SOABI)
+            execute_process(
+                COMMAND
+                    "${Python3_EXECUTABLE}" -c
+                    "import sysconfig; print(sysconfig.get_config_var('SOABI') or '')"
+                RESULT_VARIABLE HASE_OPENPMD_PYTHON_SOABI_RESULT
+                OUTPUT_VARIABLE HASE_OPENPMD_PROVIDER_PYTHON_SOABI
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(NOT HASE_OPENPMD_PYTHON_SOABI_RESULT EQUAL 0)
+                message(
+                    FATAL_ERROR
+                    "Could not query the Python SOABI for the bundled openPMD provider."
+                )
+            endif()
+        endif()
+    endif()
     hase_openpmd_configure_parallel_level()
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hase-openpmd-provider")
     set(HASE_OPENPMD_BUNDLED_STAMP
@@ -562,6 +724,12 @@ function(hase_openpmd_bootstrap_bundled_provider)
         "openPMD CMake config directory provided by the HASE-managed bundled provider"
         FORCE
     )
+    set(HASE_OPENPMD_MANAGED_OPENPMD_DIR
+        "${HASE_OPENPMD_EXISTING_CONFIG_DIR}"
+        CACHE INTERNAL
+        "Exact openPMD_DIR managed by the bundled provider"
+        FORCE
+    )
     # Keep the bundled provider prefix visible after this function returns so
     # openPMDConfig.cmake can resolve transitive find_dependency() calls such as
     # ADIOS2 and HDF5 during the outer HASE find_package(openPMD).
@@ -570,10 +738,7 @@ function(hase_openpmd_bootstrap_bundled_provider)
         PARENT_SCOPE
     )
 
-    if(
-        HASE_OPENPMD_BUILD_PYTHON_BINDINGS
-        AND NOT HASE_OPENPMD_PYTHON_PACKAGE_DIR
-    )
+    if(HASE_OPENPMD_BUILD_PYTHON_BINDINGS)
         hase_openpmd_find_bundled_python(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
         if(HASE_OPENPMD_BUNDLED_PYTHON_DIR)
             set(HASE_OPENPMD_PYTHON_PACKAGE_DIR
@@ -582,7 +747,17 @@ function(hase_openpmd_bootstrap_bundled_provider)
                 "Directory containing the openpmd_api Python package matching openPMD::openPMD"
                 FORCE
             )
+            set(HASE_OPENPMD_MANAGED_PYTHON_PACKAGE_DIR
+                "${HASE_OPENPMD_BUNDLED_PYTHON_DIR}"
+                CACHE INTERNAL
+                "Exact Python package directory managed by the bundled provider"
+                FORCE
+            )
         else()
+            hase_openpmd_clear_managed_cache_path(
+                HASE_OPENPMD_PYTHON_PACKAGE_DIR
+                HASE_OPENPMD_MANAGED_PYTHON_PACKAGE_DIR
+            )
             message(
                 WARNING
                 "HASE_OPENPMD_BUILD_PYTHON_BINDINGS=ON, but no installed openpmd_api package "
@@ -595,6 +770,14 @@ endfunction()
 
 set(HASE_OPENPMD_ACTUAL_PROVIDER "")
 if(HASE_OPENPMD_PROVIDER STREQUAL "system")
+    hase_openpmd_clear_managed_cache_path(
+        openPMD_DIR
+        HASE_OPENPMD_MANAGED_OPENPMD_DIR
+    )
+    hase_openpmd_clear_managed_cache_path(
+        HASE_OPENPMD_PYTHON_PACKAGE_DIR
+        HASE_OPENPMD_MANAGED_PYTHON_PACKAGE_DIR
+    )
     message(STATUS "Using system openPMD-api for the HASE openPMD transport")
     find_package(openPMD CONFIG QUIET)
     if(NOT openPMD_FOUND)

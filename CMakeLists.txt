@@ -40,6 +40,11 @@ string(
     "${HASEONGPU_VERSION_PATCH_HPP}"
 )
 
+include(cmake/HaseTargetToolchain.cmake)
+hase_collect_initial_target_toolchain_variables(
+    HASE_INITIAL_TARGET_TOOLCHAIN_VARIABLES
+)
+
 project(
     HASEonGPU
     VERSION
@@ -57,24 +62,23 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# A thin frontend must not mistake scikit-build's temporary compiler/prefix
-# cache entries for deliberate changes to an existing native runtime. Forward
-# only definitions the caller explicitly supplied through CMAKE_ARGS (the same
-# interface used by hase-configure).
+# Track definitions explicitly supplied through CMAKE_ARGS (the interface used
+# by hase-configure). A controlled target-toolchain allowlist below also covers
+# first-class scikit-build settings such as cmake.toolchain-file without
+# persisting scikit-build's temporary Python/search prefixes.
 set(HASE_INITIAL_CACHE_VARIABLES "")
 if(DEFINED ENV{CMAKE_ARGS} AND NOT "$ENV{CMAKE_ARGS}" STREQUAL "")
-    separate_arguments(
-        HASE_EXPLICIT_CMAKE_ARGUMENTS
-        NATIVE_COMMAND
+    hase_extract_cmake_definition_names(
         "$ENV{CMAKE_ARGS}"
+        HASE_INITIAL_CACHE_VARIABLES
     )
-    foreach(HASE_EXPLICIT_CMAKE_ARGUMENT IN LISTS HASE_EXPLICIT_CMAKE_ARGUMENTS)
-        if(HASE_EXPLICIT_CMAKE_ARGUMENT MATCHES "^-D([^:=]+)(:[^=]+)?=")
-            list(APPEND HASE_INITIAL_CACHE_VARIABLES "${CMAKE_MATCH_1}")
-        endif()
-    endforeach()
-    list(REMOVE_DUPLICATES HASE_INITIAL_CACHE_VARIABLES)
 endif()
+list(
+    APPEND
+    HASE_INITIAL_CACHE_VARIABLES
+    ${HASE_INITIAL_TARGET_TOOLCHAIN_VARIABLES}
+)
+list(REMOVE_DUPLICATES HASE_INITIAL_CACHE_VARIABLES)
 
 # build options
 option(
@@ -191,12 +195,17 @@ if(NOT HASE_BUILD_RUNTIME)
             HASE_CACHE_VARIABLE MATCHES "^HASE_"
             OR HASE_CACHE_VARIABLE MATCHES "^alpaka_"
             OR HASE_CACHE_VARIABLE
+                IN_LIST
+                HASE_FORWARDED_TARGET_TOOLCHAIN_VARIABLES
+            OR HASE_CACHE_VARIABLE
                 MATCHES
                 "^CMAKE_(BUILD_TYPE|INTERPROCEDURAL_OPTIMIZATION|BUILD_RPATH_USE_ORIGIN|INSTALL_RPATH|INSTALL_RPATH_USE_LINK_PATH|PREFIX_PATH|TOOLCHAIN_FILE)$"
             OR HASE_CACHE_VARIABLE
                 MATCHES
                 "^CMAKE_(C|CXX|CUDA|HIP)_(COMPILER|COMPILER_LAUNCHER|FLAGS|FLAGS_[A-Z]+|ARCHITECTURES)$"
-            OR HASE_CACHE_VARIABLE MATCHES "^(ADIOS2|HDF5|CUDAToolkit)_DIR$"
+            OR HASE_CACHE_VARIABLE
+                MATCHES
+                "^(ADIOS2|HDF5|openPMD|CUDAToolkit)_DIR$"
             OR HASE_CACHE_VARIABLE MATCHES "^(openPMD|CUDAToolkit)_ROOT$"
             OR HASE_CACHE_VARIABLE MATCHES "^(BUILD_TESTING|DISABLE_MPI)$"
         )
@@ -336,21 +345,100 @@ if(NOT HASE_BUILD_RUNTIME)
     endif()
 
     message(STATUS "Building shared native HASE runtime: ${HASE_RUNTIME_DIR}")
+    set(HASE_RUNTIME_BUILD_COMMAND
+        "${CMAKE_COMMAND}"
+        --build
+        "${HASE_RUNTIME_DIR}"
+    )
+    set(HASE_RUNTIME_BUILD_CONFIG "")
+    set(HASE_RUNTIME_CONFIGURATION_TYPES "")
+    set(HASE_RUNTIME_CACHED_BUILD_TYPE "")
+    if(EXISTS "${HASE_RUNTIME_DIR}/CMakeCache.txt")
+        load_cache(
+            "${HASE_RUNTIME_DIR}"
+            READ_WITH_PREFIX HASE_RUNTIME_BUILD_CACHE_
+            CMAKE_BUILD_TYPE
+            CMAKE_CONFIGURATION_TYPES
+        )
+        if(DEFINED HASE_RUNTIME_BUILD_CACHE_CMAKE_BUILD_TYPE)
+            set(HASE_RUNTIME_CACHED_BUILD_TYPE
+                "${HASE_RUNTIME_BUILD_CACHE_CMAKE_BUILD_TYPE}"
+            )
+        endif()
+        if(DEFINED HASE_RUNTIME_BUILD_CACHE_CMAKE_CONFIGURATION_TYPES)
+            set(HASE_RUNTIME_CONFIGURATION_TYPES
+                "${HASE_RUNTIME_BUILD_CACHE_CMAKE_CONFIGURATION_TYPES}"
+            )
+        endif()
+    endif()
+    if(HASE_RUNTIME_CONFIGURATION_TYPES)
+        if(
+            CMAKE_BUILD_TYPE
+            AND CMAKE_BUILD_TYPE IN_LIST HASE_RUNTIME_CONFIGURATION_TYPES
+        )
+            set(HASE_RUNTIME_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
+        elseif(
+            HASE_BUILD_RELEASE
+            AND "Release" IN_LIST HASE_RUNTIME_CONFIGURATION_TYPES
+        )
+            set(HASE_RUNTIME_BUILD_CONFIG Release)
+        elseif(
+            HASE_RUNTIME_CACHED_BUILD_TYPE
+            AND HASE_RUNTIME_CACHED_BUILD_TYPE
+                IN_LIST
+                HASE_RUNTIME_CONFIGURATION_TYPES
+        )
+            set(HASE_RUNTIME_BUILD_CONFIG "${HASE_RUNTIME_CACHED_BUILD_TYPE}")
+        else()
+            list(
+                GET
+                HASE_RUNTIME_CONFIGURATION_TYPES
+                0
+                HASE_RUNTIME_BUILD_CONFIG
+            )
+        endif()
+        list(
+            APPEND
+            HASE_RUNTIME_BUILD_COMMAND
+            --config
+            "${HASE_RUNTIME_BUILD_CONFIG}"
+        )
+    endif()
     execute_process(
-        COMMAND "${CMAKE_COMMAND}" --build "${HASE_RUNTIME_DIR}"
+        COMMAND ${HASE_RUNTIME_BUILD_COMMAND}
         RESULT_VARIABLE HASE_RUNTIME_BUILD_RESULT
         COMMAND_ECHO STDOUT
     )
     if(NOT HASE_RUNTIME_BUILD_RESULT EQUAL 0)
         message(FATAL_ERROR "Failed to build the shared native HASE runtime.")
     endif()
-    if(
-        NOT EXISTS "${HASE_RUNTIME_DIR}/calcPhiASE"
-        AND NOT EXISTS "${HASE_RUNTIME_DIR}/python/pyInclude/_runtime/calcPhiASE"
+    set(HASE_RUNTIME_EXECUTABLE_NAME "calcPhiASE${CMAKE_EXECUTABLE_SUFFIX}")
+    set(HASE_RUNTIME_EXECUTABLE_CANDIDATES
+        "${HASE_RUNTIME_DIR}/${HASE_RUNTIME_EXECUTABLE_NAME}"
+        "${HASE_RUNTIME_DIR}/python/pyInclude/_runtime/${HASE_RUNTIME_EXECUTABLE_NAME}"
     )
+    if(HASE_RUNTIME_BUILD_CONFIG)
+        list(
+            APPEND
+            HASE_RUNTIME_EXECUTABLE_CANDIDATES
+            "${HASE_RUNTIME_DIR}/${HASE_RUNTIME_BUILD_CONFIG}/${HASE_RUNTIME_EXECUTABLE_NAME}"
+        )
+    endif()
+    set(HASE_RUNTIME_EXECUTABLE_FOUND FALSE)
+    foreach(
+        HASE_RUNTIME_EXECUTABLE_CANDIDATE
+        IN
+        LISTS HASE_RUNTIME_EXECUTABLE_CANDIDATES
+    )
+        if(EXISTS "${HASE_RUNTIME_EXECUTABLE_CANDIDATE}")
+            set(HASE_RUNTIME_EXECUTABLE_FOUND TRUE)
+            break()
+        endif()
+    endforeach()
+    if(NOT HASE_RUNTIME_EXECUTABLE_FOUND)
         message(
             FATAL_ERROR
-            "The shared runtime '${HASE_RUNTIME_DIR}' did not produce calcPhiASE."
+            "The shared runtime '${HASE_RUNTIME_DIR}' did not produce ${HASE_RUNTIME_EXECUTABLE_NAME}."
         )
     endif()
 
