@@ -131,12 +131,12 @@ def testCompiledSimulationUsesPhiAseMpiLaunchOptions(
         parallelMode="mpi",
         nPerNode=3,
     )
-    simulation = Simulation(
-        gainMedium=smallGainMedium,
-        pump=pumpProperties,
-        phiASE=phi_ase,
-        timeIntegrationSolver="heun",
-        timeStep=1e-5,
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=phi_ase,
+        time_integrator="heun",
+        time_step_size=1e-5,
     )
 
     simulation.runSteps(1)
