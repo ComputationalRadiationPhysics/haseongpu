@@ -1,6 +1,7 @@
 import os
 import shlex
 import subprocess
+import threading
 import sys
 import textwrap
 import time
@@ -1214,7 +1215,15 @@ def _parser_validation_binary():
     configured = os.environ.get("HASE_OPENPMD_PARSER_VALIDATION")
     for helper in _parser_validation_candidates():
         if helper.is_file() and os.access(helper, os.X_OK):
-            return helper
+            resolved = helper.resolve()
+            source_mtime = max(
+                (Path(__file__).resolve().parents[3] / "tests" / "openpmdParserValidation.cpp").stat().st_mtime,
+                (Path(__file__).resolve().parents[3] / "src" / "openpmd" / "OpenPmdParser.cpp").stat().st_mtime,
+            )
+            if resolved.stat().st_mtime >= source_mtime:
+                return resolved
+            if configured:
+                pytest.fail(f"configured HASE_OPENPMD_PARSER_VALIDATION is stale: {configured}")
     if configured:
         pytest.fail(f"configured HASE_OPENPMD_PARSER_VALIDATION is not executable: {configured}")
     pytest.skip("no openPMD parser validation binary found; build tests_openpmdParserValidation or set HASE_OPENPMD_PARSER_VALIDATION")
@@ -1635,3 +1644,175 @@ def test_openPmdInputSeriesPreservesCustomFields(tmp_path):
     assert record.get_attribute("haseUnit") == "K"
     _assert_base_openpmd_scalar_metadata(record, axis_labels=["flatIndex"], unit_dimension=temperature_dimension)
     series.close()
+
+
+def _write_minimal_snapshot_scalar(iteration, name, values):
+    io = _io()
+    data = np.asarray(values)
+    component = iteration.meshes[name][io.Mesh_Record_Component.SCALAR]
+    component.reset_dataset(io.Dataset(data.dtype, data.shape))
+    component.store_chunk(data)
+
+
+def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
+    output = tmp_path / ("simulation-output" + _file_suffix_for_tests())
+    io = _io()
+    series = io.Series(str(output), transport._access("create_linear"), transport._series_config(output))
+    iteration = series.snapshots()[0]
+    number_of_points = 2
+    number_of_levels = 3
+    number_of_cells = 1
+    point_level_shape = (number_of_points, number_of_levels)
+    sample_flat = np.array([10.0 * level + point for level in range(number_of_levels) for point in range(number_of_points)])
+    cell_layer_flat = np.array([100.0 + level for level in range(number_of_levels - 1)])
+
+    iteration.set_attribute("number_of_points", number_of_points)
+    iteration.set_attribute("number_of_levels", number_of_levels)
+    iteration.set_attribute("number_of_cells", number_of_cells)
+    iteration.set_attribute("step_index", 1)
+    iteration.set_attribute("time", 0.25)
+    iteration.set_attribute("haseStaticUpdate", True)
+    iteration.time = 0.25
+
+    _write_minimal_snapshot_scalar(iteration, "core_point_beta", sample_flat.astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_beta_volume", cell_layer_flat.astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_phi_ase", sample_flat.astype(np.float32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_mse", (sample_flat + 1000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_total_rays", np.arange(sample_flat.size, dtype=np.uint32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_ase", (sample_flat + 2000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_pump", (sample_flat + 3000.0).astype(np.float64))
+    iteration.close()
+    series.close()
+
+    state = transport.read_simulation_output(output)[0]
+
+    expected = sample_flat.reshape(point_level_shape, order="F")
+    np.testing.assert_array_equal(state.betaCells, expected)
+    np.testing.assert_array_equal(state.phiAse, expected.astype(np.float32))
+    np.testing.assert_array_equal(state.dndtAse, expected + 2000.0)
+    np.testing.assert_array_equal(state.dndtPump, expected + 3000.0)
+    np.testing.assert_array_equal(
+        state.betaVolume,
+        cell_layer_flat.reshape((number_of_cells, number_of_levels - 1), order="F"),
+    )
+
+
+def test_simulation_run_control_serializes_compiled_solver_metadata():
+    class Pump:
+        solver = None
+        intensity = 16e3
+        wavelength = 940e-9
+        radiusX = 1.5
+        radiusY = 1.25
+        exponent = 40
+        pumpSubsteps = 12
+        backReflection = False
+        reflectivity = 0.75
+        extraction = True
+        temporaryFluorescence = 1.0e-3
+
+        def toDict(self, *, timeFrame):
+            assert timeFrame == 2.0e-6
+            return {"s_abs": np.array([1.0e-22]), "s_ems": np.array([2.0e-22])}
+
+        def getProperty(self, name):
+            assert name == "pumpSteps"
+            return 4
+
+        def activeDuration(self, time_step):
+            assert time_step == 2.0e-6
+            return 3.0e-6
+
+    simulation = SimpleNamespace(
+        pump=Pump(),
+        timeStep=2.0e-6,
+        timeIntegrationSolver=SimpleNamespace(name="implicit-euler", iterations=5, tolerance=1.0e-7),
+    )
+
+    control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+
+    assert control["time_step"] == 2.0e-6
+    assert control["number_of_steps"] == 7
+    assert control["enable_ase"] is True
+    assert control["pump_steps"] == 4
+    assert control["time_integrator"] == "implicit-euler"
+    assert control["implicit_iterations"] == 5
+    assert control["implicit_tolerance"] == 1.0e-7
+    assert control["pump_routine"] == "one-dimensional-z-traversal"
+    assert control["pump_duration"] == 3.0e-6
+    assert control["pump_substeps"] == 12
+    assert control["pump_sigma_absorption"] == 1.0e-22
+    assert control["pump_sigma_emission"] == 2.0e-22
+    assert control["pump_back_reflection"] is False
+    assert control["pump_extraction"] is True
+
+    simulation.enableASE = False
+    disabled_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+    assert disabled_control["enable_ase"] is False
+
+    simulation.timeIntegrationSolver = SimpleNamespace(name="frozen-phi-ase-runge-kutta-4")
+    frozen_control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+    assert frozen_control["time_integrator"] == "frozen-phi-ase-runge-kutta-4"
+
+
+def test_simulation_run_control_rejects_custom_python_pump_solver():
+    simulation = SimpleNamespace(pump=SimpleNamespace(solver=object()))
+
+    with pytest.raises(ValueError, match="custom Python pump solvers"):
+        transport._simulation_run_control(simulation, steps=1, pumpSteps=None)
+
+
+def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypatch, tmp_path):
+    events = []
+    receiver_started = threading.Event()
+    release_receiver = threading.Event()
+
+    class FakeProcess:
+        returncode = 0
+
+        def __init__(self, command, **kwargs):
+            events.append(("popen", tuple(command), kwargs.get("text")))
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            events.append(("kill",))
+
+        def communicate(self):
+            events.append(("communicate",))
+            release_receiver.set()
+            return "", ""
+
+    def fake_read_simulation_output(path):
+        events.append(("read-start", threading.current_thread().name, Path(path).name))
+        receiver_started.set()
+        assert release_receiver.wait(timeout=2.0)
+        events.append(("read-end",))
+        return [SimpleNamespace(step=1)]
+
+    def fake_write_input(input_path, spec, simulation, run_control):
+        assert receiver_started.wait(timeout=2.0)
+        events.append(("write-input", Path(input_path).name, spec.name, run_control["number_of_steps"]))
+
+    monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
+    monkeypatch.setattr(transport, "_write_simulation_input", fake_write_input)
+
+    spec = SimpleNamespace(name="adios-sst")
+    states = transport._run_streaming_simulation(
+        ["calcPhiASE", "--run-simulation"],
+        tmp_path / "input.sst",
+        tmp_path / "output.sst",
+        spec,
+        SimpleNamespace(),
+        {"number_of_steps": 1},
+    )
+
+    assert states[0].step == 1
+    event_names = [event[0] for event in events]
+    assert event_names.index("read-start") < event_names.index("write-input")
+    assert event_names.index("write-input") < event_names.index("communicate")
+    assert event_names.index("communicate") < event_names.index("read-end")
+    read_event = next(event for event in events if event[0] == "read-start")
+    assert read_event[1] == "HASE compiled simulation snapshot receiver"

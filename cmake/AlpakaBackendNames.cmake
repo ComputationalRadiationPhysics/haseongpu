@@ -14,5 +14,5 @@ set_target_properties(
         INSTALL_RPATH_USE_LINK_PATH ON
         POSITION_INDEPENDENT_CODE ON
 )
-target_link_libraries(HaseAlpakaBackendNames PRIVATE hase::core)
+target_link_libraries(HaseAlpakaBackendNames PRIVATE hase_core)
 alpaka_finalize(HaseAlpakaBackendNames)

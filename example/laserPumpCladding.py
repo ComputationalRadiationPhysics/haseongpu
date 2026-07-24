@@ -13,13 +13,13 @@ import numpy as np
 
 from _source_tree_import import ensure_hase_importable
 
+
 scriptDir = Path(__file__).resolve().parent
 defaultPhiAseConfigPath = scriptDir.parent / "config/hase-phiase.yaml"
 
 ensure_hase_importable()
 
 from HASEonGPU import (  # noqa: E402
-    OneDimensionalZTraversal,
     calcGainFromState,
     CrossSectionData,
     FrozenPhiAseRungeKutta4,
@@ -28,7 +28,6 @@ from HASEonGPU import (  # noqa: E402
     PhiASE,
     PumpProperties,
     Simulation,
-    PumpRadiationProfile,
     vtkWedge,
     writeParaviewState,
 )
@@ -83,9 +82,9 @@ def laserPumpCladdingMedium(numberOfLevels=10, thickness=None, cladAbsorption =5
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
         reflectivities=np.zeros((topology.numberOfTriangles, 2), dtype=np.float32),
-        nTot=2 * 1.388e20,
-        crystalTFluo=9.41e-4,
-        claddingNumber=1,
+        nTot = 2 * 1.388e20,
+        crystalTFluo = 9.41e-4,
+        claddingNumber = 1,
         claddingAbsorption=cladAbsorption,
     )
 
@@ -97,9 +96,9 @@ def runExample(
     # pumpSteps: pumped outer simulation steps; None pumps for all timeSlices.
     pumpSteps=50,
     vtkOutputDir=scriptDir,
-    enableAse=True,
-    prePump=True,
     openPmdOutputDir=None,
+    openpmdBackend="UseConfig",
+    enableASE=True,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -115,16 +114,12 @@ def runExample(
         resolution=np.loadtxt(materialDir / "lambda_a.txt").size,
     )
 
-    pumpProfile = PumpRadiationProfile(
-        intensity=16e3, # KW/cm^2
-        wavelengths=[940e-9],
-        waist=(1.5, 1.5),
-        superGaussianOrder=40,
-        propagationDirection=(0.0, 0.0, 1.0),
-        backReflection=True,
-        reflectivity=1.0,
+    pumpCrossSections = CrossSectionData.monochromatic(
+        wavelength=940e-9,
+        crossSectionAbsorption=0.778e-20,
+        crossSectionEmission=0.195e-20,
     )
-    absorption=5.5 # constant absoption coefficient
+    absorption=5.5
     medium = laserPumpCladdingMedium(
         numberOfLevels=numberOfLevels,
         thickness=thickness,
@@ -138,26 +133,34 @@ def runExample(
     )
 
     if backend != "UseConfig" : phiAse.backend=backend
+    if openpmdBackend != "UseConfig" : phiAse.openpmdBackend=openpmdBackend
 
 
     pumpProperties=PumpProperties(
-                         crossSections=spectralProperties,
-                         profile=pumpProfile,
-                         pumpSteps=pumpSteps, # allows stopping pumping earlier to see gain degrading
-                         solver=OneDimensionalZTraversal(),
+                         crossSections=pumpCrossSections,
+                         intensity=16e3,
+                         pumpDuration=1e-6,
+                         pumpSubsteps=100,
+                         temporaryFluorescence=1.0,
+                         pumpSteps=pumpSteps,
+                         wavelength=940e-9,
+                         radiusX=1.5,
+                         radiusY=1.5,
+                         exponent=40,
+                         backReflection=True,
+                         reflectivity=1.0,
                          extraction=False)
     print(f"Running simulation with backend {phiAse.backend}")
+    print(f"Using openPMD backend {phiAse.openpmdBackend}")
     simulation = Simulation(
         gainMedium=medium,
         pump=pumpProperties,
         phiASE=phiAse,
         timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
-        timeStep=2e-5, #20 μs
+        timeStep=2e-5,
         crossSections=spectralProperties,
-        enableAse=enableAse,
-        prePump=prePump,
+        enableASE=enableASE,
     )
-
     simulation.onStep(printState)
     simulation.onStep(
         writeVtkFields,
@@ -175,6 +178,7 @@ def runExample(
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Modern HASEonGPU laser-pump cladding example")
     parser.add_argument("--backend", type=str, default="UseConfig")
+    parser.add_argument("--openpmd-backend", type=str, default="UseConfig")
     parser.add_argument("--timeSteps", type=int, default=150)
     parser.add_argument(
         "--pumpSteps",
@@ -183,8 +187,9 @@ def main(argv=None):
         help=(
             "Number of outer simulation steps with pump contribution. "
             "Default: 100. Use a value matching --timeSteps to pump for the full run. "
-            "The continuous pump solver evaluates dndtPump once per outer step; "
-            "there are no internal pump substeps."
+            "This is distinct from "
+            "PumpProperties.pumpSubsteps, which is the internal pump "
+            "integration resolution."
         ),
     )
     parser.add_argument(
@@ -194,14 +199,12 @@ def main(argv=None):
         help="PhiASE run-control YAML. Defaults to config/hase-phiase.yaml.",
     )
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
-    parser.add_argument("--disable-ase", action="store_true", help="Skip PhiASE backend runs and use zero ASE depletion")
-    parser.add_argument(
-        "--disable-pre-pump",
-        action="store_true",
-        help="Run ASE from the first simulation step instead of first seeding beta with pump only",
-    )
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
-    parser.add_argument("--openpmd-backend", type=str, default=None)
+    parser.add_argument(
+        "--disable-ase",
+        action="store_true",
+        help="Disable ASE depletion during the time-stepped pump simulation.",
+    )
     parser.add_argument("--min-sample-range", type=int, default=None)
     parser.add_argument("--max-sample-range", type=int, default=None)
     parser.add_argument("--rng-seed", type=int, default=None)
@@ -214,8 +217,6 @@ def main(argv=None):
         aseOverrides["maxSampleRange"] = args.max_sample_range
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
-    if args.openpmd_backend is not None:
-        aseOverrides["openpmdBackend"] = args.openpmd_backend
 
     state = runExample(
         args.phi_ase_config,
@@ -223,9 +224,9 @@ def main(argv=None):
         timeSlices=args.timeSteps,
         pumpSteps=args.pumpSteps,
         vtkOutputDir=args.vtk_output_dir,
-        enableAse=not args.disable_ase,
-        prePump=not args.disable_pre_pump,
         openPmdOutputDir=args.openpmd_output_dir,
+        openpmdBackend=args.openpmd_backend,
+        enableASE=not args.disable_ase,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phiAse.shape}")

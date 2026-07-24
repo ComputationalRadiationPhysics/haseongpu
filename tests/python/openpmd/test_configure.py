@@ -244,6 +244,7 @@ def test_installCommandUsesEnvVarAndSafeDefaults():
 
     assert command.startswith("HASE_CONFIGURE_CMAKE_ARGS=")
     assert 'CMAKE_ARGS="$HASE_CONFIGURE_CMAKE_ARGS" python3 -m pip install -v .' in command
+    assert "-DHASE_INSTALL_CPP_INTERFACE=OFF" in command
     assert "-DDISABLE_MPI=AUTO" in command
     assert "-DHASE_NATIVE_OPTIMIZATIONS=OFF" in command
     assert "-DHASE_BUILD_RUNTIME=OFF" in command
@@ -363,6 +364,12 @@ def test_cmakeMpiDisableUsesCurrentDisableMpiChoice():
     assert "if(HASE_MPI_ENABLED)\n    target_compile_definitions(hase_core INTERFACE MPI_FOUND)" in cmake_lists
     assert "if(HASE_MPI_ENABLED)\n        set(HASE_OPENPMD_PROVIDER_MPI ON)" in provider_script
     assert "if(HASE_MPI_ENABLED)\n            set(HASE_PROVIDER_USE_MPI ON)" in provider_script
+
+
+def test_pythonInstallDisablesPublicCppInstallArtifacts():
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'HASE_INSTALL_CPP_INTERFACE = "OFF"' in pyproject
 
 
 def test_bundledProviderStagesFetchedDependenciesBeforeOpenPmd():

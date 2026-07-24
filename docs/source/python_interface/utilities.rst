@@ -19,6 +19,7 @@ Import built-in solvers from ``HASEonGPU``:
        FrozenPhiAseRungeKutta4,
        ImplicitEuler,
        ExponentialEuler,
+       FrozenPhiAseRungeKutta4,
    )
 
 Available solvers:
@@ -27,54 +28,17 @@ Available solvers:
 * ``Heun()``
 * ``Midpoint()``
 * ``RungeKutta4()``
+* ``FrozenPhiAseRungeKutta4()``: reuses one ASE evaluation across RK4 stages.
 * ``FrozenPhiAseRungeKutta4()``
 * ``ImplicitEuler(iterations=8, tolerance=1e-10)``
 * ``ExponentialEuler()``
 
-``FrozenPhiAseRungeKutta4`` computes ``phiASE`` once per outer simulation step,
-then reuses that fixed ASE flux while RK4 re-evaluates the pump and local ASE
-coupling terms for each stage. Use it to reduce ASE backend cost when a
-stage-by-stage transport solve is not required.
+These objects are lightweight descriptors. Python serializes their ``name`` to
+the openPMD run-control record and the compiled C++/Alpaka backend performs the
+actual time integration. You can also pass one of the names directly as a
+string.
 
-All solvers implement:
-
-.. code-block:: python
-
-   step(rhs, betaCells, time, timeStep)
-
-The return value is a ``TimeIntegrationResult`` with:
-
-* ``betaCells``: updated beta array :math:`\beta_i`.
-* ``evaluation``: the ``TimeDerivative`` used by the solver.
-
-Custom Time Integration
------------------------
-
-Custom solvers only need the same ``step`` method:
-
-.. code-block:: python
-
-   class MyEuler:
-       def step(self, rhs, betaCells, time, timeStep):
-           evaluation = rhs(betaCells, time)
-           return TimeIntegrationResult(
-               betaCells=betaCells + timeStep * evaluation.derivative,
-               evaluation=evaluation,
-           )
-
-``TimeDerivative`` contains:
-
-* ``betaCells``
-* ``dndtPump``
-* ``dndtAse``
-* ``derivative``
-* ``tau``
-* ``phiAse``
-* ``aseResult``
-
-Here ``dndtPump``, ``dndtAse``, and ``derivative`` are contributions to
-:math:`d\beta/dt`; ``tau`` is the fluorescence lifetime :math:`\tau`, and
-``phiAse`` is the ASE flux :math:`\Phi_i`.
+Custom Python time integrators are not supported by compiled simulation runs.
 
 VTK Export
 ----------
@@ -157,47 +121,6 @@ with ``vtkWedge``:
        },
    )
 
-
-Pump Solver Utilities
----------------------
-
-``OneDimensionalZTraversal`` is the built-in continuous pump solver.  It reads
-``PumpProperties`` and returns beta advanced by one outer time step using the
-instantaneous one-dimensional z-traversal pump rate.  For diagnostics, call
-``oneDimensionalZTraversalPumpRate(...)`` directly to inspect the frozen-state
-contribution :math:`d\beta/dt` that the solver uses.
-
-``BetaIntegrationGaussianSolver`` is the legacy/default super-Gaussian pump
-solver.  ``BetaIntegrationSolver`` and ``BetaInt3PumpSolver`` are compatibility
-aliases for the same solver.  The lower-level helpers ``integrateLaserPump`` and
-``runLaserPumpStep`` remain available for workflows that need the historical
-analytical pump update directly.
-
-
-Physical Constants
-------------------
-
-``Constants`` stores predefined physical constants.
-``Simulation`` creates this object automatically, so most users do not need to pass constants explicitly.
-
-.. code-block:: python
-
-   from HASEonGPU import Constants
-
-   constants = Constants()
-   constants.speedOfLight
-   constants.planckConstant
-
-These correspond to :math:`c` and :math:`h` in the pump equations.
-
-The short names used by the pump implementation remain available as aliases:
-
-.. code-block:: python
-
-   constants.c
-   constants.h
-   constants.toDict()
-   constants.describeConstant("speedOfLight")
 
 Backend Names
 -------------

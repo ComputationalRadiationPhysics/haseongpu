@@ -15,6 +15,7 @@ Simulation
        timeIntegrationSolver=RungeKutta4(),
        timeStep=1e-5,
        endTime=1e-3,
+       enableASE=True,
    )
 
 Running
@@ -37,25 +38,9 @@ continue for the full run:
 to ``runSteps`` or store it on ``PumpProperties`` and then call
 ``simulation.runSteps(150)``.  When neither location provides ``pumpSteps``, the
 pump is active for every step passed to ``runSteps``.  This is different from
-``PumpProperties.pumpSubsteps``, which only controls the internal time
-resolution of the legacy pump integration inside one pumped simulation step.
-
-Seed the first step with pump only:
-
-.. code-block:: python
-
-   simulation = Simulation(
-       gainMedium=medium,
-       pump=pump,
-       phiASE=phi_ase,
-       timeIntegrationSolver=FrozenPhiAseRungeKutta4(),
-       timeStep=2e-5,
-       prePump=True,
-   )
-
-``prePump=True`` skips the ASE backend during the first outer step only.  The
-pump and fluorescence terms still run, so the first stored state can seed
-``betaCells`` before ASE depletion starts on the following steps.
+``PumpProperties.pumpSubsteps``, which is a compatibility field for pump
+routines with inner time integration and does not count outer simulation
+steps.
 
 Run until a target time:
 
@@ -79,21 +64,17 @@ Run exactly one step and inspect the returned state:
 Simulation Step Order
 ---------------------
 
-Each call to ``step()`` performs:
+Each call to ``step()`` or ``runSteps(...)`` serializes the initial setup to
+openPMD, launches the compiled ``calcPhiASE --run-simulation`` path, and then
+receives one streamed snapshot per completed step.  Pump traversal, ASE
+evaluation, derivative composition, time integration, clipping, and prism beta
+mapping all run in C++/Alpaka.  Python only runs ``onInit`` before launch and
+``onStep`` callbacks as snapshots arrive.
 
-1. One-time ``onInit`` callbacks.
-2. ``beforeStep`` callbacks.
-3. Time integration of the beta derivative :math:`d\beta/dt`.  The selected
-   time-integration solver may evaluate this derivative more than once.
-4. During each derivative evaluation, ``Simulation`` updates ``betaVolume``,
-   calls ``phiASE.run(...)`` when ASE is enabled for the current step, computes
-   the pump rate through the configured pump solver, and combines pump, ASE,
-   and fluorescence decay.  Higher-order solvers can therefore call the ASE
-   backend more than once per outer ``step()`` unless they explicitly freeze
-   ``phiAse``.
-5. Clipping of updated beta values to ``[0, 1]``.
-6. Final ``betaVolume`` update from ``betaCells``.
-7. Latest-state update and ``onStep`` callbacks.
+The supported compiled pump routine is ``one-dimensional-z-traversal``.
+Set ``enableASE=False`` to run the same pump, fluorescence, and integration
+path while omitting ASE depletion; ASE result fields remain present and are
+filled with zeros.
 
 Callbacks
 ---------
@@ -110,10 +91,9 @@ returns ``self`` so calls can be chained.
    simulation inputs.
 
 ``beforeStep(callback, *args, **kwargs)``
-   Runs before every step, after ``onInit`` has run. The callback signature is
-   ``callback(simulation, *args, **kwargs)`` and receives the live
-   ``Simulation`` object first. Use it for controlled pre-step changes such as
-   time-dependent pump settings.
+   Not supported by compiled simulation runs. Registering this hook causes
+   ``runSteps``/``step`` to raise, because Python cannot mutate state between
+   C++-owned steps.
 
 ``onStep(callback, *args, **kwargs)``
    Runs after every completed step. The callback signature is
@@ -128,14 +108,10 @@ Examples:
    def initialize(simulation, beta0):
        simulation.gainMedium.get("betaCells").value = beta0
 
-   def adjust_pump(simulation, scale):
-       simulation.pump.withProperty("scale", scale)
-
    def write_state(state, output_dir):
        print(state.step, state.time, state.betaCells.mean())
 
    simulation.onInit(initialize, beta0)
-   simulation.beforeStep(adjust_pump, 0.5)
    simulation.onStep(write_state, output_dir)
 
 This means ``simulation.onStep(write_state, output_dir)`` calls
@@ -203,23 +179,28 @@ The resolved spectra are also written back to ``phiASE`` if needed.
 Time Integration
 ----------------
 
-``timeIntegrationSolver`` must provide:
+``timeIntegrationSolver`` is a compiled integrator name or a descriptor object
+with a ``.name`` attribute. Built-in descriptors are documented in
+:doc:`utilities`. Supported names are:
 
-.. code-block:: python
+* ``explicit-euler``
+* ``heun``
+* ``midpoint``
+* ``runge-kutta-4``
+* ``frozen-phi-ase-runge-kutta-4`` (reuses one ASE evaluation across RK4 stages)
+* ``frozen-phi-ase-runge-kutta-4``
+* ``implicit-euler``
+* ``exponential-euler``
 
-   step(rhs, betaCells, time, timeStep)
-
-Built-in solvers are documented in :doc:`utilities`.
-
-``FrozenPhiAseRungeKutta4`` is a special simulation-aware solver: it runs
-``phiASE`` once at the beginning of the outer step and keeps that ASE flux
-constant for all RK4 stages. Pump and local terms are still evaluated for each
-stage trial beta value.
+``ImplicitEuler(iterations=8, tolerance=1e-10)`` also serializes
+``implicit_iterations`` and ``implicit_tolerance`` run-control attributes.
+Set ``simulation.enableASE = False`` to advance pump and fluorescence without ASE. Custom Python time integrators are not supported by compiled runs.
 
 Beta Volume Mapping
 -------------------
 
-``Simulation`` updates ``betaVolume`` (:math:`\beta_j`) from ``betaCells``
-(:math:`\beta_i`) after each step using ``LegacyGridDataBetaVolumeMapper``.
-The mapper interpolates beta values from topology points and z-levels to prism
-centers.  It requires ``scipy``.
+``Simulation`` initializes missing ``betaVolume`` values from ``betaCells`` with
+``ConnectivityAverageBetaVolumeMapper``.  Each prism value is the mean of the
+three lower-level and three upper-level vertex beta values, matching the
+C++/Alpaka mapping kernel. ``LegacyGridDataBetaVolumeMapper`` remains as a
+compatibility alias for this mapper.

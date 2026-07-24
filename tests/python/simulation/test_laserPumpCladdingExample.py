@@ -6,14 +6,17 @@
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 
 repoRoot = Path(__file__).resolve().parents[3]
 exampleDir = repoRoot / "example"
 sys.path.insert(0, str(exampleDir))
 import laserPumpCladding  # noqa: E402
+from pyInclude.openpmd import transport  # noqa: E402
 
 
 def _vtkScalarNames(path):
@@ -21,7 +24,7 @@ def _vtkScalarNames(path):
     return {tokens[index + 1] for index, token in enumerate(tokens) if token.upper() == "SCALARS"}
 
 
-def test_laserPumpCladdingMediumUsesPrimitiveReflectivityShape():
+def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
     medium = laserPumpCladding.laserPumpCladdingMedium()
 
     assert medium.get("reflectivities").expectedShape == (
@@ -34,50 +37,49 @@ def test_laserPumpCladdingMediumUsesPrimitiveReflectivityShape():
     )
 
 
-class _NoPumpSolver:
-    def step(self, input, pump):
-        return np.asarray(input["betaCell"], dtype=np.float64).copy()
+@pytest.fixture
+def fakeCompiledSnapshots(monkeypatch):
+    calls = []
 
-
-class _ConstantPumpSolver:
-    def step(self, input, pump):
-        return np.asarray(input["betaCell"], dtype=np.float64) + 1.0e-6
-
-
-class _FakePhiASE:
-    def __init__(self, spectralProperties=None, **overrides):
-        self.crossSections = spectralProperties
-        self.spectralProperties = spectralProperties
-        self.laserProperties = None
-        self.backend = overrides.get("backend", "FakeBackend")
-        self.openpmdBackend = overrides.get(
-            "openpmdBackend",
-            overrides.get("openpmd_backend", "adios"),
+    def fake_run_simulation(simulation, *, steps, pumpSteps=None, transport=None):
+        calls.append(
+            {
+                "simulation": simulation,
+                "steps": steps,
+                "pumpSteps": pumpSteps,
+                "transport": transport,
+                "phiASE": simulation.phiASE,
+            }
         )
-        self._shape = None
-        self.runInputs = []
+        point_shape = simulation.gainMedium.get("betaCells").expectedShape
+        volume_shape = simulation.gainMedium.get("betaVolume").expectedShape
+        states = []
+        for step in range(1, steps + 1):
+            pump_active = pumpSteps is None or step <= pumpSteps
+            states.append(
+                SimpleNamespace(
+                    step=step,
+                    time=step * simulation.timeStep,
+                    betaCells=np.full(point_shape, 0.05 * step, dtype=np.float64),
+                    betaVolume=np.full(volume_shape, 0.025 * step, dtype=np.float64),
+                    phiAse=np.ones(point_shape, dtype=np.float64),
+                    dndtAse=np.zeros(point_shape, dtype=np.float64),
+                    dndtPump=(np.ones(point_shape, dtype=np.float64) if pump_active else np.zeros(point_shape, dtype=np.float64)),
+                    aseResult=object(),
+                )
+            )
+        return states
 
-    def run(self, gainMedium=None, crossSections=None, **kwargs):
-        self._shape = gainMedium.get("betaCells").expectedShape
-        self.runInputs.append(np.asarray(gainMedium.get("betaCells").value, dtype=np.float64).copy())
-        return self
+    monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)
+    return calls
 
-    def getResults(self):
-        class Result:
-            pass
-
-        result = Result()
-        result.phiAse = np.ones(int(np.prod(self._shape)), dtype=np.float64)
-        return result
-
-def test_laserPumpExampleWritesVtk(monkeypatch, tmp_path, smallGainMedium):
-    monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _NoPumpSolver())
+def testLaserPumpCladdingExampleWritesVtkFromCompiledSnapshots(
+    monkeypatch,
+    tmp_path,
+    smallGainMedium,
+    fakeCompiledSnapshots,
+):
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
-    monkeypatch.setattr(
-        laserPumpCladding.PhiASE,
-        "fromYaml",
-        classmethod(lambda cls, filename, **overrides: _FakePhiASE(**overrides)),
-    )
 
     state = laserPumpCladding.runExample(timeSlices=2, pumpSteps=1, vtkOutputDir=tmp_path)
 
@@ -88,34 +90,68 @@ def test_laserPumpExampleWritesVtk(monkeypatch, tmp_path, smallGainMedium):
     assert state.step == 2
     scalars = _vtkScalarNames(second)
     assert {"betaCells", "phiASE", "dndtAse", "dndtPump", "cladAbs"}.issubset(scalars)
+    assert fakeCompiledSnapshots[-1]["pumpSteps"] == 1
 
 
-def test_laserPumpExampleSkipsInitialAse(monkeypatch, tmp_path, smallGainMedium):
-    monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _ConstantPumpSolver())
+def testLaserPumpCladdingExampleWiresOpenPmdBackend(
+    monkeypatch,
+    tmp_path,
+    smallGainMedium,
+    fakeCompiledSnapshots,
+):
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
-    phiAse = _FakePhiASE()
-    monkeypatch.setattr(
-        laserPumpCladding.PhiASE,
-        "fromYaml",
-        classmethod(lambda cls, filename, **overrides: phiAse),
-    )
 
-    state = laserPumpCladding.runExample(timeSlices=2, pumpSteps=1, vtkOutputDir=tmp_path)
+    state = laserPumpCladding.runExample(
+        timeSlices=2,
+        pumpSteps=1,
+        vtkOutputDir=tmp_path,
+        openpmdBackend="hdf5",
+    )
 
     assert state.step == 2
-    assert len(phiAse.runInputs) == 1
-    assert np.any(phiAse.runInputs[0] > 0.0)
+    assert fakeCompiledSnapshots[-1]["transport"] == "hdf5"
+    assert fakeCompiledSnapshots[-1]["phiASE"].openpmdBackend == "hdf5"
+    assert np.allclose(state.dndtPump, 0.0)
 
 
-def test_laserPumpExamplePassesPumpSteps(monkeypatch, tmp_path, smallGainMedium):
-    monkeypatch.setattr(laserPumpCladding, "OneDimensionalZTraversal", lambda: _ConstantPumpSolver())
+def testLaserPumpCladdingExampleCanDisableAse(
+    monkeypatch,
+    tmp_path,
+    smallGainMedium,
+    fakeCompiledSnapshots,
+):
     monkeypatch.setattr(laserPumpCladding, "laserPumpCladdingMedium", lambda **kwargs: smallGainMedium)
-    monkeypatch.setattr(
-        laserPumpCladding.PhiASE,
-        "fromYaml",
-        classmethod(lambda cls, filename, **overrides: _FakePhiASE(**overrides)),
+
+    state = laserPumpCladding.runExample(
+        timeSlices=1,
+        pumpSteps=1,
+        vtkOutputDir=tmp_path,
+        enableASE=False,
     )
 
-    state = laserPumpCladding.runExample(timeSlices=2, pumpSteps=1, vtkOutputDir=tmp_path)
+    assert state.step == 1
+    assert fakeCompiledSnapshots[-1]["simulation"].enableASE is False
 
-    assert np.allclose(state.dndtPump, 0.0)
+
+def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_example(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaCells=np.zeros((2, 3)))
+
+    monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
+
+    laserPumpCladding.main(
+        [
+            "--disable-ase",
+            "--timeSteps",
+            "1",
+            "--pumpSteps",
+            "1",
+            "--vtk-output-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert calls[-1]["kwargs"]["enableASE"] is False

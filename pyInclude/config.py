@@ -193,7 +193,9 @@ def _apply_ccache_args(args, use_ccache=False):
 
 def cmake_args(selection: WizardSelection, *, use_ccache=False):
     """Return CMake arguments for the selected provider/install path."""
-    args = []
+    # hase-configure drives Python/scikit-build installs, which keep compiled
+    # runtime artifacts private to the frontend package.
+    args = ["-DHASE_INSTALL_CPP_INTERFACE=OFF"]
     if selection.provider == PROVIDER_BUNDLED:
         args.append("-DHASE_OPENPMD_PROVIDER=bundled")
         if selection.bundled_python_bindings:

@@ -13,11 +13,11 @@ from pathlib import Path
 
 import numpy as np
 
+from .alpakaUtils import AlpakaBackends
 from .geometry import GainMedium
 from .laser import CrossSectionData, LaserProperties, PumpProperties, SpectralDecomposition
 from .openpmd import transport
-from .pumping import BetaIntegrationGaussianSolver, Constants
-from .timeIntegration import TimeDerivative, TimeIntegrationSolver
+from .timeIntegration import TimeIntegrationSolver
 
 
 HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
@@ -319,52 +319,33 @@ class PhiASE:
 
 
 
-class LegacyGridDataBetaVolumeMapper:
-    """Map point-centered ``betaCells`` to prism-centered ``betaVolume``."""
+class ConnectivityAverageBetaVolumeMapper:
+    """Map point-centered ``betaCells`` to prism beta by vertex averaging.
 
-    def __init__(self, method="linear"):
-        """Create a mapper using a scipy ``griddata`` interpolation method.
-
-        The mapper samples point-level beta values at prism centers so ASE can
-        use one representative excited-state fraction per wedge volume.
-        """
-        self.method = method
+    This matches the C++/Alpaka prism-beta kernel: each prism value is the
+    arithmetic mean of the three triangle vertices on the lower and upper
+    z-levels.
+    """
 
     def map(self, medium):
         """Return prism-centered ``betaVolume`` for the supplied medium."""
-        try:
-            from scipy.interpolate import griddata
-        except ImportError as exc:
-            raise ImportError("LegacyGridDataBetaVolumeMapper requires scipy") from exc
-
         topology = medium.topology
-        derived = topology._topology()
         beta_cells = np.asarray(medium.get("betaCells").value, dtype=np.float64).reshape(
             (topology.numberOfPoints, topology.levels),
             order="F",
         )
-
-        x_1 = topology.points[:, 0]
-        y_1 = topology.points[:, 1]
-        x_2 = topology.points[:, 0]
-        y_2 = topology.points[:, 1]
-        x = np.concatenate((x_1, x_2))
-        y = np.concatenate((y_1, y_2))
-        z_1 = np.zeros(x_1.shape[0])
-        z_2 = np.zeros(x_2.shape[0]) + topology.thickness
-        z = np.concatenate((z_1, z_2))
-
-        xi = np.asarray(derived["triangleCenterX"], dtype=np.float64)
-        yi = np.asarray(derived["triangleCenterY"], dtype=np.float64)
-        zi = np.zeros(xi.shape) + topology.thickness / 2.0
-
-        beta_volume = np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
+        triangles = np.asarray(topology.trianglePointIndices, dtype=np.int64)
+        if triangles.shape[0] != topology.numberOfTriangles:
+            triangles = triangles.reshape((topology.numberOfTriangles, 3), order="F")
+        beta_volume = np.empty((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
         for level in range(topology.levels - 1):
-            values = np.concatenate((beta_cells[:, level], beta_cells[:, level + 1]))
-            beta_volume[:, level] = griddata((x, y, z), values, (xi, yi, zi), method=self.method)
-            z = z + topology.thickness
-            zi = zi + topology.thickness
+            lower = beta_cells[triangles, level]
+            upper = beta_cells[triangles, level + 1]
+            beta_volume[:, level] = (lower.sum(axis=1) + upper.sum(axis=1)) / 6.0
         return beta_volume
+
+
+LegacyGridDataBetaVolumeMapper = ConnectivityAverageBetaVolumeMapper
 
 
 @dataclass
@@ -399,12 +380,13 @@ class TimeStepState:
 
 @dataclass
 class Simulation:
-    """High-level pump, ASE, fluorescence, and time-integration loop.
+    """High-level Python wrapper for compiled C++/Alpaka simulation runs.
 
-    Register ``onInit`` or ``beforeStep`` callbacks when a function needs the
-    live ``Simulation`` object and may inspect or mutate it. Register
-    ``onStep`` callbacks when a function needs the completed ``TimeStepState``
-    snapshot produced by each step.
+    Python sends the initial setup to the compiled backend and receives
+    ``TimeStepState`` snapshots after completed steps. Register ``onInit`` for
+    one-time Python setup before launch and ``onStep`` for snapshot consumers.
+    ``beforeStep`` is retained only to report that per-step Python mutation is
+    unsupported by compiled runs.
     """
 
     gainMedium: GainMedium
@@ -413,21 +395,16 @@ class Simulation:
     """Pump model that adds population to ``betaCells``."""
     phiASE: PhiASE
     """ASE configuration and execution handle."""
-    timeIntegrationSolver: TimeIntegrationSolver
-    """Solver object that advances ``betaCells`` using ``d beta / dt``."""
+    timeIntegrationSolver: TimeIntegrationSolver | str
+    """Compiled integrator name or descriptor with a ``name`` attribute."""
     timeStep: float
     """Physical time increment per step, in seconds."""
     crossSections: CrossSectionData | None = None
     """Shared spectra used by pump and ASE when not set on either object."""
     endTime: float | None = None
     """Optional target physical time for ``runUntil()``."""
-    constants: Constants = field(default_factory=Constants)
-    """Physical constants used by the pump integrator."""
-    enableAse: bool = True
-    """Whether each derivative evaluation runs ASE depletion through ``PhiASE``."""
-    prePump: bool = False
-    """When true, the first time step advances without ASE so pump can seed beta."""
-
+    enableASE: bool = True
+    """Whether compiled time-stepped runs include ASE depletion."""
     _time: float = field(default=0.0, init=False, repr=False)
     _step: int = field(default=0, init=False, repr=False)
     _initialized: bool = field(default=False, init=False, repr=False)
@@ -435,14 +412,12 @@ class Simulation:
     _beforeStepCallbacks: list = field(default_factory=list, init=False, repr=False)
     _callbacks: list = field(default_factory=list, init=False, repr=False)
     _lastState: TimeStepState | None = field(default=None, init=False, repr=False)
-    _pumpEnabled: bool = field(default=True, init=False, repr=False)
-    _openpmdSession: object | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
-        has_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "step")
-        has_simulation_step = self.timeIntegrationSolver is not None and hasattr(self.timeIntegrationSolver, "stepSimulation")
-        if not has_step and not has_simulation_step:
-            raise ValueError("Simulation requires a timeIntegrationSolver with step(...) or stepSimulation(...)")
+        if self.timeIntegrationSolver is None:
+            raise ValueError("Simulation requires a timeIntegrationSolver")
+        if not isinstance(self.timeIntegrationSolver, str) and not hasattr(self.timeIntegrationSolver, "name"):
+            raise ValueError("Simulation requires a compiled time integrator name or descriptor with a .name attribute")
         if self.timeStep <= 0.0:
             raise ValueError("timeStep must be positive")
         if self.crossSections is None:
@@ -498,145 +473,81 @@ class Simulation:
         return self
 
     def beforeStep(self, callback, *args, **kwargs):
-        """Register a pre-step callback.
+        """Register an unsupported legacy pre-step callback.
 
-        The callback signature is ``callback(simulation, *args, **kwargs)``.
-        ``Simulation`` supplies the live simulation object as the first
-        argument, then appends the user arguments passed to ``beforeStep``. The
-        hook runs before every step, after one-time ``onInit`` callbacks.
-
-        Use this hook for controlled changes that must happen before derivative
-        evaluation, such as time-dependent pump settings. Callback return values
-        are ignored. The method returns ``self`` for chaining.
+        Compiled simulations cannot call Python between C++-owned steps. The
+        registration is stored so ``runSteps`` can raise a clear error instead
+        of silently ignoring the callback.
         """
         self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
-
-    def _withOpenPmdSession(self, openpmdSession):
-        if openpmdSession is None:
-            selected = "auto" if self.phiASE.openpmdBackend is None else str(self.phiASE.openpmdBackend).strip().lower()
-            if selected in {"auto", "adios-sst"}:
-                return self.phiASE.openStream(), True
-            return None, False
-        if openpmdSession == "interval":
-            return None, False
-        if openpmdSession == "persistent":
-            return self.phiASE.openStream(), True
-        return openpmdSession, False
 
     def runUntil(self, endtime=None, endTime=None, *, openpmdSession=None):
         """Advance steps until the configured or supplied end time is reached."""
         target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
         if target is None:
             raise ValueError("runUntil requires endtime or an endTime configured on construction")
-        session, close_session = self._withOpenPmdSession(openpmdSession)
-        previous_session = self._openpmdSession
-        self._openpmdSession = session
-        try:
-            while self._time < float(target) - 0.5 * self.timeStep:
-                self.step(openpmdSession=session)
-        finally:
-            self._openpmdSession = previous_session
-            if close_session:
-                self.phiASE.closeStream()
+        steps = 0
+        while self._time + steps * self.timeStep < float(target) - 0.5 * self.timeStep:
+            steps += 1
+        if steps:
+            self.runSteps(steps, openpmdSession=openpmdSession)
         return self
 
     def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
-        """Run exactly ``steps`` calls to ``step()`` and return ``self``.
+        """Run exactly ``steps`` compiled C++/Alpaka time steps and return ``self``.
 
         ``pumpSteps`` optionally limits the pump contribution to the first
         ``pumpSteps`` calls in this run. When omitted, ``PumpProperties`` may
-        provide a ``pumpSteps`` custom property. If neither is set, the pump is
-        active for every step, matching the historical ``runSteps(steps)``
-        behavior. ``PumpProperties.pumpSubsteps`` is separate: it controls the
-        internal pump integration resolution inside one pumped simulation step.
+        provide a ``pumpSteps`` custom property. The complete time loop is
+        executed by the C++ backend; Python only sends the initial setup and
+        receives streamed snapshots.
         """
+        if openpmdSession not in (None, "interval"):
+            raise ValueError("compiled Simulation owns its C++ openPMD lifetime; openpmdSession is no longer supported")
         steps = int(steps)
-        session, close_session = self._withOpenPmdSession(openpmdSession)
-        previous_session = self._openpmdSession
-        self._openpmdSession = session
+        if steps <= 0:
+            raise ValueError("steps must be positive")
+        if self._beforeStepCallbacks:
+            raise ValueError("compiled Simulation does not support Python beforeStep callbacks during C++-owned steps")
+        self._runInitCallbacks()
         if pumpSteps is None and hasattr(self, "pump"):
             pumpSteps = self.pump.getProperty("pumpSteps")
-        previousPumpEnabled = self._pumpEnabled
-        try:
-            if pumpSteps is None:
-                for _ in range(steps):
-                    self.step(openpmdSession=session)
-            else:
-                pumpSteps = int(pumpSteps)
-                if pumpSteps < 0:
-                    raise ValueError("pumpSteps must be non-negative")
-                for index in range(steps):
-                    self._pumpEnabled = index < pumpSteps
-                    self.step(openpmdSession=session)
-        finally:
-            self._openpmdSession = previous_session
-            self._pumpEnabled = previousPumpEnabled
-            if close_session:
-                self.phiASE.closeStream()
+        if pumpSteps is not None and int(pumpSteps) < 0:
+            raise ValueError("pumpSteps must be non-negative")
+
+        previous_step = self._step
+        previous_time = self._time
+        states = transport.runSimulation(
+            self,
+            steps=steps,
+            pumpSteps=pumpSteps,
+            transport=self.phiASE.openpmdBackend,
+        )
+        for raw_state in states:
+            state = TimeStepState(
+                step=previous_step + int(raw_state.step),
+                time=previous_time + float(raw_state.time),
+                betaCells=np.asarray(raw_state.betaCells, dtype=np.float64).copy(),
+                betaVolume=np.asarray(raw_state.betaVolume, dtype=np.float64).copy(),
+                phiAse=np.asarray(raw_state.phiAse, dtype=np.float64).copy(),
+                dndtAse=np.asarray(raw_state.dndtAse, dtype=np.float64).copy(),
+                dndtPump=np.asarray(raw_state.dndtPump, dtype=np.float64).copy(),
+                aseResult=raw_state.aseResult,
+                topology=self.gainMedium.topology,
+            )
+            self.gainMedium.get("betaCells").value = state.betaCells
+            self.gainMedium.get("betaVolume").value = state.betaVolume
+            self._lastState = state
+            self._step = state.step
+            self._time = state.time
+            for callback, args, kwargs in self._callbacks:
+                callback(state, *args, **kwargs)
         return self
 
     def step(self, *, openpmdSession=None):
-        """Advance one time step and return the completed ``TimeStepState``."""
-        previous_session = self._openpmdSession
-        if openpmdSession is not None:
-            self._openpmdSession = openpmdSession
-        try:
-            self._runInitCallbacks()
-            for callback, args, kwargs in self._beforeStepCallbacks:
-                callback(self, *args, **kwargs)
-
-            beta_cells = np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(
-                self.gainMedium.get("betaCells").expectedShape,
-                order="F",
-            )
-
-            if hasattr(self.timeIntegrationSolver, "stepSimulation"):
-                integration_result = self.timeIntegrationSolver.stepSimulation(
-                    self,
-                    beta_cells.copy(),
-                    self._time,
-                    self.timeStep,
-                )
-            else:
-                integration_result = self.timeIntegrationSolver.step(
-                    self._timeDerivative,
-                    beta_cells.copy(),
-                    self._time,
-                    self.timeStep,
-                )
-        finally:
-            self._openpmdSession = previous_session
-        updated_beta = integration_result.betaCells
-        derivative = integration_result.evaluation
-
-        self.gainMedium.get("betaCells").value = np.clip(updated_beta, 0.0, 1.0)
-        self._updateBetaVolumeFromCells()
-
-        self._step += 1
-        self._time += self.timeStep
-
-        state = TimeStepState(
-            step=self._step,
-            time=self._time,
-            betaCells=np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(
-                beta_cells.shape,
-                order="F",
-            ).copy(),
-            betaVolume=np.asarray(self.gainMedium.get("betaVolume").value, dtype=np.float64).reshape(
-                self.gainMedium.get("betaVolume").expectedShape,
-                order="F",
-            ).copy(),
-            phiAse=None if derivative.phiAse is None else derivative.phiAse.copy(),
-            dndtAse=derivative.dndtAse.copy(),
-            dndtPump=derivative.dndtPump.copy(),
-            aseResult=derivative.aseResult,
-            topology=self.gainMedium.topology,
-        )
-        self._lastState = state
-        for callback, args, kwargs in self._callbacks:
-            callback(state, *args, **kwargs)
-        return state
+        """Advance one compiled C++/Alpaka time step and return the completed state."""
+        return self.runSteps(1, openpmdSession=openpmdSession).getLastState()
 
     def getLastState(self):
         """Return the most recent completed ``TimeStepState`` snapshot."""
@@ -681,103 +592,8 @@ class Simulation:
         for callback, args, kwargs in self._initCallbacks:
             callback(self, *args, **kwargs)
 
-    def _dndtPump(self, beta_cells):
-        if not self._pumpEnabled:
-            return np.zeros_like(beta_cells, dtype=np.float64)
-        pump_duration = self.pump.activeDuration(self.timeStep)
-        solver = self.pump.solver if self.pump.solver is not None else BetaIntegrationGaussianSolver()
-        # Pump solvers return β(t + Δt); this converts the update into ∂β/∂t|pump.
-        updated = solver.step(
-            {
-                "betaCell": beta_cells,
-                "_medium": self.gainMedium,
-                "_timeStep": self.timeStep,
-                "_constants": self.constants,
-                "_substeps": None,
-            },
-            self.pump,
-        )
-        return (updated - beta_cells) / pump_duration
-
-    def _timeDerivative(self, beta_cells, time):
-        beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
-            self.gainMedium.get("betaCells").expectedShape,
-            order="F",
-        )
-        phi_ase, ase_result = self._runPhiAseForBeta(beta_cells)
-        return self._timeDerivativeWithFrozenPhiAse(beta_cells, time, phi_ase, ase_result)
-
-    def _aseEnabledForCurrentStep(self):
-        return self.enableAse and not (self.prePump and self._step == 0)
-
-    def _runPhiAseForBeta(self, beta_cells):
-        beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
-            self.gainMedium.get("betaCells").expectedShape,
-            order="F",
-        )
-        self.gainMedium.get("betaCells").value = beta_cells
-        self._updateBetaVolumeFromCells()
-        if not self._aseEnabledForCurrentStep():
-            return np.zeros_like(beta_cells, dtype=np.float64), None
-
-        self.phiASE.run(
-            gainMedium=self.gainMedium,
-            crossSections=self.crossSections,
-            openpmdSession=self._openpmdSession,
-        )
-        ase_result = self.phiASE.getResults()
-        phi_ase = np.asarray(ase_result.phiAse, dtype=np.float64).reshape(beta_cells.shape, order="F")
-        return phi_ase.copy(), ase_result
-
-    def _timeDerivativeWithFrozenPhiAse(self, beta_cells, time, phi_ase, ase_result):
-        beta_cells = np.asarray(beta_cells, dtype=np.float64).reshape(
-            self.gainMedium.get("betaCells").expectedShape,
-            order="F",
-        )
-        phi_ase = np.asarray(phi_ase, dtype=np.float64).reshape(beta_cells.shape, order="F")
-        self.gainMedium.get("betaCells").value = beta_cells
-        self._updateBetaVolumeFromCells()
-        dndt_ase = (
-            self._aseDerivative(phi_ase, betaCells=beta_cells)
-            if self._aseEnabledForCurrentStep()
-            else np.zeros_like(beta_cells)
-        )
-        dndt_pump = self._dndtPump(beta_cells)
-        tau = max(float(self.gainMedium.get("crystalTFluo").value), np.finfo(float).tiny)
-        total_derivative = dndt_pump - dndt_ase - beta_cells / tau
-        return TimeDerivative(
-            betaCells=beta_cells.copy(),
-            dndtPump=dndt_pump.copy(),
-            dndtAse=dndt_ase.copy(),
-            derivative=total_derivative,
-            tau=tau,
-            phiAse=phi_ase.copy(),
-            aseResult=ase_result,
-        )
-
-    def _aseDerivative(self, phi_ase, betaCells=None):
-        laser = self.phiASE.laserProperties
-        laser = LaserProperties(crossSections=self.crossSections) if laser is None else laser
-        sigma_e = laser.maxSigmaE
-        sigma_a = laser.absorptionAtEmissionPeak
-        if betaCells is None:
-            betaCells = np.asarray(self.gainMedium.get("betaCells").value, dtype=np.float64).reshape(phi_ase.shape, order="F")
-        gain_per_density = betaCells * (sigma_e + sigma_a) - sigma_a
-        active_mask = self._activePointMask()[:, None]
-        return np.where(active_mask, gain_per_density * phi_ase, 0.0)
-
-    def _activePointMask(self):
-        topology = self.gainMedium.topology
-        cladding_types = np.asarray(self.gainMedium.get("claddingCellTypes").value, dtype=np.uint32).reshape(-1)
-        cladding_number = int(self.gainMedium.get("claddingNumber").value)
-        active = np.zeros(topology.numberOfPoints, dtype=bool)
-        for tri_id, tri in enumerate(topology.trianglePointIndices):
-            if tri_id >= len(cladding_types) or cladding_types[tri_id] != cladding_number:
-                active[np.asarray(tri, dtype=np.uint32)] = True
-        return active
-
     def _updateBetaVolumeFromCells(self):
-        beta_volume = LegacyGridDataBetaVolumeMapper().map(self.gainMedium)
+        beta_volume = ConnectivityAverageBetaVolumeMapper().map(self.gainMedium)
         self.gainMedium.get("betaVolume").value = beta_volume
 
 

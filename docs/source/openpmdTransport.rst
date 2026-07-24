@@ -56,9 +56,8 @@ repeated ``adios-sst`` calls, keep a stream open:
        phi_ase.closeStream()
 
 Use ``openpmdSession="persistent"`` to let ``PhiASE`` own a reusable stream, or
-``openpmdSession="interval"`` to force one-shot behavior.  ``Simulation`` uses a
-persistent stream automatically for ``adios-sst`` unless another mode or session
-is supplied.
+``openpmdSession="interval"`` to force one-shot behavior.  ``Simulation`` owns a separate transport session for each compiled run;
+caller-managed simulation sessions are not supported.
 
 Provider Compatibility
 ----------------------
@@ -120,6 +119,20 @@ Custom fields declared with ``GainMedium.defineField(...)`` or
 ``PrimitiveFieldSpec`` are serialized as additional openPMD mesh records with
 their unit metadata.  They are available to downstream readers; the current ASE
 backend ignores them unless a future backend explicitly consumes them.
+
+Compiled Simulation Snapshots
+-----------------------------
+
+A compiled ``Simulation`` input additionally stores run control as iteration
+attributes: the time step, number of steps, pump-step limit, ASE switch, integrator, and
+one-dimensional pump parameters. The C++ backend writes one output iteration
+per completed step. The integrator can also be
+``frozen-phi-ase-runge-kutta-4``. Each snapshot contains the dynamic beta fields plus the ASE
+results and ``core_result_dndt_pump``; its first snapshot also contains the
+static topology, material, and spectral records.
+For streaming backends, a dedicated receiver drains snapshots while the backend
+runs, so slow Python ``onStep`` work (such as file output) does not prevent the
+backend from completing its output stream.
 
 Iteration Updates
 -----------------

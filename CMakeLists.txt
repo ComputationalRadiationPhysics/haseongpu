@@ -55,6 +55,28 @@ set(CMAKE_CXX_STANDARD 20)
 include(CMakePrintHelpers)
 include(GNUInstallDirs)
 
+set(HASE_FETCHCONTENT_EXCLUDE_FROM_ALL)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.28")
+    list(APPEND HASE_FETCHCONTENT_EXCLUDE_FROM_ALL EXCLUDE_FROM_ALL)
+endif()
+
+macro(hase_fetchcontent_make_available name)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.28")
+        FetchContent_MakeAvailable(${name})
+    else()
+        FetchContent_GetProperties(${name})
+        string(TOLOWER "${name}" HASE_FETCHCONTENT_LOWER_NAME)
+        if(NOT ${HASE_FETCHCONTENT_LOWER_NAME}_POPULATED)
+            FetchContent_Populate(${name})
+            add_subdirectory(
+                "${${HASE_FETCHCONTENT_LOWER_NAME}_SOURCE_DIR}"
+                "${${HASE_FETCHCONTENT_LOWER_NAME}_BINARY_DIR}"
+                EXCLUDE_FROM_ALL
+            )
+        endif()
+    endif()
+endmacro()
+
 # dependencies
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     cmake_policy(SET CMP0167 NEW)
@@ -104,6 +126,11 @@ option(
 option(
     HASE_ENABLE_PYTHON
     "Generate/install the HASEonGPU Python frontend and runtime metadata"
+    ON
+)
+option(
+    HASE_INSTALL_CPP_INTERFACE
+    "Install the public HASEonGPU C++ headers, library, executable, and helper"
     ON
 )
 option(HASE_CUDA_FLUSHTOZERO "Set flush to zero for GPU" OFF)
@@ -675,6 +702,7 @@ target_include_directories(
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Benchmark>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 set_target_properties(
@@ -865,7 +893,7 @@ set_target_properties(
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_ARCHITECTURES "${HASE_CUDA_ARCHITECTURES}"
 )
-target_link_libraries(hase PUBLIC hase::core)
+target_link_libraries(hase PUBLIC hase_core)
 if(HASE_BENCHMARK)
     target_sources(
         hase
@@ -891,6 +919,7 @@ set_target_properties(
         INSTALL_RPATH "${HASE_INSTALL_RPATH}"
         INSTALL_RPATH_USE_LINK_PATH ON
 )
+target_compile_definitions(calcPhiASE PRIVATE ${HASE_OPENPMD_PROBE_DEFINES})
 target_link_libraries(calcPhiASE PRIVATE hase::hase)
 foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
     if(TARGET ${HASE_ADIOS2_RUNTIME_MODULE})
@@ -898,6 +927,20 @@ foreach(HASE_ADIOS2_RUNTIME_MODULE IN ITEMS cmselect cmsockets)
     endif()
 endforeach()
 alpaka_finalize(calcPhiASE)
+
+if(HASE_INSTALL_CPP_INTERFACE)
+    install(
+        TARGETS hase hase_core calcPhiASE HaseAlpakaBackendNames
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+endif()
 
 if(HASE_ENABLE_PYTHON)
     include(cmake/pythonRuntime.cmake)

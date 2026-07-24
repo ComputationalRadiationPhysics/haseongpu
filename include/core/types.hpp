@@ -266,12 +266,5 @@ namespace hase::core
         unsigned spectral;
     };
 
-    struct SimulationContext
-    {
-        core::ExperimentParameters experiment;
-        core::ComputeParameters compute;
-        core::HostMesh mesh;
-        core::Result result;
-    };
 
 } // namespace hase::core

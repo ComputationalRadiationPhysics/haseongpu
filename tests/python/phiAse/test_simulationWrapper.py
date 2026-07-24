@@ -20,7 +20,7 @@ class DummyResult:
     dndtAse = [0.0]
 
 
-def test_simulationRunStoresResults(
+def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -58,7 +58,7 @@ def test_simulationRunStoresResults(
     assert captured["phi_ase"].rngSeed == 1234
 
 
-def test_phiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
+def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     phiAse = PhiASE(phiAseTestConfigPath)
 
     assert phiAse.minRaysPerSample == 1000
@@ -84,13 +84,21 @@ def test_phiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     assert fromArgs.openpmdBackend == "adios-sst"
 
 
-def test_phiAseLoadsOpenPmdBackendFromConfig():
+def testPhiAseDefaultBackendSerializesAvailableAlpakaBackend():
+    phiAse = PhiASE()
+    backend = phiAse.openPmdAttributes(numberOfSamples=1)["backend"]
+
+    assert backend != "gpu"
+    assert backend in simulation_module.AlpakaBackends.all()
+
+
+def testPhiAseLoadsOpenPmdBackendFromConfig():
     assert PhiASE().openpmdBackend == "auto"
     assert PhiASE({"compute": {"openpmd_backend": "hdf5"}}).openpmdBackend == "hdf5"
     assert PhiASE({"compute": {"openpmdBackend": "adios-sst"}}).openpmdBackend == "adios-sst"
 
 
-def test_phiAseMpiRunMetadata(
+def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
     monkeypatch,
     tmp_path,
     smallGainMedium,
@@ -172,7 +180,7 @@ def test_phiAseMpiRejectsInvalidRanksPerNode(monkeypatch):
         PhiASE(parallelMode="mpi", nPerNode=0).openStream()
 
 
-def test_phiAseRunUsesProvidedOpenPmdSession(
+def testPhiAseRunUsesProvidedOpenPmdSession(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -195,7 +203,7 @@ def test_phiAseRunUsesProvidedOpenPmdSession(
     assert captured["openpmdSession"] is openpmdSession
 
 
-def test_phiAseRunForwardsConfiguredOpenPmdBackend(
+def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -222,7 +230,7 @@ def test_phiAseRunForwardsConfiguredOpenPmdBackend(
     assert captured == {"transport": "hdf5", "openpmdSession": None}
 
 
-def test_phiAsePersistentSessionLifecycle(
+def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -263,7 +271,7 @@ def test_phiAsePersistentSessionLifecycle(
     ]
 
 
-def test_phiAseIntervalUsesOneShot(
+def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
     monkeypatch,
     smallGainMedium,
     crossSections,
@@ -285,63 +293,53 @@ def test_phiAseIntervalUsesOneShot(
     assert captured["openpmdSession"] is None
 
 
-def test_runStepsKeepsPersistentSession(monkeypatch):
-    events = []
-    openpmdSession = object()
+def testSimulationRunStepsRejectsExternalOpenPmdSessionOwnership():
     simulation = object.__new__(simulation_module.Simulation)
-    simulation.phiASE = SimpleNamespace(
-        openpmdBackend=None,
-        openStream=lambda: events.append(("openStream",)) or openpmdSession,
-        closeStream=lambda: events.append(("closeStream",)),
-    )
-    simulation._openpmdSession = None
 
-    def fakeStep(self, *, openpmdSession=None):
-        events.append(("step", openpmdSession))
-
-    monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
-
-    simulation_module.Simulation.runSteps(
-        simulation,
-        2,
-        openpmdSession="persistent",
-    )
-
-    assert events == [
-        ("openStream",),
-        ("step", openpmdSession),
-        ("step", openpmdSession),
-        ("closeStream",),
-    ]
+    try:
+        simulation_module.Simulation.runSteps(
+            simulation,
+            2,
+            openpmdSession="persistent",
+        )
+    except ValueError as exc:
+        assert "owns its C++ openPMD lifetime" in str(exc)
+    else:
+        raise AssertionError("compiled Simulation accepted external openPMD session ownership")
 
 
-def test_runStepsDefaultsToPersistentSession(monkeypatch):
-    events = []
-    openpmdSession = object()
-    simulation = object.__new__(simulation_module.Simulation)
-    simulation.phiASE = SimpleNamespace(
-        openpmdBackend="adios-sst",
-        openStream=lambda **kwargs: events.append(("openStream", kwargs)) or openpmdSession,
-        closeStream=lambda: events.append(("closeStream",)),
-    )
-    simulation._openpmdSession = None
+def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch):
     captured = {}
+    simulation = object.__new__(simulation_module.Simulation)
+    simulation.phiASE = SimpleNamespace(openpmdBackend="adios-sst")
+    simulation.pump = SimpleNamespace(getProperty=lambda name: None)
+    simulation.timeStep = 1e-5
+    simulation._initialized = True
+    simulation._beforeStepCallbacks = []
+    simulation._callbacks = []
+    simulation._step = 0
+    simulation._time = 0.0
 
-    def fakeStep(self, *, openpmdSession=None):
-        events.append(("step", openpmdSession))
+    def fake_run_simulation(simulation_arg, *, steps, pumpSteps=None, transport=None):
+        captured["simulation"] = simulation_arg
+        captured["steps"] = steps
+        captured["pumpSteps"] = pumpSteps
+        captured["transport"] = transport
+        return []
 
-    monkeypatch.setattr(simulation_module.Simulation, "step", fakeStep)
+    monkeypatch.setattr(simulation_module.transport, "runSimulation", fake_run_simulation)
 
     simulation_module.Simulation.runSteps(simulation, 1)
 
-    assert events == [
-        ("openStream", {}),
-        ("step", openpmdSession),
-        ("closeStream",),
-    ]
+    assert captured == {
+        "simulation": simulation,
+        "steps": 1,
+        "pumpSteps": None,
+        "transport": "adios-sst",
+    }
 
 
-def test_phiAseNPerNodeLoadsConfig():
+def testPhiAseNPerNodeLoadsFromArgsAndConfig():
     phiAse = PhiASE({"compute": {"nPerNode": 3}})
     assert phiAse.nPerNode == 3
 
@@ -353,7 +351,7 @@ def test_phiAseNPerNodeLoadsConfig():
     assert fromArgs.nPerNode == 5
 
 
-def test_phiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
+def testPhiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
     monkeypatch.setattr(simulation_module, "_preferredDefaultBackend", lambda: "Host_Cpu_CpuSerial")
 
     attributes = PhiASE().openPmdAttributes(numberOfSamples=1)
@@ -361,7 +359,7 @@ def test_phiAseDefaultBackendUsesAvailableAlpakaBackend(monkeypatch):
     assert attributes["backend"] == "Host_Cpu_CpuSerial"
 
 
-def test_phiAseDefaultBackendFailureMentionsConfigure(monkeypatch):
+def testPhiAseDefaultBackendFailureMentionsConfigure(monkeypatch):
     def fail():
         raise RuntimeError("Run `hase-configure` to generate a matching backend/openPMD setup.")
 
