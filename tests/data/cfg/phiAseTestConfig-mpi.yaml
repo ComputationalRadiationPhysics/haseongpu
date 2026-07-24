@@ -1,0 +1,15 @@
+experiment:
+  minRays: 1000
+  maxRays: 10000
+  relativeStandardErrorThreshold: 0.1
+  adaptiveSteps: 3
+  useReflections: false
+  monochromatic: false
+
+compute:
+  repetitions: 1
+  adaptiveSteps: 1
+  backend: Host_Cpu_CpuSerial
+  parallelMode: mpi
+  numDevices: 1
+  nPerNode: 2

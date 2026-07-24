@@ -1740,6 +1740,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
     events = []
     receiver_started = threading.Event()
     release_receiver = threading.Event()
+    input_written = threading.Event()
 
     class FakeProcess:
         returncode = 0
@@ -1754,7 +1755,9 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
             events.append(("kill",))
 
         def communicate(self):
-            events.append(("communicate",))
+            events.append(("communicate-start",))
+            assert input_written.wait(timeout=2.0)
+            events.append(("communicate-end",))
             release_receiver.set()
             return "", ""
 
@@ -1767,7 +1770,16 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
 
     def fake_write_input(input_path, spec, simulation, run_control):
         assert receiver_started.wait(timeout=2.0)
-        events.append(("write-input", Path(input_path).name, spec.name, run_control["number_of_steps"]))
+        events.append(
+            (
+                "write-input",
+                threading.current_thread().name,
+                Path(input_path).name,
+                spec.name,
+                run_control["number_of_steps"],
+            )
+        )
+        input_written.set()
 
     monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
     monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
@@ -1786,7 +1798,100 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
     assert states[0].step == 1
     event_names = [event[0] for event in events]
     assert event_names.index("read-start") < event_names.index("write-input")
-    assert event_names.index("write-input") < event_names.index("communicate")
-    assert event_names.index("communicate") < event_names.index("read-end")
+    assert event_names.index("write-input") < event_names.index("communicate-end")
+    assert event_names.index("communicate-end") < event_names.index("read-end")
     read_event = next(event for event in events if event[0] == "read-start")
     assert read_event[1] == "HASE compiled simulation snapshot receiver"
+    write_event = next(event for event in events if event[0] == "write-input")
+    assert write_event[1] == "HASE compiled simulation input sender"
+
+
+def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(monkeypatch, tmp_path):
+    writer_started = threading.Event()
+    release_writer = threading.Event()
+
+    class FailedProcess:
+        returncode = 2
+        stderr = None
+
+        def __init__(self, command, **kwargs):
+            pass
+
+        def poll(self):
+            return self.returncode
+
+        def kill(self):
+            raise AssertionError("an already-finished backend must not be killed")
+
+        def communicate(self):
+            assert writer_started.wait(timeout=2.0)
+            return "", "unknown option --cpp-control"
+
+    def blocked_write_input(input_path, spec, simulation, run_control):
+        writer_started.set()
+        assert release_writer.wait(timeout=2.0)
+
+    def blocked_read_output(path):
+        assert release_writer.wait(timeout=2.0)
+        return []
+
+    monkeypatch.setattr(transport.subprocess, "Popen", FailedProcess)
+    monkeypatch.setattr(transport, "_write_simulation_input", blocked_write_input)
+    monkeypatch.setattr(transport, "read_simulation_output", blocked_read_output)
+    monkeypatch.setattr(transport, "_streaming_thread_join_timeout", lambda value=None: 0.01)
+
+    try:
+        with pytest.raises(RuntimeError) as exc_info:
+            transport._run_streaming_simulation(
+                ["calcPhiASE", "--cpp-control"],
+                tmp_path / "input.sst",
+                tmp_path / "output.sst",
+                SimpleNamespace(name="adios-sst"),
+                SimpleNamespace(),
+                {"number_of_steps": 1},
+            )
+        assert "return code 2" in str(exc_info.value)
+        assert "unknown option --cpp-control" in str(exc_info.value)
+    finally:
+        release_writer.set()
+
+
+def test_streaming_simulation_preserves_input_writer_failure(monkeypatch, tmp_path):
+    killed = threading.Event()
+
+    class KilledProcess:
+        returncode = None
+
+        def __init__(self, command, **kwargs):
+            pass
+
+        def poll(self):
+            return self.returncode
+
+        def kill(self):
+            self.returncode = -9
+            killed.set()
+
+        def communicate(self):
+            assert killed.wait(timeout=2.0)
+            return "", ""
+
+    def failed_write_input(input_path, spec, simulation, run_control):
+        raise ValueError("invalid simulation input")
+
+    monkeypatch.setattr(transport.subprocess, "Popen", KilledProcess)
+    monkeypatch.setattr(transport, "_write_simulation_input", failed_write_input)
+    monkeypatch.setattr(transport, "read_simulation_output", lambda path: [])
+
+    with pytest.raises(RuntimeError, match="simulation input writer failed") as exc_info:
+        transport._run_streaming_simulation(
+            ["calcPhiASE", "--cpp-control"],
+            tmp_path / "input.sst",
+            tmp_path / "output.sst",
+            SimpleNamespace(name="adios-sst"),
+            SimpleNamespace(),
+            {"number_of_steps": 1},
+        )
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert str(exc_info.value.__cause__) == "invalid simulation input"

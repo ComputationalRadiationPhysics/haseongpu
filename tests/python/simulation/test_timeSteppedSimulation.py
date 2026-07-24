@@ -45,15 +45,26 @@ def fakeCppSimulation(monkeypatch, smallTopology):
             aseResult=object(),
         )
 
-    def fake_run_simulation(simulation, *, steps, pumpSteps=None, transport=None):
-        captured.append(
-            {
-                "simulation": simulation,
-                "steps": steps,
-                "pumpSteps": pumpSteps,
-                "transport": transport,
-            }
-        )
+    def fake_run_simulation(
+        simulation,
+        *,
+        steps,
+        pumpSteps=None,
+        transport=None,
+        command_prefix=None,
+        workspace_dir=None,
+    ):
+        call = {
+            "simulation": simulation,
+            "steps": steps,
+            "pumpSteps": pumpSteps,
+            "transport": transport,
+        }
+        if command_prefix is not None:
+            call["command_prefix"] = command_prefix
+        if workspace_dir is not None:
+            call["workspace_dir"] = workspace_dir
+        captured.append(call)
         return [make_state(step, simulation, pumpSteps) for step in range(1, steps + 1)]
 
     monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)
@@ -93,6 +104,41 @@ def testCompiledSimulationDelegatesRunStepsToCppTransport(
     assert state.step == 1
     assert np.allclose(state.betaCells, 0.25)
     assert np.allclose(simulation.gainMedium.get("betaCells").value, 0.25)
+
+
+def testCompiledSimulationUsesPhiAseMpiLaunchOptions(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HASE_MPIEXEC_EXTRA_ARGS", "--oversubscribe")
+    phi_ase = PhiASE(
+        spectralProperties=crossSections,
+        openpmdBackend="adios",
+        parallelMode="mpi",
+        nPerNode=3,
+    )
+    simulation = Simulation(
+        gainMedium=smallGainMedium,
+        pump=pumpProperties,
+        phiASE=phi_ase,
+        timeIntegrationSolver="heun",
+        timeStep=1e-5,
+    )
+
+    simulation.runSteps(1)
+
+    assert fakeCppSimulation[-1]["command_prefix"] == [
+        "mpiexec",
+        "--oversubscribe",
+        "-npernode",
+        "3",
+    ]
+    assert fakeCppSimulation[-1]["workspace_dir"] == tmp_path / "IO" / "phiase_mpi"
 
 
 def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(

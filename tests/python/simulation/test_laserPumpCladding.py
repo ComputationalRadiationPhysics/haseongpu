@@ -406,13 +406,23 @@ def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
 def fakeCompiledSnapshots(monkeypatch):
     calls = []
 
-    def fake_run_simulation(simulation, *, steps, pumpSteps=None, transport=None):
+    def fake_run_simulation(
+        simulation,
+        *,
+        steps,
+        pumpSteps=None,
+        transport=None,
+        command_prefix=None,
+        workspace_dir=None,
+    ):
         calls.append(
             {
                 "simulation": simulation,
                 "steps": steps,
                 "pumpSteps": pumpSteps,
                 "transport": transport,
+                "command_prefix": command_prefix,
+                "workspace_dir": workspace_dir,
                 "phiASE": simulation.phiASE,
             }
         )
@@ -533,6 +543,8 @@ def testLaserPumpCladdingCliAcceptsDisableAse(monkeypatch, tmp_path):
 
 def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
     calls = []
+    mpi_config = tmp_path / "hase-phiase-mpi.yaml"
+    monkeypatch.setenv("HASE_PHIASE_CONFIG", str(mpi_config))
 
     def fake_run_example(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
@@ -545,6 +557,7 @@ def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
 
     assert calls[-1]["kwargs"]["openpmdBackend"] == "hdf5"
     assert calls[-1]["kwargs"]["rngSeed"] == 5489
+    assert calls[-1]["args"][0] == mpi_config
 
 
 @pytest.mark.parametrize("option", ("--min-sample-range", "--max-sample-range"))

@@ -6,6 +6,9 @@
 
 
 import argparse
+import os
+import shlex
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -130,6 +133,7 @@ def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
 ):
     captured = {}
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("HASE_MPIEXEC_EXTRA_ARGS", raising=False)
 
     def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
         captured["nPerNode"] = phiAse.nPerNode
@@ -166,6 +170,7 @@ def testPhiAseMpiRunUsesOpenPmdTransportMetadata(
 def test_phiAseMpiPersistentSessionUsesConfiguredRanks(monkeypatch, tmp_path):
     captured = {}
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("HASE_MPIEXEC_EXTRA_ARGS", raising=False)
     monkeypatch.setattr(
         simulation_module.transport,
         "openStream",
@@ -286,8 +291,22 @@ def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
     phiAse.run(gainMedium=smallGainMedium, openpmdSession="persistent")
     phiAse.closeStream()
 
+    expected_open_kwargs = {"transport": "adios-sst"}
+    if phiAse.parallelMode == "mpi":
+        expected_open_kwargs.update(
+            {
+                "command_prefix": [
+                    "mpiexec",
+                    *shlex.split(os.environ.get("HASE_MPIEXEC_EXTRA_ARGS", "")),
+                    "-npernode",
+                    str(phiAse.nPerNode),
+                ],
+                "workspace_dir": Path.cwd() / "IO" / "phiase_mpi",
+            }
+        )
+
     assert events == [
-        ("openStream", {"transport": "adios-sst"}),
+        ("openStream", expected_open_kwargs),
         ("run", openpmdSession),
         ("run", openpmdSession),
         ("closeStream", openpmdSession),
@@ -334,7 +353,10 @@ def testSimulationRunStepsRejectsExternalOpenPmdSessionOwnership():
 def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch):
     captured = {}
     simulation = object.__new__(simulation_module.Simulation)
-    simulation.phiASE = SimpleNamespace(openpmdBackend="adios-sst")
+    simulation.phiASE = SimpleNamespace(
+        openpmdBackend="adios-sst",
+        _transportLaunchOptions=lambda: {},
+    )
     simulation.pump = SimpleNamespace(getProperty=lambda name: None)
     simulation.timeStep = 1e-5
     simulation._initialized = True

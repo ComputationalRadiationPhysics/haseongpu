@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,12 @@ from _source_tree_import import ensure_hase_importable
 
 
 scriptDir = Path(__file__).resolve().parent
-defaultPhiAseConfigPath = scriptDir.parent / "config/hase-phiase.yaml"
+defaultPhiAseConfigPath = Path(
+    os.environ.get(
+        "HASE_PHIASE_CONFIG",
+        scriptDir.parent / "config/hase-phiase.yaml",
+    )
+)
 
 ensure_hase_importable()
 

@@ -11,7 +11,12 @@ import copy
 import importlib
 
 repoRoot = Path(__file__).resolve().parents[1]
-pythonTestPhiAseConfig = Path(__file__).parent / "data" / "cfg" / "phiAseTestConfig.yaml"
+pythonTestPhiAseConfig = Path(
+    os.environ.get(
+        "HASE_TEST_PHIASE_CONFIG",
+        Path(__file__).parent / "data" / "cfg" / "phiAseTestConfig.yaml",
+    )
+)
 legacyPhiAseConfigFile = Path(__file__).parent / "data" / "cfg" / "legacy_config.yaml"
 requiredHaseApi = (
     "AlpakaBackends",
@@ -23,6 +28,7 @@ requiredHaseApi = (
     "PumpProperties",
     "PumpRadiationProfile",
     "SpectralDecomposition",
+    "VolumeTopology",
     "Constants",
     "oneDimensionalZTraversalPumpRate",
 )
