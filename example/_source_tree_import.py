@@ -18,8 +18,16 @@ def _resolve_sys_path_entry(entry):
         return Path(entry)
 
 
+def _clear_hase_modules():
+    for name in list(sys.modules):
+        if name == "HASEonGPU" or name.startswith("HASEonGPU."):
+            del sys.modules[name]
+        elif name == "pyInclude" or name.startswith("pyInclude."):
+            del sys.modules[name]
+
+
 def ensure_hase_importable():
-    """Prefer an installed HASEonGPU package, then fall back to this checkout."""
+    """Prefer a compatible installed HASE package, then fall back to this checkout."""
     source_root = Path(__file__).resolve().parents[1]
     original_path = list(sys.path)
     sys.path[:] = [
@@ -28,14 +36,16 @@ def ensure_hase_importable():
         if _resolve_sys_path_entry(entry) != source_root
     ]
     try:
-        importlib.import_module("HASEonGPU")
-        return
+        module = importlib.import_module("HASEonGPU")
+        if hasattr(module, "VolumeTopology"):
+            return
     except ModuleNotFoundError as err:
         if err.name != "HASEonGPU":
             raise
     finally:
         sys.path[:] = original_path
 
+    _clear_hase_modules()
     source_root_text = str(source_root)
     if source_root_text not in sys.path:
         sys.path.insert(0, source_root_text)

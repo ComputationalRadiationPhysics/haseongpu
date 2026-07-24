@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import os
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
@@ -314,8 +316,14 @@ class PhiASE:
         ranks_per_node = int(self.nPerNode)
         if ranks_per_node < 1:
             raise ValueError("nPerNode must be a positive integer for MPI execution")
+        mpiexec_extra_args = shlex.split(os.environ.get("HASE_MPIEXEC_EXTRA_ARGS", ""))
         return {
-            "command_prefix": ["mpiexec", "-npernode", str(ranks_per_node)],
+            "command_prefix": [
+                "mpiexec",
+                *mpiexec_extra_args,
+                "-npernode",
+                str(ranks_per_node),
+            ],
             # A scheduler allocation commonly spans nodes. Keep file-based
             # openPMD artifacts below the launch directory instead of /tmp so
             # they are visible when that directory is on shared storage.
@@ -597,6 +605,7 @@ class Simulation:
             steps=steps,
             pumpSteps=pumpSteps,
             transport=self.phiASE.openpmdBackend,
+            **self.phiASE._transportLaunchOptions(),
         )
         transport_seconds = perf_counter() - transport_started if self.reportTimings else 0.0
         state_materialization_seconds = 0.0

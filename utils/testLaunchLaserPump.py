@@ -15,7 +15,7 @@ def repoRoot() -> Path:
 
 
 def launchCommand(openpmdBackend: str, outputDir: Path) -> list[str]:
-    return [
+    command = [
         sys.executable,
         str(repoRoot() / "example" / "laserPumpCladding.py"),
         "--backend",
@@ -31,6 +31,10 @@ def launchCommand(openpmdBackend: str, outputDir: Path) -> list[str]:
         "--rng-seed",
         "5489",
     ]
+    phi_ase_config = os.environ.get("HASE_PHIASE_CONFIG")
+    if phi_ase_config:
+        command.extend(("--phi-ase-config", phi_ase_config))
+    return command
 
 
 def launchLaserPump(openpmdBackend: str, outputDir: Path) -> int:

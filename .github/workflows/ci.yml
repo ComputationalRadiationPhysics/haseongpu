@@ -434,6 +434,43 @@ jobs:
           python hase_runtime_smoketest.py
           python hase_frontend_smoketest.py
 
+      - name: Configure MPI test runs
+        if: matrix.config.mpi == 'on' && matrix.config.mpi_ranks != ''
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import yaml
+
+          ranks = int(os.environ["HASE_MPI_TEST_RANKS"])
+          config_paths = (
+              Path("config/hase-phiase-mpi.yaml"),
+              Path("tests/data/cfg/phiAseTestConfig-mpi.yaml"),
+          )
+          for path in config_paths:
+              config = yaml.safe_load(path.read_text(encoding="utf-8"))
+              compute = config.get("compute")
+              if not isinstance(compute, dict):
+                  raise RuntimeError(f"{path} does not contain a compute mapping")
+
+              parallel_mode_key = (
+                  "parallel_mode" if "parallel_mode" in compute else "parallelMode"
+              )
+              n_per_node_key = "n_per_node" if "n_per_node" in compute else "nPerNode"
+              compute[parallel_mode_key] = "mpi"
+              compute[n_per_node_key] = ranks
+              path.write_text(
+                  yaml.safe_dump(config, sort_keys=False),
+                  encoding="utf-8",
+              )
+              print(f"{path}: {parallel_mode_key}=mpi, {n_per_node_key}={ranks}")
+          PY
+          echo "HASE_PHIASE_CONFIG=$GITHUB_WORKSPACE/config/hase-phiase-mpi.yaml" >> "$GITHUB_ENV"
+          echo "HASE_TEST_PHIASE_CONFIG=$GITHUB_WORKSPACE/tests/data/cfg/phiAseTestConfig-mpi.yaml" >> "$GITHUB_ENV"
+
       - name: Run laserPumpCladding example from installed package
         shell: bash
         run: |

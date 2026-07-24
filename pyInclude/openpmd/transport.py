@@ -1648,14 +1648,24 @@ def _write_simulation_input(input_path, spec, simulation, run_control):
 
 
 def _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control):
-    """Run compiled simulation while a Python receiver thread drains snapshots."""
+    """Run compiled simulation while Python threads exchange SST snapshots."""
     result_queue = queue.Queue(maxsize=1)
+    input_queue = queue.Queue(maxsize=1)
 
     def read_output():
         try:
             result_queue.put((True, read_simulation_output(output_path)))
         except BaseException as exc:
             result_queue.put((False, exc))
+
+    def write_input():
+        try:
+            _write_simulation_input(input_path, spec, simulation, run_control)
+            input_queue.put((True, None))
+        except BaseException as exc:
+            input_queue.put((False, exc))
+            if proc.poll() is None:
+                proc.kill()
 
     proc = subprocess.Popen(
         command,
@@ -1669,28 +1679,40 @@ def _run_streaming_simulation(command, input_path, output_path, spec, simulation
         daemon=True,
     )
     reader.start()
-
-    input_error = None
-    try:
-        _write_simulation_input(input_path, spec, simulation, run_control)
-    except BaseException as exc:
-        input_error = exc
-        if proc.poll() is None:
-            proc.kill()
+    writer = threading.Thread(
+        target=write_input,
+        name="HASE compiled simulation input sender",
+        daemon=True,
+    )
+    writer.start()
 
     stdout, stderr = proc.communicate()
     _forward_backend_logging(stdout=stdout, stderr=stderr)
 
     timeout = _streaming_thread_join_timeout()
-    reader.join(timeout=timeout)
-    if reader.is_alive():
-        raise RuntimeError(f"openPMD simulation snapshot receiver thread did not stop within {timeout:g} seconds")
+    deadline = time.monotonic() + timeout
+    writer.join(timeout=max(0.0, deadline - time.monotonic()))
+    reader.join(timeout=max(0.0, deadline - time.monotonic()))
 
-    if input_error is not None:
-        raise RuntimeError("openPMD simulation input writer failed") from input_error
+    input_result = None
+    if not writer.is_alive():
+        try:
+            input_result = input_queue.get_nowait()
+        except queue.Empty:
+            if proc.returncode == 0:
+                raise RuntimeError("openPMD simulation input sender stopped without reporting completion")
+        if input_result is not None:
+            input_ok, input_payload = input_result
+            if not input_ok:
+                raise RuntimeError("openPMD simulation input writer failed") from input_payload
+
     if proc.returncode != 0:
         detail = _backend_failure_detail(stdout=stdout, stderr=stderr)
         raise RuntimeError(f"calcPhiASE failed with return code {proc.returncode}{detail}")
+    if writer.is_alive():
+        raise RuntimeError(f"openPMD simulation input sender thread did not stop within {timeout:g} seconds")
+    if reader.is_alive():
+        raise RuntimeError(f"openPMD simulation snapshot receiver thread did not stop within {timeout:g} seconds")
 
     try:
         ok, payload = result_queue.get_nowait()
@@ -1712,6 +1734,8 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
     run_control = _simulation_run_control(simulation, steps=steps, pumpSteps=pumpSteps)
 
     artifact_root = _artifact_root()
+    if artifact_root is None and workspace_dir is not None:
+        Path(workspace_dir).mkdir(parents=True, exist_ok=True)
     workspace_context = (
         tempfile.TemporaryDirectory(prefix="hase-openpmd-simulation-", dir=workspace_dir)
         if artifact_root is None
