@@ -25,11 +25,12 @@ namespace hase::openpmd
     public:
         using WriteSnapshot = std::function<void(core::SimulationSnapshot const&)>;
 
-        AsyncSimulationSnapshotWriter(bool enabled, WriteSnapshot writeSnapshot)
+        AsyncSimulationSnapshotWriter(bool enabled, WriteSnapshot writeSnapshot, bool asynchronous = true)
             : m_enabled(enabled)
+            , m_asynchronous(asynchronous)
             , m_writeSnapshot(std::move(writeSnapshot))
         {
-            if(m_enabled)
+            if(m_enabled && m_asynchronous)
             {
                 m_thread = std::thread([this] { drain(); });
             }
@@ -58,6 +59,11 @@ namespace hase::openpmd
             {
                 return;
             }
+            if(!m_asynchronous)
+            {
+                m_writeSnapshot(snapshot);
+                return;
+            }
             {
                 std::scoped_lock lock{m_mutex};
                 m_pending.push(snapshot);
@@ -69,6 +75,11 @@ namespace hase::openpmd
         {
             if(!m_enabled || m_finished)
             {
+                return;
+            }
+            if(!m_asynchronous)
+            {
+                m_finished = true;
                 return;
             }
             {
@@ -115,6 +126,7 @@ namespace hase::openpmd
         }
 
         bool m_enabled = false;
+        bool m_asynchronous = true;
         bool m_finished = false;
         WriteSnapshot m_writeSnapshot;
         std::mutex m_mutex;
