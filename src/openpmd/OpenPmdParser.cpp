@@ -1928,7 +1928,8 @@ namespace hase::openpmd
                     simulation.experiment,
                     includeStatic);
                 series->flush();
-            }};
+            },
+            simulation.compute.parallelMode != core::ParallelMode::MPI};
 
         std::exception_ptr simulationError;
         int result = 0;
