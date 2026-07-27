@@ -6,7 +6,7 @@
 
 """Public Python convenience exports for HASEonGPU's openPMD frontend."""
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
 
 from ._runtime import activate_openpmd_python_provider as _activate_openpmd_python_provider
 

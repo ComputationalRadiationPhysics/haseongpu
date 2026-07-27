@@ -165,6 +165,13 @@ index outside the surface.  A reflectivity of ``0.0`` still allows total
 internal reflection when ``n_inside`` and ``n_outside`` make the incident angle
 supercritical; this matches the legacy reflection model.
 
+Refractive indices currently serve only the total-internal-reflection test.
+Otherwise the backend uses the configured constant reflectivity. It does not
+yet evaluate Fresnel coefficients or continue the non-reflected fraction as a
+transmitted or refracted ray. Surface domains and ``SurfaceOptics`` establish
+the boundary assignment API for those future models without implying that they
+are already implemented.
+
 Shape and Size Queries
 ----------------------
 

@@ -10,6 +10,21 @@ def test_backendMatrixUsesFrontEndBackends(monkeypatch):
     assert openpmd_backend_matrix.openpmd_test_backends() == ["hdf5"]
 
 
+def test_backendMatrixKeepsEveryAvailableBackend(monkeypatch):
+    monkeypatch.delenv("HASE_OPENPMD_TEST_BACKENDS", raising=False)
+    monkeypatch.setattr(
+        openpmd_backend_matrix,
+        "_front_end_backends",
+        lambda: ["hdf5", "adios-sst", "adios"],
+    )
+
+    assert openpmd_backend_matrix.openpmd_test_backends() == [
+        "adios",
+        "adios-sst",
+        "hdf5",
+    ]
+
+
 def test_backendMatrixAcceptsSelector(monkeypatch):
     monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "hdf5, adios-sst")
 

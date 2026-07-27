@@ -11,14 +11,17 @@ Storage Backends
 
 The openPMD storage backend is independent from the Alpaka compute backend.
 ``auto`` is the default: it chooses the first backend supported by both the
-compiled and Python openPMD providers in this order: ``adios-sst``, ``adios``,
+compiled and Python openPMD providers in this order: ``adios``, ``adios-sst``,
 then ``hdf5``. Explicit runtime values are:
 
 ``adios-sst``
-   ADIOS2 SST streaming series.  This is the default when supported.
+   ADIOS2 SST streaming series. Select it explicitly when a live stream is
+   preferable to file-backed exchange.
 
 ``adios``
-   ADIOS2 file-backed ``.bp`` series.
+   ADIOS2 file-backed ``.bp`` series. This is the automatic default when
+   supported because it is currently more robust and usually faster than SST
+   for HASEonGPU's frontend/backend exchange.
 
 ``hdf5``
    HDF5 ``.h5`` series.  Requires HDF5 support in the selected openPMD-api

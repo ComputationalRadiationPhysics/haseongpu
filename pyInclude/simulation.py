@@ -103,7 +103,7 @@ class PhiASE:
     backend: str = None
     """Alpaka backend name; inspect valid strings with ``AlpakaBackends.all()``."""
     openpmdBackend: str | None = "auto"
-    """openPMD backend; ``auto`` prefers SST, ADIOS, then HDF5 when supported."""
+    """openPMD backend; ``auto`` prefers ADIOS, SST, then HDF5 when supported."""
     parallelMode: str = "single"
     """Execution mode: local ``single`` execution or the MPI launcher ``mpi``."""
     numDevices: int = 1
@@ -428,10 +428,11 @@ LegacyGridDataBetaVolumeMapper = ConnectivityAverageBetaVolumeMapper
 class TimeStepState:
     """Snapshot handed to ``onStep`` callbacks after a completed time step.
 
-    The arrays are copies of the simulation outputs at ``step``/``time``.
-    ``betaCells`` and ``phiAse`` are point-by-level arrays with shape
-    ``(numberOfPoints, numberOfLevels)``. ``betaVolume`` is prism-centered
-    with shape ``(numberOfTriangles, numberOfLevels - 1)``.
+    The arrays are copies of the simulation outputs at ``step``/``time`` and
+    follow the gain medium's sample and volume shapes. Explicit Tet4 topology
+    normally stores one value per mesh point in ``betaCells``/``phiAse`` and
+    one value per tetrahedron in ``betaVolume``. The legacy structured layout
+    retains its point-by-level and triangle-by-layer shapes.
     """
 
     step: int
@@ -439,11 +440,11 @@ class TimeStepState:
     time: float
     """Physical simulation time after the step, in seconds."""
     betaCells: np.ndarray
-    """Excited-state fraction at mesh points and z-levels."""
+    """Excited-state fraction at the topology's simulation samples."""
     betaVolume: np.ndarray
-    """Excited-state fraction interpolated to wedge-prism centers."""
+    """Excited-state fraction mapped to explicit cells or legacy prisms."""
     phiAse: np.ndarray | None
-    """ASE flux at mesh points and z-levels, or ``None`` if unavailable."""
+    """ASE flux at the topology's simulation samples, or ``None`` if unavailable."""
     dndtAse: np.ndarray
     """ASE depletion contribution to ``d beta / dt``."""
     dndtPump: np.ndarray

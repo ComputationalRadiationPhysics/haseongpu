@@ -20,7 +20,7 @@ BACKEND_EXTENSIONS = {
     "adios-sst": "sst",
     "hdf5": "h5",
 }
-HASE_SOURCE_BUILD_BACKENDS = ("adios-sst", "adios", "hdf5")
+HASE_SOURCE_BUILD_BACKENDS = ("adios", "adios-sst", "hdf5")
 
 
 def _default_cmake_generator() -> str | None:
@@ -38,7 +38,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--backend",
         choices=tuple(BACKEND_EXTENSIONS),
-        default="adios-sst",
+        default="adios",
         help="Runtime openPMD backend to check.",
     )
     parser.add_argument(

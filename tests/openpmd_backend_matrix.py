@@ -6,7 +6,7 @@
 
 import os
 
-BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
+BACKEND_PRIORITY = ("adios", "adios-sst", "hdf5")
 
 
 def _clean(values):

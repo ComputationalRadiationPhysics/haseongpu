@@ -485,7 +485,7 @@ def test_backendNamesMapToConfigs(monkeypatch):
             transport._backend_spec(backend)
 
 
-def test_autoBackendPrefersSstThenAdiosThenHdf5(monkeypatch, tmp_path):
+def test_autoBackendPrefersAdiosThenSstThenHdf5(monkeypatch, tmp_path):
     executable = tmp_path / "calcPhiASE"
     executable.write_text("", encoding="utf-8")
     io = SimpleNamespace(
@@ -498,7 +498,7 @@ def test_autoBackendPrefersSstThenAdiosThenHdf5(monkeypatch, tmp_path):
         "_probed_openpmd_backends",
         lambda executable: (("adios-sst", "adios", "hdf5"), tmp_path / "probe"),
     )
-    assert transport._ensure_backend_available("auto", executable).name == "adios-sst"
+    assert transport._ensure_backend_available("auto", executable).name == "adios"
     monkeypatch.setattr(
         transport,
         "_probed_openpmd_backends",

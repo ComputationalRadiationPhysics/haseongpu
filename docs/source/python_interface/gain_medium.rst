@@ -1,8 +1,9 @@
 GainMedium
 ==========
 
-``GainMedium`` combines a ``MeshTopology`` with the material and state arrays
-that the ASE calculation needs.
+``GainMedium`` combines a topology with the material and state arrays that the
+ASE calculation needs. ``VolumeTopology`` provides the explicit Tet4 layout;
+``MeshTopology`` retains the legacy extruded-triangle layout.
 
 .. code-block:: python
 
@@ -39,15 +40,20 @@ Property Reference
 ------------------
 
 ``betaCells``
-   Excited-state fraction :math:`\beta_i` at topology points and z-levels.
-   Matrix shape: ``(numberOfPoints, numberOfLevels)``.
+   Excited-state fraction :math:`\beta_i` at simulation samples. Explicit Tet4
+   state is normally vertex-centered with shape ``(numberOfSamplePoints,)``.
+   The legacy structured layout uses
+   ``(numberOfPoints, numberOfLevels)``.
 
 ``betaVolume``
-   Prism-centered excited-state fraction :math:`\beta_j` used by the ASE ray
-   integration.  Matrix shape: ``(numberOfTriangles, numberOfLevels - 1)``.
+   Cell-centered excited-state fraction :math:`\beta_j` used by ASE and pump
+   transport. Explicit Tet4 topology uses shape ``(numberOfCells,)``. The
+   legacy extruded layout uses
+   ``(numberOfTriangles, numberOfLevels - 1)``.
 
 ``claddingCellTypes``
-   Triangle-wise cladding type index.  Shape: ``(numberOfTriangles,)``.
+   Cell-wise cladding type index. Explicit Tet4 topology uses
+   ``(numberOfCells,)``; the legacy layout uses ``(numberOfTriangles,)``.
 
 ``refractiveIndices``
    Four refractive indices:

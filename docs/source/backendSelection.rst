@@ -6,7 +6,7 @@ HASEonGPU has two independent backend choices:
 * **Alpaka compute backend**: where kernels run, for example a CPU, CUDA, or HIP
   backend.
 * **openPMD storage backend**: how Python and ``calcPhiASE`` exchange data.
-  The default ``auto`` selects ``adios-sst``, then ``adios``, then ``hdf5``
+  The default ``auto`` selects ``adios``, then ``adios-sst``, then ``hdf5``
   from the backends supported by both runtime providers.
 
 Do not use an openPMD backend name as the Alpaka ``backend`` value.

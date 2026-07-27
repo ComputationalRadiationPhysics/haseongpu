@@ -90,9 +90,10 @@ snapshot also carries the static context needed to read the series on its own.
 
 The run control selects a time step, step count, pump-step limit, and one of the
 compiled integrators (explicit Euler, Heun, midpoint, RK4, implicit Euler, or
-exponential Euler). The supported pump routine is
-``one-dimensional-z-traversal``. It is configured through ``PumpProperties``;
-custom Python pump routines are not part of this execution path.
+exponential Euler). The general pump transport launches Monte Carlo rays from
+tagged exterior Tet4 faces. Its serialized sources carry total power, spatial,
+spectral, and angular distributions, plus optional finite planar relays. Custom
+Python pump routines are not part of this execution path.
 
 In this mode Python sends the initial mesh/material/spectra/beta state and the
 binary writes one output iteration per completed time step. The output snapshot

@@ -1,8 +1,8 @@
 {
   "title": "HASEonGPU Software - High performance Amplified Spontaneous Emission on GPU",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "pub_id": "43533",
-  "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux in configurable gain media using a Monte Carlo ray-tracing approach.\nRelease 2.1.1 moves pump time stepping into the compiled C++/Alpaka backend, adds compiled frozen-RK4 and ASE controls, improves streamed output handling, and separates the private Python runtime from optional public C++ installation artifacts.\nHASEonGPU uses alpaka 3 (https://github.com/alpaka-group/alpaka3) to support ASE calculations on CPU and GPU (CUDA, HIP) backends with improved performance portability.",
+  "description": "HASEonGPU is open-source HPC software for calculating amplified spontaneous emission (ASE) flux in laser gain media. It supports the design and analysis of high-power laser systems by estimating ASE flux in configurable gain media using a Monte Carlo ray-tracing approach.\nRelease 2.2.0 replaces backward target-driven PhiASE with Alpaka forward Monte Carlo transport on explicit Tet4 meshes, adds surface-reservoir reflections and relative-standard-error adaptation, introduces general domain-injected Monte Carlo pump transport with spatial, spectral, angular, and finite relay models, and makes persistent ADIOS/BP the preferred automatic openPMD backend.\nHASEonGPU uses alpaka 3 (https://github.com/alpaka-group/alpaka3) to support ASE calculations on CPU and GPU (CUDA, HIP) backends with improved performance portability.",
   "creators": [
     {
       "name": "Hanel, Tim",
