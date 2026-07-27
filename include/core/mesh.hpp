@@ -170,7 +170,6 @@ namespace hase::core
         float crystalTFluo;
         unsigned claddingNumber;
         unsigned numberOfCells;
-        unsigned numberOfPrisms;
         unsigned numberOfPoints;
         unsigned numberOfSamples;
         unsigned numberOfFacesPerCell;
@@ -401,7 +400,6 @@ namespace hase::core
             , crystalTFluo(crystalTFluo)
             , claddingNumber(claddingNumber)
             , numberOfCells(numberOfCells)
-            , numberOfPrisms(numberOfCells)
             , numberOfPoints(numberOfPoints)
             , numberOfSamples(numberOfSamples)
             , numberOfFacesPerCell(numberOfFacesPerCell)
@@ -451,7 +449,6 @@ namespace hase::core
                 crystalTFluo,
                 claddingNumber,
                 numberOfCells,
-                numberOfCells,
                 numberOfPoints,
                 numberOfSamples,
                 numberOfFacesPerCell,
@@ -499,7 +496,6 @@ namespace hase::core
         float crystalTFluo;
         unsigned claddingNumber;
         unsigned numberOfCells;
-        unsigned numberOfPrisms;
         unsigned numberOfPoints;
         unsigned numberOfSamples;
         unsigned numberOfFacesPerCell;
@@ -546,7 +542,6 @@ namespace hase::core
         unsigned claddingNumber = 1u;
         double claddingAbsorption = 0.0;
         unsigned numberOfCells = 0u;
-        unsigned numberOfPrisms = 0u;
         unsigned numberOfMeshPoints = 0u;
         unsigned numberOfPoints = 0u;
         unsigned numberOfSamples = 0u;
@@ -608,7 +603,6 @@ namespace hase::core
             , claddingNumber(claddingNumber)
             , claddingAbsorption(claddingAbsorption)
             , numberOfCells(static_cast<unsigned>(this->cellTypes.size()))
-            , numberOfPrisms(numberOfCells)
             , numberOfMeshPoints(static_cast<unsigned>(this->points.size() / 3u))
             , numberOfPoints(
                   structuredNumberOfPoints == 0u ? static_cast<unsigned>(this->samplePoints.size() / 3u)

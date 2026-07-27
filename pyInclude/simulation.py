@@ -35,6 +35,29 @@ from .timeIntegration import TimeIntegrationSolver
 
 HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
 
+SIMULATION_OUTPUT_FIELDS = (
+    "beta_volume",
+    "phi_ase",
+    "standard_error",
+    "relative_standard_error",
+    "total_rays",
+    "dndt_ase",
+    "dndt_pump",
+)
+SIMULATION_CONTROL_FIELDS = ("beta_volume",)
+
+
+def autonomous_final(number_of_steps):
+    """Return the explicit output index list for a final-state-only autonomous run."""
+    final_step = int(number_of_steps)
+    if final_step <= 0:
+        raise ValueError("number_of_steps must be positive")
+    return (final_step,)
+
+
+def _optional_state_array(values, dtype):
+    return None if values is None else np.asarray(values, dtype=dtype).copy()
+
 
 def _preferredDefaultBackend():
     try:
@@ -408,22 +431,22 @@ class TimeStepState:
     """Completed one-based step index."""
     time: float
     """Physical simulation time after the step, in seconds."""
-    betaVolume: np.ndarray
-    """Authoritative excited-state fraction for every Tet4 cell."""
+    betaVolume: np.ndarray | None
+    """Authoritative excited-state fraction for every Tet4 cell, when selected."""
     phiAse: np.ndarray | None
-    """ASE flux for every Tet4 cell, or ``None`` if unavailable."""
-    standardError: np.ndarray | None
-    """Absolute one-sigma error of the cell ASE flux estimate."""
-    relativeStandardError: np.ndarray | None
-    """Relative one-sigma error of the cell ASE flux estimate."""
-    totalRays: np.ndarray | None
-    """Ray visit count for every Tet4 cell."""
-    dndtAse: np.ndarray
-    """Cell-centered ASE depletion contribution to ``d beta / dt``."""
-    dndtPump: np.ndarray
-    """Cell-centered pump contribution to ``d beta / dt``."""
+    """ASE flux for every Tet4 cell, when selected."""
+    dndtAse: np.ndarray | None
+    """Cell-centered ASE depletion contribution to ``d beta / dt``, when selected."""
+    dndtPump: np.ndarray | None
+    """Cell-centered pump contribution to ``d beta / dt``, when selected."""
     aseResult: object | None
     """Raw lower-level ASE result object for advanced inspection."""
+    standardError: np.ndarray | None = None
+    """Absolute one-sigma error of the cell ASE estimate, when selected."""
+    relativeStandardError: np.ndarray | None = None
+    """Relative one-sigma error of the cell ASE estimate, when selected."""
+    totalRays: np.ndarray | None = None
+    """Ray visit count for each cell, when selected."""
     topology: object | None = None
     """Static mesh topology used by geometry-aware state callbacks."""
     @property
@@ -453,8 +476,9 @@ class Simulation:
     Python sends the initial setup to the compiled backend and receives
     ``TimeStepState`` snapshots after completed steps. Register ``on_init`` for
     one-time Python setup before launch and ``on_step`` for snapshot consumers.
-    ``beforeStep`` is retained only to report that per-step Python mutation is
-    unsupported by compiled runs.
+    Autonomous runs never call Python between backend steps. Synchronized-debug
+    runs additionally allow ``beforeStep`` callbacks to update explicitly
+    selected control fields between steps.
     """
 
     gainMedium: GainMedium
@@ -469,6 +493,10 @@ class Simulation:
     pumpSolver: MonteCarloPumpSolver
     maxSteps: int | None
     reportTimings: bool
+    executionMode: str
+    outputSteps: tuple[int, ...] | None
+    outputFields: tuple[str, ...]
+    controlFields: tuple[str, ...]
     _pumpRegistrations: list
     _time: float
     _step: int
@@ -492,6 +520,10 @@ class Simulation:
         enable_ase=True,
         pre_pump=False,
         report_timings=False,
+        execution_mode="autonomous",
+        output_steps=None,
+        output_fields=None,
+        control_fields=(),
     ):
         self.gainMedium = gain_medium
         self.pump = None
@@ -505,6 +537,12 @@ class Simulation:
         self.pumpSolver = MonteCarloPumpSolver() if pump_solver is None else pump_solver
         self.maxSteps = None if max_steps is None else int(max_steps)
         self.reportTimings = bool(report_timings)
+        self.executionMode = str(execution_mode)
+        self.outputSteps = None if output_steps is None else tuple(int(step) for step in output_steps)
+        self.outputFields = tuple(
+            SIMULATION_OUTPUT_FIELDS if output_fields is None else (str(field) for field in output_fields)
+        )
+        self.controlFields = tuple(str(field) for field in control_fields)
         self._pumpRegistrations = []
         self._time = 0.0
         self._step = 0
@@ -526,6 +564,30 @@ class Simulation:
             raise TypeError("pump_solver must be MonteCarloPumpSolver")
         if self.maxSteps is not None and self.maxSteps <= 0:
             raise ValueError("max_steps must be positive")
+        if self.executionMode not in {"autonomous", "synchronized-debug"}:
+            raise ValueError("execution_mode must be 'autonomous' or 'synchronized-debug'")
+        if self.outputSteps is not None and not self.outputSteps:
+            raise ValueError("output_steps must be omitted or contain at least one completed-step index")
+        if self.outputSteps is not None and any(step <= 0 for step in self.outputSteps):
+            raise ValueError("output_steps must contain positive completed-step indices")
+        if self.outputSteps is not None and tuple(sorted(set(self.outputSteps))) != self.outputSteps:
+            raise ValueError("output_steps must be strictly increasing and unique")
+        if not self.outputFields:
+            raise ValueError("output_fields must contain at least one field")
+        unknown_output_fields = sorted(set(self.outputFields) - set(SIMULATION_OUTPUT_FIELDS))
+        if unknown_output_fields:
+            raise ValueError(f"unsupported output_fields: {unknown_output_fields}")
+        if len(set(self.outputFields)) != len(self.outputFields):
+            raise ValueError("output_fields must be unique")
+        if self.executionMode == "autonomous" and self.controlFields:
+            raise ValueError("control_fields require execution_mode='synchronized-debug'")
+        if self.executionMode == "synchronized-debug" and self.outputSteps is not None:
+            raise ValueError("synchronized-debug emits every completed step; output_steps must be omitted")
+        unknown_control_fields = sorted(set(self.controlFields) - set(SIMULATION_CONTROL_FIELDS))
+        if unknown_control_fields:
+            raise ValueError(f"unsupported control_fields: {unknown_control_fields}")
+        if len(set(self.controlFields)) != len(self.controlFields):
+            raise ValueError("control_fields must be unique")
         if self.crossSections is None and (
             self.phiASE.spectralProperties is not None or self.phiASE.crossSections is not None
         ):
@@ -624,11 +686,12 @@ class Simulation:
         return self
 
     def beforeStep(self, callback, *args, **kwargs):
-        """Register an unsupported legacy pre-step callback.
+        """Register a synchronized-debug control callback.
 
-        Compiled simulations cannot call Python between C++-owned steps. The
-        registration is stored so ``runSteps`` can raise a clear error instead
-        of silently ignoring the callback.
+        The callback receives the live ``Simulation`` after a completed debug
+        snapshot and before the next step. It may update fields named in
+        ``control_fields``; currently ``beta_volume`` is supported. Autonomous
+        runs reject this callback because their C++ loop never contacts Python.
         """
         self._beforeStepCallbacks.append((callback, args, kwargs))
         return self
@@ -670,8 +733,11 @@ class Simulation:
         steps = int(steps)
         if steps <= 0:
             raise ValueError("steps must be positive")
-        if self._beforeStepCallbacks:
-            raise ValueError("compiled Simulation does not support Python beforeStep callbacks during C++-owned steps")
+        if self._beforeStepCallbacks and self.executionMode != "synchronized-debug":
+            raise ValueError(
+                "beforeStep callbacks require execution_mode='synchronized-debug'; "
+                "autonomous runs do not contact Python between steps"
+            )
         if self.pump is None:
             raise ValueError("Simulation requires at least one pump registered with add_pump")
         self._runInitCallbacks()
@@ -684,35 +750,39 @@ class Simulation:
         previous_time = self._time
         run_started = perf_counter() if self.reportTimings else None
         transport_started = perf_counter() if self.reportTimings else None
-        states = transport.runSimulation(
-            self,
-            steps=steps,
-            pumpSteps=pumpSteps,
-            transport=self.phiASE.openpmdBackend,
-            **self.phiASE._transportLaunchOptions(),
-        )
-        transport_seconds = perf_counter() - transport_started if self.reportTimings else 0.0
         state_materialization_seconds = 0.0
         callback_seconds = {}
-        for raw_state in states:
+        received_states = []
+
+        def consume_raw_state(raw_state):
+            nonlocal state_materialization_seconds
             state_started = perf_counter() if self.reportTimings else None
             state = TimeStepState(
                 step=previous_step + int(raw_state.step),
                 time=previous_time + float(raw_state.time),
-                betaVolume=np.asarray(raw_state.betaVolume, dtype=np.float64).copy(),
-                phiAse=np.asarray(raw_state.phiAse, dtype=np.float64).copy(),
-                standardError=np.asarray(raw_state.standardError, dtype=np.float64).copy(),
-                relativeStandardError=np.asarray(raw_state.relativeStandardError, dtype=np.float64).copy(),
-                totalRays=np.asarray(raw_state.totalRays, dtype=np.uint32).copy(),
-                dndtAse=np.asarray(raw_state.dndtAse, dtype=np.float64).copy(),
-                dndtPump=np.asarray(raw_state.dndtPump, dtype=np.float64).copy(),
+                betaVolume=_optional_state_array(raw_state.betaVolume, np.float64),
+                phiAse=_optional_state_array(raw_state.phiAse, np.float64),
+                standardError=_optional_state_array(getattr(raw_state, "standardError", None), np.float64),
+                relativeStandardError=_optional_state_array(
+                    getattr(raw_state, "relativeStandardError", None), np.float64
+                ),
+                totalRays=_optional_state_array(getattr(raw_state, "totalRays", None), np.uint32),
+                dndtAse=_optional_state_array(raw_state.dndtAse, np.float64),
+                dndtPump=_optional_state_array(raw_state.dndtPump, np.float64),
                 aseResult=raw_state.aseResult,
                 topology=self.gainMedium.topology,
             )
-            self.gainMedium.get("betaVolume").value = backendFlat(state.betaVolume.reshape(-1, order="F"))
+            explicit_topology = hasattr(self.gainMedium.topology, "cellPointIndices")
+            if state.betaVolume is not None:
+                self.gainMedium.get("betaVolume").value = (
+                    backendFlat(state.betaVolume.reshape(-1, order="F"))
+                    if explicit_topology
+                    else state.betaVolume
+                )
             self._lastState = state
             self._step = state.step
             self._time = state.time
+            received_states.append(state)
             if self.reportTimings:
                 state_materialization_seconds += perf_counter() - state_started
             for callback, args, kwargs in self._callbacks:
@@ -723,12 +793,30 @@ class Simulation:
                     callback_seconds[callback_name] = callback_seconds.get(callback_name, 0.0) + (
                         perf_counter() - callback_started
                     )
+            if self.executionMode == "synchronized-debug" and int(raw_state.step) < steps:
+                for callback, args, kwargs in self._beforeStepCallbacks:
+                    callback(self, *args, **kwargs)
+
+        states = transport.runSimulation(
+            self,
+            steps=steps,
+            pumpSteps=pumpSteps,
+            transport=self.phiASE.openpmdBackend,
+            on_state=consume_raw_state,
+            **self.phiASE._transportLaunchOptions(),
+        )
+        transport_seconds = perf_counter() - transport_started if self.reportTimings else 0.0
+        if not received_states:
+            for raw_state in states:
+                consume_raw_state(raw_state)
+        self._step = previous_step + steps
+        self._time = previous_time + steps * self.timeStep
         if self.reportTimings:
             total_seconds = perf_counter() - run_started
             callbacks_total = sum(callback_seconds.values())
             print(
                 "HASE frontend timing: "
-                f"steps={len(states)} total={total_seconds:.6f}s "
+                f"snapshots={len(received_states)} total={total_seconds:.6f}s "
                 f"compiled_transport_and_decode={transport_seconds:.6f}s "
                 f"snapshot_materialization={state_materialization_seconds:.6f}s "
                 f"callbacks={callbacks_total:.6f}s"

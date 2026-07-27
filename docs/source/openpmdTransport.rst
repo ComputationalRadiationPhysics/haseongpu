@@ -66,11 +66,20 @@ caller-managed simulation sessions are not supported.
 compiled ``calcPhiASE --cpp-control`` path. Python writes one initial input
 iteration with run-control attributes, then reads the snapshot series produced
 by the C++ time loop. For streaming backends, Python starts a dedicated
-snapshot receiver thread before sending the input iteration, so the C++ backend
-can drain its output stream and finish independently of slower Python
-``on_step`` callbacks such as VTK file writers. Caller-managed simulation
-openPMD sessions are not supported; the compiled run owns its transport
-lifetime.
+snapshot receiver thread before sending the input iteration. The autonomous
+backend owns stepping; Python only consumes the completed-step indices and
+fields selected by ``output_steps`` and ``output_fields`` in the initial
+iteration. A bounded handoff keeps memory use finite, so a slow callback can
+apply ordinary stream backpressure without turning Python into the step
+controller. Caller-managed simulation openPMD sessions are not supported; the
+compiled run owns its transport lifetime.
+
+With ``execution_mode="synchronized-debug"``, the input series remains open.
+After output step *N*, Python writes dynamic input iteration *N* and the backend
+waits for it before starting step *N+1*. Only records listed in
+``control_fields`` are written in these later iterations; currently that list
+may contain ``beta_volume``. Static topology, spectra, backend selection, and
+all other initialization records are transferred only in iteration zero.
 
 Provider Compatibility
 ----------------------
@@ -146,7 +155,7 @@ stores a VTK-compatible unstructured-cell layout in openPMD records:
 
 Main input field records are:
 
-* ``core_beta_volume`` for dynamic excited-state data
+* ``core_beta_volume`` for the authoritative dynamic time-integrator state
 * ``core_cladding_cell_type``, ``core_refractive_index``, and
   ``core_reflectivity`` for static material/surface data
 * ``core_lambda_absorption``, ``core_lambda_emission``,
@@ -179,12 +188,19 @@ metadata:
 * ``time_step`` and ``number_of_steps``
 * ``pump_steps``
 * ``enable_ase`` and ``pre_pump``
+* ``output_fields_string`` and ``control_fields_string`` as scalar JSON arrays
+  of field names; this scalar encoding is identical for ADIOS BP, ADIOS SST,
+  and HDF5
 * ``time_integrator`` (``explicit-euler``, ``heun``, ``midpoint``,
   ``runge-kutta-4``, ``frozen-phi-ase-runge-kutta-4``,
   ``implicit-euler``, or ``exponential-euler``)
 * ``implicit_iterations`` and ``implicit_tolerance`` for implicit Euler
 * ``pump_schema_version`` (currently ``1``), ``pump_ray_count``, and ``pump_rng_seed``
 * flattened source, spectrum, angular, profile, and planar-relay arrays
+
+Readers continue to accept the former ``output_fields`` and ``control_fields``
+string-vector attributes for existing series. New writers use only the scalar
+JSON attributes so that run control has one backend-independent wire format.
 
 The C++ backend writes one output iteration per completed step. Snapshot
 iterations contain the cell-centered ``core_beta_volume`` record plus ``core_result_phi_ase``,
@@ -200,9 +216,9 @@ Iteration Updates
 -----------------
 
 The first Python-written iteration contains the full static context: topology,
-material records, spectra, compute attributes, and the dynamic
-``core_beta_volume`` field. Later iterations normally contain only
-``core_beta_volume`` and reuse the cached static context from iteration 0.
+material records, spectra, compute attributes, and ``core_beta_volume``.
+Synchronized-debug control iterations contain only ``core_beta_volume`` and
+reuse the cached static context from iteration 0.
 
 Changing topology, spectra, material constants, or compute settings requires a
 new input series whose first iteration carries a complete static update.  This

@@ -185,6 +185,19 @@ CLADDING_SURFACE_ID = 3
 NUMBER_OF_Z_LAYERS = 10
 
 
+def laserPumpCladdingOutputSteps(timeSlices, pumpSteps):
+    """Observe the pump boundary, when reached, and the final time slice."""
+    finalStep = int(timeSlices)
+    if finalStep <= 0:
+        raise ValueError("timeSlices must be positive")
+    if pumpSteps is None:
+        return (finalStep,)
+    pumpBoundary = int(pumpSteps)
+    if pumpBoundary < 0:
+        raise ValueError("pumpSteps must be non-negative")
+    return tuple(sorted({step for step in (pumpBoundary, finalStep) if 0 < step <= finalStep}))
+
+
 def _assignLegacyTet4SurfaceDomains(topology):
     """Attach the legacy optical regions to its geometrically identical Tet4 mesh."""
     sample_points = np.asarray(topology.samplePoints, dtype=np.float64).copy()
@@ -276,6 +289,7 @@ def runExample(
     pumpRayCount=50000,
     pumpRngSeed=5489,
     reportTimings=False,
+    outputSteps=None,
     **AseOverride,
 ):
     vtkOutputDir = Path(vtkOutputDir)
@@ -342,6 +356,11 @@ def runExample(
         enable_ase=enableASE,
         pre_pump=prePump,
         report_timings=reportTimings,
+        output_steps=(
+            laserPumpCladdingOutputSteps(timeSlices, pumpSteps)
+            if outputSteps is None
+            else tuple(int(step) for step in outputSteps)
+        ),
     ).add_pump(
         pump,
         injection_method=SurfacePumpInjector(surface_domains="ase_bottom"),
@@ -366,6 +385,16 @@ def main(argv=None):
     parser.add_argument("--backend", type=str, default="UseConfig")
     parser.add_argument("--openpmd-backend", type=str, default="UseConfig")
     parser.add_argument("--timeSteps", type=int, default=150)
+    parser.add_argument(
+        "--output-steps",
+        type=int,
+        nargs="+",
+        default=None,
+        help=(
+            "Completed one-based step indices to emit. By default, emit only "
+            "the pump boundary and final step."
+        ),
+    )
     parser.add_argument(
         "--pumpSteps",
         type=int,
@@ -457,6 +486,7 @@ def main(argv=None):
         reportTimings=args.timings,
         pumpRayCount=args.pump_ray_count,
         pumpRngSeed=args.pump_rng_seed,
+        outputSteps=args.output_steps,
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phi_ase.shape}")

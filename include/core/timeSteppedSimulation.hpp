@@ -10,9 +10,12 @@
 #include <alpaka/alpaka.hpp>
 
 #include <alpakaUtils/DevBundle.hpp>
+#include <alpakaUtils/backendNames.hpp>
 #include <alpakaUtils/memory.hpp>
 #include <alpakaUtils/utils.hpp>
-#include <core/simulation.hpp>
+#include <core/forwardPhiAseEvaluator.hpp>
+#include <core/logging.hpp>
+#include <core/mesh.hpp>
 #include <core/simulationRunControl.hpp>
 #include <core/simulationSnapshot.hpp>
 #include <core/types.hpp>
@@ -23,6 +26,8 @@
 #include <algorithm>
 #include <functional>
 #include <limits>
+#include <memory>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -32,17 +37,7 @@ namespace hase::core
 {
     namespace detail
     {
-        template<typename T_Buffer>
-        std::vector<typename T_Buffer::value_type> copyToVector(auto const& queue, T_Buffer const& buffer)
-        {
-            auto hostBuffer = alpaka::onHost::allocHostLike(buffer);
-            alpaka::onHost::memcpy(queue, hostBuffer, buffer);
-            alpaka::onHost::wait(queue);
-            auto const* data = alpaka::onHost::data(hostBuffer);
-            return {data, data + buffer.getExtents().product()};
-        }
-
-        double absorptionAtEmissionPeak(ExperimentParameters const& experiment)
+        inline double absorptionAtEmissionPeak(ExperimentParameters const& experiment)
         {
             if(experiment.sigmaA.empty() || experiment.sigmaE.empty())
             {
@@ -53,7 +48,7 @@ namespace hase::core
             return experiment.sigmaA.at(std::min(index, experiment.sigmaA.size() - 1u));
         }
 
-        std::vector<double> makeLumpedPointVolumes(HostMesh const& mesh)
+        inline std::vector<double> makeLumpedPointVolumes(HostMesh const& mesh)
         {
             std::vector<double> volumes(mesh.numberOfMeshPoints, 0.0);
             for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
@@ -69,7 +64,7 @@ namespace hase::core
             return volumes;
         }
 
-        void validateRunParameters(SimulationRunControl const& run)
+        inline void validateRunParameters(SimulationRunControl const& run)
         {
             if(run.timeStep <= 0.0)
             {
@@ -78,6 +73,58 @@ namespace hase::core
             if(run.numberOfSteps == 0u)
             {
                 throw std::runtime_error("simulation number_of_steps must be positive");
+            }
+            if(run.executionMode != SimulationExecutionMode::AUTONOMOUS
+               && run.executionMode != SimulationExecutionMode::SYNCHRONIZED_DEBUG)
+            {
+                throw std::runtime_error("simulation execution_mode must be autonomous or synchronized-debug");
+            }
+            unsigned previousOutputStep = 0u;
+            for(unsigned outputStep : run.outputSteps)
+            {
+                if(outputStep == 0u || outputStep > run.numberOfSteps)
+                {
+                    throw std::runtime_error(
+                        "simulation output_steps entries must be completed-step indices in [1, number_of_steps]");
+                }
+                if(outputStep <= previousOutputStep)
+                {
+                    throw std::runtime_error("simulation output_steps must be strictly increasing and unique");
+                }
+                previousOutputStep = outputStep;
+            }
+            auto const supportedOutputFields = SimulationOutputField::all();
+            if(run.outputFields.empty())
+            {
+                throw std::runtime_error("simulation output_fields must contain at least one field");
+            }
+            for(std::size_t index = 0u; index < run.outputFields.size(); ++index)
+            {
+                auto const& outputField = run.outputFields[index];
+                if(std::ranges::find(supportedOutputFields, outputField) == supportedOutputFields.end())
+                {
+                    throw std::runtime_error("unsupported simulation output field '" + outputField + "'");
+                }
+                if(std::ranges::find(run.outputFields.begin(), run.outputFields.begin() + index, outputField)
+                   != run.outputFields.begin() + index)
+                {
+                    throw std::runtime_error("simulation output_fields must be unique");
+                }
+            }
+            if(run.executionMode == SimulationExecutionMode::AUTONOMOUS && !run.controlFields.empty())
+                throw std::runtime_error("simulation control_fields require synchronized-debug mode");
+            if(run.executionMode == SimulationExecutionMode::SYNCHRONIZED_DEBUG && !run.outputSteps.empty())
+                throw std::runtime_error(
+                    "synchronized-debug emits every completed step; output_steps must be omitted");
+            auto const supportedControlFields = SimulationControlField::all();
+            for(std::size_t index = 0u; index < run.controlFields.size(); ++index)
+            {
+                auto const& controlField = run.controlFields[index];
+                if(std::ranges::find(supportedControlFields, controlField) == supportedControlFields.end())
+                    throw std::runtime_error("unsupported simulation control field '" + controlField + "'");
+                if(std::ranges::find(run.controlFields.begin(), run.controlFields.begin() + index, controlField)
+                   != run.controlFields.begin() + index)
+                    throw std::runtime_error("simulation control_fields must be unique");
             }
             if(run.pump.schemaVersion != 1u || run.pump.rayCount == 0u || run.pump.sources.empty())
                 throw std::runtime_error("invalid general pump configuration");
@@ -101,51 +148,70 @@ namespace hase::core
 
     public:
         CompiledSimulationRunner(
-            T_Device& device,
+            std::vector<T_Device> devices,
             T_Executor const& executor,
             ExperimentParameters& experiment,
             ComputeParameters& compute,
             SimulationRunControl const& run,
             HostMesh& hostMesh)
-            : m_device(device)
-            , m_queue(device.makeQueue(alpaka::queueKind::blocking))
-            , m_devBundle(device, executor)
+            : m_forwardAseContext(std::move(devices), executor, experiment, hostMesh)
+            , m_device(m_forwardAseContext.primaryDevice())
+            , m_queue(m_device.makeQueue(alpaka::queueKind::blocking))
+            , m_devBundle(m_device, executor)
             , m_experiment(experiment)
             , m_compute(compute)
             , m_run(run)
             , m_hostMesh(hostMesh)
-            , m_meshContainer(hostMesh.toDevice(device))
-            , m_mesh(m_meshContainer.toView())
+            , m_mesh(m_forwardAseContext.primaryMesh().toView())
             , m_beta(hase::alpakaUtils::toDevice(m_queue, hostMesh.betaVolume))
-            , m_betaNext(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_stage(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_phiAse(alpaka::onHost::alloc<float>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_derivative(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_dndtPump(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_dndtAse(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_k1(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_k2(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_k3(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_k4(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_cellPumpIntegral(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_betaNext(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_stage(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_phiAse(alpaka::onHost::alloc<float>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_derivative(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_dndtPump(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_dndtAse(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k1(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k2(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k3(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k4(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_cellPumpIntegral(
+                  alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_pointPumpIntegral(
-                  alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
+                  alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
             , m_lumpedPointVolume(hase::alpakaUtils::toDevice(m_queue, detail::makeLumpedPointVolumes(hostMesh)))
         {
             if(hostMesh.betaVolume.size() != hostMesh.numberOfCells)
                 throw std::runtime_error("simulation beta_volume must contain exactly one value per cell");
         }
 
-        void run(std::function<void(SimulationSnapshot const&)> const& callback)
+        void run(
+            std::function<void(SimulationSnapshot const&)> const& callback,
+            std::function<std::vector<double>(unsigned)> const& receiveControl)
         {
             for(unsigned step = 0u; step < m_run.numberOfSteps; ++step)
             {
                 bool const pumpEnabled = step < m_run.pumpSteps;
                 bool const aseEnabled = m_run.enableAse && !(m_run.prePump && step == 0u);
                 advanceOneStep(pumpEnabled, aseEnabled);
-                callback(makeSnapshot(step + 1u));
-                alpaka::onHost::memcpy(m_queue, m_beta, m_betaNext);
-                alpaka::onHost::wait(m_queue);
+                std::swap(m_beta, m_betaNext);
+                unsigned const completedStep = step + 1u;
+                bool const synchronizedDebug = m_run.executionMode == SimulationExecutionMode::SYNCHRONIZED_DEBUG;
+                if(synchronizedDebug || shouldOutput(completedStep))
+                {
+                    callback(makeSnapshot(completedStep));
+                }
+                if(synchronizedDebug && completedStep < m_run.numberOfSteps)
+                {
+                    if(!receiveControl)
+                        throw std::runtime_error("synchronized-debug requires a control receiver");
+                    auto betaVolume = receiveControl(completedStep);
+                    if(includesControl(SimulationControlField::BETA_VOLUME))
+                    {
+                        if(betaVolume.size() != m_mesh.numberOfCells)
+                            throw std::runtime_error("synchronized beta_volume control has the wrong cell count");
+                        detail::copyVectorToBuffer(m_queue, betaVolume, m_beta);
+                    }
+                }
             }
         }
 
@@ -161,25 +227,27 @@ namespace hase::core
 
         void evaluateDerivative(auto& beta, bool pumpEnabled, bool aseEnabled, bool refreshAse = true)
         {
-            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, beta));
             if(refreshAse)
             {
                 initializeResult(aseEnabled ? 100000.0 : 0.0, m_hostMesh.numberOfCells);
 
                 if(aseEnabled)
                 {
-                    int const result
-                        = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
-                    if(result != 0)
-                    {
-                        throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
-                    }
+                    m_phiAseDeviceResident
+                        = m_forwardAseContext.evaluate(m_experiment, m_compute, m_hostMesh, beta, m_lastAseResult)
+                              .deviceResidentPhi;
+                    if(!m_phiAseDeviceResident)
+                        detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
                 }
-                auto hostPhiAse = alpaka::makeView(
-                    alpaka::api::host,
-                    m_lastAseResult.phiAse.data(),
-                    alpaka::Vec{m_lastAseResult.phiAse.size()});
-                alpaka::onHost::memcpy(m_queue, m_phiAse, hostPhiAse);
+                else
+                {
+                    m_phiAseDeviceResident = false;
+                    alpaka::onHost::fill(
+                        m_queue,
+                        m_phiAse,
+                        0.0f,
+                        alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
+                }
             }
 
             if(pumpEnabled)
@@ -197,7 +265,8 @@ namespace hase::core
                     m_dndtPump);
             }
 
-            DerivativeBuffers derivativeBuffers{beta, m_phiAse, m_dndtPump, m_dndtAse, m_derivative};
+            auto& activePhiAse = m_phiAseDeviceResident ? m_forwardAseContext.primaryVolumePhiAse() : m_phiAse;
+            DerivativeBuffers derivativeBuffers{beta, activePhiAse, m_dndtPump, m_dndtAse, m_derivative};
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
                 m_queue,
@@ -207,7 +276,6 @@ namespace hase::core
                 std::max(static_cast<double>(m_hostMesh.crystalTFluo), std::numeric_limits<double>::min()),
                 pumpEnabled,
                 derivativeBuffers);
-            alpaka::onHost::wait(m_queue);
         }
 
         void advanceOneStep(bool pumpEnabled, bool aseEnabled)
@@ -256,8 +324,6 @@ namespace hase::core
             }
 
             enqueueClip(m_betaNext);
-            alpaka::onHost::wait(m_queue);
-            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaNext));
         }
 
         void stepRungeKutta4(bool pumpEnabled, bool aseEnabled)
@@ -320,18 +386,96 @@ namespace hase::core
                 std::vector<double>(resultSize, 0.0));
         }
 
+        [[nodiscard]] bool includes(std::string const& field) const
+        {
+            return std::ranges::find(m_run.outputFields, field) != m_run.outputFields.end();
+        }
+
+        [[nodiscard]] bool includesControl(std::string const& field) const
+        {
+            return std::ranges::find(m_run.controlFields, field) != m_run.controlFields.end();
+        }
+
+        [[nodiscard]] bool shouldOutput(unsigned completedStep)
+        {
+            if(m_run.outputSteps.empty())
+            {
+                return true;
+            }
+            if(m_nextOutputStep >= m_run.outputSteps.size() || m_run.outputSteps[m_nextOutputStep] != completedStep)
+            {
+                return false;
+            }
+            ++m_nextOutputStep;
+            return true;
+        }
+
+        static void copyStatus(Result const& source, Result& target)
+        {
+            target.srmStatus = source.srmStatus;
+            target.srmPasses = source.srmPasses;
+            target.srmRemainingFraction = source.srmRemainingFraction;
+            target.srmMaxIterations = source.srmMaxIterations;
+            target.srmDivergenceStreak = source.srmDivergenceStreak;
+        }
+
         SimulationSnapshot makeSnapshot(unsigned step)
         {
-            auto dndtPump = detail::copyToVector(m_queue, m_dndtPump);
-            auto dndtAse = detail::copyToVector(m_queue, m_dndtAse);
-            m_lastAseResult.dndtAse = dndtAse;
+            std::vector<double> betaVolume;
+            std::vector<double> dndtPump;
+            std::vector<double> dndtAse;
+            Result aseResult;
+            copyStatus(m_lastAseResult, aseResult);
+
+            if(includes(SimulationOutputField::BETA_VOLUME))
+                betaVolume = detail::copyToVector(m_queue, m_beta);
+            bool const includePhiAse = includes(SimulationOutputField::PHI_ASE);
+            bool const includeStandardError = includes(SimulationOutputField::STANDARD_ERROR);
+            bool const includeRelativeStandardError = includes(SimulationOutputField::RELATIVE_STANDARD_ERROR);
+            bool const includeTotalRays = includes(SimulationOutputField::TOTAL_RAYS);
+            if(m_phiAseDeviceResident)
+            {
+                auto deviceResult = m_forwardAseContext.downloadPrimaryResult(
+                    includePhiAse,
+                    includeStandardError,
+                    includeRelativeStandardError,
+                    includeTotalRays);
+                aseResult.phiAse = std::move(deviceResult.phiAse);
+                aseResult.standardError = std::move(deviceResult.standardError);
+                aseResult.relativeStandardError = std::move(deviceResult.relativeStandardError);
+                aseResult.totalRays = std::move(deviceResult.totalRays);
+                aseResult.droppedRays = std::move(deviceResult.droppedRays);
+            }
+            else
+            {
+                if(includePhiAse)
+                    aseResult.phiAse = m_lastAseResult.phiAse;
+                if(includeStandardError)
+                    aseResult.standardError = m_lastAseResult.standardError;
+                if(includeRelativeStandardError)
+                    aseResult.relativeStandardError = m_lastAseResult.relativeStandardError;
+                if(includeTotalRays)
+                {
+                    aseResult.totalRays = m_lastAseResult.totalRays;
+                    aseResult.droppedRays = m_lastAseResult.droppedRays;
+                }
+            }
+            if(includes(SimulationOutputField::DNDT_ASE))
+            {
+                dndtAse = detail::copyToVector(m_queue, m_dndtAse);
+                aseResult.dndtAse = dndtAse;
+            }
+            if(includes(SimulationOutputField::DNDT_PUMP))
+                dndtPump = detail::copyToVector(m_queue, m_dndtPump);
+
             return SimulationSnapshot{
                 step,
                 static_cast<double>(step) * m_run.timeStep,
-                m_hostMesh.betaVolume,
-                m_lastAseResult,
+                std::move(betaVolume),
+                std::move(aseResult),
                 std::move(dndtPump),
-                std::move(dndtAse)};
+                std::move(dndtAse),
+                m_run.outputFields};
         }
 
         void enqueueAddScaled(auto& base, auto& slope, auto& out, double scale)
@@ -343,7 +487,6 @@ namespace hase::core
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{hase::kernels::AddScaled{scale}, m_mesh, base, slope, out});
-            alpaka::onHost::wait(m_queue);
         }
 
         void enqueueHeun(auto& base, auto& first, auto& second, auto& out)
@@ -355,7 +498,6 @@ namespace hase::core
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{hase::kernels::CombineHeun{m_run.timeStep}, m_mesh, base, first, second, out});
-            alpaka::onHost::wait(m_queue);
         }
 
         void enqueueRungeKutta4()
@@ -375,7 +517,6 @@ namespace hase::core
                     m_k3,
                     m_k4,
                     m_betaNext});
-            alpaka::onHost::wait(m_queue);
         }
 
         void enqueueExponentialEuler()
@@ -395,7 +536,6 @@ namespace hase::core
                     m_dndtPump,
                     m_dndtAse,
                     m_betaNext});
-            alpaka::onHost::wait(m_queue);
         }
 
         void enqueueClip(auto& beta)
@@ -405,9 +545,9 @@ namespace hase::core
                 m_devBundle.executor,
                 alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(frameSpec, alpaka::KernelBundle{hase::kernels::ClipBeta{}, m_mesh, beta});
-            alpaka::onHost::wait(m_queue);
         }
 
+        ForwardPhiAseContext<T_Device, T_Executor> m_forwardAseContext;
         T_Device& m_device;
         T_Queue m_queue;
         hase::alpakaUtils::DevBundle<T_Device, T_Executor> m_devBundle;
@@ -415,7 +555,6 @@ namespace hase::core
         ComputeParameters& m_compute;
         SimulationRunControl const& m_run;
         HostMesh& m_hostMesh;
-        DeviceMeshContainer<T_Device> m_meshContainer;
         DeviceMeshView m_mesh;
 
         T_DoubleBuffer m_beta;
@@ -433,6 +572,8 @@ namespace hase::core
         T_DoubleBuffer m_pointPumpIntegral;
         T_DoubleBuffer m_lumpedPointVolume;
         Result m_lastAseResult;
+        std::size_t m_nextOutputStep = 0u;
+        bool m_phiAseDeviceResident = false;
     };
 
     inline int startTimeSteppedSimulation(
@@ -440,7 +581,8 @@ namespace hase::core
         ComputeParameters& compute,
         SimulationRunControl const& run,
         HostMesh& hostMesh,
-        std::function<void(SimulationSnapshot const&)> const& callback)
+        std::function<void(SimulationSnapshot const&)> const& callback,
+        std::function<std::vector<double>(unsigned)> const& receiveControl = {})
     {
         detail::validateRunParameters(run);
         auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
@@ -455,14 +597,33 @@ namespace hase::core
                 {
                     return 0;
                 }
-                auto device = devSelector.makeDevice(0);
-                if(!isSelected(backend, device, compute))
+                auto sampleDevice = devSelector.makeDevice(0);
+                if(hase::alpakaUtils::getNameForBackend(backend, sampleDevice) != compute.backend)
                 {
                     return 0;
                 }
+                std::size_t const deviceCount = devSelector.getDeviceCount();
+                compute.devices.resize(deviceCount);
+                std::iota(compute.devices.begin(), compute.devices.end(), 0u);
+                compute.gpu_i = compute.devices.front();
+                if(compute.numDevices == 0u)
+                    compute.numDevices = static_cast<unsigned>(deviceCount);
+                if(compute.numDevices > deviceCount)
+                {
+                    dout(V_WARNING) << "Requested number of devices (" << compute.numDevices
+                                    << ") exceeds the available device count (" << deviceCount
+                                    << "); using all available devices." << std::endl;
+                    compute.numDevices = static_cast<unsigned>(deviceCount);
+                }
+                compute.devices.resize(compute.numDevices);
+                using T_Device = ALPAKA_TYPEOF(sampleDevice);
+                std::vector<T_Device> devices;
+                devices.reserve(compute.devices.size());
+                for(unsigned deviceIndex : compute.devices)
+                    devices.emplace_back(devSelector.makeDevice(deviceIndex));
                 oneDidRun = true;
-                CompiledSimulationRunner runner{device, exec, experiment, compute, run, hostMesh};
-                runner.run(callback);
+                CompiledSimulationRunner runner{std::move(devices), exec, experiment, compute, run, hostMesh};
+                runner.run(callback, receiveControl);
                 return 0;
             },
             backends);
@@ -472,7 +633,7 @@ namespace hase::core
             std::ostringstream message;
             message << "Backend '" << compute.backend
                     << "' did not match any available backend with an available device. Available backends:";
-            for(auto const& element : backendList())
+            for(auto const& element : hase::alpakaUtils::availableBackendNames())
             {
                 message << "\n  " << element;
             }

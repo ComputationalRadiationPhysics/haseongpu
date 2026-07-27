@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <core/simulationRunControl.hpp>
 #include <openpmd/SimulationSnapshotWriter.hpp>
 
 #include <chrono>
@@ -11,7 +12,6 @@ namespace
 {
     template<typename T>
     concept ContainsMeshMember = requires(T value) { value.mesh; };
-
     template<typename T>
     concept ContainsPointBetaMember = requires(T value) { value.betaCells; };
 } // namespace
@@ -22,6 +22,24 @@ TEST_CASE("simulation snapshots contain dynamic state instead of a host mesh", "
     STATIC_REQUIRE_FALSE(ContainsPointBetaMember<hase::core::SimulationSnapshot>);
     STATIC_REQUIRE(std::is_same_v<decltype(hase::core::SimulationSnapshot::betaVolume), std::vector<double>>);
     STATIC_REQUIRE(std::is_same_v<decltype(hase::core::SimulationSnapshot::aseResult), hase::core::Result>);
+}
+
+TEST_CASE("simulation run fields expose only cell-centered state", "[simulation]")
+{
+    using hase::core::SimulationControlField;
+    using hase::core::SimulationOutputField;
+
+    CHECK(
+        SimulationOutputField::all()
+        == std::vector<std::string>{
+            "beta_volume",
+            "phi_ase",
+            "standard_error",
+            "relative_standard_error",
+            "total_rays",
+            "dndt_ase",
+            "dndt_pump"});
+    CHECK(SimulationControlField::all() == std::vector<std::string>{"beta_volume"});
 }
 
 TEST_CASE("simulation snapshot writer runs synchronously when requested", "[openpmd][mpi]")

@@ -1264,6 +1264,31 @@ def test_inputSeriesOmitsStaticTopology(tmp_path):
     series.close()
 
 
+def test_timeSteppedInputIncludesInitialVolumeBeta(tmp_path):
+    _require_openpmd_transport_io()
+    output = tmp_path / ("time_stepped_input" + _file_suffix_for_tests())
+    simulation = SimpleNamespace(
+        phiASE=asymmetric_phi_ase(),
+        gainMedium=asymmetric_medium(),
+        crossSections=asymmetric_cross_sections(),
+    )
+
+    transport._write_simulation_input(
+        output,
+        SimpleNamespace(name=_file_backend_for_tests()),
+        simulation,
+        {"number_of_steps": 1},
+    )
+
+    series = _io().Series(str(output), _io().Access.read_only)
+    iteration = series.iterations[0]
+    np.testing.assert_array_equal(
+        _read_scalar(series, iteration, "core_beta_volume"),
+        VOLUME_BETA,
+    )
+    series.close()
+
+
 def test_cppParserRoundTripsPythonWriter(contract_input, tmp_path):
     output = tmp_path / ("round_trip_result" + _file_suffix_for_tests())
     env = os.environ.copy()
@@ -1686,6 +1711,9 @@ def test_simulation_run_control_serializes_general_pump_graph():
         gainMedium=SimpleNamespace(topology=SimpleNamespace(surfaceDomainMap=lambda: None)),
         timeStep=2.0e-6,
         timeIntegrationSolver=SimpleNamespace(name="implicit-euler", iterations=5, tolerance=1.0e-7),
+        outputFields=("beta_volume", "dndt_pump"),
+        controlFields=("beta_volume",),
+        executionMode="synchronized-debug",
     )
 
     control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
@@ -1697,6 +1725,10 @@ def test_simulation_run_control_serializes_general_pump_graph():
     assert control["pump_schema_version"] == 1
     assert control["pump_ray_count"] == 1234
     assert control["pump_rng_seed"] == 99
+    assert control["output_fields_string"] == '["beta_volume","dndt_pump"]'
+    assert control["control_fields_string"] == '["beta_volume"]'
+    assert "output_fields" not in control
+    assert "control_fields" not in control
     assert control["pump_source_total_power"] == [12.5]
     assert control["pump_source_surfaces"].tolist() == [11]
     assert control["pump_spectrum_wavelengths"] == [940e-9]
@@ -1845,6 +1877,102 @@ def test_streaming_simulation_keeps_input_series_open_until_backend_exits(monkey
     assert states[0].step == 1
     assert closed_before_backend_exit == [False]
     assert input_closed.is_set()
+
+
+def test_streaming_synchronized_debug_exchanges_control_after_each_snapshot(monkeypatch, tmp_path):
+    initial_written = threading.Event()
+    controls_written = threading.Event()
+    writes = []
+
+    class FakeInputSeries:
+        def __init__(self, path, *, backend=None):
+            assert Path(path).name == "input.sst"
+            assert backend == "adios-sst"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            pass
+
+        def write(
+            self,
+            phi_ase,
+            gain_medium,
+            cross_sections,
+            *,
+            iteration_index,
+            include_static,
+            runControl=None,
+            dynamic_fields=None,
+        ):
+            writes.append(
+                (
+                    iteration_index,
+                    include_static,
+                    dynamic_fields,
+                    float(gain_medium.beta),
+                )
+            )
+            if iteration_index == 0:
+                initial_written.set()
+            if iteration_index == 2:
+                controls_written.set()
+
+    class FakeProcess:
+        returncode = 0
+
+        def __init__(self, command, **kwargs):
+            pass
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            raise AssertionError("the successful backend must not be killed")
+
+        def communicate(self):
+            assert controls_written.wait(timeout=2.0)
+            return "", ""
+
+    def fake_read_simulation_output(path, *, on_state=None):
+        assert initial_written.wait(timeout=2.0)
+        for step in (1, 2, 3):
+            state = SimpleNamespace(step=step)
+            if on_state is not None:
+                on_state(state)
+        return [SimpleNamespace(step=3)]
+
+    def update_control(state):
+        simulation.gainMedium.beta = float(state.step)
+
+    monkeypatch.setattr(transport, "OpenPmdInputSeries", FakeInputSeries)
+    monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
+
+    simulation = SimpleNamespace(
+        executionMode="synchronized-debug",
+        controlFields=("beta_volume",),
+        phiASE=object(),
+        gainMedium=SimpleNamespace(beta=0.0),
+        crossSections=object(),
+    )
+    states = transport._run_streaming_simulation(
+        ["calcPhiASE", "--cpp-control"],
+        tmp_path / "input.sst",
+        tmp_path / "output.sst",
+        SimpleNamespace(name="adios-sst"),
+        simulation,
+        {"number_of_steps": 3},
+        on_state=update_control,
+    )
+
+    assert states[-1].step == 3
+    assert writes == [
+        (0, True, {"beta_volume"}, 0.0),
+        (1, False, {"beta_volume"}, 1.0),
+        (2, False, {"beta_volume"}, 2.0),
+    ]
 
 
 def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(monkeypatch, tmp_path):

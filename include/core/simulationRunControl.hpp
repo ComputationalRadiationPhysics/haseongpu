@@ -79,6 +79,38 @@ namespace hase::core
         double implicitTolerance = 1.0e-10;
     };
 
+    struct SimulationExecutionMode
+    {
+        static inline std::string const AUTONOMOUS = "autonomous";
+        static inline std::string const SYNCHRONIZED_DEBUG = "synchronized-debug";
+    };
+
+    struct SimulationOutputField
+    {
+        static inline std::string const BETA_VOLUME = "beta_volume";
+        static inline std::string const PHI_ASE = "phi_ase";
+        static inline std::string const STANDARD_ERROR = "standard_error";
+        static inline std::string const RELATIVE_STANDARD_ERROR = "relative_standard_error";
+        static inline std::string const TOTAL_RAYS = "total_rays";
+        static inline std::string const DNDT_ASE = "dndt_ase";
+        static inline std::string const DNDT_PUMP = "dndt_pump";
+
+        [[nodiscard]] static std::vector<std::string> all()
+        {
+            return {BETA_VOLUME, PHI_ASE, STANDARD_ERROR, RELATIVE_STANDARD_ERROR, TOTAL_RAYS, DNDT_ASE, DNDT_PUMP};
+        }
+    };
+
+    struct SimulationControlField
+    {
+        static inline std::string const BETA_VOLUME = "beta_volume";
+
+        [[nodiscard]] static std::vector<std::string> all()
+        {
+            return {BETA_VOLUME};
+        }
+    };
+
     struct SimulationRunControl
     {
         double timeStep = 0.0;
@@ -86,6 +118,10 @@ namespace hase::core
         bool enableAse = true;
         bool prePump = false;
         unsigned pumpSteps = std::numeric_limits<unsigned>::max();
+        std::string executionMode = SimulationExecutionMode::AUTONOMOUS;
+        std::vector<unsigned> outputSteps;
+        std::vector<std::string> outputFields = SimulationOutputField::all();
+        std::vector<std::string> controlFields;
         TimeIntegrationParameters timeIntegration;
         PumpParameters pump;
     };

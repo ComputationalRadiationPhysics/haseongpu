@@ -66,6 +66,8 @@ def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRunti
             "--disable-ase",
             "--timeSteps",
             "100",
+            "--output-steps",
+            *[str(step) for step in range(1, 101)],
             "--pumpSteps",
             "50",
             "--pump-ray-count",

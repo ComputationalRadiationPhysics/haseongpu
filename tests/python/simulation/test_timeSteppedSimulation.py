@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -26,6 +27,8 @@ from HASEonGPU import (
     RungeKutta4,
     SurfacePumpInjector,
     Simulation,
+    VolumeTopology,
+    autonomous_final,
 )
 from pyInclude.openpmd import transport
 
@@ -37,16 +40,18 @@ def fakeCppSimulation(monkeypatch, smallTopology):
     def make_state(step, simulation, pump_steps):
         volume_shape = (smallTopology.numberOfTriangles, smallTopology.levels - 1)
         pump_active = pump_steps is None or step <= pump_steps
+        fields = set(simulation.outputFields)
         return SimpleNamespace(
             step=step,
             time=step * simulation.timeStep,
-            betaVolume=np.full(volume_shape, 0.125 * step),
-            phiAse=np.full(volume_shape, float(step)),
-            standardError=np.zeros(volume_shape),
-            relativeStandardError=np.zeros(volume_shape),
-            totalRays=np.zeros(volume_shape, dtype=np.uint32),
-            dndtAse=np.zeros(volume_shape),
-            dndtPump=np.ones(volume_shape) if pump_active else np.zeros(volume_shape),
+            betaVolume=np.full(volume_shape, 0.125 * step) if "beta_volume" in fields else None,
+            phiAse=np.full(volume_shape, float(step)) if "phi_ase" in fields else None,
+            standardError=np.zeros(volume_shape) if "standard_error" in fields else None,
+            relativeStandardError=np.zeros(volume_shape) if "relative_standard_error" in fields else None,
+            totalRays=np.zeros(volume_shape, dtype=np.uint32) if "total_rays" in fields else None,
+            dndtAse=np.zeros(volume_shape) if "dndt_ase" in fields else None,
+            dndtPump=(np.ones(volume_shape) if pump_active else np.zeros(volume_shape))
+            if "dndt_pump" in fields else None,
             aseResult=object(),
         )
 
@@ -58,6 +63,7 @@ def fakeCppSimulation(monkeypatch, smallTopology):
         transport=None,
         command_prefix=None,
         workspace_dir=None,
+        on_state=None,
     ):
         call = {
             "simulation": simulation,
@@ -70,7 +76,16 @@ def fakeCppSimulation(monkeypatch, smallTopology):
         if workspace_dir is not None:
             call["workspace_dir"] = workspace_dir
         captured.append(call)
-        return [make_state(step, simulation, pumpSteps) for step in range(1, steps + 1)]
+        emitted_steps = (
+            range(1, steps + 1)
+            if simulation.executionMode == "synchronized-debug" or simulation.outputSteps is None
+            else simulation.outputSteps
+        )
+        states = [make_state(step, simulation, pumpSteps) for step in emitted_steps]
+        if on_state is not None:
+            for state in states:
+                on_state(state)
+        return states
 
     monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)
     return captured
@@ -149,6 +164,74 @@ def testCompiledSimulationUsesPhiAseMpiLaunchOptions(
         "3",
     ]
     assert fakeCppSimulation[-1]["workspace_dir"] == tmp_path / "IO" / "phiase_mpi"
+
+
+@pytest.mark.integration
+def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
+    pumpProperties,
+    crossSections,
+    openPmdRuntimeBackend,
+    alpakaRuntimeBackend,
+    monkeypatch,
+    tmp_path,
+):
+    rank_count_text = os.environ.get("HASE_MPI_TEST_RANKS", "").strip()
+    if not rank_count_text:
+        pytest.skip("HASE_MPI_TEST_RANKS is not configured for this test run")
+    rank_count = int(rank_count_text)
+
+    topology = VolumeTopology.fromTetrahedra(
+        np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        ),
+        np.array([[0, 1, 2, 3]], dtype=np.uint32),
+    ).withDomains(surfaceDomains={"where": "all_exterior", "domain": 1})
+    gain_medium = GainMedium(topology).withPhysicalProperties(
+        betaVolume=np.array([0.1]),
+        claddingCellTypes=np.array([0], dtype=np.uint32),
+        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
+        reflectivities=np.zeros((1, 2)),
+        nTot=2.76e20,
+        crystalTFluo=9.5e-4,
+        claddingNumber=1,
+        claddingAbsorption=0.0,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HASE_MPIEXEC_EXTRA_ARGS", "--oversubscribe")
+    phi_ase = PhiASE(
+        spectralProperties=crossSections,
+        backend=alpakaRuntimeBackend,
+        openpmdBackend=openPmdRuntimeBackend,
+        parallelMode="mpi",
+        nPerNode=rank_count,
+        numDevices=1,
+        minRays=256,
+        maxRays=256,
+        adaptiveSteps=1,
+        rngSeed=1234,
+        useReflections=False,
+    )
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=gain_medium,
+        phi_ase=phi_ase,
+        time_integrator="explicit-euler",
+        time_step_size=1e-5,
+        pre_pump=True,
+    )
+
+    simulation.runSteps(2, pumpSteps=1)
+
+    state = simulation.getLastState()
+    assert state.step == 2
+    assert np.any(np.asarray(state.phiAse) > 0.0)
+    assert np.all(np.isfinite(state.betaVolume))
 
 
 def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
@@ -298,6 +381,90 @@ def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
 
     with pytest.raises(ValueError, match="beforeStep"):
         simulation.runSteps(1)
+
+
+def testAutonomousFinalIsAnOutputScheduleHelper():
+    assert autonomous_final(5) == (5,)
+    with pytest.raises(ValueError, match="positive"):
+        autonomous_final(0)
+
+
+def testAutonomousOutputScheduleAndFieldsAreAppliedAtInitialization(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    seen = []
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+        output_steps=(2, 5),
+        output_fields=("beta_volume", "dndt_pump"),
+    ).on_step(seen.append)
+
+    simulation.runSteps(5)
+
+    assert [state.step for state in seen] == [2, 5]
+    assert seen[-1].betaVolume is not None
+    assert seen[-1].dndtPump is not None
+    assert seen[-1].phiAse is None
+    assert simulation.current_step == 5
+
+
+def testSynchronizedDebugExchangesSelectedControlAfterEveryNonfinalStep(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    controlled_after = []
+
+    def control(simulation):
+        controlled_after.append(simulation.current_step)
+        simulation.gainMedium.get("betaVolume").value[...] = 0.75
+
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+        execution_mode="synchronized-debug",
+        control_fields=("beta_volume",),
+    ).beforeStep(control)
+
+    simulation.runSteps(3)
+
+    assert controlled_after == [1, 2]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"execution_mode": "autonomous", "control_fields": ("beta_volume",)}, "control_fields"),
+        ({"execution_mode": "synchronized-debug", "output_steps": (1,)}, "output_steps"),
+        ({"output_fields": ("point_beta",)}, "unsupported output_fields"),
+        ({"execution_mode": "synchronized-debug", "control_fields": ("point_beta",)}, "unsupported control_fields"),
+    ],
+)
+def testSimulationRunContractRejectsUnsupportedModeCombinations(
+    smallGainMedium,
+    crossSections,
+    kwargs,
+    message,
+):
+    with pytest.raises(ValueError, match=message):
+        Simulation(
+            gain_medium=smallGainMedium,
+            phi_ase=realPhiAse(crossSections),
+            time_integrator=ExponentialEuler(),
+            time_step_size=1e-5,
+            **kwargs,
+        )
 
 
 def testCompiledSimulationRejectsExternalOpenPmdSessionOwnership(

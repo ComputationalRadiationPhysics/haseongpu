@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import queue
 import subprocess
@@ -452,10 +453,12 @@ def _attributeValues(phiAse, gainMedium, crossSections):
     values.update(phiAse.openPmdAttributes(numberOfSamples=number_of_samples))
     return values
 
-def _arrayFields(gainMedium, crossSections, *, phiAse=None, include_static=True):
+def _arrayFields(gainMedium, crossSections, *, phiAse=None, include_static=True, dynamic_fields=None):
     context = _fieldContext(gainMedium)
     for field in _fieldsFromDomain(gainMedium.openPmdFields(context)):
         if include_static or field.spec.name in DYNAMIC_FIELD_NAMES:
+            if not include_static and dynamic_fields is not None and field.recordName not in dynamic_fields:
+                continue
             yield field
     if include_static:
         yield from _fieldsFromDomain(crossSections.openPmdFields(spectralContext))
@@ -842,7 +845,17 @@ def _open_input_series(path, *, backend=None):
     return series
 
 
-def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSections, *, include_static=True, runControl=None):
+def _write_input_iteration(
+    series,
+    iteration_index,
+    phiAse,
+    gainMedium,
+    crossSections,
+    *,
+    include_static=True,
+    runControl=None,
+    dynamic_fields=None,
+):
     iteration = series.snapshots()[int(iteration_index)]
     iteration.time = 0.0
     iteration.dt = 1.0
@@ -864,7 +877,13 @@ def _write_input_iteration(series, iteration_index, phiAse, gainMedium, crossSec
     else:
         iteration.set_attribute("haseStaticUpdate", False)
 
-    for field in _arrayFields(gainMedium, crossSections, phiAse=phiAse, include_static=include_static):
+    for field in _arrayFields(
+        gainMedium,
+        crossSections,
+        phiAse=phiAse,
+        include_static=include_static,
+        dynamic_fields=dynamic_fields,
+    ):
         _writeArrayField(iteration, field)
 
     iteration.close()
@@ -889,7 +908,17 @@ class OpenPmdInputSeries:
         self.close()
         return False
 
-    def write(self, phiAse, gainMedium, crossSections, *, iteration_index=None, include_static=None, runControl=None):
+    def write(
+        self,
+        phiAse,
+        gainMedium,
+        crossSections,
+        *,
+        iteration_index=None,
+        include_static=None,
+        runControl=None,
+        dynamic_fields=None,
+    ):
         if self._series is None:
             raise RuntimeError("OpenPmdInputSeries must be used as a context manager before writing")
         index = self._next_iteration if iteration_index is None else int(iteration_index)
@@ -902,6 +931,7 @@ class OpenPmdInputSeries:
             crossSections,
             include_static=write_static,
             runControl=runControl,
+            dynamic_fields=dynamic_fields,
         )
         self._series.flush()
         self._next_iteration = max(self._next_iteration, index + 1)
@@ -974,12 +1004,14 @@ def read_result(path, *, expected_iteration_index=0) -> Result:
     raise RuntimeError(f"No result iteration was available in {path}")
 
 
-def _read_optional_scalar(series, iteration, name, dtype, default_size=None):
+def _read_optional_scalar(series, iteration, name, dtype):
     if name not in iteration.meshes:
-        if default_size is None:
-            return None
-        return np.zeros(default_size, dtype=dtype)
+        return None
     return _loadScalar(series, iteration, name, dtype)
+
+
+def _reshape_optional(value, shape):
+    return None if value is None else value.reshape(shape, order="F")
 
 
 def _has_attribute(obj, name):
@@ -1006,7 +1038,7 @@ def _result_status_values(iteration):
     }
 
 
-def read_simulation_output(path):
+def read_simulation_output(path, *, on_state=None):
     """Read C++ time-stepped simulation snapshots from an openPMD output series."""
     path = Path(path)
     series = _io().Series(str(path), _access("read_linear"), _series_config(path))
@@ -1014,38 +1046,45 @@ def read_simulation_output(path):
     for fallback_index, iteration in enumerate(series.read_iterations()):
         iteration_index = _iteration_index(iteration, fallback_index)
         number_of_cells = int(iteration.get_attribute("number_of_cells"))
-        beta_volume = _loadScalar(series, iteration, "core_beta_volume", np.float64)
-        phi_ase = _loadScalar(series, iteration, "core_result_phi_ase", np.float32)
-        standard_error = _loadScalar(series, iteration, "core_result_standard_error", np.float64)
-        relative_standard_error = _loadScalar(
+        cell_shape = (number_of_cells,)
+        beta_volume = _read_optional_scalar(series, iteration, "core_beta_volume", np.float64)
+        phi_ase = _read_optional_scalar(series, iteration, "core_result_phi_ase", np.float32)
+        dndt_ase = _read_optional_scalar(series, iteration, "core_result_dndt_ase", np.float64)
+        standard_error = _read_optional_scalar(series, iteration, "core_result_standard_error", np.float64)
+        relative_standard_error = _read_optional_scalar(
             series, iteration, "core_result_relative_standard_error", np.float64
         )
-        total_rays = _loadScalar(series, iteration, "core_result_total_rays", np.uint32)
-        dndt_ase = _loadScalar(series, iteration, "core_result_dndt_ase", np.float64)
-        cell_shape = (number_of_cells,)
-        states.append(SimpleNamespace(
+        total_rays = _read_optional_scalar(series, iteration, "core_result_total_rays", np.uint32)
+        ase_result = None
+        if any(value is not None for value in (phi_ase, standard_error, relative_standard_error, total_rays, dndt_ase)):
+            ase_result = Result(
+                phiAse=[] if phi_ase is None else phi_ase,
+                standardError=[] if standard_error is None else standard_error,
+                relativeStandardError=[] if relative_standard_error is None else relative_standard_error,
+                totalRays=[] if total_rays is None else total_rays,
+                dndtAse=[] if dndt_ase is None else dndt_ase,
+                **_result_status_values(iteration),
+            )
+        state = SimpleNamespace(
             iterationIndex=iteration_index,
             step=int(iteration.get_attribute("step_index")) if _has_attribute(iteration, "step_index") else iteration_index + 1,
             time=float(iteration.get_attribute("time")) if _has_attribute(iteration, "time") else float(iteration.time),
-            betaVolume=beta_volume.reshape(cell_shape, order="F"),
-            phiAse=phi_ase.reshape(cell_shape, order="F"),
-            standardError=standard_error.reshape(cell_shape, order="F"),
-            relativeStandardError=relative_standard_error.reshape(cell_shape, order="F"),
-            totalRays=total_rays.reshape(cell_shape, order="F"),
-            dndtAse=dndt_ase.reshape(cell_shape, order="F"),
-            dndtPump=_loadScalar(
-                series, iteration, "core_result_dndt_pump", np.float64
-            ).reshape(cell_shape, order="F"),
-            aseResult=Result(
-                phiAse=phi_ase,
-                standardError=standard_error,
-                relativeStandardError=relative_standard_error,
-                totalRays=total_rays,
-                dndtAse=dndt_ase,
-                **_result_status_values(iteration),
+            betaVolume=_reshape_optional(beta_volume, cell_shape),
+            phiAse=_reshape_optional(phi_ase, cell_shape),
+            standardError=_reshape_optional(standard_error, cell_shape),
+            relativeStandardError=_reshape_optional(relative_standard_error, cell_shape),
+            totalRays=_reshape_optional(total_rays, cell_shape),
+            dndtAse=_reshape_optional(dndt_ase, cell_shape),
+            dndtPump=_reshape_optional(
+                _read_optional_scalar(series, iteration, "core_result_dndt_pump", np.float64),
+                cell_shape,
             ),
+            aseResult=ase_result,
             staticUpdate=bool(iteration.get_attribute("haseStaticUpdate")) if _has_attribute(iteration, "haseStaticUpdate") else iteration_index == 0,
-        ))
+        )
+        states.append(state)
+        if on_state is not None:
+            on_state(state)
         iteration.close()
     series.close()
     if not states:
@@ -1580,11 +1619,23 @@ def _simulation_run_control(simulation, *, steps, pumpSteps):
         "enable_ase": bool(getattr(simulation, "enableASE", True)),
         "pre_pump": bool(getattr(simulation, "prePump", False)),
         "pump_steps": pump_steps_value,
+        "execution_mode": getattr(simulation, "executionMode", "autonomous"),
         "time_integrator": _time_integrator_name(solver),
         "pump_schema_version": 1,
         "pump_ray_count": int(pump.rayCount),
         "pump_rng_seed": int(pump.rngSeed),
     }
+    if hasattr(simulation, "outputFields"):
+        control["output_fields_string"] = json.dumps(
+            list(simulation.outputFields), separators=(",", ":")
+        )
+    output_steps = getattr(simulation, "outputSteps", None)
+    if output_steps is not None:
+        if output_steps and output_steps[-1] > int(steps):
+            raise ValueError("output_steps entries must not exceed the number of requested steps")
+        control["output_steps"] = np.asarray(output_steps, dtype=np.uint64)
+    control_fields = getattr(simulation, "controlFields", ())
+    control["control_fields_string"] = json.dumps(list(control_fields), separators=(",", ":"))
     control.update(_general_pump_attributes(simulation))
     if hasattr(solver, "iterations"):
         control["implicit_iterations"] = int(solver.iterations)
@@ -1729,34 +1780,109 @@ def _write_simulation_input(input_path, spec, simulation, run_control, *, close_
             iteration_index=0,
             include_static=True,
             runControl=run_control,
+            dynamic_fields={"beta_volume"},
         )
         if close_after is not None:
             close_after.wait()
 
 
-def _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control):
+def _run_streaming_simulation(
+    command,
+    input_path,
+    output_path,
+    spec,
+    simulation,
+    run_control,
+    *,
+    on_state=None,
+):
     """Run compiled simulation while Python threads exchange SST snapshots."""
     result_queue = queue.Queue(maxsize=1)
     input_queue = queue.Queue(maxsize=1)
+    control_queue = queue.Queue(maxsize=1)
+    control_ack_queue = queue.Queue(maxsize=1)
     backend_finished = threading.Event()
+    synchronized_debug = getattr(simulation, "executionMode", "autonomous") == "synchronized-debug"
 
     def read_output():
         try:
-            result_queue.put((True, read_simulation_output(output_path)))
+            def receive_state(state):
+                if on_state is not None:
+                    on_state(state)
+                if synchronized_debug and int(state.step) < int(run_control["number_of_steps"]):
+                    completed_step = int(state.step)
+                    control_queue.put(completed_step)
+                    acknowledged_step = control_ack_queue.get()
+                    if acknowledged_step != completed_step:
+                        raise RuntimeError(
+                            f"synchronized-debug control iteration {completed_step} was not published"
+                        )
+
+            if on_state is None and not synchronized_debug:
+                snapshots = read_simulation_output(output_path)
+            else:
+                snapshots = read_simulation_output(output_path, on_state=receive_state)
+            result_queue.put((True, snapshots))
         except BaseException as exc:
             result_queue.put((False, exc))
+            if proc.poll() is None:
+                proc.kill()
+        finally:
+            if synchronized_debug:
+                try:
+                    control_queue.put_nowait(None)
+                except queue.Full:
+                    pass
 
     def write_input():
         try:
-            _write_simulation_input(
-                input_path,
-                spec,
-                simulation,
-                run_control,
-                close_after=backend_finished,
-            )
+            if not synchronized_debug:
+                _write_simulation_input(
+                    input_path,
+                    spec,
+                    simulation,
+                    run_control,
+                    close_after=backend_finished,
+                )
+            else:
+                with OpenPmdInputSeries(input_path, backend=spec.name) as writer:
+                    writer.write(
+                        simulation.phiASE,
+                        simulation.gainMedium,
+                        simulation.crossSections,
+                        iteration_index=0,
+                        include_static=True,
+                        runControl=run_control,
+                        dynamic_fields={"beta_volume"},
+                    )
+                    for expected_step in range(1, int(run_control["number_of_steps"])):
+                        completed_step = control_queue.get()
+                        if completed_step is None:
+                            raise RuntimeError(
+                                "synchronized-debug output ended before the next control exchange"
+                            )
+                        if completed_step != expected_step:
+                            raise RuntimeError(
+                                f"synchronized-debug expected completed step {expected_step}, "
+                                f"received {completed_step}"
+                            )
+                        writer.write(
+                            simulation.phiASE,
+                            simulation.gainMedium,
+                            simulation.crossSections,
+                            iteration_index=completed_step,
+                            include_static=False,
+                            dynamic_fields=set(getattr(simulation, "controlFields", ())),
+                        )
+                        control_ack_queue.put(completed_step)
+                    backend_finished.wait()
             input_queue.put((True, None))
         except BaseException as exc:
+            if synchronized_debug:
+                try:
+                    control_ack_queue.put_nowait(None)
+                except queue.Full:
+                    pass
             input_queue.put((False, exc))
             if proc.poll() is None:
                 proc.kill()
@@ -1820,7 +1946,16 @@ def _run_streaming_simulation(command, input_path, output_path, spec, simulation
     return payload
 
 
-def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_prefix=None, workspace_dir=None):
+def runSimulation(
+    simulation,
+    *,
+    steps,
+    pumpSteps=None,
+    transport=None,
+    command_prefix=None,
+    workspace_dir=None,
+    on_state=None,
+):
     """Run the full time-stepped Simulation in the compiled C++/alpaka backend."""
     steps = int(steps)
     if steps <= 0:
@@ -1829,6 +1964,8 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
     _ensure_backend_available(spec.name)
     executable = findCalcPhiAse()
     run_control = _simulation_run_control(simulation, steps=steps, pumpSteps=pumpSteps)
+    if simulation.executionMode == "synchronized-debug" and not spec.streaming:
+        raise ValueError("synchronized-debug requires an openPMD streaming backend")
 
     artifact_root = _artifact_root()
     if artifact_root is None and workspace_dir is not None:
@@ -1854,7 +1991,15 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
         ]
 
         if spec.streaming:
-            return _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control)
+            return _run_streaming_simulation(
+                command,
+                input_path,
+                output_path,
+                spec,
+                simulation,
+                run_control,
+                on_state=on_state,
+            )
 
         _write_simulation_input(input_path, spec, simulation, run_control)
         completed = subprocess.run(command, check=False, text=True, capture_output=True)
@@ -1862,7 +2007,7 @@ def runSimulation(simulation, *, steps, pumpSteps=None, transport=None, command_
         if completed.returncode != 0:
             detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
             raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")
-        return read_simulation_output(output_path)
+        return read_simulation_output(output_path, on_state=on_state)
 
 
 def openStream(*, transport=None, command_prefix=None, workspace_dir=None, watchdog_interval=None):

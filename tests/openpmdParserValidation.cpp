@@ -671,6 +671,9 @@ TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[o
             iteration.setAttribute("number_of_steps", 100u);
             iteration.setAttribute("enable_ase", false);
             iteration.setAttribute("pump_steps", 50u);
+            iteration.setAttribute("execution_mode", std::string{"synchronized-debug"});
+            iteration.setAttribute("output_fields_string", std::string{"[\"beta_volume\",\"dndt_pump\"]"});
+            iteration.setAttribute("control_fields_string", std::string{"[\"beta_volume\"]"});
             iteration.setAttribute("time_integrator", std::string{"frozen-phi-ase-runge-kutta-4"});
             using U64 = unsigned long long;
             iteration.setAttribute("pump_schema_version", 1u);
@@ -715,12 +718,32 @@ TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[o
     REQUIRE(context.run.numberOfSteps == 100u);
     REQUIRE(context.run.enableAse == false);
     REQUIRE(context.run.pumpSteps == 50u);
+    REQUIRE(context.run.outputFields == std::vector<std::string>{"beta_volume", "dndt_pump"});
+    REQUIRE(context.run.controlFields == std::vector<std::string>{"beta_volume"});
     REQUIRE(context.run.timeIntegration.method == "frozen-phi-ase-runge-kutta-4");
     REQUIRE(context.run.pump.rayCount == 1234u);
     REQUIRE(context.run.pump.rngSeed == 99u);
     REQUIRE(context.run.pump.sources.size() == 1u);
     REQUIRE(context.run.pump.sources.front().totalPower == 12.5);
     REQUIRE(context.run.pump.sources.front().relays.front().transmission == 0.75);
+}
+
+TEST_CASE("openPMD parser reads legacy string-vector run-control attributes", "[openpmd][parser]")
+{
+    auto const path = writeParserInput(
+        "legacy_string_vector_run_control",
+        [](io::Series& series, io::Iteration& iteration)
+        {
+            (void) series;
+            iteration.setAttribute(
+                "output_fields",
+                std::vector<std::string>{"beta_volume", "relative_standard_error"});
+        });
+    hase::openpmd::Parser parser{path, testPath("legacy-string-vector-run-control-output")};
+    auto context = parser.read();
+
+    REQUIRE(context.run.outputFields == std::vector<std::string>{"beta_volume", "relative_standard_error"});
+    REQUIRE(context.run.controlFields.empty());
 }
 
 TEST_CASE("openPMD parser rejects legacy compiled pump run control", "[openpmd][parser]")

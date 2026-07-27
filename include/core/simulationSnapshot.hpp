@@ -9,6 +9,8 @@
 
 #include <core/types.hpp>
 
+#include <algorithm>
+#include <string>
 #include <vector>
 
 namespace hase::core
@@ -21,5 +23,11 @@ namespace hase::core
         Result aseResult;
         std::vector<double> dndtPump;
         std::vector<double> dndtAse;
+        std::vector<std::string> fields;
+
+        [[nodiscard]] bool contains(std::string const& field) const
+        {
+            return std::ranges::find(fields, field) != fields.end();
+        }
     };
 } // namespace hase::core
