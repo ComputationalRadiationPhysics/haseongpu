@@ -58,6 +58,7 @@ namespace hase::openpmd
             openPMD::Series& series,
             std::uint64_t iterationIndex,
             core::SimulationSnapshot const& snapshot,
+            core::HostMesh const& mesh,
             core::ExperimentParameters const& experiment,
             bool includeStatic);
 

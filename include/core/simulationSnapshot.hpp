@@ -7,7 +7,6 @@
  */
 #pragma once
 
-#include <core/mesh.hpp>
 #include <core/types.hpp>
 
 #include <vector>
@@ -18,7 +17,8 @@ namespace hase::core
     {
         unsigned step = 0u;
         double time = 0.0;
-        HostMesh mesh;
+        std::vector<double> betaCells;
+        std::vector<double> betaVolume;
         Result aseResult;
         Result volumeAseResult;
         std::vector<double> dndtPump;

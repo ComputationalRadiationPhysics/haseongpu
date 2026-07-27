@@ -389,7 +389,8 @@ namespace hase::core
             return SimulationSnapshot{
                 step,
                 static_cast<double>(step) * m_run.timeStep,
-                m_hostMesh,
+                m_hostMesh.betaCells,
+                m_hostMesh.betaVolume,
                 m_lastAseResult,
                 m_lastVolumeAseResult,
                 std::move(dndtPump),
