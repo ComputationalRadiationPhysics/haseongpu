@@ -12,7 +12,7 @@ def _load_preflight_module():
     return module
 
 
-def test_pythonBackendCheckAcceptsDefaultAdiosSstProvider():
+def test_pythonBackendCheckAcceptsAdiosSstProvider():
     preflight = _load_preflight_module()
     errors = []
     info = {
@@ -23,6 +23,12 @@ def test_pythonBackendCheckAcceptsDefaultAdiosSstProvider():
     preflight._check_python_backend(info, "adios-sst", errors)
 
     assert errors == []
+
+
+def test_defaultBackendIsPersistentAdios():
+    preflight = _load_preflight_module()
+
+    assert preflight._parse_args([]).backend == "adios"
 
 
 def test_pythonBackendCheckRejectsMissingHdf5Support():

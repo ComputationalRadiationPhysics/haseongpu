@@ -58,6 +58,10 @@ Sampling and Physics Settings
 
 ``relativeStandardErrorThreshold``
    Target dimensionless relative standard error; ``0.1`` requests 10%.
+   RSE replaces the former mean-squared-error threshold because it describes
+   uncertainty relative to the estimated mean and does not change with the
+   physical scale or unit of ``phiAse``. ``mseThreshold`` and ``mse_threshold``
+   are retired rather than reinterpreted with different semantics.
 
 ``repetitions``
    Retained transport compatibility field. The forward backend currently uses
@@ -77,6 +81,14 @@ an isotropic direction. The volume probability is proportional to
 source weight. A ray then deposits its gain-weighted track-length contribution
 in each Tet4 volume it crosses. The next Tet4 boundary is selected from
 precomputed barycentric face planes instead of testing every triangular face.
+
+For local gain coefficient :math:`g` and segment length :math:`\ell`, the
+deposited track length is evaluated exactly as
+:math:`(\exp(g\ell)-1)/g`, with the stable :math:`\ell` limit near
+:math:`g=0`. One forward history can therefore inform every cell on its path;
+it does not move or store inversion between cells. See
+:doc:`../theoryAndModel` for the estimator, normalization, and uncertainty
+formulae.
 
 Within every adaptive batch, direct rays are distributed as evenly as possible
 over the discrete ASE spectral bins. They also use one randomly shifted
@@ -118,6 +130,11 @@ explicitly validated proposal model.
    reflected passes required to report ``diverged``. It defaults to ``3``.
    This setting is intentionally not an openPMD request attribute: it is a
    runtime safety policy, like ``HASE_SRM_MAX_ITERATIONS``.
+
+The current ASE boundary model is specular. It supports a configured constant
+reflectivity and total internal reflection, but does not launch transmitted or
+refracted rays and does not calculate angle- or polarization-dependent Fresnel
+coefficients. The non-reflected fraction leaves the simulated domain.
 
 ``monochromatic``
    Forces the ASE computation to use only the first absorption and emission
@@ -163,9 +180,11 @@ openPMD Transport Options
 -------------------------
 
 The openPMD storage backend is selected separately from ``PhiASE.backend``.
-The default is ``auto``: it selects ``adios-sst``, then ``adios``, then
+The default is ``auto``: it selects ``adios``, then ``adios-sst``, then
 ``hdf5`` from backends supported by both the compiled and Python openPMD
-providers. Set ``PhiASE.openpmdBackend`` in Python, use
+providers. The persistent ADIOS/BP backend is preferred because it is currently
+more robust and usually faster for HASEonGPU; SST remains available explicitly
+for streaming. Set ``PhiASE.openpmdBackend`` in Python, use
 ``openpmd_backend`` in YAML, or pass ``--openpmd-backend`` through the
 command-line helper to choose a different runtime backend.
 Accepted values are ``auto``, ``adios-sst``, ``adios``, and ``hdf5``.

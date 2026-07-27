@@ -40,10 +40,16 @@ def test_openPmdBackendsLoadsCompiledProbe(monkeypatch, tmp_path):
     monkeypatch.setattr(
         backends,
         "_load_probe_library",
-        lambda extra_dirs=(): (FakeProbeLibrary(("hdf5", "adios", "unsupported")), probe_path),
+        lambda extra_dirs=(): (
+            FakeProbeLibrary(("hdf5", "adios-sst", "adios", "unsupported")),
+            probe_path,
+        ),
     )
 
-    assert backends._load_backend_names() == (("adios", "hdf5"), probe_path)
+    assert backends._load_backend_names() == (
+        ("adios", "adios-sst", "hdf5"),
+        probe_path,
+    )
 
 
 def test_openPmdBackendsCachesNames(monkeypatch):

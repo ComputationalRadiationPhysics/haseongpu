@@ -19,9 +19,11 @@ Geometry and gain media
 
    Grid
    MeshTopology
+   VolumeTopology
    GainMedium
    GainMediumGeometry
    Gmsh
+   SurfaceOptics
 
 Spectra, pump, and ASE
 ^^^^^^^^^^^^^^^^^^^^^^

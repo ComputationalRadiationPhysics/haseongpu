@@ -223,7 +223,7 @@ OPENPMD_BACKENDS = {
     "hdf5": _BackendSpec("hdf5", ".h5", HDF5_CONFIG),
 }
 DEFAULT_OPENPMD_BACKEND = "auto"
-OPENPMD_BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
+OPENPMD_BACKEND_PRIORITY = ("adios", "adios-sst", "hdf5")
 HASE_CONFIGURE_HINT = "Run `hase-configure` to generate a matching backend/openPMD setup."
 _OPENPMD_BACKEND_PROBE_CACHE = {}
 

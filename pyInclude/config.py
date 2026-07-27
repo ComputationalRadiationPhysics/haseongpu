@@ -22,7 +22,7 @@ from types import SimpleNamespace
 from .openpmd import preflight
 
 
-OPENPMD_BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
+OPENPMD_BACKEND_PRIORITY = ("adios", "adios-sst", "hdf5")
 PROVIDER_AUTO = "auto"
 PROVIDER_BUNDLED = "bundled"
 PROVIDER_SYSTEM = "system"
@@ -143,7 +143,7 @@ def bundled_supported_openpmd_backends(adios2_mode, hdf5_mode=BUNDLED_HDF5_OFF):
     """Return runtime backends implied by the HASE-managed provider choices."""
     supported = []
     if adios2_mode != BUNDLED_ADIOS2_OFF:
-        supported.extend(["adios-sst", "adios"])
+        supported.extend(["adios", "adios-sst"])
     if hdf5_mode != BUNDLED_HDF5_OFF:
         supported.append("hdf5")
     return [backend for backend in OPENPMD_BACKEND_PRIORITY if backend in supported]
@@ -590,7 +590,7 @@ def _python_info_from_package_dir(package_dir, errors):
 
 def _probe_external(args, *, backend=None):
     probe_args = SimpleNamespace(
-        backend=backend or args.openpmd_backend or "adios-sst",
+        backend=backend or args.openpmd_backend or "adios",
         cmake_prefix_path=_combined_cmake_prefix_path(args.cmake_prefix_path, args.adios2_prefix, args.hdf5_prefix),
         openpmd_dir=args.openpmd_dir,
         cmake=args.cmake,

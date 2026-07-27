@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-BACKEND_PRIORITY = ("adios-sst", "adios", "hdf5")
+BACKEND_PRIORITY = ("adios", "adios-sst", "hdf5")
 
 
 def _library_names():

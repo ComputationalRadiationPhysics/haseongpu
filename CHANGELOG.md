@@ -1,5 +1,37 @@
 # Changelog
 
+## HASEonGPU 2.2.0
+
+Feature release that replaces the target-driven backward PhiASE calculation
+with source-driven forward Monte Carlo transport on explicit Tet4 meshes. A
+single Alpaka ray history now contributes an exact gain-weighted track-length
+tally to every crossed cell. Precomputed barycentric traversal, beta-volume and
+spectral stratification, adaptive global ray batches, and dimensionless
+relative standard error improve throughput and make convergence controls
+independent of the physical result scale.
+
+Surface-reservoir reflections operate on domain-tagged physical boundaries and
+report explicit convergence, stability, divergence, and iteration-limit
+status. Named cell and surface domains connect imported Gmsh, VTK, and closed
+STL volume geometry to material, pump-injection, and boundary-optics settings.
+
+The release also replaces the one-dimensional z pump with general Monte Carlo
+pump transport through Tet4 volumes. The PICMI-inspired API separates physical
+pumps, surface injectors, numerical solver controls, and finite planar relays.
+Pump sources support spatial, spectral, and angular distributions, multiple
+tagged apertures, and affine return passes with explicit scalar transmission
+and aperture vignetting.
+
+Automatic openPMD backend selection now prefers persistent ADIOS/BP over SST,
+with SST and HDF5 retained as fallbacks or explicit choices. The same order is
+used by ``hase-configure`` and runtime capability discovery.
+
+The backward propagation kernels, MSE convergence setting, forward ray-length
+cutoff, and legacy one-dimensional pump interface are retired. The current
+optics model supports constant specular reflectivity and total internal
+reflection, but not Fresnel reflection/transmission, refracted rays, or general
+internal optical interfaces.
+
 ## HASEonGPU 2.1.1
 
 Patch release that moves pump time stepping and frozen-RK4 integration into the

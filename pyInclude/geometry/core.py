@@ -523,8 +523,9 @@ PHYSICAL_PROPERTY_SPECS = {
         dtype=np.float64,
         shape=_shape_prisms,
         description=(
-            "Prism-centered excited-state fraction beta_j used by ASE. "
-            "Matrix layout is (numberOfTriangles, numberOfLevels - 1)."
+            "Cell-centered excited-state fraction beta_j used by ASE and pump transport. "
+            "Explicit volume topology stores one value per cell; the legacy layout is "
+            "(numberOfTriangles, numberOfLevels - 1)."
         ),
         default=_default_beta_volume,
     ),
@@ -533,8 +534,8 @@ PHYSICAL_PROPERTY_SPECS = {
         dtype=np.float64,
         shape=_shape_cells,
         description=(
-            "Point-centered excited-state fraction beta_i. Matrix layout is "
-            "(numberOfPoints, numberOfLevels)."
+            "Sample-centered excited-state fraction beta_i. Explicit volume topology normally "
+            "stores one value per mesh point; the legacy layout is (numberOfPoints, numberOfLevels)."
         ),
         default=_default_sample_values,
     ),
@@ -549,7 +550,7 @@ PHYSICAL_PROPERTY_SPECS = {
         name="claddingCellTypes",
         dtype=np.uint32,
         shape=_shape_triangles,
-        description="Cladding type index for each triangle.",
+        description="Cladding type index for each explicit volume cell or legacy triangle.",
         default=_default_cladding_cell_types,
     ),
     "refractiveIndices": PhysicalPropertySpec(

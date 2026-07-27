@@ -1,238 +1,257 @@
 Theory and Model
 ================
 
-HASEonGPU builds on earlier ASE modeling work by D. Albach et. al [2],
+HASEonGPU builds on earlier ASE modeling work by D. Albach et al. [2],
 where ray-tracing techniques and Monte Carlo integration were used to calculate
 ASE in laser gain media in a single-threaded CPU-centered context. Based on
-this scientific foundation, HASEonGPU [1] extends the approach with multi-GPU
-acceleration, adaptive sampling, and distributed multi-node execution.
+this scientific foundation, HASEonGPU [1] extends the approach with portable
+Alpaka execution, adaptive sampling, and distributed multi-node execution.
 
 Nature of the Problem
 ---------------------
 
-Accurate ASE simulations require a large number of sampling points as well as a
-high number of rays. In addition, reflections on the upper and lower surfaces of
-the gain medium can substantially increase the computational workload. On
-traditional CPU-based systems, this makes detailed ASE simulations
-time-consuming and limits the number of practical simulation runs.
+Accurate ASE simulations require a spatially resolved estimate of radiation
+transport through an inhomogeneous gain medium. A useful solver must sample the
+emission spectrum and source volume, integrate gain and absorption along many
+paths, and optionally account for repeated surface reflections. The cost grows
+with the mesh size and requested statistical accuracy, which makes the
+transport algorithm and its mapping to parallel hardware central to practical
+simulations.
 
-Solution Method
----------------
+Forward ASE Model
+-----------------
 
-HASEonGPU addresses this with non-uniform spatial sampling, Monte Carlo
-integration, importance sampling, adaptive sampling, and GPU parallelization
-[1].  MPI execution distributes the sample range across ranks; each rank can
-use one or more local devices.
+HASEonGPU 2.2.0 uses a source-driven forward Monte Carlo estimator on explicit
+Tet4 volume meshes. This replaces the former target-driven algorithm, which
+traced a separate population of source-to-target paths for every observation
+point. A forward history starts at an emitting volume and contributes to every
+cell it traverses. Geometric work performed for one history is therefore reused
+across all cells on that path.
 
-ASE Estimator
--------------
+Tet4 State and Emission Source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The central calculation is the ASE contribution at each sample point of the
-gain medium.  Let
+Let :math:`V_j` be the volume of Tet4 cell :math:`j` and :math:`\beta_j` its
+cell-centered excited-state fraction. For vertex-centered state, HASEonGPU
+first averages the four vertex values to obtain :math:`\beta_j`.
 
-.. math::
-
-   p_i
-
-be sample point ``i``.  The mesh is represented as an extruded triangular mesh.
-For a prism index
-
-.. math::
-
-   j = t + z N_{\mathrm{tri}},
-
-:math:`t` is the 2D triangle index, :math:`z` is the layer index, and
-:math:`N_{\mathrm{tri}}` is the number of base triangles.  The prism volume is
+The integrated source strength used for spatial sampling is
 
 .. math::
 
-   V_j = A_t \Delta z,
+   B = \sum_j \beta_j V_j.
 
-where :math:`A_t` is the triangle area and :math:`\Delta z` is the layer thickness.
+A direct history selects cell :math:`j` with probability
+:math:`\beta_j V_j / B`, samples a point uniformly inside that tetrahedron,
+selects a spectral bin, and samples an isotropic direction. Sampling the source
+with its physical :math:`\beta V` density absorbs that factor into the source
+probability and leaves a unit importance weight. If :math:`B` is zero, the ASE
+estimate is zero.
 
-For a source point ``q`` inside prism ``j``, HASEonGPU propagates a ray from
-``q`` to ``p_i``.  Along that ray the path is split into prism segments
-``s``.  The serial implementation evaluates the gain as the product
+The spectral-bin and source-cell selections are stratified within each global
+batch. The stratification uses global history indices, so splitting a batch
+over Alpaka devices or MPI ranks preserves the intended coverage. Directions
+remain isotropic; HASEonGPU does not infer a preferred direction from an
+arbitrary Tet4 mesh.
 
-.. math::
+Gain Along a Ray
+^^^^^^^^^^^^^^^^
 
-   G(q \rightarrow p_i)
-   =
-   \frac{1}{\lVert p_i - q \rVert^2}
-   \prod_s
-   \exp\left(
-   N_{\mathrm{tot}}
-   \left[
-   \beta_s(\sigma_e + \sigma_a) - \sigma_a
-   \right]
-   \Delta l_s
-   \right).
-
-Equivalently, in continuous notation this is
+Within a cell, the local gain coefficient for wavelength-dependent absorption
+and emission cross sections is
 
 .. math::
 
-   G(q \rightarrow p_i)
-   =
-   \frac{1}{\lVert p_i - q \rVert^2}
-   \exp\left(
-   \int_q^{p_i}
-   N_{\mathrm{tot}}
-   \left[
-   \beta(x)(\sigma_e + \sigma_a) - \sigma_a
-   \right]
-   \,dl
-   \right).
+   g_j = N_{\mathrm{tot}}
+         \left[\beta_j(\sigma_e + \sigma_a) - \sigma_a\right].
 
-The explicit inverse-square factor is applied in the implementation as
-``1 / ray.length^2`` after the segment product has been accumulated.
-
-Importance sampling is used only to decide where rays should start.  For each
-sample point, HASEonGPU first evaluates a raw importance from prism centers:
+Cladding cells instead use the configured cladding absorption. For a segment of
+length :math:`\ell` in cell :math:`j`, the ray weight changes by
 
 .. math::
 
-   I_j^{\mathrm{raw}}
-   =
-   \beta_j G(c_j \rightarrow p_i),
-   \qquad
-   S = \sum_j I_j^{\mathrm{raw}}.
+   G_{\mathrm{out}} = G_{\mathrm{in}}\exp(g_j\ell).
 
-The requested ray count for a prism is assigned approximately proportional to
-this raw importance:
+The contribution deposited in that cell uses the exact gain-weighted
+track-length integral
 
 .. math::
 
-   N_j =
-   \left\lfloor
-   \frac{I_j^{\mathrm{raw}}}{S} N
-   \right\rfloor,
+   T(g_j, \ell)
+   = \int_0^\ell \exp(g_j s)\,ds
+   = \begin{cases}
+       \dfrac{\exp(g_j\ell)-1}{g_j}, & g_j \ne 0,\\
+       \ell, & g_j = 0.
+     \end{cases}
 
-where :math:`N` is ``ctx.NumRays``.  Any leftover rays caused by integer rounding
-are distributed randomly over the prisms.  If ``N_j`` rays are drawn from prism
-``j``, then ``N_j / N`` approximates the sampling probability.  The final
-Monte Carlo weight is not the raw importance.  It is the prism volume corrected
-by the allocated ray count:
+The implementation evaluates the :math:`\ell` limit directly when
+:math:`|g_j\ell|` is small. The score contributed by a history to a visited cell
+is its gain on entering the cell multiplied by :math:`T(g_j,\ell)`. A history
+that does not visit the cell contributes zero.
 
-.. math::
+Direct Estimator and Physical Scaling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   W_j = \frac{V_j}{P_j}
-   \approx
-   \frac{N V_j}{N_j}.
-
-In the serial code this is the assignment
-
-.. math::
-
-   W_j =
-   \begin{cases}
-   \dfrac{N A_t \Delta z}{N_j}, & N_j > 0,\\
-   0, & N_j = 0,
-   \end{cases}
-
-with :math:`A_t` = ``surface_new[t]`` and :math:`\Delta z` = ``z_mesh``.
-
-The unscaled ASE flux estimator at sample point ``i`` is therefore
+Let :math:`X_{rj}` be the score deposited by direct history :math:`r` in cell
+:math:`j`, including a zero score when the history does not visit that cell.
+For :math:`N` globally launched histories, the unscaled volume estimator is
 
 .. math::
 
-   \Phi_i^{0}
-   =
-   \frac{1}{4\pi N_{\mathrm{real}}}
-   \sum_j
-   \sum_{k=1}^{N_j}
-   \beta_j
-   G(q_{j,k} \rightarrow p_i)
-   W_j,
+   \Phi_j^0 = \frac{B}{N V_j}\sum_{r=1}^{N} X_{rj}.
 
-where :math:`N_{\mathrm{real}}` is the actual number of rays used after integer ray allocation.
-For the serial implementation, :math:`N_{\mathrm{real}}` is the accumulated sum of allocated
-:math:`N_j` values for that sample.
+Uniform sampling over the sphere already represents the angular
+:math:`1/(4\pi)` average; no additional inverse-square target factor is applied.
+This is a track-length estimator of the radiation field in a receiving volume,
+not the old point-target estimator.
 
-The value returned by the high-level HASEonGPU backend as ``phiAse`` is already
-scaled by active-ion density and fluorescence lifetime:
+The high-level backend scales the result by active-ion density and fluorescence
+lifetime,
 
 .. math::
 
-   \Phi_i
-   =
-   \frac{N_{\mathrm{tot}}}{\tau}
-   \Phi_i^{0}.
+   \Phi_j = \frac{N_{\mathrm{tot}}}{\tau}\Phi_j^0.
 
-This convention matters for time stepping: ``phiAse`` already contains the
-:math:`N_{\mathrm{tot}} / \tau` factor.
+``phiAse`` therefore already contains the :math:`N_{\mathrm{tot}}/\tau`
+factor. It must not be applied a second time in the population derivative.
+
+Statistical Uncertainty and Adaptation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For each cell, the backend accumulates the score sum :math:`S_1=\sum_r X_r`
+and squared-score sum :math:`S_2=\sum_r X_r^2`. It reports the relative
+standard error
+
+.. math::
+
+   \mathrm{RSE}
+   = \sqrt{\frac{N S_2/S_1^2 - 1}{N}}.
+
+Unlike the former mean-squared-error threshold, RSE is dimensionless: an RSE of
+``0.1`` represents an estimated one-standard-error uncertainty of 10% relative
+to the mean. ``standardError`` carries the same physical unit as ``phiAse``;
+``relativeStandardError`` is dimensionless.
+
+Adaptive execution starts with ``minRays`` and adds geometrically increasing
+global batches until all cells satisfy the configured RSE threshold or
+``maxRays`` is reached. ``forwardRayCount`` selects a fixed global history count
+instead. Dropped or non-finite histories prevent the affected cell from being
+reported as converged. RSE measures Monte Carlo sampling uncertainty; it does
+not include mesh discretization or model error.
+
+Tet4 Traversal
+^^^^^^^^^^^^^^
+
+For each cell face, HASEonGPU precomputes the affine barycentric coordinate
+
+.. math::
+
+   \lambda_f(x) = a_f x + b_f y + c_f z + d_f.
+
+Along a ray :math:`x(t)=x_0+t v`, the next decreasing coordinate to reach zero
+identifies the exit face. Cell adjacency then provides the next tetrahedron and
+the local face that must be excluded from the following intersection. This
+avoids rebuilding triangle-intersection data in the hot traversal loop.
+
+Bounded recovery handles rays that meet several faces at a shared edge or
+vertex. Invalid connectivity, non-finite contributions, or a traversal that
+cannot be recovered are counted as dropped histories rather than silently
+contributing an invalid value.
+
+Surface Reflections
+-------------------
+
+When reflections are enabled, direct rays still propagate to a physical mesh
+boundary. Domain-assigned ``SurfaceOptics`` determines the reflected fraction.
+The current model applies specular reflection with either total internal
+reflection or a configured constant reflectivity.
+
+The surface-reservoir method (SRM) retains a bounded weighted sample of the
+direction, spectral bin, and weight arriving at each reflective boundary face.
+The face weights define the source distribution for a new reflected pass. The
+new pass contributes through the same track-length estimator and fills the
+reservoir for the following pass.
+
+Reflection terminates when the remaining source weight is below
+``reflectionTolerance``, reaches a non-growing stable state, exceeds the
+configured divergence streak, or reaches ``reflectionMaxIterations``. The
+result exposes the SRM status, pass count, remaining fraction, and the active
+safety limits.
+
+The ASE boundary model does not yet launch a transmitted or refracted ray and
+does not calculate angle- or polarization-dependent Fresnel coefficients. A
+non-reflected fraction leaves the simulated domain. Refractive indices are
+currently used to detect total internal reflection only.
 
 ASE Population Derivative
 -------------------------
 
-The ASE depletion term for the excited-state fraction is computed from the
-returned ``phiAse`` as
+The ASE depletion term for the excited-state fraction is
 
 .. math::
 
    \left.\frac{d\beta_i}{dt}\right|_{\mathrm{ASE}}
-   =
-   \left[
-   \beta_i(\sigma_e + \sigma_a) - \sigma_a
-   \right]
-   \Phi_i.
+   = \left[\beta_i(\sigma_e+\sigma_a)-\sigma_a\right]\Phi_i.
 
-Because :math:`\Phi_i` already includes :math:`N_{\mathrm{tot}} / \tau`, this derivative must not be
-multiplied by :math:`N_{\mathrm{tot}}` or divided by :math:`\tau` again.  In the compiled ``Simulation`` time loop, the cross sections used for this scalar
-conversion are the maximum emission cross section and the absorption cross
-section at the emission-peak wavelength.
+For vertex-centered state, volume-centered PhiASE is mapped to the connected
+mesh points before this derivative is evaluated. The compiled simulation uses
+the maximum emission cross section and the absorption cross section at the
+emission-peak wavelength for this scalar conversion.
+
+General Monte Carlo Pump
+------------------------
+
+The compiled pump no longer assumes a super-Gaussian profile propagated only
+through ordered z levels. It launches equal-power Monte Carlo rays from tagged
+exterior Tet4 faces. Each source defines an aperture-integrated total power, a
+normalized spatial profile, a discrete wavelength spectrum, and an angular
+distribution.
+
+Within a cell, pump power follows
+
+.. math::
+
+   P_{\mathrm{out}} = P_{\mathrm{in}}\exp(g_p\ell),
+   \qquad
+   g_p = N_{\mathrm{tot}}
+         \left[\beta(\sigma_a+\sigma_e)-\sigma_a\right].
+
+The corresponding net photon exchange is accumulated in the traversed cell.
+For vertex-centered state it is distributed to the four vertices with
+barycentric midpoint weights and normalized by the lumped sample volumes.
+
+``SurfacePumpInjector`` selects the tagged launch faces. Finite
+``PlanarPumpRelay`` stages can map rays from coplanar exit domains to entry
+domains with flips, rotation, offset, tilt, magnification, scalar transmission,
+and aperture vignetting. These relays are explicit affine return paths, not a
+Fresnel or unlimited cavity model.
 
 Pump and Time Stepping
 ----------------------
 
-The high-level Python interface constructs the physical state, then sends it to
-the C++/Alpaka backend, which advances ``betaCells``.  It combines pump
-excitation, ASE depletion, and fluorescence decay:
+The compiled C++/Alpaka simulation advances
 
 .. math::
 
    \frac{d\beta}{dt}
-   =
-   \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
-   -
-   \left.\frac{d\beta}{dt}\right|_{\mathrm{ASE}}
-   - \frac{\beta}{\tau}.
+   = \left.\frac{d\beta}{dt}\right|_{\mathrm{pump}}
+     - \left.\frac{d\beta}{dt}\right|_{\mathrm{ASE}}
+     - \frac{\beta}{\tau}.
 
-The compiled pump traces equal-power rays from tagged exterior Tet4 faces.
-Each ray samples a normalized spatial profile, discrete wavelength spectrum,
-and angular distribution. Within each tetrahedron, power changes according to
-
-.. math::
-
-   P_{out} = P_{in} \exp(g_p \ell), \qquad
-   g_p = N_{tot}[\beta(\sigma_a+\sigma_e)-\sigma_a].
-
-The absorbed photon rate is deposited conservatively into the traversed cell
-and mapped to the inversion samples. Tagged planar affine relays provide
-finite return passes with explicit transmission and aperture vignetting. Pump
-power is specified as aperture-integrated total power rather than peak
-intensity.
-
-The compiled integrator advances the combined derivative. Standard RK4
-re-evaluates ASE and pump transport at each stage;
+Standard RK4 reevaluates ASE and pump transport at every stage.
 ``FrozenPhiAseRungeKutta4`` reuses its first ASE calculation for the remaining
-stages. ``Simulation(enable_ase=False, ...)`` advances only pump and
-fluorescence.
+stages, while still evaluating the pump contribution. Setting
+``Simulation(enable_ase=False, ...)`` advances pump excitation and fluorescence
+without an ASE calculation.
 
-Restrictions
+Model Limits
 ------------
 
-Pump polarization, coating interactions, residual cavity recirculation, and
-custom Python transport callbacks are not included in the general pump core.
-The pump ray count is limited by runtime and available device memory.
-
-User-Relevant Features
------------------------
-
-HASEonGPU can run on a single workstation or on GPU clusters with MPI.
-ASE setup can include polychromatic spectra, cladding, surface coatings,
-refractive-index changes, upper/lower-surface reflections, and adaptive
-sampling up to the configured ray limit.
+The current transport model does not include polarization, Fresnel
+transmission, detailed coating stacks, general internal optical interfaces,
+unlimited pump-cavity recirculation, or custom Python transport callbacks
+inside compiled time steps. Volume transport supports Tet4 cells. Runtime and
+available device memory limit practical ray and surface-reservoir counts.
 
 References
 ----------

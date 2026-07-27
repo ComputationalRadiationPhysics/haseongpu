@@ -96,7 +96,7 @@ Attach physical arrays and scalar material properties to the topology:
 
 Use ``medium.get("...").expectedShape`` when allocating mesh-dependent arrays.
 The most important fields are ``betaCells`` for point-level excited-state
-fraction, ``betaVolume`` for prism-centered beta, cladding labels,
+fraction, ``betaVolume`` for cell-centered beta, cladding labels,
 reflectivities, active-ion density ``nTot``, and fluorescence lifetime
 ``crystalTFluo``.  See :doc:`python_interface/gain_medium` for field shapes and
 openPMD metadata.

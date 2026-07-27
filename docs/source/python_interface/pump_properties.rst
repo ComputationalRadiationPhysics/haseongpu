@@ -71,6 +71,26 @@ inside the pump itself. Multiple pumps can be registered through repeated
 ``seed``. Its optional ``max_steps`` limits the pump contribution while the
 outer simulation may continue.
 
+Compiled transport
+------------------
+
+The solver launches equal-power rays from the selected exterior faces. Every
+ray samples the normalized spatial profile, discrete wavelength spectrum, and
+angular distribution, then traverses neighboring Tet4 cells until it reaches a
+physical boundary. In a segment of length :math:`\ell`, pump power changes as
+
+.. math::
+
+   P_{out}=P_{in}\exp(g_p\ell),
+   \qquad
+   g_p=N_{tot}[\beta(\sigma_a+\sigma_e)-\sigma_a].
+
+The corresponding net photon exchange is accumulated in the traversed cell.
+For vertex-centered inversion it is distributed with barycentric midpoint
+weights and normalized by the lumped vertex volume. This replaces the former
+one-dimensional traversal through ordered z levels and allows injection on
+arbitrarily oriented, domain-tagged mesh regions.
+
 Power normalization
 -------------------
 
@@ -87,5 +107,7 @@ Planar relays
 offset, tilt, magnification, transmission, and aperture vignetting. Ordered
 relays passed to ``add_pump`` represent finite return passes.
 
-Pump polarization, coating interactions, residual cavity recirculation, and
-arbitrary Python transport callbacks are outside the general pump core.
+The relay ``transmission`` is an explicitly configured scalar throughput. It is
+not calculated from Fresnel equations. Pump polarization, coating interactions,
+refraction, residual unlimited cavity recirculation, and arbitrary Python
+transport callbacks are outside the general pump core.

@@ -40,10 +40,11 @@ def test_externalBackendsIntersectSupport():
         "ADIOS2_HAVE_SST": "TRUE",
     }
 
-    assert supported_external_openpmd_backends(python_info, cmake_info) == ["adios-sst", "adios"]
+    assert supported_external_openpmd_backends(python_info, cmake_info) == ["adios", "adios-sst"]
 
 
 def test_preferredBackendValidatesRequest():
+    assert preferred_openpmd_backend(["adios-sst", "adios", "hdf5"]) == "adios"
     assert preferred_openpmd_backend(["adios", "hdf5"]) == "adios"
     assert preferred_openpmd_backend(["adios", "hdf5"], "auto") == "adios"
     assert preferred_openpmd_backend(["adios", "hdf5"], "hdf5") == "hdf5"
@@ -51,17 +52,17 @@ def test_preferredBackendValidatesRequest():
 
 def test_bundledDefaultsAreAdios2Only():
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH) == [
-        "adios-sst",
         "adios",
+        "adios-sst",
     ]
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_FETCH) == [
-        "adios-sst",
         "adios",
+        "adios-sst",
         "hdf5",
     ]
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_SYSTEM) == [
-        "adios-sst",
         "adios",
+        "adios-sst",
         "hdf5",
     ]
     assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_OFF, BUNDLED_HDF5_SYSTEM) == ["hdf5"]
@@ -131,7 +132,7 @@ def test_bundledAdiosOnlyInstallCommandDisablesHdf5():
     command = install_command(selection)
 
     assert "-DHASE_OPENPMD_USE_HDF5=OFF" in command
-    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_OFF) == ["adios-sst", "adios"]
+    assert bundled_supported_openpmd_backends(BUNDLED_ADIOS2_FETCH, BUNDLED_HDF5_OFF) == ["adios", "adios-sst"]
 
 
 def test_bundledSystemCarriesAdios2Paths():
@@ -321,6 +322,7 @@ def test_mainWritesDefaultYamlUnderConfig(tmp_path, monkeypatch, capsys):
     assert output_path.is_file()
     generated = yaml.safe_load(output_path.read_text(encoding="utf-8"))
     assert generated["compute"]["backend"] == "Host_Cpu_CpuSerial"
+    assert generated["compute"]["openpmd_backend"] == "adios"
 
     output = capsys.readouterr().out
     assert "Wrote config/hase-phiase.yaml" in output
