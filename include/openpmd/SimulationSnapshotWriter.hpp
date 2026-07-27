@@ -13,8 +13,8 @@
 #include <exception>
 #include <functional>
 #include <mutex>
-#include <optional>
 #include <queue>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -64,10 +64,20 @@ namespace hase::openpmd
                 m_writeSnapshot(snapshot);
                 return;
             }
+            std::unique_lock lock{m_mutex};
+            m_spaceAvailable.wait(
+                lock,
+                [&] { return m_pending.size() < maxPendingSnapshots || m_error || m_finishRequested; });
+            if(m_error)
             {
-                std::scoped_lock lock{m_mutex};
-                m_pending.push(snapshot);
+                std::rethrow_exception(m_error);
             }
+            if(m_finishRequested)
+            {
+                throw std::logic_error("cannot enqueue a simulation snapshot after finish was requested");
+            }
+            m_pending.push(snapshot);
+            lock.unlock();
             m_ready.notify_one();
         }
 
@@ -84,7 +94,7 @@ namespace hase::openpmd
             }
             {
                 std::scoped_lock lock{m_mutex};
-                m_pending.push(std::nullopt);
+                m_finishRequested = true;
             }
             m_ready.notify_one();
             if(m_thread.joinable())
@@ -92,9 +102,14 @@ namespace hase::openpmd
                 m_thread.join();
             }
             m_finished = true;
-            if(m_error)
+            std::exception_ptr error;
             {
-                std::rethrow_exception(m_error);
+                std::scoped_lock lock{m_mutex};
+                error = m_error;
+            }
+            if(error)
+            {
+                std::rethrow_exception(error);
             }
         }
 
@@ -105,33 +120,44 @@ namespace hase::openpmd
             {
                 while(true)
                 {
-                    std::optional<core::SimulationSnapshot> item;
+                    core::SimulationSnapshot item;
                     {
                         std::unique_lock lock{m_mutex};
-                        m_ready.wait(lock, [&] { return !m_pending.empty(); });
+                        m_ready.wait(lock, [&] { return !m_pending.empty() || m_finishRequested; });
+                        if(m_pending.empty())
+                        {
+                            break;
+                        }
                         item = std::move(m_pending.front());
                         m_pending.pop();
                     }
-                    if(!item)
-                    {
-                        break;
-                    }
-                    m_writeSnapshot(*item);
+                    m_spaceAvailable.notify_one();
+                    m_writeSnapshot(item);
                 }
             }
             catch(...)
             {
-                m_error = std::current_exception();
+                {
+                    std::scoped_lock lock{m_mutex};
+                    m_error = std::current_exception();
+                    m_finishRequested = true;
+                    std::queue<core::SimulationSnapshot> empty;
+                    m_pending.swap(empty);
+                }
+                m_spaceAvailable.notify_all();
             }
         }
 
+        static constexpr std::size_t maxPendingSnapshots = 1u;
         bool m_enabled = false;
         bool m_asynchronous = true;
         bool m_finished = false;
+        bool m_finishRequested = false;
         WriteSnapshot m_writeSnapshot;
         std::mutex m_mutex;
         std::condition_variable m_ready;
-        std::queue<std::optional<core::SimulationSnapshot>> m_pending;
+        std::condition_variable m_spaceAvailable;
+        std::queue<core::SimulationSnapshot> m_pending;
         std::thread m_thread;
         std::exception_ptr m_error;
     };

@@ -1560,6 +1560,7 @@ namespace hase::openpmd
         io::Series& series,
         std::uint64_t iterationIndex,
         core::SimulationSnapshot const& snapshot,
+        core::HostMesh const& mesh,
         core::ExperimentParameters const& experiment,
         bool includeStatic)
     {
@@ -1571,9 +1572,9 @@ namespace hase::openpmd
         iteration.setAttribute("haseStaticUpdate", includeStatic);
         iteration.setAttribute("step_index", snapshot.step);
         iteration.setAttribute("time", snapshot.time);
-        iteration.setAttribute(field::numberOfPoints, snapshot.mesh.numberOfPoints);
-        iteration.setAttribute(field::numberOfCells, snapshot.mesh.numberOfTriangles);
-        iteration.setAttribute(field::numberOfLevels, snapshot.mesh.numberOfLevels);
+        iteration.setAttribute(field::numberOfPoints, mesh.numberOfPoints);
+        iteration.setAttribute(field::numberOfCells, mesh.numberOfTriangles);
+        iteration.setAttribute(field::numberOfLevels, mesh.numberOfLevels);
         iteration.setAttribute(field::srmStatus, std::string{core::toString(snapshot.aseResult.srmStatus)});
         iteration.setAttribute(field::srmPasses, snapshot.aseResult.srmPasses);
         iteration.setAttribute(field::srmRemainingFraction, snapshot.aseResult.srmRemainingFraction);
@@ -1583,17 +1584,17 @@ namespace hase::openpmd
         std::string const prefix = m_meshGroup + "_";
         if(includeStatic)
         {
-            auto const numberOfMeshPoints = snapshot.mesh.numberOfMeshPoints;
-            auto const numberOfCells = snapshot.mesh.numberOfCells;
+            auto const numberOfMeshPoints = mesh.numberOfMeshPoints;
+            auto const numberOfCells = mesh.numberOfCells;
 
             std::vector<double> x(numberOfMeshPoints);
             std::vector<double> y(numberOfMeshPoints);
             std::vector<double> z(numberOfMeshPoints);
             for(unsigned point = 0u; point < numberOfMeshPoints; ++point)
             {
-                x.at(point) = snapshot.mesh.points.at(point);
-                y.at(point) = snapshot.mesh.points.at(point + numberOfMeshPoints);
-                z.at(point) = snapshot.mesh.points.at(point + 2u * numberOfMeshPoints);
+                x.at(point) = mesh.points.at(point);
+                y.at(point) = mesh.points.at(point + numberOfMeshPoints);
+                z.at(point) = mesh.points.at(point + 2u * numberOfMeshPoints);
             }
             auto pointsRecordName = prefix + "points";
             writeComponent(
@@ -1637,7 +1638,7 @@ namespace hase::openpmd
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cells_connectivity",
-                snapshot.mesh.cellPointIndices,
+                mesh.cellPointIndices,
                 {"cell", "local_vertex"},
                 {numberOfCells, core::tet4VertexCount},
                 false);
@@ -1664,21 +1665,21 @@ namespace hase::openpmd
             writeFlatScalar<unsigned>(
                 iteration,
                 prefix + "cladding_cell_type",
-                snapshot.mesh.claddingCellTypes,
+                mesh.claddingCellTypes,
                 {"cell"},
                 {numberOfCells},
                 false);
             writeFlatScalar<float>(
                 iteration,
                 prefix + "refractive_index",
-                snapshot.mesh.refractiveIndices,
+                mesh.refractiveIndices,
                 {"interface"},
                 {4u},
                 false);
             writeFlatScalar<float>(
                 iteration,
                 prefix + "reflectivity",
-                snapshot.mesh.reflectivities,
+                mesh.reflectivities,
                 {"cell", "interface"},
                 {numberOfCells, 2u},
                 false);
@@ -1723,16 +1724,16 @@ namespace hase::openpmd
         writeFlatScalar<double>(
             iteration,
             prefix + "point_beta",
-            snapshot.mesh.betaCells,
+            snapshot.betaCells,
             {"point", "level"},
-            {snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            {mesh.numberOfPoints, mesh.numberOfLevels},
             true);
         writeFlatScalar<double>(
             iteration,
             prefix + "beta_volume",
-            snapshot.mesh.betaVolume,
+            snapshot.betaVolume,
             {"cell"},
-            {snapshot.mesh.numberOfCells},
+            {mesh.numberOfCells},
             true);
 
         std::string const resultPrefix = prefix + "result_";
@@ -1740,7 +1741,7 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "phi_ase",
             snapshot.aseResult.phiAse,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"},
             "cm^-2 s^-1",
             1.0e4,
@@ -1749,7 +1750,7 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "standard_error",
             snapshot.aseResult.standardError,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"},
             "cm^-2 s^-1",
             1.0e4,
@@ -1758,20 +1759,20 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "relative_standard_error",
             snapshot.aseResult.relativeStandardError,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"});
         writeScalar(
             iteration,
             resultPrefix + "total_rays",
             snapshot.aseResult.totalRays,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"},
             "count");
         writeScalar(
             iteration,
             resultPrefix + "dndt_ase",
             snapshot.dndtAse,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"},
             "s^-1",
             1.0,
@@ -1780,7 +1781,7 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "volume_phi_ase",
             snapshot.volumeAseResult.phiAse,
-            io::Extent{snapshot.mesh.numberOfCells},
+            io::Extent{mesh.numberOfCells},
             {"cell"},
             "cm^-2 s^-1",
             1.0e4,
@@ -1789,7 +1790,7 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "volume_standard_error",
             snapshot.volumeAseResult.standardError,
-            io::Extent{snapshot.mesh.numberOfCells},
+            io::Extent{mesh.numberOfCells},
             {"cell"},
             "cm^-2 s^-1",
             1.0e4,
@@ -1798,20 +1799,20 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "volume_relative_standard_error",
             snapshot.volumeAseResult.relativeStandardError,
-            io::Extent{snapshot.mesh.numberOfCells},
+            io::Extent{mesh.numberOfCells},
             {"cell"});
         writeScalar(
             iteration,
             resultPrefix + "volume_total_rays",
             snapshot.volumeAseResult.totalRays,
-            io::Extent{snapshot.mesh.numberOfCells},
+            io::Extent{mesh.numberOfCells},
             {"cell"},
             "count");
         writeScalar(
             iteration,
             resultPrefix + "volume_dndt_ase",
             snapshot.volumeAseResult.dndtAse,
-            io::Extent{snapshot.mesh.numberOfCells},
+            io::Extent{mesh.numberOfCells},
             {"cell"},
             "s^-1",
             1.0,
@@ -1820,7 +1821,7 @@ namespace hase::openpmd
             iteration,
             prefix + "result_dndt_pump",
             snapshot.dndtPump,
-            io::Extent{snapshot.mesh.numberOfPoints, snapshot.mesh.numberOfLevels},
+            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
             {"point", "level"},
             "s^-1",
             1.0,
@@ -1925,6 +1926,7 @@ namespace hase::openpmd
                     *series,
                     snapshot.step - 1u,
                     snapshot,
+                    simulation.mesh,
                     simulation.experiment,
                     includeStatic);
                 series->flush();
