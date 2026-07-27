@@ -7,6 +7,7 @@
 import os
 
 BACKEND_PRIORITY = ("adios", "adios-sst", "hdf5")
+RUNTIME_TEST_BACKEND_OVERRIDE = "HASE_OPENPMD_RUNTIME_TEST_BACKEND"
 
 
 def _clean(values):
@@ -32,6 +33,24 @@ def openpmd_test_backends():
             "Build HaseOpenPmdBackendProbe or set HASE_OPENPMD_TEST_BACKENDS for an explicit manual matrix."
         )
     return backends
+
+
+def openpmd_runtime_test_backends():
+    available = openpmd_test_backends()
+    override = os.environ.get(RUNTIME_TEST_BACKEND_OVERRIDE, "").strip().lower()
+    if not override:
+        return available
+    if override not in BACKEND_PRIORITY:
+        allowed = ", ".join(BACKEND_PRIORITY)
+        raise RuntimeError(
+            f"{RUNTIME_TEST_BACKEND_OVERRIDE}={override!r} is unsupported; expected one of: {allowed}."
+        )
+    if override not in available:
+        raise RuntimeError(
+            f"{RUNTIME_TEST_BACKEND_OVERRIDE}={override!r} is not available in this build; "
+            f"available backends: {', '.join(available)}."
+        )
+    return [override]
 
 
 def openpmd_runtime_backend():

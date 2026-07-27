@@ -25,6 +25,29 @@ def test_backendMatrixKeepsEveryAvailableBackend(monkeypatch):
     ]
 
 
+def test_runtimeTestBackendsUseEveryAvailableBackendWithoutOverride(monkeypatch):
+    monkeypatch.delenv(openpmd_backend_matrix.RUNTIME_TEST_BACKEND_OVERRIDE, raising=False)
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "adios-sst, adios")
+
+    assert openpmd_backend_matrix.openpmd_runtime_test_backends() == ["adios", "adios-sst"]
+
+
+def test_runtimeTestBackendsHonorCiOverrideWithoutNarrowingInternalMatrix(monkeypatch):
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "adios-sst, adios")
+    monkeypatch.setenv(openpmd_backend_matrix.RUNTIME_TEST_BACKEND_OVERRIDE, "adios-sst")
+
+    assert openpmd_backend_matrix.openpmd_runtime_test_backends() == ["adios-sst"]
+    assert openpmd_backend_matrix.openpmd_test_backends() == ["adios", "adios-sst"]
+
+
+def test_runtimeTestBackendOverrideMustBeAvailable(monkeypatch):
+    monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "adios")
+    monkeypatch.setenv(openpmd_backend_matrix.RUNTIME_TEST_BACKEND_OVERRIDE, "adios-sst")
+
+    with pytest.raises(RuntimeError, match="is not available in this build"):
+        openpmd_backend_matrix.openpmd_runtime_test_backends()
+
+
 def test_backendMatrixAcceptsSelector(monkeypatch):
     monkeypatch.setenv("HASE_OPENPMD_TEST_BACKENDS", "hdf5, adios-sst")
 

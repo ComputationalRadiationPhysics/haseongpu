@@ -478,13 +478,16 @@ jobs:
           mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
           python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py" --csv \
             | sed 's/^/HASE_OPENPMD_TEST_BACKENDS=/' >> "$GITHUB_ENV"
+          if [[ ! " ${openpmd_backends[*]} " =~ " ${OPENPMD_RUNTIME_BACKEND} " ]]; then
+            echo "::error::Selected runtime backend '${OPENPMD_RUNTIME_BACKEND}' is unavailable: ${openpmd_backends[*]}" >&2
+            exit 1
+          fi
+          echo "HASE_OPENPMD_RUNTIME_TEST_BACKEND=$OPENPMD_RUNTIME_BACKEND" >> "$GITHUB_ENV"
 
-          for backend in "${openpmd_backends[@]}"; do
-            example_output_dir="/tmp/hase-laser-pump-cladding-${backend}"
-            python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
-              "$backend" \
-              "$example_output_dir"
-          done
+          example_output_dir="/tmp/hase-laser-pump-cladding-${OPENPMD_RUNTIME_BACKEND}"
+          python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
+            "$OPENPMD_RUNTIME_BACKEND" \
+            "$example_output_dir"
 
       - name: Run CTest
         shell: bash
