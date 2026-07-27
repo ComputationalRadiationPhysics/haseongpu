@@ -10,8 +10,10 @@
 #include <benchmark.hpp>
 #include <core/forwardSrm.hpp>
 #include <core/mesh.hpp>
+#include <kernels/forwardPhiAseMapping.hpp>
 #include <random/random.hpp>
 
+#include <chrono>
 #include <ctime>
 #include <stdexcept>
 #include <vector>
@@ -43,6 +45,319 @@ namespace hase::core
         double volumeSize);
 
     void finalizeForwardPhiAse(HostMesh const& hostMesh, ForwardPhiAseRawResult const& rawResult, Result& result);
+
+    void finalizeForwardPhiAse(
+        HostMesh const& hostMesh,
+        ForwardPhiAseRawResult const& rawResult,
+        double betaVolumeTotal,
+        Result& result);
+
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    class ForwardPhiAseDeviceContext
+    {
+        using T_Queue = ALPAKA_TYPEOF(std::declval<T_Device>().makeQueue(alpaka::queueKind::nonBlocking));
+        using T_DoubleBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::size_t{1}));
+        using T_FloatBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<float>(std::declval<T_Device&>(), std::size_t{1}));
+        using T_UnsignedBuffer
+            = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
+
+    public:
+        ForwardPhiAseDeviceContext(
+            T_Device const& device,
+            T_Exec const& executor,
+            ExperimentParameters const& experiment,
+            unsigned volumeCount)
+            : m_devBundle(device, executor)
+            , m_queue(m_devBundle.device.makeQueue(alpaka::queueKind::nonBlocking))
+            , m_phi(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_phiSquare(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_volumeRayVisits(
+                  alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_droppedRays(alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_sigmaA(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaA))
+            , m_sigmaE(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaE))
+            , m_volumePhiAse(alpaka::onHost::alloc<float>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_standardError(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_relativeStandardError(
+                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_volumeDndtAse(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(volumeCount)))
+            , m_betaVolumeTotal(alpaka::onHost::alloc<double>(m_devBundle.device, std::size_t{1}))
+            , m_volumeCount(volumeCount)
+            , m_spectralCount(static_cast<unsigned>(experiment.sigmaA.size()))
+        {
+            if(experiment.useReflections)
+            {
+                m_srmWorkspace = std::make_unique<ForwardSrmWorkspace<T_Device>>(
+                    m_devBundle.device,
+                    volumeCount * tet4FaceCount,
+                    experiment.surfaceReservoirSize,
+                    std::max(experiment.maxRays, experiment.resolvedForwardRayCount()));
+            }
+        }
+
+        void begin(
+            DeviceMeshView const mesh,
+            unsigned rayCount,
+            unsigned rngSeed,
+            unsigned globalRayOffset,
+            unsigned globalRayCount,
+            double sourceStratificationOffset,
+            unsigned spectrumStratificationPhase,
+            double betaVolumeTotal,
+            ExperimentParameters const& experiment,
+            bool resetAccumulators = true)
+        {
+            m_started = std::chrono::steady_clock::now();
+            m_rayCount = rayCount;
+            if(resetAccumulators)
+                m_accumulatedRayCount = 0u;
+            m_accumulatedRayCount += rayCount;
+            if(rayCount == 0u)
+                return;
+
+            if(resetAccumulators)
+            {
+                alpaka::onHost::fill(m_queue, m_phi, 0.0, alpaka::Vec{static_cast<std::size_t>(m_volumeCount)});
+                alpaka::onHost::fill(m_queue, m_phiSquare, 0.0, alpaka::Vec{static_cast<std::size_t>(m_volumeCount)});
+                alpaka::onHost::fill(
+                    m_queue,
+                    m_volumeRayVisits,
+                    0u,
+                    alpaka::Vec{static_cast<std::size_t>(m_volumeCount)});
+                alpaka::onHost::fill(m_queue, m_droppedRays, 0u, alpaka::Vec{static_cast<std::size_t>(m_volumeCount)});
+            }
+
+            auto accumulation = hase::kernels::forward::ForwardAccumulationSpans{
+                m_phi,
+                m_phiSquare,
+                m_volumeRayVisits,
+                m_droppedRays};
+            auto spectrum = hase::kernels::forward::ForwardSpectrumSpans{m_sigmaA, m_sigmaE, m_spectralCount};
+            auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+                m_devBundle.device,
+                m_devBundle.executor,
+                alpaka::Vec{rayCount});
+            m_srmResult = makeForwardRawResult(m_volumeCount);
+            m_srmResult.rayCount = rayCount;
+            if(experiment.useReflections)
+            {
+                if(!m_srmWorkspace)
+                    throw std::runtime_error("persistent forward SRM workspace was not initialized");
+                auto const controls = resolveSrmControls(experiment);
+                m_srmResult.srmMaxIterations = controls.maxIterations;
+                m_srmResult.srmDivergenceStreak = controls.divergenceStreak;
+                runForwardSrm(
+                    m_devBundle,
+                    m_queue,
+                    mesh,
+                    experiment,
+                    m_srmResult,
+                    rayCount,
+                    globalRayOffset,
+                    globalRayCount,
+                    sourceStratificationOffset,
+                    spectrumStratificationPhase,
+                    betaVolumeTotal,
+                    m_phi,
+                    m_phiSquare,
+                    m_volumeRayVisits,
+                    m_droppedRays,
+                    m_sigmaA,
+                    m_sigmaE,
+                    m_spectralCount,
+                    rngSeed,
+                    controls,
+                    *m_srmWorkspace);
+            }
+            else
+            {
+                BENCH_SYNC(m_queue, AccumulateForwardPhiAse);
+                m_queue.enqueue(
+                    frameSpec,
+                    alpaka::KernelBundle{
+                        hase::kernels::forward::AccumulateForwardPhiAse{},
+                        mesh,
+                        rayCount,
+                        globalRayOffset,
+                        globalRayCount,
+                        sourceStratificationOffset,
+                        spectrumStratificationPhase,
+                        betaVolumeTotal,
+                        accumulation,
+                        spectrum,
+                        rngSeed});
+            }
+        }
+
+        void finish(ForwardPhiAseRawResult& result, float& runtime, bool downloadAccumulators = true)
+        {
+            result = makeForwardRawResult(m_volumeCount);
+            result.rayCount = m_accumulatedRayCount;
+            result.srmStatus = m_srmResult.srmStatus;
+            result.srmPasses = m_srmResult.srmPasses;
+            result.srmRemainingFraction = m_srmResult.srmRemainingFraction;
+            result.srmMaxIterations = m_srmResult.srmMaxIterations;
+            result.srmDivergenceStreak = m_srmResult.srmDivergenceStreak;
+            if(m_rayCount == 0u)
+            {
+                runtime = 0.0f;
+                return;
+            }
+            if(downloadAccumulators)
+            {
+                alpaka::onHost::memcpy(m_queue, result.scoreSum, m_phi);
+                alpaka::onHost::memcpy(m_queue, result.scoreSquareSum, m_phiSquare);
+                alpaka::onHost::memcpy(m_queue, result.totalRays, m_volumeRayVisits);
+                alpaka::onHost::memcpy(m_queue, result.droppedRays, m_droppedRays);
+            }
+            alpaka::onHost::wait(m_queue);
+            runtime = static_cast<float>(
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - m_started).count());
+        }
+
+        void evaluate(
+            DeviceMeshView const mesh,
+            ForwardPhiAseRawResult& result,
+            float& runtime,
+            unsigned rayCount,
+            unsigned rngSeed,
+            unsigned globalRayOffset,
+            unsigned globalRayCount,
+            double sourceStratificationOffset,
+            unsigned spectrumStratificationPhase,
+            double betaVolumeTotal,
+            ExperimentParameters const& experiment)
+        {
+            begin(
+                mesh,
+                rayCount,
+                rngSeed,
+                globalRayOffset,
+                globalRayCount,
+                sourceStratificationOffset,
+                spectrumStratificationPhase,
+                betaVolumeTotal,
+                experiment);
+            finish(result, runtime);
+        }
+
+        void finalizeCellPhiAse(
+            DeviceMeshView const mesh,
+            unsigned rayCount,
+            double betaVolumeTotal,
+            double fluorescenceRate,
+            double sigmaA,
+            double sigmaE)
+        {
+            hase::kernels::enqueueFinalizeForwardCellPhiAse(
+                m_devBundle,
+                m_queue,
+                mesh,
+                m_phi,
+                m_phiSquare,
+                m_droppedRays,
+                m_volumePhiAse,
+                m_standardError,
+                m_relativeStandardError,
+                m_volumeDndtAse,
+                rayCount,
+                betaVolumeTotal,
+                fluorescenceRate,
+                sigmaA,
+                sigmaE);
+            alpaka::onHost::wait(m_queue);
+        }
+
+        double rebuildBetaVolumePrefix(DeviceMeshContainer<T_Device>& meshContainer, auto const& betaVolume)
+        {
+            auto mesh = meshContainer.toView();
+            mesh.betaVolume = std::span<double const>(betaVolume.data(), betaVolume.getMdSpan().getExtents().x());
+            hase::kernels::enqueueBuildBetaVolumePrefix(
+                m_devBundle,
+                m_queue,
+                mesh,
+                betaVolume,
+                meshContainer.betaVolumePrefix,
+                m_betaVolumeTotal);
+            std::vector<double> hostTotal(1u, 0.0);
+            alpaka::onHost::memcpy(m_queue, hostTotal, m_betaVolumeTotal);
+            alpaka::onHost::wait(m_queue);
+            return hostTotal.front();
+        }
+
+        std::vector<double> downloadVolumeDndtAse()
+        {
+            std::vector<double> result(m_volumeCount, 0.0);
+            alpaka::onHost::memcpy(m_queue, result, m_volumeDndtAse);
+            alpaka::onHost::wait(m_queue);
+            return result;
+        }
+
+        Result downloadFinalizedResult(
+            bool includePhiAse,
+            bool includeStandardError,
+            bool includeRelativeStandardError,
+            bool includeTotalRays)
+        {
+            Result result;
+            if(includePhiAse)
+            {
+                result.phiAse.resize(m_volumeCount);
+                alpaka::onHost::memcpy(m_queue, result.phiAse, m_volumePhiAse);
+            }
+            if(includeStandardError)
+            {
+                result.standardError.resize(m_volumeCount);
+                alpaka::onHost::memcpy(m_queue, result.standardError, m_standardError);
+            }
+            if(includeRelativeStandardError)
+            {
+                result.relativeStandardError.resize(m_volumeCount);
+                alpaka::onHost::memcpy(m_queue, result.relativeStandardError, m_relativeStandardError);
+            }
+            if(includeTotalRays)
+            {
+                result.totalRays.resize(m_volumeCount);
+                result.droppedRays.resize(m_volumeCount);
+                alpaka::onHost::memcpy(m_queue, result.totalRays, m_volumeRayVisits);
+                alpaka::onHost::memcpy(m_queue, result.droppedRays, m_droppedRays);
+            }
+            alpaka::onHost::wait(m_queue);
+            return result;
+        }
+
+        [[nodiscard]] auto& volumePhiAse()
+        {
+            return m_volumePhiAse;
+        }
+
+        [[nodiscard]] auto& volumeDndtAse()
+        {
+            return m_volumeDndtAse;
+        }
+
+    private:
+        hase::alpakaUtils::DevBundle<T_Device, T_Exec> m_devBundle;
+        T_Queue m_queue;
+        T_DoubleBuffer m_phi;
+        T_DoubleBuffer m_phiSquare;
+        T_UnsignedBuffer m_volumeRayVisits;
+        T_UnsignedBuffer m_droppedRays;
+        T_DoubleBuffer m_sigmaA;
+        T_DoubleBuffer m_sigmaE;
+        T_FloatBuffer m_volumePhiAse;
+        T_DoubleBuffer m_standardError;
+        T_DoubleBuffer m_relativeStandardError;
+        T_DoubleBuffer m_volumeDndtAse;
+        T_DoubleBuffer m_betaVolumeTotal;
+        std::unique_ptr<ForwardSrmWorkspace<T_Device>> m_srmWorkspace;
+        ForwardPhiAseRawResult m_srmResult;
+        unsigned m_volumeCount;
+        unsigned m_spectralCount;
+        unsigned m_rayCount = 0u;
+        unsigned m_accumulatedRayCount = 0u;
+        std::chrono::steady_clock::time_point m_started;
+    };
 
     template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
     float calcForwardPhiAseRaw(
@@ -139,6 +454,11 @@ namespace hase::core
         }
         else
         {
+            ForwardSrmWorkspace<T_Device> workspace{
+                devBundle.device,
+                volumeCount * tet4FaceCount,
+                experiment.surfaceReservoirSize,
+                rayCount};
             runForwardSrm(
                 devBundle,
                 queue,
@@ -159,7 +479,8 @@ namespace hase::core
                 dSigmaE,
                 static_cast<unsigned>(experiment.sigmaA.size()),
                 threadLocalStridingRNG,
-                srmControls);
+                srmControls,
+                workspace);
         }
 
         alpaka::onHost::memcpy(queue, result.scoreSum, dPhiAccumulator);

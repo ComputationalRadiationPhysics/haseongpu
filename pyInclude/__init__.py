@@ -58,6 +58,7 @@ from .simulation import (
     Simulation,
     TimeStepState,
     TimeSteppedSimulation,
+    autonomous_final,
 )
 from .structures import Result as TransportResult
 from .gainMap import calcGainFromState

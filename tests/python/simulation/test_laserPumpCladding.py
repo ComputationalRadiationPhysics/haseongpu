@@ -324,6 +324,7 @@ def laserPumpCladdingBackendResults(
             maxRays=metadata["parameters"]["maxRaysPerSample"],
             relativeStandardErrorThreshold=0.05,
             adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
+            outputSteps=metadata["observable"]["stepNumbers"],
         )
 
         relative_standard_error = np.asarray(state.relativeStandardError, dtype=np.float64)
@@ -412,6 +413,7 @@ def fakeCompiledSnapshots(monkeypatch):
         transport=None,
         command_prefix=None,
         workspace_dir=None,
+        on_state=None,
     ):
         calls.append(
             {
@@ -426,7 +428,8 @@ def fakeCompiledSnapshots(monkeypatch):
         )
         volume_shape = simulation.gainMedium.get("betaVolume").expectedShape
         states = []
-        for step in range(1, steps + 1):
+        emitted_steps = range(1, steps + 1) if simulation.outputSteps is None else simulation.outputSteps
+        for step in emitted_steps:
             pump_active = pumpSteps is None or step <= pumpSteps
             states.append(
                 SimpleNamespace(
@@ -446,6 +449,9 @@ def fakeCompiledSnapshots(monkeypatch):
                     aseResult=object(),
                 )
             )
+        if on_state is not None:
+            for state in states:
+                on_state(state)
         return states
 
     monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)

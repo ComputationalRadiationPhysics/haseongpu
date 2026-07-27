@@ -43,6 +43,7 @@
 #    include <iostream>
 #    include <limits>
 #    include <ranges>
+#    include <stdexcept>
 #    include <vector>
 
 // Nodes
@@ -114,10 +115,28 @@ namespace hase::core
         }
 
         int const localDeviceCount = static_cast<int>(meshes.size());
-        int const devicesPerRank = localDeviceCount / localSize;
-        int const deviceRemainder = localDeviceCount % localSize;
-        int const firstDevice = localRank * devicesPerRank + std::min(localRank, deviceRemainder);
-        int const assignedDeviceCount = devicesPerRank + (localRank < deviceRemainder ? 1 : 0);
+        if(localDeviceCount == 0)
+            throw std::runtime_error("MPI forward ASE requires at least one local device on every rank");
+
+        // Prefer disjoint device subsets when the node has at least as many
+        // devices as ranks.  Otherwise every rank still participates by using
+        // its own process-local queue/context on a round-robin shared device.
+        // In particular, CPU backends commonly expose one logical device even
+        // though multiple MPI ranks can execute against it independently.
+        int firstDevice = 0;
+        int assignedDeviceCount = 0;
+        if(localSize <= localDeviceCount)
+        {
+            int const devicesPerRank = localDeviceCount / localSize;
+            int const deviceRemainder = localDeviceCount % localSize;
+            firstDevice = localRank * devicesPerRank + std::min(localRank, deviceRemainder);
+            assignedDeviceCount = devicesPerRank + (localRank < deviceRemainder ? 1 : 0);
+        }
+        else
+        {
+            firstDevice = localRank % localDeviceCount;
+            assignedDeviceCount = 1;
+        }
 
         MPI_Comm activeComm = MPI_COMM_NULL;
         int const activeColor = assignedDeviceCount > 0 ? 0 : MPI_UNDEFINED;
@@ -171,28 +190,25 @@ namespace hase::core
         MPI_Allreduce(&gpuNodeMinContribution, &minGpusPerNode, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
         MPI_Allreduce(&gpuNodeMaxContribution, &maxGpusPerNode, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-        if(rank == HEAD_NODE)
-        {
-            topology.activeNodes = static_cast<unsigned>(activeNodesTotal);
-            topology.activeRanks = static_cast<unsigned>(activeRanksTotal);
-            topology.activeGpus = static_cast<unsigned>(activeDevicesTotal);
-            topology.avgActiveRanksPerNode
-                = activeNodesTotal > 0 ? static_cast<double>(activeRanksTotal) / static_cast<double>(activeNodesTotal)
-                                       : 0.0;
-            topology.minActiveRanksPerNode = minActiveRanksPerNode == std::numeric_limits<int>::max()
-                                                 ? 0u
-                                                 : static_cast<unsigned>(minActiveRanksPerNode);
-            topology.maxActiveRanksPerNode = static_cast<unsigned>(maxActiveRanksPerNode);
-            topology.avgGpusPerRank = activeRanksTotal > 0 ? static_cast<double>(activeDevicesTotal)
-                                                                 / static_cast<double>(activeRanksTotal)
-                                                           : 0.0;
-            topology.avgGpusPerNode = activeNodesTotal > 0 ? static_cast<double>(activeDevicesTotal)
-                                                                 / static_cast<double>(activeNodesTotal)
-                                                           : 0.0;
-            topology.minGpusPerNode
-                = minGpusPerNode == std::numeric_limits<int>::max() ? 0u : static_cast<unsigned>(minGpusPerNode);
-            topology.maxGpusPerNode = static_cast<unsigned>(maxGpusPerNode);
-        }
+        topology.activeNodes = static_cast<unsigned>(activeNodesTotal);
+        topology.activeRanks = static_cast<unsigned>(activeRanksTotal);
+        topology.activeGpus = static_cast<unsigned>(activeDevicesTotal);
+        topology.avgActiveRanksPerNode
+            = activeNodesTotal > 0 ? static_cast<double>(activeRanksTotal) / static_cast<double>(activeNodesTotal)
+                                   : 0.0;
+        topology.minActiveRanksPerNode = minActiveRanksPerNode == std::numeric_limits<int>::max()
+                                             ? 0u
+                                             : static_cast<unsigned>(minActiveRanksPerNode);
+        topology.maxActiveRanksPerNode = static_cast<unsigned>(maxActiveRanksPerNode);
+        topology.avgGpusPerRank = activeRanksTotal > 0
+                                      ? static_cast<double>(activeDevicesTotal) / static_cast<double>(activeRanksTotal)
+                                      : 0.0;
+        topology.avgGpusPerNode = activeNodesTotal > 0
+                                      ? static_cast<double>(activeDevicesTotal) / static_cast<double>(activeNodesTotal)
+                                      : 0.0;
+        topology.minGpusPerNode
+            = minGpusPerNode == std::numeric_limits<int>::max() ? 0u : static_cast<unsigned>(minGpusPerNode);
+        topology.maxGpusPerNode = static_cast<unsigned>(maxGpusPerNode);
 
         std::array<int, 8> const rankWorkInfo{
             rank,
@@ -290,11 +306,8 @@ namespace hase::core
         int const volumeCount = static_cast<int>(mesh.numberOfCells);
         int totalUsedDevices = 0;
         adaptiveLaunches = 0u;
-        if(activeRank == HEAD_NODE)
-        {
-            result = makeForwardRawResult(mesh.numberOfCells);
-            convergenceRayCounts.assign(mesh.numberOfCells, 0u);
-        }
+        result = makeForwardRawResult(mesh.numberOfCells);
+        convergenceRayCounts.assign(mesh.numberOfCells, 0u);
         unsigned accumulatedRayCount = 0u;
 
         for(unsigned completedIncreases = 0u;; ++completedIncreases)
@@ -331,72 +344,55 @@ namespace hase::core
             }
 
             ForwardPhiAseRawResult batchResult = makeForwardRawResult(mesh.numberOfCells);
-            MPI_Reduce(
+            MPI_Allreduce(
                 localResult.scoreSum.data(),
-                activeRank == HEAD_NODE ? batchResult.scoreSum.data() : nullptr,
+                batchResult.scoreSum.data(),
                 volumeCount,
                 MPI_DOUBLE,
                 MPI_SUM,
-                HEAD_NODE,
                 activeComm);
-            MPI_Reduce(
+            MPI_Allreduce(
                 localResult.scoreSquareSum.data(),
-                activeRank == HEAD_NODE ? batchResult.scoreSquareSum.data() : nullptr,
+                batchResult.scoreSquareSum.data(),
                 volumeCount,
                 MPI_DOUBLE,
                 MPI_SUM,
-                HEAD_NODE,
                 activeComm);
-            MPI_Reduce(
+            MPI_Allreduce(
                 localResult.totalRays.data(),
-                activeRank == HEAD_NODE ? batchResult.totalRays.data() : nullptr,
+                batchResult.totalRays.data(),
                 volumeCount,
                 MPI_UNSIGNED,
                 MPI_SUM,
-                HEAD_NODE,
                 activeComm);
-            MPI_Reduce(
+            MPI_Allreduce(
                 localResult.droppedRays.data(),
-                activeRank == HEAD_NODE ? batchResult.droppedRays.data() : nullptr,
+                batchResult.droppedRays.data(),
                 volumeCount,
                 MPI_UNSIGNED,
                 MPI_SUM,
-                HEAD_NODE,
                 activeComm);
-            MPI_Reduce(
-                &localResult.rayCount,
-                activeRank == HEAD_NODE ? &batchResult.rayCount : nullptr,
-                1,
-                MPI_UNSIGNED,
-                MPI_SUM,
-                HEAD_NODE,
-                activeComm);
+            MPI_Allreduce(&localResult.rayCount, &batchResult.rayCount, 1, MPI_UNSIGNED, MPI_SUM, activeComm);
 
             float maxBatchRuntime = 0.0f;
-            MPI_Reduce(&batchRuntime, &maxBatchRuntime, 1, MPI_FLOAT, MPI_MAX, HEAD_NODE, activeComm);
+            MPI_Allreduce(&batchRuntime, &maxBatchRuntime, 1, MPI_FLOAT, MPI_MAX, activeComm);
             int batchTotalUsedDevices = 0;
-            MPI_Reduce(&batchUsedDevices, &batchTotalUsedDevices, 1, MPI_INT, MPI_SUM, HEAD_NODE, activeComm);
+            MPI_Allreduce(&batchUsedDevices, &batchTotalUsedDevices, 1, MPI_INT, MPI_SUM, activeComm);
 
-            int stop = 0;
-            if(activeRank == HEAD_NODE)
-            {
-                mergeForwardRawResult(result, batchResult);
-                maxRankRuntime += maxBatchRuntime;
-                totalUsedDevices = std::max(totalUsedDevices, batchTotalUsedDevices);
-                ++adaptiveLaunches;
-                Result provisional;
-                finalizeForwardPhiAse(hostMesh, result, provisional);
-                recordAdaptiveRayConvergence(
-                    provisional,
-                    targetRayCount,
-                    experiment.relativeStandardErrorThreshold,
-                    convergenceRayCounts);
-                stop = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays
-                       || forwardResultMeetsRelativeStandardError(
-                           provisional,
-                           experiment.relativeStandardErrorThreshold);
-            }
-            MPI_Bcast(&stop, 1, MPI_INT, HEAD_NODE, activeComm);
+            mergeForwardRawResult(result, batchResult);
+            maxRankRuntime += maxBatchRuntime;
+            totalUsedDevices = std::max(totalUsedDevices, batchTotalUsedDevices);
+            ++adaptiveLaunches;
+            Result provisional;
+            finalizeForwardPhiAse(hostMesh, result, provisional);
+            recordAdaptiveRayConvergence(
+                provisional,
+                targetRayCount,
+                experiment.relativeStandardErrorThreshold,
+                convergenceRayCounts);
+            int const stop
+                = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays
+                  || forwardResultMeetsRelativeStandardError(provisional, experiment.relativeStandardErrorThreshold);
             accumulatedRayCount = targetRayCount;
             if(stop != 0)
             {
@@ -420,7 +416,7 @@ namespace hase::core
         }
 
 
-        return activeRank == HEAD_NODE ? static_cast<float>(totalUsedDevices) : 0.0f;
+        return static_cast<float>(totalUsedDevices);
     }
 #endif
 

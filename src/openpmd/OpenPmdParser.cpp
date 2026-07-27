@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -70,6 +71,12 @@ namespace
         constexpr char const* enableAse = "enable_ase";
         constexpr char const* prePump = "pre_pump";
         constexpr char const* pumpSteps = "pump_steps";
+        constexpr char const* executionMode = "execution_mode";
+        constexpr char const* outputSteps = "output_steps";
+        constexpr char const* outputFieldsString = "output_fields_string";
+        constexpr char const* controlFieldsString = "control_fields_string";
+        constexpr char const* legacyOutputFields = "output_fields";
+        constexpr char const* legacyControlFields = "control_fields";
         constexpr char const* timeIntegrator = "time_integrator";
         constexpr char const* implicitIterations = "implicit_iterations";
         constexpr char const* implicitTolerance = "implicit_tolerance";
@@ -182,6 +189,194 @@ namespace
         if(!obj.containsAttribute(name))
             return {};
         return unsignedVectorAttribute(obj, name);
+    }
+
+    std::vector<std::string> parseStringVectorJson(std::string const& value, std::string const& attributeName)
+    {
+        std::size_t position = 0u;
+        auto skipWhitespace = [&]()
+        {
+            while(position < value.size() && std::isspace(static_cast<unsigned char>(value[position])))
+            {
+                ++position;
+            }
+        };
+        auto invalidJson = [&]() -> void
+        { throw std::runtime_error("openPMD attribute '" + attributeName + "' must be a JSON array of strings"); };
+
+        skipWhitespace();
+        if(position == value.size() || value[position++] != '[')
+        {
+            invalidJson();
+        }
+
+        std::vector<std::string> result;
+        skipWhitespace();
+        if(position < value.size() && value[position] == ']')
+        {
+            ++position;
+            skipWhitespace();
+            if(position != value.size())
+            {
+                invalidJson();
+            }
+            return result;
+        }
+
+        while(position < value.size())
+        {
+            if(value[position++] != '"')
+            {
+                invalidJson();
+            }
+            std::string item;
+            bool closed = false;
+            while(position < value.size())
+            {
+                char const character = value[position++];
+                if(character == '"')
+                {
+                    closed = true;
+                    break;
+                }
+                if(static_cast<unsigned char>(character) < 0x20u)
+                {
+                    invalidJson();
+                }
+                if(character != '\\')
+                {
+                    item += character;
+                    continue;
+                }
+                if(position == value.size())
+                {
+                    invalidJson();
+                }
+                switch(value[position++])
+                {
+                case '"':
+                    item += '"';
+                    break;
+                case '\\':
+                    item += '\\';
+                    break;
+                case '/':
+                    item += '/';
+                    break;
+                case 'b':
+                    item += '\b';
+                    break;
+                case 'f':
+                    item += '\f';
+                    break;
+                case 'n':
+                    item += '\n';
+                    break;
+                case 'r':
+                    item += '\r';
+                    break;
+                case 't':
+                    item += '\t';
+                    break;
+                default:
+                    invalidJson();
+                }
+            }
+            if(!closed)
+            {
+                invalidJson();
+            }
+            result.push_back(std::move(item));
+
+            skipWhitespace();
+            if(position == value.size())
+            {
+                invalidJson();
+            }
+            char const separator = value[position++];
+            if(separator == ']')
+            {
+                skipWhitespace();
+                if(position != value.size())
+                {
+                    invalidJson();
+                }
+                return result;
+            }
+            if(separator != ',')
+            {
+                invalidJson();
+            }
+            skipWhitespace();
+        }
+        invalidJson();
+        return {};
+    }
+
+    std::string stringVectorJson(std::vector<std::string> const& values)
+    {
+        std::string result{"["};
+        for(auto const& value : values)
+        {
+            if(result.size() > 1u)
+            {
+                result += ',';
+            }
+            result += '"';
+            for(char const character : value)
+            {
+                switch(character)
+                {
+                case '"':
+                    result += "\\\"";
+                    break;
+                case '\\':
+                    result += "\\\\";
+                    break;
+                case '\b':
+                    result += "\\b";
+                    break;
+                case '\f':
+                    result += "\\f";
+                    break;
+                case '\n':
+                    result += "\\n";
+                    break;
+                case '\r':
+                    result += "\\r";
+                    break;
+                case '\t':
+                    result += "\\t";
+                    break;
+                default:
+                    if(static_cast<unsigned char>(character) < 0x20u)
+                    {
+                        throw std::runtime_error("simulation field names must not contain control characters");
+                    }
+                    result += character;
+                }
+            }
+            result += '"';
+        }
+        result += ']';
+        return result;
+    }
+
+    std::vector<std::string> stringVectorAttribute(
+        io::Attributable const& obj,
+        std::string const& canonicalName,
+        std::string const& legacyName,
+        std::vector<std::string> fallback)
+    {
+        if(obj.containsAttribute(canonicalName))
+        {
+            return parseStringVectorJson(attribute<std::string>(obj, canonicalName), canonicalName);
+        }
+        if(obj.containsAttribute(legacyName))
+        {
+            return attribute<std::vector<std::string>>(obj, legacyName);
+        }
+        return fallback;
     }
 
     template<typename T>
@@ -1277,6 +1472,17 @@ namespace hase::openpmd
         run.enableAse = attributeOr<bool>(iteration, field::enableAse, true);
         run.prePump = attributeOr<bool>(iteration, field::prePump, false);
         run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
+        run.executionMode
+            = attributeOr<std::string>(iteration, field::executionMode, core::SimulationExecutionMode::AUTONOMOUS);
+        if(iteration.containsAttribute(field::outputSteps))
+            run.outputSteps = unsignedVectorAttribute(iteration, field::outputSteps);
+        run.outputFields = stringVectorAttribute(
+            iteration,
+            field::outputFieldsString,
+            field::legacyOutputFields,
+            core::SimulationOutputField::all());
+        run.controlFields
+            = stringVectorAttribute(iteration, field::controlFieldsString, field::legacyControlFields, {});
         run.timeIntegration.method
             = attributeOr<std::string>(iteration, field::timeIntegrator, core::TimeIntegrator::EXPLICIT_EULER);
         run.timeIntegration.implicitIterations = attributeOr<unsigned>(iteration, field::implicitIterations, 8u);
@@ -1709,64 +1915,74 @@ namespace hase::openpmd
                 {-4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
         }
 
-        writeFlatScalar<double>(
-            iteration,
-            prefix + "beta_volume",
-            snapshot.betaVolume,
-            {"cell"},
-            {mesh.numberOfCells},
-            true);
+        iteration.setAttribute(field::outputFieldsString, stringVectorJson(snapshot.fields));
+        if(snapshot.contains(core::SimulationOutputField::BETA_VOLUME))
+        {
+            writeFlatScalar<double>(
+                iteration,
+                prefix + "beta_volume",
+                snapshot.betaVolume,
+                {"cell"},
+                {mesh.numberOfCells},
+                true);
+        }
 
         std::string const resultPrefix = prefix + "result_";
-        writeScalar(
-            iteration,
-            resultPrefix + "phi_ase",
-            snapshot.aseResult.phiAse,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "cm^-2 s^-1",
-            1.0e4,
-            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            resultPrefix + "standard_error",
-            snapshot.aseResult.standardError,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "cm^-2 s^-1",
-            1.0e4,
-            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            resultPrefix + "relative_standard_error",
-            snapshot.aseResult.relativeStandardError,
-            io::Extent{mesh.numberOfCells},
-            {"cell"});
-        writeScalar(
-            iteration,
-            resultPrefix + "total_rays",
-            snapshot.aseResult.totalRays,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "count");
-        writeScalar(
-            iteration,
-            resultPrefix + "dndt_ase",
-            snapshot.dndtAse,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "s^-1",
-            1.0,
-            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            prefix + "result_dndt_pump",
-            snapshot.dndtPump,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "s^-1",
-            1.0,
-            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        if(snapshot.contains(core::SimulationOutputField::PHI_ASE))
+            writeScalar(
+                iteration,
+                resultPrefix + "phi_ase",
+                snapshot.aseResult.phiAse,
+                io::Extent{mesh.numberOfCells},
+                {"cell"},
+                "cm^-2 s^-1",
+                1.0e4,
+                {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        if(snapshot.contains(core::SimulationOutputField::STANDARD_ERROR))
+            writeScalar(
+                iteration,
+                resultPrefix + "standard_error",
+                snapshot.aseResult.standardError,
+                io::Extent{mesh.numberOfCells},
+                {"cell"},
+                "cm^-2 s^-1",
+                1.0e4,
+                {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        if(snapshot.contains(core::SimulationOutputField::RELATIVE_STANDARD_ERROR))
+            writeScalar(
+                iteration,
+                resultPrefix + "relative_standard_error",
+                snapshot.aseResult.relativeStandardError,
+                io::Extent{mesh.numberOfCells},
+                {"cell"});
+        if(snapshot.contains(core::SimulationOutputField::TOTAL_RAYS))
+            writeScalar(
+                iteration,
+                resultPrefix + "total_rays",
+                snapshot.aseResult.totalRays,
+                io::Extent{mesh.numberOfCells},
+                {"cell"},
+                "count");
+        if(snapshot.contains(core::SimulationOutputField::DNDT_ASE))
+            writeScalar(
+                iteration,
+                resultPrefix + "dndt_ase",
+                snapshot.dndtAse,
+                io::Extent{mesh.numberOfCells},
+                {"cell"},
+                "s^-1",
+                1.0,
+                {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
+        if(snapshot.contains(core::SimulationOutputField::DNDT_PUMP))
+            writeScalar(
+                iteration,
+                prefix + "result_dndt_pump",
+                snapshot.dndtPump,
+                io::Extent{mesh.numberOfCells},
+                {"cell"},
+                "s^-1",
+                1.0,
+                {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
         iteration.close();
     }
 
@@ -1839,7 +2055,18 @@ namespace hase::openpmd
 
     void Parser::runCoreSimulation()
     {
-        auto simulation = read();
+        auto const inputStream = m_inputPath.string();
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+        io::Series inputSeries(inputStream, io::Access::READ_LINEAR, m_comm, seriesConfig(inputStream));
+#else
+        io::Series inputSeries(inputStream, io::Access::READ_LINEAR, seriesConfig(inputStream));
+#endif
+        auto inputIterations = inputSeries.readIterations();
+        auto inputIterator = inputIterations.begin();
+        if(inputIterator == inputIterations.end())
+            throw std::runtime_error("No iteration was available in the openPMD input stream.");
+        auto initialIteration = *inputIterator;
+        auto simulation = readIteration(inputSeries, initialIteration);
         bool const writesOutput = isHeadRank();
 
         std::unique_ptr<io::Series> series;
@@ -1862,14 +2089,13 @@ namespace hase::openpmd
             writesOutput,
             [&](core::SimulationSnapshot const& snapshot)
             {
-                bool const includeStatic = snapshot.step == 1u;
                 writeSimulationSnapshotIteration(
                     *series,
                     snapshot.step - 1u,
                     snapshot,
                     simulation.mesh,
                     simulation.experiment,
-                    includeStatic);
+                    false);
                 series->flush();
             },
             simulation.compute.parallelMode != core::ParallelMode::MPI};
@@ -1883,7 +2109,33 @@ namespace hase::openpmd
                 simulation.compute,
                 simulation.run,
                 simulation.mesh,
-                [&](core::SimulationSnapshot const& snapshot) { snapshotWriter.enqueue(snapshot); });
+                [&](core::SimulationSnapshot const& snapshot) { snapshotWriter.enqueue(snapshot); },
+                [&](unsigned completedStep)
+                {
+                    ++inputIterator;
+                    if(inputIterator == inputIterations.end())
+                        throw std::runtime_error(
+                            "synchronized-debug input ended before control iteration "
+                            + std::to_string(completedStep));
+                    auto controlIteration = *inputIterator;
+                    if(controlIteration.iterationIndex != completedStep)
+                        throw std::runtime_error(
+                            "synchronized-debug expected control iteration " + std::to_string(completedStep)
+                            + ", received " + std::to_string(controlIteration.iterationIndex));
+                    if(containsStaticMeshUpdate(controlIteration))
+                        validationError(
+                            "synchronized-debug control",
+                            "static topology updates are not supported after initialization");
+                    validateDynamicOnlyIteration(controlIteration, simulation);
+                    if(std::ranges::find(simulation.run.controlFields, core::SimulationControlField::BETA_VOLUME)
+                       != simulation.run.controlFields.end())
+                    {
+                        updateDynamicIteration(inputSeries, controlIteration, simulation);
+                        return simulation.mesh.betaVolume;
+                    }
+                    controlIteration.close();
+                    return std::vector<double>{};
+                });
         }
         catch(...)
         {
@@ -1891,6 +2143,7 @@ namespace hase::openpmd
         }
 
         snapshotWriter.finish();
+        inputSeries.close();
         if(series)
         {
             series->close();

@@ -9,7 +9,6 @@
 
 #include <algorithm> /* std::max */
 #include <chrono> /* std::chrono::system_clock */
-#include <cstdlib> /* getenv, strtoul */
 #include <ctime> /* time */
 #include <locale> /* std::locale */
 #include <numeric> /* accumulate*/
@@ -22,112 +21,18 @@
 #include <alpaka/alpaka.hpp>
 
 #include <alpakaUtils/DevBundle.hpp>
+#include <alpakaUtils/backendNames.hpp>
 #include <core/SerialVersion.hpp>
-#include <core/calcForwardPhiAse.hpp>
-#include <core/calcPhiAseThreaded.hpp>
+#include <core/forwardPhiAseEvaluator.hpp>
+#include <core/forwardPhiAseUtilities.hpp>
 #include <core/logging.hpp>
 #include <core/mesh.hpp>
 #include <core/types.hpp>
-#include <random/random.hpp>
 #include <utils/ray_histogram.hpp>
 #include <utils/writeToVtk.hpp>
-#if !defined(DISABLE_MPI) && defined(MPI_FOUND)
-#    include <core/calcPhiAseMpi.hpp>
-#endif
 
 namespace hase::core
 {
-
-    inline double calcVolumeDndtAse(
-        HostMesh const& mesh,
-        double const sigmaA,
-        double const sigmaE,
-        float const phiAse,
-        unsigned const volume)
-    {
-        double const gainPerDensity = mesh.betaVolume[volume] * (sigmaE + sigmaA) - sigmaA;
-        return gainPerDensity * phiAse;
-    }
-
-    inline unsigned baseRngSeed(ComputeParameters const& compute)
-    {
-        if(compute.rngSeed == ComputeParameters::unspecifiedRngSeed)
-        {
-            return random::SeedGenerator::get().getSeed();
-        }
-        return compute.rngSeed;
-    }
-
-    std::string getNameForBackend(auto const& backend, auto const& device)
-    {
-        std::string backendName;
-        backendName += alpaka::onHost::getName(alpaka::getApi(device)) + "_";
-        backendName += alpaka::onHost::getName(alpaka::getDeviceKind(device)) + "_";
-        backendName += alpaka::onHost::getName(backend[alpaka::object::exec]);
-        return backendName;
-    }
-
-    static std::vector<std::string> backendList()
-    {
-        auto backends = alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors);
-        std::vector<std::string> list;
-        alpaka::onHost::executeForEachIfHasDevice(
-            [&](auto const& backend) -> int
-            {
-                auto devSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
-                auto sampleDevice = devSelector.makeDevice(0);
-                list.emplace_back(getNameForBackend(backend, sampleDevice));
-                return 0;
-            },
-            backends);
-        return list;
-    }
-
-    inline unsigned envUnsigned(char const* name, unsigned fallback = 0)
-    {
-        char const* value = std::getenv(name);
-        if(value == nullptr || *value == '\0')
-        {
-            return fallback;
-        }
-
-        char* end = nullptr;
-        unsigned long parsed = std::strtoul(value, &end, 10);
-        return end == value ? fallback : static_cast<unsigned>(parsed);
-    }
-
-    inline RuntimeTopology detectRuntimeTopology()
-    {
-        RuntimeTopology topology;
-
-        unsigned const worldSize = envUnsigned(
-            "OMPI_COMM_WORLD_SIZE",
-            envUnsigned("PMI_SIZE", envUnsigned("PMIX_SIZE", envUnsigned("SLURM_NTASKS", 1))));
-        unsigned const localSize = std::max(
-            1u,
-            envUnsigned(
-                "OMPI_COMM_WORLD_LOCAL_SIZE",
-                envUnsigned("MPI_LOCALNRANKS", envUnsigned("MV2_COMM_WORLD_LOCAL_SIZE", 1))));
-        unsigned const slurmNodes = envUnsigned("SLURM_JOB_NUM_NODES", 0);
-        unsigned const activeNodes
-            = slurmNodes > 0 ? slurmNodes : std::max(1u, (worldSize + localSize - 1u) / localSize);
-
-        topology.activeNodes = activeNodes;
-        topology.activeRanks = worldSize;
-        topology.avgActiveRanksPerNode = static_cast<double>(worldSize) / static_cast<double>(activeNodes);
-        topology.minActiveRanksPerNode = localSize;
-        topology.maxActiveRanksPerNode = localSize;
-        return topology;
-    }
-
-    bool isSelected(auto const& backend, auto const& device, ComputeParameters& compute)
-    {
-        if(getNameForBackend(backend, device) == compute.backend)
-        {
-            return true;
-        }
-        return false;
-    }
 
     template<bool MATLAB>
     int startSimulation(
@@ -161,7 +66,7 @@ namespace hase::core
                 }
                 using T_Device = ALPAKA_TYPEOF(devSelector.makeDevice(0));
                 T_Device sampleDevice = devSelector.makeDevice(0);
-                if(!isSelected(backend, sampleDevice, compute))
+                if(hase::alpakaUtils::getNameForBackend(backend, sampleDevice) != compute.backend)
                 {
                     return 0;
                 }
@@ -176,137 +81,30 @@ namespace hase::core
                 }
                 compute.devices.resize(compute.numDevices);
 
-                std::vector<DeviceMeshContainer<T_Device>> meshes;
+                std::vector<T_Device> devices;
+                devices.reserve(compute.devices.size());
                 for(auto const& gpu_i : compute.devices)
-                {
-                    // use the first device
-                    alpaka::onHost::Device device = devSelector.makeDevice(gpu_i);
-                    meshes.emplace_back(hostMesh.toDevice(device));
-                }
+                    devices.emplace_back(devSelector.makeDevice(gpu_i));
 
                 oneDidRun = true;
                 // Statistics data
-                float runtime = 0.0;
                 double maxRelativeStandardError = 0;
                 double avgRelativeStandardError = 0;
                 unsigned highRelativeStandardError = 0;
                 unsigned definedRelativeStandardErrors = 0;
                 time_t starttime = time(0);
-                unsigned maxDevices = compute.devices.size();
-                std::vector runtimes(maxDevices, 0.f);
-                unsigned usedGPUs = 0;
-                RuntimeTopology topology;
-                if(!experiment.isForwardPropagation())
-                {
-                    throw std::runtime_error("Only forward volume propagation is supported by the openPMD backend.");
-                }
-
-                ForwardPhiAseRawResult rawResult;
-                unsigned adaptiveLaunches = 0u;
-                std::vector<unsigned> convergenceRayCounts;
-                if(compute.parallelMode == ParallelMode::SINGLE)
-                {
-                    unsigned const rngSeed = baseRngSeed(compute);
-                    for(unsigned completedIncreases = 0u;; ++completedIncreases)
-                    {
-                        unsigned const targetRayCount = adaptiveRayTarget(experiment, compute, completedIncreases);
-                        unsigned const batchRayCount = targetRayCount - rawResult.rayCount;
-                        unsigned const activeDevices = std::min(maxDevices, batchRayCount);
-                        if(batchRayCount == 0u)
-                        {
-                            if(targetRayCount == experiment.maxRays || experiment.forwardRayCount != 0u)
-                            {
-                                break;
-                            }
-                            continue;
-                        }
-                        if(activeDevices == 0u)
-                        {
-                            break;
-                        }
-
-                        std::fill(runtimes.begin(), runtimes.end(), 0.0f);
-                        ForwardPhiAseRawResult const batchResult = calcForwardPhiAseOnDevices(
-                            exec,
-                            experiment,
-                            compute,
-                            hostMesh,
-                            meshes,
-                            0u,
-                            activeDevices,
-                            batchRayCount,
-                            0u,
-                            batchRayCount,
-                            random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches),
-                            0u,
-                            runtimes);
-                        mergeForwardRawResult(rawResult, batchResult);
-                        runtime += *std::ranges::max_element(runtimes);
-                        usedGPUs = std::max(usedGPUs, activeDevices);
-                        ++adaptiveLaunches;
-                        finalizeForwardPhiAse(hostMesh, rawResult, result);
-                        recordAdaptiveRayConvergence(
-                            result,
-                            targetRayCount,
-                            experiment.relativeStandardErrorThreshold,
-                            convergenceRayCounts);
-
-                        if(experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays
-                           || forwardResultMeetsRelativeStandardError(
-                               result,
-                               experiment.relativeStandardErrorThreshold))
-                        {
-                            break;
-                        }
-                    }
-                    topology = RuntimeTopology{};
-                    topology.activeNodes = 1u;
-                    topology.activeRanks = 1u;
-                    topology.avgActiveRanksPerNode = 1.0;
-                    topology.minActiveRanksPerNode = 1u;
-                    topology.maxActiveRanksPerNode = 1u;
-                    topology.activeGpus = usedGPUs;
-                    topology.avgGpusPerRank = static_cast<double>(usedGPUs);
-                    topology.avgGpusPerNode = static_cast<double>(usedGPUs);
-                    topology.minGpusPerNode = usedGPUs;
-                    topology.maxGpusPerNode = usedGPUs;
-                }
-                else if(compute.parallelMode == ParallelMode::MPI)
-                {
-#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
-                    usedGPUs = hase::core::calcForwardPhiAseMPI(
-                        exec,
-                        experiment,
-                        compute,
-                        hostMesh,
-                        meshes,
-                        rawResult,
-                        topology,
-                        runtime,
-                        adaptiveLaunches,
-                        convergenceRayCounts);
-#else
-#    if !defined(MPI_FOUND)
-                    dout(V_ERROR) << "Did not find MPI on your system!";
-                    exit(1);
-#    else
-                    dout(V_ERROR) << "TURN 'DISABLE_MPI' to 'OFF' in order to run PhiASE on multiple nodes!";
-                    exit(1);
-#    endif
-#endif
-                }
-
-                else
-                {
-                    dout(V_ERROR) << "No valid parallel-mode for GPU!" << std::endl;
-                    exit(1);
-                }
+                ForwardPhiAseContext context{std::move(devices), exec, experiment, hostMesh};
+                auto evaluation
+                    = context.evaluate(experiment, compute, hostMesh, context.primaryBetaVolume(), result, false);
+                float const runtime = evaluation.runtime;
+                unsigned const usedGPUs = evaluation.usedDevices;
+                RuntimeTopology const& topology = evaluation.topology;
+                unsigned const rayCount = evaluation.rayCount;
+                unsigned const adaptiveLaunches = evaluation.adaptiveLaunches;
+                auto const& convergenceRayCounts = evaluation.convergenceRayCounts;
 
                 if(usedGPUs == 0)
-                {
-                    return 0;
-                }
-                finalizeForwardPhiAse(hostMesh, rawResult, result);
+                    throw std::runtime_error("forward ASE evaluator used no devices");
 
                 dout(V_INFO) << "Active nodes             : " << topology.activeNodes << std::endl;
                 dout(V_INFO) << "Active ranks             : " << topology.activeRanks << std::endl;
@@ -319,19 +117,6 @@ namespace hase::core
                              << " avg (min=" << topology.minGpusPerNode << ", max=" << topology.maxGpusPerNode << ")"
                              << std::endl;
 
-                for(unsigned volume = 0u; volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
-                    ++volume)
-                {
-                    double const fluorescenceRate = hostMesh.nTot / hostMesh.crystalTFluo;
-                    result.phiAse.at(volume) *= fluorescenceRate;
-                    result.standardError.at(volume) *= fluorescenceRate;
-                    result.dndtAse.at(volume) = calcVolumeDndtAse(
-                        hostMesh,
-                        experiment.maxSigmaA,
-                        experiment.maxSigmaE,
-                        result.phiAse.at(volume),
-                        volume);
-                }
                 /***************************************************************************
                  * PRINT SOLUTION
                  **************************************************************************/
@@ -369,7 +154,7 @@ namespace hase::core
                         hostMesh,
                         result.dndtAse,
                         vtkPath / fs::path("dndt_" + currentTime + ".vtk"),
-                        rawResult.rayCount,
+                        rayCount,
                         experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
@@ -379,7 +164,7 @@ namespace hase::core
                         hostMesh,
                         tmpPhiAse,
                         vtkPath / fs::path("phiase_" + currentTime + ".vtk"),
-                        rawResult.rayCount,
+                        rayCount,
                         experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
@@ -389,7 +174,7 @@ namespace hase::core
                         hostMesh,
                         result.standardError,
                         vtkPath / fs::path("standard_error_" + currentTime + ".vtk"),
-                        rawResult.rayCount,
+                        rayCount,
                         experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
@@ -399,7 +184,7 @@ namespace hase::core
                         hostMesh,
                         tmpTotalRays,
                         vtkPath / fs::path("total_rays_" + currentTime + ".vtk"),
-                        rawResult.rayCount,
+                        rayCount,
                         experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
@@ -409,7 +194,7 @@ namespace hase::core
                         hostMesh,
                         result.relativeStandardError,
                         vtkPath / fs::path("relative_standard_error_" + currentTime + ".vtk"),
-                        rawResult.rayCount,
+                        rayCount,
                         experiment.maxRays,
                         experiment.relativeStandardErrorThreshold,
                         experiment.useReflections,
@@ -459,22 +244,21 @@ namespace hase::core
                     dout(V_STAT) << "Backend       : " << compute.backend << std::endl;
                     dout(V_STAT) << "RNG Seed      : " << baseRngSeed(compute) << std::endl;
                     dout(V_STAT) << "ParallelMode      : " << compute.parallelMode << std::endl;
-                    dout(V_STAT) << "Prisms            : " << meshes[0].numberOfPrisms << std::endl;
+                    dout(V_STAT) << "Cells             : " << context.primaryMesh().numberOfCells << std::endl;
                     dout(V_STAT) << "Samples           : "
                                  << std::min(static_cast<unsigned>(result.dndtAse.size()), numSamples) << std::endl;
                     if(experiment.forwardRayCount != 0u)
                     {
-                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << " (explicit)" << std::endl;
+                        dout(V_STAT) << "Forward rays      : " << rayCount << " (explicit)" << std::endl;
                     }
                     else if(experiment.maxRays > experiment.minRays)
                     {
-                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << " of " << experiment.minRays
-                                     << " - " << experiment.maxRays << " (" << adaptiveLaunches << " launches)"
-                                     << std::endl;
+                        dout(V_STAT) << "Forward rays      : " << rayCount << " of " << experiment.minRays << " - "
+                                     << experiment.maxRays << " (" << adaptiveLaunches << " launches)" << std::endl;
                     }
                     else
                     {
-                        dout(V_STAT) << "Forward rays      : " << rawResult.rayCount << std::endl;
+                        dout(V_STAT) << "Forward rays      : " << rayCount << std::endl;
                     }
                     dout(V_STAT) << "sum(totalRays)    : "
                                  << std::accumulate(result.totalRays.begin(), result.totalRays.end(), 0.) << std::endl;
@@ -499,7 +283,7 @@ namespace hase::core
                     dout(V_STAT) << "=== Adaptive forward-ray convergence by cell (green: RSE target reached; red: "
                                     "budget exhausted) ==="
                                  << std::endl;
-                    hase::utils::ray_histogram(convergenceRayCounts, rawResult.rayCount);
+                    hase::utils::ray_histogram(convergenceRayCounts, rayCount);
                     dout(V_STAT) << std::endl;
                 }
                 // Cleanup device memory
@@ -515,7 +299,7 @@ namespace hase::core
             std::cout << " Backend did not match any available backend with available device! \n Available backend "
                          "specifications are: "
                       << std::endl;
-            for(auto const& element : backendList())
+            for(auto const& element : hase::alpakaUtils::availableBackendNames())
             {
                 std::cout << element << "\n";
             }

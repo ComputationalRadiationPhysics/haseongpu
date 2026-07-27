@@ -116,9 +116,16 @@ namespace hase::core
 
     void finalizeForwardPhiAse(HostMesh const& hostMesh, ForwardPhiAseRawResult const& rawResult, Result& result)
     {
-        unsigned const volumeCount = static_cast<unsigned>(rawResult.scoreSum.size());
-        double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
+        finalizeForwardPhiAse(hostMesh, rawResult, calcForwardBetaVolumeTotal(hostMesh), result);
+    }
 
+    void finalizeForwardPhiAse(
+        HostMesh const& hostMesh,
+        ForwardPhiAseRawResult const& rawResult,
+        double const betaVolumeTotal,
+        Result& result)
+    {
+        unsigned const volumeCount = static_cast<unsigned>(rawResult.scoreSum.size());
         result = Result(
             std::vector(volumeCount, 0.0f),
             std::vector(volumeCount, 0.0),

@@ -34,6 +34,7 @@ requiredHaseApi = (
     "SuperGaussianPumpProfile",
     "SurfacePumpInjector",
     "VolumeTopology",
+    "autonomous_final",
 )
 
 
