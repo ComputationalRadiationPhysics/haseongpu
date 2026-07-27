@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from HASEonGPU import AlpakaBackends, GainMedium, PhiASE, SpectralDecomposition, VolumeTopology
+from openpmd_backend_matrix import openpmd_runtime_test_backends
 
 
 def analyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad):
@@ -115,23 +116,14 @@ def analyticalSphereBackends():
     return [_NO_ANALYTICAL_SPHERE_BACKEND]
 
 
-def openPmdBackendForTest():
-    explicit = os.environ.get("OPENPMD_RUNTIME_BACKEND")
-    if explicit:
-        return explicit
-    configured = os.environ.get("HASE_OPENPMD_TEST_BACKENDS")
-    if configured:
-        return configured.split(",", maxsplit=1)[0].strip()
-    return "adios"
-
-
 def analyticalSphereRayCount():
     return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "5000000"))
 
 
 @pytest.mark.parametrize("backend", analyticalSphereBackends())
+@pytest.mark.parametrize("openpmdBackend", openpmd_runtime_test_backends())
 @pytest.mark.parametrize(("radius", "gain"), sphereCases, ids=sphereCaseIds)
-def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend):
+def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, openpmdBackend, backend):
     if backend == _NO_ANALYTICAL_SPHERE_BACKEND:
         pytest.fail("analytical sphere test requires at least one Alpaka backend")
 
@@ -168,7 +160,7 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, backend
         relativeStandardErrorThreshold=0.05,
         useReflections=False,
         backend=backend,
-        openpmdBackend=openPmdBackendForTest(),
+        openpmdBackend=openpmdBackend,
         parallelMode="single",
         numDevices=1,
         monochromatic=True,

@@ -37,7 +37,7 @@ requiredHaseApi = (
 )
 
 
-from openpmd_backend_matrix import openpmd_test_backends
+from openpmd_backend_matrix import openpmd_runtime_test_backends, openpmd_test_backends
 
 
 def _openpmd_file_backends():
@@ -132,7 +132,7 @@ import numpy as np
 import pytest
 
 
-@pytest.fixture(scope="session", params=openpmd_test_backends())
+@pytest.fixture(scope="session", params=openpmd_runtime_test_backends())
 def openPmdRuntimeBackend(request):
     return request.param
 
