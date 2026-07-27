@@ -1746,7 +1746,7 @@ def _general_pump_attributes(simulation):
     return attributes
 
 
-def _write_simulation_input(input_path, spec, simulation, run_control):
+def _write_simulation_input(input_path, spec, simulation, run_control, *, close_after=None):
     with OpenPmdInputSeries(input_path, backend=spec.name) as writer:
         writer.write(
             simulation.phiASE,
@@ -1756,12 +1756,15 @@ def _write_simulation_input(input_path, spec, simulation, run_control):
             include_static=True,
             runControl=run_control,
         )
+        if close_after is not None:
+            close_after.wait()
 
 
 def _run_streaming_simulation(command, input_path, output_path, spec, simulation, run_control):
     """Run compiled simulation while Python threads exchange SST snapshots."""
     result_queue = queue.Queue(maxsize=1)
     input_queue = queue.Queue(maxsize=1)
+    backend_finished = threading.Event()
 
     def read_output():
         try:
@@ -1771,7 +1774,13 @@ def _run_streaming_simulation(command, input_path, output_path, spec, simulation
 
     def write_input():
         try:
-            _write_simulation_input(input_path, spec, simulation, run_control)
+            _write_simulation_input(
+                input_path,
+                spec,
+                simulation,
+                run_control,
+                close_after=backend_finished,
+            )
             input_queue.put((True, None))
         except BaseException as exc:
             input_queue.put((False, exc))
@@ -1797,7 +1806,10 @@ def _run_streaming_simulation(command, input_path, output_path, spec, simulation
     )
     writer.start()
 
-    stdout, stderr = proc.communicate()
+    try:
+        stdout, stderr = proc.communicate()
+    finally:
+        backend_finished.set()
     _forward_backend_logging(stdout=stdout, stderr=stderr)
 
     timeout = _streaming_thread_join_timeout()

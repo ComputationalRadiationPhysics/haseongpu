@@ -1756,7 +1756,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
         events.append(("read-end",))
         return [SimpleNamespace(step=1)]
 
-    def fake_write_input(input_path, spec, simulation, run_control):
+    def fake_write_input(input_path, spec, simulation, run_control, *, close_after=None):
         assert receiver_started.wait(timeout=2.0)
         events.append(
             (
@@ -1768,6 +1768,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
             )
         )
         input_written.set()
+        assert close_after.wait(timeout=2.0)
 
     monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
     monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
@@ -1794,6 +1795,70 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
     assert write_event[1] == "HASE compiled simulation input sender"
 
 
+def test_streaming_simulation_keeps_input_series_open_until_backend_exits(monkeypatch, tmp_path):
+    input_published = threading.Event()
+    backend_observing_input = threading.Event()
+    input_closed = threading.Event()
+    backend_exited = threading.Event()
+    closed_before_backend_exit = []
+
+    class FakeInputSeries:
+        def __init__(self, path, *, backend=None):
+            assert Path(path).name == "input.sst"
+            assert backend == "adios-sst"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            input_closed.set()
+
+        def write(self, *args, **kwargs):
+            input_published.set()
+            assert backend_observing_input.wait(timeout=2.0)
+
+    class FakeProcess:
+        returncode = 0
+
+        def __init__(self, command, **kwargs):
+            pass
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            raise AssertionError("the successful backend must not be killed")
+
+        def communicate(self):
+            assert input_published.wait(timeout=2.0)
+            backend_observing_input.set()
+            closed_before_backend_exit.append(input_closed.wait(timeout=0.1))
+            backend_exited.set()
+            return "", ""
+
+    def fake_read_simulation_output(path):
+        assert backend_exited.wait(timeout=2.0)
+        return [SimpleNamespace(step=1)]
+
+    monkeypatch.setattr(transport, "OpenPmdInputSeries", FakeInputSeries)
+    monkeypatch.setattr(transport.subprocess, "Popen", FakeProcess)
+    monkeypatch.setattr(transport, "read_simulation_output", fake_read_simulation_output)
+
+    simulation = SimpleNamespace(phiASE=object(), gainMedium=object(), crossSections=object())
+    states = transport._run_streaming_simulation(
+        ["calcPhiASE", "--cpp-control"],
+        tmp_path / "input.sst",
+        tmp_path / "output.sst",
+        SimpleNamespace(name="adios-sst"),
+        simulation,
+        {"number_of_steps": 1},
+    )
+
+    assert states[0].step == 1
+    assert closed_before_backend_exit == [False]
+    assert input_closed.is_set()
+
+
 def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(monkeypatch, tmp_path):
     writer_started = threading.Event()
     release_writer = threading.Event()
@@ -1815,7 +1880,7 @@ def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(
             assert writer_started.wait(timeout=2.0)
             return "", "unknown option --cpp-control"
 
-    def blocked_write_input(input_path, spec, simulation, run_control):
+    def blocked_write_input(input_path, spec, simulation, run_control, *, close_after=None):
         writer_started.set()
         assert release_writer.wait(timeout=2.0)
 
@@ -1864,7 +1929,7 @@ def test_streaming_simulation_preserves_input_writer_failure(monkeypatch, tmp_pa
             assert killed.wait(timeout=2.0)
             return "", ""
 
-    def failed_write_input(input_path, spec, simulation, run_control):
+    def failed_write_input(input_path, spec, simulation, run_control, *, close_after=None):
         raise ValueError("invalid simulation input")
 
     monkeypatch.setattr(transport.subprocess, "Popen", KilledProcess)
