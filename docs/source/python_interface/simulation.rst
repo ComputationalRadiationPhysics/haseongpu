@@ -32,6 +32,6 @@ simulation does not retain the full history, so register ``on_step`` to store or
 write every snapshot.
 
 The full time loop, pump evaluation, ASE evaluation, derivative composition,
-time integration, clipping, and beta mapping run in C++/Alpaka. Python executes
+time integration, and clipping run on cell-centered fields in C++/Alpaka. Python executes
 ``on_init`` before launch and ``on_step`` callbacks as snapshots arrive.
 Per-step Python mutation is not supported inside a compiled run.

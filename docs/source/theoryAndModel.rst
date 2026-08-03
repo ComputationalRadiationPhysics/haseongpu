@@ -190,13 +190,11 @@ The ASE depletion term for the excited-state fraction is
 
 .. math::
 
-   \left.\frac{d\beta_i}{dt}\right|_{\mathrm{ASE}}
-   = \left[\beta_i(\sigma_e+\sigma_a)-\sigma_a\right]\Phi_i.
+   \left.\frac{d\beta_j}{dt}\right|_{\mathrm{ASE}}
+   = \left[\beta_j(\sigma_e+\sigma_a)-\sigma_a\right]\Phi_j.
 
-For vertex-centered state, volume-centered PhiASE is mapped to the connected
-mesh points before this derivative is evaluated. The compiled simulation uses
-the maximum emission cross section and the absorption cross section at the
-emission-peak wavelength for this scalar conversion.
+The compiled simulation evaluates and integrates this term directly on Tet4
+cells. It does not maintain a point-centered beta or PhiASE representation.
 
 General Monte Carlo Pump
 ------------------------
@@ -216,9 +214,9 @@ Within a cell, pump power follows
    g_p = N_{\mathrm{tot}}
          \left[\beta(\sigma_a+\sigma_e)-\sigma_a\right].
 
-The corresponding net photon exchange is accumulated in the traversed cell.
-For vertex-centered state it is distributed to the four vertices with
-barycentric midpoint weights and normalized by the lumped sample volumes.
+The corresponding net photon exchange is accumulated in the traversed cell
+and divided by that cell's volume to obtain its contribution to
+:math:`d\beta_j/dt`. No cell-to-point deposition is performed.
 
 ``SurfacePumpInjector`` selects the tagged launch faces. Finite
 ``PlanarPumpRelay`` stages can map rays from coplanar exit domains to entry
@@ -229,7 +227,8 @@ Fresnel or unlimited cavity model.
 Pump and Time Stepping
 ----------------------
 
-The compiled C++/Alpaka simulation advances
+The compiled C++/Alpaka simulation advances one authoritative beta value per
+Tet4 cell:
 
 .. math::
 

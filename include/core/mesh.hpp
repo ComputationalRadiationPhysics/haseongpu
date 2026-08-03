@@ -145,7 +145,6 @@ namespace hase::core
     {
         std::span<double const> points;
         std::span<double const> betaVolume;
-        std::span<double const> betaCells;
         std::span<unsigned const> claddingCellTypes;
         std::span<float const> refractiveIndices;
         std::span<float const> reflectivities;
@@ -357,7 +356,6 @@ namespace hase::core
             bool samplePointsAreMeshPoints,
             std::vector<double> points,
             std::vector<double> betaVolume,
-            std::vector<double> betaCells,
             std::vector<unsigned> claddingCellTypes,
             std::vector<float> refractiveIndices,
             std::vector<float> reflectivities,
@@ -380,7 +378,6 @@ namespace hase::core
             , m_queue(device.makeQueue(alpaka::queueKind::blocking))
             , points(hase::alpakaUtils::toDevice(m_queue, points))
             , betaVolume(hase::alpakaUtils::toDevice(m_queue, betaVolume))
-            , betaCells(hase::alpakaUtils::toDevice(m_queue, betaCells))
             , claddingCellTypes(hase::alpakaUtils::toDevice(m_queue, claddingCellTypes))
             , refractiveIndices(hase::alpakaUtils::toDevice(m_queue, refractiveIndices))
             , reflectivities(hase::alpakaUtils::toDevice(m_queue, reflectivities))
@@ -421,7 +418,6 @@ namespace hase::core
             return {
                 std::span<double const>(points.data(), points.getMdSpan().getExtents().x()),
                 std::span<double const>(betaVolume.data(), betaVolume.getMdSpan().getExtents().x()),
-                std::span<double const>(betaCells.data(), betaCells.getMdSpan().getExtents().x()),
                 std::span<unsigned const>(claddingCellTypes.data(), claddingCellTypes.getMdSpan().getExtents().x()),
                 std::span<float const>(refractiveIndices.data(), refractiveIndices.getMdSpan().getExtents().x()),
                 std::span<float const>(reflectivities.data(), reflectivities.getMdSpan().getExtents().x()),
@@ -479,7 +475,6 @@ namespace hase::core
 
         T_Buffer<double> points;
         T_Buffer<double> betaVolume;
-        T_Buffer<double> betaCells;
         T_Buffer<unsigned> claddingCellTypes;
         T_Buffer<float> refractiveIndices;
         T_Buffer<float> reflectivities;
@@ -520,7 +515,6 @@ namespace hase::core
     public:
         std::vector<double> points;
         std::vector<double> betaVolume;
-        std::vector<double> betaCells;
         std::vector<unsigned> claddingCellTypes;
         std::vector<float> refractiveIndices;
         std::vector<float> reflectivities;
@@ -578,7 +572,6 @@ namespace hase::core
             std::vector<double> samplePoints,
             std::vector<double> cellCenters,
             std::vector<double> betaVolume,
-            std::vector<double> betaCells,
             std::vector<unsigned> claddingCellTypes,
             std::vector<float> refractiveIndices,
             std::vector<float> reflectivities,
@@ -595,7 +588,6 @@ namespace hase::core
             bool samplePointsAreMeshPoints = false)
             : points(std::move(points))
             , betaVolume(std::move(betaVolume))
-            , betaCells(std::move(betaCells))
             , claddingCellTypes(std::move(claddingCellTypes))
             , refractiveIndices(std::move(refractiveIndices))
             , reflectivities(std::move(reflectivities))
@@ -760,7 +752,6 @@ namespace hase::core
                 samplePointsAreMeshPoints,
                 points,
                 betaVolume,
-                betaCells,
                 claddingCellTypes,
                 refractiveIndices,
                 reflectivities,

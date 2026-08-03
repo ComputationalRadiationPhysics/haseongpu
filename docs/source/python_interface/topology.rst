@@ -91,7 +91,7 @@ non-standard extensions:
    volume = VolumeTopology.fromFile("volume.mesh", format="stl", meshSize=0.05)
 
 The topology importer only creates geometry and layer metadata.  It does not
-populate material arrays such as ``betaCells`` or ``reflectivities`` except for
+populate material arrays such as ``betaVolume`` or ``reflectivities`` except for
 metadata that can later be used by ``GainMedium``.  For VTK files that contain
 both geometry and HASEonGPU field data, load a full gain medium instead:
 
@@ -101,8 +101,8 @@ both geometry and HASEonGPU field data, load a full gain medium instead:
    medium = GainMedium.fromFile("medium.vtk")
 
 ``GainMedium.fromVtk(...)`` expects a Tet4 VTK unstructured grid, the same
-format accepted by ``VolumeTopology.fromVtk(...)``. ``betaCells`` is read from
-point or cell data, ``betaVolume`` from cell data, and ``claddingCellTypes``,
+format accepted by ``VolumeTopology.fromVtk(...)``. ``betaVolume`` is read from
+cell data, and ``claddingCellTypes``,
 ``refractiveIndices``, ``reflectivities``, ``nTot``, ``crystalTFluo``,
 ``claddingNumber``, and ``claddingAbsorption`` from VTK ``FIELD`` arrays when
 present. ``numberOfLevels`` and ``thickness`` are metadata in the Tet4 file and
@@ -197,7 +197,6 @@ Use ``GainMedium`` property metadata for array shapes:
 .. code-block:: python
 
    medium = topology.asGainMedium()
-   medium.get("betaCells").expectedShape       # (numberOfPoints, levels)
    medium.get("betaVolume").expectedShape      # (numberOfTriangles, levels - 1)
    medium.get("reflectivities").expectedShape  # (numberOfTriangles, 2)
 
@@ -210,11 +209,8 @@ These helpers convert physical coordinates to topology indices:
 
    point_index = topology.pointIndexAt(x=0.0, y=0.0)
    level_index = topology.levelIndexAt(z=0.1)
-   point_index, level_index = topology.betaCellIndexAt(0.0, 0.0, 0.1)
-   flat_index = topology.betaCellIndexAt(0.0, 0.0, 0.1, flat=True)
-
-``betaCellIndexAt`` is useful when initializing or inspecting one
-:math:`\beta_i` entry in the ``betaCells`` array.
+Use the topology connectivity to locate the volume cell whose ``betaVolume``
+entry should be initialized or inspected.
 
 Conversion to GainMedium
 ------------------------

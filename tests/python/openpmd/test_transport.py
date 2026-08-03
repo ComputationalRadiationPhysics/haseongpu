@@ -50,7 +50,6 @@ VOLUME_CELLS = np.array(
     dtype=np.uint32,
 )
 VOLUME_BETA = np.array([0.11, 0.21, 0.31], dtype=np.float64)
-VOLUME_POINT_BETA = np.array([100.0, 110.0, 120.0], dtype=np.float64)
 
 MESH_FIELD_VALUES = {
     "points": np.array([0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75], dtype=np.float64),
@@ -64,7 +63,6 @@ MESH_FIELD_VALUES = {
     "cellNormalY": np.array([-0.10, -0.40, -0.70, -0.20, -0.50, -0.80, -0.30, -0.60, -0.90], dtype=np.float64),
     "surface": np.array([1.25, 2.50, 3.75], dtype=np.float32),
     "betaVolume": np.array([0.11, 0.21, 0.31, 0.12, 0.22, 0.32, 0.13, 0.23, 0.33, 0.14, 0.24, 0.34, 0.15, 0.25, 0.35], dtype=np.float64),
-    "pointBeta": np.array([100.0 + 10.0 * point + level for level in range(6) for point in range(5)], dtype=np.float64),
     "claddingCellType": np.array([0, 2, 1], dtype=np.uint32),
     "refractiveIndex": np.array([1.80, 1.20, 1.65, 1.05], dtype=np.float32),
     "reflectivity": np.array([0.01, 0.03, 0.05, 0.02, 0.04, 0.06], dtype=np.float32),
@@ -96,7 +94,6 @@ SCALAR_RECORD_SPECS = {
     "cell_normal_y": "cellNormalY",
     "surface": "surface",
     "beta_volume": "betaVolume",
-    "point_beta": "pointBeta",
     "cladding_cell_type": "claddingCellType",
     "refractive_index": "refractiveIndex",
     "reflectivity": "reflectivity",
@@ -114,7 +111,6 @@ def asymmetric_topology():
 def asymmetric_medium():
     return GainMedium(asymmetric_topology()).withPhysicalProperties(
         betaVolume=backendFlat(VOLUME_BETA),
-        betaCells=backendFlat(VOLUME_POINT_BETA),
         claddingCellTypes=MESH_FIELD_VALUES["claddingCellType"],
         refractiveIndices=MESH_FIELD_VALUES["refractiveIndex"],
         reflectivities=backendFlat(MESH_FIELD_VALUES["reflectivity"]),
@@ -167,7 +163,6 @@ def launch_smoke_medium():
     topology = launch_smoke_topology()
     return GainMedium(topology).withPhysicalProperties(
         betaVolume=backendFlat(np.array([0.0], dtype=np.float64)),
-        betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
         claddingCellTypes=np.array([0], dtype=np.uint32),
         refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
         reflectivities=backendFlat(np.array([0.0, 0.0], dtype=np.float32)),
@@ -243,7 +238,6 @@ def asymmetric_mesh():
         triangleNormalsY=derived["triangleNormalsY"],
         triangleSurfaces=derived["triangleSurfaces"],
         betaVolume=MESH_FIELD_VALUES["betaVolume"],
-        betaCells=MESH_FIELD_VALUES["pointBeta"],
         claddingCellTypes=MESH_FIELD_VALUES["claddingCellType"],
         refractiveIndices=MESH_FIELD_VALUES["refractiveIndex"],
         reflectivities=MESH_FIELD_VALUES["reflectivity"],
@@ -262,7 +256,6 @@ def _field_context():
 def _transport_scalar_record_values():
     return {
         "beta_volume": VOLUME_BETA,
-        "point_beta": VOLUME_POINT_BETA,
         "cladding_cell_type": MESH_FIELD_VALUES["claddingCellType"],
         "refractive_index": MESH_FIELD_VALUES["refractiveIndex"],
         "reflectivity": MESH_FIELD_VALUES["reflectivity"],
@@ -1625,17 +1618,15 @@ def _write_minimal_snapshot_scalar(iteration, name, values):
     component.store_chunk(data)
 
 
-def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
+def test_read_simulation_output_uses_cell_layout(tmp_path):
     output = tmp_path / ("simulation-output" + _file_suffix_for_tests())
     io = _io()
     series = io.Series(str(output), transport._access("create_linear"), transport._series_config(output))
     iteration = series.snapshots()[0]
-    number_of_points = 2
-    number_of_levels = 3
-    number_of_cells = 1
-    point_level_shape = (number_of_points, number_of_levels)
-    sample_flat = np.array([10.0 * level + point for level in range(number_of_levels) for point in range(number_of_points)])
-    cell_layer_flat = np.array([100.0 + level for level in range(number_of_levels - 1)])
+    number_of_points = 4
+    number_of_levels = 1
+    number_of_cells = 2
+    cell_flat = np.array([100.0 + cell for cell in range(number_of_cells)])
 
     iteration.set_attribute("number_of_points", number_of_points)
     iteration.set_attribute("number_of_levels", number_of_levels)
@@ -1650,28 +1641,25 @@ def test_read_simulation_output_uses_backend_flat_point_level_layout(tmp_path):
     iteration.set_attribute("srm_divergence_streak", 3)
     iteration.time = 0.25
 
-    _write_minimal_snapshot_scalar(iteration, "core_point_beta", sample_flat.astype(np.float64))
-    _write_minimal_snapshot_scalar(iteration, "core_beta_volume", cell_layer_flat.astype(np.float64))
-    _write_minimal_snapshot_scalar(iteration, "core_result_phi_ase", sample_flat.astype(np.float32))
-    _write_minimal_snapshot_scalar(iteration, "core_result_standard_error", (sample_flat + 1000.0).astype(np.float64))
-    _write_minimal_snapshot_scalar(iteration, "core_result_relative_standard_error", (sample_flat + 0.1).astype(np.float64))
-    _write_minimal_snapshot_scalar(iteration, "core_result_total_rays", np.arange(sample_flat.size, dtype=np.uint32))
-    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_ase", (sample_flat + 2000.0).astype(np.float64))
-    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_pump", (sample_flat + 3000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_beta_volume", cell_flat.astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_phi_ase", cell_flat.astype(np.float32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_standard_error", (cell_flat + 1000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_relative_standard_error", (cell_flat + 0.1).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_total_rays", np.arange(cell_flat.size, dtype=np.uint32))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_ase", (cell_flat + 2000.0).astype(np.float64))
+    _write_minimal_snapshot_scalar(iteration, "core_result_dndt_pump", (cell_flat + 3000.0).astype(np.float64))
     iteration.close()
     series.close()
 
     state = transport.read_simulation_output(output)[0]
 
-    expected = sample_flat.reshape(point_level_shape, order="F")
-    np.testing.assert_array_equal(state.betaCells, expected)
-    np.testing.assert_array_equal(state.phiAse, expected.astype(np.float32))
-    np.testing.assert_array_equal(state.dndtAse, expected + 2000.0)
-    np.testing.assert_array_equal(state.dndtPump, expected + 3000.0)
-    np.testing.assert_array_equal(
-        state.betaVolume,
-        cell_layer_flat.reshape((number_of_cells, number_of_levels - 1), order="F"),
-    )
+    np.testing.assert_array_equal(state.betaVolume, cell_flat)
+    np.testing.assert_array_equal(state.phiAse, cell_flat.astype(np.float32))
+    np.testing.assert_array_equal(state.standardError, cell_flat + 1000.0)
+    np.testing.assert_array_equal(state.relativeStandardError, cell_flat + 0.1)
+    np.testing.assert_array_equal(state.totalRays, np.arange(cell_flat.size, dtype=np.uint32))
+    np.testing.assert_array_equal(state.dndtAse, cell_flat + 2000.0)
+    np.testing.assert_array_equal(state.dndtPump, cell_flat + 3000.0)
     assert state.aseResult.srmStatus == "stable"
     assert state.aseResult.srmPasses == 2
     assert state.aseResult.srmRemainingFraction == pytest.approx(0.25)

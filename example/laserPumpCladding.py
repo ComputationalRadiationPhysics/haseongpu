@@ -108,7 +108,7 @@ def printState(state):
     print(
         f"step={state.step:03d} "
         f"time={state.time:.3e}s "
-        f"mean_beta={state.beta_cells.mean():.6e} "
+        f"mean_beta={state.beta_volume.mean():.6e} "
         f"mean_phi={state.phi_ase.mean():.6e}"
     )
 
@@ -166,7 +166,6 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
         raise ValueError("VTK export requires nTot for gain")
 
     fields = {
-        "betaCells": state.beta_cells,
         "betaVolume": state.beta_volume,
         "phiASE": state.phi_ase,
         "dndtAse": state.dndt_ase,
@@ -174,10 +173,6 @@ def writeVtkFields(state, vtkOutputDir=scriptDir, claddingAbsorption=1.0, crossS
         "cladAbs": state.phi_ase * np.float64(claddingAbsorption),
         "localGain": calcGainFromState(state, crossSections, nTot),
     }
-    if state.volume_phi_ase is not None:
-        fields["volumePhiASE"] = state.volume_phi_ase
-    if state.volume_dndt_ase is not None:
-        fields["volumeDndtAse"] = state.volume_dndt_ase
     path = Path(vtkOutputDir) / f"laserPumpCladding_{state.step:03d}.vtk"
     if hasattr(state.topology, "cellPointIndices"):
         return _writeTet4StateVtk(path, state, fields)
@@ -237,7 +232,6 @@ def laserPumpCladdingMedium(cladAbsorption=5.5):
     topology = _assignLegacyTet4SurfaceDomains(VolumeTopology.fromVtk(materialPath))
     refractiveIndices = np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32)
     return GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=backendFlat(np.zeros(topology.numberOfSamplePoints, dtype=np.float64)),
         betaVolume=backendFlat(np.zeros(topology.numberOfCells, dtype=np.float64)),
         claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
         refractiveIndices=refractiveIndices,
@@ -466,7 +460,7 @@ def main(argv=None):
         **aseOverrides,
     )
     print(f"phiAse shape: {state.phi_ase.shape}")
-    print(f"betaCells shape: {state.beta_cells.shape}")
+    print(f"betaVolume shape: {state.beta_volume.shape}")
 
 
 if __name__ == "__main__":

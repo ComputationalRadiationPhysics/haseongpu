@@ -455,8 +455,6 @@ def _attributeValues(phiAse, gainMedium, crossSections):
 def _arrayFields(gainMedium, crossSections, *, phiAse=None, include_static=True):
     context = _fieldContext(gainMedium)
     for field in _fieldsFromDomain(gainMedium.openPmdFields(context)):
-        if field.spec.name in {"pointBeta", "betaCells"}:
-            continue
         if include_static or field.spec.name in DYNAMIC_FIELD_NAMES:
             yield field
     if include_static:
@@ -1015,59 +1013,35 @@ def read_simulation_output(path):
     states = []
     for fallback_index, iteration in enumerate(series.read_iterations()):
         iteration_index = _iteration_index(iteration, fallback_index)
-        number_of_points = int(iteration.get_attribute("number_of_points"))
-        number_of_levels = int(iteration.get_attribute("number_of_levels"))
         number_of_cells = int(iteration.get_attribute("number_of_cells"))
-        point_count = number_of_points * number_of_levels
-        beta_cells = _loadScalar(series, iteration, "core_point_beta", np.float64)
         beta_volume = _loadScalar(series, iteration, "core_beta_volume", np.float64)
         phi_ase = _loadScalar(series, iteration, "core_result_phi_ase", np.float32)
+        standard_error = _loadScalar(series, iteration, "core_result_standard_error", np.float64)
+        relative_standard_error = _loadScalar(
+            series, iteration, "core_result_relative_standard_error", np.float64
+        )
+        total_rays = _loadScalar(series, iteration, "core_result_total_rays", np.uint32)
         dndt_ase = _loadScalar(series, iteration, "core_result_dndt_ase", np.float64)
-        volume_phi_ase = _read_optional_scalar(series, iteration, "core_result_volume_phi_ase", np.float32, number_of_cells)
-        volume_standard_error = _read_optional_scalar(
-            series, iteration, "core_result_volume_standard_error", np.float64, number_of_cells
-        )
-        volume_relative_standard_error = _read_optional_scalar(
-            series, iteration, "core_result_volume_relative_standard_error", np.float64, number_of_cells
-        )
-        volume_total_rays = _read_optional_scalar(
-            series, iteration, "core_result_volume_total_rays", np.uint32, number_of_cells
-        )
-        volume_dndt_ase = _read_optional_scalar(
-            series, iteration, "core_result_volume_dndt_ase", np.float64, number_of_cells
-        )
-        beta_volume_shape = (number_of_cells,) if beta_volume.size == number_of_cells else (number_of_cells, number_of_levels - 1)
-        result_shape = (number_of_points, number_of_levels)
+        cell_shape = (number_of_cells,)
         states.append(SimpleNamespace(
             iterationIndex=iteration_index,
             step=int(iteration.get_attribute("step_index")) if _has_attribute(iteration, "step_index") else iteration_index + 1,
             time=float(iteration.get_attribute("time")) if _has_attribute(iteration, "time") else float(iteration.time),
-            betaCells=beta_cells.reshape(result_shape, order="F"),
-            betaVolume=beta_volume.reshape(beta_volume_shape, order="F"),
-            phiAse=phi_ase.reshape(result_shape, order="F"),
-            volumePhiAse=volume_phi_ase.reshape((number_of_cells,), order="F"),
-            volumeStandardError=volume_standard_error.reshape((number_of_cells,), order="F"),
-            volumeRelativeStandardError=volume_relative_standard_error.reshape((number_of_cells,), order="F"),
-            volumeTotalRays=volume_total_rays.reshape((number_of_cells,), order="F"),
-            volumeDndtAse=volume_dndt_ase.reshape((number_of_cells,), order="F"),
-            dndtAse=dndt_ase.reshape(result_shape, order="F"),
-            dndtPump=_read_optional_scalar(
-                series,
-                iteration,
-                "core_result_dndt_pump",
-                np.float64,
-                point_count,
-            ).reshape((number_of_points, number_of_levels), order="F"),
+            betaVolume=beta_volume.reshape(cell_shape, order="F"),
+            phiAse=phi_ase.reshape(cell_shape, order="F"),
+            standardError=standard_error.reshape(cell_shape, order="F"),
+            relativeStandardError=relative_standard_error.reshape(cell_shape, order="F"),
+            totalRays=total_rays.reshape(cell_shape, order="F"),
+            dndtAse=dndt_ase.reshape(cell_shape, order="F"),
+            dndtPump=_loadScalar(
+                series, iteration, "core_result_dndt_pump", np.float64
+            ).reshape(cell_shape, order="F"),
             aseResult=Result(
-                phiAse=_read_optional_scalar(series, iteration, "core_result_phi_ase", np.float32, point_count),
-                standardError=_read_optional_scalar(
-                    series, iteration, "core_result_standard_error", np.float64, point_count
-                ),
-                relativeStandardError=_read_optional_scalar(
-                    series, iteration, "core_result_relative_standard_error", np.float64, point_count
-                ),
-                totalRays=_read_optional_scalar(series, iteration, "core_result_total_rays", np.uint32, point_count),
-                dndtAse=_read_optional_scalar(series, iteration, "core_result_dndt_ase", np.float64, point_count),
+                phiAse=phi_ase,
+                standardError=standard_error,
+                relativeStandardError=relative_standard_error,
+                totalRays=total_rays,
+                dndtAse=dndt_ase,
                 **_result_status_values(iteration),
             ),
             staticUpdate=bool(iteration.get_attribute("haseStaticUpdate")) if _has_attribute(iteration, "haseStaticUpdate") else iteration_index == 0,

@@ -141,7 +141,6 @@ def _tet4TopologyFromUnstructuredGrid(path):
         "crystalTFluo",
         "claddingNumber",
         "claddingAbsorption",
-        "betaCells",
         "betaVolume",
         "cellDomains",
         "faceBoundaries",
@@ -207,9 +206,6 @@ def volumeTopologyFromVtk(path, topologyCls):
         faceBoundaries=boundaries,
         metadata={"source": str(path), "format": "vtk", **_structured_metadata_from_vtk(points, physical)},
     )
-    beta_cells = physical.get("betaCells")
-    if beta_cells is not None and np.asarray(beta_cells).size == points.shape[0]:
-        topology.samplePoints = np.asarray(points, dtype=np.float64)
     return topology
 
 
@@ -241,9 +237,6 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
         ),
         metadata={"source": str(path), "format": "vtk", **_structured_metadata_from_vtk(points, physical)},
     )
-    beta_cells = physical.get("betaCells")
-    if beta_cells is not None and np.asarray(beta_cells).size == points.shape[0]:
-        topology.samplePoints = np.asarray(points, dtype=np.float64)
     medium = gainMediumCls(topology=topology)
     for name, value in physical.items():
         if name in {"cellDomains", "faceBoundaries", "structuredNumberOfPoints", "structuredNumberOfLevels", "structuredThickness"}:
@@ -288,11 +281,6 @@ def writeGainMediumVtk(path, gainMedium):
     }
     pointArrays = {}
     cellArrays = {"betaVolume": gainMedium.get("betaVolume").value}
-    betaCells = gainMedium.get("betaCells").value
-    if betaCells.size == topology.numberOfPoints:
-        pointArrays["betaCells"] = betaCells
-    elif betaCells.size == topology.numberOfCells:
-        cellArrays["betaCells"] = betaCells
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -22,7 +22,7 @@ from HASEonGPU import (
     SurfacePumpInjector,
     integrate_pump_profile,
 )
-from example import laserPumpCladding as example
+import laserPumpCladding as example
 
 
 @pytest.mark.integration
@@ -75,12 +75,14 @@ def test_general_pump_reproduces_legacy_crystal_inversion(openPmdFileBackend, al
     )
     assert relative_field_error < 0.05
 
-    cell_points = np.asarray(medium.topology.cellPointIndices).reshape(-1)
-    lumped_volume = np.bincount(
-        cell_points,
-        weights=np.repeat(np.asarray(medium.topology.cellVolumes) / 4.0, 4),
-        minlength=medium.topology.numberOfSamplePoints,
-    ).reshape(np.asarray(states[0].dndtPump).shape, order="F")
-    new_total = np.asarray([np.sum(np.asarray(state.dndt_pump) * lumped_volume) for state in states])
-    old_total = np.asarray([np.sum(values * lumped_volume) for values in reference["dndtPump"]])
+    cell_volumes = np.asarray(medium.topology.cellVolumes)
+    legacy_lumped_volume = np.bincount(
+        np.asarray(medium.topology.cellPointIndices).reshape(-1),
+        weights=np.repeat(cell_volumes / 4.0, 4),
+        minlength=medium.topology.numberOfPoints,
+    ).reshape(reference["dndtPump"].shape[1:], order="F")
+    new_total = np.asarray([np.sum(np.asarray(state.dndt_pump) * cell_volumes) for state in states])
+    old_total = np.asarray(
+        [np.sum(values * legacy_lumped_volume) for values in reference["dndtPump"]]
+    )
     np.testing.assert_allclose(new_total, old_total, rtol=0.01, atol=1e-12)

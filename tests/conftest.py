@@ -217,7 +217,7 @@ def smallTopology():
 @pytest.fixture
 def smallGainMedium(smallTopology):
     return GainMedium(topology=smallTopology).withPhysicalProperties(
-        betaCells=np.zeros((4, 3)),
+        betaVolume=np.zeros((smallTopology.numberOfTriangles, smallTopology.levels - 1)),
         claddingCellTypes=np.zeros(2, dtype=np.uint32),
         refractiveIndices=[1.8, 1.0, 1.8, 1.0],
         reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),

@@ -395,79 +395,37 @@ class PhiASE:
 
 
 
-class ConnectivityAverageBetaVolumeMapper:
-    """Map point-centered ``betaCells`` to prism beta by vertex averaging.
-
-    This matches the C++/Alpaka prism-beta kernel: each prism value is the
-    arithmetic mean of the three triangle vertices on the lower and upper
-    z-levels.
-    """
-
-    def map(self, medium):
-        """Return prism-centered ``betaVolume`` for the supplied medium."""
-        topology = medium.topology
-        beta_cells = np.asarray(medium.get("betaCells").value, dtype=np.float64).reshape(
-            (topology.numberOfPoints, topology.levels),
-            order="F",
-        )
-        triangles = np.asarray(topology.trianglePointIndices, dtype=np.int64)
-        if triangles.shape[0] != topology.numberOfTriangles:
-            triangles = triangles.reshape((topology.numberOfTriangles, 3), order="F")
-        beta_volume = np.empty((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64)
-        for level in range(topology.levels - 1):
-            lower = beta_cells[triangles, level]
-            upper = beta_cells[triangles, level + 1]
-            beta_volume[:, level] = (lower.sum(axis=1) + upper.sum(axis=1)) / 6.0
-        return beta_volume
-
-
-LegacyGridDataBetaVolumeMapper = ConnectivityAverageBetaVolumeMapper
-
-
 @dataclass
 class TimeStepState:
     """Snapshot handed to ``onStep`` callbacks after a completed time step.
 
     The arrays are copies of the simulation outputs at ``step``/``time`` and
-    follow the gain medium's sample and volume shapes. Explicit Tet4 topology
-    normally stores one value per mesh point in ``betaCells``/``phiAse`` and
-    one value per tetrahedron in ``betaVolume``. The legacy structured layout
-    retains its point-by-level and triangle-by-layer shapes.
+    contain exactly one value per Tet4 cell. The compiled simulation has no
+    point-centered state representation.
     """
 
     step: int
     """Completed one-based step index."""
     time: float
     """Physical simulation time after the step, in seconds."""
-    betaCells: np.ndarray
-    """Excited-state fraction at the topology's simulation samples."""
     betaVolume: np.ndarray
-    """Excited-state fraction mapped to explicit cells or legacy prisms."""
+    """Authoritative excited-state fraction for every Tet4 cell."""
     phiAse: np.ndarray | None
-    """ASE flux at the topology's simulation samples, or ``None`` if unavailable."""
+    """ASE flux for every Tet4 cell, or ``None`` if unavailable."""
+    standardError: np.ndarray | None
+    """Absolute one-sigma error of the cell ASE flux estimate."""
+    relativeStandardError: np.ndarray | None
+    """Relative one-sigma error of the cell ASE flux estimate."""
+    totalRays: np.ndarray | None
+    """Ray visit count for every Tet4 cell."""
     dndtAse: np.ndarray
-    """ASE depletion contribution to ``d beta / dt``."""
+    """Cell-centered ASE depletion contribution to ``d beta / dt``."""
     dndtPump: np.ndarray
-    """Pump contribution to ``d beta / dt``."""
+    """Cell-centered pump contribution to ``d beta / dt``."""
     aseResult: object | None
     """Raw lower-level ASE result object for advanced inspection."""
     topology: object | None = None
     """Static mesh topology used by geometry-aware state callbacks."""
-    volumePhiAse: np.ndarray | None = None
-    """Native volume-centered ASE flux, when provided by the compiled backend."""
-    volumeDndtAse: np.ndarray | None = None
-    """Native volume-centered ASE depletion contribution, when available."""
-    volumeStandardError: np.ndarray | None = None
-    """Native volume-centered absolute one-sigma sampling uncertainty, when available."""
-    volumeRelativeStandardError: np.ndarray | None = None
-    """Native volume-centered relative one-sigma sampling uncertainty, when available."""
-    volumeTotalRays: np.ndarray | None = None
-    """Native volume-centered ray visit counts, when available."""
-
-    @property
-    def beta_cells(self):
-        return self.betaCells
-
     @property
     def beta_volume(self):
         return self.betaVolume
@@ -487,27 +445,6 @@ class TimeStepState:
     @property
     def ase_result(self):
         return self.aseResult
-
-    @property
-    def volume_phi_ase(self):
-        return self.volumePhiAse
-
-    @property
-    def volume_dndt_ase(self):
-        return self.volumeDndtAse
-
-    @property
-    def volume_standard_error(self):
-        return self.volumeStandardError
-
-    @property
-    def volume_relative_standard_error(self):
-        return self.volumeRelativeStandardError
-
-    @property
-    def volume_total_rays(self):
-        return self.volumeTotalRays
-
 
 @dataclass(init=False)
 class Simulation:
@@ -762,40 +699,17 @@ class Simulation:
             state = TimeStepState(
                 step=previous_step + int(raw_state.step),
                 time=previous_time + float(raw_state.time),
-                betaCells=np.asarray(raw_state.betaCells, dtype=np.float64).copy(),
                 betaVolume=np.asarray(raw_state.betaVolume, dtype=np.float64).copy(),
                 phiAse=np.asarray(raw_state.phiAse, dtype=np.float64).copy(),
+                standardError=np.asarray(raw_state.standardError, dtype=np.float64).copy(),
+                relativeStandardError=np.asarray(raw_state.relativeStandardError, dtype=np.float64).copy(),
+                totalRays=np.asarray(raw_state.totalRays, dtype=np.uint32).copy(),
                 dndtAse=np.asarray(raw_state.dndtAse, dtype=np.float64).copy(),
                 dndtPump=np.asarray(raw_state.dndtPump, dtype=np.float64).copy(),
                 aseResult=raw_state.aseResult,
                 topology=self.gainMedium.topology,
-                volumePhiAse=(
-                    None if getattr(raw_state, "volumePhiAse", None) is None
-                    else np.asarray(raw_state.volumePhiAse, dtype=np.float64).copy()
-                ),
-                volumeDndtAse=(
-                    None if getattr(raw_state, "volumeDndtAse", None) is None
-                    else np.asarray(raw_state.volumeDndtAse, dtype=np.float64).copy()
-                ),
-                volumeStandardError=(
-                    None if getattr(raw_state, "volumeStandardError", None) is None
-                    else np.asarray(raw_state.volumeStandardError, dtype=np.float64).copy()
-                ),
-                volumeRelativeStandardError=(
-                    None if getattr(raw_state, "volumeRelativeStandardError", None) is None
-                    else np.asarray(raw_state.volumeRelativeStandardError, dtype=np.float64).copy()
-                ),
-                volumeTotalRays=(
-                    None if getattr(raw_state, "volumeTotalRays", None) is None
-                    else np.asarray(raw_state.volumeTotalRays, dtype=np.uint32).copy()
-                ),
             )
-            if hasattr(self.gainMedium.topology, "cellPointIndices"):
-                self.gainMedium.get("betaCells").value = backendFlat(state.betaCells.reshape(-1, order="F"))
-                self.gainMedium.get("betaVolume").value = backendFlat(state.betaVolume.reshape(-1, order="F"))
-            else:
-                self.gainMedium.get("betaCells").value = state.betaCells
-                self.gainMedium.get("betaVolume").value = state.betaVolume
+            self.gainMedium.get("betaVolume").value = backendFlat(state.betaVolume.reshape(-1, order="F"))
             self._lastState = state
             self._step = state.step
             self._time = state.time
@@ -917,11 +831,11 @@ class Simulation:
         return self._step
 
     def _ensureStateArrays(self):
-        topology = self.gainMedium.topology
-        if "betaCells" not in self.gainMedium.physical:
-            self.gainMedium.get("betaCells").value = np.zeros((topology.numberOfPoints, topology.levels))
         if "betaVolume" not in self.gainMedium.physical:
-            self._updateBetaVolumeFromCells()
+            self.gainMedium.get("betaVolume").value = np.zeros(
+                self.gainMedium.get("betaVolume").expectedShape,
+                dtype=np.float64,
+            )
 
     def _runInitCallbacks(self):
         if self._initialized:
@@ -929,10 +843,5 @@ class Simulation:
         self._initialized = True
         for callback, args, kwargs in self._initCallbacks:
             callback(self, *args, **kwargs)
-
-    def _updateBetaVolumeFromCells(self):
-        beta_volume = ConnectivityAverageBetaVolumeMapper().map(self.gainMedium)
-        self.gainMedium.get("betaVolume").value = beta_volume
-
 
 TimeSteppedSimulation = Simulation

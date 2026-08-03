@@ -85,9 +85,9 @@ physical boundary. In a segment of length :math:`\ell`, pump power changes as
    \qquad
    g_p=N_{tot}[\beta(\sigma_a+\sigma_e)-\sigma_a].
 
-The corresponding net photon exchange is accumulated in the traversed cell.
-For vertex-centered inversion it is distributed with barycentric midpoint
-weights and normalized by the lumped vertex volume. This replaces the former
+The corresponding net photon exchange is accumulated in the traversed cell
+and normalized by that cell's volume. The cell rate is consumed directly by
+the time integrator. This replaces the former point-scatter path and the former
 one-dimensional traversal through ordered z levels and allows injection on
 arbitrarily oriented, domain-tagged mesh regions.
 

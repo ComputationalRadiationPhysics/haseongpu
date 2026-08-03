@@ -64,29 +64,26 @@ def writeParaviewState(
     iteration.time_unit_SI = 1.0
 
     topology = state.topology
-    beta_cells = np.asarray(state.betaCells)
-    primitive_shape = beta_cells.shape
-    _reset_scalar_record(iteration, "beta_cells", beta_cells, primitive_shape, ["point", "level"])
+    beta_volume = np.asarray(state.betaVolume)
+    cell_axes = ["cell"] if beta_volume.ndim == 1 else ["cell", "layer"]
+    _reset_scalar_record(iteration, "beta_volume", beta_volume, beta_volume.shape, cell_axes)
 
     if state.phiAse is not None:
         phi_ase = np.asarray(state.phiAse)
-        _reset_scalar_record(iteration, "phi_ase", phi_ase, phi_ase.shape, ["point", "level"])
+        _reset_scalar_record(iteration, "phi_ase", phi_ase, phi_ase.shape, cell_axes)
         _reset_scalar_record(
             iteration,
             "cladding_absorption",
             phi_ase * np.float64(claddingAbsorption),
             phi_ase.shape,
-            ["point", "level"],
+            cell_axes,
         )
     if state.dndtAse is not None:
         dndt_ase = np.asarray(state.dndtAse)
-        _reset_scalar_record(iteration, "dndt_ase", dndt_ase, dndt_ase.shape, ["point", "level"])
+        _reset_scalar_record(iteration, "dndt_ase", dndt_ase, dndt_ase.shape, cell_axes)
     if state.dndtPump is not None:
         dndt_pump = np.asarray(state.dndtPump)
-        _reset_scalar_record(iteration, "dndt_pump", dndt_pump, dndt_pump.shape, ["point", "level"])
-    if state.betaVolume is not None:
-        beta_volume = np.asarray(state.betaVolume)
-        _reset_scalar_record(iteration, "beta_volume", beta_volume, beta_volume.shape, ["cell", "layer"])
+        _reset_scalar_record(iteration, "dndt_pump", dndt_pump, dndt_pump.shape, cell_axes)
 
     if topology is not None:
         _reset_scalar_record(iteration, "points", np.asarray(topology.points), topology.points.shape, ["point", "coordinate"])

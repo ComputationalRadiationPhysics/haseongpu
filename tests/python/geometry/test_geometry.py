@@ -68,29 +68,22 @@ def _assertGainMediumLaunchContract(medium):
     numberOfTriangles = topology.numberOfTriangles
     numberOfLevels = int(topology.levels)
 
-    assert medium.get("betaCells").expectedShape == (numberOfPoints, numberOfLevels)
     assert medium.get("betaVolume").expectedShape == (numberOfTriangles, numberOfLevels - 1)
     assert medium.get("claddingCellTypes").expectedShape == (numberOfTriangles,)
     assert medium.get("reflectivities").expectedShape == (numberOfTriangles, 2)
     assert medium.get("refractiveIndices").expectedShape == (4,)
 
-    betaCells = np.asarray(medium.get("betaCells").value)
     betaVolume = np.asarray(medium.get("betaVolume").value)
     cladding = np.asarray(medium.get("claddingCellTypes").value)
     reflectivities = np.asarray(medium.get("reflectivities").value)
     refractive = np.asarray(medium.get("refractiveIndices").value)
 
-    assert betaCells.size == numberOfPoints * numberOfLevels
     assert betaVolume.size == numberOfTriangles * (numberOfLevels - 1)
     assert betaVolume.size == topology.numberOfPrisms
     assert cladding.size == numberOfTriangles
     assert reflectivities.size == 2 * numberOfTriangles
     assert refractive.size == 4
 
-    assert betaCells.reshape((numberOfPoints, numberOfLevels), order="F").shape == (
-        numberOfPoints,
-        numberOfLevels,
-    )
     assert betaVolume.reshape((numberOfTriangles, numberOfLevels - 1), order="F").shape == (
         numberOfTriangles,
         numberOfLevels - 1,
@@ -101,18 +94,15 @@ def _mediumForGrid(grid, *, flat):
     topology = MeshTopology.fromGrid(grid)
     medium = GainMedium(topology=topology)
 
-    betaCells = np.linspace(0.0, 1.0, topology.numberOfPoints * topology.levels, dtype=np.float64)
     betaVolume = np.linspace(0.0, 1.0, topology.numberOfPrisms, dtype=np.float64)
     cladding = np.zeros(topology.numberOfTriangles, dtype=np.uint32)
     reflectivities = np.zeros(2 * topology.numberOfTriangles, dtype=np.float32)
 
     if not flat:
-        betaCells = betaCells.reshape((topology.numberOfPoints, topology.levels), order="F")
         betaVolume = betaVolume.reshape((topology.numberOfTriangles, topology.levels - 1), order="F")
         reflectivities = reflectivities.reshape((topology.numberOfTriangles, 2), order="F")
 
     medium.withPhysicalProperties(
-        betaCells=backendFlat(betaCells) if flat else betaCells,
         betaVolume=backendFlat(betaVolume) if flat else betaVolume,
         claddingCellTypes=cladding,
         refractiveIndices=[1.8, 1.0, 1.8, 1.0],
@@ -153,7 +143,6 @@ def test_pointIndexFallsBackToNearest():
 def test_gainMediumPrimitiveViewsShareCanonicalFlatStorage():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=backendFlat(np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64)),
         betaVolume=backendFlat(np.array([0.1, 0.3, 0.2, 0.4], dtype=np.float64)),
         claddingCellTypes=np.array([0, 1], dtype=np.uint32),
         refractiveIndices=[1.8, 1.0, 1.8, 1.0],
@@ -161,22 +150,17 @@ def test_gainMediumPrimitiveViewsShareCanonicalFlatStorage():
     )
 
     prismView = medium.getPrisms()["betaVolume"]
-    pointView = medium.getPoints()["betaCells"]
     triangleView = medium.getTriangles()["reflectivities"]
 
     assert prismView.shape == (topology.numberOfTriangles, topology.levels - 1)
-    assert pointView.shape == (topology.numberOfPoints, topology.levels)
     assert triangleView.shape == (topology.numberOfTriangles, 2)
     assert np.shares_memory(prismView, medium.get("betaVolume").value)
-    assert np.shares_memory(pointView, medium.get("betaCells").value)
     assert np.shares_memory(triangleView, medium.get("reflectivities").value)
 
     prismView[1, 1] = 9.0
-    pointView[2, 1] = 8.0
     triangleView[0, 1] = 0.75
 
     assert medium.get("betaVolume").value[1 + topology.numberOfTriangles] == 9.0
-    assert medium.get("betaCells").value[2 + topology.numberOfPoints] == 8.0
     assert medium.get("reflectivities").value[topology.numberOfTriangles] == np.float32(0.75)
 
 
@@ -196,8 +180,8 @@ def test_gainMediumRejectsArraysThatBreakGeometryDependencies():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 
-    with pytest.raises(ValueError, match="betaCells expects"):
-        medium.withPhysicalProperties(betaCells=np.zeros(topology.numberOfPoints * topology.levels - 1))
+    with pytest.raises(KeyError, match="unknown gain medium property 'betaCells'"):
+        medium.withPhysicalProperties(betaCells=np.zeros(topology.numberOfPoints * topology.levels))
 
     with pytest.raises(ValueError, match="betaVolume expects"):
         medium.withPhysicalProperties(betaVolume=np.zeros(topology.numberOfPrisms + 1))

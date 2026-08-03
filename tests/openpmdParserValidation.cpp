@@ -596,7 +596,6 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     REQUIRE(context.mesh.numberOfTriangles == 1u);
     REQUIRE(context.mesh.numberOfLevels == 1u);
     REQUIRE(context.mesh.cellPointIndices == std::vector<unsigned>{0u, 1u, 2u, 3u});
-    REQUIRE(context.mesh.betaCells.size() == 4u);
     REQUIRE(context.experiment.spectral == 2u);
     REQUIRE(context.compute.maxRepetitions == 3u);
     REQUIRE(context.compute.writeVtk == false);
@@ -879,7 +878,6 @@ TEST_CASE(
             if(calls == 1u)
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.1});
-                REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
                 REQUIRE(context.mesh.betaVolumePrefix.size() == 1u);
                 REQUIRE(
                     context.mesh.betaVolumePrefix.front()
@@ -888,7 +886,6 @@ TEST_CASE(
             else
             {
                 REQUIRE(context.mesh.betaVolume == std::vector<double>{0.9});
-                REQUIRE(context.mesh.betaCells == std::vector<double>(4u, 0.0));
                 REQUIRE(context.mesh.betaVolumePrefix.size() == 1u);
                 REQUIRE(
                     context.mesh.betaVolumePrefix.front()
@@ -1027,7 +1024,6 @@ TEST_CASE("openPMD parser round-trips a Python writer contract input", "[openpmd
         context.mesh.points
         == std::vector<double>{0.0, 1.5, 0.25, 2.25, -0.75, 0.0, -0.5, 1.25, 2.5, 3.75, 0.0, 0.0, 0.0, 1.0, 1.0});
     REQUIRE(context.mesh.betaVolume == std::vector<double>{0.11, 0.21, 0.31});
-    REQUIRE(context.mesh.betaCells == std::vector<double>(3u, 0.0));
     REQUIRE(context.mesh.claddingCellTypes == std::vector<unsigned>{0u, 2u, 1u});
     REQUIRE(context.mesh.refractiveIndices == std::vector<float>{1.80f, 1.20f, 1.65f, 1.05f});
     REQUIRE(context.mesh.reflectivities == std::vector<float>{0.01f, 0.03f, 0.05f, 0.02f, 0.04f, 0.06f});

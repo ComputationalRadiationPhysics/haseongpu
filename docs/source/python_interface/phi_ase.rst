@@ -32,7 +32,7 @@ ASE can be run once without a ``Simulation`` time loop:
    result = phi_ase.getResults()
 
    phi = np.asarray(result.phiAse).reshape(
-       medium.get("betaCells").expectedShape,
+       medium.get("betaVolume").expectedShape,
        order="F",
    )
 

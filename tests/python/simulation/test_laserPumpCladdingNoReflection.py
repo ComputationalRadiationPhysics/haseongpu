@@ -147,14 +147,14 @@ def testCurrentTet4WithoutReflectionsMatchesLegacyWedgeIntegral(
     assert state.aseResult.srmMaxIterations == 0
     # A stale all-zero beta-volume CDF sends every source history to the final
     # Tet. Keep the source visits dispersed as beta evolves from its zero state.
-    assert np.max(state.volume_total_rays) < metadata["parameters"]["maxRaysPerSample"] // 20
+    assert np.max(state.totalRays) < metadata["parameters"]["maxRaysPerSample"] // 20
 
     observed_integrals = []
     for step in metadata["observable"]["stepNumbers"]:
         points, cells, _cell_types, _point_data, cell_data, _fields = _parseVtk(
             output_dir / f"laserPumpCladding_{step:03d}.vtk"
         )
-        observed_integrals.append(_tet_cell_integral(points, cells, cell_data["volumePhiASE"]))
+        observed_integrals.append(_tet_cell_integral(points, cells, cell_data["phiASE"]))
 
     reference_integrals = _wedge_point_integrals(
         legacyNoReflectionReference["points"],

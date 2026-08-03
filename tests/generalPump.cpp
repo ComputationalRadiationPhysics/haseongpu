@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <core/mesh.hpp>
 #include <core/simulationRunControl.hpp>
+#include <kernels/derivativeComposition.hpp>
 #include <kernels/generalPump.hpp>
 
 #include <algorithm>
@@ -19,8 +20,8 @@
 
 namespace
 {
-    using TestBackends = std::decay_t<
-        decltype(alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
+    using TestBackends = std::decay_t<ALPAKA_TYPEOF(
+        alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
 
     hase::core::HostMesh makeSingleTetMesh()
     {
@@ -38,7 +39,6 @@ namespace
             {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0},
             {0.25, 0.25, 0.25},
             {0.0},
-            {0.0, 0.0, 0.0, 0.0},
             {10u},
             {1.0f, 1.0f, 1.0f, 1.0f},
             {0.0f, 0.0f},
@@ -186,7 +186,7 @@ TEMPLATE_LIST_TEST_CASE(
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
     auto cellIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    auto sampleIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
+    auto pointIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
 
     hase::kernels::PumpRayBatch ray;
     ray.originX = {0.2};
@@ -209,7 +209,7 @@ TEMPLATE_LIST_TEST_CASE(
         deviceMesh.toView(),
         betaVolume,
         cellIntegral,
-        sampleIntegral,
+        pointIntegral,
         std::move(ray));
 
     constexpr double pathLength = 0.6;
@@ -220,13 +220,15 @@ TEMPLATE_LIST_TEST_CASE(
     CHECK(traced.exitFace[0] == 0);
 
     auto const cellValues = copyDoubleBuffer(queue, cellIntegral);
-    auto const sampleValues = copyDoubleBuffer(queue, sampleIntegral);
     REQUIRE(cellValues.size() == 1u);
     CHECK(cellValues[0] == Catch::Approx(expectedIntegral).epsilon(2.0e-6));
-    CHECK(
-        std::accumulate(sampleValues.begin(), sampleValues.end(), 0.0)
-        == Catch::Approx(cellValues[0]).epsilon(2.0e-6));
-    CHECK(std::ranges::all_of(sampleValues, [](double const value) { return value >= 0.0; }));
+    auto const pointValues = copyDoubleBuffer(queue, pointIntegral);
+    REQUIRE(pointValues.size() == 4u);
+    CHECK(pointValues[0] == Catch::Approx(0.3 * expectedIntegral).epsilon(2.0e-6));
+    CHECK(pointValues[1] == Catch::Approx(0.2 * expectedIntegral).epsilon(2.0e-6));
+    CHECK(pointValues[2] == Catch::Approx(0.2 * expectedIntegral).epsilon(2.0e-6));
+    CHECK(pointValues[3] == Catch::Approx(0.3 * expectedIntegral).epsilon(2.0e-6));
+    CHECK(std::reduce(pointValues.begin(), pointValues.end()) == Catch::Approx(cellValues[0]).epsilon(2.0e-6));
 }
 
 TEST_CASE("general pump super-Gaussian profile and angular sampling use physical coordinates", "[pump][source]")
@@ -256,10 +258,7 @@ TEST_CASE("general pump super-Gaussian profile and angular sampling use physical
     }
 }
 
-TEMPLATE_LIST_TEST_CASE(
-    "general pump orchestration conserves cell-to-sample deposition",
-    "[pump][backend]",
-    TestBackends)
+TEMPLATE_LIST_TEST_CASE("general pump orchestration produces conservative cell rates", "[pump][backend]", TestBackends)
 {
     auto const backend = TestType::makeDict();
     auto deviceSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
@@ -277,9 +276,10 @@ TEMPLATE_LIST_TEST_CASE(
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
     auto cellIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    double const lumpedShare = static_cast<double>(mesh.cellVolumes[0]) / 4.0;
-    auto lumpedVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, lumpedShare));
-    auto sampleRate = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
+    auto pointIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
+    auto lumpedPointVolume
+        = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, static_cast<double>(mesh.cellVolumes[0]) / 4.0));
+    auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
 
     auto source = uniformSource(10u);
     source.wavelengths = {940e-9};
@@ -299,15 +299,67 @@ TEMPLATE_LIST_TEST_CASE(
         pump,
         betaVolume,
         cellIntegral,
-        lumpedVolume,
-        sampleRate);
+        pointIntegral,
+        lumpedPointVolume,
+        cellRate);
 
     auto const cells = copyDoubleBuffer(queue, cellIntegral);
-    auto const samples = copyDoubleBuffer(queue, sampleRate);
+    auto const rates = copyDoubleBuffer(queue, cellRate);
     REQUIRE(cells.size() == 1u);
-    REQUIRE(samples.size() == 4u);
+    REQUIRE(rates.size() == 1u);
     CHECK(cells[0] > 0.0);
-    CHECK(std::ranges::all_of(samples, [](double const value) { return std::isfinite(value) && value >= 0.0; }));
-    double const integratedSamples = std::accumulate(samples.begin(), samples.end(), 0.0) * lumpedShare;
-    CHECK(integratedSamples == Catch::Approx(cells[0]).epsilon(2.0e-6));
+    CHECK(std::isfinite(rates[0]));
+    CHECK(rates[0] >= 0.0);
+    CHECK(rates[0] * static_cast<double>(mesh.cellVolumes[0]) == Catch::Approx(cells[0]).epsilon(2.0e-6));
+}
+
+TEMPLATE_LIST_TEST_CASE(
+    "derivative composition refreshes ASE depletion from stage beta with frozen phi",
+    "[simulation][time-integration][backend]",
+    TestBackends)
+{
+    auto const backend = TestType::makeDict();
+    auto deviceSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
+    if(!deviceSelector.isAvailable())
+    {
+        SUCCEED("No device available for " << backend[alpaka::object::deviceSpec].getName());
+        return;
+    }
+    auto device = deviceSelector.makeDevice(0);
+    auto const executor = backend[alpaka::object::exec];
+    auto queue = device.makeQueue(alpaka::queueKind::blocking);
+    hase::alpakaUtils::DevBundle devBundle(device, executor);
+
+    auto mesh = makeSingleTetMesh();
+    auto deviceMesh = mesh.toDevice(device);
+    auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.2});
+    auto phiAse = hase::alpakaUtils::toDevice(queue, std::vector<float>{5.0f});
+    auto dndtPump = hase::alpakaUtils::toDevice(queue, std::vector<double>{7.0});
+    auto dndtAse = hase::alpakaUtils::toDevice(queue, std::vector<double>{-1.0});
+    auto derivative = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
+    using DoubleBuffer = ALPAKA_TYPEOF(betaVolume);
+    using FloatBuffer = ALPAKA_TYPEOF(phiAse);
+
+    struct Buffers
+    {
+        DoubleBuffer& betaVolume;
+        FloatBuffer& phiAse;
+        DoubleBuffer& dndtPump;
+        DoubleBuffer& dndtAse;
+        DoubleBuffer& derivative;
+    } buffers{betaVolume, phiAse, dndtPump, dndtAse, derivative};
+
+    hase::kernels::enqueueComposeDerivative(devBundle, queue, deviceMesh.toView(), 2.0, 3.0, 10.0, true, buffers);
+    alpaka::onHost::wait(queue);
+
+    CHECK(copyDoubleBuffer(queue, dndtAse)[0] == Catch::Approx(-5.0));
+    CHECK(copyDoubleBuffer(queue, derivative)[0] == Catch::Approx(11.98));
+
+    auto nextBetaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.4});
+    Buffers nextStage{nextBetaVolume, phiAse, dndtPump, dndtAse, derivative};
+    hase::kernels::enqueueComposeDerivative(devBundle, queue, deviceMesh.toView(), 2.0, 3.0, 10.0, true, nextStage);
+    alpaka::onHost::wait(queue);
+
+    CHECK(copyDoubleBuffer(queue, dndtAse)[0] == Catch::Approx(0.0).margin(1.0e-14));
+    CHECK(copyDoubleBuffer(queue, derivative)[0] == Catch::Approx(6.96));
 }

@@ -37,18 +37,20 @@ def _scalarNamesByDataKind(path):
     return names
 
 
-def test_vtkWedgeWritesPointDataFromState(tmp_path):
+def test_vtkWedgeWritesCellDataFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
-    values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
-        (topology.numberOfPoints, topology.levels),
+    values = np.arange(topology.numberOfPrisms, dtype=np.float64).reshape(
+        (topology.numberOfTriangles, topology.levels - 1),
         order="F",
     )
     state = TimeStepState(
         step=2,
         time=2e-5,
-        betaCells=values,
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        betaVolume=values,
         phiAse=values + 1.0,
+        standardError=np.zeros_like(values),
+        relativeStandardError=np.zeros_like(values),
+        totalRays=np.zeros_like(values, dtype=np.uint32),
         dndtAse=values,
         dndtPump=values,
         aseResult=None,
@@ -63,22 +65,24 @@ def test_vtkWedgeWritesPointDataFromState(tmp_path):
     assert f"POINTS {topology.numberOfPoints * topology.levels} float" in text
     assert f"CELLS {topology.numberOfPrisms} {topology.numberOfPrisms * 7}" in text
     assert "CELL_TYPES 4" in text
-    assert "POINT_DATA 12" in text
-    assert "phiAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
+    assert "CELL_DATA 4" in text
+    assert "phiAse" in _scalarNamesByDataKind(path)["CELL_DATA"]
 
 
-def test_vtkWedgeWritesMultiplePointFieldsFromState(tmp_path):
+def test_vtkWedgeWritesMultipleCellFieldsFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
-    values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
-        (topology.numberOfPoints, topology.levels),
+    values = np.arange(topology.numberOfPrisms, dtype=np.float64).reshape(
+        (topology.numberOfTriangles, topology.levels - 1),
         order="F",
     )
     state = TimeStepState(
         step=3,
         time=3e-5,
-        betaCells=values,
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        betaVolume=values,
         phiAse=values + 1.0,
+        standardError=np.zeros_like(values),
+        relativeStandardError=np.zeros_like(values),
+        totalRays=np.zeros_like(values, dtype=np.uint32),
         dndtAse=values + 2.0,
         dndtPump=values + 3.0,
         aseResult=None,
@@ -89,23 +93,25 @@ def test_vtkWedgeWritesMultiplePointFieldsFromState(tmp_path):
 
     text = path.read_text(encoding="utf-8")
     assert path.name == "out_phiAse_dndtAse_003.vtk"
-    assert text.count(f"POINT_DATA {topology.numberOfPoints * topology.levels}") == 1
-    assert "phiAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
-    assert "dndtAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
+    assert text.count(f"CELL_DATA {topology.numberOfPrisms}") == 1
+    assert "phiAse" in _scalarNamesByDataKind(path)["CELL_DATA"]
+    assert "dndtAse" in _scalarNamesByDataKind(path)["CELL_DATA"]
 
 
 def test_vtkWedgeWritesAliasedFieldMappingFromState(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
-    values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
-        (topology.numberOfPoints, topology.levels),
+    values = np.arange(topology.numberOfPrisms, dtype=np.float64).reshape(
+        (topology.numberOfTriangles, topology.levels - 1),
         order="F",
     )
     state = TimeStepState(
         step=4,
         time=4e-5,
-        betaCells=values,
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        betaVolume=values,
         phiAse=values + 1.0,
+        standardError=np.zeros_like(values),
+        relativeStandardError=np.zeros_like(values),
+        totalRays=np.zeros_like(values, dtype=np.uint32),
         dndtAse=values + 2.0,
         dndtPump=values + 3.0,
         aseResult=None,
@@ -116,22 +122,24 @@ def test_vtkWedgeWritesAliasedFieldMappingFromState(tmp_path):
 
     text = path.read_text(encoding="utf-8")
     assert path.name == "named_004.vtk"
-    assert "phi" in _scalarNamesByDataKind(path)["POINT_DATA"]
-    assert "dn" in _scalarNamesByDataKind(path)["POINT_DATA"]
+    assert "phi" in _scalarNamesByDataKind(path)["CELL_DATA"]
+    assert "dn" in _scalarNamesByDataKind(path)["CELL_DATA"]
 
 
 def test_vtkWedgeWritesDirectlyFromStateTopology(tmp_path):
     topology = MeshTopology.fromGrid(Grid(xExtent=1, yExtent=1, zExtent=0.5, tileSizeZ=0.25))
-    values = np.arange(topology.numberOfPoints * topology.levels, dtype=np.float64).reshape(
-        (topology.numberOfPoints, topology.levels),
+    values = np.arange(topology.numberOfPrisms, dtype=np.float64).reshape(
+        (topology.numberOfTriangles, topology.levels - 1),
         order="F",
     )
     state = TimeStepState(
         step=5,
         time=5e-5,
-        betaCells=values,
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        betaVolume=values,
         phiAse=values + 1.0,
+        standardError=np.zeros_like(values),
+        relativeStandardError=np.zeros_like(values),
+        totalRays=np.zeros_like(values, dtype=np.uint32),
         dndtAse=values + 2.0,
         dndtPump=values + 3.0,
         aseResult=None,
@@ -142,7 +150,7 @@ def test_vtkWedgeWritesDirectlyFromStateTopology(tmp_path):
         tmp_path / "state_{step:03d}",
         state,
         fields={
-            "betaCells": state.betaCells,
+            "betaVolume": state.betaVolume,
             "phiASE": state.phiAse,
             "dndtAse": state.dndtAse,
             "cladAbs": state.phiAse * 5.5,
@@ -151,10 +159,10 @@ def test_vtkWedgeWritesDirectlyFromStateTopology(tmp_path):
 
     text = path.read_text(encoding="utf-8")
     assert path.name == "state_005.vtk"
-    assert "betaCells" in _scalarNamesByDataKind(path)["POINT_DATA"]
-    assert "phiASE" in _scalarNamesByDataKind(path)["POINT_DATA"]
-    assert "dndtAse" in _scalarNamesByDataKind(path)["POINT_DATA"]
-    assert "cladAbs" in _scalarNamesByDataKind(path)["POINT_DATA"]
+    assert "betaVolume" in _scalarNamesByDataKind(path)["CELL_DATA"]
+    assert "phiASE" in _scalarNamesByDataKind(path)["CELL_DATA"]
+    assert "dndtAse" in _scalarNamesByDataKind(path)["CELL_DATA"]
+    assert "cladAbs" in _scalarNamesByDataKind(path)["CELL_DATA"]
 
 
 def test_vtkWedgeWritesMixedPointAndCellFields(tmp_path):

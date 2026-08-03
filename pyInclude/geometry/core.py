@@ -75,8 +75,6 @@ _ALLOWED_ENTITY_AXES = {
 _CUSTOM_FIELD_RESERVED_NAMES = {
     "coordinates",
     "pointIndices",
-    "betaCells",
-    "dntdAse",
     "betaVolume",
     "claddingCellTypes",
     "reflectivities",
@@ -446,13 +444,6 @@ def _shape_prisms(topology):
     return (topology.numberOfTriangles, topology.levels - 1)
 
 
-def _shape_cells(topology):
-    if hasattr(topology, "cellPointIndices"):
-        return (topology.numberOfSamplePoints,)
-    topology._require_levels()
-    return (topology.numberOfPoints, topology.levels)
-
-
 def _shape_triangles(topology):
     if hasattr(topology, "cellPointIndices"):
         return (topology.numberOfCells,)
@@ -501,12 +492,6 @@ def _default_beta_volume(topology):
     return np.zeros(size, dtype=np.float64)
 
 
-def _default_sample_values(topology):
-    if hasattr(topology, "cellPointIndices"):
-        return np.zeros(topology.numberOfSamplePoints, dtype=np.float64)
-    return np.zeros(topology.numberOfPoints * topology.levels, dtype=np.float64)
-
-
 def _default_cladding_cell_types(topology):
     size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfTriangles
     return np.zeros(size, dtype=np.uint32)
@@ -528,23 +513,6 @@ PHYSICAL_PROPERTY_SPECS = {
             "(numberOfTriangles, numberOfLevels - 1)."
         ),
         default=_default_beta_volume,
-    ),
-    "betaCells": PhysicalPropertySpec(
-        name="betaCells",
-        dtype=np.float64,
-        shape=_shape_cells,
-        description=(
-            "Sample-centered excited-state fraction beta_i. Explicit volume topology normally "
-            "stores one value per mesh point; the legacy layout is (numberOfPoints, numberOfLevels)."
-        ),
-        default=_default_sample_values,
-    ),
-    "dntdAse": PhysicalPropertySpec(
-        name="dntdAse",
-        dtype=np.float64,
-        shape=_shape_cells,
-        description="ASE contribution to d beta / dt at sample points.",
-        default=_default_sample_values,
     ),
     "claddingCellTypes": PhysicalPropertySpec(
         name="claddingCellTypes",
@@ -635,10 +603,6 @@ PROPERTY_ALIASES = {
     "cladding_number": "claddingNumber",
     "crystal_t_fluo": "crystalTFluo",
     "beta_volume": "betaVolume",
-    "beta_cells": "betaCells",
-    "dndtAse": "dntdAse",
-    "dndt_ASE": "dntdAse",
-    "phi_ASE": "dntdAse",
 }
 
 
@@ -1065,14 +1029,6 @@ class MeshTopology:
             raise ValueError(f"no topology level found at z={z}")
         return int(matches[0])
 
-    def betaCellIndexAt(self, x, y, z, *, tol=1e-12, flat=False):
-        """Return the ``betaCells`` index for a physical ``(x, y, z)`` point."""
-        point_index = self.pointIndexAt(x, y, tol=tol)
-        level_index = self.levelIndexAt(z, tol=tol)
-        if flat:
-            return point_index + level_index * self.numberOfPoints
-        return point_index, level_index
-
     @property
     def numberOfTriangles(self):
         """Number of base triangles."""
@@ -1413,14 +1369,6 @@ class GainMedium:
             if tuple(field.axes) in wanted
         }
 
-    def emptyBetaCells(self, fill=0.0):
-        """Create a correctly shaped point-level beta array filled with ``fill``."""
-        return np.full(self.get("betaCells").expectedShape, fill, dtype=np.float64)
-
-    def betaCellIndexAt(self, x, y, z, *, tol=1e-12, flat=False):
-        """Forward coordinate lookup for a ``betaCells`` entry."""
-        return self.topology.betaCellIndexAt(x, y, z, tol=tol, flat=flat)
-
     def _fieldView(self, name):
         prop = self.get(name)
         if prop.name not in self.physical:
@@ -1456,8 +1404,6 @@ class GainMedium:
         fields = {
             "position": position,
             "coordinates": position,
-            "betaCells": self._fieldView("betaCells"),
-            "dntdAse": self._fieldView("dntdAse"),
         }
         custom = self._customFieldViews(("point",), ("point", "level"))
         fields.update(custom)
@@ -1473,8 +1419,6 @@ class GainMedium:
         metadata = {
             "position": position_meta,
             "coordinates": {**position_meta, "name": "coordinates"},
-            "betaCells": self._propertyFieldMeta("betaCells", entity="point_level", axes=("point", "level")),
-            "dntdAse": self._propertyFieldMeta("dntdAse", entity="point_level", axes=("point", "level")),
         }
         metadata.update(self._customFieldMetadata(("point",), ("point", "level")))
         return PrimitiveView("point", (self.topology.numberOfPoints,), fields, metadata)
@@ -1565,19 +1509,6 @@ class GainMedium:
         topology = self.topology
         if hasattr(topology, "cellPointIndices"):
             yield OpenPmdScalarField(
-                "betaCells",
-                _flat(self.get("betaCells").value, None, np.float64, "betaCells"),
-                context,
-                spec=FieldSpec(
-                    "betaCells",
-                    "point_beta",
-                    ("point", "level"),
-                    np.float64,
-                    lambda ctx: (ctx.numberOfPoints, ctx.numberOfLevels),
-                    dynamic=True,
-                ),
-            )
-            yield OpenPmdScalarField(
                 "betaVolume",
                 _flat(self.get("betaVolume").value, None, np.float64, "betaVolume"),
                 context,
@@ -1655,11 +1586,6 @@ class GainMedium:
             )
 
         raise ValueError(f"{prop.name} expects primitive shape {expected}, got {arr.shape}")
-
-    @property
-    def dntdAse(self):
-        """ASE contribution to ``d beta / dt`` at the sample points."""
-        return self.get("dntdAse").value
 
     @property
     def numberOfTriangles(self):

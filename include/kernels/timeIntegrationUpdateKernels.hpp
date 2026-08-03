@@ -29,12 +29,12 @@ namespace hase::kernels
             auto slope,
             auto out) const
         {
-            for(auto [sample] : alpaka::onAcc::makeIdxMap(
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{mesh.numberOfSamples}))
+                    alpaka::IdxRange{mesh.numberOfCells}))
             {
-                out[sample] = base[sample] + scale * slope[sample];
+                out[cell] = base[cell] + scale * slope[cell];
             }
         }
     };
@@ -51,12 +51,12 @@ namespace hase::kernels
             auto second,
             auto out) const
         {
-            for(auto [sample] : alpaka::onAcc::makeIdxMap(
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{mesh.numberOfSamples}))
+                    alpaka::IdxRange{mesh.numberOfCells}))
             {
-                out[sample] = base[sample] + 0.5 * timeStep * (first[sample] + second[sample]);
+                out[cell] = base[cell] + 0.5 * timeStep * (first[cell] + second[cell]);
             }
         }
     };
@@ -75,13 +75,12 @@ namespace hase::kernels
             auto k4,
             auto out) const
         {
-            for(auto [sample] : alpaka::onAcc::makeIdxMap(
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{mesh.numberOfSamples}))
+                    alpaka::IdxRange{mesh.numberOfCells}))
             {
-                out[sample] = base[sample]
-                              + (timeStep / 6.0) * (k1[sample] + 2.0 * k2[sample] + 2.0 * k3[sample] + k4[sample]);
+                out[cell] = base[cell] + (timeStep / 6.0) * (k1[cell] + 2.0 * k2[cell] + 2.0 * k3[cell] + k4[cell]);
             }
         }
     };
@@ -94,33 +93,33 @@ namespace hase::kernels
         ALPAKA_FN_ACC void operator()(
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
-            auto betaCells,
+            auto betaVolume,
             auto dndtPump,
             auto dndtAse,
             auto out) const
         {
             double const decay = alpaka::math::exp(-timeStep / tau);
-            for(auto [sample] : alpaka::onAcc::makeIdxMap(
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{mesh.numberOfSamples}))
+                    alpaka::IdxRange{mesh.numberOfCells}))
             {
-                double const source = dndtPump[sample] - dndtAse[sample];
-                out[sample] = tau * source * (1.0 - decay) + betaCells[sample] * decay;
+                double const source = dndtPump[cell] - dndtAse[cell];
+                out[cell] = tau * source * (1.0 - decay) + betaVolume[cell] * decay;
             }
         }
     };
 
     struct ClipBeta
     {
-        ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto betaCells) const
+        ALPAKA_FN_ACC void operator()(auto const& acc, hase::core::DeviceMeshView const mesh, auto betaVolume) const
         {
-            for(auto [sample] : alpaka::onAcc::makeIdxMap(
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
                     alpaka::onAcc::worker::threadsInGrid,
-                    alpaka::IdxRange{mesh.numberOfSamples}))
+                    alpaka::IdxRange{mesh.numberOfCells}))
             {
-                betaCells[sample] = alpaka::math::min(1.0, alpaka::math::max(0.0, betaCells[sample]));
+                betaVolume[cell] = alpaka::math::min(1.0, alpaka::math::max(0.0, betaVolume[cell]));
             }
         }
     };

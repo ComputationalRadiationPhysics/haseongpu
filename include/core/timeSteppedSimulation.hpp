@@ -16,10 +16,8 @@
 #include <core/simulationRunControl.hpp>
 #include <core/simulationSnapshot.hpp>
 #include <core/types.hpp>
-#include <kernels/activePointMasks.hpp>
 #include <kernels/derivativeComposition.hpp>
 #include <kernels/generalPump.hpp>
-#include <kernels/pointBetaMapping.hpp>
 #include <kernels/timeIntegrationUpdateKernels.hpp>
 
 #include <algorithm>
@@ -44,48 +42,6 @@ namespace hase::core
             return {data, data + buffer.getExtents().product()};
         }
 
-        template<typename T_Buffer, typename T>
-        void copyVectorToBuffer(auto const& queue, std::vector<T> const& values, T_Buffer& buffer)
-        {
-            auto hostView = alpaka::makeView(alpaka::api::host, values.data(), alpaka::Vec{values.size()});
-            alpaka::onHost::memcpy(queue, buffer, hostView);
-            alpaka::onHost::wait(queue);
-        }
-
-        std::vector<float> mapVolumePhiToSamples(HostMesh const& mesh, std::vector<float> const& volumePhi)
-        {
-            if(volumePhi.size() == mesh.numberOfSamples)
-            {
-                return volumePhi;
-            }
-            std::vector<float> samplePhi(mesh.numberOfSamples, 0.0f);
-            if(volumePhi.size() != mesh.numberOfCells || !mesh.samplePointsAreMeshPoints)
-            {
-                return samplePhi;
-            }
-            std::vector<unsigned> counts(mesh.numberOfSamples, 0u);
-            for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
-            {
-                for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
-                {
-                    unsigned const sample = mesh.cellPointIndices.at(cell * mesh.numberOfCellVertices + localVertex);
-                    if(sample < mesh.numberOfSamples)
-                    {
-                        samplePhi.at(sample) += volumePhi.at(cell);
-                        ++counts.at(sample);
-                    }
-                }
-            }
-            for(unsigned sample = 0u; sample < mesh.numberOfSamples; ++sample)
-            {
-                if(counts.at(sample) > 0u)
-                {
-                    samplePhi.at(sample) /= static_cast<float>(counts.at(sample));
-                }
-            }
-            return samplePhi;
-        }
-
         double absorptionAtEmissionPeak(ExperimentParameters const& experiment)
         {
             if(experiment.sigmaA.empty() || experiment.sigmaE.empty())
@@ -97,21 +53,18 @@ namespace hase::core
             return experiment.sigmaA.at(std::min(index, experiment.sigmaA.size() - 1u));
         }
 
-        std::vector<double> makeLumpedSampleVolumes(HostMesh const& mesh)
+        std::vector<double> makeLumpedPointVolumes(HostMesh const& mesh)
         {
-            std::vector<double> volumes(mesh.numberOfSamples, 0.0);
-            if(!mesh.samplePointsAreMeshPoints)
-            {
-                for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
-                    volumes[cell] = static_cast<double>(mesh.cellVolumes[cell]);
-                return volumes;
-            }
+            std::vector<double> volumes(mesh.numberOfMeshPoints, 0.0);
             for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
             {
                 double const share
                     = static_cast<double>(mesh.cellVolumes[cell]) / static_cast<double>(mesh.numberOfCellVertices);
                 for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
-                    volumes[mesh.cellPointIndices[cell * mesh.numberOfCellVertices + vertex]] += share;
+                {
+                    unsigned const point = mesh.cellPointIndices[cell * mesh.numberOfCellVertices + vertex];
+                    volumes[point] += share;
+                }
             }
             return volumes;
         }
@@ -145,8 +98,6 @@ namespace hase::core
         using T_Queue = ALPAKA_TYPEOF(std::declval<T_Device>().makeQueue(alpaka::queueKind::blocking));
         using T_DoubleBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::size_t{1}));
         using T_FloatBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<float>(std::declval<T_Device&>(), std::size_t{1}));
-        using T_UnsignedBuffer
-            = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
 
     public:
         CompiledSimulationRunner(
@@ -165,24 +116,24 @@ namespace hase::core
             , m_hostMesh(hostMesh)
             , m_meshContainer(hostMesh.toDevice(device))
             , m_mesh(m_meshContainer.toView())
-            , m_beta(hase::alpakaUtils::toDevice(m_queue, hostMesh.betaCells))
-            , m_betaNext(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_stage(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_betaVolume(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfPrisms)))
-            , m_phiAse(alpaka::onHost::alloc<float>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_activeMask(alpaka::onHost::alloc<unsigned>(device, static_cast<std::size_t>(m_mesh.numberOfPoints)))
-            , m_derivative(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_dndtPump(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_dndtAse(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_k1(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_k2(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_k3(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
-            , m_k4(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfSamples)))
+            , m_beta(hase::alpakaUtils::toDevice(m_queue, hostMesh.betaVolume))
+            , m_betaNext(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_stage(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_phiAse(alpaka::onHost::alloc<float>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_derivative(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_dndtPump(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_dndtAse(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k1(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k2(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k3(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_k4(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_cellPumpIntegral(alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_lumpedSampleVolume(hase::alpakaUtils::toDevice(m_queue, detail::makeLumpedSampleVolumes(hostMesh)))
+            , m_pointPumpIntegral(
+                  alpaka::onHost::alloc<double>(device, static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
+            , m_lumpedPointVolume(hase::alpakaUtils::toDevice(m_queue, detail::makeLumpedPointVolumes(hostMesh)))
         {
-            hase::kernels::enqueueBuildActivePointMask(m_devBundle, m_queue, m_mesh, m_activeMask);
-            alpaka::onHost::wait(m_queue);
+            if(hostMesh.betaVolume.size() != hostMesh.numberOfCells)
+                throw std::runtime_error("simulation beta_volume must contain exactly one value per cell");
         }
 
         void run(std::function<void(SimulationSnapshot const&)> const& callback)
@@ -201,9 +152,8 @@ namespace hase::core
     private:
         struct DerivativeBuffers
         {
-            T_DoubleBuffer& betaCells;
+            T_DoubleBuffer& betaVolume;
             T_FloatBuffer& phiAse;
-            T_UnsignedBuffer& activeMask;
             T_DoubleBuffer& dndtPump;
             T_DoubleBuffer& dndtAse;
             T_DoubleBuffer& derivative;
@@ -211,34 +161,25 @@ namespace hase::core
 
         void evaluateDerivative(auto& beta, bool pumpEnabled, bool aseEnabled, bool refreshAse = true)
         {
-            hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, beta, m_betaVolume);
-            alpaka::onHost::wait(m_queue);
-
-            m_hostMesh.betaCells = detail::copyToVector(m_queue, beta);
-            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaVolume));
+            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, beta));
             if(refreshAse)
             {
                 initializeResult(aseEnabled ? 100000.0 : 0.0, m_hostMesh.numberOfCells);
 
                 if(aseEnabled)
                 {
-                    int const result = hase::core::startSimulation<false>(
-                        m_experiment,
-                        m_compute,
-                        m_lastVolumeAseResult,
-                        m_hostMesh);
+                    int const result
+                        = hase::core::startSimulation<false>(m_experiment, m_compute, m_lastAseResult, m_hostMesh);
                     if(result != 0)
                     {
                         throw std::runtime_error("ASE evaluation failed with return code " + std::to_string(result));
                     }
                 }
-                m_lastAseResult = m_lastVolumeAseResult;
-                m_lastAseResult.phiAse = detail::mapVolumePhiToSamples(m_hostMesh, m_lastVolumeAseResult.phiAse);
-                m_lastAseResult.standardError.assign(m_hostMesh.numberOfSamples, 0.0);
-                m_lastAseResult.relativeStandardError.assign(m_hostMesh.numberOfSamples, 0.0);
-                m_lastAseResult.totalRays.assign(m_hostMesh.numberOfSamples, 0u);
-                m_lastAseResult.droppedRays.assign(m_hostMesh.numberOfSamples, 0u);
-                detail::copyVectorToBuffer(m_queue, m_lastAseResult.phiAse, m_phiAse);
+                auto hostPhiAse = alpaka::makeView(
+                    alpaka::api::host,
+                    m_lastAseResult.phiAse.data(),
+                    alpaka::Vec{m_lastAseResult.phiAse.size()});
+                alpaka::onHost::memcpy(m_queue, m_phiAse, hostPhiAse);
             }
 
             if(pumpEnabled)
@@ -249,13 +190,14 @@ namespace hase::core
                     m_hostMesh,
                     m_mesh,
                     m_run.pump,
-                    m_betaVolume,
+                    beta,
                     m_cellPumpIntegral,
-                    m_lumpedSampleVolume,
+                    m_pointPumpIntegral,
+                    m_lumpedPointVolume,
                     m_dndtPump);
             }
 
-            DerivativeBuffers derivativeBuffers{beta, m_phiAse, m_activeMask, m_dndtPump, m_dndtAse, m_derivative};
+            DerivativeBuffers derivativeBuffers{beta, m_phiAse, m_dndtPump, m_dndtAse, m_derivative};
             hase::kernels::enqueueComposeDerivative(
                 m_devBundle,
                 m_queue,
@@ -314,10 +256,8 @@ namespace hase::core
             }
 
             enqueueClip(m_betaNext);
-            hase::kernels::enqueueMapPointBetaToPrismBeta(m_devBundle, m_queue, m_mesh, m_betaNext, m_betaVolume);
             alpaka::onHost::wait(m_queue);
-            m_hostMesh.betaCells = detail::copyToVector(m_queue, m_betaNext);
-            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaVolume));
+            m_hostMesh.setBetaVolume(detail::copyToVector(m_queue, m_betaNext));
         }
 
         void stepRungeKutta4(bool pumpEnabled, bool aseEnabled)
@@ -378,7 +318,6 @@ namespace hase::core
                 std::vector<double>(resultSize, 0.0),
                 std::vector<unsigned>(resultSize, 0u),
                 std::vector<double>(resultSize, 0.0));
-            m_lastVolumeAseResult = m_lastAseResult;
         }
 
         SimulationSnapshot makeSnapshot(unsigned step)
@@ -389,10 +328,8 @@ namespace hase::core
             return SimulationSnapshot{
                 step,
                 static_cast<double>(step) * m_run.timeStep,
-                m_hostMesh.betaCells,
                 m_hostMesh.betaVolume,
                 m_lastAseResult,
-                m_lastVolumeAseResult,
                 std::move(dndtPump),
                 std::move(dndtAse)};
         }
@@ -402,7 +339,7 @@ namespace hase::core
             auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                 m_devBundle.device,
                 m_devBundle.executor,
-                alpaka::Vec{m_mesh.numberOfSamples});
+                alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{hase::kernels::AddScaled{scale}, m_mesh, base, slope, out});
@@ -414,7 +351,7 @@ namespace hase::core
             auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                 m_devBundle.device,
                 m_devBundle.executor,
-                alpaka::Vec{m_mesh.numberOfSamples});
+                alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{hase::kernels::CombineHeun{m_run.timeStep}, m_mesh, base, first, second, out});
@@ -426,7 +363,7 @@ namespace hase::core
             auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                 m_devBundle.device,
                 m_devBundle.executor,
-                alpaka::Vec{m_mesh.numberOfSamples});
+                alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{
@@ -446,7 +383,7 @@ namespace hase::core
             auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                 m_devBundle.device,
                 m_devBundle.executor,
-                alpaka::Vec{m_mesh.numberOfSamples});
+                alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(
                 frameSpec,
                 alpaka::KernelBundle{
@@ -466,7 +403,7 @@ namespace hase::core
             auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
                 m_devBundle.device,
                 m_devBundle.executor,
-                alpaka::Vec{m_mesh.numberOfSamples});
+                alpaka::Vec{m_mesh.numberOfCells});
             m_queue.enqueue(frameSpec, alpaka::KernelBundle{hase::kernels::ClipBeta{}, m_mesh, beta});
             alpaka::onHost::wait(m_queue);
         }
@@ -484,10 +421,7 @@ namespace hase::core
         T_DoubleBuffer m_beta;
         T_DoubleBuffer m_betaNext;
         T_DoubleBuffer m_stage;
-        T_DoubleBuffer m_betaVolume;
         T_FloatBuffer m_phiAse;
-        Result m_lastVolumeAseResult;
-        T_UnsignedBuffer m_activeMask;
         T_DoubleBuffer m_derivative;
         T_DoubleBuffer m_dndtPump;
         T_DoubleBuffer m_dndtAse;
@@ -496,7 +430,8 @@ namespace hase::core
         T_DoubleBuffer m_k3;
         T_DoubleBuffer m_k4;
         T_DoubleBuffer m_cellPumpIntegral;
-        T_DoubleBuffer m_lumpedSampleVolume;
+        T_DoubleBuffer m_pointPumpIntegral;
+        T_DoubleBuffer m_lumpedPointVolume;
         Result m_lastAseResult;
     };
 

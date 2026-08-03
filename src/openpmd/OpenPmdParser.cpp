@@ -1056,17 +1056,6 @@ namespace hase::openpmd
         unsigned const numberOfSurfaceDomains = surfaceDomainCount(cellFaceBoundaries);
         bool const samplePointsAreMeshPoints = numberOfPoints * numberOfLevels == numberOfMeshPoints;
         auto samplePoints = samplePointsAreMeshPoints ? points : cellCenters;
-        auto betaCells = iteration.meshes.contains(prefix + "point_beta")
-                             ? loadScalar<double>(
-                                   series,
-                                   iteration,
-                                   prefix + "point_beta",
-                                   io::Extent{numberOfPoints * numberOfLevels},
-                                   {"point", "level"},
-                                   {numberOfPoints, numberOfLevels},
-                                   true,
-                                   true)
-                             : std::vector<double>(numberOfPoints * numberOfLevels, 0.0);
 
         core::HostMesh mesh(
             std::move(connectivity),
@@ -1112,7 +1101,6 @@ namespace hase::openpmd
                 {numberOfCells},
                 true,
                 true),
-            std::move(betaCells),
             loadScalar<unsigned>(
                 series,
                 iteration,
@@ -1723,13 +1711,6 @@ namespace hase::openpmd
 
         writeFlatScalar<double>(
             iteration,
-            prefix + "point_beta",
-            snapshot.betaCells,
-            {"point", "level"},
-            {mesh.numberOfPoints, mesh.numberOfLevels},
-            true);
-        writeFlatScalar<double>(
-            iteration,
             prefix + "beta_volume",
             snapshot.betaVolume,
             {"cell"},
@@ -1741,8 +1722,8 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "phi_ase",
             snapshot.aseResult.phiAse,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"},
+            io::Extent{mesh.numberOfCells},
+            {"cell"},
             "cm^-2 s^-1",
             1.0e4,
             {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
@@ -1750,8 +1731,8 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "standard_error",
             snapshot.aseResult.standardError,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"},
+            io::Extent{mesh.numberOfCells},
+            {"cell"},
             "cm^-2 s^-1",
             1.0e4,
             {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
@@ -1759,59 +1740,19 @@ namespace hase::openpmd
             iteration,
             resultPrefix + "relative_standard_error",
             snapshot.aseResult.relativeStandardError,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"});
+            io::Extent{mesh.numberOfCells},
+            {"cell"});
         writeScalar(
             iteration,
             resultPrefix + "total_rays",
             snapshot.aseResult.totalRays,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"},
+            io::Extent{mesh.numberOfCells},
+            {"cell"},
             "count");
         writeScalar(
             iteration,
             resultPrefix + "dndt_ase",
             snapshot.dndtAse,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"},
-            "s^-1",
-            1.0,
-            {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            resultPrefix + "volume_phi_ase",
-            snapshot.volumeAseResult.phiAse,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "cm^-2 s^-1",
-            1.0e4,
-            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            resultPrefix + "volume_standard_error",
-            snapshot.volumeAseResult.standardError,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "cm^-2 s^-1",
-            1.0e4,
-            {-2.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
-        writeScalar(
-            iteration,
-            resultPrefix + "volume_relative_standard_error",
-            snapshot.volumeAseResult.relativeStandardError,
-            io::Extent{mesh.numberOfCells},
-            {"cell"});
-        writeScalar(
-            iteration,
-            resultPrefix + "volume_total_rays",
-            snapshot.volumeAseResult.totalRays,
-            io::Extent{mesh.numberOfCells},
-            {"cell"},
-            "count");
-        writeScalar(
-            iteration,
-            resultPrefix + "volume_dndt_ase",
-            snapshot.volumeAseResult.dndtAse,
             io::Extent{mesh.numberOfCells},
             {"cell"},
             "s^-1",
@@ -1821,8 +1762,8 @@ namespace hase::openpmd
             iteration,
             prefix + "result_dndt_pump",
             snapshot.dndtPump,
-            io::Extent{mesh.numberOfPoints, mesh.numberOfLevels},
-            {"point", "level"},
+            io::Extent{mesh.numberOfCells},
+            {"cell"},
             "s^-1",
             1.0,
             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0});
