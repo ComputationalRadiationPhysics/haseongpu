@@ -17,10 +17,8 @@ namespace hase::core
     {
         unsigned step = 0u;
         double time = 0.0;
-        std::vector<double> betaCells;
         std::vector<double> betaVolume;
         Result aseResult;
-        Result volumeAseResult;
         std::vector<double> dndtPump;
         std::vector<double> dndtAse;
     };

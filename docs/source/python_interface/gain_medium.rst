@@ -19,7 +19,6 @@ the field for its primitive shape first so the code follows the topology:
 
 .. code-block:: python
 
-   medium.get("betaCells").value = np.zeros(medium.get("betaCells").expectedShape)
    medium.get("betaVolume").value = np.zeros(medium.get("betaVolume").expectedShape)
    medium.get("claddingCellTypes").value = np.zeros(
        medium.get("claddingCellTypes").expectedShape, dtype=np.uint32
@@ -39,14 +38,8 @@ construct a separate adapter object for backend input.
 Property Reference
 ------------------
 
-``betaCells``
-   Excited-state fraction :math:`\beta_i` at simulation samples. Explicit Tet4
-   state is normally vertex-centered with shape ``(numberOfSamplePoints,)``.
-   The legacy structured layout uses
-   ``(numberOfPoints, numberOfLevels)``.
-
 ``betaVolume``
-   Cell-centered excited-state fraction :math:`\beta_j` used by ASE and pump
+   Authoritative cell-centered excited-state fraction :math:`\beta_j` used by ASE and pump
    transport. Explicit Tet4 topology uses shape ``(numberOfCells,)``. The
    legacy extruded layout uses
    ``(numberOfTriangles, numberOfLevels - 1)``.
@@ -82,7 +75,7 @@ Shape and Metadata Utilities
 
 .. code-block:: python
 
-   prop = medium.get("betaCells")
+   prop = medium.get("betaVolume")
    prop.name
    prop.description
    prop.dtype
@@ -102,26 +95,10 @@ Shape and Metadata Utilities
 .. code-block:: python
 
    medium.set("nTot", 2.776e20)
-   medium.set("betaCells", np.zeros(medium.get("betaCells").expectedShape))
+   medium.set("betaVolume", np.zeros(medium.get("betaVolume").expectedShape))
 
 Arrays can be supplied either in matrix shape or flat Fortran order.  Stored
 arrays are flattened internally for the HASEonGPU binding.
-
-Indexing Helpers
-----------------
-
-``GainMedium`` forwards beta-cell coordinate lookups for :math:`\beta_i` to
-its topology:
-
-.. code-block:: python
-
-   i, k = medium.betaCellIndexAt(x=0.0, y=0.0, z=0.0)
-   beta = medium.get("betaCells").value.reshape(
-       medium.get("betaCells").expectedShape,
-       order="F",
-   )
-   beta[i, k] = 0.5
-   medium.get("betaCells").value = beta
 
 Convenience Dimensions
 ----------------------
@@ -132,13 +109,6 @@ Convenience Dimensions
    medium.numberOfTriangles
    medium.numberOfPrisms
    medium.numberOfLevels
-
-``emptyBetaCells(fill=0.0)`` creates a correctly shaped beta array
-:math:`\beta_i`:
-
-.. code-block:: python
-
-   medium.get("betaCells").value = medium.emptyBetaCells(fill=0.0)
 
 Custom Fields
 -------------

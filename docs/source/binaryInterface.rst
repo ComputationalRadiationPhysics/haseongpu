@@ -78,7 +78,7 @@ Compiled Simulation Mode
 running a Python pump loop. Python writes the initial geometry, material,
 spectra, beta state, and run-control attributes; C++/Alpaka advances the
 requested steps and writes a snapshot after each one. The snapshots contain the
-updated beta fields, ASE results, and pump and ASE derivatives. The first
+updated cell beta, cell ASE results, and cell pump and ASE derivatives. The first
 snapshot also carries the static context needed to read the series on its own.
 
 .. code-block:: bash
@@ -97,12 +97,13 @@ Python pump routines are not part of this execution path.
 
 In this mode Python sends the initial mesh/material/spectra/beta state and the
 binary writes one output iteration per completed time step. The output snapshot
-iterations include ``core_point_beta``, ``core_beta_volume``,
+iterations include ``core_beta_volume``,
 ``core_result_phi_ase``, ``core_result_standard_error``,
 ``core_result_relative_standard_error``, ``core_result_total_rays``,
 ``core_result_dndt_ase``, and ``core_result_dndt_pump``. Iteration 0 also
 carries the static mesh/material/spectral records so the snapshot series can be
-read independently.
+read independently. All dynamic and result records use the ``cell`` axis; the
+compiled model has no point-centered state records.
 
 Run-control attributes include ``time_step``, ``number_of_steps``,
 ``pump_steps``, ``time_integrator``, optional implicit-Euler controls

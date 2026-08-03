@@ -7,8 +7,5 @@
  */
 #pragma once
 
-#include <kernels/activePointMasks.hpp>
 #include <kernels/derivativeComposition.hpp>
-#include <kernels/oneDimensionalPump.hpp>
-#include <kernels/pointBetaMapping.hpp>
 #include <kernels/timeIntegrationUpdateKernels.hpp>

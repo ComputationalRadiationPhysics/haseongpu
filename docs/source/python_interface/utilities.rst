@@ -56,7 +56,7 @@ Callback use:
            output_dir / "fields_{step:03d}.vtk",
            state,
            fields={
-               "betaCells": state.beta_cells,
+               "betaVolume": state.beta_volume,
                "phiASE": state.phi_ase,
                "dndtAse": state.dndt_ase,
                "cladAbs": state.phi_ase * cladding_absorption,

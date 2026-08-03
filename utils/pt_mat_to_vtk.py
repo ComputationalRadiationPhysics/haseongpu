@@ -58,7 +58,6 @@ def _text_medium(input_dir: Path) -> GainMedium:
         metadata={"source": str(input_dir), "format": "legacy-text"},
     )
     return GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=backendFlat(_array(input_dir / "betaCells.txt", np.float64)),
         betaVolume=backendFlat(_array(input_dir / "betaVolume.txt", np.float64)),
         claddingCellTypes=_array(input_dir / "claddingCellTypes.txt", np.uint32),
         refractiveIndices=_array(input_dir / "refractiveIndices.txt", np.float32),
@@ -90,7 +89,6 @@ def _pt_mat_medium(material_path: Path, *, number_of_levels: int = 10, length: f
         metadata={"source": str(material_path), "format": "matlab-pt"},
     )
     return GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=np.zeros((topology.numberOfPoints, topology.levels), dtype=np.float64),
         betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
         refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),

@@ -40,7 +40,7 @@ def printState(state):
     print(
         f"step={state.step:03d} "
         f"time={state.time:.3e}s "
-        f"mean_beta={state.beta_cells.mean():.6e} "
+        f"mean_beta={state.beta_volume.mean():.6e} "
         f"mean_phi={state.phi_ase.mean():.6e}"
     )
 
@@ -97,10 +97,9 @@ def main():
         topology = MeshTopology.fromFile(gmsh_file, format="gmsh", numberOfLevels=6, thickness=0.25)
         medium = GainMedium(topology=topology)
 
-        print(medium.get("betaCells").expectedShape)
+        print(medium.get("betaVolume").expectedShape)
         print("gmsh claddingCellTypes:", medium.get("claddingCellTypes").value)
 
-        medium.get("betaCells").value = np.zeros(medium.get("betaCells").expectedShape)
         medium.get("betaVolume").value = np.zeros(medium.get("betaVolume").expectedShape)
         medium.get("claddingCellTypes").value = np.asarray(
             medium.get("claddingCellTypes").value, dtype=np.uint32

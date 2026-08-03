@@ -361,7 +361,6 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
 
     medium = GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=np.zeros(topology.numberOfCells, dtype=np.float64),
-        betaCells=np.zeros(topology.numberOfSamplePoints, dtype=np.float64),
         claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
         refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
         reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),

@@ -54,8 +54,6 @@ from .laser import (
     integrate_pump_profile,
 )
 from .simulation import (
-    ConnectivityAverageBetaVolumeMapper,
-    LegacyGridDataBetaVolumeMapper,
     PhiASE,
     Simulation,
     TimeStepState,

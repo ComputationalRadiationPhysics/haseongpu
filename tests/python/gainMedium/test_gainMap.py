@@ -14,18 +14,20 @@ def _state(topology, beta):
     return TimeStepState(
         step=1,
         time=1e-9,
-        betaCells=np.asarray(beta, dtype=np.float64),
-        betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        betaVolume=np.asarray(beta, dtype=np.float64),
         phiAse=None,
-        dndtAse=np.zeros((topology.numberOfPoints, topology.levels)),
-        dndtPump=np.zeros((topology.numberOfPoints, topology.levels)),
+        standardError=None,
+        relativeStandardError=None,
+        totalRays=None,
+        dndtAse=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
+        dndtPump=np.zeros((topology.numberOfTriangles, topology.levels - 1)),
         aseResult=None,
         topology=topology,
     )
 
 
-def test_calcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
-    beta = np.full((smallTopology.numberOfPoints, smallTopology.levels), 0.25)
+def test_calcGainFromStateReturnsVtkCellField(smallTopology, crossSections):
+    beta = np.full((smallTopology.numberOfTriangles, smallTopology.levels - 1), 0.25)
     state = _state(smallTopology, beta)
 
     gain = calcGainFromState(state, crossSections, nTot=2.0)
@@ -33,12 +35,12 @@ def test_calcGainFromStateReturnsVtkPointField(smallTopology, crossSections):
     sigma_abs = crossSections.crossSectionAbsorption[0]
     sigma_ems = crossSections.crossSectionEmission[0]
     expected = (0.25 * (sigma_abs + sigma_ems) - sigma_abs) * 2.0
-    assert gain.shape == (smallTopology.numberOfPoints, smallTopology.levels)
+    assert gain.shape == (smallTopology.numberOfPrisms,)
     assert np.allclose(gain, expected)
 
 
 def test_calcGainFromStateRequiresNTot(smallTopology, crossSections):
-    beta = np.ones((smallTopology.numberOfPoints, smallTopology.levels), dtype=np.float64)
+    beta = np.ones((smallTopology.numberOfTriangles, smallTopology.levels - 1), dtype=np.float64)
     state = _state(smallTopology, beta)
 
     with pytest.raises(ValueError, match="requires nTot"):

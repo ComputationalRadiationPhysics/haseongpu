@@ -31,7 +31,6 @@ def _smallVolumeGainMedium():
         metadata={"structured": {"numberOfPoints": 1, "numberOfLevels": 1, "thickness": 0.0}},
     )
     return GainMedium(topology=topology).withPhysicalProperties(
-        betaCells=np.asarray([0.25], dtype=np.float64),
         betaVolume=np.asarray([0.5], dtype=np.float64),
         claddingCellTypes=np.asarray([2], dtype=np.uint32),
         refractiveIndices=np.asarray([1.0, 1.1, 1.2, 1.3], dtype=np.float64),
@@ -55,7 +54,6 @@ def test_gainMediumRoundTripsThroughTet4Vtk(tmp_path):
     assert np.allclose(loaded.topology.points, medium.topology.points)
     assert np.array_equal(loaded.topology.cellPointIndices, medium.topology.cellPointIndices)
     assert np.array_equal(loaded.topology.faceBoundaries, medium.topology.faceBoundaries)
-    assert np.allclose(loaded.get("betaCells").value, medium.get("betaCells").value)
     assert np.allclose(loaded.get("betaVolume").value, medium.get("betaVolume").value)
     assert np.array_equal(loaded.get("claddingCellTypes").value, medium.get("claddingCellTypes").value)
     assert np.allclose(loaded.get("refractiveIndices").value, medium.get("refractiveIndices").value)
@@ -113,7 +111,6 @@ def test_bundledExampleVtkFixturesExposeFrontendFields():
         assert medium.numberOfPoints == points
         assert medium.numberOfTriangles == triangles
         assert medium.numberOfLevels == levels
-        assert np.asarray(medium.get("betaCells").value).size == points * levels
         assert np.asarray(medium.get("betaVolume").value).size == triangles
         assert np.asarray(medium.get("claddingCellTypes").value).shape == (triangles,)
         assert np.asarray(medium.get("refractiveIndices").value).shape == (4,)

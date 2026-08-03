@@ -95,8 +95,8 @@ Attach physical arrays and scalar material properties to the topology:
    :end-before: # docs:end: gain-medium
 
 Use ``medium.get("...").expectedShape`` when allocating mesh-dependent arrays.
-The most important fields are ``betaCells`` for point-level excited-state
-fraction, ``betaVolume`` for cell-centered beta, cladding labels,
+The authoritative state field is ``betaVolume``, with one excited-state
+fraction per volume cell. Other important fields are cladding labels,
 reflectivities, active-ion density ``nTot``, and fluorescence lifetime
 ``crystalTFluo``.  See :doc:`python_interface/gain_medium` for field shapes and
 openPMD metadata.
@@ -215,6 +215,6 @@ Results
    :end-before: # docs:end: results
 
 ``simulation.get_last_state()`` returns the latest ``TimeStepState`` with step,
-time, ``beta_cells``, ``beta_volume``, ``phi_ase``, pump derivative, ASE
+time, ``beta_volume``, ``phi_ase``, pump derivative, ASE
 derivative, and the raw ASE result object.  Use callbacks to store or export
 every step.

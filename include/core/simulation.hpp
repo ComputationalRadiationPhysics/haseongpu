@@ -38,28 +38,6 @@
 namespace hase::core
 {
 
-    /**
-     * @brief Calculates dndt ASE from phi ASE values
-     *
-     * @param mesh needed for some constants
-     * @param sigmaA absorption
-     * @param sigmaE emission
-     * @param phiAse results from calcPhiAse
-     * @param sample_i index of sample point
-     * @return dndtAse
-     *
-     */
-    inline double calcDndtAse(
-        HostMesh const& mesh,
-        double const sigmaA,
-        double const sigmaE,
-        float const phiAse,
-        unsigned const sample_i)
-    {
-        double const gainPerDensity = mesh.betaCells[sample_i] * (sigmaE + sigmaA) - sigmaA;
-        return gainPerDensity * phiAse;
-    }
-
     inline double calcVolumeDndtAse(
         HostMesh const& mesh,
         double const sigmaA,

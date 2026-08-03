@@ -139,14 +139,8 @@ def _make_current_medium(reference, cladding_absorption):
     beta_volume = np.full(topology.numberOfCells, gain_beta, dtype=np.float64)
     beta_volume[cladding_cells] = 0.0
 
-    # PhiASE source selection and propagation use per-cell betaVolume. Keep
-    # shared interface betaCells uniform so a shared vertex cannot erase a
-    # neighboring gain cell; cladding cells still have exactly zero source.
-    medium.get("betaCells").value = np.full(
-        medium.get("betaCells").expectedShape,
-        gain_beta,
-        dtype=np.float64,
-    )
+    # PhiASE source selection and propagation use only per-cell betaVolume;
+    # cladding cells have exactly zero source.
     medium.get("betaVolume").value = beta_volume
     medium.get("claddingCellTypes").value = tet_types
     medium.get("claddingNumber").value = CLADDING_NUMBER

@@ -34,7 +34,7 @@ def printState(state):
     print(
         f"step={state.step:03d} "
         f"time={state.time:.3e}s "
-        f"mean_beta={state.beta_cells.mean():.6e} "
+        f"mean_beta={state.beta_volume.mean():.6e} "
         f"mean_phi={state.phi_ase.mean():.6e}"
     )
 
@@ -50,10 +50,7 @@ def main():
     # docs:end: topology
     # docs:start: gain-medium
     medium = GainMedium(topology=topology)
-    print("betaCells shape:", medium.get("betaCells").expectedShape)
-
-    for point in medium.getPoints():
-        point.betaCells = 0.0
+    print("betaVolume shape:", medium.get("betaVolume").expectedShape)
 
     for prism in medium.getPrisms():
         prism.betaVolume = 0.0

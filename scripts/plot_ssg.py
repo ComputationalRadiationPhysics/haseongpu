@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Compute line-wise distance gain and net gain factors from the VTK field ``gain``.
+"""Trace small-signal gain through the VTK field ``gain``.
 
 Example usages:
     python3 scripts/plot_ssg.py \
@@ -35,6 +35,7 @@ from typing import Iterable
 AXES = ("x", "y", "z")
 AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
 TIMESTEP_RE = re.compile(r"laserPumpCladding_(\d+)\.vtk$")
+SMALL_SIGNAL_PROBE_POWER = 1.0e-30
 
 
 @dataclass(frozen=True)
@@ -58,8 +59,8 @@ class VtkScalarField:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Read laserPumpCladding_*.vtk files, integrate the local gain field "
-            "'gain' along one coordinate axis, and plot net gain versus timestep."
+            "Read laserPumpCladding_*.vtk files, trace a non-depleting small-signal probe "
+            "through the local gain field along one coordinate axis, and plot net gain versus timestep."
         )
     )
     parser.add_argument(
@@ -72,7 +73,7 @@ def parse_args() -> argparse.Namespace:
         "--direction",
         choices=AXES,
         help=(
-            "Integration axis. If omitted, the script infers it from the "
+            "Probe-ray axis. If omitted, the script infers it from the "
             "missing coordinate when exactly two of --x/--y/--z are provided."
         ),
     )
@@ -82,7 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--field",
         default="gain",
-        help="POINT_DATA or Tet4 CELL_DATA scalar field to integrate (default: gain).",
+        help="POINT_DATA or Tet4 CELL_DATA scalar field sampled by the probe (default: gain).",
     )
     parser.add_argument(
         "--output-prefix",
@@ -299,7 +300,7 @@ def compute_distance_gain(selection: LineSelection, gains: list[float], np_modul
     return float(np_module.trapezoid(point_gains, axis_coordinates))
 
 
-def select_tetrahedron_line_segments(points, cells, varying_axis, fixed_axes, requested_coords, np_module):
+def select_tetrahedron_ray_segments(points, cells, varying_axis, fixed_axes, requested_coords, np_module):
     line_origin = np_module.zeros(3, dtype=float)
     line_origin[AXIS_INDEX[fixed_axes[0]]] = requested_coords[0]
     line_origin[AXIS_INDEX[fixed_axes[1]]] = requested_coords[1]
@@ -334,20 +335,28 @@ def select_tetrahedron_line_segments(points, cells, varying_axis, fixed_axes, re
             else:
                 upper = min(upper, -value / slope)
         if valid and upper - lower > tolerance:
-            segments.append((cell_index, float(upper - lower)))
+            segments.append((float(lower), float(upper), cell_index))
 
     if not segments:
         raise ValueError(
             f"The requested {varying_axis}-line at {fixed_axes[0]}={requested_coords[0]}, "
             f"{fixed_axes[1]}={requested_coords[1]} does not intersect any tetrahedra."
         )
-    return tuple(segments)
+    return tuple(sorted(segments))
 
 
-def compute_cell_distance_gain(segments, gains, np_module) -> float:
-    if len(gains) <= max(cell_index for cell_index, _ in segments):
+def trace_cell_small_signal_ray(segments, gains, np_module) -> tuple[float, float]:
+    """Propagate a tiny non-depleting probe through ordered cell segments."""
+    if len(gains) <= max(cell_index for _, _, cell_index in segments):
         raise ValueError("CELL_DATA scalar has fewer values than the intersected tetrahedra.")
-    return float(sum(gains[cell_index] * length for cell_index, length in segments))
+    input_power = SMALL_SIGNAL_PROBE_POWER
+    output_power = input_power
+    distance_gain = 0.0
+    for entry_distance, exit_distance, cell_index in segments:
+        segment_gain = gains[cell_index] * (exit_distance - entry_distance)
+        distance_gain += segment_gain
+        output_power *= np_module.exp(segment_gain)
+    return float(distance_gain), float(output_power / input_power)
 
 
 def compute_single_pass_gain_factor(distance_gain: float, np_module) -> float:
@@ -414,14 +423,18 @@ def main() -> int:
     if reference_field.association == "POINT_DATA":
         assert reference_field.points is not None
         selection = select_line(reference_field.points, varying_axis, fixed_axes, requested_coords)
-        distance_gain = lambda values: compute_distance_gain(selection, values, np)
+
+        def evaluate_gain(values):
+            distance_gain = compute_distance_gain(selection, values, np)
+            return distance_gain, compute_single_pass_gain_factor(distance_gain, np)
+
         actual_coords = selection.actual_coords
         sample_count = len(selection.coordinate_groups)
         sample_description = "point samples"
     elif reference_field.association == "CELL_DATA":
         assert reference_field.points is not None
         assert reference_field.cells is not None
-        segments = select_tetrahedron_line_segments(
+        segments = select_tetrahedron_ray_segments(
             reference_field.points,
             reference_field.cells,
             varying_axis,
@@ -429,7 +442,7 @@ def main() -> int:
             requested_coords,
             np,
         )
-        distance_gain = lambda values: compute_cell_distance_gain(segments, values, np)
+        evaluate_gain = lambda values: trace_cell_small_signal_ray(segments, values, np)
         actual_coords = requested_coords
         sample_count = len(segments)
         sample_description = "tetrahedron chords"
@@ -437,8 +450,7 @@ def main() -> int:
         raise ValueError(f"Unsupported VTK data association: {reference_field.association}")
 
     results: list[tuple[int, float, float, float]] = []
-    first_distance_gain = distance_gain(reference_field.values)
-    first_single_pass = compute_single_pass_gain_factor(first_distance_gain, np)
+    first_distance_gain, first_single_pass = evaluate_gain(reference_field.values)
     results.append(
         (
             vtk_files[0][0],
@@ -462,8 +474,7 @@ def main() -> int:
             raise ValueError(
                 f"{path} has {field.count} values for '{args.field}', expected {reference_field.count}."
             )
-        current_distance_gain = distance_gain(field.values)
-        single_pass_gain = compute_single_pass_gain_factor(current_distance_gain, np)
+        current_distance_gain, single_pass_gain = evaluate_gain(field.values)
         results.append(
             (
                 timestep,
@@ -519,7 +530,7 @@ def main() -> int:
         else "single-pass only"
     )
     print(f"Processed {len(results)} files from {input_dir}")
-    print(f"Integrated local gain along {varying_axis} using requested coordinates: {requested_text}")
+    print(f"Traced small-signal gain along {varying_axis} using requested coordinates: {requested_text}")
     print(f"Nearest available line used: {actual_text}")
     print(f"Samples along {varying_axis}: {sample_count} {sample_description}")
     print(f"Mode: {mode_text}")

@@ -98,3 +98,4 @@ utils/validity_checking/difference_plots/*
 tests/*.txt
 tests/data/*_results.csv
 docs/source/generated/*.rst
+/julia1D/

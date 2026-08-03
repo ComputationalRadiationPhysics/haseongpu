@@ -72,7 +72,6 @@ def test_gainMediumOwnsPhysicalProperties():
         GainMedium(topology=topology)
         .withPhysicalProperties(
             betaVolume=np.ones((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
-            betaCells=np.ones((topology.numberOfPoints, topology.levels), dtype=np.float64),
             claddingCellTypes=np.zeros(2, dtype=np.uint32),
             refractiveIndices=np.array([1.8, 1.0, 1.8, 1.0], dtype=np.float32),
             reflectivities=backendFlat(np.ones(4, dtype=np.float32)),
@@ -137,18 +136,12 @@ def test_primitiveElementsAssignFieldsAndExposeMetadata():
     topology = MeshTopology.fromGrid(Grid(xExtent=1.0, yExtent=1.0, zExtent=0.5, tileSizeZ=0.25))
     medium = GainMedium(topology=topology)
 
-    for point in medium.getPoints():
-        point.betaCells = 0.25
     for prism in medium.getPrisms():
         prism.betaVolume = 0.5
     for triangle in medium.getTriangles():
         triangle.claddingGroup = 7
         triangle.reflectivities = [0.1, 0.2]
 
-    np.testing.assert_array_equal(
-        medium.get("betaCells").value.reshape(medium.get("betaCells").expectedShape, order="F"),
-        np.full(medium.get("betaCells").expectedShape, 0.25),
-    )
     np.testing.assert_array_equal(
         medium.get("betaVolume").value.reshape(medium.get("betaVolume").expectedShape, order="F"),
         np.full(medium.get("betaVolume").expectedShape, 0.5),

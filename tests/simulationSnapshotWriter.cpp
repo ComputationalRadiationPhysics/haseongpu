@@ -11,12 +11,15 @@ namespace
 {
     template<typename T>
     concept ContainsMeshMember = requires(T value) { value.mesh; };
+
+    template<typename T>
+    concept ContainsPointBetaMember = requires(T value) { value.betaCells; };
 } // namespace
 
 TEST_CASE("simulation snapshots contain dynamic state instead of a host mesh", "[openpmd]")
 {
     STATIC_REQUIRE_FALSE(ContainsMeshMember<hase::core::SimulationSnapshot>);
-    STATIC_REQUIRE(std::is_same_v<decltype(hase::core::SimulationSnapshot::betaCells), std::vector<double>>);
+    STATIC_REQUIRE_FALSE(ContainsPointBetaMember<hase::core::SimulationSnapshot>);
     STATIC_REQUIRE(std::is_same_v<decltype(hase::core::SimulationSnapshot::betaVolume), std::vector<double>>);
     STATIC_REQUIRE(std::is_same_v<decltype(hase::core::SimulationSnapshot::aseResult), hase::core::Result>);
 }

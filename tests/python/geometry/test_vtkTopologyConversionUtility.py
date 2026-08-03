@@ -47,7 +47,7 @@ def _writeTwoWedgeVtk(path):
                 "globalValue 1 1 double",
                 "42",
                 "POINT_DATA 8",
-                "SCALARS betaCells double 1",
+                "SCALARS pointTemperature double 1",
                 "LOOKUP_TABLE default",
                 "0.0",
                 "0.1",
@@ -99,7 +99,7 @@ def testConvertWedgeVtkToTet4AndBackTransfersCellAdjacentFields(tmp_path):
     assert points.shape == (8, 3)
     assert len(cells) == 6
     assert np.all(np.asarray(cell_types) == 10)
-    np.testing.assert_allclose(point_data["betaCells"], np.arange(8, dtype=np.float64) / 10.0)
+    np.testing.assert_allclose(point_data["pointTemperature"], np.arange(8, dtype=np.float64) / 10.0)
     np.testing.assert_allclose(cell_data["betaVolume"], [10.0, 10.0, 10.0, 20.0, 20.0, 20.0])
     np.testing.assert_array_equal(fields["cellMaterial"], [7, 7, 7, 8, 8, 8])
     np.testing.assert_allclose(fields["globalValue"], 42.0)
@@ -133,7 +133,7 @@ def testConvertWedgeVtkToTet4AndBackTransfersCellAdjacentFields(tmp_path):
     assert sum(count == 1 for count in face_counts.values()) == 12
     assert face_counts[(1, 2, 5)] == 2
     assert face_counts[(2, 5, 6)] == 2
-    np.testing.assert_allclose(round_point_data["betaCells"], point_data["betaCells"])
+    np.testing.assert_allclose(round_point_data["pointTemperature"], point_data["pointTemperature"])
     np.testing.assert_allclose(round_cell_data["betaVolume"], [10.0, 20.0])
     np.testing.assert_array_equal(round_fields["cellMaterial"], [7, 8])
     np.testing.assert_allclose(round_fields["globalValue"], 42.0)

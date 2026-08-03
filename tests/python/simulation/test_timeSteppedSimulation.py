@@ -35,17 +35,18 @@ def fakeCppSimulation(monkeypatch, smallTopology):
     captured = []
 
     def make_state(step, simulation, pump_steps):
-        shape = (smallTopology.numberOfPoints, smallTopology.levels)
         volume_shape = (smallTopology.numberOfTriangles, smallTopology.levels - 1)
         pump_active = pump_steps is None or step <= pump_steps
         return SimpleNamespace(
             step=step,
             time=step * simulation.timeStep,
-            betaCells=np.full(shape, 0.25 * step),
             betaVolume=np.full(volume_shape, 0.125 * step),
-            phiAse=np.full(shape, float(step)),
-            dndtAse=np.zeros(shape),
-            dndtPump=np.ones(shape) if pump_active else np.zeros(shape),
+            phiAse=np.full(volume_shape, float(step)),
+            standardError=np.zeros(volume_shape),
+            relativeStandardError=np.zeros(volume_shape),
+            totalRays=np.zeros(volume_shape, dtype=np.uint32),
+            dndtAse=np.zeros(volume_shape),
+            dndtPump=np.ones(volume_shape) if pump_active else np.zeros(volume_shape),
             aseResult=object(),
         )
 
@@ -111,8 +112,8 @@ def testCompiledSimulationDelegatesRunStepsToCppTransport(
         }
     ]
     assert state.step == 1
-    assert np.allclose(state.betaCells, 0.25)
-    assert np.allclose(simulation.gainMedium.get("betaCells").value, 0.25)
+    assert np.allclose(state.betaVolume, 0.125)
+    assert np.allclose(simulation.gainMedium.get("betaVolume").value, 0.125)
 
 
 def testCompiledSimulationUsesPhiAseMpiLaunchOptions(
@@ -172,7 +173,6 @@ def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
     assert len(seen) == 2
     assert seen[-1].step == 2
     assert seen[-1].time == 2e-5
-    assert seen[-1].betaCells.shape == (4, 3)
     assert seen[-1].betaVolume.shape == (2, 2)
 
 
@@ -253,7 +253,7 @@ def testOnStepPassesStateBeforeUserArguments(
 
     simulation.step(2)
 
-    assert seen == [("vtk", 1, 2.0, (4, 3)), ("vtk", 2, 2.0, (4, 3))]
+    assert seen == [("vtk", 1, 2.0, (2, 2)), ("vtk", 2, 2.0, (2, 2))]
 
 
 def testInitCallbacksRunBeforeCompiledTransport(
@@ -372,7 +372,7 @@ def testTimeIntegrationSolversCanStepSimulation(
 
     for solver in solvers:
         medium = GainMedium(topology=smallTopology).withPhysicalProperties(
-            betaCells=np.zeros((smallTopology.numberOfPoints, smallTopology.levels)),
+            betaVolume=np.zeros((smallTopology.numberOfTriangles, smallTopology.levels - 1)),
             claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
             refractiveIndices=[1.8, 1.0, 1.8, 1.0],
             reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
@@ -390,8 +390,8 @@ def testTimeIntegrationSolversCanStepSimulation(
         ).step()
         state = simulation.get_last_state()
 
-        assert state.beta_cells.shape == (smallTopology.numberOfPoints, smallTopology.levels)
-        assert np.all(np.isfinite(state.beta_cells))
+        assert state.beta_volume.shape == (smallTopology.numberOfTriangles, smallTopology.levels - 1)
+        assert np.all(np.isfinite(state.beta_volume))
 
 
 def testPicmiStyleStepDefaultsToOneStep(

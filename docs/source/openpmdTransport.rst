@@ -187,10 +187,12 @@ metadata:
 * flattened source, spectrum, angular, profile, and planar-relay arrays
 
 The C++ backend writes one output iteration per completed step. Snapshot
-iterations contain dynamic beta records plus ``core_result_phi_ase``,
+iterations contain the cell-centered ``core_beta_volume`` record plus ``core_result_phi_ase``,
 ``core_result_standard_error``, ``core_result_relative_standard_error``,
 ``core_result_total_rays``, ``core_result_dndt_ase``, and
-``core_result_dndt_pump``. The first snapshot also includes the static canonical
+``core_result_dndt_pump``. Every dynamic and result field has the ``cell`` axis;
+point beta, point PhiASE, and point derivatives are not part of the compiled
+simulation contract. The first snapshot also includes the static canonical
 mesh/material/spectral records.
 
 
