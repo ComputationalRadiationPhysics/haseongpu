@@ -4,6 +4,7 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
@@ -11,23 +12,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Install pre-commit
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3 python3-pip
-          python3 -m pip install --user pre-commit==4.3.0
-
       - name: Run pre-commit
-        run: |
-          python3 -m pre_commit install
-          python3 -m pre_commit run --all-files --show-diff-on-failure
+        run: bash script/ci/pre-commit.sh
 
   ci:
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.config.container }}
-
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -63,596 +54,65 @@ jobs:
           - { compiler: clang, version: "20", cuda: "no", hip: "7.1", container: "rocm/dev-ubuntu-24.04:7.1", mpi: "off", openpmd_backend: "adios-sst" }
           - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "on", mpi_ranks: "3", openpmd_backend: "adios" }
           - { compiler: clang, version: "22", cuda: "no", hip: "7.2", container: "rocm/dev-ubuntu-24.04:7.2", mpi: "off", simd: "EMULATION", hwloc: "no", openpmd_backend: "hdf5" }
-
     env:
       DEBIAN_FRONTEND: noninteractive
-      OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
       HASE_CI_BUILD_DIR: build/ci
-      HASE_MPI: ${{ matrix.config.mpi }}
-      HASE_MPI_TEST_RANKS: ${{ matrix.config.mpi_ranks || '' }}
-      HASE_CMAKE_ARGS_BASE: >-
-        -DBUILD_TESTING=ON
-        -DHASE_TESTING=ON
-
+      HASE_CI_COMPILER: ${{ matrix.config.compiler }}
+      HASE_CI_COMPILER_VERSION: ${{ matrix.config.version }}
+      HASE_CI_CUDA: ${{ matrix.config.cuda }}
+      HASE_CI_HIP: ${{ matrix.config.hip }}
+      HASE_CI_MPI: ${{ matrix.config.mpi }}
+      HASE_CI_MPI_RANKS: ${{ matrix.config.mpi_ranks || '' }}
+      HASE_CI_TBB: ${{ matrix.config.tbb || 'off' }}
+      HASE_CI_HWLOC: ${{ matrix.config.hwloc || 'yes' }}
+      HASE_CI_SIMD: ${{ matrix.config.simd || 'DEFAULT' }}
+      OPENPMD_RUNTIME_BACKEND: ${{ matrix.config.openpmd_backend }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Configure MPI matrix settings
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          mpi_cmake_arg="-DDISABLE_MPI=ON"
-          if [[ "$HASE_MPI" == "on" ]]; then
-            mpi_cmake_arg="-DDISABLE_MPI=OFF"
-            echo "OMPI_ALLOW_RUN_AS_ROOT=1" >> "$GITHUB_ENV"
-            echo "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> "$GITHUB_ENV"
-            echo "HASE_MPIEXEC_EXTRA_ARGS=--oversubscribe" >> "$GITHUB_ENV"
-          fi
-
-          {
-            echo "HASE_CMAKE_ARGS<<EOF"
-            echo "$HASE_CMAKE_ARGS_BASE $mpi_cmake_arg"
-            echo "EOF"
-          } >> "$GITHUB_ENV"
-
       - name: Install system dependencies
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          printf 'Acquire::Retries "3";\n' > /etc/apt/apt.conf.d/80-hase-retries
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates \
-            curl \
-            git \
-            gnupg \
-            lsb-release \
-            ninja-build \
-            pkg-config \
-            python3 \
-            python3-dev \
-            python3-pip \
-            python3-venv \
-            libgl1 \
-            libglu1 \
-            libomp-dev \
-            libxcursor1 \
-            libxft2 \
-            libxinerama1 \
-            libxrender1 \
-            software-properties-common \
-            wget
-
-          if ! command -v cmake >/dev/null 2>&1; then
-            apt-get install -y --no-install-recommends cmake
-          fi
-
-          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
-            apt-get install -y --no-install-recommends libhwloc-dev
-          fi
-
-          if [[ "${{ matrix.config.tbb || 'off' }}" == "on" ]]; then
-            apt-get install -y --no-install-recommends libtbb-dev
-          fi
-
-          if [[ "$HASE_MPI" == "on" ]]; then
-            apt-get install -y --no-install-recommends openmpi-bin libopenmpi-dev
-          fi
-
-
-          if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
-            requested_version="${{ matrix.config.version }}"
-            if command -v "gcc-$requested_version" >/dev/null 2>&1 \
-                && command -v "g++-$requested_version" >/dev/null 2>&1; then
-              :
-            elif command -v gcc >/dev/null 2>&1 \
-                && command -v g++ >/dev/null 2>&1 \
-                && [[ "$(gcc -dumpversion)" == "$requested_version"* ]] \
-                && [[ "$(g++ -dumpversion)" == "$requested_version"* ]]; then
-              :
-            else
-              apt-get install -y --no-install-recommends \
-                "gcc-$requested_version" \
-                "g++-$requested_version"
-            fi
-          fi
-
-          if [[ "${{ matrix.config.compiler }}" == "clang" && "${{ matrix.config.hip }}" == "no" ]]; then
-            if ! command -v "clang-${{ matrix.config.version }}" >/dev/null 2>&1; then
-              wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-              chmod +x /tmp/llvm.sh
-              /tmp/llvm.sh "${{ matrix.config.version }}"
-            fi
-            apt-get install -y --no-install-recommends \
-              "clang-${{ matrix.config.version }}" \
-              "lld-${{ matrix.config.version }}"
-          fi
-
-      - name: Install Python dependencies
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python3 -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
-          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
-
-      - name: Select compiler and runtime paths
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          cc=
-          cxx=
-          cudacxx=
-          if [[ "${{ matrix.config.compiler }}" == "gcc" ]]; then
-            requested_version="${{ matrix.config.version }}"
-            if command -v "gcc-$requested_version" >/dev/null 2>&1 \
-                && command -v "g++-$requested_version" >/dev/null 2>&1; then
-              cc="$(command -v "gcc-$requested_version")"
-              cxx="$(command -v "g++-$requested_version")"
-            elif command -v gcc >/dev/null 2>&1 && command -v g++ >/dev/null 2>&1; then
-              cc="$(command -v gcc)"
-              cxx="$(command -v g++)"
-            else
-              echo "::error::GCC $requested_version C and C++ compilers were not installed" >&2
-              exit 1
-            fi
-            if [[ "$("$cc" -dumpversion)" != "$requested_version"* ]] \
-                || [[ "$("$cxx" -dumpversion)" != "$requested_version"* ]]; then
-              echo "::error::Selected compilers do not provide GCC $requested_version: $cc, $cxx" >&2
-              exit 1
-            fi
-          elif [[ "${{ matrix.config.compiler }}" == "clang" ]]; then
-            requested_version="${{ matrix.config.version }}"
-            if [[ "${{ matrix.config.hip }}" != "no" \
-                && -x /opt/rocm/llvm/bin/clang \
-                && -x /opt/rocm/llvm/bin/clang++ ]]; then
-              cc=/opt/rocm/llvm/bin/clang
-              cxx=/opt/rocm/llvm/bin/clang++
-            elif command -v "clang-$requested_version" >/dev/null 2>&1 \
-                && command -v "clang++-$requested_version" >/dev/null 2>&1; then
-              cc="$(command -v "clang-$requested_version")"
-              cxx="$(command -v "clang++-$requested_version")"
-              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
-                cudacxx="$cxx"
-              fi
-            elif command -v clang >/dev/null 2>&1 && command -v clang++ >/dev/null 2>&1; then
-              cc="$(command -v clang)"
-              cxx="$(command -v clang++)"
-              if [[ "${{ matrix.config.cuda }}" != "no" ]]; then
-                cudacxx="$cxx"
-              fi
-            else
-              echo "::error::Clang $requested_version C and C++ compilers were not installed" >&2
-              exit 1
-            fi
-            if [[ "$("$cc" -dumpversion)" != "$requested_version"* ]] \
-                || [[ "$("$cxx" -dumpversion)" != "$requested_version"* ]]; then
-              echo "::error::Selected compilers do not provide Clang $requested_version: $cc, $cxx" >&2
-              exit 1
-            fi
-          elif [[ "${{ matrix.config.compiler }}" == "nvcc" ]]; then
-            cudacxx="$(command -v nvcc)"
-            cc="$(command -v gcc)"
-            cxx="$(command -v g++)"
-          else
-            echo "::error::Unsupported compiler '${{ matrix.config.compiler }}'" >&2
-            exit 1
-          fi
-
-          {
-            echo "CC=$cc"
-            echo "CXX=$cxx"
-            if [[ -n "$cudacxx" ]]; then
-              echo "CUDACXX=$cudacxx"
-            fi
-          } >> "$GITHUB_ENV"
-
-          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
-            echo "ROCM_PATH=${ROCM_PATH:-/opt/rocm}" >> "$GITHUB_ENV"
-            if [[ -x /opt/rocm/llvm/bin/clang++ ]]; then
-              echo "HIPCXX=/opt/rocm/llvm/bin/clang++" >> "$GITHUB_ENV"
-            elif [[ -x /opt/rocm/bin/hipcc ]]; then
-              echo "HIPCXX=/opt/rocm/bin/hipcc" >> "$GITHUB_ENV"
-            else
-              echo "::error::No HIP C++ compiler was found under /opt/rocm" >&2
-              exit 1
-            fi
-          fi
-
-          runtime_paths=()
-          for cuda_dir in /usr/local/cuda /usr/local/cuda-*; do
-            if [[ -d "$cuda_dir/lib64" ]]; then
-              runtime_paths+=("$cuda_dir/lib64")
-            fi
-          done
-          if [[ -d /opt/rocm/lib ]]; then
-            runtime_paths+=("/opt/rocm/lib")
-          fi
-          if (( ${#runtime_paths[@]} > 0 )); then
-            current_ld_library_path="${LD_LIBRARY_PATH:-}"
-            printf 'LD_LIBRARY_PATH=%s:%s\n' "$(IFS=:; echo "${runtime_paths[*]}")" "$current_ld_library_path" >> "$GITHUB_ENV"
-          fi
-
-
+        run: bash script/ci/install-system.sh
+      - name: Set up Python and compiler environment
+        run: bash script/ci/setup.sh
       - name: Configure
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake_args=(
-            $HASE_CMAKE_ARGS
-            -DHASE_OPENPMD_PROVIDER=bundled
-          )
-          if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
-            cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=OFF
-              -DHASE_OPENPMD_USE_SST=OFF
-              -DHASE_OPENPMD_USE_HDF5=ON
-              -DHASE_OPENPMD_FETCH_HDF5=ON
-            )
-          elif [[ "$OPENPMD_RUNTIME_BACKEND" == "adios-sst" ]]; then
-            cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=ON
-              -DHASE_OPENPMD_USE_SST=ON
-              -DHASE_OPENPMD_USE_HDF5=OFF
-            )
-          else
-            cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=ON
-              -DHASE_OPENPMD_USE_SST=OFF
-              -DHASE_OPENPMD_USE_HDF5=OFF
-            )
-          fi
-          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
-            cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
-            cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
-          else
-            cmake_args+=(-Dalpaka_DEP_HWLOC=OFF)
-          fi
-          if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
-            cmake_args+=(-Dalpaka_SIMD=EMULATION)
-          fi
-
-          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
-            cmake_args+=(
-              -DCMAKE_PREFIX_PATH="${ROCM_PATH:-/opt/rocm}"
-              -DCMAKE_HIP_COMPILER="${HIPCXX:-/opt/rocm/llvm/bin/clang++}"
-              -DCMAKE_HIP_ARCHITECTURES=gfx900
-            )
-          fi
-
-          cmake -S . -B "$HASE_CI_BUILD_DIR" -G Ninja \
-            "${cmake_args[@]}"
-
+        run: bash script/ci/configure.sh
       - name: Build
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake --build "$HASE_CI_BUILD_DIR" --parallel "$(nproc)"
-
+        run: bash script/ci/build.sh
       - name: Install Python package
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          pip_cmake_args=(
-            $HASE_CMAKE_ARGS
-            -DHASE_BUILD_OPENPMD_FROM_SOURCE=ON
-            "-DHASE_RUNTIME_DIR=$GITHUB_WORKSPACE/$HASE_CI_BUILD_DIR"
-          )
-          if [[ "$OPENPMD_RUNTIME_BACKEND" == "hdf5" ]]; then
-            pip_cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=OFF
-              -DHASE_OPENPMD_USE_SST=OFF
-              -DHASE_OPENPMD_USE_HDF5=ON
-              -DHASE_OPENPMD_FETCH_HDF5=ON
-            )
-          elif [[ "$OPENPMD_RUNTIME_BACKEND" == "adios-sst" ]]; then
-            pip_cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=ON
-              -DHASE_OPENPMD_USE_SST=ON
-              -DHASE_OPENPMD_USE_HDF5=OFF
-            )
-          else
-            pip_cmake_args+=(
-              -DHASE_OPENPMD_USE_ADIOS2=ON
-              -DHASE_OPENPMD_USE_SST=OFF
-              -DHASE_OPENPMD_USE_HDF5=OFF
-            )
-          fi
-
-          if [[ "${{ matrix.config.hwloc || 'yes' }}" != "no" ]]; then
-            pip_cmake_args+=(-Dalpaka_DEP_HWLOC=ON)
-            pip_cmake_args+=(-Dalpaka_HOST_MemPinningCanFail=ON)
-          else
-            pip_cmake_args+=(-Dalpaka_DEP_HWLOC=OFF)
-          fi
-
-          if [[ "${{ matrix.config.simd || 'DEFAULT' }}" == "EMULATION" ]]; then
-            pip_cmake_args+=(-Dalpaka_SIMD=EMULATION)
-          fi
-
-          if [[ "${{ matrix.config.hip }}" != "no" ]]; then
-            pip_cmake_args+=(
-              -DCMAKE_PREFIX_PATH="${ROCM_PATH:-/opt/rocm}"
-              -DCMAKE_HIP_COMPILER="${HIPCXX:-/opt/rocm/llvm/bin/clang++}"
-              -DCMAKE_HIP_ARCHITECTURES=gfx900
-            )
-          fi
-
-          CMAKE_ARGS="${pip_cmake_args[*]}" python -m pip install -v ".[test]"
-
+        run: bash script/ci/install-python.sh
       - name: Debug Python install
-        shell: bash
-        run: |
-          set -euxo pipefail
-          which python
-          python -V
-          python -m pip -V
-          python -m pip list
-          python - <<'PY'
-          import pathlib
-          import site
-          import sys
-
-          print("sys.executable =", sys.executable)
-          print("sys.path =", sys.path)
-          print("site-packages =", site.getsitepackages())
-          print("user-site =", site.getusersitepackages())
-
-          for p in site.getsitepackages() + [site.getusersitepackages()]:
-              pp = pathlib.Path(p)
-              if pp.exists():
-                  print("contents matching HASE* in", pp)
-                  print(list(pp.glob("HASE*")))
-
-          # The workflow checkout is on sys.path when Python starts in the
-          # repository root. Import from outside the checkout so this debug
-          # step validates the wheel installed above, not the source-tree
-          # fallback package.
-          import os
-          os.chdir("/tmp")
-          sys.path[0] = ""
-
-          import HASEonGPU
-          print("HASEonGPU imported from:", HASEonGPU.__file__)
-          PY
-
-      - name: Run installed-package smoke test from /tmp
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
-          cp tests/python/imports/hase_frontend_smoketest.py /tmp/hase_frontend_smoketest.py
-          cd /tmp
-          python hase_runtime_smoketest.py
-          python hase_frontend_smoketest.py
-
+        run: bash script/ci/diagnose-python.sh
+      - name: Run installed-package smoke tests
+        run: bash script/ci/smoke-installed.sh
       - name: Configure MPI test runs
-        if: matrix.config.mpi == 'on' && matrix.config.mpi_ranks != ''
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          import yaml
-
-          ranks = int(os.environ["HASE_MPI_TEST_RANKS"])
-          config_paths = (
-              Path("config/hase-phiase-mpi.yaml"),
-              Path("tests/data/cfg/phiAseTestConfig-mpi.yaml"),
-          )
-          for path in config_paths:
-              config = yaml.safe_load(path.read_text(encoding="utf-8"))
-              simulation = config.get("simulation")
-              if not isinstance(simulation, dict):
-                  raise RuntimeError(f"{path} does not contain a simulation mapping")
-              phi_ase = simulation.get("phi_ase")
-              if not isinstance(phi_ase, dict):
-                  raise RuntimeError(f"{path} does not contain simulation.phi_ase")
-
-              phi_ase["parallel_mode"] = "mpi"
-              phi_ase["n_per_node"] = ranks
-              path.write_text(
-                  yaml.safe_dump(config, sort_keys=False),
-                  encoding="utf-8",
-              )
-              print(f"{path}: parallel_mode=mpi, n_per_node={ranks}")
-          PY
-          echo "HASE_PHIASE_CONFIG=$GITHUB_WORKSPACE/config/hase-phiase-mpi.yaml" >> "$GITHUB_ENV"
-          echo "HASE_TEST_PHIASE_CONFIG=$GITHUB_WORKSPACE/tests/data/cfg/phiAseTestConfig-mpi.yaml" >> "$GITHUB_ENV"
-
-      - name: Run laserPumpCladding example from installed package
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
-          python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py" --csv \
-            | sed 's/^/HASE_OPENPMD_TEST_BACKENDS=/' >> "$GITHUB_ENV"
-          if [[ ! " ${openpmd_backends[*]} " =~ " ${OPENPMD_RUNTIME_BACKEND} " ]]; then
-            echo "::error::Selected runtime backend '${OPENPMD_RUNTIME_BACKEND}' is unavailable: ${openpmd_backends[*]}" >&2
-            exit 1
-          fi
-          echo "HASE_OPENPMD_RUNTIME_TEST_BACKEND=$OPENPMD_RUNTIME_BACKEND" >> "$GITHUB_ENV"
-
-          example_output_dir="/tmp/hase-laser-pump-cladding-${OPENPMD_RUNTIME_BACKEND}"
-          python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
-            "$OPENPMD_RUNTIME_BACKEND" \
-            "$example_output_dir"
-
+        run: bash script/ci/configure-mpi-tests.sh
+      - name: Run laserPumpCladding example
+        run: bash script/ci/run-example.sh
       - name: Run CTest
-        shell: bash
-        run: |
-          set -euxo pipefail
-          ctest --test-dir "$HASE_CI_BUILD_DIR" --output-on-failure
-
+        run: bash script/ci/test-ctest.sh
       - name: Run pytest
-        shell: bash
-        run: |
-          set -euxo pipefail
-          pytest tests
+        run: bash script/ci/test-pytest.sh
 
   openpmd-provider-smoke:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
-
     env:
       DEBIAN_FRONTEND: noninteractive
+      HASE_CI_COMPILER: gcc
+      HASE_CI_COMPILER_VERSION: "13"
+      HASE_CI_HWLOC: "yes"
+      HASE_CI_MPI: "off"
+      HASE_CI_PROVIDER_SMOKE: "1"
       OPENPMD_PROVIDER_VERSIONS: 0.17.0 0.17.1
-      HASE_CMAKE_ARGS: >-
-        -DBUILD_TESTING=ON
-        -DHASE_TESTING=ON
-        -DDISABLE_MPI=ON
-        -DHASE_OPENPMD_PROVIDER=system
-
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
       - name: Install system dependencies
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates \
-            curl \
-            git \
-            g++-13 \
-            gcc-13 \
-            libgl1 \
-            libglu1 \
-            libhdf5-dev \
-            libhwloc-dev \
-            libomp-dev \
-            libxcursor1 \
-            libxft2 \
-            libxinerama1 \
-            libxrender1 \
-            ninja-build \
-            pkg-config \
-            python3 \
-            python3-dev \
-            python3-pip \
-            python3-venv \
-            wget
-
-          if ! command -v cmake >/dev/null 2>&1; then
-            apt-get install -y --no-install-recommends cmake
-          fi
-
-      - name: Install Python dependencies
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python3 -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> "$GITHUB_ENV"
-          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
-
-      - name: Select compiler
-        shell: bash
-        run: |
-          set -euxo pipefail
-          echo "CC=$(command -v gcc-13)" >> "$GITHUB_ENV"
-          echo "CXX=$(command -v g++-13)" >> "$GITHUB_ENV"
-
+        run: bash script/ci/install-system.sh
+      - name: Set up Python and compiler environment
+        run: bash script/ci/setup.sh
       - name: Run external openPMD provider smoke matrix
-        shell: bash
-        run: |
-          set -euxo pipefail
-          adios2_src="/tmp/hase-external-adios2-src"
-          adios2_build="/tmp/hase-external-adios2-build"
-          adios2_prefix="$GITHUB_WORKSPACE/.adios2-prefix"
-
-          rm -rf "$adios2_src" "$adios2_build" "$adios2_prefix"
-          git clone --depth 1 --branch v2.12.1 \
-            https://github.com/ornladios/ADIOS2.git \
-            "$adios2_src"
-          cmake -S "$adios2_src" -B "$adios2_build" -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$adios2_prefix" \
-            -DADIOS2_USE_MPI=OFF \
-            -DADIOS2_USE_Fortran=OFF \
-            -DADIOS2_USE_Python=OFF \
-            -DADIOS2_USE_SST=ON \
-            -DADIOS2_USE_HDF5=OFF \
-            -DADIOS2_BUILD_EXAMPLES=OFF \
-            -DADIOS2_BUILD_TESTING=OFF \
-            -DADIOS2_INSTALL_GENERATE_CONFIG=OFF \
-            -DBUILD_TESTING=OFF
-          cmake --build "$adios2_build" --target install --parallel "$(nproc)"
-
-          run_backend_smoke() {
-            local openpmd_version="$1"
-            local openpmd_prefix="$2"
-            local backend="$3"
-            local example_output_dir
-
-            python "$GITHUB_WORKSPACE/utils/check_openpmd_compatibility.py" \
-              --backend "$backend" \
-              --cmake-prefix-path "$openpmd_prefix;$adios2_prefix"
-
-            example_output_dir="/tmp/hase-laser-pump-cladding-openpmd-${openpmd_version}-${backend}"
-            python "$GITHUB_WORKSPACE/utils/testLaunchLaserPump.py" \
-              "$backend" \
-              "$example_output_dir"
-          }
-
-          for openpmd_version in $OPENPMD_PROVIDER_VERSIONS; do
-            openpmd_src="/tmp/hase-external-openpmd-src-$openpmd_version"
-            openpmd_build="/tmp/hase-external-openpmd-build-$openpmd_version"
-            openpmd_prefix="$GITHUB_WORKSPACE/.openpmd-prefix/$openpmd_version"
-
-            rm -rf "$openpmd_src" "$openpmd_build" "$openpmd_prefix" build
-            git clone --depth 1 --branch "$openpmd_version" \
-              https://github.com/openPMD/openPMD-api.git \
-              "$openpmd_src"
-            cmake -S "$openpmd_src" -B "$openpmd_build" -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX="$openpmd_prefix" \
-              -DCMAKE_PREFIX_PATH="$adios2_prefix" \
-              -DBUILD_TESTING=OFF \
-              -DopenPMD_BUILD_EXAMPLES=OFF \
-              -DopenPMD_USE_MPI=OFF \
-              -DopenPMD_USE_ADIOS2=ON \
-              -DopenPMD_USE_HDF5=ON \
-              -DopenPMD_USE_PYTHON=OFF \
-              -DADIOS2_USE_SST=ON
-            cmake --build "$openpmd_build" --target install --parallel "$(nproc)"
-
-            python -m pip uninstall -y HASEonGPU openpmd-api || true
-            python -m pip install "openpmd-api==$openpmd_version"
-            CMAKE_ARGS="$HASE_CMAKE_ARGS -DBUILD_TESTING=OFF -DHASE_TESTING=OFF -DCMAKE_PREFIX_PATH=$openpmd_prefix;$adios2_prefix -DHASE_OPENPMD_RUNTIME_RPATH=$openpmd_prefix/lib;$openpmd_prefix/lib64;$adios2_prefix/lib;$adios2_prefix/lib64 -Dalpaka_DEP_HWLOC=ON -Dalpaka_HOST_MemPinningCanFail=ON" \
-              python -m pip install ".[test]"
-
-            cp tests/python/imports/hase_runtime_smoketest.py /tmp/hase_runtime_smoketest.py
-            cp tests/python/imports/hase_frontend_smoketest.py /tmp/hase_frontend_smoketest.py
-            (
-              cd /tmp
-              python hase_runtime_smoketest.py
-              python hase_frontend_smoketest.py
-            )
-
-            mapfile -t openpmd_backends < <(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py")
-            openpmd_backend_csv="$(python "$GITHUB_WORKSPACE/utils/listOpenPmdBackends.py" --csv)"
-
-            for backend in "${openpmd_backends[@]}"; do
-              run_backend_smoke "$openpmd_version" "$openpmd_prefix" "$backend"
-            done
-
-            HASE_OPENPMD_TEST_BACKENDS="$openpmd_backend_csv" \
-              pytest tests/python/openpmd/test_openpmd_preflight.py tests/python/openpmd/test_transport.py
-          done
+        run: bash script/ci/openpmd-provider-smoke.sh
