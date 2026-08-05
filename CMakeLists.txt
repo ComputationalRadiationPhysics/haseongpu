@@ -167,6 +167,16 @@ option(
     OFF
 )
 option(
+    HASE_BACKEND_TIMING
+    "Enable direct-backend timing output selected by HASE_BACKEND_TIMING_CSV"
+    OFF
+)
+option(
+    HASE_STEP_TIMING
+    "Enable compiled-step timing output selected by HASE_STEP_TIMING_CSV"
+    OFF
+)
+option(
     HASE_FORWARD_LOGGING
     "Forward captured calcPhiASE stdout and stderr through the Python openPMD launcher."
     OFF
@@ -918,6 +928,12 @@ if(HASE_BENCHMARK)
         PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Benchmark/benchmark.cpp"
     )
     target_compile_definitions(hase_core INTERFACE HASE_ENABLE_BENCHMARK)
+endif()
+if(HASE_BACKEND_TIMING)
+    target_compile_definitions(hase_core INTERFACE HASE_ENABLE_BACKEND_TIMING)
+endif()
+if(HASE_STEP_TIMING)
+    target_compile_definitions(hase_core INTERFACE HASE_ENABLE_STEP_TIMING)
 endif()
 if(HASE_FORWARD_LOGGING)
     target_compile_definitions(hase_core INTERFACE HASE_FORWARD_LOGGING)
