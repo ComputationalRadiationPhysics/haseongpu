@@ -6,8 +6,8 @@ HASEonGPU has two independent backend choices:
 * **Alpaka compute backend**: where kernels run, for example a CPU, CUDA, or HIP
   backend.
 * **openPMD storage backend**: how Python and ``calcPhiASE`` exchange data.
-  The default ``auto`` selects ``adios``, then ``adios-sst``, then ``hdf5``
-  from the backends supported by both runtime providers.
+  The available formats, automatic priority, and provider compatibility are
+  specified in :doc:`openpmdTransport`.
 
 Do not use an openPMD backend name as the Alpaka ``backend`` value.
 
@@ -38,9 +38,9 @@ backends should be treated as experimental unless validated in your environment.
 Runtime Compute Backend
 -----------------------
 
-The Python ``PhiASE.backend`` value, or the equivalent openPMD metadata used by
-``calcPhiASE``, selects one compiled-and-available compute backend.  Backend
-names have the form:
+The Python ``PhiASE.backend`` value, or the equivalent HASE iteration attribute
+consumed by ``calcPhiASE``, selects one compiled-and-available compute backend.
+Backend names have the form:
 
 .. code-block:: text
 
@@ -58,6 +58,10 @@ From Python, query the same list with ``AlpakaBackends``:
 
    available = AlpakaBackends.all()
    phi_ase = PhiASE(backend=available[0])
+
+To leave compute selection in the PhiASE YAML file, the
+``laserPumpCladding.py`` command uses its default ``--backend UseConfig``.
+Passing ``--backend`` overrides that YAML value for one run.
 
 ``AlpakaBackends.known()`` is an alias for ``all()``.  Names that are valid
 Python identifiers are also exposed as attributes, for example

@@ -1,35 +1,64 @@
 Simulation
 ==========
 
-``Simulation`` is the central assembly object. Its public constructor and
-registration methods follow PICMI-style snake_case naming:
+``Simulation`` is the assembly and execution boundary for a time-dependent run.
+It references one ``GainMedium``, one ``PhiASE`` configuration, one compiled
+time-integrator descriptor, shared pump-solver controls, and the ASE cross
+sections. Physical pumps are registered separately before execution.
+
+Assembly
+--------
 
 .. code-block:: python
 
    simulation = Simulation(
        gain_medium=medium,
        phi_ase=phi_ase,
-       time_integrator=RungeKutta4(),
-       time_step_size=1e-5,
-       pump_solver=MonteCarloPumpSolver(ray_count=50000, seed=5489),
-       cross_sections=spectra,
-       max_steps=150,
+       time_integrator=FrozenPhiAseRungeKutta4(),
+       time_step_size=2e-5,
+       pump_solver=MonteCarloPumpSolver(
+           ray_count=50_000,
+           seed=5489,
+           max_steps=100,
+       ),
+       cross_sections=ase_spectra,
        enable_ase=True,
        pre_pump=True,
    )
-   simulation.add_pump(pump, injection_method=injector, relays=relays)
-   simulation.on_step(write_state, output_directory)
-   simulation.step()
+   simulation.add_pump(
+       pump,
+       injection_method=SurfacePumpInjector("pump_input"),
+       relays=(PlanarPumpRelay.retroreflect("pump_output"),),
+   )
 
-As in PICMI, ``simulation.step(nsteps=1)`` advances the requested number of
-steps and defaults to one. ``max_steps`` and ``max_time`` describe the intended
-run limits; pass the desired count to ``step`` or use ``run_until`` for a time
-limit. ``pump_steps`` can override the pump solver's ``max_steps`` for a
-particular call.
+``gain_medium`` supplies geometry, material fields, and initial excitation.
+``cross_sections`` supplies the complete spectrum used by ASE. The registered
+``Pump`` carries its own physical spectrum and matching pump cross sections.
+See :doc:`pump_properties` for that separation.
 
-``simulation.get_last_state()`` returns the latest ``TimeStepState``. The
-simulation does not retain the full history, so register ``on_step`` to store or
-write every snapshot.
+Advance controls
+----------------
+
+``step`` advances an explicit number of outer time steps and returns the
+simulation for chaining:
+
+.. code-block:: python
+
+   simulation.step(150)
+   simulation.step(150, pump_steps=50)
+
+The optional call-level ``pump_steps`` overrides
+``MonteCarloPumpSolver.max_steps`` for that run. It selects how many of the
+requested outer steps include pump transport; it does not change pump ray count
+or Tet4 traversal length.
+
+``run_until(max_time)`` converts a physical end time into steps using
+``time_step_size``. Constructor ``max_time`` supplies its default target.
+``max_steps`` is retained as an intended-run property, but ``step`` still takes
+the count to execute explicitly.
+
+Execution ownership
+-------------------
 
 The full time loop, pump evaluation, ASE evaluation, derivative composition,
 time integration, and clipping run on cell-centered fields in C++/Alpaka.
@@ -107,3 +136,44 @@ Unselected arrays are ``None`` in ``TimeStepState``. The synchronized-debug
 ``control_fields`` list currently supports ``beta_volume``. Point-state names
 are deliberately unsupported: the current model and transport contract are
 cell/volume based throughout.
+
+State and callbacks
+-------------------
+
+Register output consumers before the first step:
+
+.. code-block:: python
+
+   def report(state, prefix):
+       print(prefix, state.step, state.time, state.beta_volume.mean())
+
+   simulation.on_step(report, "completed")
+   simulation.step(10)
+   final_state = simulation.get_last_state()
+
+An ``on_step`` callback receives a copied ``TimeStepState`` followed by the
+arguments supplied during registration. It exposes the completed one-based
+``step``, physical ``time``, static ``topology``, and cell arrays
+``beta_volume``, ``phi_ase``, ``dndt_pump``, and ``dndt_ase``. ASE uncertainty,
+history counts, and reflection status remain available through ``ase_result``.
+Mutating a callback snapshot does not change backend state.
+
+``Simulation`` stores only the latest requested snapshot. Use callbacks to
+retain a history or write output. ``on_init`` receives the live simulation once
+before compiled execution and can finalize its inputs. Autonomous execution
+does not run Python between C++-owned time steps. A ``beforeStep`` callback
+therefore requires ``execution_mode="synchronized-debug"`` and runs at each
+explicit control boundary.
+
+Runtime behavior
+----------------
+
+``enable_ase=False`` skips ASE transport and depletion while retaining pump and
+fluorescence terms. ``pre_pump=True`` omits ASE from the first pumped step so
+the pump can seed excitation before the first ASE evaluation.
+``report_timings=True`` reports frontend transport/decoding, snapshot creation,
+and callback time; build-time backend instrumentation is documented in
+:doc:`../compilation`.
+
+The compiled population equation and integrator behavior are described in
+:ref:`pump-and-time-stepping`.

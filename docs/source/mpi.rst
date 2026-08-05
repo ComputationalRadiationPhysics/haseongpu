@@ -3,7 +3,8 @@ MPI Execution
 
 HASEonGPU can distribute one ASE calculation over multiple MPI ranks.  MPI
 splits the sample index range across ranks; each rank then uses the devices
-assigned on its node.
+assigned on its node. MPI changes execution topology, not the physical model or
+openPMD record layout.
 
 Build Requirement
 -----------------
@@ -37,6 +38,8 @@ Runtime Settings
 These values are set through ``PhiASE`` or YAML. The scheduler supplies the
 node allocation; for ``parallelMode="mpi"``, the Python frontend starts
 ``calcPhiASE`` with ``mpiexec -npernode <nPerNode>`` inside that allocation.
+Alpaka compute and openPMD storage backends remain independent selections; see
+:doc:`backendSelection` and :doc:`openpmdTransport`.
 
 ``parallelMode`` / ``parallel_mode``
    ``single`` runs without MPI. ``mpi`` launches the executable under MPI and
@@ -52,6 +55,10 @@ node allocation; for ``parallelMode="mpi"``, the Python frontend starts
 The frontend places temporary file-based openPMD transport data below
 ``./IO/phiase_mpi``. For multi-node runs, launch HASE from a working directory
 that is visible on every allocated node.
+
+Direct executable invocation uses the same ``calcPhiASE`` arguments documented
+in :doc:`binaryInterface`; the Python frontend normally constructs those paths
+and launches the binary automatically.
 
 Common Layouts
 --------------

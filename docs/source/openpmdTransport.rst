@@ -4,7 +4,9 @@ openPMD Transport
 HASEonGPU uses openPMD as the transport boundary between the Python frontend and
 the C++ ``calcPhiASE`` backend.  Users normally work with Python objects such
 as ``GainMedium`` and ``PhiASE``; the transport converts those objects into the
-records and attributes consumed by the backend.
+records and attributes consumed by the backend. This page owns storage-backend,
+provider-compatibility, and record-layout details; Alpaka compute selection is
+documented separately in :doc:`backendSelection`.
 
 Storage Backends
 ----------------
@@ -107,7 +109,10 @@ at build time or ``HASE_OPENPMD_PYTHONPATH`` before importing HASEonGPU.
 
 The HASEonGPU wheel does not vendor openPMD runtime libraries or generated
 ``openpmd_api`` bindings.  The runtime environment must provide compatible
-openPMD libraries and Python bindings.
+openPMD libraries and Python bindings. Provider build options are listed in
+:ref:`openpmd-provider-options`.
+
+.. _openpmd-record-layout:
 
 openPMD Record Layout
 ---------------------
@@ -179,6 +184,8 @@ iteration metadata, not mesh records. Python readers expose them as
 ``Result.srmStatus``, ``srmPasses``, ``srmRemainingFraction``,
 ``srmMaxIterations``, and ``srmDivergenceStreak``.
 
+.. _compiled-simulation-run-control:
+
 Compiled Simulation Run Control
 --------------------------------
 
@@ -225,35 +232,10 @@ new input series whose first iteration carries a complete static update.  This
 keeps repeated ASE evaluations and streaming runs small while preserving a
 stable backend contract.
 
-MPI Launching
--------------
-
-The standalone binary reads the same transport layout under MPI:
-
-.. code-block:: bash
-
-   mpiexec -npernode 4 ./build/calcPhiASE \
-       --input-path=input.sst \
-       --output-path=output.sst
-
-The high-level Python frontend launches the binary automatically when MPI mode
-is selected:
-
-.. code-block:: python
-
-   import HASEonGPU
-
-   phi_ase = HASEonGPU.PhiASE(
-       parallelMode="mpi",
-       nPerNode=4,
-       openpmdBackend="adios-sst",
-   )
-   phi_ase.run(gainMedium=medium, crossSections=spectra)
-
-The scheduler controls the node allocation, while ``nPerNode`` controls the
-number of ranks launched on each allocated node. File-based transport data is
-created below ``./IO/phiase_mpi`` so the launch directory must be shared for a
-multi-node run.
+MPI uses the same records and attributes; it changes execution topology, not
+the transport schema. Rank/device layout, automatic frontend launching, shared
+working-directory requirements, and scheduler examples are documented in
+:doc:`mpi`.
 
 Artifact Retention
 ------------------

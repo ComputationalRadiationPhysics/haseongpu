@@ -1,226 +1,135 @@
-Topology
-========
+Volume topology
+===============
 
-``MeshTopology`` describes the spatial discretization used by HASEonGPU.  It is
-the user-facing replacement for manually constructing point arrays, triangle
-indices, derived triangle geometry, and z-level metadata.
+``VolumeTopology`` is the geometry contract for current HASEonGPU transport.
+It stores an explicit unstructured Tet4 mesh; ASE, pump, and time-dependent
+state are cell-centered. It does not store excitation, material constants,
+spectra, or boundary optics. Only VTK cell type ``10`` (Tet4) is supported.
 
-The public import names are:
+Construction
+------------
 
-.. code-block:: python
-
-   from HASEonGPU import GainMedium, Grid, MeshTopology, VolumeTopology
-
-``GainMediumGeometry`` is an alias for ``MeshTopology``.
-
-Grid
-----
-
-``Grid`` is the shortest path to a usable topology for three-dimensional
-rectangular media.
+Load gmsh, VTK, or a closed STL surface:
 
 .. code-block:: python
 
-   grid = Grid(
-       xExtent=4.0,
-       yExtent=4.0,
-       zExtent=0.7,
-       tileSizeX=0.25,
-       tileSizeZ=0.7 / 9.0,
+   from HASEonGPU import VolumeTopology
+
+   topology = VolumeTopology.fromFile("crystal.msh")
+   topology = VolumeTopology.fromFile("crystal.vtk")
+   topology = VolumeTopology.fromFile("crystal.stl", meshSize=0.05)
+
+Use ``format=`` when a filename has a non-standard extension. ``fromVtk``
+expects an ASCII VTK unstructured grid. ``fromStl`` uses gmsh to tetrahedralize
+a closed three-dimensional surface and warns that HASEonGPU does not perform a
+complete mesh-validity proof.
+
+Construct a topology directly when another mesher already provides arrays:
+
+.. code-block:: python
+
+   topology = VolumeTopology.fromTetrahedra(
+       points,                 # (numberOfPoints, 3)
+       cellPointIndices,       # (numberOfCells, 4)
+       cellDomains=cell_ids,   # optional (numberOfCells,)
+       faceBoundaries=faces,   # optional (numberOfCells, 4)
    )
-   topology = MeshTopology.fromGrid(grid)
 
-``tileSizeY`` defaults to ``tileSizeX``.  ``tileSizeZ`` defaults to
-``tileSizeX`` if it is not supplied.
+Derived geometry
+----------------
 
-Useful ``Grid`` members:
+Construction derives and validates the arrays needed by transport:
 
-* ``numberOfLevels``: number of z-levels generated from ``zExtent`` and
-  ``tileSizeZ``.
-* ``thickness``: z-spacing :math:`\Delta z` between levels.  This is the value
-  passed to HASEonGPU as the layer thickness.
-* ``constructPoints()``: returns the transverse point array with shape
-  ``(numberOfPoints, 2)``.
+``cellPointIndices``
+   Four point indices per cell.
 
-MeshTopology Construction
--------------------------
+``facePointIndices``
+   Three point indices for each of the four local faces.
 
-From a grid:
+``neighborCells`` and ``neighborLocalFaces``
+   The adjacent cell and its matching local face, or a negative value at the
+   exterior boundary.
 
-.. code-block:: python
+``cellCenters`` and ``cellVolumes``
+   Cell geometry used for state placement, source weighting, pump-rate
+   normalization, and volume-weighted post-processing.
 
-   topology = MeshTopology.fromGrid(grid)
+``faceCenters``, ``faceNormals``, and ``faceAreas``
+   Oriented face geometry used by boundary optics and pump injection.
 
-From a legacy planar file:
+The main size queries are ``numberOfPoints``, ``numberOfCells``,
+``numberOfFacesPerCell``, and ``numberOfSamplePoints``. ``samplePoints`` equals
+the cell centers in an explicit volume topology.
 
-.. code-block:: python
+Named domains
+-------------
 
-   topology = MeshTopology.fromFile("mesh.msh", numberOfLevels=5, thickness=0.1)
-
-Supported ``MeshTopology`` mesh formats are:
-
-* ``msh`` or ``gmsh``: gmsh 2D triangle meshes are supported through the Python
-  ``gmsh`` package.  The mesh must be planar and must contain triangle
-  elements.  ``numberOfLevels`` and ``thickness`` are required.
-
-Tet4 volume files, including closed 3D STL surfaces, are loaded as
-``VolumeTopology``:
+Domains are positive integer labels. Cell domains identify volume regions;
+surface domains identify faces used by pump injection, relays, or optical
+boundaries. gmsh physical names are retained and can be used instead of numeric
+tags. A domain label is geometry metadata: it acquires physical meaning when a
+``GainMedium``, pump injector, or relay refers to it.
 
 .. code-block:: python
-
-   topology = VolumeTopology.fromFile("mesh.stl", meshSize=0.05)
-   topology = VolumeTopology.fromFile("mesh.msh")
-   topology = VolumeTopology.fromFile("mesh.vtk")
-
-STL volume import expects a closed 3D surface suitable for Tet4 volume meshing
-and emits a warning that HASEonGPU does not run a full tetrahedral mesh
-validation pass.
-
-``MeshTopology.fromFile(...)`` and ``VolumeTopology.fromFile(...)`` can override
-auto-detection with ``format=``.  This is useful for temporary files or
-non-standard extensions:
-
-.. code-block:: python
-
-   topology = MeshTopology.fromFile(
-       "surface.mesh",
-       format="gmsh",
-       numberOfLevels=8,
-       thickness=0.05,
-   )
-   volume = VolumeTopology.fromFile("volume.mesh", format="stl", meshSize=0.05)
-
-The topology importer only creates geometry and layer metadata.  It does not
-populate material arrays such as ``betaVolume`` or ``reflectivities`` except for
-metadata that can later be used by ``GainMedium``.  For VTK files that contain
-both geometry and HASEonGPU field data, load a full gain medium instead:
-
-.. code-block:: python
-
-   medium = GainMedium.fromVtk("medium.vtk")
-   medium = GainMedium.fromFile("medium.vtk")
-
-``GainMedium.fromVtk(...)`` expects a Tet4 VTK unstructured grid, the same
-format accepted by ``VolumeTopology.fromVtk(...)``. ``betaVolume`` is read from
-cell data, and ``claddingCellTypes``,
-``refractiveIndices``, ``reflectivities``, ``nTot``, ``crystalTFluo``,
-``claddingNumber``, and ``claddingAbsorption`` from VTK ``FIELD`` arrays when
-present. ``numberOfLevels`` and ``thickness`` are metadata in the Tet4 file and
-are not accepted as import overrides.
-
-The gmsh importer can also map physical groups whose names contain
-``cladding`` to ``claddingCellTypes`` when the topology is used by
-``GainMedium``.  The stored value is the gmsh physical tag for triangles in
-matching two-dimensional physical groups; all other triangles keep the default
-cladding type ``0``.
-
-Domains
--------
-
-Domains are integer labels attached to topology entities.  Cell domains label
-volume cells; surface domains label boundary faces.  The labels are independent
-of mesh ordering, so they are a stable way to assign material regions, cladding
-groups, boundary optics, or later solver options to named parts of a mesh.
-
-For gmsh input, HASEonGPU keeps physical group names as domain metadata:
-three-dimensional physical groups become cell-domain names, and
-two-dimensional physical groups become surface-domain names.  The names can be
-resolved later, so code can refer to ``"gain"`` or ``"crystal_exit"`` instead
-of hard-coding a physical tag.  Domains can also be assigned directly in Python
-when a file format does not contain the required group labels.
-
-.. code-block:: python
-
-   from HASEonGPU import GainMedium, SurfaceOptics, VolumeTopology
 
    topology = (
-       VolumeTopology.fromFile("crystal.vtk")
-       .withCellDomains({"where": "all", "domain": 1, "name": "gain"})
-       .withSurfaceDomains(
-           [
-               {"where": "z_min", "domain": 10, "name": "entry"},
-               {"where": "z_max", "domain": 11, "name": "exit"},
-           ]
+       topology
+       .withCellDomains(where="all", domain=1, name="gain")
+       .withSurfaceDomains([
+           {"where": "z_min", "domain": 10, "name": "pump_input"},
+           {"where": "z_max", "domain": 11, "name": "pump_output"},
+       ])
+   )
+
+``withCellDomains`` accepts cell indices, ``where="all"``, and gmsh physical
+names or tags. ``withSurfaceDomains`` additionally accepts face indices,
+``z_min``, ``z_max``, and all exterior faces. It rejects internal faces unless
+``allowInternal=True`` is explicit. Both methods return a copied topology, so
+the input object remains unchanged.
+
+Resolve names with ``cellDomainMap()`` or ``surfaceDomainMap()``:
+
+.. code-block:: python
+
+   entry_id = topology.surfaceDomainMap().resolve("pump_input")
+
+Boundary optics belong to ``GainMedium`` because they are physical fields, not
+connectivity. The topology supplies only the name that connects an optical
+assignment to a set of faces:
+
+.. code-block:: python
+
+   from HASEonGPU import GainMedium, SurfaceOptics
+
+   medium = GainMedium(topology).withSurfaceOptics({
+       "pump_input": SurfaceOptics(
+           reflectivity=0.0, n_inside=1.83, n_outside=1.0
        )
-   )
+   })
 
-   medium = GainMedium(topology).withSurfaceOptics(
-       {
-           "entry": SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
-           "exit": SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
-       }
-   )
+See :doc:`gain_medium` for ``SurfaceOptics`` syntax and
+:ref:`ase-surface-reflections` for the implemented boundary physics.
 
-``withCellDomains(...)`` accepts assignments for cell indices, ``where="all"``,
-gmsh physical names, or gmsh physical tags.  ``withSurfaceDomains(...)`` accepts
-face indices, exterior z-plane selectors such as ``where="z_min"`` and
-``where="z_max"``, all exterior faces, gmsh physical names, or gmsh physical
-tags.  Surface assignments reject internal faces by default; pass
-``allowInternal=True`` only when the caller intentionally labels internal
-interfaces.
-
-``SurfaceOptics`` fills the backend arrays used for reflective boundaries:
-explicit reflectivity, refractive index inside the surface, and refractive
-index outside the surface.  A reflectivity of ``0.0`` still allows total
-internal reflection when ``n_inside`` and ``n_outside`` make the incident angle
-supercritical; this matches the legacy reflection model.
-
-Refractive indices currently serve only the total-internal-reflection test.
-Otherwise the backend uses the configured constant reflectivity. It does not
-yet evaluate Fresnel coefficients or continue the non-reflected fraction as a
-transmitted or refracted ray. Surface domains and ``SurfaceOptics`` establish
-the boundary assignment API for those future models without implying that they
-are already implemented.
-
-Shape and Size Queries
-----------------------
-
-``MeshTopology`` exposes the dimensions needed by other objects:
-
-.. code-block:: python
-
-   topology.numberOfPoints
-   topology.numberOfTriangles
-   topology.numberOfLevels(10)        # sets levels and returns topology
-   topology.numberOfPrisms            # triangles * (levels - 1)
-   topology.levelCoordinates()        # z coordinates
-
-``numberOfLevels`` is both a construction parameter name and a setter method on
-``MeshTopology``.  After construction, use it as:
-
-.. code-block:: python
-
-   topology.numberOfLevels(10).withThickness(0.05)
-
-Use ``GainMedium`` property metadata for array shapes:
-
-.. code-block:: python
-
-   medium = topology.asGainMedium()
-   medium.get("betaVolume").expectedShape      # (numberOfTriangles, levels - 1)
-   medium.get("reflectivities").expectedShape  # (numberOfTriangles, 2)
-
-Index Utilities
+VTK state input
 ---------------
 
-These helpers convert physical coordinates to topology indices:
+``VolumeTopology.fromVtk`` reads geometry only. Use ``GainMedium.fromVtk``
+when a Tet4 VTK file also contains ``betaVolume`` and supported physical
+fields:
 
 .. code-block:: python
 
-   point_index = topology.pointIndexAt(x=0.0, y=0.0)
-   level_index = topology.levelIndexAt(z=0.1)
-Use the topology connectivity to locate the volume cell whose ``betaVolume``
-entry should be initialized or inspected.
+   topology = VolumeTopology.fromVtk("geometry.vtk")
+   medium = GainMedium.fromVtk("prepared-state.vtk")
 
-Conversion to GainMedium
+This distinction prevents a geometry loader from silently becoming a material
+or initial-state loader.
+
+Legacy extruded topology
 ------------------------
 
-.. code-block:: python
-
-   medium = topology.asGainMedium()
-
-This is equivalent to:
-
-.. code-block:: python
-
-   medium = GainMedium(topology=topology)
+``Grid`` and ``MeshTopology`` remain available for compatibility with planar
+triangle meshes extruded into wedge layers. They expose legacy queries such as
+``numberOfTriangles``, ``numberOfLevels``, and ``numberOfPrisms``. New
+forward-volume simulations should use ``VolumeTopology``; VTK Tet4 input is
+intentionally rejected by ``MeshTopology.fromVtk``.

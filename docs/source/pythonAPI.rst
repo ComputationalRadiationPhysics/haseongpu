@@ -2,8 +2,10 @@ Python API Reference
 ====================
 
 This page is generated from the public Python objects exposed by ``HASEonGPU``.
-It is a reference for signatures and members. For the user workflow and a
-complete example, start with the :doc:`Python Interface Guide <pythonInterface>`.
+It is a reference for signatures and members, not a workflow description. Start
+with the :doc:`laserPumpCladding tutorial <laserPumpCladding>` for a complete
+example and use the :doc:`Python Interface Guide <pythonInterface>` to navigate
+the reusable concepts.
 
 Public API
 ----------
@@ -17,13 +19,25 @@ Geometry and gain media
    :toctree: generated
    :nosignatures:
 
-   Grid
-   MeshTopology
    VolumeTopology
    GainMedium
-   GainMediumGeometry
    Gmsh
+   DomainMap
+   SurfaceDomainMap
    SurfaceOptics
+   writeGainMediumVtk
+
+Legacy planar geometry
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   Grid
+   MeshTopology
+   GainMediumGeometry
+   vtkWedge
 
 Spectra, pump, and ASE
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -57,6 +71,7 @@ Simulation and time integration
    Simulation
    TimeStepState
    TimeSteppedSimulation
+   TransportResult
    ExplicitEuler
    ExponentialEuler
    FrozenPhiAseRungeKutta4
@@ -66,24 +81,33 @@ Simulation and time integration
    RungeKutta4
    TimeIntegrationSolver
 
-Utilities and transport schemas
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Utilities
+^^^^^^^^^
 
 .. autosummary::
    :toctree: generated
    :nosignatures:
 
    AlpakaBackends
+   OpenPmdBackends
+   backendFlat
+   calcGainFromState
+   writeParaviewState
+
+Low-level transport schemas
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   BaseGroup
    BaseSchema
+   GroupFieldSpec
    PointSchema
    TriangleSchema
    PrismSchema
    PrimitiveFieldSpec
-   backendFlat
-   calcGainFromState
-   vtkWedge
-   writeGainMediumVtk
-   writeParaviewState
 
 The ``unitDimension`` namespace is exported from ``HASEonGPU`` and contains
 predefined openPMD unit-dimension tuples for HASE transport variables and common

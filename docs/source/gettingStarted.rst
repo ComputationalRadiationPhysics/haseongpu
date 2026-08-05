@@ -3,10 +3,11 @@
 Getting Started
 ===============
 
-This page is a compact installation guide for a source checkout of HASEonGPU.
-For modeling concepts, see :doc:`Theory and Model <theoryAndModel>`.  For the
-main user workflow, continue with :doc:`Python Interface Guide <pythonInterface>`
-after installation.
+This page installs and verifies a source checkout of HASEonGPU. After the
+installation works, continue with the :doc:`laserPumpCladding tutorial
+<laserPumpCladding>` for a complete user workflow. Modeling concepts and API
+composition are collected in the :doc:`Python Interface Guide
+<pythonInterface>`.
 
 1. Clone the Repository
 -----------------------
@@ -154,8 +155,10 @@ Check that the package imports:
 
    python3 -c "import HASEonGPU; print(HASEonGPU.__version__)"
 
-For the recommended user workflow, continue with
-:doc:`Python Interface Guide <pythonInterface>`.  Use
+For the recommended user workflow, continue with the
+:doc:`laserPumpCladding tutorial <laserPumpCladding>`. Use the
+:doc:`Python Interface Guide <pythonInterface>` when adapting that workflow to
+another geometry or pump. Use
 :doc:`Binary Interface <binaryInterface>` only when running ``calcPhiASE``
 directly, and :doc:`CMake Build Options <compilation>` when you need manual
 CMake configuration.

@@ -33,6 +33,6 @@ namespace hase::utils
     std::vector<double> interpolateLinear(
         std::vector<double> const& y,
         std::vector<double> const& x,
-        unsigned const nInterpolations);
+        unsigned nInterpolations);
 
 } // namespace hase::utils

@@ -18,6 +18,53 @@ with the mesh size and requested statistical accuracy, which makes the
 transport algorithm and its mapping to parallel hardware central to practical
 simulations.
 
+Frontend quantities and model symbols
+-------------------------------------
+
+The Python objects name the same quantities used in the equations below. This
+mapping is the bridge between a physical model and a runnable input:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 32 50
+
+   * - Symbol
+     - Python field or object
+     - Meaning
+   * - :math:`\beta_j`
+     - ``medium.get("betaVolume")`` / ``TimeStepState.beta_volume``
+     - Cell-centered excited-state fraction.
+   * - :math:`N_{\mathrm{tot}}`
+     - ``medium.get("nTot")``
+     - Active-ion concentration used in ASE and pump gain.
+   * - :math:`\tau`
+     - ``medium.get("crystalTFluo")``
+     - Fluorescence lifetime.
+   * - :math:`\sigma_a(\lambda)`, :math:`\sigma_e(\lambda)`
+     - ``CrossSectionData``
+     - Wavelength-dependent absorption and emission cross sections.
+   * - :math:`\Phi_j`
+     - ``TimeStepState.phi_ase``
+     - ASE flux estimate after backend physical scaling.
+   * - :math:`d\beta/dt|_{\mathrm{ASE}}`
+     - ``TimeStepState.dndt_ase``
+     - ASE depletion contribution.
+   * - :math:`d\beta/dt|_{\mathrm{pump}}`
+     - ``TimeStepState.dndt_pump``
+     - Pump-induced population contribution.
+   * - :math:`P`
+     - ``Pump.total_power``
+     - Pump power integrated over the injection aperture.
+   * - boundary reflectivity and indices
+     - ``SurfaceOptics``
+     - Domain-assigned ASE boundary properties.
+
+Object construction and units are documented in the :doc:`Python Interface
+Guide <pythonInterface>`. This page owns the estimator equations, physical
+normalization, and model limits.
+
+.. _forward-ase-model:
+
 Forward ASE Model
 -----------------
 
@@ -32,8 +79,8 @@ Tet4 State and Emission Source
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Let :math:`V_j` be the volume of Tet4 cell :math:`j` and :math:`\beta_j` its
-cell-centered excited-state fraction. For vertex-centered state, HASEonGPU
-first averages the four vertex values to obtain :math:`\beta_j`.
+cell-centered excited-state fraction. The compiled model has no
+vertex-centered excitation state.
 
 The integrated source strength used for spatial sampling is
 
@@ -158,6 +205,8 @@ vertex. Invalid connectivity, non-finite contributions, or a traversal that
 cannot be recovered are counted as dropped histories rather than silently
 contributing an invalid value.
 
+.. _ase-surface-reflections:
+
 Surface Reflections
 -------------------
 
@@ -196,6 +245,8 @@ The ASE depletion term for the excited-state fraction is
 The compiled simulation evaluates and integrates this term directly on Tet4
 cells. It does not maintain a point-centered beta or PhiASE representation.
 
+.. _general-monte-carlo-pump:
+
 General Monte Carlo Pump
 ------------------------
 
@@ -214,15 +265,19 @@ Within a cell, pump power follows
    g_p = N_{\mathrm{tot}}
          \left[\beta(\sigma_a+\sigma_e)-\sigma_a\right].
 
-The corresponding net photon exchange is accumulated in the traversed cell
-and divided by that cell's volume to obtain its contribution to
-:math:`d\beta_j/dt`. No cell-to-point deposition is performed.
+The corresponding net photon exchange is distributed barycentrically to the
+Tet4 vertices, normalized with lumped vertex volumes, and averaged back to the
+cells. This temporary projection smooths the pump rate; it does not introduce
+an evolving point-centered beta field. The time integrator receives one
+:math:`d\beta_j/dt` value per cell.
 
 ``SurfacePumpInjector`` selects the tagged launch faces. Finite
 ``PlanarPumpRelay`` stages can map rays from coplanar exit domains to entry
 domains with flips, rotation, offset, tilt, magnification, scalar transmission,
 and aperture vignetting. These relays are explicit affine return paths, not a
 Fresnel or unlimited cavity model.
+
+.. _pump-and-time-stepping:
 
 Pump and Time Stepping
 ----------------------
