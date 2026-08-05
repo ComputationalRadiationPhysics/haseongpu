@@ -24,6 +24,11 @@
 #include <kernels/timeIntegrationUpdateKernels.hpp>
 
 #include <algorithm>
+#ifdef HASE_ENABLE_STEP_TIMING
+#    include <chrono>
+#    include <cstdlib>
+#    include <fstream>
+#endif
 #include <functional>
 #include <limits>
 #include <memory>
@@ -188,11 +193,35 @@ namespace hase::core
             std::function<void(SimulationSnapshot const&)> const& callback,
             std::function<std::vector<double>(unsigned)> const& receiveControl)
         {
+#ifdef HASE_ENABLE_STEP_TIMING
+            std::ofstream timingCsv;
+            if(auto const* timingPath = std::getenv("HASE_STEP_TIMING_CSV"))
+            {
+                timingCsv.open(timingPath);
+                timingCsv << "revision,backend,step,elapsed_seconds,pump_enabled,ase_enabled\n";
+            }
+            char const* revision = std::getenv("HASE_BENCHMARK_REVISION");
+            char const* backend = std::getenv("HASE_BENCHMARK_BACKEND");
+#endif
             for(unsigned step = 0u; step < m_run.numberOfSteps; ++step)
             {
                 bool const pumpEnabled = step < m_run.pumpSteps;
                 bool const aseEnabled = m_run.enableAse && !(m_run.prePump && step == 0u);
+#ifdef HASE_ENABLE_STEP_TIMING
+                auto const started = std::chrono::steady_clock::now();
+#endif
                 advanceOneStep(pumpEnabled, aseEnabled);
+#ifdef HASE_ENABLE_STEP_TIMING
+                alpaka::onHost::wait(m_queue);
+                if(timingCsv)
+                {
+                    std::chrono::duration<double> const elapsed = std::chrono::steady_clock::now() - started;
+                    timingCsv << (revision ? revision : "") << ',' << (backend ? backend : "") << ',' << (step + 1u)
+                              << ',' << elapsed.count() << ',' << (pumpEnabled ? 1 : 0) << ',' << (aseEnabled ? 1 : 0)
+                              << '\n';
+                    timingCsv.flush();
+                }
+#endif
                 std::swap(m_beta, m_betaNext);
                 unsigned const completedStep = step + 1u;
                 bool const synchronizedDebug = m_run.executionMode == SimulationExecutionMode::SYNCHRONIZED_DEBUG;

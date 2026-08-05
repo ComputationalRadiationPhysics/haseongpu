@@ -10,6 +10,11 @@
 #include <algorithm> /* std::max */
 #include <chrono> /* std::chrono::system_clock */
 #include <ctime> /* time */
+#ifdef HASE_ENABLE_BACKEND_TIMING
+#    include <cstdlib>
+#    include <fstream>
+#    include <iomanip>
+#endif
 #include <locale> /* std::locale */
 #include <numeric> /* accumulate*/
 #include <stdexcept>
@@ -94,6 +99,9 @@ namespace hase::core
                 unsigned definedRelativeStandardErrors = 0;
                 time_t starttime = time(0);
                 ForwardPhiAseContext context{std::move(devices), exec, experiment, hostMesh};
+#ifdef HASE_ENABLE_BACKEND_TIMING
+                auto const preciseBackendStarted = std::chrono::steady_clock::now();
+#endif
                 auto evaluation
                     = context.evaluate(experiment, compute, hostMesh, context.primaryBetaVolume(), result, false);
                 float const runtime = evaluation.runtime;
@@ -102,6 +110,20 @@ namespace hase::core
                 unsigned const rayCount = evaluation.rayCount;
                 unsigned const adaptiveLaunches = evaluation.adaptiveLaunches;
                 auto const& convergenceRayCounts = evaluation.convergenceRayCounts;
+
+#ifdef HASE_ENABLE_BACKEND_TIMING
+                if(auto const* timingPath = std::getenv("HASE_BACKEND_TIMING_CSV"))
+                {
+                    std::chrono::duration<double> const preciseBackendElapsed
+                        = std::chrono::steady_clock::now() - preciseBackendStarted;
+                    std::ofstream timing(timingPath, std::ios::app);
+                    if(timing.tellp() == 0)
+                    {
+                        timing << "elapsed_seconds\n";
+                    }
+                    timing << std::setprecision(17) << preciseBackendElapsed.count() << '\n';
+                }
+#endif
 
                 if(usedGPUs == 0)
                     throw std::runtime_error("forward ASE evaluator used no devices");
