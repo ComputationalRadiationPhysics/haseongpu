@@ -1,113 +1,145 @@
-PICMI-style pump configuration
-==============================
+Pump configuration
+==================
 
-The public pump API separates the physical pump, numerical injection method,
-and Monte Carlo solver controls. This follows the composition used by PICMI's
-laser and injection objects without claiming that HASEonGPU implements the PIC
-model itself.
+The pump API separates four concerns that are easy to conflate:
+
+* ``Pump`` describes a physical source;
+* ``SurfacePumpInjector`` selects the boundary through which it enters;
+* ``PlanarPumpRelay`` describes an optional finite return path;
+* ``MonteCarloPumpSolver`` controls numerical ray sampling and its seed.
+
+This composition lets several physical pumps share one numerical solver while
+using different spectra, profiles, directions, and launch surfaces.
+
+Physical source
+---------------
+
+``Pump`` combines aperture-integrated power with wavelength, material, spatial,
+and angular distributions:
 
 .. code-block:: python
-
-   from HASEonGPU import (
-       MonteCarloPumpSolver,
-       PlanarPumpRelay,
-       Pump,
-       PumpAngularDistribution,
-       PumpSpectrum,
-       SuperGaussianPumpProfile,
-       SurfacePumpInjector,
-   )
 
    profile = SuperGaussianPumpProfile(
        radius_u=1.5,
        radius_v=1.5,
        exponent=40,
-       center=(0, 0, 0),
-       axis_u=(1, 0, 0),
-       axis_v=(0, 1, 0),
    )
    pump = Pump(
-       total_power=100000.0,
+       total_power=16_000.0,
        spectrum=PumpSpectrum.monochromatic(940e-9),
        cross_sections=pump_cross_sections,
        angular_distribution=PumpAngularDistribution.collimated(),
        profile=profile,
    )
-   injector = SurfacePumpInjector(surface_domains=("pump_input",))
-   pump_solver = MonteCarloPumpSolver(
-       ray_count=100000,
-       seed=5489,
-       max_steps=50,
-   )
 
-   simulation = Simulation(
-       gain_medium=medium,
-       phi_ase=phi_ase,
-       time_integrator=FrozenPhiAseRungeKutta4(),
-       time_step_size=2e-5,
-       pump_solver=pump_solver,
-   )
-   simulation.add_pump(
-       pump,
-       injection_method=injector,
-       relays=(PlanarPumpRelay.retroreflect("pump_output"),),
-   )
-   simulation.step(150)
+``PumpSpectrum`` is a normalized discrete wavelength distribution. The pump's
+``cross_sections`` must describe absorption and emission at those wavelengths;
+they are distinct from the full spectrum commonly supplied to ``PhiASE``. See
+:doc:`spectral_decomposition`.
 
-Physical and numerical objects
-------------------------------
+``PumpAngularDistribution`` stores normalized polar/azimuthal direction samples
+in the injector's inward-local frame. ``collimated`` supplies one normal-incidence
+direction; ``uniform_cone`` creates a discrete cone.
 
-``Pump`` contains total power, spectrum, material cross sections, spatial
-profile, and angular distribution. ``GaussianPump`` is a convenience class
-that creates a super-Gaussian physical pump from a scalar or two-component
-``waist``.
+``UniformPumpProfile`` weights every position equally.
+``SuperGaussianPumpProfile`` evaluates an elliptical world-space profile from
+its center, two orthogonal axes, radii, and exponent. ``GaussianPump`` is a
+convenience ``Pump`` subclass that constructs such a profile from ``waist``.
 
-``SurfacePumpInjector`` selects tagged exterior triangle domains. It describes
-where the physical pump is introduced, rather than duplicating those domains
-inside the pump itself. Multiple pumps can be registered through repeated
-``Simulation.add_pump`` calls.
-
-``MonteCarloPumpSolver`` owns the numerical ``ray_count`` and reproducibility
-``seed``. Its optional ``max_steps`` limits the pump contribution while the
-outer simulation may continue.
-
-Compiled transport
+Injection surfaces
 ------------------
 
-The solver launches equal-power rays from the selected exterior faces. Every
-ray samples the normalized spatial profile, discrete wavelength spectrum, and
-angular distribution, then traverses neighboring Tet4 cells until it reaches a
-physical boundary. In a segment of length :math:`\ell`, pump power changes as
+An injector refers to one or more named or numeric exterior surface domains on
+the medium's topology:
 
-.. math::
+.. code-block:: python
 
-   P_{out}=P_{in}\exp(g_p\ell),
-   \qquad
-   g_p=N_{tot}[\beta(\sigma_a+\sigma_e)-\sigma_a].
+   injector = SurfacePumpInjector("pump_input")
+   simulation.add_pump(pump, injection_method=injector)
 
-The corresponding net photon exchange is accumulated in the traversed cell
-and normalized by that cell's volume. The cell rate is consumed directly by
-the time integrator. This replaces the former point-scatter path and the former
-one-dimensional traversal through ordered z levels and allows injection on
-arbitrarily oriented, domain-tagged mesh regions.
+The domain assignment belongs to ``VolumeTopology``; the injector gives that
+geometry a pump-specific role. Repeated ``add_pump`` calls register multiple
+sources before the simulation is initialized.
+
+Numerical sampling
+------------------
+
+The solver controls are shared by all registered pump sources:
+
+.. code-block:: python
+
+   pump_solver = MonteCarloPumpSolver(
+       ray_count=50_000,
+       seed=5489,
+       max_steps=100,
+   )
+
+``ray_count`` is the number of equal-power histories launched for each source
+evaluation. ``seed`` makes pump sampling reproducible. ``max_steps`` limits the
+initial outer simulation steps that include pump transport; it is not a limit
+on how many Tet4 cells one ray may traverse. ``Simulation.step`` independently
+selects the total number of outer time steps.
 
 Power normalization
 -------------------
 
-``total_power`` is integrated over the selected injector aperture. The profile
-changes the launch distribution but not total power.
-``integrate_pump_profile(topology, domains, profile)`` converts a legacy peak
-intensity into total power on a tagged triangular aperture.
+``Pump.total_power`` is the power integrated over the selected aperture. The
+profile changes where rays launch but is normalized so it does not change that
+total.
 
-Planar relays
--------------
+When adapting a legacy peak-power-density value, integrate the dimensionless
+profile over the actual tagged surface before constructing the pump:
 
-``PlanarPumpRelay`` maps rays leaving tagged, coplanar ``exit_domains`` to
-``entry_domains``. It supports ``flip_u``, ``flip_v``, in-plane rotation,
-offset, tilt, magnification, transmission, and aperture vignetting. Ordered
-relays passed to ``add_pump`` represent finite return passes.
+.. code-block:: python
 
-The relay ``transmission`` is an explicitly configured scalar throughput. It is
-not calculated from Fresnel equations. Pump polarization, coating interactions,
-refraction, residual unlimited cavity recirculation, and arbitrary Python
-transport callbacks are outside the general pump core.
+   profile_area = integrate_pump_profile(
+       topology,
+       "pump_input",
+       profile,
+   )
+   pump = Pump(
+       total_power=peak_power_density * profile_area,
+       spectrum=pump_spectrum,
+       cross_sections=pump_cross_sections,
+       profile=profile,
+   )
+
+The surface area uses the topology's geometry unit, so the power-density input
+must use the corresponding inverse-area unit.
+
+Finite planar relays
+--------------------
+
+``PlanarPumpRelay`` maps rays that leave coplanar exit domains back to entry
+domains. A simple return from the same aperture is:
+
+.. code-block:: python
+
+   relay = PlanarPumpRelay.retroreflect(
+       "pump_output",
+       transmission=0.95,
+   )
+   simulation.add_pump(
+       pump,
+       injection_method=injector,
+       relays=(relay,),
+   )
+
+General relays support flips, in-plane rotation, offset, tilt, magnification,
+scalar transmission, and aperture vignetting. The ordered tuple represents a
+finite number of explicit passes. It does not create an unlimited cavity.
+
+Transport model
+---------------
+
+The compiled solver samples launch position, wavelength, and direction, then
+traverses neighboring Tet4 cells to a physical boundary. Material interaction
+uses the local excited-state fraction and the pump wavelength's cross sections.
+The deposited pump rate is temporarily projected through Tet4 vertices for
+smoothing and returned to one value per cell; the evolving excitation remains
+cell-centered.
+
+The gain equation, deposited population rate, temporary projection, and model
+limits are specified once in :ref:`general-monte-carlo-pump`. Relay transmission
+is a configured scalar: the current pump model does not calculate polarization,
+coating response, refraction, or Fresnel transmission.

@@ -1,85 +1,39 @@
 Binary Interface
 ================
 
-``calcPhiASE`` is the standalone C++ executable.  Most users call it through
-``PhiASE.run(...)``; use the binary directly when you already have a HASEonGPU
-openPMD input series.
+``calcPhiASE`` is the standalone C++ executable behind the Python frontend.
+Most users call it through ``PhiASE`` or ``Simulation``; use it directly when a
+workflow already produces the HASE openPMD input series.
 
 Build
 -----
 
-Manual compilation is required for direct command-line use.  See
-:doc:`CMake Build Options <compilation>`.
+Manual CMake compilation produces ``./build/calcPhiASE``. See
+:doc:`compilation` for build and provider options. A thin Python installation
+also records the matching executable and normally launches it automatically.
 
-.. code-block:: text
+One ASE evaluation
+------------------
 
-   ./build/calcPhiASE
-
-Usage
------
-
-The binary reads one openPMD input series and writes one openPMD result series:
+The default mode reads one input series and writes one result series:
 
 .. code-block:: bash
 
    ./build/calcPhiASE \
-       --input-path=<openPMD-input-series> \
-       --output-path=<openPMD-output-series>
-
-The input series contains mesh topology, material fields, the dynamic
-``core_beta_volume`` field, backend settings, parallel mode, sample range, and
-optional RNG seed.  This is the same transport layout written by the Python
-interface; see :doc:`openpmdTransport`.
-
-For forward reflections, the request uses the schema-defined iteration
-attributes ``use_reflections``, ``reflection_max_iterations``,
-``reflection_tolerance``, and ``surface_reservoir_size``. ``forward_ray_length``
-is retired and rejected. The local environment variables
-``HASE_SRM_MAX_ITERATIONS`` and ``HASE_SRM_DIVERGENCE_STREAK`` override the
-maximum reflected-pass count and the consecutive-growth divergence threshold;
-both must be positive integers. The latter defaults to ``3``.
-
-Examples
---------
-
-Single process:
-
-.. code-block:: bash
-
-   ./build/calcPhiASE --input-path=./input.bp --output-path=./output.bp
-
-MPI launch:
-
-.. code-block:: bash
-
-   mpiexec -npernode 4 ./build/calcPhiASE \
        --input-path=./input.bp \
        --output-path=./output.bp
 
-Arguments
----------
+The input iteration contains Tet4 topology, gain-medium and spectral fields,
+dynamic cell excitation, PhiASE controls, and compute settings. The output
+contains cell-centered flux, uncertainty, history counts, depletion rate, and
+reflection termination metadata. The authoritative record and attribute names
+are specified in :ref:`openpmd-record-layout`.
 
-``--input-path``
-   Path to the HASEonGPU openPMD input series.
-
-``--output-path``
-   Path for the result series.  Results are written as
-   ``core_result_phi_ase``, ``core_result_standard_error``,
-   ``core_result_relative_standard_error``, ``core_result_total_rays``, and
-   ``core_result_dndt_ase`` mesh records. Result iterations also report SRM
-   termination through ``srm_status``, ``srm_passes``,
-   ``srm_remaining_fraction``, ``srm_max_iterations``, and
-   ``srm_divergence_streak`` attributes.
-
-Compiled Simulation Mode
+Compiled simulation mode
 ------------------------
 
-``Simulation.runSteps(...)`` uses ``calcPhiASE --cpp-control`` rather than
-running a Python pump loop. Python writes the initial geometry, material,
-spectra, beta state, and run-control attributes; C++/Alpaka advances the
-requested steps and writes a snapshot after each one. The snapshots contain the
-updated cell beta, cell ASE results, and cell pump and ASE derivatives. The first
-snapshot also carries the static context needed to read the series on its own.
+``--cpp-control`` interprets the input iteration as a complete time-stepped run
+request:
 
 .. code-block:: bash
 
@@ -88,26 +42,36 @@ snapshot also carries the static context needed to read the series on its own.
        --output-path=./simulation-output.bp \
        --cpp-control
 
-The run control selects a time step, step count, pump-step limit, and one of the
-compiled integrators (explicit Euler, Heun, midpoint, RK4, implicit Euler, or
-exponential Euler). The general pump transport launches Monte Carlo rays from
-tagged exterior Tet4 faces. Its serialized sources carry total power, spatial,
-spectral, and angular distributions, plus optional finite planar relays. Custom
-Python pump routines are not part of this execution path.
+The request adds time-step, step-count, pump-duration, integrator, ASE toggle,
+pre-pump, and serialized pump-source controls. C++/Alpaka owns the loop and
+writes one snapshot iteration per completed step. The first snapshot repeats
+the static context so the output series can be read independently; later
+snapshots contain the evolving cell fields and results.
 
-In this mode Python sends the initial mesh/material/spectra/beta state and the
-binary writes one output iteration per completed time step. The output snapshot
-iterations include ``core_beta_volume``,
-``core_result_phi_ase``, ``core_result_standard_error``,
-``core_result_relative_standard_error``, ``core_result_total_rays``,
-``core_result_dndt_ase``, and ``core_result_dndt_pump``. Iteration 0 also
-carries the static mesh/material/spectral records so the snapshot series can be
-read independently. All dynamic and result records use the ``cell`` axis; the
-compiled model has no point-centered state records.
+Python ``Simulation.step`` uses this mode automatically. Physical object
+composition is documented in :doc:`pythonInterface`; serialized run controls
+and snapshot records are specified in :ref:`compiled-simulation-run-control`.
 
-Run-control attributes include ``time_step``, ``number_of_steps``,
-``pump_steps``, ``time_integrator``, optional implicit-Euler controls
-``implicit_iterations`` and ``implicit_tolerance``, and general-pump attributes: ``pump_schema_version``, ``pump_ray_count``,
-``pump_rng_seed``, plus flattened source, spectrum, angular-distribution,
-spatial-profile, and planar-relay arrays. Schema version 1 replaces the legacy
-one-dimensional pump attributes.
+Arguments
+---------
+
+``--input-path=<series>``
+   Required HASE openPMD input series.
+
+``--output-path=<series>``
+   Required destination for result iterations.
+
+``--cpp-control``
+   Optional compiled simulation mode. Without it, the executable performs one
+   PhiASE evaluation.
+
+No other command-line options are accepted. Physics, sampling, compute, and
+transport settings belong to the openPMD request rather than to a second binary
+CLI configuration surface.
+
+MPI
+---
+
+The same executable runs under MPI and consumes the same transport layout.
+Build requirements, frontend launching, rank/device distribution, and scheduler
+examples are centralized in :doc:`mpi`.

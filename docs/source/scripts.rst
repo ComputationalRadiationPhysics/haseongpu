@@ -18,14 +18,19 @@ For the default ``laserPumpCladding.py`` output, run for example:
 .. code-block:: bash
 
    python3 scripts/plot_ssg.py \
-       --input-dir example/python_example \
+       --input-dir output \
+       --field localGain \
        --direction z \
        --x 0 \
        --y 0 \
        --output-prefix scripts/gain_z_origin
 
-By default the script integrates the ``gain`` field and applies the round-trip
-reflection convention used by the legacy gain workflow:
-``net_gain = reflectivity * single_pass_gain**2``.  Use ``--field`` to select a
-different VTK scalar, ``--no-back-reflection`` for single-pass gain, and
-``--show`` to display the figure interactively after writing it.
+The current Tet4 example writes its cell-centered small-signal coefficient as
+``localGain``. The script's default field name ``gain`` remains for legacy
+point-data files, so select ``localGain`` explicitly for tutorial output.
+
+By default the script applies the round-trip reflection convention used by the
+legacy gain workflow: ``net_gain = reflectivity * single_pass_gain**2``. Use
+``--no-back-reflection`` for single-pass gain and ``--show`` to display the
+figure interactively after writing it. The tutorial's VTK fields and their
+physical inputs are described in :doc:`laserPumpCladding`.

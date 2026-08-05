@@ -1,147 +1,93 @@
 Utilities
 =========
 
-This page lists supporting public objects that are commonly used with the new
-Python interface.
+Time integration
+----------------
 
-Time Integration Solvers
-------------------------
-
-Import built-in solvers from ``HASEonGPU``:
-
-.. code-block:: python
-
-   from HASEonGPU import (
-       ExplicitEuler,
-       Heun,
-       Midpoint,
-       RungeKutta4,
-       FrozenPhiAseRungeKutta4,
-       ImplicitEuler,
-       ExponentialEuler,
-       FrozenPhiAseRungeKutta4,
-   )
-
-Available solvers:
+The public solver descriptors are:
 
 * ``ExplicitEuler()``
 * ``Heun()``
 * ``Midpoint()``
 * ``RungeKutta4()``
-* ``FrozenPhiAseRungeKutta4()``: reuses one ASE evaluation across RK4 stages.
 * ``FrozenPhiAseRungeKutta4()``
 * ``ImplicitEuler(iterations=8, tolerance=1e-10)``
 * ``ExponentialEuler()``
 
-These objects are lightweight descriptors. Python serializes their ``name`` to
-the openPMD run-control record and the compiled C++/Alpaka backend performs the
-actual time integration. You can also pass one of the names directly as a
-string.
+Python serializes the descriptor name and controls; the C++/Alpaka backend
+performs the integration on cell-centered fields. Standard RK4 evaluates ASE
+at each stage. ``FrozenPhiAseRungeKutta4`` reuses the first ASE result for the
+remaining stages while pump transport is still evaluated. Custom Python time
+integrators cannot run inside the compiled loop. See
+:ref:`pump-and-time-stepping` for how these evaluations enter the population
+equation.
 
-Custom Python time integrators are not supported by compiled simulation runs.
+Tet4 VTK
+--------
 
-VTK Export
+Write a static explicit-volume medium, including supported physical fields,
+with either form:
+
+.. code-block:: python
+
+   medium.toVtk("prepared-state.vtk")
+   writeGainMediumVtk("prepared-state.vtk", medium)
+
+``GainMedium.fromVtk`` restores that prepared state. For dynamic
+``TimeStepState`` output, use a cell-data writer in an ``on_step`` callback; the
+:doc:`laserPumpCladding tutorial <../laserPumpCladding>` contains the current
+Tet4 VTK callback used by the complete example.
+
+``vtkWedge`` is the compatibility writer for ``MeshTopology``'s extruded
+triangle layout. It accepts point arrays shaped
+``(numberOfPoints, numberOfLevels)`` and cell arrays shaped
+``(numberOfTriangles, numberOfLevels - 1)``. It is not the writer for an
+explicit ``VolumeTopology``.
+
+Local gain
 ----------
 
-``vtkWedge`` writes point or cell data on the wedge mesh to a legacy ASCII
-VTK file. In a ``Simulation.on_step`` callback, pass the ``TimeStepState`` to
-``vtkWedge``; the state carries the static topology and the dynamic arrays.
-
-Callback use:
+``calcGainFromState`` returns one small-signal gain value per volume cell:
 
 .. code-block:: python
 
-   def write_vtk(state, output_dir, cladding_absorption):
-       vtkWedge(
-           output_dir / "fields_{step:03d}.vtk",
-           state,
-           fields={
-               "betaVolume": state.beta_volume,
-               "phiASE": state.phi_ase,
-               "dndtAse": state.dndt_ase,
-               "cladAbs": state.phi_ase * cladding_absorption,
-           },
-       )
+   gain = calcGainFromState(state, spectra, nTot)
+   assert gain.shape == (state.topology.numberOfCells,)
 
-   simulation.on_step(write_vtk, output_dir, 5.5)
+By default it evaluates at the emission-spectrum maximum. Pass ``wavelength``
+or explicit ``sigmaAbsorption`` and ``sigmaEmission`` for another wavelength.
+The function requires ``nTot`` because a ``TimeStepState`` deliberately
+contains evolving state and topology, not all medium constants.
 
-Direct use after one step:
+openPMD/ParaView output
+-----------------------
 
-.. code-block:: python
-
-   simulation.step()
-   state = simulation.get_last_state()
-   vtkWedge("phi.vtk", state)
-   vtkWedge("fields.vtk", state, field=["phiAse", "dndtAse"])
-   vtkWedge("named.vtk", state, field={"phi": "phiAse", "dn": "dndtAse"})
-
-For standalone array exports outside a simulation state, pass ``geometry`` as a
-``GainMedium`` or ``MeshTopology``:
+``writeParaviewState`` appends callback snapshots to an openPMD series and
+writes a small ``.pmd`` handle for ParaView. Pass an output directory and,
+optionally, the cladding absorption used for the derived field:
 
 .. code-block:: python
 
-   vtkWedge("fields.vtk", geometry=medium, fields={"phi": phi, "dn": dndt})
+   simulation.on_step(writeParaviewState, "openpmd-output", 5.5)
 
-The older callback-factory form is still accepted and can use ``every`` to
-reduce output frequency:
+The output contains beta, PhiASE, pump/ASE derivatives, and topology records.
+Its storage engine comes from the installed ``openpmd_api`` provider. See
+:doc:`../openpmdTransport` for provider compatibility, backend selection, and
+the record layout.
 
-.. code-block:: python
-
-   simulation.on_step(vtkWedge("phi_{step:03d}.vtk", medium, every=10))
-
-For new code, prefer an explicit callback when output frequency or derived
-fields are needed:
-
-.. code-block:: python
-
-   def write_every_tenth(state, output_dir):
-       if state.step % 10 == 0:
-           vtkWedge(output_dir / "phi_{step:03d}.vtk", state)
-
-   simulation.on_step(write_every_tenth, output_dir)
-
-The data shape must match either:
-
-* point data: ``(numberOfPoints, numberOfLevels)``
-* cell data: ``(numberOfTriangles, numberOfLevels - 1)``
-
-Gain Field Export
------------------
-
-``calcGainFromState`` calculates small-signal laser gain from a
-``TimeStepState`` and returns a point-shaped array that can be written directly
-with ``vtkWedge``:
-
-.. code-block:: python
-
-   vtkWedge(
-       output_path,
-       state,
-       fields={
-           "gain": calcGainFromState(state, spectra, nTot),
-       },
-   )
-
-
-Backend Names
+Backend names
 -------------
 
-``AlpakaBackends`` can list backend names discovered from the installed
-HASEonGPU backend-name library.  Use these strings wherever the Python
-interface accepts a ``backend`` option, for example in ``PhiASE``:
+``AlpakaBackends.all()`` returns compute backend names from the installed
+runtime:
 
 .. code-block:: python
 
-   from HASEonGPU import AlpakaBackends, PhiASE
-
    available = AlpakaBackends.all()
-   backend = available[0]
+   phi_ase = PhiASE(backend=available[0])
 
-   phi_ase = PhiASE(backend=backend)
-
-``AlpakaBackends.known()`` is an alias for ``AlpakaBackends.all()``.  Backend
-names that are valid Python identifiers are also exposed as class attributes,
-for example ``AlpakaBackends.Host_Cpu_CpuSerial``.
-
-For details on how the helper library is built and how backend names are
-formed, see :doc:`../backendSelection`.
+Valid identifier-like names are also class attributes, such as
+``AlpakaBackends.Host_Cpu_CpuSerial``. These names choose compute execution;
+they do not choose the openPMD storage backend. Backend discovery, build-time
+availability, and storage-backend selection are owned by
+:doc:`../backendSelection`.

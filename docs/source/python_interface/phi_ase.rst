@@ -1,289 +1,147 @@
 PhiASE
 ======
 
-``PhiASE`` configures and runs the ASE calculation from domain-level Python
-objects: a ``GainMedium``, spectral data, and solver/backend settings. The backend transport data is built internally and is not part of the
-frontend modeling interface.
+``PhiASE`` configures the forward, source-driven ASE estimator. It consumes a
+Tet4 ``GainMedium`` and cross-section data and returns one flux estimate per
+cell. It owns numerical sampling, reflection, compute, transport, and parallel
+controls; it does not own geometry or the evolving excitation state.
+``propagationMode="forward"`` is the only supported mode.
 
 .. code-block:: python
 
-   from HASEonGPU import PhiASE
-
    phi_ase = PhiASE(
        spectralProperties=spectra,
-       forwardRayCount=1000,
-       repetitions=1,
-       relativeStandardErrorThreshold=0.1,
+       minRays=100_000,
+       maxRays=1_000_000,
+       adaptiveSteps=4,
+       relativeStandardErrorThreshold=0.05,
        useReflections=True,
        backend="Host_Cpu_CpuSerial",
-       parallelMode="single",
-       numDevices=1,
+       openpmdBackend="auto",
        rngSeed=1234,
    )
 
-Run One PhiASE Step
--------------------
-
-ASE can be run once without a ``Simulation`` time loop:
+Call it directly for one state or pass it to ``Simulation``:
 
 .. code-block:: python
 
    phi_ase.run(gainMedium=medium, crossSections=spectra)
    result = phi_ase.getResults()
+   phi = np.asarray(result.phiAse)
 
-   phi = np.asarray(result.phiAse).reshape(
-       medium.get("betaVolume").expectedShape,
-       order="F",
-   )
+``getResults`` raises ``RuntimeError`` before a successful run.
+The result includes ``phiAse``, ``standardError``,
+``relativeStandardError``, ``totalRays``, and ``dndtAse`` plus surface-reservoir
+termination information when reflections are enabled. A time-stepped
+``Simulation`` exposes the same raw object as ``TimeStepState.ase_result``.
 
-``run(...)`` canonicalizes the domain objects for the openPMD transport,
-launches the compiled ``calcPhiASE`` backend, stores the raw result, and
-returns ``self``. The returned ``result.phiAse`` values correspond to the ASE
-flux :math:`\Phi_i` described in the scientific background.
+Sampling controls
+-----------------
 
-Sampling and Physics Settings
------------------------------
-
-``minRays``
-   Initial number of globally launched Monte Carlo rays :math:`N`.
-
-``maxRays``
-   Hard cap on the cumulative forward-ray histories.  If ``forwardRayCount`` is
-   unset and this exceeds ``minRays``, the backend adds geometrically sized
-   batches until every cell meets the RSE target or this cap is reached.
-
-``forwardRayCount``
-   Explicit fixed number of globally launched forward rays. When nonzero it
-   overrides the adaptive ``minRays``/``maxRays`` range.
-
-``relativeStandardErrorThreshold``
-   Target dimensionless relative standard error; ``0.1`` requests 10%.
-   RSE replaces the former mean-squared-error threshold because it describes
-   uncertainty relative to the estimated mean and does not change with the
-   physical scale or unit of ``phiAse``. ``mseThreshold`` and ``mse_threshold``
-   are retired rather than reinterpreted with different semantics.
-
-``repetitions``
-   Retained transport compatibility field. The forward backend currently uses
-   the adaptive ray range instead; it does not schedule extra fixed-count
-   repetitions.
+``minRays`` and ``maxRays``
+   Initial and maximum global history counts. Adaptive execution adds
+   geometrically growing batches until every cell reaches the requested RSE or
+   the maximum is reached.
 
 ``adaptiveSteps``
-   Maximum number of geometric ray-count increases between ``minRays`` and
-   ``maxRays``. It is ignored for an explicit ``forwardRayCount``.
+   Maximum geometric count increases between the two ray limits.
 
-How direct rays are sampled
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``forwardRayCount``
+   Fixed global history count. Setting it disables adaptive count selection.
 
-Each direct ray samples a spectral bin, an emitting Tet4 volume and point, and
-an isotropic direction. The volume probability is proportional to
-``betaVolume * cellVolume``; this matches the source strength and uses a unit
-source weight. A ray then deposits its gain-weighted track-length contribution
-in each Tet4 volume it crosses. The next Tet4 boundary is selected from
-precomputed barycentric face planes instead of testing every triangular face.
-
-For local gain coefficient :math:`g` and segment length :math:`\ell`, the
-deposited track length is evaluated exactly as
-:math:`(\exp(g\ell)-1)/g`, with the stable :math:`\ell` limit near
-:math:`g=0`. One forward history can therefore inform every cell on its path;
-it does not move or store inversion between cells. See
-:doc:`../theoryAndModel` for the estimator, normalization, and uncertainty
-formulae.
-
-Within every adaptive batch, direct rays are distributed as evenly as possible
-over the discrete ASE spectral bins. They also use one randomly shifted
-systematic point per interval of the beta-volume CDF. Both strategies preserve
-the original sampling distributions while reducing spectral and source-cell
-selection noise.
-
-The stratifiers use global batch indices, so their coverage is preserved when a
-batch is split across devices or MPI ranks. They apply to direct volume sources
-only. Reflected rays retain the surface-reservoir sampler because their source
-distribution is determined by incident boundary weight.
-
-Directions remain isotropic. HASE does not infer a preferred axis from an
-arbitrary Tet4 mesh; directional importance sampling requires a separate,
-explicitly validated proposal model.
-
-``useReflections``
-   Enables or disables the surface-reservoir method (SRM) for reflected ASE
-   sources. Direct and relaunched rays always propagate from their starting
-   point to a physical mesh boundary; there is no forward ray-length cutoff.
-
-``reflectionMaxIterations``
-   Hard cap on reflected SRM passes after the direct pass. It is serialized as
-   the openPMD ``reflection_max_iterations`` request attribute and defaults to
-   ``40``. ``HASE_SRM_MAX_ITERATIONS`` overrides it at runtime and must be a
-   positive integer.
-
-``reflectionTolerance``
-   Fraction used for the SRM convergence and stability checks. A pass is
-   converged when its remaining reflected source weight divided by the direct
-   pass's reflected source weight is below this value.
-
-``surfaceReservoirSize``
-   Number of weighted SRM source records retained per physical boundary face.
-   It is serialized as ``surface_reservoir_size``.
-
-``HASE_SRM_DIVERGENCE_STREAK``
-   Runtime-only positive-integer override for the number of consecutive growing
-   reflected passes required to report ``diverged``. It defaults to ``3``.
-   This setting is intentionally not an openPMD request attribute: it is a
-   runtime safety policy, like ``HASE_SRM_MAX_ITERATIONS``.
-
-The current ASE boundary model is specular. It supports a configured constant
-reflectivity and total internal reflection, but does not launch transmitted or
-refracted rays and does not calculate angle- or polarization-dependent Fresnel
-coefficients. The non-reflected fraction leaves the simulated domain.
-
-``monochromatic``
-   Forces the ASE computation to use only the first absorption and emission
-   cross-section samples instead of spectral interpolation.
+``relativeStandardErrorThreshold``
+   Target one-sigma uncertainty relative to each cell's estimated mean. ``0.05``
+   requests 5%. It measures sampling uncertainty, not discretization or model
+   error.
 
 ``rngSeed``
-   Optional unsigned RNG seed for reproducible Monte Carlo ray sampling.  Set
-   this explicitly for reproducible runs.  If omitted, the Python wrapper
-   initializes a process-local NumPy seed stream from ``np.random.SeedSequence()``
-   and draws one unsigned 32-bit backend seed for each ASE invocation.
+   Unsigned seed for reproducible ASE histories. If omitted, each invocation
+   draws a process-local seed.
 
-Backend and Parallel Settings
------------------------------
+``monochromatic``
+   Use the first absorption and emission samples instead of integrating the
+   spectrum.
 
-``backend``
-   Alpaka backend name.  The minimal example uses ``"Host_Cpu_CpuSerial"``
-   because it is available in a plain CPU build.  Query the installed build
-   with ``AlpakaBackends.all()`` and pass one of the returned strings here.
-   See :doc:`../backendSelection`.
+Each direct history samples a spectral bin, a source cell with probability
+proportional to ``betaVolume * cellVolume``, a uniform point in that Tet4 cell,
+and an isotropic direction. It then deposits a gain-weighted track-length score
+in every traversed cell. Spectral bins and source cells are stratified over the
+global batch, including when devices or MPI ranks split that batch. See
+:ref:`forward-ase-model` for normalization and uncertainty equations.
 
-``parallelMode``
-   Backend compute mode written to the openPMD ``parallel_mode`` metadata.
-   ``"single"`` runs without MPI communication inside one launched process.
-   ``"mpi"`` makes the Python frontend launch ``calcPhiASE`` through
-   ``mpiexec``. The number of ranks per allocated node comes from ``nPerNode``.
+Reflections
+-----------
 
-``numDevices``
-   Maximum number of devices made available on each node for the compute run.
-   In MPI execution, HASEonGPU distributes those devices across the MPI ranks
-   that are active on the same node.
+``useReflections`` enables specular ASE reflection on domain-assigned
+``SurfaceOptics``. Direct and reflected rays travel to a physical mesh boundary;
+there is no configurable forward ray-length cutoff.
 
-``nPerNode``
-   Number of MPI ranks launched per allocated node when ``parallelMode`` is
-   ``"mpi"``. It is not serialized as a HASE openPMD transport attribute. See
-   :doc:`../mpi` and :doc:`../openpmdTransport` for the interaction between
-   process launching, ``parallelMode``, and ``numDevices``.
+``reflectionMaxIterations``
+   Maximum surface-reservoir passes after the direct pass. The positive integer
+   environment override is ``HASE_SRM_MAX_ITERATIONS``.
 
-``minSampleRange`` and ``maxSampleRange``
-   Optional inclusive sample-index range.  When omitted, all beta samples
-   :math:`\beta_i` are processed.
+``reflectionTolerance``
+   Stop when remaining reflected source weight, relative to the direct pass,
+   falls below this fraction.
 
-openPMD Transport Options
--------------------------
+``surfaceReservoirSize``
+   Maximum weighted source records retained per physical boundary face.
 
-The openPMD storage backend is selected separately from ``PhiASE.backend``.
-The default is ``auto``: it selects ``adios``, then ``adios-sst``, then
-``hdf5`` from backends supported by both the compiled and Python openPMD
-providers. The persistent ADIOS/BP backend is preferred because it is currently
-more robust and usually faster for HASEonGPU; SST remains available explicitly
-for streaming. Set ``PhiASE.openpmdBackend`` in Python, use
-``openpmd_backend`` in YAML, or pass ``--openpmd-backend`` through the
-command-line helper to choose a different runtime backend.
-Accepted values are ``auto``, ``adios-sst``, ``adios``, and ``hdf5``.
+The runtime reports ``srmStatus``, ``srmPasses``, ``srmRemainingFraction``,
+``srmMaxIterations``, and ``srmDivergenceStreak``. Terminal status can be
+``converged``, ``stable``, ``diverged``, or ``max_iterations``; ``disabled``
+means reflections were not requested. ``HASE_SRM_DIVERGENCE_STREAK`` controls
+how many consecutive growing passes report divergence.
 
-For repeated or streaming use, the transport can keep a session open and write
-only dynamic fields after the first iteration. See :doc:`../openpmdTransport`
-for the openPMD record layout, storage backend options, artifact-retention environment
-variables, and MPI command-prefix examples.
+The current boundary model uses configured constant reflectivity and total
+internal reflection. It does not calculate Fresnel coefficients or launch a
+transmitted/refracted ray. See :ref:`ase-surface-reflections` for the physical
+model and termination criteria.
 
-Configuration Helpers
+Compute and transport
 ---------------------
 
-``PhiASE`` can read settings from a dictionary or YAML file.  This is intended
-for run-control values: sampling, convergence, reflection flags, Alpaka compute
-backend selection, openPMD storage backend selection, MPI launcher settings,
-and optional sample ranges.
-Objects such as ``GainMedium``, ``SpectralDecomposition``, and pump solvers are
-still passed from Python.
+``backend`` selects an Alpaka compute backend reported by
+``AlpakaBackends.all()``. ``openpmdBackend`` independently selects the transport
+format/engine. See :doc:`../backendSelection` for selection syntax and
+:doc:`../openpmdTransport` for available storage backends and provider
+compatibility.
 
-.. code-block:: python
+``parallelMode="single"`` runs one process. ``parallelMode="mpi"`` asks the
+frontend to launch through MPI; ``nPerNode`` selects ranks per node and
+``numDevices`` limits devices available on each node. See :doc:`../mpi`.
 
-   phi_ase = PhiASE({"forwardRayCount": 1000, "backend": "Host_Cpu_CpuSerial"})
-   phi_ase = PhiASE.fromYaml(
-       "phi_ase.yaml",
-       spectralProperties=spectra,
-       gainMedium=medium,
-   )
+``minSampleRange`` and ``maxSampleRange`` optionally restrict the inclusive
+flattened cell range. Normal full-volume runs leave them unset.
 
-A YAML file can keep experiment and compute settings together:
+YAML and CLI helpers
+--------------------
+
+``fromYaml`` accepts run-control settings under ``experiment`` and ``compute``:
 
 .. code-block:: yaml
 
    experiment:
      minRays: 100000
      maxRays: 1000000
-     relativeStandardErrorThreshold: 0.05
-     repetitions: 2
+     relative_standard_error_threshold: 0.05
      adaptive_steps: 4
      use_reflections: true
      reflection_max_iterations: 40
-     reflection_tolerance: 1.0e-4
-     surface_reservoir_size: 32
-     monochromatic: false
-
    compute:
      backend: Host_Cpu_CpuSerial
+     openpmd_backend: auto
      parallel_mode: single
-     numDevices: 1
-     n_per_node: 1
-     min_sample_range: 0
-     max_sample_range: 999
      rng_seed: 1234
 
-YAML keys may be placed at the top level or under ``phiASE``, ``phi_ase``,
-``experiment``, or ``compute``.  If the same setting appears more than once,
-``PhiASE`` applies sections in this order: ``phiASE``, ``phi_ase``,
-``experiment``, ``compute``, then the top-level mapping.  Explicit keyword
-overrides passed to ``fromYaml(...)`` are applied after the file is read.
-
-Accepted setting names are the ``PhiASE`` attribute names plus the legacy aliases
-``minRaysPerSample`` -> ``minRays``, ``maxRaysPerSample`` -> ``maxRays``,
-``min_rays_per_sample`` -> ``minRays``, ``max_rays_per_sample`` -> ``maxRays``,
-``relative_standard_error_threshold``, ``adaptive_steps``, ``use_reflections``,
-``parallel_mode``, ``max_gpus`` -> ``numDevices``, ``n_per_node``,
-``min_sample_range``, ``max_sample_range``, and ``rng_seed``.
-
-Loading YAML requires ``PyYAML``. Package installation installs that
-dependency; the openPMD Python bindings come from the runtime provider selected
-at build time. Source-tree usage must provide both in the Python environment.
-
-For command-line tools:
-
 .. code-block:: python
 
-   parser = PhiASE.addArguments(parser)
-   args = parser.parse_args()
-   phi_ase = PhiASE.fromArgs(args, spectralProperties=spectra)
+   phi_ase = PhiASE.fromYaml(
+       "config/hase-phiase.yaml",
+       spectralProperties=spectra,
+       maxRays=2_000_000,
+   )
 
-The command-line helper accepts ``--phi-ase-config`` first and then applies
-explicit command-line options such as ``--backend`` or
-``--min-rays-per-sample`` as overrides.  It also accepts ``--rng-seed`` for
-reproducible Monte Carlo sampling.
-
-Inspection After a Run
-----------------------
-
-After ``run(...)``, inspect the simulation result and the original domain
-objects rather than backend adapter containers:
-
-.. code-block:: python
-
-   result = phi_ase.getResults()
-   points = medium.getPoints()
-   prisms = medium.getPrisms()
-
-``getResults()`` raises ``RuntimeError`` if the object has not been run yet.
-For reflected runs, the returned result also exposes ``srmStatus``,
-``srmPasses``, ``srmRemainingFraction``, ``srmMaxIterations``, and
-``srmDivergenceStreak``. Terminal statuses are ``converged`` (the reflected
-source decayed), ``stable`` (non-growing equilibrium), ``diverged`` (the
-configured consecutive-growth streak), and ``max_iterations`` (hard cap
-reached). ``disabled`` is reported when reflections were not requested.
+Keyword arguments override file values. ``addArguments`` and ``fromArgs`` add
+the same controls to an ``argparse`` command. Geometry, state, spectra, and pump
+objects remain Python inputs and are not YAML run-control data.

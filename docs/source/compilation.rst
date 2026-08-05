@@ -103,6 +103,12 @@ Core HASE Options
    Default ``ON``. Generates the Python frontend metadata describing the
    matching native runtime. Set ``OFF`` for command-line-only C++ builds.
 
+``HASE_INSTALL_CPP_INTERFACE``
+   Default ``ON``. Installs the public C++ headers, static library, executable,
+   and backend-name helper for a normal source installation. The thin-wheel
+   build sets it to ``OFF`` because that wheel installs only the Python
+   frontend and runtime metadata.
+
 ``HASE_BUILD_RUNTIME``
    Default ``ON`` for ordinary CMake builds. The thin-wheel build sets this to
    ``OFF`` and builds the runtime separately in the durable directory selected
@@ -122,6 +128,24 @@ Core HASE Options
    individual device work, and synchronized propagation kernels. Rows are
    appended to ``hase_benchmark.csv``. Because the required synchronization
    changes execution timing, use this only for benchmark builds.
+
+``HASE_BACKEND_TIMING``
+   Default ``OFF``. Enables one wall-time measurement around each direct
+   backend PhiASE calculation. Set ``HASE_BACKEND_TIMING_CSV`` at runtime to the
+   destination CSV path; the executable appends rows under the
+   ``elapsed_seconds`` header.
+
+``HASE_STEP_TIMING``
+   Default ``OFF``. Enables one wall-time row per compiled simulation step. Set
+   ``HASE_STEP_TIMING_CSV`` to the destination CSV. Optional
+   ``HASE_BENCHMARK_REVISION`` and ``HASE_BENCHMARK_BACKEND`` environment
+   variables populate label columns alongside step number, elapsed seconds, and
+   pump/ASE enable flags.
+
+These build-time measurements are independent of
+``Simulation(report_timings=True)`` or the tutorial's ``--timings`` flag, which
+report Python frontend transport, snapshot, and callback time without requiring
+a special build.
 
 ``HASE_FORWARD_LOGGING``
    Default ``OFF``.  Forwards captured ``calcPhiASE`` stdout/stderr through the
@@ -170,6 +194,8 @@ CUDA debugging options
    ``HASE_CUDA_SHOW_REGISTER``, ``HASE_CUDA_KEEP_FILES``, and
    ``HASE_CUDA_SHOW_CODELINES`` default to ``OFF``.  They are debugging aids
    for CUDA compilation and diagnostics.
+
+.. _openpmd-provider-options:
 
 openPMD Provider Options
 ------------------------

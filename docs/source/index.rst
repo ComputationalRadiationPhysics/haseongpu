@@ -14,27 +14,48 @@ It is intended to support the design and analysis of high-power laser systems,
 where ASE is an important limiting effect for stored energy, gain distribution,
 and overall amplifier performance.
 
-Start with :doc:`Getting Started <gettingStarted>` for installation and
-interface selection.  Use :doc:`CMake Build Options <compilation>` only when
-you need manual build configuration.  The :doc:`Theory and Model
-<theoryAndModel>` page explains the ASE model and pump coupling.
+Start with :doc:`Getting Started <gettingStarted>` to install HASEonGPU, then
+follow the :doc:`laserPumpCladding tutorial <laserPumpCladding>` for a complete
+Tet4 pump-and-ASE simulation. The remaining pages separate reusable modeling
+concepts, execution and transport details, and reference material.
 
 Contents
 --------
 
 .. toctree::
    :maxdepth: 2
-   :caption: Documentation
+   :caption: Start here
 
    gettingStarted
-   additional_deps
+   laserPumpCladding
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Modeling
+
+   pythonInterface
    theoryAndModel
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Execution and data
+
    backendSelection
-   compilation
-   scripts
-   windows
-   binaryInterface
    openpmdTransport
    mpi
-   pythonInterface
+   binaryInterface
+   scripts
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Build and platforms
+
+   compilation
+   additional_deps
+   windows
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
    pythonAPI
