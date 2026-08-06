@@ -53,22 +53,6 @@ namespace hase::core
             return experiment.sigmaA.at(std::min(index, experiment.sigmaA.size() - 1u));
         }
 
-        inline std::vector<double> makeLumpedPointVolumes(HostMesh const& mesh)
-        {
-            std::vector<double> volumes(mesh.numberOfMeshPoints, 0.0);
-            for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
-            {
-                double const share
-                    = static_cast<double>(mesh.cellVolumes[cell]) / static_cast<double>(mesh.numberOfCellVertices);
-                for(unsigned vertex = 0u; vertex < mesh.numberOfCellVertices; ++vertex)
-                {
-                    unsigned const point = mesh.cellPointIndices[cell * mesh.numberOfCellVertices + vertex];
-                    volumes[point] += share;
-                }
-            }
-            return volumes;
-        }
-
         inline void validateRunParameters(SimulationRunControl const& run)
         {
             if(run.timeStep <= 0.0)
@@ -181,9 +165,13 @@ namespace hase::core
             , m_k4(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_cellPumpIntegral(
                   alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_pointPumpIntegral(
-                  alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
-            , m_lumpedPointVolume(hase::alpakaUtils::toDevice(m_queue, detail::makeLumpedPointVolumes(hostMesh)))
+            , m_generalPumpSources(
+                  hase::kernels::prepareGeneralPumpDeviceSources<T_Device>(
+                      m_queue,
+                      hostMesh,
+                      m_run.pump,
+                      0u,
+                      m_run.pump.rayCount))
         {
             if(hostMesh.betaVolume.size() != hostMesh.numberOfCells)
                 throw std::runtime_error("simulation beta_volume must contain exactly one value per cell");
@@ -284,13 +272,10 @@ namespace hase::core
                 hase::kernels::enqueueGeneralPump(
                     m_devBundle,
                     m_queue,
-                    m_hostMesh,
                     m_mesh,
-                    m_run.pump,
+                    m_generalPumpSources,
                     beta,
                     m_cellPumpIntegral,
-                    m_pointPumpIntegral,
-                    m_lumpedPointVolume,
                     m_dndtPump);
             }
 
@@ -598,8 +583,7 @@ namespace hase::core
         T_DoubleBuffer m_k3;
         T_DoubleBuffer m_k4;
         T_DoubleBuffer m_cellPumpIntegral;
-        T_DoubleBuffer m_pointPumpIntegral;
-        T_DoubleBuffer m_lumpedPointVolume;
+        std::vector<hase::kernels::GeneralPumpDeviceSource<T_Device>> m_generalPumpSources;
         Result m_lastAseResult;
         std::size_t m_nextOutputStep = 0u;
         bool m_phiAseDeviceResident = false;

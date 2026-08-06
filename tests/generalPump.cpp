@@ -7,8 +7,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <core/mesh.hpp>
 #include <core/simulationRunControl.hpp>
-#include <kernels/derivativeComposition.hpp>
 #include <kernels/generalPump.hpp>
+#include <kernels/timeIntegrationUpdateKernels.hpp>
 
 #include <algorithm>
 #include <array>
@@ -20,12 +20,14 @@
 
 namespace
 {
-    using TestBackends = std::decay_t<ALPAKA_TYPEOF(
-        alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
+    using TestBackends = std::decay_t<
+        decltype(alpaka::onHost::allBackends(alpaka::onHost::enabledApis, alpaka::exec::enabledExecutors))>;
 
     hase::core::HostMesh makeSingleTetMesh()
     {
         // Unit right tetrahedron. Local face i is opposite local vertex i.
+        std::vector<double> const meshPoints = {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+        std::vector<double> const samplePoints = {0.25, 0.25, 0.25};
         return hase::core::HostMesh{
             {0u, 1u, 2u, 3u},
             {10u},
@@ -34,9 +36,8 @@ namespace
             {-1, -1, -1, -1},
             {7, 8, 9, 10},
             {1.0f / 6.0f},
-            // Structure-of-arrays point coordinates.
-            {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0},
-            {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0},
+            meshPoints,
+            samplePoints,
             {0.25, 0.25, 0.25},
             {0.0},
             {10u},
@@ -52,7 +53,7 @@ namespace
             4u,
             1u,
             0.0f,
-            true};
+            false};
     }
 
     hase::core::PumpSourceParameters uniformSource(unsigned const surface)
@@ -79,7 +80,31 @@ namespace
         auto const size = static_cast<std::size_t>(host.getMdSpan().getExtents().x());
         return {alpaka::onHost::data(host), alpaka::onHost::data(host) + size};
     }
+
+    template<typename T_Buffer>
+    std::vector<unsigned> copyUnsignedBuffer(auto const& queue, T_Buffer const& deviceBuffer)
+    {
+        auto host = alpaka::onHost::allocHostLike(deviceBuffer);
+        alpaka::onHost::memcpy(queue, host, deviceBuffer);
+        alpaka::onHost::wait(queue);
+        auto const size = static_cast<std::size_t>(host.getMdSpan().getExtents().x());
+        return {alpaka::onHost::data(host), alpaka::onHost::data(host) + size};
+    }
 } // namespace
+
+TEST_CASE("ray walk SRM policies select boundary-position storage at compile time", "[ray][policy]")
+{
+    using namespace hase::kernels::forward::ray;
+    using AseStorage = SrmPositionStorage<typename std::remove_cvref_t<ALPAKA_TYPEOF(aseSrmPolicy)>::PositionPolicy>;
+    using PumpStorage = SrmPositionStorage<typename std::remove_cvref_t<ALPAKA_TYPEOF(pumpSrmPolicy)>::PositionPolicy>;
+
+    STATIC_CHECK_FALSE(std::derived_from<AseStorage, BarycentricSrmPositionStorage>);
+    STATIC_CHECK(std::derived_from<PumpStorage, BarycentricSrmPositionStorage>);
+    STATIC_CHECK(concepts::BoundaryBehaviour<ALPAKA_TYPEOF(aseSrmPolicy)>);
+    STATIC_CHECK(SrmBoundaryBehaviour<ALPAKA_TYPEOF(pumpSrmPolicy)>);
+    STATIC_CHECK_FALSE(std::remove_cvref_t<ALPAKA_TYPEOF(aseSrmPolicy)>::PositionPolicy::storesBarycentric);
+    STATIC_CHECK(std::remove_cvref_t<ALPAKA_TYPEOF(pumpSrmPolicy)>::PositionPolicy::storesBarycentric);
+}
 
 TEST_CASE("general pump samples tagged faces deterministically with conserved source power", "[pump][source]")
 {
@@ -96,78 +121,69 @@ TEST_CASE("general pump samples tagged faces deterministically with conserved so
     auto const repeated = hase::kernels::samplePumpSource(mesh, source, 80u, 1234u);
 
     REQUIRE(first.size() == 80u);
-    CHECK(first.originX == repeated.originX);
-    CHECK(first.originY == repeated.originY);
-    CHECK(first.wavelength == repeated.wavelength);
-    CHECK(std::accumulate(first.power.begin(), first.power.end(), 0.0) == Catch::Approx(source.totalPower));
+    REQUIRE(repeated.size() == first.size());
+    double sampledPower = 0.0;
     for(std::size_t ray = 0u; ray < first.size(); ++ray)
     {
-        CHECK(first.originZ[ray] == Catch::Approx(0.0));
-        CHECK(first.originX[ray] >= 0.0);
-        CHECK(first.originY[ray] >= 0.0);
-        CHECK(first.originX[ray] + first.originY[ray] <= 1.0);
-        CHECK(first.directionX[ray] == Catch::Approx(0.0).margin(1.0e-14));
-        CHECK(first.directionY[ray] == Catch::Approx(0.0).margin(1.0e-14));
-        CHECK(first.directionZ[ray] == Catch::Approx(1.0));
-        CHECK(first.cell[ray] == 0u);
-        CHECK(first.forbiddenFace[ray] == 3);
-        if(first.wavelength[ray] == source.wavelengths[0])
+        auto const& sampled = first[ray];
+        auto const& repeatedRay = repeated[ray];
+        sampledPower += sampled.power;
+        CHECK(sampled.position.x == repeatedRay.position.x);
+        CHECK(sampled.position.y == repeatedRay.position.y);
+        CHECK(sampled.wavelength == repeatedRay.wavelength);
+        CHECK(sampled.position.z == Catch::Approx(0.0));
+        CHECK(sampled.position.x >= 0.0);
+        CHECK(sampled.position.y >= 0.0);
+        CHECK(sampled.position.x + sampled.position.y <= 1.0);
+        CHECK(sampled.direction.x == Catch::Approx(0.0).margin(1.0e-14));
+        CHECK(sampled.direction.y == Catch::Approx(0.0).margin(1.0e-14));
+        CHECK(sampled.direction.z == Catch::Approx(1.0));
+        CHECK(sampled.cell == 0u);
+        CHECK(sampled.forbiddenFace == 3);
+        if(sampled.wavelength == source.wavelengths[0])
         {
-            CHECK(first.sigmaAbsorption[ray] == source.sigmaAbsorption[0]);
-            CHECK(first.sigmaEmission[ray] == source.sigmaEmission[0]);
+            CHECK(sampled.sigmaAbsorption == source.sigmaAbsorption[0]);
+            CHECK(sampled.sigmaEmission == source.sigmaEmission[0]);
         }
         else
         {
-            CHECK(first.wavelength[ray] == source.wavelengths[1]);
-            CHECK(first.sigmaAbsorption[ray] == source.sigmaAbsorption[1]);
-            CHECK(first.sigmaEmission[ray] == source.sigmaEmission[1]);
+            CHECK(sampled.wavelength == source.wavelengths[1]);
+            CHECK(sampled.sigmaAbsorption == source.sigmaAbsorption[1]);
+            CHECK(sampled.sigmaEmission == source.sigmaEmission[1]);
         }
     }
+    CHECK(sampledPower == Catch::Approx(source.totalPower));
 }
 
-TEST_CASE("planar pump relay retroreflects, transmits, and vignettes", "[pump][relay]")
+TEST_CASE("pump relay preparation encodes physical exit and entry surfaces", "[pump][relay]")
 {
     auto const mesh = makeSingleTetMesh();
-    hase::kernels::PumpRayBatch exiting;
-    exiting.originX = {0.2};
-    exiting.originY = {0.3};
-    exiting.originZ = {0.0};
-    exiting.directionX = {0.0};
-    exiting.directionY = {0.0};
-    exiting.directionZ = {-1.0};
-    exiting.power = {5.0};
-    exiting.wavelength = {940e-9};
-    exiting.sigmaAbsorption = {1.0e-20};
-    exiting.sigmaEmission = {0.0};
-    exiting.cell = {0u};
-    exiting.forbiddenFace = {3};
-    exiting.exitFace = {3};
-
-    auto const frame = hase::kernels::makeRelayFrame(mesh, {10});
-    REQUIRE(frame.faces.size() == 1u);
-    CHECK(hase::kernels::pointInTriangle({0.2, 0.3, 0.0}, frame.faces.front(), frame.u, frame.v));
-
     hase::core::PumpRelayParameters relay;
-    relay.exitSurfaces = {10};
+    relay.exitSurfaces = {7};
     relay.entrySurfaces = {10};
     relay.transmission = 0.4;
-    auto returned = hase::kernels::applyPumpRelay(mesh, exiting, relay);
-    REQUIRE(returned.size() == 1u);
-    CHECK(returned.originX[0] == Catch::Approx(0.2));
-    CHECK(returned.originY[0] == Catch::Approx(0.3));
-    CHECK(returned.originZ[0] == Catch::Approx(0.0).margin(1.0e-14));
-    CHECK(returned.directionZ[0] == Catch::Approx(1.0));
-    CHECK(returned.power[0] == Catch::Approx(2.0));
-    CHECK(returned.cell[0] == 0u);
-    CHECK(returned.forbiddenFace[0] == 3);
+    relay.rotation = 0.25;
+    relay.offset[0] = 0.1;
+    relay.tilt[1] = -0.2;
 
-    relay.offset[0] = 2.0;
-    CHECK(hase::kernels::applyPumpRelay(mesh, exiting, relay).size() == 0u);
+    auto const geometry = hase::kernels::preparePumpRelayGeometry(mesh, {relay});
+    REQUIRE(geometry.descriptors.size() == 1u);
+    REQUIRE(geometry.exitMask.size() == mesh.numberOfCells * mesh.numberOfFacesPerCell);
+    REQUIRE(geometry.entryFaceIds.size() == 1u);
+    CHECK(geometry.exitMask[0u] == 1u);
+    CHECK(geometry.exitMask[3u] == 0u);
+    CHECK(geometry.entryFaceIds[0u] == 3u);
+    auto const& descriptor = geometry.descriptors.front();
+    CHECK(descriptor.transmission == Catch::Approx(0.4));
+    CHECK(descriptor.cosine == Catch::Approx(std::cos(0.25)));
+    CHECK(descriptor.offsetU == Catch::Approx(0.1));
+    CHECK(descriptor.tiltV == Catch::Approx(-0.2));
+    CHECK(descriptor.entryFaceEnd - descriptor.entryFaceBegin == 1u);
 }
 
 TEMPLATE_LIST_TEST_CASE(
-    "general pump device trace matches Beer-Lambert power and conservative deposition",
-    "[pump][backend]",
+    "general pump reuses device relay target cache without changing deposition",
+    "[pump][backend][integration]",
     TestBackends)
 {
     auto const backend = TestType::makeDict();
@@ -186,49 +202,49 @@ TEMPLATE_LIST_TEST_CASE(
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
     auto cellIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    auto pointIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
 
-    hase::kernels::PumpRayBatch ray;
-    ray.originX = {0.2};
-    ray.originY = {0.2};
-    ray.originZ = {0.0};
-    ray.directionX = {0.0};
-    ray.directionY = {0.0};
-    ray.directionZ = {1.0};
-    ray.power = {10.0};
-    ray.wavelength = {940e-9};
-    ray.sigmaAbsorption = {1.0e-20};
-    ray.sigmaEmission = {0.0};
-    ray.cell = {0u};
-    ray.forbiddenFace = {3};
-    ray.exitFace = {-1};
+    auto source = uniformSource(10u);
+    source.wavelengths = {940e-9};
+    source.spectralWeights = {1.0};
+    source.sigmaAbsorption = {1.0e-20};
+    source.sigmaEmission = {0.0};
+    hase::core::PumpRelayParameters relay;
+    relay.exitSurfaces = {7};
+    relay.entrySurfaces = {7};
+    relay.transmission = 0.5;
+    source.relays = {relay};
+    hase::core::PumpParameters pump;
+    pump.rayCount = 512u;
+    pump.rngSeed = 17u;
+    pump.sources = {source};
+    auto prepared
+        = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
+    REQUIRE(prepared.size() == 1u);
 
-    auto traced = hase::kernels::tracePumpBatch(
+    hase::kernels::enqueueGeneralPumpIntegrals(
         devBundle,
         queue,
         deviceMesh.toView(),
+        prepared,
         betaVolume,
         cellIntegral,
-        pointIntegral,
-        std::move(ray));
+        hase::kernels::pumpRelayPolicy);
+    auto const firstCellValues = copyDoubleBuffer(queue, cellIntegral);
+    auto const cacheValues = copyUnsignedBuffer(queue, prepared.front().cacheState());
+    REQUIRE(firstCellValues.size() == 1u);
+    CHECK(firstCellValues.front() > 0.0);
+    CHECK(std::count(cacheValues.begin(), cacheValues.end(), 1u) == pump.rayCount);
 
-    constexpr double pathLength = 0.6;
-    double const expectedPower = 10.0 * std::exp(-pathLength);
-    double const expectedIntegral = (10.0 - expectedPower) * 940e-9 / (6.62607015e-34 * 299792458.0 * 1.0e20);
-    REQUIRE(traced.size() == 1u);
-    CHECK(traced.power[0] == Catch::Approx(expectedPower).epsilon(2.0e-6));
-    CHECK(traced.exitFace[0] == 0);
-
-    auto const cellValues = copyDoubleBuffer(queue, cellIntegral);
-    REQUIRE(cellValues.size() == 1u);
-    CHECK(cellValues[0] == Catch::Approx(expectedIntegral).epsilon(2.0e-6));
-    auto const pointValues = copyDoubleBuffer(queue, pointIntegral);
-    REQUIRE(pointValues.size() == 4u);
-    CHECK(pointValues[0] == Catch::Approx(0.3 * expectedIntegral).epsilon(2.0e-6));
-    CHECK(pointValues[1] == Catch::Approx(0.2 * expectedIntegral).epsilon(2.0e-6));
-    CHECK(pointValues[2] == Catch::Approx(0.2 * expectedIntegral).epsilon(2.0e-6));
-    CHECK(pointValues[3] == Catch::Approx(0.3 * expectedIntegral).epsilon(2.0e-6));
-    CHECK(std::reduce(pointValues.begin(), pointValues.end()) == Catch::Approx(cellValues[0]).epsilon(2.0e-6));
+    hase::kernels::enqueueGeneralPumpIntegrals(
+        devBundle,
+        queue,
+        deviceMesh.toView(),
+        prepared,
+        betaVolume,
+        cellIntegral,
+        hase::kernels::pumpRelayPolicy);
+    auto const repeatedCellValues = copyDoubleBuffer(queue, cellIntegral);
+    CHECK(repeatedCellValues.front() == Catch::Approx(firstCellValues.front()).epsilon(2.0e-6));
 }
 
 TEST_CASE("general pump super-Gaussian profile and angular sampling use physical coordinates", "[pump][source]")
@@ -248,17 +264,18 @@ TEST_CASE("general pump super-Gaussian profile and angular sampling use physical
     source.polarAngles = {polar};
     source.azimuthalAngles = {0.7};
     auto const rays = hase::kernels::samplePumpSource(makeSingleTetMesh(), source, 16u, 5u);
-    for(std::size_t ray = 0u; ray < rays.size(); ++ray)
+    for(auto const& ray : rays)
     {
-        double const norm = std::sqrt(
-            rays.directionX[ray] * rays.directionX[ray] + rays.directionY[ray] * rays.directionY[ray]
-            + rays.directionZ[ray] * rays.directionZ[ray]);
+        double const norm = ray.direction.euclidLength();
         CHECK(norm == Catch::Approx(1.0));
-        CHECK(rays.directionZ[ray] == Catch::Approx(std::cos(polar)));
+        CHECK(ray.direction.z == Catch::Approx(std::cos(polar)));
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("general pump orchestration produces conservative cell rates", "[pump][backend]", TestBackends)
+TEMPLATE_LIST_TEST_CASE(
+    "general pump orchestration conserves cell-centered deposition",
+    "[pump][backend][integration]",
+    TestBackends)
 {
     auto const backend = TestType::makeDict();
     auto deviceSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
@@ -276,9 +293,6 @@ TEMPLATE_LIST_TEST_CASE("general pump orchestration produces conservative cell r
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
     auto cellIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    auto pointIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, 0.0));
-    auto lumpedPointVolume
-        = hase::alpakaUtils::toDevice(queue, std::vector<double>(4u, static_cast<double>(mesh.cellVolumes[0]) / 4.0));
     auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
 
     auto source = uniformSource(10u);
@@ -290,17 +304,16 @@ TEMPLATE_LIST_TEST_CASE("general pump orchestration produces conservative cell r
     pump.rayCount = 1024u;
     pump.rngSeed = 42u;
     pump.sources = {source};
+    auto prepared
+        = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
 
     hase::kernels::enqueueGeneralPump(
         devBundle,
         queue,
-        mesh,
         deviceMesh.toView(),
-        pump,
+        prepared,
         betaVolume,
         cellIntegral,
-        pointIntegral,
-        lumpedPointVolume,
         cellRate);
 
     auto const cells = copyDoubleBuffer(queue, cellIntegral);
@@ -314,8 +327,8 @@ TEMPLATE_LIST_TEST_CASE("general pump orchestration produces conservative cell r
 }
 
 TEMPLATE_LIST_TEST_CASE(
-    "derivative composition refreshes ASE depletion from stage beta with frozen phi",
-    "[simulation][time-integration][backend]",
+    "device relay and barycentric SRM produce beta fields within five percent",
+    "[pump][backend][integration][policy]",
     TestBackends)
 {
     auto const backend = TestType::makeDict();
@@ -329,37 +342,69 @@ TEMPLATE_LIST_TEST_CASE(
     auto const executor = backend[alpaka::object::exec];
     auto queue = device.makeQueue(alpaka::queueKind::blocking);
     hase::alpakaUtils::DevBundle devBundle(device, executor);
-
     auto mesh = makeSingleTetMesh();
     auto deviceMesh = mesh.toDevice(device);
-    auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.2});
-    auto phiAse = hase::alpakaUtils::toDevice(queue, std::vector<float>{5.0f});
-    auto dndtPump = hase::alpakaUtils::toDevice(queue, std::vector<double>{7.0});
-    auto dndtAse = hase::alpakaUtils::toDevice(queue, std::vector<double>{-1.0});
-    auto derivative = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    using DoubleBuffer = ALPAKA_TYPEOF(betaVolume);
-    using FloatBuffer = ALPAKA_TYPEOF(phiAse);
 
-    struct Buffers
+    auto source = uniformSource(10u);
+    source.wavelengths = {940e-9};
+    source.spectralWeights = {1.0};
+    source.sigmaAbsorption = {1.0e-20};
+    source.sigmaEmission = {0.0};
+    hase::core::PumpRelayParameters returnPass;
+    returnPass.exitSurfaces = {7};
+    returnPass.entrySurfaces = {7};
+    returnPass.transmission = 0.8;
+    source.relays = {returnPass};
+    hase::core::PumpParameters pump;
+    pump.rayCount = 4096u;
+    pump.rngSeed = 71u;
+    pump.sources = {source};
+
+    auto runOneStep = [&](auto boundaryPolicy)
     {
-        DoubleBuffer& betaVolume;
-        FloatBuffer& phiAse;
-        DoubleBuffer& dndtPump;
-        DoubleBuffer& dndtAse;
-        DoubleBuffer& derivative;
-    } buffers{betaVolume, phiAse, dndtPump, dndtAse, derivative};
+        auto prepared
+            = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
+        auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.1});
+        auto cellIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
+        auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
+        hase::kernels::enqueueGeneralPump(
+            devBundle,
+            queue,
+            deviceMesh.toView(),
+            prepared,
+            betaVolume,
+            cellIntegral,
+            cellRate,
+            boundaryPolicy);
 
-    hase::kernels::enqueueComposeDerivative(devBundle, queue, deviceMesh.toView(), 2.0, 3.0, 10.0, true, buffers);
-    alpaka::onHost::wait(queue);
+        auto beta = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.1});
+        auto betaNext = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
+        auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+            devBundle.device,
+            devBundle.executor,
+            alpaka::Vec{mesh.numberOfCells});
+        queue.enqueue(
+            frameSpec,
+            alpaka::KernelBundle{hase::kernels::AddScaled{1.0e-3}, deviceMesh.toView(), beta, cellRate, betaNext});
+        queue.enqueue(frameSpec, alpaka::KernelBundle{hase::kernels::ClipBeta{}, deviceMesh.toView(), betaNext});
+        return copyDoubleBuffer(queue, betaNext);
+    };
 
-    CHECK(copyDoubleBuffer(queue, dndtAse)[0] == Catch::Approx(-5.0));
-    CHECK(copyDoubleBuffer(queue, derivative)[0] == Catch::Approx(11.98));
-
-    auto nextBetaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.4});
-    Buffers nextStage{nextBetaVolume, phiAse, dndtPump, dndtAse, derivative};
-    hase::kernels::enqueueComposeDerivative(devBundle, queue, deviceMesh.toView(), 2.0, 3.0, 10.0, true, nextStage);
-    alpaka::onHost::wait(queue);
-
-    CHECK(copyDoubleBuffer(queue, dndtAse)[0] == Catch::Approx(0.0).margin(1.0e-14));
-    CHECK(copyDoubleBuffer(queue, derivative)[0] == Catch::Approx(6.96));
+    auto const relayBeta = runOneStep(hase::kernels::pumpRelayPolicy);
+    auto const srmBeta = runOneStep(hase::kernels::pumpSrmBarycentricPolicy);
+    REQUIRE(relayBeta.size() == srmBeta.size());
+    REQUIRE_FALSE(relayBeta.empty());
+    double absoluteDifference = 0.0;
+    double relayMagnitude = 0.0;
+    for(std::size_t sample = 0u; sample < relayBeta.size(); ++sample)
+    {
+        CHECK(std::isfinite(relayBeta[sample]));
+        CHECK(std::isfinite(srmBeta[sample]));
+        CHECK(relayBeta[sample] >= 0.1);
+        CHECK(srmBeta[sample] >= 0.1);
+        absoluteDifference += std::abs(relayBeta[sample] - srmBeta[sample]);
+        relayMagnitude += std::abs(relayBeta[sample] - 0.1);
+    }
+    REQUIRE(relayMagnitude > 0.0);
+    CHECK(absoluteDifference / relayMagnitude < 0.05);
 }

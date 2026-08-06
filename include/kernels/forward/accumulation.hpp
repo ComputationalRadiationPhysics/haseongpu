@@ -8,6 +8,7 @@
 #pragma once
 
 #include <core/mesh.hpp>
+#include <kernels/forward/policyRay.hpp>
 #include <kernels/forward/rayTransition.hpp>
 #include <kernels/importanceSampling.hpp>
 #include <kernels/propagateRay.hpp>
@@ -20,6 +21,19 @@
 
 namespace hase::kernels::forward
 {
+    struct ForwardAseRayState
+        : ray::TraversalState
+        , ray::SrmPositionStorage<typename std::remove_cvref_t<ALPAKA_TYPEOF(ray::aseSrmPolicy)>::PositionPolicy>
+    {
+        double weight = 0.0;
+        double sigmaAbsorption = 0.0;
+        double sigmaEmission = 0.0;
+        double accumulatedGain = 1.0;
+        unsigned sigmaIndex = 0u;
+    };
+
+    static_assert(!std::derived_from<ForwardAseRayState, ray::BarycentricSrmPositionStorage>);
+
     ALPAKA_FN_HOST_ACC constexpr std::uint64_t rayHistoryId(unsigned const pass, unsigned const rayIndex)
     {
         return (static_cast<std::uint64_t>(pass) << 32u) | rayIndex;
@@ -269,6 +283,61 @@ namespace alpaka::trait
 namespace hase::kernels::forward
 {
 
+    template<typename T_Accumulation>
+    struct ForwardAseCellPolicy : ray::behaviourDimension::Cell
+    {
+        T_Accumulation accumulation;
+
+        ALPAKA_FN_HOST_ACC constexpr explicit ForwardAseCellPolicy(T_Accumulation value) : accumulation{value}
+        {
+        }
+
+        ALPAKA_FN_ACC bool operator()(
+            auto const& acc,
+            hase::core::DeviceMeshView const& mesh,
+            auto& rayState,
+            unsigned const tet,
+            Tet4FaceIntersection const intersection)
+        {
+            double const segmentGain
+                = localSegmentGain(mesh, tet, intersection.length, rayState.sigmaAbsorption, rayState.sigmaEmission);
+            double contribution = rayState.weight * rayState.accumulatedGain;
+            contribution *= localSegmentTrackLengthIntegral(
+                mesh,
+                tet,
+                intersection.length,
+                rayState.sigmaAbsorption,
+                rayState.sigmaEmission);
+            if(alpaka::math::isfinite(contribution))
+            {
+                alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
+                alpaka::onAcc::atomicAdd(acc, &accumulation.phiSquare[tet], contribution * contribution);
+                alpaka::onAcc::atomicAdd(acc, &accumulation.volumeRayVisits[tet], 1u);
+            }
+            else
+            {
+                alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
+            }
+            rayState.accumulatedGain *= segmentGain;
+            return true;
+        }
+    };
+
+    template<typename T_Accumulation>
+    struct CountDroppedForwardRay
+    {
+        T_Accumulation accumulation;
+
+        ALPAKA_FN_HOST_ACC constexpr explicit CountDroppedForwardRay(T_Accumulation value) : accumulation{value}
+        {
+        }
+
+        ALPAKA_FN_ACC void operator()(auto const& acc, auto const&, auto& rayState)
+        {
+            alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[rayState.cell], 1u);
+        }
+    };
+
     struct AccumulateForwardPhiAse
     {
         ALPAKA_FN_HOST_ACC void operator()(
@@ -332,73 +401,24 @@ namespace hase::kernels::forward
             double const sigmaEmission,
             auto accumulation) const
         {
-            int forbiddenFace = -1;
-            double accumulatedGain = 1.0;
-            constexpr unsigned maxTraversalSteps = 10000u;
-            for(unsigned step = 0u; step < maxTraversalSteps; ++step)
-            {
-                assert(tet < mesh.numberOfCells);
-                Tet4FaceIntersection const intersection
-                    = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace);
-                if(intersection.localFace < 0)
-                {
-                    int const recoveryFace = isNearTet4Face(mesh, tet, origin)
-                                                 ? immediateExitFace(mesh, tet, origin, direction, forbiddenFace)
-                                                 : -1;
-                    if(recoveryFace >= 0)
-                    {
-                        Tet4FaceTransition const transition
-                            = recoverFaceTransition(mesh, tet, recoveryFace, origin, direction);
-                        if(transition.status == Tet4TransitionStatus::failed)
-                        {
-                            alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[transition.cell], 1u);
-                            break;
-                        }
-                        if(transition.status == Tet4TransitionStatus::reachedBoundary)
-                        {
-                            break;
-                        }
-                        tet = transition.cell;
-                        forbiddenFace = transition.forbiddenFace;
-                        continue;
-                    }
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-                    break;
-                }
-                double const segmentLength = intersection.length;
-                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
-                double contribution = sourceWeight * accumulatedGain;
-                contribution
-                    *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
-                if(alpaka::math::isfinite(contribution))
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.phiSquare[tet], contribution * contribution);
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.volumeRayVisits[tet], 1u);
-                }
-                else
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-                }
-
-                accumulatedGain *= segmentGain;
-                origin = advance(origin, direction, segmentLength);
-                Tet4FaceTransition const transition
-                    = transitionAcrossIntersection(mesh, tet, intersection, origin, direction);
-                if(transition.status == Tet4TransitionStatus::failed)
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[transition.cell], 1u);
-                    break;
-                }
-                if(transition.status == Tet4TransitionStatus::reachedBoundary)
-                {
-                    break;
-                }
-                tet = transition.cell;
-                forbiddenFace = transition.forbiddenFace;
-                if(step + 1u == maxTraversalSteps)
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-            }
+            namespace ray = hase::kernels::forward::ray;
+            ForwardAseRayState rayState;
+            rayState.position = origin;
+            rayState.direction = direction;
+            rayState.cell = tet;
+            rayState.forbiddenFace = -1;
+            rayState.weight = sourceWeight;
+            rayState.sigmaAbsorption = sigmaAbsorption;
+            rayState.sigmaEmission = sigmaEmission;
+            auto const walkResult = ray::walk(
+                acc,
+                mesh,
+                rayState,
+                ray::RayWalkBehaviour{
+                    ForwardAseCellPolicy<ALPAKA_TYPEOF(accumulation)>{accumulation},
+                    ray::BoundaryPolicyEscape{}});
+            if(walkResult == ray::WalkResult::failed)
+                CountDroppedForwardRay<ALPAKA_TYPEOF(accumulation)>{accumulation}(acc, mesh, rayState);
         }
     };
 
@@ -455,6 +475,39 @@ namespace hase::kernels::forward
             reservoir.sigmaIndices[index] = sigmaIndex;
         }
 
+        template<typename T_Reservoir, typename T_Rng>
+        struct StoreReflectionBoundary : ray::BoundaryPolicySrm<ray::srmPosition::Centroid>
+        {
+            T_Reservoir reservoir;
+            T_Rng rng;
+
+            ALPAKA_FN_HOST_ACC constexpr StoreReflectionBoundary(T_Reservoir reservoirValue, T_Rng rngValue)
+                : reservoir{reservoirValue}
+                , rng{rngValue}
+            {
+            }
+
+            ALPAKA_FN_ACC ray::BoundaryResult operator()(
+                auto const& acc,
+                hase::core::DeviceMeshView const& mesh,
+                auto& rayState,
+                unsigned const tet,
+                unsigned const localFace)
+            {
+                AccumulateForwardPhiAseReservoir{}.depositReflection(
+                    acc,
+                    mesh,
+                    tet,
+                    localFace,
+                    rayState.direction,
+                    rayState.weight * rayState.accumulatedGain,
+                    rayState.sigmaIndex,
+                    reservoir,
+                    rng);
+                return ray::BoundaryResult::stop;
+            }
+        };
+
         ALPAKA_FN_HOST_ACC void walkForwardRay(
             auto const& acc,
             hase::core::DeviceMeshView const& mesh,
@@ -470,93 +523,27 @@ namespace hase::kernels::forward
             auto reservoir,
             auto& rndEngine) const
         {
-            int forbiddenFace = initialForbiddenFace;
-            double accumulatedGain = 1.0;
-            constexpr unsigned maxTraversalSteps = 10000u;
-            for(unsigned step = 0u; step < maxTraversalSteps; ++step)
-            {
-                assert(tet < mesh.numberOfCells);
-                Tet4FaceIntersection const intersection
-                    = nextFaceIntersection(mesh, tet, origin, direction, forbiddenFace);
-                if(intersection.localFace < 0)
-                {
-                    int const recoveryFace = isNearTet4Face(mesh, tet, origin)
-                                                 ? immediateExitFace(mesh, tet, origin, direction, forbiddenFace)
-                                                 : -1;
-                    if(recoveryFace >= 0)
-                    {
-                        Tet4FaceTransition const transition
-                            = recoverFaceTransition(mesh, tet, recoveryFace, origin, direction);
-                        if(transition.status == Tet4TransitionStatus::failed)
-                        {
-                            alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[transition.cell], 1u);
-                            break;
-                        }
-                        if(transition.status == Tet4TransitionStatus::reachedBoundary)
-                        {
-                            depositReflection(
-                                acc,
-                                mesh,
-                                transition.cell,
-                                static_cast<unsigned>(transition.boundaryFace),
-                                direction,
-                                sourceWeight * accumulatedGain,
-                                sigmaIndex,
-                                reservoir,
-                                rndEngine);
-                            break;
-                        }
-                        tet = transition.cell;
-                        forbiddenFace = transition.forbiddenFace;
-                        continue;
-                    }
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-                    break;
-                }
-                double const segmentLength = intersection.length;
-                double const segmentGain = localSegmentGain(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
-                double contribution = sourceWeight * accumulatedGain;
-                contribution
-                    *= localSegmentTrackLengthIntegral(mesh, tet, segmentLength, sigmaAbsorption, sigmaEmission);
-                if(alpaka::math::isfinite(contribution))
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.phi[tet], contribution);
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.phiSquare[tet], contribution * contribution);
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.volumeRayVisits[tet], 1u);
-                }
-                else
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-                }
-
-                accumulatedGain *= segmentGain;
-                origin = advance(origin, direction, segmentLength);
-                Tet4FaceTransition const transition
-                    = transitionAcrossIntersection(mesh, tet, intersection, origin, direction);
-                if(transition.status == Tet4TransitionStatus::failed)
-                {
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[transition.cell], 1u);
-                    break;
-                }
-                if(transition.status == Tet4TransitionStatus::reachedBoundary)
-                {
-                    depositReflection(
-                        acc,
-                        mesh,
-                        transition.cell,
-                        static_cast<unsigned>(transition.boundaryFace),
-                        direction,
-                        sourceWeight * accumulatedGain,
-                        sigmaIndex,
+            namespace ray = hase::kernels::forward::ray;
+            ForwardAseRayState rayState;
+            rayState.position = origin;
+            rayState.direction = direction;
+            rayState.cell = tet;
+            rayState.forbiddenFace = initialForbiddenFace;
+            rayState.weight = sourceWeight;
+            rayState.sigmaAbsorption = sigmaAbsorption;
+            rayState.sigmaEmission = sigmaEmission;
+            rayState.sigmaIndex = sigmaIndex;
+            auto const walkResult = ray::walk(
+                acc,
+                mesh,
+                rayState,
+                ray::RayWalkBehaviour{
+                    ForwardAseCellPolicy<ALPAKA_TYPEOF(accumulation)>{accumulation},
+                    StoreReflectionBoundary<ALPAKA_TYPEOF(reservoir), ALPAKA_TYPEOF(rndEngine)>{
                         reservoir,
-                        rndEngine);
-                    break;
-                }
-                tet = transition.cell;
-                forbiddenFace = transition.forbiddenFace;
-                if(step + 1u == maxTraversalSteps)
-                    alpaka::onAcc::atomicAdd(acc, &accumulation.droppedRays[tet], 1u);
-            }
+                        rndEngine}});
+            if(walkResult == ray::WalkResult::failed)
+                CountDroppedForwardRay<ALPAKA_TYPEOF(accumulation)>{accumulation}(acc, mesh, rayState);
         }
 
         ALPAKA_FN_HOST_ACC void operator()(
@@ -773,7 +760,8 @@ namespace hase::kernels::forward
                         inReservoir.dirX[slotIndex],
                         inReservoir.dirY[slotIndex],
                         inReservoir.dirZ[slotIndex]});
-                hase::core::Point const origin = faceCentroid(mesh, tet, localFace);
+                hase::core::Point const origin
+                    = ray::restoreSrmPosition(ray::aseSrmPolicy.positionPolicy, mesh, tet, localFace);
                 unsigned const sigmaIndex = inReservoir.sigmaIndices[slotIndex];
                 walker.walkForwardRay(
                     acc,
