@@ -29,7 +29,8 @@ The setup proceeds from geometry to physical state and then to solvers:
 #. ``PhiASE`` controls the ASE Monte Carlo estimator and its compute and
    transport settings.
 #. ``Simulation`` combines those objects with a time integrator and returns one
-   ``TimeStepState`` snapshot after each completed step.
+   ``TimeStepState`` snapshot for each selected output step. With no explicit
+   ``output_steps`` schedule, every completed step is selected.
 
 A compact assembly has this shape:
 

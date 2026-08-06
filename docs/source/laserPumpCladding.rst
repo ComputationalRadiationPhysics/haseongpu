@@ -23,6 +23,7 @@ repository root:
        --backend Host_Cpu_CpuSerial \
        --timeSteps 3 \
        --pumpSteps 3 \
+       --output-steps 1 2 3 \
        --pump-ray-count 1000 \
        --rng-seed 1234 \
        --pump-rng-seed 5489 \
@@ -33,10 +34,12 @@ runtime. ``--openpmd-backend`` is a separate storage/streaming choice. See
 :doc:`backendSelection` for the distinction and :doc:`openpmdTransport` for the
 storage backends.
 
-The short run writes ``output/laserPumpCladding_001.vtk`` through
-``output/laserPumpCladding_003.vtk`` and prints the final PhiASE and excitation
-array shapes. The small ray count makes this a workflow check, not a
-statistically converged production calculation.
+The explicit output schedule makes the short run write
+``output/laserPumpCladding_001.vtk`` through
+``output/laserPumpCladding_003.vtk``. Without ``--output-steps``, the example
+emits only the pump-boundary and final snapshots. It also prints the final
+PhiASE and excitation array shapes. The small ray count makes this a workflow
+check, not a statistically converged production calculation.
 
 Load the material spectra
 -------------------------
@@ -221,6 +224,11 @@ pump sampling controls:
        cross_sections=spectralProperties,
        enable_ase=enableASE,
        pre_pump=prePump,
+       output_steps=(
+           laserPumpCladdingOutputSteps(timeSlices, pumpSteps)
+           if outputSteps is None
+           else tuple(int(step) for step in outputSteps)
+       ),
    ).add_pump(
        pump,
        injection_method=SurfacePumpInjector("ase_bottom"),
@@ -237,7 +245,9 @@ Fresnel calculation. ASE reflection is a separate ``PhiASE`` process using the
 source evaluation. Its ``max_steps`` limits the outer simulation steps that
 include the pump. ``simulation.step(timeSlices)`` controls the total number of
 outer steps, so the run can continue with ASE and fluorescence after pumping
-stops.
+stops. By default, ``laserPumpCladdingOutputSteps`` emits the pump boundary and
+the final step; ``--output-steps`` replaces that schedule with explicit
+one-based completed-step indices.
 
 ``FrozenPhiAseRungeKutta4`` evaluates PhiASE once per RK4 step and reuses it for
 the remaining RK stages, while the pump term is still evaluated at each stage.
@@ -263,7 +273,7 @@ The example registers callbacks before starting the compiled run:
    simulation.step(timeSlices)
    state = simulation.get_last_state()
 
-Each callback receives a completed ``TimeStepState`` with cell-centered
+Each callback receives a ``TimeStepState`` for an emitted step, with cell-centered
 ``beta_volume``, ``phi_ase``, ``dndt_pump``, and ``dndt_ase`` arrays. The VTK
 callback additionally writes ``cladAbs`` and ``localGain``. ``Simulation`` keeps
 only the last snapshot; callbacks are the place to retain a history.
@@ -329,6 +339,10 @@ Time and physics controls
 ``--timeSteps N``
    Total outer simulation steps. Default: ``150``.
 
+``--output-steps STEP [STEP ...]``
+   One-based completed-step indices to emit. By default, the example emits the
+   pump boundary, when reached, and the final step.
+
 ``--pumpSteps N``
    Initial outer steps that include pump transport. Default: ``100``. Set it to
    ``timeSteps`` to pump for the complete run.
@@ -365,7 +379,7 @@ Input, output, and alternate mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``--vtk-output-dir PATH``
-   Directory for one ``laserPumpCladding_<step>.vtk`` file per completed step.
+   Directory for one ``laserPumpCladding_<step>.vtk`` file per emitted step.
    Defaults to the example directory.
 
 ``--openpmd-output-dir PATH``

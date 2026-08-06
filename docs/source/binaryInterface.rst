@@ -43,10 +43,12 @@ request:
        --cpp-control
 
 The request adds time-step, step-count, pump-duration, integrator, ASE toggle,
-pre-pump, and serialized pump-source controls. C++/Alpaka owns the loop and
-writes one snapshot iteration per completed step. The first snapshot repeats
+pre-pump, execution mode, output schedule and field selection, control fields,
+and serialized pump-source controls. C++/Alpaka owns the loop and writes one
+snapshot iteration for each selected completed step. Without an output
+schedule, every completed step is selected. The first emitted snapshot repeats
 the static context so the output series can be read independently; later
-snapshots contain the evolving cell fields and results.
+snapshots contain the selected evolving cell fields and results.
 
 Python ``Simulation.step`` uses this mode automatically. Physical object
 composition is documented in :doc:`pythonInterface`; serialized run controls
