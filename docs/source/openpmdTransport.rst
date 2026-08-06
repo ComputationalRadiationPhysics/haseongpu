@@ -195,6 +195,9 @@ metadata:
 * ``time_step`` and ``number_of_steps``
 * ``pump_steps``
 * ``enable_ase`` and ``pre_pump``
+* ``execution_mode`` (``autonomous`` or ``synchronized-debug``)
+* optional ``output_steps`` containing one-based completed-step indices; when
+  omitted, every completed step is emitted
 * ``output_fields_string`` and ``control_fields_string`` as scalar JSON arrays
   of field names; this scalar encoding is identical for ADIOS BP, ADIOS SST,
   and HDF5
@@ -209,14 +212,15 @@ Readers continue to accept the former ``output_fields`` and ``control_fields``
 string-vector attributes for existing series. New writers use only the scalar
 JSON attributes so that run control has one backend-independent wire format.
 
-The C++ backend writes one output iteration per completed step. Snapshot
-iterations contain the cell-centered ``core_beta_volume`` record plus ``core_result_phi_ase``,
-``core_result_standard_error``, ``core_result_relative_standard_error``,
-``core_result_total_rays``, ``core_result_dndt_ase``, and
-``core_result_dndt_pump``. Every dynamic and result field has the ``cell`` axis;
-point beta, point PhiASE, and point derivatives are not part of the compiled
-simulation contract. The first snapshot also includes the static canonical
-mesh/material/spectral records.
+The C++ backend writes one output iteration for each selected completed step.
+Snapshot iterations contain the records selected by ``output_fields_string``;
+by default these are the cell-centered ``core_beta_volume`` record plus
+``core_result_phi_ase``, ``core_result_standard_error``,
+``core_result_relative_standard_error``, ``core_result_total_rays``,
+``core_result_dndt_ase``, and ``core_result_dndt_pump``. Every dynamic and
+result field has the ``cell`` axis; point beta, point PhiASE, and point
+derivatives are not part of the compiled simulation contract. The first emitted
+snapshot also includes the static canonical mesh/material/spectral records.
 
 
 Iteration Updates
