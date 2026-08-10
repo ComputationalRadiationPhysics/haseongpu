@@ -99,3 +99,4 @@ tests/*.txt
 tests/data/*_results.csv
 docs/source/generated/*.rst
 /julia1D/
+/juliaASE/
