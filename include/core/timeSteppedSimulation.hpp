@@ -163,8 +163,10 @@ namespace hase::core
             , m_k2(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_k3(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_k4(alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_cellPumpIntegral(
-                  alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_vertexPumpIntegral(
+                  alpaka::onHost::alloc<double>(m_device, static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
+            , m_lumpedGainVertexVolume(
+                  hase::alpakaUtils::toDevice(m_queue, hase::kernels::makeLumpedGainVertexVolumes(hostMesh)))
             , m_generalPumpSources(
                   hase::kernels::prepareGeneralPumpDeviceSources<T_Device>(
                       m_queue,
@@ -275,7 +277,8 @@ namespace hase::core
                     m_mesh,
                     m_generalPumpSources,
                     beta,
-                    m_cellPumpIntegral,
+                    m_vertexPumpIntegral,
+                    m_lumpedGainVertexVolume,
                     m_dndtPump);
             }
 
@@ -582,7 +585,8 @@ namespace hase::core
         T_DoubleBuffer m_k2;
         T_DoubleBuffer m_k3;
         T_DoubleBuffer m_k4;
-        T_DoubleBuffer m_cellPumpIntegral;
+        T_DoubleBuffer m_vertexPumpIntegral;
+        T_DoubleBuffer m_lumpedGainVertexVolume;
         std::vector<hase::kernels::GeneralPumpDeviceSource<T_Device>> m_generalPumpSources;
         Result m_lastAseResult;
         std::size_t m_nextOutputStep = 0u;

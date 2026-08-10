@@ -15,6 +15,7 @@
 #include <core/hostRoutineTiming.hpp>
 #include <core/mesh.hpp>
 #include <core/simulationRunControl.hpp>
+#include <kernels/forward/barycentric.hpp>
 #include <kernels/forward/policyRay.hpp>
 #include <kernels/forward/rayTransition.hpp>
 #include <kernels/forward/rayWalk.hpp>
@@ -110,6 +111,28 @@ namespace hase::kernels
                 if(hase::core::dot(info.normal, center - info.centroid) > 0.0)
                     info.normal = info.normal * -1.0;
                 result.push_back(info);
+            }
+        }
+        return result;
+    }
+
+    [[nodiscard]] inline std::vector<double> makeLumpedGainVertexVolumes(hase::core::HostMesh const& mesh)
+    {
+        // The vertex-to-cell projection below uses the standard Tet4 lumped volume V/4.
+        // Excluding cladding here and in the projection prevents a shared interface vertex
+        // from diluting the gain-medium pump rate or injecting pump into cladding cells.
+        std::vector<double> result(mesh.numberOfMeshPoints, 0.0);
+        for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
+        {
+            if(mesh.claddingCellTypes.at(cell) == mesh.claddingNumber)
+                continue;
+
+            double const share
+                = static_cast<double>(mesh.cellVolumes.at(cell)) / static_cast<double>(mesh.numberOfCellVertices);
+            for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
+            {
+                unsigned const point = mesh.cellPointIndices.at(cell * mesh.numberOfCellVertices + localVertex);
+                result.at(point) += share;
             }
         }
         return result;
@@ -266,23 +289,23 @@ namespace hase::kernels
         double planckConstant = 6.62607015e-34;
         double speedOfLight = 299792458.0;
 
-        template<typename T_BetaVolumeView, typename T_CellPumpIntegralView>
+        template<typename T_BetaVolumeView, typename T_VertexPumpIntegralView>
         struct CellPolicy : hase::kernels::forward::ray::behaviourDimension::Cell
         {
             double planckConstant;
             double speedOfLight;
             T_BetaVolumeView betaVolume;
-            T_CellPumpIntegralView cellPumpIntegral;
+            T_VertexPumpIntegralView vertexPumpIntegral;
 
             ALPAKA_FN_HOST_ACC constexpr CellPolicy(
                 double const planckConstantValue,
                 double const speedOfLightValue,
                 T_BetaVolumeView betaVolumeValue,
-                T_CellPumpIntegralView cellPumpIntegralValue)
+                T_VertexPumpIntegralView vertexPumpIntegralValue)
                 : planckConstant{planckConstantValue}
                 , speedOfLight{speedOfLightValue}
                 , betaVolume{betaVolumeValue}
-                , cellPumpIntegral{cellPumpIntegralValue}
+                , vertexPumpIntegral{vertexPumpIntegralValue}
             {
             }
 
@@ -310,7 +333,27 @@ namespace hase::kernels
                 {
                     double const integral = (ray.power - nextPower) * ray.wavelength
                                             / (planckConstant * speedOfLight * static_cast<double>(mesh.nTot));
-                    alpaka::onAcc::atomicAdd(acc, &cellPumpIntegral[tet], integral);
+                    // Deposit at the segment midpoint. Clamping and renormalizing protects
+                    // positivity and exact integral conservation against round-off at faces.
+                    auto const midpoint = ray.position + ray.direction * (0.5 * intersection.length);
+                    auto const barycentric = hase::kernels::forward::barycentricCoordinates(mesh, tet, midpoint);
+                    std::array<double, hase::core::tet4VertexCount> weights{};
+                    double weightSum = 0.0;
+                    for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
+                    {
+                        weights[localVertex] = alpaka::math::max(0.0, barycentric[localVertex]);
+                        weightSum += weights[localVertex];
+                    }
+                    double const inverseWeightSum
+                        = weightSum > std::numeric_limits<double>::epsilon() ? 1.0 / weightSum : 0.0;
+                    for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
+                    {
+                        double const weight
+                            = inverseWeightSum > 0.0 ? weights[localVertex] * inverseWeightSum : 0.25;
+                        unsigned const point
+                            = mesh.cellPointIndices[tet * mesh.numberOfCellVertices + localVertex];
+                        alpaka::onAcc::atomicAdd(acc, &vertexPumpIntegral[point], integral * weight);
+                    }
                 }
                 ray.power = nextPower;
                 return ray.power != 0.0;
@@ -333,7 +376,7 @@ namespace hase::kernels
             typename T_CellView,
             typename T_ForbiddenFaceView,
             typename T_BoundaryPolicyFactory,
-            typename T_CellPumpIntegralView>
+            typename T_VertexPumpIntegralView>
         ALPAKA_FN_ACC void operator()(
             T_Acc const& acc,
             hase::core::DeviceMeshView const mesh,
@@ -351,7 +394,7 @@ namespace hase::kernels
             T_CellView cell,
             T_ForbiddenFaceView forbiddenFace,
             T_BoundaryPolicyFactory boundaryPolicyFactory,
-            T_CellPumpIntegralView cellPumpIntegral,
+            T_VertexPumpIntegralView vertexPumpIntegral,
             unsigned const rayCount) const
         {
             for(auto [rayIndex] :
@@ -373,11 +416,11 @@ namespace hase::kernels
                     mesh,
                     rayState,
                     ray::RayWalkBehaviour{
-                        CellPolicy<T_BetaVolumeView, T_CellPumpIntegralView>{
+                        CellPolicy<T_BetaVolumeView, T_VertexPumpIntegralView>{
                             planckConstant,
                             speedOfLight,
                             betaVolume,
-                            cellPumpIntegral},
+                            vertexPumpIntegral},
                         boundaryPolicy}));
             }
         }
@@ -948,7 +991,7 @@ namespace hase::kernels
             auto const& queue,
             hase::core::DeviceMeshView const mesh,
             auto& betaVolume,
-            auto& cellPumpIntegral,
+            auto& vertexPumpIntegral,
             pumpBoundaryPolicy::Relay)
         {
             enqueueWithFactory(
@@ -956,7 +999,7 @@ namespace hase::kernels
                 queue,
                 mesh,
                 betaVolume,
-                cellPumpIntegral,
+                vertexPumpIntegral,
                 DevicePumpRelayBoundaryFactory{
                     m_descriptors.getView(),
                     m_exitMask.getView(),
@@ -976,7 +1019,7 @@ namespace hase::kernels
             auto const& queue,
             hase::core::DeviceMeshView const mesh,
             auto& betaVolume,
-            auto& cellPumpIntegral,
+            auto& vertexPumpIntegral,
             pumpBoundaryPolicy::SrmBarycentric)
         {
             enqueueWithFactory(
@@ -984,7 +1027,7 @@ namespace hase::kernels
                 queue,
                 mesh,
                 betaVolume,
-                cellPumpIntegral,
+                vertexPumpIntegral,
                 PumpBarycentricSrmBoundaryFactory{
                     m_descriptors.getView(),
                     m_exitMask.getView(),
@@ -1004,7 +1047,7 @@ namespace hase::kernels
             auto const& queue,
             hase::core::DeviceMeshView const mesh,
             auto& betaVolume,
-            auto& cellPumpIntegral,
+            auto& vertexPumpIntegral,
             auto boundaryPolicyFactory)
         {
             if(m_rayCount == 0u)
@@ -1032,7 +1075,7 @@ namespace hase::kernels
                     m_cell,
                     m_forbiddenFace,
                     boundaryPolicyFactory,
-                    cellPumpIntegral,
+                    vertexPumpIntegral,
                     m_rayCount});
         }
 
@@ -1074,12 +1117,13 @@ namespace hase::kernels
         return result;
     }
 
-    struct NormalizeCellPumpRate
+    struct ProjectVertexPumpRateToCells
     {
         ALPAKA_FN_ACC void operator()(
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
-            auto cellIntegral,
+            auto vertexIntegral,
+            auto lumpedVertexVolume,
             auto cellRate) const
         {
             for(auto [cell] : alpaka::onAcc::makeIdxMap(
@@ -1087,8 +1131,22 @@ namespace hase::kernels
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{mesh.numberOfCells}))
             {
-                double const volume = mesh.getCellVolume(cell);
-                cellRate[cell] = volume > 0.0 ? cellIntegral[cell] / volume : 0.0;
+                if(mesh.getCellType(cell) == mesh.claddingNumber)
+                {
+                    cellRate[cell] = 0.0;
+                    continue;
+                }
+
+                double rateSum = 0.0;
+                for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
+                {
+                    unsigned const point = mesh.cellPointIndices[cell * mesh.numberOfCellVertices + localVertex];
+                    double const volume = lumpedVertexVolume[point];
+                    rateSum += volume > 0.0 ? vertexIntegral[point] / volume : 0.0;
+                }
+                // Volume averaging the four lumped nodal rates preserves the deposited
+                // integral: sum_cell(V_cell * cellRate) == sum_vertex(vertexIntegral).
+                cellRate[cell] = rateSum / static_cast<double>(mesh.numberOfCellVertices);
             }
         }
     };
@@ -1097,7 +1155,7 @@ namespace hase::kernels
         typename T_Device,
         typename T_Executor,
         typename T_BetaBuffer,
-        typename T_CellBuffer,
+        typename T_VertexBuffer,
         typename T_BoundaryPolicy = pumpBoundaryPolicy::Relay>
     void enqueueGeneralPumpIntegrals(
         hase::alpakaUtils::DevBundle<T_Device, T_Executor>& devBundle,
@@ -1105,38 +1163,56 @@ namespace hase::kernels
         hase::core::DeviceMeshView const mesh,
         std::vector<GeneralPumpDeviceSource<T_Device>>& sources,
         T_BetaBuffer& betaVolume,
-        T_CellBuffer& cellPumpIntegral,
+        T_VertexBuffer& vertexPumpIntegral,
         T_BoundaryPolicy boundaryPolicy = {})
     {
         HASE_HOST_ROUTINE_SCOPE("pump.enqueue_integrals");
-        alpaka::onHost::fill(queue, cellPumpIntegral, 0.0, alpaka::Vec{static_cast<std::size_t>(mesh.numberOfCells)});
+        alpaka::onHost::fill(
+            queue,
+            vertexPumpIntegral,
+            0.0,
+            alpaka::Vec{static_cast<std::size_t>(mesh.numberOfMeshPoints)});
         for(auto& source : sources)
         {
-            source.enqueue(devBundle, queue, mesh, betaVolume, cellPumpIntegral, boundaryPolicy);
+            source.enqueue(devBundle, queue, mesh, betaVolume, vertexPumpIntegral, boundaryPolicy);
         }
     }
 
-    template<typename T_Device, typename T_Executor, typename T_CellBuffer, typename T_RateBuffer>
-    void enqueueNormalizeCellPumpRate(
+    template<
+        typename T_Device,
+        typename T_Executor,
+        typename T_VertexBuffer,
+        typename T_LumpedVolumeBuffer,
+        typename T_RateBuffer>
+    void enqueueProjectVertexPumpRateToCells(
         hase::alpakaUtils::DevBundle<T_Device, T_Executor>& devBundle,
         auto const& queue,
         hase::core::DeviceMeshView const mesh,
-        T_CellBuffer& cellPumpIntegral,
+        T_VertexBuffer& vertexPumpIntegral,
+        T_LumpedVolumeBuffer& lumpedVertexVolume,
         T_RateBuffer& cellRate)
     {
-        HASE_HOST_ROUTINE_SCOPE("pump.enqueue_normalize_cells");
+        HASE_HOST_ROUTINE_SCOPE("pump.enqueue_project_vertices");
         auto cellFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
             devBundle.device,
             devBundle.executor,
             alpaka::Vec{mesh.numberOfCells});
-        queue.enqueue(cellFrameSpec, alpaka::KernelBundle{NormalizeCellPumpRate{}, mesh, cellPumpIntegral, cellRate});
+        queue.enqueue(
+            cellFrameSpec,
+            alpaka::KernelBundle{
+                ProjectVertexPumpRateToCells{},
+                mesh,
+                vertexPumpIntegral,
+                lumpedVertexVolume,
+                cellRate});
     }
 
     template<
         typename T_Device,
         typename T_Executor,
         typename T_BetaBuffer,
-        typename T_CellBuffer,
+        typename T_VertexBuffer,
+        typename T_LumpedVolumeBuffer,
         typename T_RateBuffer,
         typename T_BoundaryPolicy = pumpBoundaryPolicy::Relay>
     void enqueueGeneralPump(
@@ -1145,11 +1221,18 @@ namespace hase::kernels
         hase::core::DeviceMeshView const mesh,
         std::vector<GeneralPumpDeviceSource<T_Device>>& sources,
         T_BetaBuffer& betaVolume,
-        T_CellBuffer& cellPumpIntegral,
+        T_VertexBuffer& vertexPumpIntegral,
+        T_LumpedVolumeBuffer& lumpedVertexVolume,
         T_RateBuffer& cellRate,
         T_BoundaryPolicy boundaryPolicy = {})
     {
-        enqueueGeneralPumpIntegrals(devBundle, queue, mesh, sources, betaVolume, cellPumpIntegral, boundaryPolicy);
-        enqueueNormalizeCellPumpRate(devBundle, queue, mesh, cellPumpIntegral, cellRate);
+        enqueueGeneralPumpIntegrals(devBundle, queue, mesh, sources, betaVolume, vertexPumpIntegral, boundaryPolicy);
+        enqueueProjectVertexPumpRateToCells(
+            devBundle,
+            queue,
+            mesh,
+            vertexPumpIntegral,
+            lumpedVertexVolume,
+            cellRate);
     }
 } // namespace hase::kernels
