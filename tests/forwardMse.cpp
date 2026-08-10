@@ -139,14 +139,13 @@ TEST_CASE("forward PhiASE RSE handles invalid and zero-score estimates", "[forwa
 
 TEST_CASE("forward PhiASE RSE batches use independent deterministic sampling streams", "[forward][rse]")
 {
-    constexpr unsigned applicationSeed = 123456789u;
+    constexpr unsigned applicationSeed = 123'456'789u;
     std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> seeds{};
     std::array<double, hase::kernels::forward::forwardRseBatchCount> sourceOffsets{};
     for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
     {
         seeds.at(batch) = hase::kernels::forward::rseBatchSeed(applicationSeed, batch);
-        sourceOffsets.at(batch)
-            = hase::kernels::forward::rseBatchSourceStratificationOffset(applicationSeed, batch);
+        sourceOffsets.at(batch) = hase::kernels::forward::rseBatchSourceStratificationOffset(applicationSeed, batch);
         CHECK(seeds.at(batch) == hase::kernels::forward::rseBatchSeed(applicationSeed, batch));
         CHECK(sourceOffsets.at(batch) >= 0.0);
         CHECK(sourceOffsets.at(batch) < 1.0);
@@ -202,11 +201,8 @@ TEST_CASE("forward PhiASE vertex accumulation remains cell based and conservativ
     REQUIRE(result.phiAse.size() == mesh.numberOfCells);
     CHECK(result.phiAse[0u] == Catch::Approx(0.5));
     CHECK(result.phiAse[1u] == Catch::Approx(0.5));
-    double const cellIntegral = std::inner_product(
-        result.phiAse.cbegin(),
-        result.phiAse.cend(),
-        mesh.cellVolumes.cbegin(),
-        0.0);
+    double const cellIntegral
+        = std::inner_product(result.phiAse.cbegin(), result.phiAse.cend(), mesh.cellVolumes.cbegin(), 0.0);
     CHECK(cellIntegral == Catch::Approx(1.0));
 
     double const batchMean = 0.125;

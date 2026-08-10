@@ -18,9 +18,7 @@ namespace hase::core
     ForwardPhiAseRawResult makeForwardRawResult(unsigned const volumeCount, unsigned const vertexCount)
     {
         return ForwardPhiAseRawResult{
-            std::vector<double>(
-                hase::kernels::forward::forwardRseBatchCount * 2u * vertexCount,
-                0.0),
+            std::vector<double>(hase::kernels::forward::forwardRseBatchCount * 2u * vertexCount, 0.0),
             {},
             std::vector<unsigned>(volumeCount, 0u),
             std::vector<unsigned>(volumeCount, 0u),
@@ -133,8 +131,7 @@ namespace hase::core
     {
         unsigned const volumeCount = hostMesh.numberOfCells;
         unsigned const materialVertexCount = 2u * hostMesh.numberOfMeshPoints;
-        if(rawResult.vertexBatchScoreSum.size()
-           != hase::kernels::forward::forwardRseBatchCount * materialVertexCount)
+        if(rawResult.vertexBatchScoreSum.size() != hase::kernels::forward::forwardRseBatchCount * materialVertexCount)
             throw std::runtime_error("forward ASE vertex score count does not match the mesh");
         std::array<std::vector<double>, hase::kernels::forward::forwardRseBatchCount> cellBatchScoreDensity;
         for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
@@ -189,8 +186,9 @@ namespace hase::core
                         relativeError = std::numeric_limits<double>::quiet_NaN();
                     else
                     {
-                        double const sampleVariance
-                            = std::max(0.0, (batchMeanSquareSum - batchMeanSum * batchMeanSum / count) / (count - 1.0));
+                        double const sampleVariance = std::max(
+                            0.0,
+                            (batchMeanSquareSum - batchMeanSum * batchMeanSum / count) / (count - 1.0));
                         relativeError = std::sqrt(sampleVariance / count) / std::abs(batchMean);
                     }
                 }

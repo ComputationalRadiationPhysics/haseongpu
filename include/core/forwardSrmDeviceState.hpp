@@ -45,10 +45,8 @@ namespace hase::core
         using T_DoubleSpan = ALPAKA_TYPEOF(std::declval<T_DoubleBuffer&>().getMdSpan());
         using T_UnsignedSpan = ALPAKA_TYPEOF(std::declval<T_UnsignedBuffer&>().getMdSpan());
         using T_CharBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<char>(std::declval<T_Device&>(), std::size_t{1}));
-        using T_Accumulation = hase::kernels::forward::ForwardAccumulationSpans<
-            T_DoubleSpan,
-            T_UnsignedSpan,
-            T_UnsignedSpan>;
+        using T_Accumulation
+            = hase::kernels::forward::ForwardAccumulationSpans<T_DoubleSpan, T_UnsignedSpan, T_UnsignedSpan>;
         using T_Spectrum = hase::kernels::forward::ForwardSpectrumSpans<T_DoubleBuffer, T_DoubleBuffer>;
         using T_Reservoir = hase::kernels::forward::SurfaceReservoirSpans<
             T_UnsignedBuffer,
@@ -96,10 +94,7 @@ namespace hase::core
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_sigmaA(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaA))
             , m_sigmaE(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaE))
-            , m_accumulation{
-                  m_vertexBatchScoreSum.getMdSpan(),
-                  m_volumeRayVisits.getMdSpan(),
-                  m_droppedRays.getMdSpan()}
+            , m_accumulation{m_vertexBatchScoreSum.getMdSpan(), m_volumeRayVisits.getMdSpan(), m_droppedRays.getMdSpan()}
             , m_spectrum{m_sigmaA, m_sigmaE, static_cast<unsigned>(experiment.sigmaA.size())}
             , m_countsA(alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
             , m_countsB(alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(faceCount())))

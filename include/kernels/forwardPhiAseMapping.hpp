@@ -97,10 +97,8 @@ namespace hase::kernels
                                 = materialVertexOffset
                                   + mesh.cellPointIndices[cell * mesh.numberOfCellVertices + localVertex];
                             double const vertexVolume = lumpedMaterialVertexVolume[materialVertex];
-                            unsigned const vertex
-                                = batch * (2u * mesh.numberOfMeshPoints) + materialVertex;
-                            batchScoreDensity
-                                += vertexVolume > 0.0 ? vertexBatchScoreSum[vertex] / vertexVolume : 0.0;
+                            unsigned const vertex = batch * (2u * mesh.numberOfMeshPoints) + materialVertex;
+                            batchScoreDensity += vertexVolume > 0.0 ? vertexBatchScoreSum[vertex] / vertexVolume : 0.0;
                         }
                         batchScoreDensity /= static_cast<double>(mesh.numberOfCellVertices);
                         double const batchScore = batchScoreDensity * volume;

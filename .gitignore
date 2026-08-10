@@ -1,4 +1,6 @@
 build
+/.venv/
+AGENTS.md
 /.hase-python-build/
 bin/*
 *.~lock.*

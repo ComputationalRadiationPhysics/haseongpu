@@ -158,8 +158,7 @@ namespace hase::core
             throw std::runtime_error("Forward reflections require surfaceReservoirSize > 0.");
         }
 
-        ForwardPhiAseRawResult combined
-            = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
+        ForwardPhiAseRawResult combined = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
         SrmControls const controls = resolveSrmControls(experiment);
         bool const debugSrm = srmDebugLoggingEnabled();
         combined.srmMaxIterations = controls.maxIterations;
@@ -301,8 +300,7 @@ namespace hase::core
 
         for(auto const& device : devices)
         {
-            ForwardPhiAseRawResult partial
-                = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
+            ForwardPhiAseRawResult partial = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
             device->downloadAccumulation(partial);
             mergeForwardRawResult(combined, partial);
         }
