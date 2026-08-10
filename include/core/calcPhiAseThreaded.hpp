@@ -158,7 +158,8 @@ namespace hase::core
             throw std::runtime_error("Forward reflections require surfaceReservoirSize > 0.");
         }
 
-        ForwardPhiAseRawResult combined = makeForwardRawResult(hostMesh.numberOfCells);
+        ForwardPhiAseRawResult combined
+            = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
         SrmControls const controls = resolveSrmControls(experiment);
         bool const debugSrm = srmDebugLoggingEnabled();
         combined.srmMaxIterations = controls.maxIterations;
@@ -195,7 +196,7 @@ namespace hase::core
                     experiment,
                     betaVolumeTotal,
                     localRayCount,
-                    hase::random::seedForWorker(baseSeed, rank, deviceIndex),
+                    baseSeed,
                     localRayOffset,
                     globalRayCount,
                     sourceStratificationOffset,
@@ -300,7 +301,8 @@ namespace hase::core
 
         for(auto const& device : devices)
         {
-            ForwardPhiAseRawResult partial = makeForwardRawResult(hostMesh.numberOfCells);
+            ForwardPhiAseRawResult partial
+                = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
             device->downloadAccumulation(partial);
             mergeForwardRawResult(combined, partial);
         }
@@ -336,7 +338,7 @@ namespace hase::core
         unsigned const volumeCount = hostMesh.numberOfCells;
         // Each partial contributes the histories it actually launched; starting
         // this counter at the requested total would count every history twice.
-        ForwardPhiAseRawResult combined = makeForwardRawResult(volumeCount);
+        ForwardPhiAseRawResult combined = makeForwardRawResult(volumeCount, hostMesh.numberOfMeshPoints);
         if(rayCount == 0u || assignedDeviceCount == 0u)
         {
             return combined;
@@ -373,7 +375,9 @@ namespace hase::core
         unsigned const activeDevices = std::min(assignedDeviceCount, rayCount);
         unsigned const raysPerDevice = rayCount / activeDevices;
         unsigned const remainder = rayCount % activeDevices;
-        std::vector<ForwardPhiAseRawResult> partials(activeDevices, makeForwardRawResult(volumeCount));
+        std::vector<ForwardPhiAseRawResult> partials(
+            activeDevices,
+            makeForwardRawResult(volumeCount, hostMesh.numberOfMeshPoints));
         unsigned localRayOffset = globalRayOffset;
 
         for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
@@ -382,7 +386,6 @@ namespace hase::core
             unsigned const localRayCount
                 = localDeviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
             hase::alpakaUtils::DevBundle devBundle{meshes.at(deviceIndex).m_device, exec};
-            unsigned const rngSeed = hase::random::seedForWorker(baseSeed, rank, deviceIndex);
             calcForwardPhiAseThreaded(
                 devBundle,
                 experiment,
@@ -391,7 +394,7 @@ namespace hase::core
                 meshes.at(deviceIndex),
                 partials.at(localDeviceIndex),
                 localRayCount,
-                rngSeed,
+                baseSeed,
                 localRayOffset,
                 globalRayCount,
                 sourceStratificationOffset,

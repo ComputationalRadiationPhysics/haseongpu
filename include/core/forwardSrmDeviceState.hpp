@@ -42,9 +42,13 @@ namespace hase::core
         using T_DoubleBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::size_t{1}));
         using T_UnsignedBuffer
             = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
+        using T_DoubleSpan = ALPAKA_TYPEOF(std::declval<T_DoubleBuffer&>().getMdSpan());
+        using T_UnsignedSpan = ALPAKA_TYPEOF(std::declval<T_UnsignedBuffer&>().getMdSpan());
         using T_CharBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<char>(std::declval<T_Device&>(), std::size_t{1}));
-        using T_Accumulation = hase::kernels::forward::
-            ForwardAccumulationSpans<T_DoubleBuffer, T_DoubleBuffer, T_UnsignedBuffer, T_UnsignedBuffer>;
+        using T_Accumulation = hase::kernels::forward::ForwardAccumulationSpans<
+            T_DoubleSpan,
+            T_UnsignedSpan,
+            T_UnsignedSpan>;
         using T_Spectrum = hase::kernels::forward::ForwardSpectrumSpans<T_DoubleBuffer, T_DoubleBuffer>;
         using T_Reservoir = hase::kernels::forward::SurfaceReservoirSpans<
             T_UnsignedBuffer,
@@ -81,16 +85,21 @@ namespace hase::core
             , m_spectrumStratificationPhase(spectrumStratificationPhase)
             , m_betaVolumeTotal(betaVolumeTotal)
             , m_slotsPerFace(experiment.surfaceReservoirSize)
-            , m_phi(alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
-            , m_phiSquare(
-                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
+            , m_vertexBatchScoreSum(
+                  alpaka::onHost::alloc<double>(
+                      m_devBundle.device,
+                      hase::kernels::forward::forwardRseBatchCount * 2u
+                          * static_cast<std::size_t>(m_mesh.numberOfMeshPoints)))
             , m_volumeRayVisits(
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_droppedRays(
                   alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(m_mesh.numberOfCells)))
             , m_sigmaA(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaA))
             , m_sigmaE(hase::alpakaUtils::toDevice(m_queue, experiment.sigmaE))
-            , m_accumulation{m_phi, m_phiSquare, m_volumeRayVisits, m_droppedRays}
+            , m_accumulation{
+                  m_vertexBatchScoreSum.getMdSpan(),
+                  m_volumeRayVisits.getMdSpan(),
+                  m_droppedRays.getMdSpan()}
             , m_spectrum{m_sigmaA, m_sigmaE, static_cast<unsigned>(experiment.sigmaA.size())}
             , m_countsA(alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
             , m_countsB(alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(faceCount())))
@@ -129,12 +138,13 @@ namespace hase::core
             , m_reservoirB{m_countsB, m_dirXB, m_dirYB, m_dirZB, m_weightsB, m_sigmaIndicesB, m_faceWeightsB, m_slotsPerFace}
             , m_samplingCdfSpans{m_samplingCdf, m_samplingTotalWeight, m_stratifiedRayFaces, faceCount() <= m_rayCount}
         {
-            alpaka::onHost::fill(m_queue, m_phi, 0.0, alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
             alpaka::onHost::fill(
                 m_queue,
-                m_phiSquare,
+                m_vertexBatchScoreSum,
                 0.0,
-                alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
+                alpaka::Vec{
+                    hase::kernels::forward::forwardRseBatchCount * 2u
+                    * static_cast<std::size_t>(m_mesh.numberOfMeshPoints)});
             alpaka::onHost::fill(
                 m_queue,
                 m_volumeRayVisits,
@@ -211,6 +221,8 @@ namespace hase::core
                     hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
                     m_mesh,
                     m_rayCount,
+                    m_globalRayOffset,
+                    m_globalRayCount,
                     sourceWeight,
                     m_accumulation,
                     inputReservoir,
@@ -225,8 +237,10 @@ namespace hase::core
 
         void downloadAccumulation(ForwardPhiAseRawResult& result)
         {
-            result.scoreSum = detail::copyBufferToVector(m_queue, m_phi);
-            result.scoreSquareSum = detail::copyBufferToVector(m_queue, m_phiSquare);
+            result.vertexBatchScoreSum = detail::copyBufferToVector(m_queue, m_vertexBatchScoreSum);
+            for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+                result.rseBatchRayCounts.at(batch)
+                    = hase::kernels::forward::rseBatchRayCount(m_globalRayOffset, m_rayCount, batch);
             result.totalRays = detail::copyBufferToVector(m_queue, m_volumeRayVisits);
             result.droppedRays = detail::copyBufferToVector(m_queue, m_droppedRays);
             result.rayCount = m_rayCount;
@@ -336,8 +350,7 @@ namespace hase::core
         unsigned m_spectrumStratificationPhase;
         double m_betaVolumeTotal;
         unsigned m_slotsPerFace;
-        T_DoubleBuffer m_phi;
-        T_DoubleBuffer m_phiSquare;
+        T_DoubleBuffer m_vertexBatchScoreSum;
         T_UnsignedBuffer m_volumeRayVisits;
         T_UnsignedBuffer m_droppedRays;
         T_DoubleBuffer m_sigmaA;

@@ -14,6 +14,7 @@
 #include <core/types.hpp>
 #include <kernels/forward/accumulation.hpp>
 
+#include <array>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -23,8 +24,8 @@ namespace hase::core
 {
     struct ForwardPhiAseRawResult
     {
-        std::vector<double> scoreSum;
-        std::vector<double> scoreSquareSum;
+        std::vector<double> vertexBatchScoreSum;
+        std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts{};
         std::vector<unsigned> totalRays;
         std::vector<unsigned> droppedRays;
         unsigned rayCount = 0u;
@@ -119,8 +120,7 @@ namespace hase::core
         double const sourceStratificationOffset,
         unsigned const spectrumStratificationPhase,
         double const betaVolumeTotal,
-        alpaka::concepts::IBuffer auto& phi,
-        alpaka::concepts::IBuffer auto& phiSquare,
+        alpaka::concepts::IBuffer auto& vertexBatchScoreSum,
         alpaka::concepts::IBuffer auto& volumeRayVisits,
         alpaka::concepts::IBuffer auto& droppedRays,
         alpaka::concepts::IBuffer auto const& sigmaA,
@@ -130,8 +130,10 @@ namespace hase::core
         SrmControls const srmControls,
         ForwardSrmWorkspace<T_Device>& workspace)
     {
-        auto accumulationSpans
-            = hase::kernels::forward::ForwardAccumulationSpans{phi, phiSquare, volumeRayVisits, droppedRays};
+        auto accumulationSpans = hase::kernels::forward::ForwardAccumulationSpans{
+            vertexBatchScoreSum.getMdSpan(),
+            volumeRayVisits.getMdSpan(),
+            droppedRays.getMdSpan()};
         auto spectrumSpans = hase::kernels::forward::ForwardSpectrumSpans{sigmaA, sigmaE, lambdaResolution};
         unsigned const faceCount = mesh.numberOfCells * mesh.numberOfFacesPerCell;
         if(workspace.faceCount != faceCount || workspace.reservoirSize != experiment.surfaceReservoirSize
@@ -193,12 +195,13 @@ namespace hase::core
         clearReservoir(countsB, faceWeightsB);
         alpaka::onHost::wait(queue);
 
-        auto const directFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-            devBundle.device,
-            devBundle.executor,
-            alpaka::Vec{static_cast<unsigned int>(rayCount)});
+        constexpr unsigned rayFrameExtent = 128u;
+        auto const rayFrameSpec = alpaka::onHost::FrameSpec{
+            alpaka::Vec{(rayCount + rayFrameExtent - 1u) / rayFrameExtent},
+            alpaka::Vec{rayFrameExtent},
+            devBundle.executor};
         queue.enqueue(
-            directFrameSpec,
+            rayFrameSpec,
             alpaka::KernelBundle{
                 hase::kernels::forward::AccumulateForwardPhiAseReservoir{},
                 mesh,
@@ -214,10 +217,6 @@ namespace hase::core
                 threadLocalStridingRNG});
         alpaka::onHost::wait(queue);
 
-        auto const reflectedFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-            devBundle.device,
-            devBundle.executor,
-            alpaka::Vec{static_cast<unsigned int>(rayCount)});
         bool inputA = true;
         auto const faceFrameSpec
             = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{faceCount});
@@ -302,11 +301,13 @@ namespace hase::core
                 clearReservoir(countsB, faceWeightsB);
                 alpaka::onHost::wait(queue);
                 queue.enqueue(
-                    reflectedFrameSpec,
+                    rayFrameSpec,
                     alpaka::KernelBundle{
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
                         mesh,
                         rayCount,
+                        globalRayOffset,
+                        globalRayCount,
                         sourceWeight,
                         accumulationSpans,
                         reservoirSpansA,
@@ -321,11 +322,13 @@ namespace hase::core
                 clearReservoir(countsA, faceWeightsA);
                 alpaka::onHost::wait(queue);
                 queue.enqueue(
-                    reflectedFrameSpec,
+                    rayFrameSpec,
                     alpaka::KernelBundle{
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
                         mesh,
                         rayCount,
+                        globalRayOffset,
+                        globalRayCount,
                         sourceWeight,
                         accumulationSpans,
                         reservoirSpansB,

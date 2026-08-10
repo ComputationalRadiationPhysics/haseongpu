@@ -12,6 +12,7 @@
 #include <alpakaUtils/DevBundle.hpp>
 #include <alpakaUtils/utils.hpp>
 #include <core/mesh.hpp>
+#include <kernels/forward/accumulation.hpp>
 
 #include <limits>
 
@@ -43,21 +44,31 @@ namespace hase::kernels
     struct FinalizeForwardVolumePhiAse
     {
         unsigned rayCount;
+        alpaka::Vec<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts;
         double betaVolumeTotal;
         double fluorescenceRate;
         double sigmaA;
         double sigmaE;
 
+        template<
+            typename T_Acc,
+            typename T_VertexBatchScoreSum,
+            typename T_LumpedMaterialVertexVolume,
+            typename T_DroppedRays,
+            typename T_VolumePhiAse,
+            typename T_StandardError,
+            typename T_RelativeStandardError,
+            typename T_VolumeDndtAse>
         ALPAKA_FN_ACC void operator()(
-            auto const& acc,
+            T_Acc const& acc,
             core::DeviceMeshView const mesh,
-            auto scoreSum,
-            auto scoreSquareSum,
-            auto droppedRays,
-            auto volumePhiAse,
-            auto standardError,
-            auto relativeStandardError,
-            auto volumeDndtAse) const
+            T_VertexBatchScoreSum vertexBatchScoreSum,
+            T_LumpedMaterialVertexVolume lumpedMaterialVertexVolume,
+            T_DroppedRays droppedRays,
+            T_VolumePhiAse volumePhiAse,
+            T_StandardError standardError,
+            T_RelativeStandardError relativeStandardError,
+            T_VolumeDndtAse volumeDndtAse) const
         {
             for(auto [cell] : alpaka::onAcc::makeIdxMap(
                     acc,
@@ -71,21 +82,52 @@ namespace hase::kernels
                 double estimate = 0.0;
                 if(rayCount > 0u && volume > 0.0)
                 {
-                    estimate = scoreSum[cell] * betaVolumeTotal / (static_cast<double>(rayCount) * volume);
-                    if(droppedRays[cell] == 0u && rayCount >= 2u && alpaka::math::isfinite(scoreSum[cell])
-                       && alpaka::math::isfinite(scoreSquareSum[cell]))
+                    unsigned const materialVertexOffset
+                        = mesh.getCellType(cell) == mesh.claddingNumber ? mesh.numberOfMeshPoints : 0u;
+                    double scoreSum = 0.0;
+                    double batchMeanSum = 0.0;
+                    double batchMeanSquareSum = 0.0;
+                    unsigned activeBatchCount = 0u;
+                    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
                     {
-                        if(scoreSum[cell] == 0.0)
+                        double batchScoreDensity = 0.0;
+                        for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
+                        {
+                            unsigned const materialVertex
+                                = materialVertexOffset
+                                  + mesh.cellPointIndices[cell * mesh.numberOfCellVertices + localVertex];
+                            double const vertexVolume = lumpedMaterialVertexVolume[materialVertex];
+                            unsigned const vertex
+                                = batch * (2u * mesh.numberOfMeshPoints) + materialVertex;
+                            batchScoreDensity
+                                += vertexVolume > 0.0 ? vertexBatchScoreSum[vertex] / vertexVolume : 0.0;
+                        }
+                        batchScoreDensity /= static_cast<double>(mesh.numberOfCellVertices);
+                        double const batchScore = batchScoreDensity * volume;
+                        scoreSum += batchScore;
+                        if(rseBatchRayCounts[batch] == 0u)
+                            continue;
+                        double const batchMean = batchScore / static_cast<double>(rseBatchRayCounts[batch]);
+                        batchMeanSum += batchMean;
+                        batchMeanSquareSum += batchMean * batchMean;
+                        ++activeBatchCount;
+                    }
+                    estimate = scoreSum * betaVolumeTotal / (static_cast<double>(rayCount) * volume);
+                    if(droppedRays[cell] == 0u && activeBatchCount >= 2u)
+                    {
+                        double const count = static_cast<double>(activeBatchCount);
+                        double const batchMean = batchMeanSum / count;
+                        if(batchMean == 0.0)
                         {
                             relativeError = std::numeric_limits<double>::quiet_NaN();
                             absoluteError = 0.0;
                         }
                         else
                         {
-                            double const n = static_cast<double>(rayCount);
-                            double const relativeVariance
-                                = (n * scoreSquareSum[cell] / (scoreSum[cell] * scoreSum[cell]) - 1.0) / n;
-                            relativeError = alpaka::math::sqrt(alpaka::math::max(0.0, relativeVariance));
+                            double const sampleVariance = alpaka::math::max(
+                                0.0,
+                                (batchMeanSquareSum - batchMeanSum * batchMeanSum / count) / (count - 1.0));
+                            relativeError = alpaka::math::sqrt(sampleVariance / count) / alpaka::math::abs(batchMean);
                             absoluteError = relativeError * alpaka::math::abs(estimate) * fluorescenceRate;
                         }
                     }
@@ -115,18 +157,29 @@ namespace hase::kernels
             alpaka::KernelBundle{BuildBetaVolumePrefix{}, mesh, betaVolume, betaVolumePrefix, betaVolumeTotal});
     }
 
+    template<
+        typename T_DevBundle,
+        typename T_Queue,
+        typename T_VertexBatchScoreSum,
+        typename T_LumpedMaterialVertexVolume,
+        typename T_DroppedRays,
+        typename T_VolumePhiAse,
+        typename T_StandardError,
+        typename T_RelativeStandardError,
+        typename T_VolumeDndtAse>
     void enqueueFinalizeForwardCellPhiAse(
-        auto& devBundle,
-        auto const& queue,
+        T_DevBundle& devBundle,
+        T_Queue const& queue,
         core::DeviceMeshView const mesh,
-        auto const& scoreSum,
-        auto const& scoreSquareSum,
-        auto const& droppedRays,
-        auto& volumePhiAse,
-        auto& standardError,
-        auto& relativeStandardError,
-        auto& volumeDndtAse,
+        T_VertexBatchScoreSum const& vertexBatchScoreSum,
+        T_LumpedMaterialVertexVolume const& lumpedMaterialVertexVolume,
+        T_DroppedRays const& droppedRays,
+        T_VolumePhiAse& volumePhiAse,
+        T_StandardError& standardError,
+        T_RelativeStandardError& relativeStandardError,
+        T_VolumeDndtAse& volumeDndtAse,
         unsigned rayCount,
+        alpaka::Vec<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts,
         double betaVolumeTotal,
         double fluorescenceRate,
         double sigmaA,
@@ -139,10 +192,16 @@ namespace hase::kernels
         queue.enqueue(
             cellFrameSpec,
             alpaka::KernelBundle{
-                FinalizeForwardVolumePhiAse{rayCount, betaVolumeTotal, fluorescenceRate, sigmaA, sigmaE},
+                FinalizeForwardVolumePhiAse{
+                    rayCount,
+                    rseBatchRayCounts,
+                    betaVolumeTotal,
+                    fluorescenceRate,
+                    sigmaA,
+                    sigmaE},
                 mesh,
-                scoreSum,
-                scoreSquareSum,
+                vertexBatchScoreSum,
+                lumpedMaterialVertexVolume,
                 droppedRays,
                 volumePhiAse,
                 standardError,
