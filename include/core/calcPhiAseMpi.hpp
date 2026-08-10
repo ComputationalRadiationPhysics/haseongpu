@@ -304,8 +304,8 @@ namespace hase::core
 
         auto const& mesh = meshes.at(static_cast<std::size_t>(firstDevice));
         int const volumeCount = static_cast<int>(mesh.numberOfCells);
-        int const batchedMaterialVertexCount = static_cast<int>(
-            hase::kernels::forward::forwardRseBatchCount * 2u * mesh.numberOfMeshPoints);
+        int const batchedMaterialVertexCount
+            = static_cast<int>(hase::kernels::forward::forwardRseBatchCount * 2u * mesh.numberOfMeshPoints);
         int totalUsedDevices = 0;
         adaptiveLaunches = 0u;
         result = makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);

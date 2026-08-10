@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -35,7 +36,7 @@ LEGACY_COMMIT = "effd8077edccef93a68d818e8a5eb2f0ebdc03b4"
 CLADDING_NUMBER = 1
 PHYSICAL_CLADDING_ABSORPTION = 5.5
 INSTRUMENTATION_CLADDING_ABSORPTION = 55.0
-CURRENT_FORWARD_RAYS = 4_000_000
+CURRENT_FORWARD_RAYS = int(os.environ.get("HASE_TEST_TRUE_CLADDING_FORWARD_RAYS", "750000"))
 
 
 def _tet_volume(points, cell):

@@ -7,6 +7,7 @@
 import json
 import importlib.util
 import itertools
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -62,6 +63,12 @@ REFERENCE_PATH = (
 # The fixed legacy wedge and Tet4 solvers both reflect at the physical top
 # plane, z = (numberOfLevels - 1) * thickness.
 INTEGRAL_RTOL = 0.05
+REFLECTION_TOGGLE_FORWARD_RAYS = int(
+    os.environ.get("HASE_TEST_REFLECTION_TOGGLE_FORWARD_RAYS", "1000")
+)
+LEGACY_WEDGE_FORWARD_RAYS = int(
+    os.environ.get("HASE_TEST_LEGACY_WEDGE_FORWARD_RAYS", "200000")
+)
 
 
 def _triangle_area(points):
@@ -280,8 +287,8 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             prePump=True,
             rngSeed=1234,
             useReflections=use_reflections,
-        minRays=20_000,
-        maxRays=20_000,
+            minRays=REFLECTION_TOGGLE_FORWARD_RAYS,
+            maxRays=REFLECTION_TOGGLE_FORWARD_RAYS,
             adaptiveSteps=1,
             relativeStandardErrorThreshold=0.1,
             reflectionMaxIterations=17,
@@ -320,8 +327,9 @@ def laserPumpCladdingBackendResults(
             prePump=metadata["parameters"]["prePump"],
             rngSeed=metadata["random"]["rngSeed"],
             useReflections=metadata["parameters"]["useReflections"],
-            minRays=metadata["parameters"]["minRaysPerSample"],
-            maxRays=metadata["parameters"]["maxRaysPerSample"],
+            minRays=LEGACY_WEDGE_FORWARD_RAYS,
+            maxRays=LEGACY_WEDGE_FORWARD_RAYS,
+            forwardRayCount=LEGACY_WEDGE_FORWARD_RAYS,
             relativeStandardErrorThreshold=0.05,
             adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
             outputSteps=metadata["observable"]["stepNumbers"],

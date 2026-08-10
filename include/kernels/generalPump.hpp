@@ -322,8 +322,7 @@ namespace hase::kernels
                         intersection.length);
                     for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
                     {
-                        unsigned const point
-                            = mesh.cellPointIndices[tet * mesh.numberOfCellVertices + localVertex];
+                        unsigned const point = mesh.cellPointIndices[tet * mesh.numberOfCellVertices + localVertex];
                         alpaka::onAcc::atomicAdd(acc, &vertexPumpIntegral[point], integral * weights[localVertex]);
                     }
                 }
@@ -1199,12 +1198,6 @@ namespace hase::kernels
         T_BoundaryPolicy boundaryPolicy = {})
     {
         enqueueGeneralPumpIntegrals(devBundle, queue, mesh, sources, betaVolume, vertexPumpIntegral, boundaryPolicy);
-        enqueueProjectVertexPumpRateToCells(
-            devBundle,
-            queue,
-            mesh,
-            vertexPumpIntegral,
-            lumpedVertexVolume,
-            cellRate);
+        enqueueProjectVertexPumpRateToCells(devBundle, queue, mesh, vertexPumpIntegral, lumpedVertexVolume, cellRate);
     }
 } // namespace hase::kernels

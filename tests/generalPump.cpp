@@ -59,22 +59,8 @@ namespace
     hase::core::HostMesh makeTwoTetMesh()
     {
         // Two unit-height tetrahedra share the triangle (0, 1, 2).
-        std::vector<double> const meshPoints = {
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            -1.0};
+        std::vector<double> const meshPoints
+            = {0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0};
         std::vector<double> const centers = {0.25, 0.25, 0.25, 0.25, 0.25, -0.25};
         return hase::core::HostMesh{
             {0u, 1u, 2u, 3u, 0u, 2u, 1u, 4u},
@@ -179,10 +165,8 @@ TEMPLATE_LIST_TEST_CASE(
         std::vector<double> vertexValues(mesh.numberOfMeshPoints, 0.0);
         vertexValues[0] = 1.0;
         auto vertexIntegral = hase::alpakaUtils::toDevice(queue, vertexValues);
-        auto lumpedVertexVolume
-            = hase::alpakaUtils::toDevice(queue, hase::kernels::makeLumpedGainVertexVolumes(mesh));
-        auto cellRate
-            = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfCells, 0.0));
+        auto lumpedVertexVolume = hase::alpakaUtils::toDevice(queue, hase::kernels::makeLumpedGainVertexVolumes(mesh));
+        auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfCells, 0.0));
         hase::kernels::enqueueProjectVertexPumpRateToCells(
             devBundle,
             queue,
@@ -316,8 +300,7 @@ TEMPLATE_LIST_TEST_CASE(
     auto mesh = makeSingleTetMesh();
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    auto vertexIntegral
-        = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
+    auto vertexIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
 
     auto source = uniformSource(10u);
     source.wavelengths = {940e-9};
@@ -410,8 +393,7 @@ TEMPLATE_LIST_TEST_CASE(
     auto mesh = makeSingleTetMesh();
     auto deviceMesh = mesh.toDevice(device);
     auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
-    auto vertexIntegral
-        = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
+    auto vertexIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
     auto const lumpedVolumes = hase::kernels::makeLumpedGainVertexVolumes(mesh);
     auto lumpedVertexVolume = hase::alpakaUtils::toDevice(queue, lumpedVolumes);
     auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
@@ -446,9 +428,7 @@ TEMPLATE_LIST_TEST_CASE(
     CHECK(depositedIntegral > 0.0);
     CHECK(std::isfinite(rates[0]));
     CHECK(rates[0] >= 0.0);
-    CHECK(
-        rates[0] * static_cast<double>(mesh.cellVolumes[0])
-        == Catch::Approx(depositedIntegral).epsilon(2.0e-6));
+    CHECK(rates[0] * static_cast<double>(mesh.cellVolumes[0]) == Catch::Approx(depositedIntegral).epsilon(2.0e-6));
 }
 
 TEMPLATE_LIST_TEST_CASE(
@@ -490,10 +470,8 @@ TEMPLATE_LIST_TEST_CASE(
         auto prepared
             = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
         auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.1});
-        auto vertexIntegral
-            = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
-        auto lumpedVertexVolume
-            = hase::alpakaUtils::toDevice(queue, hase::kernels::makeLumpedGainVertexVolumes(mesh));
+        auto vertexIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
+        auto lumpedVertexVolume = hase::alpakaUtils::toDevice(queue, hase::kernels::makeLumpedGainVertexVolumes(mesh));
         auto cellRate = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.0});
         hase::kernels::enqueueGeneralPump(
             devBundle,

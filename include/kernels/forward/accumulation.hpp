@@ -31,8 +31,8 @@ namespace hase::kernels::forward
     {
         unsigned const end = globalRayOffset + rayCount;
         unsigned const first
-            = globalRayOffset + (batch + forwardRseBatchCount - globalRayOffset % forwardRseBatchCount)
-                                    % forwardRseBatchCount;
+            = globalRayOffset
+              + (batch + forwardRseBatchCount - globalRayOffset % forwardRseBatchCount) % forwardRseBatchCount;
         return first < end ? 1u + (end - 1u - first) / forwardRseBatchCount : 0u;
     }
 
@@ -57,8 +57,7 @@ namespace hase::kernels::forward
         unsigned const applicationSeed,
         unsigned const batch)
     {
-        return static_cast<double>(rseBatchSeed(rseBatchSeed(applicationSeed, batch), 0x7d3a'9f21u))
-               / 4294967296.0;
+        return static_cast<double>(rseBatchSeed(rseBatchSeed(applicationSeed, batch), 0x7d3a'9f21u)) / 4294967296.0;
     }
 
     ALPAKA_FN_HOST_ACC constexpr unsigned rseBatchSpectrumStratificationPhase(
@@ -66,9 +65,8 @@ namespace hase::kernels::forward
         unsigned const batch,
         unsigned const spectrumSize)
     {
-        return spectrumSize == 0u
-                   ? 0u
-                   : rseBatchSeed(rseBatchSeed(applicationSeed, batch), 0x6ca4'c37du) % spectrumSize;
+        return spectrumSize == 0u ? 0u
+                                  : rseBatchSeed(rseBatchSeed(applicationSeed, batch), 0x6ca4'c37du) % spectrumSize;
     }
 
     ALPAKA_FN_HOST_ACC constexpr unsigned rseBatchRayIndex(unsigned const globalRayIndex)
@@ -330,16 +328,11 @@ namespace hase::kernels::forward
                     = mesh.getCellType(tet) == mesh.claddingNumber ? mesh.numberOfMeshPoints : 0u;
                 for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
                 {
-                    unsigned const materialVertex = materialVertexOffset
-                                                    + mesh.cellPointIndices[
-                                                        tet * mesh.numberOfCellVertices + localVertex];
-                    unsigned const vertex
-                        = rayState.rseBatch * (2u * mesh.numberOfMeshPoints) + materialVertex;
+                    unsigned const materialVertex
+                        = materialVertexOffset + mesh.cellPointIndices[tet * mesh.numberOfCellVertices + localVertex];
+                    unsigned const vertex = rayState.rseBatch * (2u * mesh.numberOfMeshPoints) + materialVertex;
                     double const weight = weights[localVertex];
-                    alpaka::onAcc::atomicAdd(
-                        acc,
-                        &accumulation.vertexBatchScoreSum[vertex],
-                        contribution * weight);
+                    alpaka::onAcc::atomicAdd(acc, &accumulation.vertexBatchScoreSum[vertex], contribution * weight);
                 }
             }
             else

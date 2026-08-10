@@ -15,20 +15,19 @@
 namespace hase::kernels
 {
     [[nodiscard]] inline unsigned materialVertexIndex(
-        hase::core::HostMesh const& mesh,
+        core::HostMesh const& mesh,
         unsigned const cell,
         unsigned const localVertex)
     {
         unsigned const point = mesh.cellPointIndices.at(cell * mesh.numberOfCellVertices + localVertex);
-        return point
-               + (mesh.claddingCellTypes.at(cell) == mesh.claddingNumber ? mesh.numberOfMeshPoints : 0u);
+        return point + (mesh.claddingCellTypes.at(cell) == mesh.claddingNumber ? mesh.numberOfMeshPoints : 0u);
     }
 
-    [[nodiscard]] inline std::vector<double> makeLumpedMaterialVertexVolumes(hase::core::HostMesh const& mesh)
+    [[nodiscard]] inline std::vector<double> makeLumpedMaterialVertexVolumes(core::HostMesh const& mesh)
     {
         // Gain and cladding use separate values at a shared geometric vertex so
         // accumulation cannot smear a physical discontinuity across the interface.
-        std::vector<double> result(2u * mesh.numberOfMeshPoints, 0.0);
+        std::vector result(2u * mesh.numberOfMeshPoints, 0.0);
         for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
         {
             double const share
@@ -39,21 +38,21 @@ namespace hase::kernels
         return result;
     }
 
-    [[nodiscard]] inline std::vector<double> makeLumpedGainVertexVolumes(hase::core::HostMesh const& mesh)
+    [[nodiscard]] inline std::vector<double> makeLumpedGainVertexVolumes(core::HostMesh const& mesh)
     {
         auto const materialVolumes = makeLumpedMaterialVertexVolumes(mesh);
         return {materialVolumes.begin(), materialVolumes.begin() + mesh.numberOfMeshPoints};
     }
 
     [[nodiscard]] inline std::vector<double> accumulateMaterialVertexIntegralsToCellDensities(
-        hase::core::HostMesh const& mesh,
+        core::HostMesh const& mesh,
         std::vector<double> const& vertexIntegrals)
     {
         if(vertexIntegrals.size() != 2u * mesh.numberOfMeshPoints)
             throw std::runtime_error("material vertex integral count does not match the mesh");
 
         auto const lumpedVertexVolumes = makeLumpedMaterialVertexVolumes(mesh);
-        std::vector<double> result(mesh.numberOfCells, 0.0);
+        std::vector result(mesh.numberOfCells, 0.0);
         for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
         {
             double densitySum = 0.0;

@@ -89,21 +89,13 @@ namespace hase::core
             , m_lumpedMaterialVertexVolume(
                   hase::alpakaUtils::toDevice(m_queue, hase::kernels::makeLumpedMaterialVertexVolumes(hostMesh)))
             , m_volumePhiAse(
-                  alpaka::onHost::alloc<float>(
-                      m_devBundle.device,
-                      static_cast<std::size_t>(hostMesh.numberOfCells)))
+                  alpaka::onHost::alloc<float>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
             , m_standardError(
-                  alpaka::onHost::alloc<double>(
-                      m_devBundle.device,
-                      static_cast<std::size_t>(hostMesh.numberOfCells)))
+                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
             , m_relativeStandardError(
-                  alpaka::onHost::alloc<double>(
-                      m_devBundle.device,
-                      static_cast<std::size_t>(hostMesh.numberOfCells)))
+                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
             , m_volumeDndtAse(
-                  alpaka::onHost::alloc<double>(
-                      m_devBundle.device,
-                      static_cast<std::size_t>(hostMesh.numberOfCells)))
+                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
             , m_betaVolumeTotal(alpaka::onHost::alloc<double>(m_devBundle.device, std::size_t{1}))
             , m_volumeCount(hostMesh.numberOfCells)
             , m_vertexCount(hostMesh.numberOfMeshPoints)
@@ -141,10 +133,8 @@ namespace hase::core
             m_accumulatedRayCount += rayCount;
             for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
             {
-                m_rseBatchRayCounts.at(batch) += hase::kernels::forward::rseBatchRayCount(
-                    globalRayOffset,
-                    rayCount,
-                    batch);
+                m_rseBatchRayCounts.at(batch)
+                    += hase::kernels::forward::rseBatchRayCount(globalRayOffset, rayCount, batch);
             }
             if(rayCount == 0u)
                 return;
@@ -156,8 +146,7 @@ namespace hase::core
                     m_vertexBatchScoreSum,
                     0.0,
                     alpaka::Vec{
-                        hase::kernels::forward::forwardRseBatchCount * 2u
-                        * static_cast<std::size_t>(m_vertexCount)});
+                        hase::kernels::forward::forwardRseBatchCount * 2u * static_cast<std::size_t>(m_vertexCount)});
                 alpaka::onHost::fill(
                     m_queue,
                     m_volumeRayVisits,

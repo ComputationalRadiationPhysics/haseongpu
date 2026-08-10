@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +30,9 @@ REFERENCE_PATH = (
     / "phiase_reference.npz"
 )
 INTEGRAL_RTOL = 0.05
+LEGACY_WEDGE_FORWARD_RAYS = int(
+    os.environ.get("HASE_TEST_LEGACY_WEDGE_FORWARD_RAYS", "200000")
+)
 
 
 def _triangle_area(points):
@@ -136,8 +140,9 @@ def testCurrentTet4WithoutReflectionsMatchesLegacyWedgeIntegral(
         prePump=metadata["parameters"]["prePump"],
         rngSeed=metadata["random"]["rngSeed"],
         useReflections=False,
-        minRays=metadata["parameters"]["minRaysPerSample"],
-        maxRays=metadata["parameters"]["maxRaysPerSample"],
+        minRays=LEGACY_WEDGE_FORWARD_RAYS,
+        maxRays=LEGACY_WEDGE_FORWARD_RAYS,
+        forwardRayCount=LEGACY_WEDGE_FORWARD_RAYS,
         relativeStandardErrorThreshold=0.05,
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
         outputSteps=metadata["observable"]["stepNumbers"],

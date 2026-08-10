@@ -180,8 +180,7 @@ namespace hase::core
                     unsigned const launchSeed = random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches);
                     bool const terminalLaunch
                         = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays;
-                    bool const deviceResidentBatch
-                        = allowDeviceResident && usedDevices <= 1u && activeDevices == 1u;
+                    bool const deviceResidentBatch = allowDeviceResident && usedDevices <= 1u && activeDevices == 1u;
                     auto const batchResult = evaluatePersistentBatch(
                         experiment,
                         hostMesh,
@@ -227,8 +226,9 @@ namespace hase::core
                             targetRayCount,
                             experiment.relativeStandardErrorThreshold,
                             convergenceRayCounts);
-                        meetsRelativeStandardError
-                            = forwardResultMeetsRelativeStandardError(result, experiment.relativeStandardErrorThreshold);
+                        meetsRelativeStandardError = forwardResultMeetsRelativeStandardError(
+                            result,
+                            experiment.relativeStandardErrorThreshold);
                     }
                     if(terminalLaunch || meetsRelativeStandardError)
                         break;
