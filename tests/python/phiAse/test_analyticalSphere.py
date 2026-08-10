@@ -53,7 +53,7 @@ def _requireGmsh():
 
 def constructExplicitSphereTopology(radius, *, samplePoints=None, meshSizeDivisor=8.0):
     gmshApi = _requireGmsh()
-    center = np.asarray((radius, radius, radius), dtype=np.float64)
+    center = np.zeros(3, dtype=np.float64)
     with tempfile.TemporaryDirectory() as tmpdir:
         msh = f"{tmpdir}/sphere_tet4.msh"
         gmshApi.initialize()
@@ -62,10 +62,56 @@ def constructExplicitSphereTopology(radius, *, samplePoints=None, meshSizeDiviso
             gmshApi.clear()
             gmshApi.model.add("sphere_tet4")
             sphere = gmshApi.model.occ.addSphere(float(center[0]), float(center[1]), float(center[2]), float(radius))
+
+            # Preserve one regular central tetrahedron as a distinct CAD volume. Its
+            # signed-coordinate vertices have an exact centroid at the sphere center.
+            centralScale = float(radius) / (3.0 * float(meshSizeDivisor))
+            centralCoordinates = (
+                (+centralScale, +centralScale, +centralScale),
+                (+centralScale, -centralScale, -centralScale),
+                (-centralScale, +centralScale, -centralScale),
+                (-centralScale, -centralScale, +centralScale),
+            )
+            points = [gmshApi.model.occ.addPoint(*coordinate) for coordinate in centralCoordinates]
+            line01 = gmshApi.model.occ.addLine(points[0], points[1])
+            line02 = gmshApi.model.occ.addLine(points[0], points[2])
+            line03 = gmshApi.model.occ.addLine(points[0], points[3])
+            line12 = gmshApi.model.occ.addLine(points[1], points[2])
+            line13 = gmshApi.model.occ.addLine(points[1], points[3])
+            line23 = gmshApi.model.occ.addLine(points[2], points[3])
+            faces = [
+                gmshApi.model.occ.addPlaneSurface(
+                    [gmshApi.model.occ.addCurveLoop([line02, -line12, -line01])]
+                ),
+                gmshApi.model.occ.addPlaneSurface(
+                    [gmshApi.model.occ.addCurveLoop([line01, line13, -line03])]
+                ),
+                gmshApi.model.occ.addPlaneSurface(
+                    [gmshApi.model.occ.addCurveLoop([line03, -line23, -line02])]
+                ),
+                gmshApi.model.occ.addPlaneSurface(
+                    [gmshApi.model.occ.addCurveLoop([line12, line23, -line13])]
+                ),
+            ]
+            centralSurfaceLoop = gmshApi.model.occ.addSurfaceLoop(faces)
+            centralTetrahedron = gmshApi.model.occ.addVolume([centralSurfaceLoop])
+            fragments, _ = gmshApi.model.occ.fragment(
+                [(3, sphere)],
+                [(3, centralTetrahedron)],
+                removeObject=True,
+                removeTool=True,
+            )
             gmshApi.model.occ.synchronize()
-            gmshApi.model.addPhysicalGroup(3, [sphere], 1)
+            volumeTags = [tag for dim, tag in fragments if dim == 3]
+            gmshApi.model.addPhysicalGroup(3, volumeTags, 1)
             gmshApi.model.setPhysicalName(3, 1, "gain")
-            surfaces = [tag for dim, tag in gmshApi.model.getEntities(2)]
+            combinedBoundary = gmshApi.model.getBoundary(
+                [(3, tag) for tag in volumeTags],
+                combined=True,
+                oriented=False,
+                recursive=False,
+            )
+            surfaces = [tag for dim, tag in combinedBoundary if dim == 2]
             if surfaces:
                 gmshApi.model.addPhysicalGroup(2, surfaces, 2)
                 gmshApi.model.setPhysicalName(2, 2, "outer")
@@ -86,6 +132,18 @@ def nearestVolumeIndex(topology, point):
     point = np.asarray(point, dtype=np.float64)
     distances = np.linalg.norm(np.asarray(topology.cellCenters, dtype=np.float64) - point, axis=1)
     return int(np.argmin(distances))
+
+
+def centeredVolumeIndex(topology, radius):
+    centerVolume = nearestVolumeIndex(topology, np.zeros(3, dtype=np.float64))
+    center = np.asarray(topology.cellCenters[centerVolume], dtype=np.float64)
+    np.testing.assert_allclose(
+        center,
+        np.zeros(3, dtype=np.float64),
+        rtol=0.0,
+        atol=64.0 * np.finfo(np.float64).eps * max(1.0, float(radius)),
+    )
+    return centerVolume
 
 
 nTot = np.float64(1.38e20 * 1.0)
@@ -117,7 +175,14 @@ def analyticalSphereBackends():
 
 
 def analyticalSphereRayCount():
-    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "5000000"))
+    return int(os.environ.get("HASE_ANALYTICAL_SPHERE_RAYS", "2000000"))
+
+
+def analyticalSphereMeshSizeDivisor():
+    divisor = float(os.environ.get("HASE_ANALYTICAL_SPHERE_MESH_SIZE_DIVISOR", "10.0"))
+    if not np.isfinite(divisor) or divisor <= 0.0:
+        raise ValueError("HASE_ANALYTICAL_SPHERE_MESH_SIZE_DIVISOR must be finite and positive")
+    return divisor
 
 
 @pytest.mark.parametrize("backend", analyticalSphereBackends())
@@ -132,12 +197,10 @@ def testForwardSphereCenterVolumeMatchesAnalyticalSolution(radius, gain, openpmd
     sigmaE = np.float64(2.1e-20)
     beta = calcBetaFromGain(gain, nTot, sigmaA=sigmaA, sigmaE=sigmaE)
     flourescenceLifetime = np.float64(9.41e-4)
-    center = np.asarray((radius, radius, radius), dtype=np.float64)
-
-    topology = constructExplicitSphereTopology(radius, meshSizeDivisor=8.0)
+    topology = constructExplicitSphereTopology(radius, meshSizeDivisor=analyticalSphereMeshSizeDivisor())
     assert topology.numberOfCells >= 1_000
 
-    centerVolume = nearestVolumeIndex(topology, center)
+    centerVolume = centeredVolumeIndex(topology, radius)
     medium = GainMedium(topology=topology)
     medium.withPhysicalProperties(
         betaVolume=np.full(topology.numberOfCells, beta, dtype=np.float64),
