@@ -20,12 +20,14 @@
 #include <kernels/forward/rayTransition.hpp>
 #include <kernels/forward/rayWalk.hpp>
 #include <kernels/vertexAccumulation.hpp>
+#include <random/random.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <concepts>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <random>
 #include <stdexcept>
@@ -149,6 +151,97 @@ namespace hase::kernels
         return std::exp(-std::pow(std::sqrt(u * u + v * v), profile.exponent));
     }
 
+    [[nodiscard]] inline double pumpEntryWeight(
+        PumpBoundaryFace const& face,
+        hase::core::PumpProfileParameters const& profile)
+    {
+        // Seven-point Dunavant quadrature.  The CDF must represent the
+        // aperture's spatial entry distribution, not just its triangle areas:
+        // after a region is selected, rejection sampling supplies the matching
+        // conditional distribution inside that region.
+        constexpr std::array<std::array<double, 3u>, 7u> barycentric{{
+            {1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0},
+            {0.059715871789770, 0.470142064105115, 0.470142064105115},
+            {0.470142064105115, 0.059715871789770, 0.470142064105115},
+            {0.470142064105115, 0.470142064105115, 0.059715871789770},
+            {0.797426985353087, 0.101286507323456, 0.101286507323456},
+            {0.101286507323456, 0.797426985353087, 0.101286507323456},
+            {0.101286507323456, 0.101286507323456, 0.797426985353087},
+        }};
+        constexpr std::array<double, 7u> weights{
+            0.225,
+            0.132394152788506,
+            0.132394152788506,
+            0.132394152788506,
+            0.125939180544827,
+            0.125939180544827,
+            0.125939180544827};
+
+        double integral = 0.0;
+        for(std::size_t sample = 0u; sample < barycentric.size(); ++sample)
+        {
+            auto const& coordinate = barycentric[sample];
+            hase::core::Point const point = face.vertices[0] * coordinate[0] + face.vertices[1] * coordinate[1]
+                                            + face.vertices[2] * coordinate[2];
+            integral += weights[sample] * pumpProfileWeight(profile, point);
+        }
+        return face.area * integral;
+    }
+
+    inline void appendPumpEntryRegions(
+        PumpBoundaryFace const& face,
+        unsigned const remainingSubdivisions,
+        std::vector<PumpBoundaryFace>& regions)
+    {
+        if(remainingSubdivisions == 0u)
+        {
+            regions.push_back(face);
+            return;
+        }
+
+        auto const midpoint = [](hase::core::Point const a, hase::core::Point const b) { return (a + b) * 0.5; };
+        hase::core::Point const midpoint01 = midpoint(face.vertices[0], face.vertices[1]);
+        hase::core::Point const midpoint12 = midpoint(face.vertices[1], face.vertices[2]);
+        hase::core::Point const midpoint20 = midpoint(face.vertices[2], face.vertices[0]);
+        std::array<std::array<hase::core::Point, 3u>, 4u> const vertices{{
+            {face.vertices[0], midpoint01, midpoint20},
+            {midpoint01, face.vertices[1], midpoint12},
+            {midpoint20, midpoint12, face.vertices[2]},
+            {midpoint01, midpoint12, midpoint20},
+        }};
+        for(auto const& regionVertices : vertices)
+        {
+            PumpBoundaryFace region = face;
+            region.vertices = regionVertices;
+            region.centroid = (regionVertices[0] + regionVertices[1] + regionVertices[2]) * (1.0 / 3.0);
+            region.area = face.area * 0.25;
+            appendPumpEntryRegions(region, remainingSubdivisions - 1u, regions);
+        }
+    }
+
+    [[nodiscard]] inline std::vector<PumpBoundaryFace> pumpEntryRegions(std::vector<PumpBoundaryFace> const& faces)
+    {
+        // Spatial regions make the systematic CDF cover the continuous entry
+        // aperture.  A face-only CDF leaves all within-face variation random,
+        // which is especially noisy for a nonuniform beam profile.
+        constexpr unsigned subdivisionDepth = 2u;
+        constexpr std::size_t regionsPerFace = 1u << (2u * subdivisionDepth);
+        std::vector<PumpBoundaryFace> regions;
+        regions.reserve(faces.size() * regionsPerFace);
+        for(auto const& face : faces)
+            appendPumpEntryRegions(face, subdivisionDepth, regions);
+        return regions;
+    }
+
+    [[nodiscard]] inline std::size_t pumpEntryRegionForTarget(std::vector<double> const& entryCdf, double const target)
+    {
+        if(entryCdf.empty())
+            return 0u;
+        auto const region = std::upper_bound(entryCdf.cbegin(), entryCdf.cend(), target);
+        return region == entryCdf.cend() ? entryCdf.size() - 1u
+                                         : static_cast<std::size_t>(std::distance(entryCdf.cbegin(), region));
+    }
+
     template<typename T_Rng>
     [[nodiscard]] inline hase::core::Point sampleTriangle(PumpBoundaryFace const& face, T_Rng& rng)
     {
@@ -177,11 +270,19 @@ namespace hase::kernels
         auto const faces = pumpBoundaryFaces(mesh, source.surfaces);
         if(faces.empty())
             throw std::runtime_error("pump source selected no exterior boundary faces");
-        std::vector<double> areas;
-        areas.reserve(faces.size());
-        for(auto const& face : faces)
-            areas.push_back(face.area);
-        std::discrete_distribution<std::size_t> faceDistribution(areas.begin(), areas.end());
+        if(selectedRayCount == 0u)
+            return {};
+        auto const entryRegions = pumpEntryRegions(faces);
+        std::vector<double> entryCdf;
+        entryCdf.reserve(entryRegions.size());
+        double totalEntryWeight = 0.0;
+        for(auto const& region : entryRegions)
+        {
+            totalEntryWeight += pumpEntryWeight(region, source.profile);
+            entryCdf.push_back(totalEntryWeight);
+        }
+        if(!(totalEntryWeight > 0.0) || !std::isfinite(totalEntryWeight))
+            throw std::runtime_error("pump spatial profile has no finite weight on the selected exterior faces");
         std::discrete_distribution<std::size_t> spectrumDistribution(
             source.spectralWeights.begin(),
             source.spectralWeights.end());
@@ -190,17 +291,19 @@ namespace hase::kernels
             source.angularWeights.end());
         std::mt19937_64 rng(seed);
         std::uniform_real_distribution<double> uniform(0.0, 1.0);
+        double const entryStratificationOffset = hase::random::stratifiedUnitOffset(seed);
 
         std::vector<GeneralPumpRayState> rays;
         rays.reserve(selectedRayCount);
         for(unsigned ray = 0u; ray < selectedRayEnd; ++ray)
         {
-            PumpBoundaryFace const* face = nullptr;
+            double const entryTarget = (static_cast<double>(ray) + entryStratificationOffset)
+                                       / static_cast<double>(globalRayCount) * totalEntryWeight;
+            PumpBoundaryFace const* face = &entryRegions[pumpEntryRegionForTarget(entryCdf, entryTarget)];
             hase::core::Point origin;
             bool accepted = false;
             for(unsigned attempt = 0u; attempt < 100000u; ++attempt)
             {
-                face = &faces[faceDistribution(rng)];
                 origin = sampleTriangle(*face, rng);
                 if(uniform(rng) <= pumpProfileWeight(source.profile, origin))
                 {
