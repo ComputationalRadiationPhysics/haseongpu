@@ -71,7 +71,7 @@ def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRunti
             "--pumpSteps",
             "50",
             "--pump-ray-count",
-            "10000",
+            "100000",
             "--spectral-resolution",
             "191",
             "--vtk-output-dir",
