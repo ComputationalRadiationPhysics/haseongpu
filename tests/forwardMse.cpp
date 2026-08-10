@@ -137,6 +137,119 @@ TEST_CASE("forward PhiASE RSE handles invalid and zero-score estimates", "[forwa
         == std::numeric_limits<double>::max());
 }
 
+TEST_CASE("forward PhiASE RSE batches use independent deterministic sampling streams", "[forward][rse]")
+{
+    constexpr unsigned applicationSeed = 123456789u;
+    std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> seeds{};
+    std::array<double, hase::kernels::forward::forwardRseBatchCount> sourceOffsets{};
+    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+    {
+        seeds.at(batch) = hase::kernels::forward::rseBatchSeed(applicationSeed, batch);
+        sourceOffsets.at(batch)
+            = hase::kernels::forward::rseBatchSourceStratificationOffset(applicationSeed, batch);
+        CHECK(seeds.at(batch) == hase::kernels::forward::rseBatchSeed(applicationSeed, batch));
+        CHECK(sourceOffsets.at(batch) >= 0.0);
+        CHECK(sourceOffsets.at(batch) < 1.0);
+    }
+    std::ranges::sort(seeds);
+    CHECK(std::ranges::adjacent_find(seeds) == seeds.end());
+    std::ranges::sort(sourceOffsets);
+    CHECK(std::ranges::adjacent_find(sourceOffsets) == sourceOffsets.end());
+
+    constexpr unsigned rayCount = 19u;
+    unsigned countedRays = 0u;
+    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+    {
+        unsigned const batchRayCount = hase::kernels::forward::rseBatchRayCount(0u, rayCount, batch);
+        countedRays += batchRayCount;
+        for(unsigned batchRay = 0u; batchRay < batchRayCount; ++batchRay)
+        {
+            unsigned const globalRay = batchRay * hase::kernels::forward::forwardRseBatchCount + batch;
+            CHECK(hase::kernels::forward::rseBatchRayIndex(globalRay) == batchRay);
+        }
+    }
+    CHECK(countedRays == rayCount);
+}
+
+TEST_CASE("forward PhiASE vertex accumulation remains cell based and conservative", "[forward][vertex]")
+{
+    auto mesh = makeTraversalMesh(
+        {
+            {0.0, 0.0, 0.0},
+            {1.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            {0.0, 0.0, 1.0},
+            {0.0, 0.0, -1.0},
+        },
+        {{0u, 1u, 2u, 3u}, {0u, 1u, 2u, 4u}});
+    mesh.cellVolumes = {1.0f, 1.0f};
+    mesh.claddingCellTypes = {0u, 0u};
+    mesh.claddingNumber = 1u;
+
+    auto raw = hase::core::makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);
+    unsigned const materialVertexCount = 2u * mesh.numberOfMeshPoints;
+    std::array<double, 4u> const batchScores{0.1, 0.2, 0.3, 0.4};
+    for(unsigned batch = 0u; batch < batchScores.size(); ++batch)
+    {
+        raw.vertexBatchScoreSum[batch * materialVertexCount] = batchScores.at(batch);
+        raw.rseBatchRayCounts.at(batch) = 1u;
+    }
+    raw.rayCount = 4u;
+
+    hase::core::Result result;
+    hase::core::finalizeForwardPhiAse(mesh, raw, 4.0, result);
+
+    REQUIRE(result.phiAse.size() == mesh.numberOfCells);
+    CHECK(result.phiAse[0u] == Catch::Approx(0.5));
+    CHECK(result.phiAse[1u] == Catch::Approx(0.5));
+    double const cellIntegral = std::inner_product(
+        result.phiAse.cbegin(),
+        result.phiAse.cend(),
+        mesh.cellVolumes.cbegin(),
+        0.0);
+    CHECK(cellIntegral == Catch::Approx(1.0));
+
+    double const batchMean = 0.125;
+    double const batchSampleVariance = (0.075 - 0.5 * 0.5 / 4.0) / 3.0;
+    double const expectedRse = std::sqrt(batchSampleVariance / 4.0) / batchMean;
+    CHECK(result.relativeStandardError[0u] == Catch::Approx(expectedRse));
+    CHECK(result.standardError[0u] == Catch::Approx(expectedRse * result.phiAse[0u]));
+}
+
+TEST_CASE("forward PhiASE vertex accumulation preserves gain cladding interfaces", "[forward][vertex][cladding]")
+{
+    auto mesh = makeTraversalMesh(
+        {
+            {0.0, 0.0, 0.0},
+            {1.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            {0.0, 0.0, 1.0},
+            {0.0, 0.0, -1.0},
+        },
+        {{0u, 1u, 2u, 3u}, {0u, 1u, 2u, 4u}});
+    mesh.cellVolumes = {1.0f, 1.0f};
+    mesh.claddingCellTypes = {0u, 1u};
+    mesh.claddingNumber = 1u;
+
+    auto raw = hase::core::makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);
+    unsigned const materialVertexCount = 2u * mesh.numberOfMeshPoints;
+    for(unsigned batch = 0u; batch < 4u; ++batch)
+    {
+        raw.vertexBatchScoreSum[batch * materialVertexCount] = 0.25;
+        raw.vertexBatchScoreSum[batch * materialVertexCount + mesh.numberOfMeshPoints] = 1.0;
+        raw.rseBatchRayCounts.at(batch) = 1u;
+    }
+    raw.rayCount = 4u;
+
+    hase::core::Result result;
+    hase::core::finalizeForwardPhiAse(mesh, raw, 4.0, result);
+
+    REQUIRE(result.phiAse.size() == mesh.numberOfCells);
+    CHECK(result.phiAse[0u] == Catch::Approx(1.0));
+    // Gain and cladding accumulate separate values at their shared geometric vertex.
+    CHECK(result.phiAse[1u] == Catch::Approx(4.0));
+}
+
 TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[forward][rse]")
 {
     hase::core::BetaVolumeContribution contribution;

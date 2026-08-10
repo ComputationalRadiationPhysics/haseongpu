@@ -19,6 +19,7 @@
 #include <kernels/forward/policyRay.hpp>
 #include <kernels/forward/rayTransition.hpp>
 #include <kernels/forward/rayWalk.hpp>
+#include <kernels/vertexAccumulation.hpp>
 
 #include <algorithm>
 #include <array>
@@ -111,28 +112,6 @@ namespace hase::kernels
                 if(hase::core::dot(info.normal, center - info.centroid) > 0.0)
                     info.normal = info.normal * -1.0;
                 result.push_back(info);
-            }
-        }
-        return result;
-    }
-
-    [[nodiscard]] inline std::vector<double> makeLumpedGainVertexVolumes(hase::core::HostMesh const& mesh)
-    {
-        // The vertex-to-cell projection below uses the standard Tet4 lumped volume V/4.
-        // Excluding cladding here and in the projection prevents a shared interface vertex
-        // from diluting the gain-medium pump rate or injecting pump into cladding cells.
-        std::vector<double> result(mesh.numberOfMeshPoints, 0.0);
-        for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
-        {
-            if(mesh.claddingCellTypes.at(cell) == mesh.claddingNumber)
-                continue;
-
-            double const share
-                = static_cast<double>(mesh.cellVolumes.at(cell)) / static_cast<double>(mesh.numberOfCellVertices);
-            for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
-            {
-                unsigned const point = mesh.cellPointIndices.at(cell * mesh.numberOfCellVertices + localVertex);
-                result.at(point) += share;
             }
         }
         return result;
@@ -333,26 +312,19 @@ namespace hase::kernels
                 {
                     double const integral = (ray.power - nextPower) * ray.wavelength
                                             / (planckConstant * speedOfLight * static_cast<double>(mesh.nTot));
-                    // Deposit at the segment midpoint. Clamping and renormalizing protects
-                    // positivity and exact integral conservation against round-off at faces.
-                    auto const midpoint = ray.position + ray.direction * (0.5 * intersection.length);
-                    auto const barycentric = hase::kernels::forward::barycentricCoordinates(mesh, tet, midpoint);
-                    std::array<double, hase::core::tet4VertexCount> weights{};
-                    double weightSum = 0.0;
+                    // Clamping and renormalizing protects positivity and exact integral
+                    // conservation against round-off at faces.
+                    auto const weights = hase::kernels::forward::segmentMidpointBarycentricVertexWeights(
+                        mesh,
+                        tet,
+                        ray.position,
+                        ray.direction,
+                        intersection.length);
                     for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
                     {
-                        weights[localVertex] = alpaka::math::max(0.0, barycentric[localVertex]);
-                        weightSum += weights[localVertex];
-                    }
-                    double const inverseWeightSum
-                        = weightSum > std::numeric_limits<double>::epsilon() ? 1.0 / weightSum : 0.0;
-                    for(unsigned localVertex = 0u; localVertex < hase::core::tet4VertexCount; ++localVertex)
-                    {
-                        double const weight
-                            = inverseWeightSum > 0.0 ? weights[localVertex] * inverseWeightSum : 0.25;
                         unsigned const point
                             = mesh.cellPointIndices[tet * mesh.numberOfCellVertices + localVertex];
-                        alpaka::onAcc::atomicAdd(acc, &vertexPumpIntegral[point], integral * weight);
+                        alpaka::onAcc::atomicAdd(acc, &vertexPumpIntegral[point], integral * weights[localVertex]);
                     }
                 }
                 ray.power = nextPower;
@@ -1144,7 +1116,7 @@ namespace hase::kernels
                     double const volume = lumpedVertexVolume[point];
                     rateSum += volume > 0.0 ? vertexIntegral[point] / volume : 0.0;
                 }
-                // Volume averaging the four lumped nodal rates preserves the deposited
+                // Volume averaging the four lumped vertex rates preserves the deposited
                 // integral: sum_cell(V_cell * cellRate) == sum_vertex(vertexIntegral).
                 cellRate[cell] = rateSum / static_cast<double>(mesh.numberOfCellVertices);
             }

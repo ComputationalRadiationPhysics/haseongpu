@@ -304,9 +304,11 @@ namespace hase::core
 
         auto const& mesh = meshes.at(static_cast<std::size_t>(firstDevice));
         int const volumeCount = static_cast<int>(mesh.numberOfCells);
+        int const batchedMaterialVertexCount = static_cast<int>(
+            hase::kernels::forward::forwardRseBatchCount * 2u * mesh.numberOfMeshPoints);
         int totalUsedDevices = 0;
         adaptiveLaunches = 0u;
-        result = makeForwardRawResult(mesh.numberOfCells);
+        result = makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);
         convergenceRayCounts.assign(mesh.numberOfCells, 0u);
         unsigned accumulatedRayCount = 0u;
 
@@ -321,7 +323,7 @@ namespace hase::core
                                                + static_cast<unsigned>(std::min(activeRank, batchRemainder));
             int const batchUsedDevices = std::min(assignedDeviceCount, batchLocalCount);
 
-            ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells);
+            ForwardPhiAseRawResult localResult = makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);
             float batchRuntime = 0.0f;
             if(batchLocalCount > 0)
             {
@@ -343,19 +345,19 @@ namespace hase::core
                 batchRuntime = *std::ranges::max_element(deviceRuntimes);
             }
 
-            ForwardPhiAseRawResult batchResult = makeForwardRawResult(mesh.numberOfCells);
+            ForwardPhiAseRawResult batchResult = makeForwardRawResult(mesh.numberOfCells, mesh.numberOfMeshPoints);
             MPI_Allreduce(
-                localResult.scoreSum.data(),
-                batchResult.scoreSum.data(),
-                volumeCount,
+                localResult.vertexBatchScoreSum.data(),
+                batchResult.vertexBatchScoreSum.data(),
+                batchedMaterialVertexCount,
                 MPI_DOUBLE,
                 MPI_SUM,
                 activeComm);
             MPI_Allreduce(
-                localResult.scoreSquareSum.data(),
-                batchResult.scoreSquareSum.data(),
-                volumeCount,
-                MPI_DOUBLE,
+                localResult.rseBatchRayCounts.data(),
+                batchResult.rseBatchRayCounts.data(),
+                hase::kernels::forward::forwardRseBatchCount,
+                MPI_UNSIGNED,
                 MPI_SUM,
                 activeComm);
             MPI_Allreduce(

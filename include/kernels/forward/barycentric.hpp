@@ -62,6 +62,39 @@ namespace hase::kernels::forward
             mesh.getCellPoint(tet, 3u));
     }
 
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC BarycentricTet4 normalizedBarycentricVertexWeights(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        hase::core::Point const point)
+    {
+        auto weights = barycentricCoordinates(mesh, tet, point);
+        double weightSum = 0.0;
+        for(double& weight : weights)
+        {
+            weight = alpaka::math::max(0.0, weight);
+            weightSum += weight;
+        }
+
+        if(weightSum <= std::numeric_limits<double>::epsilon())
+            return {0.25, 0.25, 0.25, 0.25};
+
+        double const inverseWeightSum = 1.0 / weightSum;
+        for(double& weight : weights)
+            weight *= inverseWeightSum;
+        return weights;
+    }
+
+    [[nodiscard]] inline ALPAKA_FN_HOST_ACC BarycentricTet4 segmentMidpointBarycentricVertexWeights(
+        hase::core::DeviceMeshView const& mesh,
+        unsigned const tet,
+        hase::core::Point const position,
+        hase::core::Point const direction,
+        double const length)
+    {
+        auto const midpoint = position + direction * (0.5 * length);
+        return normalizedBarycentricVertexWeights(mesh, tet, midpoint);
+    }
+
     [[nodiscard]] inline ALPAKA_FN_HOST_ACC double centerProximityWeight(BarycentricTet4 const& barycentric)
     {
         double distanceSquared = 0.0;

@@ -84,7 +84,7 @@ namespace hase::core
                         mesh.m_device,
                         m_executor,
                         experiment,
-                        hostMesh.numberOfCells));
+                        hostMesh));
             }
         }
 
@@ -180,7 +180,8 @@ namespace hase::core
                     unsigned const launchSeed = random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches);
                     bool const terminalLaunch
                         = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays;
-                    bool const downloadAccumulators = !allowDeviceResident || activeDevices > 1u || !terminalLaunch;
+                    bool const deviceResidentBatch
+                        = allowDeviceResident && usedDevices <= 1u && activeDevices == 1u;
                     auto const batchResult = evaluatePersistentBatch(
                         experiment,
                         hostMesh,
@@ -191,12 +192,33 @@ namespace hase::core
                         launchSeed,
                         runtimes,
                         adaptiveLaunches == 0u,
-                        downloadAccumulators);
+                        !deviceResidentBatch);
                     rawResult = batchResult;
                     runtime += *std::ranges::max_element(runtimes);
                     usedDevices = std::max(usedDevices, activeDevices);
                     ++adaptiveLaunches;
-                    if(downloadAccumulators)
+                    bool meetsRelativeStandardError = false;
+                    if(deviceResidentBatch)
+                    {
+                        m_deviceContexts.front()->finalizeCellPhiAse(
+                            primaryMeshView(betaVolume),
+                            rawResult.rayCount,
+                            m_betaVolumeTotal,
+                            hostMesh.nTot / hostMesh.crystalTFluo,
+                            experiment.maxSigmaA,
+                            experiment.maxSigmaE);
+                        Result const convergenceResult
+                            = m_deviceContexts.front()->downloadFinalizedResult(false, false, true, true);
+                        recordAdaptiveRayConvergence(
+                            convergenceResult,
+                            targetRayCount,
+                            experiment.relativeStandardErrorThreshold,
+                            convergenceRayCounts);
+                        meetsRelativeStandardError = forwardResultMeetsRelativeStandardError(
+                            convergenceResult,
+                            experiment.relativeStandardErrorThreshold);
+                    }
+                    else
                     {
                         finalizeForwardPhiAse(hostMesh, rawResult, m_betaVolumeTotal, result);
                         hostResultAvailable = true;
@@ -205,9 +227,10 @@ namespace hase::core
                             targetRayCount,
                             experiment.relativeStandardErrorThreshold,
                             convergenceRayCounts);
+                        meetsRelativeStandardError
+                            = forwardResultMeetsRelativeStandardError(result, experiment.relativeStandardErrorThreshold);
                     }
-                    if(terminalLaunch
-                       || forwardResultMeetsRelativeStandardError(result, experiment.relativeStandardErrorThreshold))
+                    if(terminalLaunch || meetsRelativeStandardError)
                         break;
                 }
                 topology.activeNodes = 1u;
@@ -314,7 +337,8 @@ namespace hase::core
             bool resetAccumulators,
             bool downloadAccumulators)
         {
-            ForwardPhiAseRawResult combined = makeForwardRawResult(hostMesh.numberOfCells);
+            ForwardPhiAseRawResult combined
+                = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
             if(rayCount == 0u || activeDevices == 0u)
                 return combined;
 
@@ -333,7 +357,7 @@ namespace hase::core
                 m_deviceContexts[deviceIndex]->begin(
                     deviceIndex == 0u ? primaryMeshView(betaVolume) : m_meshes[deviceIndex].toView(),
                     localRayCount,
-                    random::seedForWorker(baseSeed, 0u, deviceIndex),
+                    baseSeed,
                     rayOffset,
                     rayCount,
                     sourceOffset,
