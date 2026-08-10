@@ -256,6 +256,12 @@ exterior Tet4 faces. Each source defines an aperture-integrated total power, a
 normalized spatial profile, a discrete wavelength spectrum, and an angular
 distribution.
 
+Pump entry positions use randomized systematic stratification over spatial
+subregions of the injector aperture. The subregion CDF is weighted by the
+integrated pump profile, rather than only by boundary-face area, and sampling
+within a selected subregion retains the configured continuous profile. Global
+ray indices preserve the same coverage when a ray batch is partitioned.
+
 Within a cell, pump power follows
 
 .. math::

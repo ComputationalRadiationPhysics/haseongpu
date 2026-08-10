@@ -14,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <numeric>
 #include <type_traits>
 #include <vector>
@@ -222,6 +223,7 @@ TEST_CASE("general pump samples tagged faces deterministically with conserved so
     REQUIRE(first.size() == 80u);
     REQUIRE(repeated.size() == first.size());
     double sampledPower = 0.0;
+    std::array<unsigned, 4u> entryQuarterVisits{};
     for(std::size_t ray = 0u; ray < first.size(); ++ray)
     {
         auto const& sampled = first[ray];
@@ -239,6 +241,14 @@ TEST_CASE("general pump samples tagged faces deterministically with conserved so
         CHECK(sampled.direction.z == Catch::Approx(1.0));
         CHECK(sampled.cell == 0u);
         CHECK(sampled.forbiddenFace == 3);
+        if(sampled.position.x + sampled.position.y <= 0.5)
+            ++entryQuarterVisits[0];
+        else if(sampled.position.x >= 0.5)
+            ++entryQuarterVisits[1];
+        else if(sampled.position.y >= 0.5)
+            ++entryQuarterVisits[2];
+        else
+            ++entryQuarterVisits[3];
         if(sampled.wavelength == source.wavelengths[0])
         {
             CHECK(sampled.sigmaAbsorption == source.sigmaAbsorption[0]);
@@ -252,6 +262,93 @@ TEST_CASE("general pump samples tagged faces deterministically with conserved so
         }
     }
     CHECK(sampledPower == Catch::Approx(source.totalPower));
+    for(auto const visits : entryQuarterVisits)
+        CHECK(visits == 20u);
+}
+
+TEST_CASE("general pump stratifies faces by the spatial entry distribution", "[pump][source]")
+{
+    auto const mesh = makeSingleTetMesh();
+    auto source = uniformSource(10u);
+    source.surfaces = {7, 8, 9, 10};
+    source.profile.kind = 1u;
+    source.profile.radiusU = 0.35;
+    source.profile.radiusV = 0.55;
+    source.profile.exponent = 2.0;
+    source.profile.center[0] = 0.15;
+    source.profile.center[1] = 0.1;
+
+    auto const faces = hase::kernels::pumpBoundaryFaces(mesh, source.surfaces);
+    REQUIRE(faces.size() == 4u);
+    std::array<double, 4u> entryWeights{};
+    double totalEntryWeight = 0.0;
+    auto const regions = hase::kernels::pumpEntryRegions(faces);
+    for(auto const& region : regions)
+    {
+        auto const face = std::ranges::find_if(
+            faces,
+            [&](auto const& candidate)
+            { return candidate.cell == region.cell && candidate.localFace == region.localFace; });
+        REQUIRE(face != faces.cend());
+        double const weight = hase::kernels::pumpEntryWeight(region, source.profile);
+        entryWeights[static_cast<std::size_t>(std::distance(faces.cbegin(), face))] += weight;
+        totalEntryWeight += weight;
+    }
+
+    constexpr unsigned rayCount = 1000u;
+    auto const rays = hase::kernels::samplePumpSource(mesh, source, rayCount, 91u);
+    std::array<unsigned, 4u> visits{};
+    for(auto const& ray : rays)
+    {
+        auto const face = std::ranges::find_if(
+            faces,
+            [&](auto const& candidate)
+            { return candidate.cell == ray.cell && static_cast<int>(candidate.localFace) == ray.forbiddenFace; });
+        REQUIRE(face != faces.cend());
+        ++visits[static_cast<std::size_t>(std::distance(faces.cbegin(), face))];
+    }
+
+    for(std::size_t face = 0u; face < faces.size(); ++face)
+    {
+        double const expected = rayCount * entryWeights[face] / totalEntryWeight;
+        CHECK(std::abs(static_cast<double>(visits[face]) - expected) < 1.0);
+    }
+}
+
+TEST_CASE("pump entry stratification is stable across ray partitions", "[pump][source]")
+{
+    auto const mesh = makeSingleTetMesh();
+    auto source = uniformSource(10u);
+    source.surfaces = {7, 8, 9, 10};
+
+    auto const complete = hase::kernels::samplePumpSource(mesh, source, 80u, 17u);
+    auto const partition = hase::kernels::samplePumpSource(mesh, source, 80u, 17u, 31u, 23u);
+    REQUIRE(partition.size() == 23u);
+    for(std::size_t ray = 0u; ray < partition.size(); ++ray)
+    {
+        auto const& expected = complete[31u + ray];
+        auto const& sampled = partition[ray];
+        CHECK(sampled.position.x == expected.position.x);
+        CHECK(sampled.position.y == expected.position.y);
+        CHECK(sampled.position.z == expected.position.z);
+        CHECK(sampled.cell == expected.cell);
+        CHECK(sampled.forbiddenFace == expected.forbiddenFace);
+        CHECK(sampled.wavelength == expected.wavelength);
+    }
+}
+
+TEST_CASE("pump entry CDF lookup clamps a rounded upper boundary", "[pump][source]")
+{
+    std::vector<double> const cdf{0.25, 0.5, 1.0};
+    CHECK(hase::kernels::pumpEntryRegionForTarget(cdf, 0.0) == 0u);
+    CHECK(hase::kernels::pumpEntryRegionForTarget(cdf, 0.25) == 1u);
+    CHECK(hase::kernels::pumpEntryRegionForTarget(cdf, 1.0) == 2u);
+}
+
+TEST_CASE("pump entry sampling accepts an empty global ray range", "[pump][source]")
+{
+    auto const rays = hase::kernels::samplePumpSource(makeSingleTetMesh(), uniformSource(10u), 0u, 17u);
+    CHECK(rays.empty());
 }
 
 TEST_CASE("pump relay preparation encodes physical exit and entry surfaces", "[pump][relay]")
