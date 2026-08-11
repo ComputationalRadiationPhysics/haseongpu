@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Keep the root pipeline small.  As in Alpaka's GitLab CI, this job generates
+# focused child pipelines and the trigger jobs execute them independently.
+stages:
+  - generator
+  - run-test-jobs
+
+generate:
+  stage: generator
+  image: python:3.14-alpine
+  script:
+    - python3 script/ci/generate-gitlab.py
+    - cat compile_only.yml
+    - cat runtime_cpu.yml
+    - cat special.yml
+  artifacts:
+    paths:
+      - compile_only.yml
+      - runtime_cpu.yml
+      - special.yml
+    expire_in: 1 week
+  interruptible: true
+  tags:
+    - x86_64
+    - cpuonly
+
+run-compile-only-test:
+  stage: run-test-jobs
+  trigger:
+    include:
+      - artifact: compile_only.yml
+        job: generate
+    strategy: depend
+
+run-runtime-cpu-test:
+  stage: run-test-jobs
+  trigger:
+    include:
+      - artifact: runtime_cpu.yml
+        job: generate
+    strategy: depend
+
+run-special-test:
+  stage: run-test-jobs
+  trigger:
+    include:
+      - artifact: special.yml
+        job: generate
+    strategy: depend

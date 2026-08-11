@@ -5,4 +5,5 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 set -x
 
 cd "$HASE_CI_ROOT"
-ci_python -m pytest tests
+read -r -a pytest_paths <<< "${HASE_CI_PYTEST_PATHS:-tests}"
+ci_python -m pytest "${pytest_paths[@]}"
