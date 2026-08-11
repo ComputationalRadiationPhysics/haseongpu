@@ -65,6 +65,7 @@ namespace hase::core
         using T_FloatBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<float>(std::declval<T_Device&>(), std::size_t{1}));
         using T_UnsignedBuffer
             = ALPAKA_TYPEOF(alpaka::onHost::alloc<unsigned>(std::declval<T_Device&>(), std::size_t{1}));
+        using T_CharBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<char>(std::declval<T_Device&>(), std::size_t{1}));
 
     public:
         ForwardPhiAseDeviceContext(
@@ -104,6 +105,13 @@ namespace hase::core
             , m_volumeDndtAse(
                   alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
             , m_betaVolumeTotal(alpaka::onHost::alloc<double>(m_devBundle.device, std::size_t{1}))
+            , m_betaVolumeWeights(
+                  alpaka::onHost::alloc<double>(m_devBundle.device, static_cast<std::size_t>(hostMesh.numberOfCells)))
+            , m_betaVolumePrefixScanBuffer(
+                  alpaka::onHost::alloc<char>(
+                      m_devBundle.device,
+                      alpaka::onHost::getScanBufferSize<double>(
+                          alpaka::Vec{static_cast<std::size_t>(hostMesh.numberOfCells)})))
             , m_volumeCount(hostMesh.numberOfCells)
             , m_vertexCount(hostMesh.numberOfMeshPoints)
             , m_spectralCount(static_cast<unsigned>(experiment.sigmaA.size()))
@@ -330,13 +338,41 @@ namespace hase::core
         {
             auto mesh = meshContainer.toView();
             mesh.betaVolume = std::span<double const>(betaVolume.data(), betaVolume.getMdSpan().getExtents().x());
-            hase::kernels::enqueueBuildBetaVolumePrefix(
-                m_devBundle,
-                m_queue,
-                mesh,
-                betaVolume,
-                meshContainer.betaVolumePrefix,
-                m_betaVolumeTotal);
+            if(mesh.numberOfCells == 0u)
+            {
+                alpaka::onHost::fill(m_queue, m_betaVolumeTotal, 0.0, alpaka::Vec{std::size_t{1}});
+            }
+            else
+            {
+                auto const cellFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+                    m_devBundle.device,
+                    m_devBundle.executor,
+                    alpaka::Vec{mesh.numberOfCells});
+                m_queue.enqueue(
+                    cellFrameSpec,
+                    alpaka::KernelBundle{
+                        hase::kernels::BuildBetaVolumeWeights{},
+                        mesh,
+                        betaVolume,
+                        m_betaVolumeWeights});
+                alpaka::onHost::inclusiveScan(
+                    m_queue,
+                    m_devBundle.executor,
+                    m_betaVolumePrefixScanBuffer,
+                    meshContainer.betaVolumePrefix,
+                    m_betaVolumeWeights);
+                auto const scalarFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+                    m_devBundle.device,
+                    m_devBundle.executor,
+                    alpaka::Vec{1u});
+                m_queue.enqueue(
+                    scalarFrameSpec,
+                    alpaka::KernelBundle{
+                        hase::kernels::CaptureBetaVolumeTotal{},
+                        mesh.numberOfCells,
+                        meshContainer.betaVolumePrefix,
+                        m_betaVolumeTotal});
+            }
             std::vector<double> hostTotal(1u, 0.0);
             alpaka::onHost::memcpy(m_queue, hostTotal, m_betaVolumeTotal);
             alpaka::onHost::wait(m_queue);
@@ -409,6 +445,8 @@ namespace hase::core
         T_DoubleBuffer m_relativeStandardError;
         T_DoubleBuffer m_volumeDndtAse;
         T_DoubleBuffer m_betaVolumeTotal;
+        T_DoubleBuffer m_betaVolumeWeights;
+        T_CharBuffer m_betaVolumePrefixScanBuffer;
         std::unique_ptr<ForwardSrmWorkspace<T_Device>> m_srmWorkspace;
         ForwardPhiAseRawResult m_srmResult;
         unsigned m_volumeCount;
