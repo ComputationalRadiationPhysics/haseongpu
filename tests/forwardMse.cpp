@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
+#include <core/haseWorker.hpp>
 #include <kernels/forward/rayTransition.hpp>
 #include <kernels/forward/volumeSampling.hpp>
 
@@ -140,9 +141,10 @@ TEST_CASE("forward PhiASE RSE handles invalid and zero-score estimates", "[forwa
 TEST_CASE("forward PhiASE RSE batches use independent deterministic sampling streams", "[forward][rse]")
 {
     constexpr unsigned applicationSeed = 123'456'789u;
-    std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> seeds{};
-    std::array<double, hase::kernels::forward::forwardRseBatchCount> sourceOffsets{};
-    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+    constexpr unsigned batchCount = hase::kernels::forward::defaultForwardRseBatchCount;
+    std::array<unsigned, batchCount> seeds{};
+    std::array<double, batchCount> sourceOffsets{};
+    for(unsigned batch = 0u; batch < batchCount; ++batch)
     {
         seeds.at(batch) = hase::kernels::forward::rseBatchSeed(applicationSeed, batch);
         sourceOffsets.at(batch) = hase::kernels::forward::rseBatchSourceStratificationOffset(applicationSeed, batch);
@@ -157,17 +159,107 @@ TEST_CASE("forward PhiASE RSE batches use independent deterministic sampling str
 
     constexpr unsigned rayCount = 19u;
     unsigned countedRays = 0u;
-    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+    for(unsigned batch = 0u; batch < batchCount; ++batch)
     {
         unsigned const batchRayCount = hase::kernels::forward::rseBatchRayCount(0u, rayCount, batch);
         countedRays += batchRayCount;
         for(unsigned batchRay = 0u; batchRay < batchRayCount; ++batchRay)
         {
-            unsigned const globalRay = batchRay * hase::kernels::forward::forwardRseBatchCount + batch;
-            CHECK(hase::kernels::forward::rseBatchRayIndex(globalRay) == batchRay);
+            unsigned const globalRay = batchRay * batchCount + batch;
+            CHECK(hase::kernels::forward::rseBatchRayIndex(globalRay, batchCount) == batchRay);
         }
     }
     CHECK(countedRays == rayCount);
+}
+
+TEST_CASE("forward PhiASE batch count expands with the worker group", "[forward][rse][worker]")
+{
+    CHECK(hase::kernels::forward::forwardRseBatchCount(1u) == 8u);
+    CHECK(hase::kernels::forward::forwardRseBatchCount(8u) == 8u);
+    CHECK(hase::kernels::forward::forwardRseBatchCount(12u) == 12u);
+
+    constexpr unsigned rayCount = 137u;
+    constexpr unsigned batchCount = 12u;
+    unsigned countedRays = 0u;
+    for(unsigned batch = 0u; batch < batchCount; ++batch)
+        countedRays += hase::kernels::forward::rseBatchRayCount(0u, rayCount, batch, batchCount);
+    CHECK(countedRays == rayCount);
+
+    auto const raw = hase::core::makeForwardRawResult(2u, 3u, batchCount);
+    CHECK(raw.rseBatchRayCounts.size() == batchCount);
+    CHECK(raw.vertexBatchScoreSum.size() == batchCount * 2u * 3u);
+}
+
+TEST_CASE("HASE workers map every complete batch exactly once", "[forward][worker]")
+{
+    struct WorkerIdentity
+    {
+        unsigned index;
+        unsigned count;
+
+        [[nodiscard]] unsigned workerIndex() const
+        {
+            return index;
+        }
+
+        [[nodiscard]] unsigned workerCount() const
+        {
+            return count;
+        }
+    };
+
+    constexpr unsigned begin = 3u;
+    constexpr unsigned end = 11u;
+    for(unsigned const workerCount : {1u, 3u, 8u, 12u})
+    {
+        std::array<unsigned, end> visits{};
+        for(unsigned workerIndex = 0u; workerIndex < workerCount; ++workerIndex)
+        {
+            WorkerIdentity const worker{workerIndex, workerCount};
+            for(auto [batch] : hase::mapIdx(worker, alpaka::IdxRange{begin, end}))
+            {
+                REQUIRE(batch >= begin);
+                REQUIRE(batch < end);
+                ++visits.at(batch);
+            }
+        }
+        for(unsigned batch = begin; batch < end; ++batch)
+            CHECK(visits.at(batch) == 1u);
+    }
+}
+
+TEST_CASE("expanded HASE batch domains keep every worker active", "[forward][worker]")
+{
+    struct WorkerIdentity
+    {
+        unsigned index;
+        unsigned count;
+
+        [[nodiscard]] unsigned workerIndex() const
+        {
+            return index;
+        }
+
+        [[nodiscard]] unsigned workerCount() const
+        {
+            return count;
+        }
+    };
+
+    constexpr unsigned workerCount = 12u;
+    constexpr unsigned batchCount = hase::kernels::forward::forwardRseBatchCount(workerCount);
+    std::array<unsigned, workerCount> workPerWorker{};
+    for(unsigned workerIndex = 0u; workerIndex < workerCount; ++workerIndex)
+    {
+        WorkerIdentity const worker{workerIndex, workerCount};
+        for(auto const batch : hase::mapIdx(worker, alpaka::IdxRange{batchCount}))
+        {
+            static_cast<void>(batch);
+            ++workPerWorker.at(workerIndex);
+        }
+    }
+    for(auto const workItems : workPerWorker)
+        CHECK(workItems == 1u);
 }
 
 TEST_CASE("forward PhiASE vertex accumulation remains cell based and conservative", "[forward][vertex]")
