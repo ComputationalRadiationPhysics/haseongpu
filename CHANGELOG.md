@@ -59,7 +59,7 @@ both 0.17.0 and 0.17.1 system-provider installations.
 
 ## HASEonGPU 2.0.2
 
-Patch release for the 2.0 series with a Julia 1D SSG regression check for
+Patch release for the 2.0 series with a one-dimensional SSG regression check for
 disabled-ASE laser-pump cladding output, synchronized release metadata, and
 CodeRabbit review configuration.
 
