@@ -18,26 +18,33 @@
 
 namespace hase::kernels
 {
-    struct BuildBetaVolumePrefix
+    struct BuildBetaVolumeWeights
     {
         ALPAKA_FN_ACC void operator()(
             auto const& acc,
             core::DeviceMeshView const mesh,
             auto betaVolume,
+            auto betaVolumeWeights) const
+        {
+            for(auto [cell] : alpaka::onAcc::makeIdxMap(
+                    acc,
+                    alpaka::onAcc::worker::threadsInGrid,
+                    alpaka::IdxRange{mesh.numberOfCells}))
+            {
+                betaVolumeWeights[cell] = betaVolume[cell] * static_cast<double>(mesh.cellVolumes[cell]);
+            }
+        }
+    };
+
+    struct CaptureBetaVolumeTotal
+    {
+        ALPAKA_FN_ACC void operator()(
+            auto const&,
+            unsigned const numberOfCells,
             auto betaVolumePrefix,
             auto betaVolumeTotal) const
         {
-            for(auto [worker] :
-                alpaka::onAcc::makeIdxMap(acc, alpaka::onAcc::worker::threadsInGrid, alpaka::IdxRange{1u}))
-            {
-                double total = 0.0;
-                for(unsigned cell = 0u; cell < mesh.numberOfCells; ++cell)
-                {
-                    total += betaVolume[cell] * static_cast<double>(mesh.cellVolumes[cell]);
-                    betaVolumePrefix[cell] = total;
-                }
-                betaVolumeTotal[worker] = total;
-            }
+            betaVolumeTotal[0u] = numberOfCells == 0u ? 0.0 : betaVolumePrefix[numberOfCells - 1u];
         }
     };
 
@@ -141,21 +148,6 @@ namespace hase::kernels
             }
         }
     };
-
-    void enqueueBuildBetaVolumePrefix(
-        auto& devBundle,
-        auto const& queue,
-        core::DeviceMeshView const mesh,
-        auto const& betaVolume,
-        auto& betaVolumePrefix,
-        auto& betaVolumeTotal)
-    {
-        auto frameSpec
-            = hase::alpakaUtils::getFrameSpec<uint32_t>(devBundle.device, devBundle.executor, alpaka::Vec{1u});
-        queue.enqueue(
-            frameSpec,
-            alpaka::KernelBundle{BuildBetaVolumePrefix{}, mesh, betaVolume, betaVolumePrefix, betaVolumeTotal});
-    }
 
     template<
         typename T_DevBundle,
