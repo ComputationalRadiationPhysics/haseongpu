@@ -4,436 +4,254 @@
  *
  * This file is part of HASEonGPU
  *
- * HASEonGPU is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * HASEonGPU is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with HASEonGPU.
- * If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
-
-/**
- * @author Erik Zenker
- * @author Carlchristian Eckert
- * @licence GPLv3
- *
- */
-
 #pragma once
 
-#include <benchmark.hpp>
 #include <core/calcForwardPhiAse.hpp>
-#include <core/forwardSrmDeviceState.hpp>
-#include <core/logging.hpp>
-#include <core/mesh.hpp>
-#include <core/types.hpp>
-#include <random/random.hpp>
-#include <utils/progressbar.hpp>
+#include <core/haseWorker.hpp>
 
 #include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <exception>
+#include <any>
+#include <barrier>
 #include <memory>
-#include <mutex>
-#include <numeric>
+#include <ranges>
 #include <stdexcept>
-#include <thread>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-/**
- * @brief Wrapper for forward PhiASE accumulation on pthread base.
- *        This function will spawn a thread for
- *        each function call and start calcForwardPhiAseRaw.
- *
- * @param dMesh            Explicit 3D cell mesh in device memory.
- * @param hMesh            Same as dMesh, but located in host memory.
- * @param sigmaA           Vector with Absorption values
- * @param sigmaE           Vector with Emission values
- * @param result           Reference to raw forward accumulators.
- * @param gpu_i            Number of device that should be used.
- * @param rayCount         Number of forward ray histories assigned to this thread.
- * @param runtime          Reference to the needed runtime.
- */
 namespace hase::core
 {
-
-    static std::vector<std::thread> threadIds;
-    static std::vector<std::exception_ptr> threadExceptions;
-    static std::mutex threadExceptionsMutex;
-
-    void joinAll();
-
-    template<alpaka::onHost::concepts::Device T_Device>
-    void calcForwardPhiAseThreaded(
-        auto& devBundle,
-        ExperimentParameters const& experiment,
-        ComputeParameters const& compute,
-        HostMesh const& hostMesh,
-        DeviceMeshContainer<T_Device> const& mesh,
-        ForwardPhiAseRawResult& result,
-        unsigned const rayCount,
-        unsigned rngSeed,
-        unsigned const globalRayOffset,
-        unsigned const globalRayCount,
-        double const sourceStratificationOffset,
-        unsigned const spectrumStratificationPhase,
-        float& runtime)
+    /** @brief One complete, indivisible forward-ray batch. */
+    struct ForwardRayBatch
     {
-        threadIds.emplace_back(
-            std::thread(
-                [&experiment,
-                 &compute,
-                 &hostMesh,
-                 &mesh,
-                 &result,
-                 &runtime,
-                 devBundle,
-                 rayCount,
-                 rngSeed,
-                 globalRayOffset,
-                 globalRayCount,
-                 sourceStratificationOffset,
-                 spectrumStratificationPhase]() mutable
-                {
-                    try
-                    {
-#ifdef HASE_ENABLE_BENCHMARK
-                        hase::benchmark::ScopedRunContext benchmarkContext{
-                            devBundle.device,
-                            devBundle.executor,
-                            compute,
-                            experiment};
-#endif
-                        BENCH(ForwardPhiAseDevice);
-                        calcForwardPhiAseRaw(
-                            devBundle,
-                            experiment,
-                            hostMesh,
-                            mesh,
-                            result,
-                            runtime,
-                            rayCount,
-                            rngSeed,
-                            globalRayOffset,
-                            globalRayCount,
-                            sourceStratificationOffset,
-                            spectrumStratificationPhase);
-                    }
-                    catch(...)
-                    {
-                        std::lock_guard<std::mutex> lock(threadExceptionsMutex);
-                        threadExceptions.emplace_back(std::current_exception());
-                    }
-                }));
-    }
+        unsigned index = 0u; //!< Statistical batch index.
+        unsigned rayCount = 0u; //!< Complete number of histories in this batch.
+        unsigned rngSeed = 0u; //!< Seed shared by all batches in one adaptive launch.
+    };
 
-    template<typename T_Exec, alpaka::onHost::concepts::Device T_Device>
-    ForwardPhiAseRawResult calcForwardPhiAseSrmOnDevices(
-        T_Exec const& exec,
-        ExperimentParameters const& experiment,
-        HostMesh const& hostMesh,
-        std::vector<DeviceMeshContainer<T_Device>> const& meshes,
-        unsigned const firstDevice,
-        unsigned const assignedDeviceCount,
-        unsigned const rayCount,
-        unsigned const globalRayOffset,
-        unsigned const globalRayCount,
-        double const sourceStratificationOffset,
-        unsigned const spectrumStratificationPhase,
-        unsigned const baseSeed,
-        unsigned const rank,
-        std::vector<float>& runtimes)
+    /** @brief Result of one complete forward-ray batch, retaining its statistical identity. */
+    struct ForwardRayBatchResult
     {
-        if(experiment.surfaceReservoirSize == 0u)
-        {
-            throw std::runtime_error("Forward reflections require surfaceReservoirSize > 0.");
-        }
+        unsigned index = 0u; //!< Statistical batch index.
+        ForwardPhiAseRawResult raw; //!< Unnormalized batch accumulation.
+        float runtime = 0.0f; //!< Device execution time in seconds.
+    };
 
-        ForwardPhiAseRawResult combined = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
-        SrmControls const controls = resolveSrmControls(experiment);
-        bool const debugSrm = srmDebugLoggingEnabled();
-        combined.srmMaxIterations = controls.maxIterations;
-        combined.srmDivergenceStreak = controls.divergenceStreak;
-        if(rayCount == 0u)
-        {
-            combined.srmStatus = SrmStatus::CONVERGED;
-            return combined;
-        }
+    /** @brief Batch-preserving result collection used by worker gather operations. */
+    using ForwardRayBatchResults = std::vector<ForwardRayBatchResult>;
 
-        unsigned const activeDevices = std::min(assignedDeviceCount, rayCount);
-        if(activeDevices == 0u)
-        {
-            return combined;
-        }
-        unsigned const raysPerDevice = rayCount / activeDevices;
-        unsigned const remainder = rayCount % activeDevices;
-        double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
-        std::vector<std::unique_ptr<ForwardSrmDeviceState<T_Device, T_Exec>>> devices;
-        devices.reserve(activeDevices);
-        std::vector<unsigned> deviceIndices;
-        deviceIndices.reserve(activeDevices);
-        unsigned localRayOffset = globalRayOffset;
-        for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
-        {
-            unsigned const deviceIndex = firstDevice + localDeviceIndex;
-            unsigned const localRayCount
-                = localDeviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
-            devices.emplace_back(
-                std::make_unique<ForwardSrmDeviceState<T_Device, T_Exec>>(
-                    meshes.at(deviceIndex).m_device,
-                    exec,
-                    meshes.at(deviceIndex),
-                    experiment,
-                    betaVolumeTotal,
-                    localRayCount,
-                    baseSeed,
-                    localRayOffset,
-                    globalRayCount,
-                    sourceStratificationOffset,
-                    spectrumStratificationPhase));
-            deviceIndices.emplace_back(deviceIndex);
-            localRayOffset += localRayCount;
-        }
+    /** @brief Device-finalization work item created after batch gathering. */
+    struct FinalizeForwardAse
+    {
+        ForwardPhiAseRawResult const& raw; //!< Gathered, unnormalized batch accumulators.
+        double fluorescenceRate; //!< Fluorescence normalization applied on the device.
+        double sigmaA; //!< Absorption cross section used for ASE depletion.
+        double sigmaE; //!< Emission cross section used for ASE depletion.
+    };
 
-        auto const started = std::chrono::steady_clock::now();
-        auto const directStarted = started;
-        if(debugSrm)
+    namespace detail
+    {
+        /** @brief Reusable host-thread collective storage for a single worker group. */
+        class ThreadWorkerGroup
         {
-            dout(V_INFO) << "SRM: direct pass: rays=" << rayCount << ", devices=" << activeDevices
-                         << ", faces=" << hostMesh.numberOfCells * 4u << std::endl;
-        }
-        for(auto& device : devices)
-        {
-            device->traceDirect();
-        }
-
-        std::vector<double> sourceWeights(activeDevices, 0.0);
-        for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-        {
-            sourceWeights[deviceIndex] = devices[deviceIndex]->prepareDirectSamplingCdf();
-        }
-        double const initialWeight = std::accumulate(sourceWeights.cbegin(), sourceWeights.cend(), 0.0);
-        if(debugSrm)
-        {
-            double const directSeconds
-                = std::chrono::duration<double>(std::chrono::steady_clock::now() - directStarted).count();
-            dout(V_INFO) << "SRM: direct pass completed in " << directSeconds
-                         << " s; reflected source weight=" << initialWeight << std::endl;
-        }
-        if(initialWeight == 0.0)
-        {
-            combined.srmStatus = SrmStatus::CONVERGED;
-        }
-        else
-        {
-            double previousWeight = initialWeight;
-            unsigned growCount = 0u;
-            combined.srmStatus = SrmStatus::MAX_ITERATIONS;
-            combined.srmRemainingFraction = 1.0;
-            for(unsigned pass = 1u; pass <= controls.maxIterations; ++pass)
+        public:
+            explicit ThreadWorkerGroup(unsigned const workerCount) : m_barrier(workerCount), m_values(workerCount)
             {
-                auto const passStarted = std::chrono::steady_clock::now();
-                if(debugSrm)
-                {
-                    dout(V_INFO) << "SRM: reflected pass " << pass << "/" << controls.maxIterations << ": launching "
-                                 << rayCount << " rays from weight=" << previousWeight << " across " << activeDevices
-                                 << " in-memory reservoir strata" << std::endl;
-                }
-                for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-                {
-                    double const sourceWeight
-                        = sourceWeights[deviceIndex] / static_cast<double>(devices[deviceIndex]->rayCount());
-                    devices[deviceIndex]->traceReflected(sourceWeight, pass);
-                }
-
-                for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-                {
-                    sourceWeights[deviceIndex] = devices[deviceIndex]->prepareReflectedSamplingCdf(pass);
-                }
-                double const currentWeight = std::accumulate(sourceWeights.cbegin(), sourceWeights.cend(), 0.0);
-                combined.srmPasses = pass;
-                combined.srmRemainingFraction = currentWeight / initialWeight;
-                if(debugSrm)
-                {
-                    double const passSeconds
-                        = std::chrono::duration<double>(std::chrono::steady_clock::now() - passStarted).count();
-                    dout(V_INFO) << "SRM: reflected pass " << pass << " completed in " << passSeconds
-                                 << " s; next weight=" << currentWeight << ", W/W0=" << combined.srmRemainingFraction
-                                 << std::endl;
-                }
-                if(currentWeight > previousWeight)
-                {
-                    ++growCount;
-                    if(growCount >= controls.divergenceStreak)
-                    {
-                        combined.srmStatus = SrmStatus::DIVERGED;
-                        break;
-                    }
-                }
-                else
-                {
-                    growCount = 0u;
-                    if(std::abs(currentWeight - previousWeight) / std::max(currentWeight, 1.0e-30)
-                       < experiment.reflectionTolerance)
-                    {
-                        combined.srmStatus = SrmStatus::STABLE;
-                        break;
-                    }
-                }
-                if(combined.srmRemainingFraction < experiment.reflectionTolerance)
-                {
-                    combined.srmStatus = SrmStatus::CONVERGED;
-                    break;
-                }
-                previousWeight = currentWeight;
+                if(workerCount == 0u)
+                    throw std::invalid_argument("a HASE thread worker group cannot be empty");
             }
-        }
 
-        for(auto const& device : devices)
-        {
-            ForwardPhiAseRawResult partial = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
-            device->downloadAccumulation(partial);
-            mergeForwardRawResult(combined, partial);
-        }
-        if(combined.rayCount != rayCount)
-        {
-            throw std::runtime_error("Forward ray partition accounting mismatch.");
-        }
-        float const runtime
-            = static_cast<float>(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
-        for(unsigned const deviceIndex : deviceIndices)
-        {
-            runtimes.at(deviceIndex) = runtime;
-        }
-        return combined;
-    }
+            template<typename T_Value>
+            [[nodiscard]] std::shared_ptr<std::vector<T_Value> const> gather(unsigned const workerIndex, T_Value value)
+            {
+                m_values.at(workerIndex) = std::move(value);
+                m_barrier.arrive_and_wait();
+                if(workerIndex == 0u)
+                {
+                    auto gathered = std::make_shared<std::vector<T_Value>>();
+                    gathered->reserve(m_values.size());
+                    for(auto& item : m_values)
+                        gathered->emplace_back(std::any_cast<T_Value>(std::move(item)));
+                    m_collectiveValue = std::move(gathered);
+                }
+                m_barrier.arrive_and_wait();
+                auto result = std::any_cast<std::shared_ptr<std::vector<T_Value>>>(m_collectiveValue);
+                m_barrier.arrive_and_wait();
+                return result;
+            }
 
-    template<typename T_Exec, alpaka::onHost::concepts::Device T_Device>
-    ForwardPhiAseRawResult calcForwardPhiAseOnDevices(
-        T_Exec exec,
-        ExperimentParameters const& experiment,
-        ComputeParameters const& compute,
-        HostMesh const& hostMesh,
-        std::vector<DeviceMeshContainer<T_Device>> const& meshes,
-        unsigned const firstDevice,
-        unsigned const assignedDeviceCount,
-        unsigned const rayCount,
-        unsigned const globalRayOffset,
-        unsigned const globalRayCount,
-        unsigned const baseSeed,
-        unsigned const rank,
-        std::vector<float>& runtimes)
-    {
-        unsigned const volumeCount = hostMesh.numberOfCells;
-        // Each partial contributes the histories it actually launched; starting
-        // this counter at the requested total would count every history twice.
-        ForwardPhiAseRawResult combined = makeForwardRawResult(volumeCount, hostMesh.numberOfMeshPoints);
-        if(rayCount == 0u || assignedDeviceCount == 0u)
-        {
-            return combined;
-        }
+            template<typename T_Value>
+            [[nodiscard]] T_Value scatter(unsigned const workerIndex, T_Value value)
+            {
+                if(workerIndex == 0u)
+                    m_collectiveValue = std::move(value);
+                m_barrier.arrive_and_wait();
+                auto result = std::any_cast<T_Value>(m_collectiveValue);
+                m_barrier.arrive_and_wait();
+                return result;
+            }
 
-#ifdef HASE_ENABLE_BENCHMARK
-        hase::benchmark::ScopedRunContext benchmarkContext{meshes.at(firstDevice).m_device, exec, compute, experiment};
-#endif
-        BENCH(ForwardPhiAseBatch);
+            template<typename T_Value, typename T_Reduction>
+            [[nodiscard]] T_Value reduce(unsigned const workerIndex, T_Value value, T_Reduction reduction)
+            {
+                auto values = gather(workerIndex, std::move(value));
+                T_Value result{};
+                if(workerIndex == 0u)
+                {
+                    result = values->front();
+                    for(auto const& item : *values | std::views::drop(1u))
+                        result = reduction(std::move(result), item);
+                }
+                return scatter(workerIndex, std::move(result));
+            }
 
-        double const sourceStratificationOffset = random::stratifiedUnitOffset(baseSeed);
-        unsigned const spectrumStratificationPhase
-            = random::stratifiedSpectrumPhase(baseSeed, static_cast<unsigned>(experiment.sigmaA.size()));
-
-        if(experiment.useReflections)
-        {
-            return calcForwardPhiAseSrmOnDevices(
-                exec,
-                experiment,
-                hostMesh,
-                meshes,
-                firstDevice,
-                assignedDeviceCount,
-                rayCount,
-                globalRayOffset,
-                globalRayCount,
-                sourceStratificationOffset,
-                spectrumStratificationPhase,
-                baseSeed,
-                rank,
-                runtimes);
-        }
-
-        unsigned const activeDevices = std::min(assignedDeviceCount, rayCount);
-        unsigned const raysPerDevice = rayCount / activeDevices;
-        unsigned const remainder = rayCount % activeDevices;
-        std::vector<ForwardPhiAseRawResult> partials(
-            activeDevices,
-            makeForwardRawResult(volumeCount, hostMesh.numberOfMeshPoints));
-        unsigned localRayOffset = globalRayOffset;
-
-        for(unsigned localDeviceIndex = 0u; localDeviceIndex < activeDevices; ++localDeviceIndex)
-        {
-            unsigned const deviceIndex = firstDevice + localDeviceIndex;
-            unsigned const localRayCount
-                = localDeviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
-            hase::alpakaUtils::DevBundle devBundle{meshes.at(deviceIndex).m_device, exec};
-            calcForwardPhiAseThreaded(
-                devBundle,
-                experiment,
-                compute,
-                hostMesh,
-                meshes.at(deviceIndex),
-                partials.at(localDeviceIndex),
-                localRayCount,
-                baseSeed,
-                localRayOffset,
-                globalRayCount,
-                sourceStratificationOffset,
-                spectrumStratificationPhase,
-                runtimes.at(deviceIndex));
-            localRayOffset += localRayCount;
-        }
-
-        joinAll();
-        for(auto const& partial : partials)
-        {
-            mergeForwardRawResult(combined, partial);
-        }
-        if(combined.rayCount != rayCount)
-        {
-            throw std::runtime_error("Forward ray partition accounting mismatch.");
-        }
-        return combined;
-    }
+        private:
+            std::barrier<> m_barrier;
+            std::vector<std::any> m_values;
+            std::any m_collectiveValue;
+        };
+    } // namespace detail
 
     /**
-     * @brief Wait for all threads to finish
+     * @brief Worker policy representing one host thread that owns exactly one device.
      *
+     * A worker executes zero or more complete batches selected by `hase::mapIdx`.
+     * It never repartitions a selected batch and never shares its device queue,
+     * accumulators, or reflection reservoir with another worker.
+     *
+     * @tparam T_Device Alpaka device type.
+     * @tparam T_Exec Alpaka executor type.
      */
-    inline void joinAll()
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    class ThreadOwnedDevices
     {
-        for(auto& t : threadIds)
+    public:
+        /** @brief Bind one worker identity to one persistent device context. */
+        ThreadOwnedDevices(
+            unsigned const workerIndex,
+            unsigned const workerCount,
+            detail::ThreadWorkerGroup& group,
+            DeviceMeshView const mesh,
+            ForwardPhiAseDeviceContext<T_Device, T_Exec>& deviceContext,
+            ExperimentParameters const& experiment,
+            double const betaVolumeTotal)
+            : m_workerIndex(workerIndex)
+            , m_workerCount(workerCount)
+            , m_group(group)
+            , m_mesh(mesh)
+            , m_deviceContext(deviceContext)
+            , m_experiment(experiment)
+            , m_betaVolumeTotal(betaVolumeTotal)
         {
-            if(t.joinable())
-            {
-                t.join();
-            }
+            if(workerIndex >= workerCount)
+                throw std::out_of_range("thread worker index exceeds worker count");
         }
-        threadIds.clear();
 
-        if(!threadExceptions.empty())
+    private:
+        unsigned m_workerIndex;
+        unsigned m_workerCount;
+        detail::ThreadWorkerGroup& m_group;
+        DeviceMeshView m_mesh;
+        ForwardPhiAseDeviceContext<T_Device, T_Exec>& m_deviceContext;
+        ExperimentParameters const& m_experiment;
+        double m_betaVolumeTotal;
+
+        friend struct HaseWorkerDispatch<ThreadOwnedDevices<T_Device, T_Exec>>;
+        friend struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, ForwardRayBatch>;
+        friend struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, FinalizeForwardAse>;
+    };
+
+    /** @brief Identity and collective dispatch for one-thread/one-device workers. */
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    struct HaseWorkerDispatch<ThreadOwnedDevices<T_Device, T_Exec>>
+    {
+        using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
+
+        [[nodiscard]] static unsigned workerIndex(T_Policy const& policy)
         {
-            auto exception = threadExceptions.front();
-            threadExceptions.clear();
-            std::rethrow_exception(exception);
+            return policy.m_workerIndex;
         }
-    }
 
+        [[nodiscard]] static unsigned workerCount(T_Policy const& policy)
+        {
+            return policy.m_workerCount;
+        }
+
+        [[nodiscard]] static bool isRoot(T_Policy const& policy)
+        {
+            return policy.m_workerIndex == 0u;
+        }
+
+        template<typename T_Value>
+        [[nodiscard]] static auto scatter(T_Policy& policy, T_Value&& value)
+        {
+            using T = std::remove_cvref_t<T_Value>;
+            return policy.m_group.scatter(policy.m_workerIndex, T(std::forward<T_Value>(value)));
+        }
+
+        template<typename T_Value>
+        [[nodiscard]] static auto gather(T_Policy& policy, T_Value&& value)
+        {
+            using T = std::remove_cvref_t<T_Value>;
+            return policy.m_group.gather(policy.m_workerIndex, T(std::forward<T_Value>(value)));
+        }
+
+        template<typename T_Value, typename T_Reduction>
+        [[nodiscard]] static auto reduce(T_Policy& policy, T_Value&& value, T_Reduction reduction)
+        {
+            using T = std::remove_cvref_t<T_Value>;
+            return policy.m_group.reduce(policy.m_workerIndex, T(std::forward<T_Value>(value)), std::move(reduction));
+        }
+    };
+
+    /** @brief Execute one complete forward-ray batch on one thread-owned device. */
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, ForwardRayBatch>
+    {
+        using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
+
+        [[nodiscard]] static ForwardRayBatchResult run(T_Policy& policy, ForwardRayBatch const& batch)
+        {
+            ForwardRayBatchResult result;
+            result.index = batch.index;
+            policy.m_deviceContext.evaluate(
+                policy.m_mesh,
+                result.raw,
+                result.runtime,
+                batch.rayCount,
+                batch.rngSeed,
+                batch.index,
+                policy.m_betaVolumeTotal,
+                policy.m_experiment);
+            return result;
+        }
+    };
+
+    /** @brief Finalize gathered batches on one thread-owned device. */
+    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, FinalizeForwardAse>
+    {
+        using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
+
+        [[nodiscard]] static Result run(T_Policy& policy, FinalizeForwardAse const& item)
+        {
+            policy.m_deviceContext.uploadAndFinalize(
+                policy.m_mesh,
+                item.raw,
+                policy.m_betaVolumeTotal,
+                item.fluorescenceRate,
+                item.sigmaA,
+                item.sigmaE);
+            auto result = policy.m_deviceContext.downloadFinalizedResult(true, true, true, true);
+            result.dndtAse = policy.m_deviceContext.downloadVolumeDndtAse();
+            result.srmStatus = item.raw.srmStatus;
+            result.srmPasses = item.raw.srmPasses;
+            result.srmRemainingFraction = item.raw.srmRemainingFraction;
+            result.srmMaxIterations = item.raw.srmMaxIterations;
+            result.srmDivergenceStreak = item.raw.srmDivergenceStreak;
+            return result;
+        }
+    };
 } // namespace hase::core

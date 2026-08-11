@@ -44,7 +44,7 @@ namespace hase::kernels
     struct FinalizeForwardVolumePhiAse
     {
         unsigned rayCount;
-        alpaka::Vec<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts;
+        unsigned batchCount;
         double betaVolumeTotal;
         double fluorescenceRate;
         double sigmaA;
@@ -53,6 +53,7 @@ namespace hase::kernels
         template<
             typename T_Acc,
             typename T_VertexBatchScoreSum,
+            typename T_RseBatchRayCounts,
             typename T_LumpedMaterialVertexVolume,
             typename T_DroppedRays,
             typename T_VolumePhiAse,
@@ -63,6 +64,7 @@ namespace hase::kernels
             T_Acc const& acc,
             core::DeviceMeshView const mesh,
             T_VertexBatchScoreSum vertexBatchScoreSum,
+            T_RseBatchRayCounts rseBatchRayCounts,
             T_LumpedMaterialVertexVolume lumpedMaterialVertexVolume,
             T_DroppedRays droppedRays,
             T_VolumePhiAse volumePhiAse,
@@ -88,7 +90,7 @@ namespace hase::kernels
                     double batchMeanSum = 0.0;
                     double batchMeanSquareSum = 0.0;
                     unsigned activeBatchCount = 0u;
-                    for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+                    for(unsigned batch = 0u; batch < batchCount; ++batch)
                     {
                         double batchScoreDensity = 0.0;
                         for(unsigned localVertex = 0u; localVertex < mesh.numberOfCellVertices; ++localVertex)
@@ -159,6 +161,7 @@ namespace hase::kernels
         typename T_DevBundle,
         typename T_Queue,
         typename T_VertexBatchScoreSum,
+        typename T_RseBatchRayCounts,
         typename T_LumpedMaterialVertexVolume,
         typename T_DroppedRays,
         typename T_VolumePhiAse,
@@ -170,6 +173,7 @@ namespace hase::kernels
         T_Queue const& queue,
         core::DeviceMeshView const mesh,
         T_VertexBatchScoreSum const& vertexBatchScoreSum,
+        T_RseBatchRayCounts const& rseBatchRayCounts,
         T_LumpedMaterialVertexVolume const& lumpedMaterialVertexVolume,
         T_DroppedRays const& droppedRays,
         T_VolumePhiAse& volumePhiAse,
@@ -177,7 +181,7 @@ namespace hase::kernels
         T_RelativeStandardError& relativeStandardError,
         T_VolumeDndtAse& volumeDndtAse,
         unsigned rayCount,
-        alpaka::Vec<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts,
+        unsigned batchCount,
         double betaVolumeTotal,
         double fluorescenceRate,
         double sigmaA,
@@ -190,15 +194,10 @@ namespace hase::kernels
         queue.enqueue(
             cellFrameSpec,
             alpaka::KernelBundle{
-                FinalizeForwardVolumePhiAse{
-                    rayCount,
-                    rseBatchRayCounts,
-                    betaVolumeTotal,
-                    fluorescenceRate,
-                    sigmaA,
-                    sigmaE},
+                FinalizeForwardVolumePhiAse{rayCount, batchCount, betaVolumeTotal, fluorescenceRate, sigmaA, sigmaE},
                 mesh,
                 vertexBatchScoreSum,
+                rseBatchRayCounts,
                 lumpedMaterialVertexVolume,
                 droppedRays,
                 volumePhiAse,

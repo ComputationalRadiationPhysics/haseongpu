@@ -22,8 +22,12 @@
 #endif
 
 #include <algorithm>
+#include <exception>
 #include <memory>
+#include <numeric>
+#include <ranges>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -49,6 +53,7 @@ namespace hase::core
         }
     } // namespace detail
 
+    /** @brief Metadata returned by one complete forward ASE evaluation. */
     struct ForwardPhiAseEvaluation
     {
         bool deviceResidentPhi = false;
@@ -59,6 +64,128 @@ namespace hase::core
         RuntimeTopology topology;
         std::vector<unsigned> convergenceRayCounts;
     };
+
+    /** @brief Policy-independent inputs for the adaptive forward simulation loop. */
+    struct ForwardSimulationContext
+    {
+        ExperimentParameters const& experiment;
+        ComputeParameters const& compute;
+        HostMesh const& hostMesh;
+        unsigned baseSeed;
+        double betaVolumeTotal;
+        unsigned batchCount;
+    };
+
+    /** @brief Raw and convergence results produced by the worker-group simulation loop. */
+    struct ForwardSimulationResult
+    {
+        ForwardPhiAseRawResult raw;
+        Result convergence;
+        float runtime = 0.0f;
+        unsigned adaptiveLaunches = 0u;
+        std::vector<unsigned> convergenceRayCounts;
+    };
+
+    /** @brief Execute all complete batches mapped to one worker for one adaptive launch. */
+    template<typename T_Worker>
+    [[nodiscard]] ForwardRayBatchResults executeMappedBatches(
+        T_Worker& worker,
+        unsigned const launchRayCount,
+        unsigned const launchSeed,
+        unsigned const batchCount)
+    {
+        ForwardRayBatchResults localResults;
+        for(auto [batch] : hase::mapIdx(worker, alpaka::IdxRange{batchCount}))
+        {
+            localResults.emplace_back(worker(
+                ForwardRayBatch{
+                    batch,
+                    hase::kernels::forward::rseBatchRayCount(0u, launchRayCount, batch, batchCount),
+                    launchSeed}));
+        }
+        return localResults;
+    }
+
+    /** @brief Flatten gathered worker containers while retaining batch indices. */
+    [[nodiscard]] inline ForwardRayBatchResults flattenBatchResults(
+        std::vector<ForwardRayBatchResults> const& workerResults,
+        unsigned const batchCount)
+    {
+        ForwardRayBatchResults batches;
+        for(auto const& results : workerResults)
+            batches.insert(batches.end(), results.begin(), results.end());
+        std::ranges::sort(batches, {}, &ForwardRayBatchResult::index);
+        if(batches.size() != batchCount)
+            throw std::runtime_error("forward worker gather did not return every statistical batch");
+        for(unsigned batch = 0u; batch < batches.size(); ++batch)
+            if(batches[batch].index != batch)
+                throw std::runtime_error("forward worker gather returned a missing or duplicate statistical batch");
+        return batches;
+    }
+
+    /**
+     * @brief Run the adaptive ASE simulation using a policy-selected worker group.
+     *
+     * Integration-stage orchestration calls this function once for the current
+     * beta state. Complete ray batches are mapped to workers, traced on their
+     * owned devices, gathered with their batch identities intact, and only then
+     * combined for normalization and adaptive RSE evaluation.
+     */
+    template<typename T_WorkerPolicy>
+    [[nodiscard]] ForwardSimulationResult runForwardSimulation(
+        HaseWorker<T_WorkerPolicy>& worker,
+        ForwardSimulationContext const& context)
+    {
+        ForwardSimulationResult simulation;
+        simulation.raw = makeForwardRawResult(
+            context.hostMesh.numberOfCells,
+            context.hostMesh.numberOfMeshPoints,
+            context.batchCount);
+        simulation.convergenceRayCounts.assign(context.hostMesh.numberOfCells, 0u);
+        unsigned const baseSeed = worker.scatter(context.baseSeed);
+
+        for(unsigned completedIncreases = 0u;; ++completedIncreases)
+        {
+            unsigned const targetRayCount = adaptiveRayTarget(context.experiment, context.compute, completedIncreases);
+            unsigned const launchRayCount = targetRayCount - simulation.raw.rayCount;
+            unsigned const launchSeed = random::seedForAdaptiveLaunch(baseSeed, simulation.adaptiveLaunches);
+            auto localResults = executeMappedBatches(worker, launchRayCount, launchSeed, context.batchCount);
+            float const localRuntime = std::accumulate(
+                localResults.cbegin(),
+                localResults.cend(),
+                0.0f,
+                [](float const sum, ForwardRayBatchResult const& batch) { return sum + batch.runtime; });
+            simulation.runtime
+                += worker.reduce(localRuntime, [](float const lhs, float const rhs) { return std::max(lhs, rhs); });
+
+            auto const gathered = worker.gather(std::move(localResults));
+            auto batches = flattenBatchResults(*gathered, context.batchCount);
+            for(auto const& batch : batches)
+                mergeForwardRawResult(simulation.raw, batch.raw);
+            if(simulation.raw.rayCount != targetRayCount)
+                throw std::runtime_error("forward statistical batch accounting mismatch");
+
+            ++simulation.adaptiveLaunches;
+            simulation.convergence = worker(
+                FinalizeForwardAse{
+                    simulation.raw,
+                    context.hostMesh.nTot / context.hostMesh.crystalTFluo,
+                    context.experiment.maxSigmaA,
+                    context.experiment.maxSigmaE});
+            recordAdaptiveRayConvergence(
+                simulation.convergence,
+                targetRayCount,
+                context.experiment.relativeStandardErrorThreshold,
+                simulation.convergenceRayCounts);
+            bool const stop = context.experiment.forwardRayCount != 0u || targetRayCount == context.experiment.maxRays
+                              || forwardResultMeetsRelativeStandardError(
+                                  simulation.convergence,
+                                  context.experiment.relativeStandardErrorThreshold);
+            if(stop)
+                break;
+        }
+        return simulation;
+    }
 
     template<typename T_Device, typename T_Executor>
     class ForwardPhiAseContext
@@ -78,14 +205,12 @@ namespace hase::core
                 m_meshes.emplace_back(hostMesh.toDevice(device));
             m_deviceContexts.reserve(m_meshes.size());
             for(auto const& mesh : m_meshes)
-            {
                 m_deviceContexts.emplace_back(
                     std::make_unique<ForwardPhiAseDeviceContext<T_Device, T_Executor>>(
                         mesh.m_device,
                         m_executor,
                         experiment,
                         hostMesh));
-            }
         }
 
         [[nodiscard]] T_Device& primaryDevice()
@@ -114,10 +239,10 @@ namespace hase::core
         }
 
         Result downloadPrimaryResult(
-            bool includePhiAse,
-            bool includeStandardError,
-            bool includeRelativeStandardError,
-            bool includeTotalRays)
+            bool const includePhiAse,
+            bool const includeStandardError,
+            bool const includeRelativeStandardError,
+            bool const includeTotalRays)
         {
             return m_deviceContexts.front()->downloadFinalizedResult(
                 includePhiAse,
@@ -142,97 +267,88 @@ namespace hase::core
             HostMesh& hostMesh,
             auto const& betaVolume,
             Result& result,
-            bool allowDeviceResident = true)
+            bool const allowDeviceResident = true)
         {
-            bool const mpiHostCombined = compute.parallelMode == ParallelMode::MPI;
-            refreshDynamicMeshes(betaVolume, hostMesh, requiresHostBetaVolume() || mpiHostCombined, mpiHostCombined);
+            bool const mpiMode = compute.parallelMode == ParallelMode::MPI;
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+            if(mpiMode)
+                detail::ensureMpiInitialized();
+#endif
+            unsigned workerCount = static_cast<unsigned>(m_meshes.size());
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+            if(mpiMode)
+            {
+                int mpiWorkerCount = 1;
+                MPI_Comm_size(MPI_COMM_WORLD, &mpiWorkerCount);
+                workerCount = static_cast<unsigned>(mpiWorkerCount);
+            }
+#endif
+            unsigned const batchCount = hase::kernels::forward::forwardRseBatchCount(workerCount);
+            for(auto& deviceContext : m_deviceContexts)
+                deviceContext->configureBatchCount(batchCount);
+            refreshDynamicMeshes(betaVolume, hostMesh, requiresHostBetaVolume() || mpiMode, mpiMode);
             if(!experiment.isForwardPropagation())
                 throw std::runtime_error("Only forward volume propagation is supported by the openPMD backend.");
 
-            float runtime = 0.0f;
-            unsigned const maxDevices = static_cast<unsigned>(m_meshes.size());
-            std::vector<float> runtimes(maxDevices, 0.0f);
-            unsigned usedDevices = 0u;
+            unsigned seed = compute.rngSeed;
+            if(seed == ComputeParameters::unspecifiedRngSeed)
+            {
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+                int rank = 0;
+                if(mpiMode)
+                    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                seed = !mpiMode || rank == 0 ? random::SeedGenerator::get().getSeed() : 0u;
+#else
+                seed = random::SeedGenerator::get().getSeed();
+#endif
+            }
+            ForwardSimulationContext
+                simulationContext{experiment, compute, hostMesh, seed, m_betaVolumeTotal, batchCount};
+            ForwardSimulationResult simulation;
             RuntimeTopology topology;
-            ForwardPhiAseRawResult rawResult;
-            unsigned adaptiveLaunches = 0u;
-            std::vector<unsigned> convergenceRayCounts;
-            bool hostResultAvailable = false;
+            unsigned usedDevices = 0u;
+            unsigned residentDeviceIndex = 0u;
 
             if(compute.parallelMode == ParallelMode::SINGLE)
             {
-                unsigned const rngSeed = baseRngSeed(compute);
-                for(unsigned completedIncreases = 0u;; ++completedIncreases)
+                unsigned const threadWorkerCount = static_cast<unsigned>(m_meshes.size());
+                detail::ThreadWorkerGroup group(threadWorkerCount);
+                std::vector<ForwardSimulationResult> workerResults(threadWorkerCount);
+                std::vector<std::exception_ptr> exceptions(threadWorkerCount);
+                std::vector<std::thread> workers;
+                workers.reserve(threadWorkerCount);
+                for(unsigned workerIndex = 0u; workerIndex < threadWorkerCount; ++workerIndex)
                 {
-                    unsigned const targetRayCount = adaptiveRayTarget(experiment, compute, completedIncreases);
-                    unsigned const batchRayCount = targetRayCount - rawResult.rayCount;
-                    unsigned const activeDevices = std::min(maxDevices, batchRayCount);
-                    if(batchRayCount == 0u)
-                    {
-                        if(targetRayCount == experiment.maxRays || experiment.forwardRayCount != 0u)
-                            break;
-                        continue;
-                    }
-                    if(activeDevices == 0u)
-                        break;
-
-                    std::fill(runtimes.begin(), runtimes.end(), 0.0f);
-                    unsigned const launchSeed = random::seedForAdaptiveLaunch(rngSeed, adaptiveLaunches);
-                    bool const terminalLaunch
-                        = experiment.forwardRayCount != 0u || targetRayCount == experiment.maxRays;
-                    bool const deviceResidentBatch = allowDeviceResident && usedDevices <= 1u && activeDevices == 1u;
-                    auto const batchResult = evaluatePersistentBatch(
-                        experiment,
-                        hostMesh,
-                        betaVolume,
-                        activeDevices,
-                        batchRayCount,
-                        targetRayCount,
-                        launchSeed,
-                        runtimes,
-                        adaptiveLaunches == 0u,
-                        !deviceResidentBatch);
-                    rawResult = batchResult;
-                    runtime += *std::ranges::max_element(runtimes);
-                    usedDevices = std::max(usedDevices, activeDevices);
-                    ++adaptiveLaunches;
-                    bool meetsRelativeStandardError = false;
-                    if(deviceResidentBatch)
-                    {
-                        m_deviceContexts.front()->finalizeCellPhiAse(
-                            primaryMeshView(betaVolume),
-                            rawResult.rayCount,
-                            m_betaVolumeTotal,
-                            hostMesh.nTot / hostMesh.crystalTFluo,
-                            experiment.maxSigmaA,
-                            experiment.maxSigmaE);
-                        Result const convergenceResult
-                            = m_deviceContexts.front()->downloadFinalizedResult(false, false, true, true);
-                        recordAdaptiveRayConvergence(
-                            convergenceResult,
-                            targetRayCount,
-                            experiment.relativeStandardErrorThreshold,
-                            convergenceRayCounts);
-                        meetsRelativeStandardError = forwardResultMeetsRelativeStandardError(
-                            convergenceResult,
-                            experiment.relativeStandardErrorThreshold);
-                    }
-                    else
-                    {
-                        finalizeForwardPhiAse(hostMesh, rawResult, m_betaVolumeTotal, result);
-                        hostResultAvailable = true;
-                        recordAdaptiveRayConvergence(
-                            result,
-                            targetRayCount,
-                            experiment.relativeStandardErrorThreshold,
-                            convergenceRayCounts);
-                        meetsRelativeStandardError = forwardResultMeetsRelativeStandardError(
-                            result,
-                            experiment.relativeStandardErrorThreshold);
-                    }
-                    if(terminalLaunch || meetsRelativeStandardError)
-                        break;
+                    workers.emplace_back(
+                        [&, workerIndex]
+                        {
+                            try
+                            {
+                                auto mesh
+                                    = workerIndex == 0u ? primaryMeshView(betaVolume) : m_meshes[workerIndex].toView();
+                                HaseWorker worker{ThreadOwnedDevices{
+                                    workerIndex,
+                                    threadWorkerCount,
+                                    group,
+                                    mesh,
+                                    *m_deviceContexts[workerIndex],
+                                    experiment,
+                                    m_betaVolumeTotal}};
+                                workerResults[workerIndex] = runForwardSimulation(worker, simulationContext);
+                            }
+                            catch(...)
+                            {
+                                exceptions[workerIndex] = std::current_exception();
+                            }
+                        });
                 }
+                for(auto& worker : workers)
+                    worker.join();
+                for(auto const& exception : exceptions)
+                    if(exception)
+                        std::rethrow_exception(exception);
+                simulation = std::move(workerResults.front());
+                usedDevices = threadWorkerCount;
                 topology.activeNodes = 1u;
                 topology.activeRanks = 1u;
                 topology.avgActiveRanksPerNode = 1.0;
@@ -247,18 +363,20 @@ namespace hase::core
             else if(compute.parallelMode == ParallelMode::MPI)
             {
 #if defined(MPI_FOUND) && !defined(DISABLE_MPI)
-                usedDevices = hase::core::calcForwardPhiAseMPI(
-                    m_executor,
+                unsigned const deviceIndex = mpiRankDeviceIndex(static_cast<unsigned>(m_meshes.size()));
+                residentDeviceIndex = deviceIndex;
+                HaseWorker worker{MPIRank{
+                    MPI_COMM_WORLD,
+                    deviceIndex == 0u ? primaryMeshView(betaVolume) : m_meshes[deviceIndex].toView(),
+                    *m_deviceContexts[deviceIndex],
                     experiment,
-                    compute,
-                    hostMesh,
-                    m_meshes,
-                    rawResult,
-                    topology,
-                    runtime,
-                    adaptiveLaunches,
-                    convergenceRayCounts);
-                hostResultAvailable = true;
+                    m_betaVolumeTotal,
+                    hostMesh.numberOfCells,
+                    hostMesh.numberOfMeshPoints,
+                    batchCount}};
+                simulation = runForwardSimulation(worker, simulationContext);
+                topology = mpiWorkerTopology();
+                usedDevices = topology.activeGpus;
 #else
                 throw std::runtime_error("MPI parallel mode is unavailable in this build");
 #endif
@@ -266,120 +384,29 @@ namespace hase::core
             else
                 throw std::runtime_error("unsupported forward ASE parallel mode '" + compute.parallelMode + "'");
 
-            if(usedDevices == 0u)
+            result = std::move(simulation.convergence);
+            if(allowDeviceResident && residentDeviceIndex != 0u)
             {
-                result = Result{};
-                return ForwardPhiAseEvaluation{};
-            }
-            if(hostResultAvailable)
-                finalizeForwardPhiAse(hostMesh, rawResult, m_betaVolumeTotal, result);
-            else
-            {
-                result = Result{};
-                result.srmStatus = rawResult.srmStatus;
-                result.srmPasses = rawResult.srmPasses;
-                result.srmRemainingFraction = rawResult.srmRemainingFraction;
-                result.srmMaxIterations = rawResult.srmMaxIterations;
-                result.srmDivergenceStreak = rawResult.srmDivergenceStreak;
-            }
-            // The persistent single-device path finalizes directly in
-            // m_deviceContexts.  MPI currently combines host accumulators, so
-            // its result must be copied back even when only one device exists.
-            bool const deviceResidentPhi
-                = allowDeviceResident && compute.parallelMode == ParallelMode::SINGLE && usedDevices == 1u;
-            double const fluorescenceRate = hostMesh.nTot / hostMesh.crystalTFluo;
-            for(unsigned volume = 0u;
-                hostResultAvailable && volume < result.phiAse.size() && volume < hostMesh.betaVolume.size();
-                ++volume)
-            {
-                result.phiAse[volume] *= fluorescenceRate;
-                result.standardError[volume] *= fluorescenceRate;
-                if(!deviceResidentPhi)
-                {
-                    result.dndtAse[volume] = calcVolumeDndtAse(
-                        hostMesh,
-                        experiment.maxSigmaA,
-                        experiment.maxSigmaE,
-                        result.phiAse[volume],
-                        volume);
-                }
-            }
-            if(deviceResidentPhi)
-            {
-                m_deviceContexts.front()->finalizeCellPhiAse(
+                m_deviceContexts.front()->uploadAndFinalize(
                     primaryMeshView(betaVolume),
-                    rawResult.rayCount,
+                    simulation.raw,
                     m_betaVolumeTotal,
-                    fluorescenceRate,
+                    hostMesh.nTot / hostMesh.crystalTFluo,
                     experiment.maxSigmaA,
                     experiment.maxSigmaE);
             }
+
             return ForwardPhiAseEvaluation{
-                deviceResidentPhi,
-                runtime,
+                allowDeviceResident,
+                simulation.runtime,
                 usedDevices,
-                rawResult.rayCount,
-                adaptiveLaunches,
+                simulation.raw.rayCount,
+                simulation.adaptiveLaunches,
                 topology,
-                std::move(convergenceRayCounts)};
+                std::move(simulation.convergenceRayCounts)};
         }
 
     private:
-        ForwardPhiAseRawResult evaluatePersistentBatch(
-            ExperimentParameters const& experiment,
-            HostMesh const& hostMesh,
-            auto const& betaVolume,
-            unsigned activeDevices,
-            unsigned rayCount,
-            unsigned accumulatedRayCount,
-            unsigned baseSeed,
-            std::vector<float>& runtimes,
-            bool resetAccumulators,
-            bool downloadAccumulators)
-        {
-            ForwardPhiAseRawResult combined
-                = makeForwardRawResult(hostMesh.numberOfCells, hostMesh.numberOfMeshPoints);
-            if(rayCount == 0u || activeDevices == 0u)
-                return combined;
-
-            unsigned const raysPerDevice = rayCount / activeDevices;
-            unsigned const remainder = rayCount % activeDevices;
-            double const betaVolumeTotal = m_betaVolumeTotal;
-            double const sourceOffset = random::stratifiedUnitOffset(baseSeed);
-            unsigned const spectrumPhase
-                = random::stratifiedSpectrumPhase(baseSeed, static_cast<unsigned>(experiment.sigmaA.size()));
-            std::vector<ForwardPhiAseRawResult> partials(activeDevices);
-            unsigned rayOffset = 0u;
-            for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-            {
-                unsigned const localRayCount
-                    = deviceIndex + 1u == activeDevices ? raysPerDevice + remainder : raysPerDevice;
-                m_deviceContexts[deviceIndex]->begin(
-                    deviceIndex == 0u ? primaryMeshView(betaVolume) : m_meshes[deviceIndex].toView(),
-                    localRayCount,
-                    baseSeed,
-                    rayOffset,
-                    rayCount,
-                    sourceOffset,
-                    spectrumPhase,
-                    betaVolumeTotal,
-                    experiment,
-                    resetAccumulators);
-                rayOffset += localRayCount;
-            }
-            for(unsigned deviceIndex = 0u; deviceIndex < activeDevices; ++deviceIndex)
-            {
-                m_deviceContexts[deviceIndex]->finish(
-                    partials[deviceIndex],
-                    runtimes[deviceIndex],
-                    downloadAccumulators);
-                mergeForwardRawResult(combined, partials[deviceIndex]);
-            }
-            if(combined.rayCount != accumulatedRayCount)
-                throw std::runtime_error("Forward ray partition accounting mismatch.");
-            return combined;
-        }
-
         [[nodiscard]] DeviceMeshView primaryMeshView(auto const& betaVolume) const
         {
             auto mesh = m_meshes.front().toView();
@@ -390,24 +417,27 @@ namespace hase::core
         void refreshDynamicMeshes(
             auto const& betaVolume,
             HostMesh& hostMesh,
-            bool requireHostValues,
-            bool synchronizePrimaryMesh)
+            bool const requireHostValues,
+            bool const synchronizePrimaryMesh)
         {
             m_betaVolumeTotal = m_deviceContexts.front()->rebuildBetaVolumePrefix(m_meshes.front(), betaVolume);
             if(m_meshes.size() == 1u && !requireHostValues)
-            {
                 return;
-            }
 
-            auto queue = m_meshes.front().m_device.makeQueue(alpaka::queueKind::blocking);
+            auto queue = m_meshes.front().m_device.makeQueue(alpaka::queueKind::nonBlocking);
             hostMesh.setBetaVolume(detail::copyToVector(queue, betaVolume));
             if(synchronizePrimaryMesh)
+            {
                 detail::copyVectorToBuffer(queue, hostMesh.betaVolume, m_meshes.front().betaVolume);
+                alpaka::onHost::wait(queue);
+                m_deviceContexts.front()->rebuildBetaVolumePrefix(m_meshes.front(), m_meshes.front().betaVolume);
+            }
             for(std::size_t index = 1u; index < m_meshes.size(); ++index)
             {
                 auto& mesh = m_meshes[index];
-                auto secondaryQueue = mesh.m_device.makeQueue(alpaka::queueKind::blocking);
+                auto secondaryQueue = mesh.m_device.makeQueue(alpaka::queueKind::nonBlocking);
                 detail::copyVectorToBuffer(secondaryQueue, hostMesh.betaVolume, mesh.betaVolume);
+                alpaka::onHost::wait(secondaryQueue);
                 m_deviceContexts[index]->rebuildBetaVolumePrefix(mesh, mesh.betaVolume);
             }
         }

@@ -14,7 +14,7 @@
 #include <kernels/vertexAccumulation.hpp>
 #include <random/random.hpp>
 
-#include <array>
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <stdexcept>
@@ -31,7 +31,10 @@ namespace hase::core
         }
     };
 
-    [[nodiscard]] ForwardPhiAseRawResult makeForwardRawResult(unsigned volumeCount, unsigned vertexCount);
+    [[nodiscard]] ForwardPhiAseRawResult makeForwardRawResult(
+        unsigned volumeCount,
+        unsigned vertexCount,
+        unsigned batchCount = hase::kernels::forward::defaultForwardRseBatchCount);
 
     [[nodiscard]] double calcForwardBetaVolumeTotal(HostMesh const& hostMesh);
 
@@ -74,8 +77,12 @@ namespace hase::core
             , m_vertexBatchScoreSum(
                   alpaka::onHost::alloc<double>(
                       m_devBundle.device,
-                      hase::kernels::forward::forwardRseBatchCount * 2u
+                      hase::kernels::forward::defaultForwardRseBatchCount * 2u
                           * static_cast<std::size_t>(hostMesh.numberOfMeshPoints)))
+            , m_rseBatchRayCountsDevice(
+                  alpaka::onHost::alloc<unsigned>(
+                      m_devBundle.device,
+                      static_cast<std::size_t>(hase::kernels::forward::defaultForwardRseBatchCount)))
             , m_volumeRayVisits(
                   alpaka::onHost::alloc<unsigned>(
                       m_devBundle.device,
@@ -100,6 +107,8 @@ namespace hase::core
             , m_volumeCount(hostMesh.numberOfCells)
             , m_vertexCount(hostMesh.numberOfMeshPoints)
             , m_spectralCount(static_cast<unsigned>(experiment.sigmaA.size()))
+            , m_batchCount(hase::kernels::forward::defaultForwardRseBatchCount)
+            , m_rseBatchRayCounts(m_batchCount, 0u)
         {
             if(experiment.useReflections)
             {
@@ -111,14 +120,28 @@ namespace hase::core
             }
         }
 
+        /** @brief Resize persistent batch accumulation storage for a worker group. */
+        void configureBatchCount(unsigned const batchCount)
+        {
+            if(batchCount == 0u)
+                throw std::invalid_argument("forward ASE batch count must be positive");
+            if(batchCount == m_batchCount)
+                return;
+            alpaka::onHost::wait(m_queue);
+            m_vertexBatchScoreSum = alpaka::onHost::alloc<double>(
+                m_devBundle.device,
+                batchCount * 2u * static_cast<std::size_t>(m_vertexCount));
+            m_rseBatchRayCountsDevice
+                = alpaka::onHost::alloc<unsigned>(m_devBundle.device, static_cast<std::size_t>(batchCount));
+            m_batchCount = batchCount;
+            m_rseBatchRayCounts.assign(batchCount, 0u);
+        }
+
         void begin(
             DeviceMeshView const mesh,
             unsigned rayCount,
             unsigned rngSeed,
-            unsigned globalRayOffset,
-            unsigned globalRayCount,
-            double sourceStratificationOffset,
-            unsigned spectrumStratificationPhase,
+            unsigned rseBatch,
             double betaVolumeTotal,
             ExperimentParameters const& experiment,
             bool resetAccumulators = true)
@@ -128,14 +151,12 @@ namespace hase::core
             if(resetAccumulators)
             {
                 m_accumulatedRayCount = 0u;
-                m_rseBatchRayCounts.fill(0u);
+                std::ranges::fill(m_rseBatchRayCounts, 0u);
             }
             m_accumulatedRayCount += rayCount;
-            for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
-            {
-                m_rseBatchRayCounts.at(batch)
-                    += hase::kernels::forward::rseBatchRayCount(globalRayOffset, rayCount, batch);
-            }
+            if(rseBatch >= m_batchCount)
+                throw std::out_of_range("forward ASE RSE batch index is out of range");
+            m_rseBatchRayCounts.at(rseBatch) += rayCount;
             if(rayCount == 0u)
                 return;
 
@@ -145,8 +166,7 @@ namespace hase::core
                     m_queue,
                     m_vertexBatchScoreSum,
                     0.0,
-                    alpaka::Vec{
-                        hase::kernels::forward::forwardRseBatchCount * 2u * static_cast<std::size_t>(m_vertexCount)});
+                    alpaka::Vec{m_batchCount * 2u * static_cast<std::size_t>(m_vertexCount)});
                 alpaka::onHost::fill(
                     m_queue,
                     m_volumeRayVisits,
@@ -164,7 +184,7 @@ namespace hase::core
                 m_devBundle.device,
                 m_devBundle.executor,
                 alpaka::Vec{rayCount});
-            m_srmResult = makeForwardRawResult(m_volumeCount, m_vertexCount);
+            m_srmResult = makeForwardRawResult(m_volumeCount, m_vertexCount, m_batchCount);
             m_srmResult.rayCount = rayCount;
             if(experiment.useReflections)
             {
@@ -180,10 +200,7 @@ namespace hase::core
                     experiment,
                     m_srmResult,
                     rayCount,
-                    globalRayOffset,
-                    globalRayCount,
-                    sourceStratificationOffset,
-                    spectrumStratificationPhase,
+                    rseBatch,
                     betaVolumeTotal,
                     m_vertexBatchScoreSum,
                     m_volumeRayVisits,
@@ -204,10 +221,7 @@ namespace hase::core
                         hase::kernels::forward::AccumulateForwardPhiAse{},
                         mesh,
                         rayCount,
-                        globalRayOffset,
-                        globalRayCount,
-                        sourceStratificationOffset,
-                        spectrumStratificationPhase,
+                        rseBatch,
                         betaVolumeTotal,
                         accumulation,
                         spectrum,
@@ -217,7 +231,7 @@ namespace hase::core
 
         void finish(ForwardPhiAseRawResult& result, float& runtime, bool downloadAccumulators = true)
         {
-            result = makeForwardRawResult(m_volumeCount, m_vertexCount);
+            result = makeForwardRawResult(m_volumeCount, m_vertexCount, m_batchCount);
             result.rayCount = m_accumulatedRayCount;
             result.rseBatchRayCounts = m_rseBatchRayCounts;
             result.srmStatus = m_srmResult.srmStatus;
@@ -247,23 +261,11 @@ namespace hase::core
             float& runtime,
             unsigned rayCount,
             unsigned rngSeed,
-            unsigned globalRayOffset,
-            unsigned globalRayCount,
-            double sourceStratificationOffset,
-            unsigned spectrumStratificationPhase,
+            unsigned rseBatch,
             double betaVolumeTotal,
             ExperimentParameters const& experiment)
         {
-            begin(
-                mesh,
-                rayCount,
-                rngSeed,
-                globalRayOffset,
-                globalRayCount,
-                sourceStratificationOffset,
-                spectrumStratificationPhase,
-                betaVolumeTotal,
-                experiment);
+            begin(mesh, rayCount, rngSeed, rseBatch, betaVolumeTotal, experiment);
             finish(result, runtime);
         }
 
@@ -275,14 +277,13 @@ namespace hase::core
             double sigmaA,
             double sigmaE)
         {
-            alpaka::Vec<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts{};
-            for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
-                rseBatchRayCounts[batch] = m_rseBatchRayCounts.at(batch);
+            alpaka::onHost::memcpy(m_queue, m_rseBatchRayCountsDevice, m_rseBatchRayCounts);
             hase::kernels::enqueueFinalizeForwardCellPhiAse(
                 m_devBundle,
                 m_queue,
                 mesh,
                 m_vertexBatchScoreSum,
+                m_rseBatchRayCountsDevice,
                 m_lumpedMaterialVertexVolume,
                 m_droppedRays,
                 m_volumePhiAse,
@@ -290,12 +291,39 @@ namespace hase::core
                 m_relativeStandardError,
                 m_volumeDndtAse,
                 rayCount,
-                rseBatchRayCounts,
+                m_batchCount,
                 betaVolumeTotal,
                 fluorescenceRate,
                 sigmaA,
                 sigmaE);
             alpaka::onHost::wait(m_queue);
+        }
+
+        /**
+         * @brief Upload gathered raw batches and finalize them on this device.
+         *
+         * This is the explicit host/device boundary after a thread or MPI
+         * gather. Normalization, RSE evaluation, and ASE derivative generation
+         * remain device-side.
+         */
+        void uploadAndFinalize(
+            DeviceMeshView const mesh,
+            ForwardPhiAseRawResult const& rawResult,
+            double const betaVolumeTotal,
+            double const fluorescenceRate,
+            double const sigmaA,
+            double const sigmaE)
+        {
+            if(rawResult.rseBatchRayCounts.size() != m_batchCount
+               || rawResult.vertexBatchScoreSum.size() != m_vertexBatchScoreSum.getExtents().product()
+               || rawResult.totalRays.size() != m_volumeCount || rawResult.droppedRays.size() != m_volumeCount)
+                throw std::runtime_error("gathered forward ASE result does not match the device context");
+            alpaka::onHost::memcpy(m_queue, m_vertexBatchScoreSum, rawResult.vertexBatchScoreSum);
+            alpaka::onHost::memcpy(m_queue, m_volumeRayVisits, rawResult.totalRays);
+            alpaka::onHost::memcpy(m_queue, m_droppedRays, rawResult.droppedRays);
+            m_rseBatchRayCounts = rawResult.rseBatchRayCounts;
+            m_accumulatedRayCount = rawResult.rayCount;
+            finalizeCellPhiAse(mesh, rawResult.rayCount, betaVolumeTotal, fluorescenceRate, sigmaA, sigmaE);
         }
 
         double rebuildBetaVolumePrefix(DeviceMeshContainer<T_Device>& meshContainer, auto const& betaVolume)
@@ -370,6 +398,7 @@ namespace hase::core
         hase::alpakaUtils::DevBundle<T_Device, T_Exec> m_devBundle;
         T_Queue m_queue;
         T_DoubleBuffer m_vertexBatchScoreSum;
+        T_UnsignedBuffer m_rseBatchRayCountsDevice;
         T_UnsignedBuffer m_volumeRayVisits;
         T_UnsignedBuffer m_droppedRays;
         T_DoubleBuffer m_sigmaA;
@@ -385,171 +414,11 @@ namespace hase::core
         unsigned m_volumeCount;
         unsigned m_vertexCount;
         unsigned m_spectralCount;
+        unsigned m_batchCount;
         unsigned m_rayCount = 0u;
         unsigned m_accumulatedRayCount = 0u;
-        std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> m_rseBatchRayCounts{};
+        std::vector<unsigned> m_rseBatchRayCounts;
         std::chrono::steady_clock::time_point m_started;
     };
 
-    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
-    float calcForwardPhiAseRaw(
-        alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
-        ExperimentParameters const& experiment,
-        HostMesh const& hostMesh,
-        DeviceMeshContainer<T_Device> const& meshContainer,
-        ForwardPhiAseRawResult& result,
-        float& runtime,
-        unsigned rayCount,
-        unsigned threadLocalStridingRNG,
-        unsigned const globalRayOffset = 0u,
-        unsigned const globalRayCount = 0u,
-        double const sourceStratificationOffset = 0.0,
-        unsigned const spectrumStratificationPhase = 0u)
-    {
-        if(experiment.useReflections && experiment.surfaceReservoirSize == 0u)
-        {
-            throw std::runtime_error("Forward reflections require surfaceReservoirSize > 0.");
-        }
-
-        time_t starttime = time(0);
-        auto queue = devBundle.device.makeQueue();
-        DeviceMeshView mesh = meshContainer.toView();
-        unsigned const volumeCount = mesh.numberOfCells;
-        double const betaVolumeTotal = calcForwardBetaVolumeTotal(hostMesh);
-        unsigned const resolvedGlobalRayCount = globalRayCount == 0u ? rayCount : globalRayCount;
-        double const resolvedSourceStratificationOffset
-            = globalRayCount == 0u ? random::stratifiedUnitOffset(threadLocalStridingRNG) : sourceStratificationOffset;
-        unsigned const resolvedSpectrumStratificationPhase = globalRayCount == 0u
-                                                                 ? random::stratifiedSpectrumPhase(
-                                                                       threadLocalStridingRNG,
-                                                                       static_cast<unsigned>(experiment.sigmaA.size()))
-                                                                 : spectrumStratificationPhase;
-
-        result = makeForwardRawResult(volumeCount, mesh.numberOfMeshPoints);
-        result.rayCount = rayCount;
-        SrmControls const srmControls = resolveSrmControls(experiment);
-        result.srmMaxIterations = experiment.useReflections ? srmControls.maxIterations : 0u;
-        result.srmDivergenceStreak = experiment.useReflections ? srmControls.divergenceStreak : 0u;
-        if(rayCount == 0u)
-        {
-            result.srmStatus = experiment.useReflections ? SrmStatus::CONVERGED : SrmStatus::DISABLED;
-            runtime = difftime(time(0), starttime);
-            return runtime;
-        }
-
-        alpaka::concepts::IBuffer auto dVertexBatchScoreSum = alpaka::onHost::alloc<double>(
-            devBundle.device,
-            hase::kernels::forward::forwardRseBatchCount * 2u * mesh.numberOfMeshPoints);
-        alpaka::concepts::IBuffer auto dVolumeRayVisits
-            = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
-        alpaka::concepts::IBuffer auto dDroppedRays = alpaka::onHost::alloc<unsigned>(devBundle.device, volumeCount);
-        alpaka::concepts::IBuffer auto dSigmaA = hase::alpakaUtils::toDevice(queue, experiment.sigmaA);
-        alpaka::concepts::IBuffer auto dSigmaE = hase::alpakaUtils::toDevice(queue, experiment.sigmaE);
-        auto accumulationSpans = hase::kernels::forward::ForwardAccumulationSpans{
-            dVertexBatchScoreSum.getMdSpan(),
-            dVolumeRayVisits.getMdSpan(),
-            dDroppedRays.getMdSpan()};
-        auto spectrumSpans = hase::kernels::forward::ForwardSpectrumSpans{
-            dSigmaA,
-            dSigmaE,
-            static_cast<unsigned>(experiment.sigmaA.size())};
-
-        alpaka::onHost::fill(
-            queue,
-            dVertexBatchScoreSum,
-            double{0},
-            alpaka::Vec{hase::kernels::forward::forwardRseBatchCount * 2u * mesh.numberOfMeshPoints});
-        alpaka::onHost::fill(queue, dVolumeRayVisits, 0u, alpaka::Vec{volumeCount});
-        alpaka::onHost::fill(queue, dDroppedRays, 0u, alpaka::Vec{volumeCount});
-        alpaka::onHost::wait(queue);
-
-        if(!experiment.useReflections)
-        {
-            auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-                devBundle.device,
-                devBundle.executor,
-                alpaka::Vec{static_cast<unsigned int>(rayCount)});
-            BENCH_SYNC(queue, AccumulateForwardPhiAse);
-            queue.enqueue(
-                frameSpec,
-                alpaka::KernelBundle{
-                    hase::kernels::forward::AccumulateForwardPhiAse{},
-                    mesh,
-                    rayCount,
-                    globalRayOffset,
-                    resolvedGlobalRayCount,
-                    resolvedSourceStratificationOffset,
-                    resolvedSpectrumStratificationPhase,
-                    betaVolumeTotal,
-                    accumulationSpans,
-                    spectrumSpans,
-                    threadLocalStridingRNG});
-            alpaka::onHost::wait(queue);
-        }
-        else
-        {
-            ForwardSrmWorkspace<T_Device> workspace{
-                devBundle.device,
-                volumeCount * tet4FaceCount,
-                experiment.surfaceReservoirSize,
-                rayCount};
-            runForwardSrm(
-                devBundle,
-                queue,
-                mesh,
-                experiment,
-                result,
-                rayCount,
-                globalRayOffset,
-                resolvedGlobalRayCount,
-                resolvedSourceStratificationOffset,
-                resolvedSpectrumStratificationPhase,
-                betaVolumeTotal,
-                dVertexBatchScoreSum,
-                dVolumeRayVisits,
-                dDroppedRays,
-                dSigmaA,
-                dSigmaE,
-                static_cast<unsigned>(experiment.sigmaA.size()),
-                threadLocalStridingRNG,
-                srmControls,
-                workspace);
-        }
-
-        alpaka::onHost::memcpy(queue, result.vertexBatchScoreSum, dVertexBatchScoreSum);
-        alpaka::onHost::memcpy(queue, result.totalRays, dVolumeRayVisits);
-        alpaka::onHost::memcpy(queue, result.droppedRays, dDroppedRays);
-        alpaka::onHost::wait(queue);
-
-        for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
-            result.rseBatchRayCounts.at(batch)
-                = hase::kernels::forward::rseBatchRayCount(globalRayOffset, rayCount, batch);
-
-        runtime = difftime(time(0), starttime);
-        return runtime;
-    }
-
-    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
-    float calcForwardPhiAse(
-        alpakaUtils::DevBundle<T_Device, T_Exec>& devBundle,
-        ExperimentParameters const& experiment,
-        HostMesh const& hostMesh,
-        DeviceMeshContainer<T_Device> const& meshContainer,
-        Result& result,
-        float& runtime,
-        unsigned threadLocalStridingRNG)
-    {
-        ForwardPhiAseRawResult rawResult;
-        calcForwardPhiAseRaw(
-            devBundle,
-            experiment,
-            hostMesh,
-            meshContainer,
-            rawResult,
-            runtime,
-            experiment.resolvedForwardRayCount(),
-            threadLocalStridingRNG);
-        finalizeForwardPhiAse(hostMesh, rawResult, result);
-        return runtime;
-    }
 } // namespace hase::core

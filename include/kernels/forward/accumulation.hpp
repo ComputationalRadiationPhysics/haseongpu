@@ -22,18 +22,23 @@
 
 namespace hase::kernels::forward
 {
-    inline constexpr unsigned forwardRseBatchCount = 8u;
+    inline constexpr unsigned defaultForwardRseBatchCount = 8u;
+
+    /** @brief Resolve the statistical batch count for a worker group. */
+    ALPAKA_FN_HOST_ACC constexpr unsigned forwardRseBatchCount(unsigned const workerCount)
+    {
+        return workerCount > defaultForwardRseBatchCount ? workerCount : defaultForwardRseBatchCount;
+    }
 
     ALPAKA_FN_HOST_ACC constexpr unsigned rseBatchRayCount(
         unsigned const globalRayOffset,
         unsigned const rayCount,
-        unsigned const batch)
+        unsigned const batch,
+        unsigned const batchCount = defaultForwardRseBatchCount)
     {
         unsigned const end = globalRayOffset + rayCount;
-        unsigned const first
-            = globalRayOffset
-              + (batch + forwardRseBatchCount - globalRayOffset % forwardRseBatchCount) % forwardRseBatchCount;
-        return first < end ? 1u + (end - 1u - first) / forwardRseBatchCount : 0u;
+        unsigned const first = globalRayOffset + (batch + batchCount - globalRayOffset % batchCount) % batchCount;
+        return first < end ? 1u + (end - 1u - first) / batchCount : 0u;
     }
 
     ALPAKA_FN_HOST_ACC constexpr std::uint64_t mixRseBatchSeed64(std::uint64_t value)
@@ -69,9 +74,11 @@ namespace hase::kernels::forward
                                   : rseBatchSeed(rseBatchSeed(applicationSeed, batch), 0x6ca4'c37du) % spectrumSize;
     }
 
-    ALPAKA_FN_HOST_ACC constexpr unsigned rseBatchRayIndex(unsigned const globalRayIndex)
+    ALPAKA_FN_HOST_ACC constexpr unsigned rseBatchRayIndex(
+        unsigned const globalRayIndex,
+        unsigned const batchCount = defaultForwardRseBatchCount)
     {
-        return globalRayIndex / forwardRseBatchCount;
+        return globalRayIndex / batchCount;
     }
 
     struct ForwardAseRayState
@@ -365,10 +372,7 @@ namespace hase::kernels::forward
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
-            unsigned const globalRayOffset,
-            unsigned const globalRayCount,
-            double const,
-            unsigned const,
+            unsigned const batch,
             double const betaVolumeTotal,
             auto accumulation,
             auto spectrum,
@@ -379,10 +383,8 @@ namespace hase::kernels::forward
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                unsigned const globalRayIndex = globalRayOffset + rayNumber;
-                unsigned const batch = globalRayIndex % forwardRseBatchCount;
-                unsigned const batchRayIndex = rseBatchRayIndex(globalRayIndex);
-                unsigned const batchRayCount = rseBatchRayCount(0u, globalRayCount, batch);
+                unsigned const batchRayIndex = rayNumber;
+                unsigned const batchRayCount = forwardRayCount;
                 unsigned const batchSeed = rseBatchSeed(rngSeed, batch);
                 auto rndEngine = alpaka::rand::engine::Philox4x32x10{batchSeed, rayHistoryId(0u, batchRayIndex)};
                 unsigned const tet = sampleStratifiedVolumeByBetaVolume(
@@ -580,10 +582,7 @@ namespace hase::kernels::forward
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
-            unsigned const globalRayOffset,
-            unsigned const globalRayCount,
-            double const,
-            unsigned const,
+            unsigned const batch,
             double const betaVolumeTotal,
             auto accumulation,
             auto reservoir,
@@ -595,10 +594,8 @@ namespace hase::kernels::forward
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                unsigned const globalRayIndex = globalRayOffset + rayNumber;
-                unsigned const batch = globalRayIndex % forwardRseBatchCount;
-                unsigned const batchRayIndex = rseBatchRayIndex(globalRayIndex);
-                unsigned const batchRayCount = rseBatchRayCount(0u, globalRayCount, batch);
+                unsigned const batchRayIndex = rayNumber;
+                unsigned const batchRayCount = forwardRayCount;
                 unsigned const batchSeed = rseBatchSeed(rngSeed, batch);
                 auto rndEngine = alpaka::rand::engine::Philox4x32x10{batchSeed, rayHistoryId(0u, batchRayIndex)};
                 unsigned const tet = sampleStratifiedVolumeByBetaVolume(
@@ -720,8 +717,7 @@ namespace hase::kernels::forward
             auto const& acc,
             hase::core::DeviceMeshView const mesh,
             unsigned const forwardRayCount,
-            unsigned const globalRayOffset,
-            unsigned const globalRayCount,
+            unsigned const batch,
             double const sourceWeight,
             auto accumulation,
             auto inReservoir,
@@ -737,10 +733,7 @@ namespace hase::kernels::forward
                     alpaka::onAcc::worker::threadsInGrid,
                     alpaka::IdxRange{forwardRayCount}))
             {
-                unsigned const globalRayIndex = globalRayOffset + rayNumber;
-                unsigned const batch = globalRayIndex % forwardRseBatchCount;
-                unsigned const batchRayIndex = rseBatchRayIndex(globalRayIndex);
-                unsigned const batchRayCount = rseBatchRayCount(0u, globalRayCount, batch);
+                unsigned const batchRayIndex = rayNumber;
                 unsigned const batchSeed = rseBatchSeed(rngSeed, batch);
                 auto rndEngine
                     = alpaka::rand::engine::Philox4x32x10{batchSeed, rayHistoryId(reflectionPass, batchRayIndex)};
@@ -755,7 +748,7 @@ namespace hase::kernels::forward
                 {
                     double const faceTarget = stratifiedUnitInterval(
                         batchRayIndex,
-                        batchRayCount,
+                        forwardRayCount,
                         rseBatchSourceStratificationOffset(rngSeed ^ reflectionPass, batch));
                     unsigned lower = 0u;
                     unsigned upper = faceCount;

@@ -15,11 +15,16 @@
 
 namespace hase::core
 {
-    ForwardPhiAseRawResult makeForwardRawResult(unsigned const volumeCount, unsigned const vertexCount)
+    ForwardPhiAseRawResult makeForwardRawResult(
+        unsigned const volumeCount,
+        unsigned const vertexCount,
+        unsigned const batchCount)
     {
+        if(batchCount == 0u)
+            throw std::invalid_argument("forward ASE batch count must be positive");
         return ForwardPhiAseRawResult{
-            std::vector<double>(hase::kernels::forward::forwardRseBatchCount * 2u * vertexCount, 0.0),
-            {},
+            std::vector<double>(batchCount * 2u * vertexCount, 0.0),
+            std::vector<unsigned>(batchCount, 0u),
             std::vector<unsigned>(volumeCount, 0u),
             std::vector<unsigned>(volumeCount, 0u),
             0u,
@@ -62,7 +67,9 @@ namespace hase::core
             throw std::runtime_error("cannot merge forward ASE results with different vertex counts");
         for(unsigned vertex = 0u; vertex < target.vertexBatchScoreSum.size(); ++vertex)
             target.vertexBatchScoreSum.at(vertex) += source.vertexBatchScoreSum.at(vertex);
-        for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+        if(target.rseBatchRayCounts.size() != source.rseBatchRayCounts.size())
+            throw std::runtime_error("cannot merge forward ASE results with different batch counts");
+        for(unsigned batch = 0u; batch < target.rseBatchRayCounts.size(); ++batch)
             target.rseBatchRayCounts.at(batch) += source.rseBatchRayCounts.at(batch);
         for(unsigned volume = 0u; volume < target.totalRays.size(); ++volume)
         {
@@ -131,10 +138,11 @@ namespace hase::core
     {
         unsigned const volumeCount = hostMesh.numberOfCells;
         unsigned const materialVertexCount = 2u * hostMesh.numberOfMeshPoints;
-        if(rawResult.vertexBatchScoreSum.size() != hase::kernels::forward::forwardRseBatchCount * materialVertexCount)
+        unsigned const batchCount = static_cast<unsigned>(rawResult.rseBatchRayCounts.size());
+        if(batchCount == 0u || rawResult.vertexBatchScoreSum.size() != batchCount * materialVertexCount)
             throw std::runtime_error("forward ASE vertex score count does not match the mesh");
-        std::array<std::vector<double>, hase::kernels::forward::forwardRseBatchCount> cellBatchScoreDensity;
-        for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+        std::vector<std::vector<double>> cellBatchScoreDensity(batchCount);
+        for(unsigned batch = 0u; batch < batchCount; ++batch)
         {
             auto const begin = rawResult.vertexBatchScoreSum.cbegin() + batch * materialVertexCount;
             std::vector<double> const vertexBatch(begin, begin + materialVertexCount);
@@ -162,7 +170,7 @@ namespace hase::core
                 double batchMeanSum = 0.0;
                 double batchMeanSquareSum = 0.0;
                 unsigned activeBatchCount = 0u;
-                for(unsigned batch = 0u; batch < hase::kernels::forward::forwardRseBatchCount; ++batch)
+                for(unsigned batch = 0u; batch < batchCount; ++batch)
                 {
                     unsigned const batchRayCount = rawResult.rseBatchRayCounts.at(batch);
                     double const batchScore = cellBatchScoreDensity.at(batch).at(volume) * volumeSize;

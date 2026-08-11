@@ -25,7 +25,7 @@ namespace hase::core
     struct ForwardPhiAseRawResult
     {
         std::vector<double> vertexBatchScoreSum;
-        std::array<unsigned, hase::kernels::forward::forwardRseBatchCount> rseBatchRayCounts{};
+        std::vector<unsigned> rseBatchRayCounts;
         std::vector<unsigned> totalRays;
         std::vector<unsigned> droppedRays;
         unsigned rayCount = 0u;
@@ -115,10 +115,7 @@ namespace hase::core
         ExperimentParameters const& experiment,
         ForwardPhiAseRawResult& result,
         unsigned const rayCount,
-        unsigned const globalRayOffset,
-        unsigned const globalRayCount,
-        double const sourceStratificationOffset,
-        unsigned const spectrumStratificationPhase,
+        unsigned const rseBatch,
         double const betaVolumeTotal,
         alpaka::concepts::IBuffer auto& vertexBatchScoreSum,
         alpaka::concepts::IBuffer auto& volumeRayVisits,
@@ -206,10 +203,7 @@ namespace hase::core
                 hase::kernels::forward::AccumulateForwardPhiAseReservoir{},
                 mesh,
                 rayCount,
-                globalRayOffset,
-                globalRayCount,
-                sourceStratificationOffset,
-                spectrumStratificationPhase,
+                rseBatch,
                 betaVolumeTotal,
                 accumulationSpans,
                 reservoirSpansA,
@@ -306,8 +300,7 @@ namespace hase::core
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
                         mesh,
                         rayCount,
-                        globalRayOffset,
-                        globalRayCount,
+                        rseBatch,
                         sourceWeight,
                         accumulationSpans,
                         reservoirSpansA,
@@ -327,8 +320,7 @@ namespace hase::core
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
                         mesh,
                         rayCount,
-                        globalRayOffset,
-                        globalRayCount,
+                        rseBatch,
                         sourceWeight,
                         accumulationSpans,
                         reservoirSpansB,
