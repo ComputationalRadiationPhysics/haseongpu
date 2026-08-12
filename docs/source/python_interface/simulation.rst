@@ -79,7 +79,7 @@ on a live stream, but they do not drive stepping.
 
 ``execution_mode="synchronized-debug"`` is the explicit diagnostic contract.
 It requires a streaming backend, emits every completed step, and waits for a
-matching Python control iteration before continuing. Register ``beforeStep``
+matching Python control iteration before continuing. Register ``before_step``
 callbacks to inspect the just-completed state and update fields named by
 ``control_fields``. This mode intentionally synchronizes Python and the backend
 and should not be used for performance measurements.
@@ -94,12 +94,9 @@ code:
 
 .. code-block:: python
 
-   def pump_boundary_and_final(number_of_steps, pump_steps):
-       return tuple(sorted({min(number_of_steps, pump_steps), number_of_steps}))
-
    simulation = Simulation(
        # ... physical configuration ...
-       output_steps=pump_boundary_and_final(150, 40),
+       output_steps=(40, 150),
    )
 
 Final-only output is only a schedule convenience, not a separate execution
@@ -161,9 +158,10 @@ Mutating a callback snapshot does not change backend state.
 ``Simulation`` stores only the latest requested snapshot. Use callbacks to
 retain a history or write output. ``on_init`` receives the live simulation once
 before compiled execution and can finalize its inputs. Autonomous execution
-does not run Python between C++-owned time steps. A ``beforeStep`` callback
-therefore requires ``execution_mode="synchronized-debug"`` and runs at each
-explicit control boundary.
+does not run Python between C++-owned time steps. A ``before_step`` callback
+therefore requires ``execution_mode="synchronized-debug"`` and runs after every
+nonfinal snapshot, before the backend is allowed to begin the next step.
+Synchronized-debug emits every step and does not accept ``output_steps``.
 
 Runtime behavior
 ----------------

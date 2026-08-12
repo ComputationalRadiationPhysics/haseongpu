@@ -178,8 +178,8 @@ option(
 )
 option(
     HASE_FORWARD_LOGGING
-    "Forward captured calcPhiASE stdout and stderr through the Python openPMD launcher."
-    OFF
+    "Forward calcPhiASE stdout and stderr through the Python launcher by default."
+    ON
 )
 set(HASE_RUNTIME_DIR
     "${CMAKE_SOURCE_DIR}/build"
@@ -934,9 +934,6 @@ if(HASE_BACKEND_TIMING)
 endif()
 if(HASE_STEP_TIMING)
     target_compile_definitions(hase_core INTERFACE HASE_ENABLE_STEP_TIMING)
-endif()
-if(HASE_FORWARD_LOGGING)
-    target_compile_definitions(hase_core INTERFACE HASE_FORWARD_LOGGING)
 endif()
 alpaka_finalize(hase)
 

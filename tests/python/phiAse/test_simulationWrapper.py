@@ -46,7 +46,6 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
         spectralProperties=crossSections,
         repetitions=1,
         adaptiveSteps=1,
-        backend="Host_Cpu_CpuOmpBlocks",
         parallelMode="single",
         useReflections=False,
         rngSeed=1234,
@@ -60,6 +59,90 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     assert captured["phi_ase"].minRays == 1000
     assert captured["phi_ase"].useReflections is False
     assert captured["phi_ase"].rngSeed == 1234
+
+
+def testPhiAseRejectsUnavailableAlpakaBackendBeforeTransport(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+):
+    monkeypatch.setattr(
+        simulation_module.AlpakaBackends,
+        "all",
+        lambda: ["Host_Cpu_CpuSerial", "Host_NumaCpu_CpuSerial"],
+    )
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "_ensure_backend_available",
+        lambda backend: pytest.fail("openPMD preflight must follow compute preflight"),
+    )
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "runPhiASE",
+        lambda *args, **kwargs: pytest.fail("an invalid compute backend must not start transport"),
+    )
+
+    phi_ase = PhiASE(
+        backend="Host_Cpu_CpuOmpBlocks",
+        spectralProperties=crossSections,
+    )
+    with pytest.raises(RuntimeError, match="Host_Cpu_CpuOmpBlocks") as error:
+        phi_ase.run(gainMedium=smallGainMedium)
+
+    assert "Host_Cpu_CpuSerial" in str(error.value)
+    assert "Host_NumaCpu_CpuSerial" in str(error.value)
+
+
+def testPhiAseRejectsUnavailableOpenPmdBackendBeforeTransport(
+    monkeypatch,
+    smallGainMedium,
+    crossSections,
+):
+    monkeypatch.setattr(simulation_module.AlpakaBackends, "all", lambda: ["Host_Cpu_CpuSerial"])
+
+    def reject_openpmd(backend):
+        raise RuntimeError(
+            f"openPMD backend '{backend}' is unavailable; available backends: adios, adios-sst"
+        )
+
+    monkeypatch.setattr(simulation_module.transport, "_ensure_backend_available", reject_openpmd)
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "runPhiASE",
+        lambda *args, **kwargs: pytest.fail("an invalid openPMD backend must not start transport"),
+    )
+
+    phi_ase = PhiASE(
+        backend="Host_Cpu_CpuSerial",
+        openpmdBackend="hdf5",
+        spectralProperties=crossSections,
+    )
+    with pytest.raises(RuntimeError, match="available backends: adios, adios-sst"):
+        phi_ase.run(gainMedium=smallGainMedium)
+
+
+def testPhiAseMpiPreflightDoesNotUseLauncherLocalDeviceVisibility(monkeypatch):
+    monkeypatch.setattr(
+        simulation_module.AlpakaBackends,
+        "all",
+        lambda: pytest.fail("MPI compute availability is rank-local"),
+    )
+    checked = []
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "_ensure_backend_available",
+        lambda backend: checked.append(backend),
+    )
+
+    simulation_module._validate_launch_backends(
+        PhiASE(
+            backend="Cuda_NvidiaGpu_GpuCuda",
+            openpmdBackend="adios",
+            parallelMode="mpi",
+        )
+    )
+
+    assert checked == ["adios"]
 
 
 def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath, legacyPhiAseConfigPath):
@@ -245,6 +328,7 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     crossSections,
 ):
     captured = {}
+    preflight = []
 
     def fakeRunPhiAse(phiAse, gainMedium, spectralProperties, **kwargs):
         captured["transport"] = kwargs.get("transport")
@@ -252,6 +336,11 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
         return DummyResult()
 
     monkeypatch.setattr(simulation_module.transport, "runPhiASE", fakeRunPhiAse)
+    monkeypatch.setattr(
+        simulation_module.transport,
+        "_ensure_backend_available",
+        lambda backend: preflight.append(backend),
+    )
 
     PhiASE(
         {
@@ -264,6 +353,7 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     ).run(gainMedium=smallGainMedium)
 
     assert captured == {"transport": "hdf5", "openpmdSession": None}
+    assert preflight == ["hdf5"]
 
 
 def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
@@ -368,8 +458,8 @@ def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch)
     simulation.pump = SimpleNamespace(getProperty=lambda name: None)
     simulation.timeStep = 1e-5
     simulation._initialized = True
-    simulation._beforeStepCallbacks = []
-    simulation._callbacks = []
+    simulation._before_step_callbacks = []
+    simulation._step_callbacks = []
     simulation._step = 0
     simulation._time = 0.0
     simulation.reportTimings = False

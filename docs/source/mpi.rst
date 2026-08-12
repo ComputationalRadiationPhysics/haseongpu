@@ -96,6 +96,36 @@ host-side limited.  Use Slurm ``--cpus-per-task`` or Open MPI
 ``--map-by ...:PE=<n>`` to match the number of devices driven by each rank.
 ``--report-bindings`` is useful for checking Open MPI CPU binding.
 
+Limitations
+-----------
+
+A supported MPI run requires every worker rank to expose the selected Alpaka
+backend and at least one compatible local device. Every rank must remain
+responsive, complete its assigned batches, participate in every collective,
+and exit normally. The Python launcher can validate the openPMD provider, but
+its process-local Alpaka query cannot establish device visibility on remote
+ranks. Verify backend and device visibility throughout the allocation before
+starting a production run.
+
+HASEonGPU does not currently provide a collective worker-health handshake,
+heartbeats, collective timeouts, failed-rank recovery, or work redistribution.
+If a rank exits prematurely, failure propagation depends on the MPI
+implementation and launcher. If a rank becomes unresponsive, the remaining
+ranks may wait indefinitely in a collective while the launcher process remains
+alive. The frontend streaming watchdog checks the launched process; it does not
+prove that every worker rank is making progress.
+
+MPI reductions require exactly one producer for each statistical batch and
+combine raw contributions before normalization. This detects an inconsistent
+batch assignment when every rank reaches the collective, but it does not detect
+plausible corrupted values returned by a participating worker. HASEonGPU has no
+redundant computation or result-integrity mechanism for that case.
+
+Treat an MPI result as complete only when ``calcPhiASE``/``mpiexec`` exits
+successfully and all requested result snapshots have been received. Do not use
+partial output from a failed or interrupted MPI run as a completed simulation
+result.
+
 Output
 ------
 

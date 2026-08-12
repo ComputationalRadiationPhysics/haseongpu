@@ -86,26 +86,6 @@ namespace hase::core
         std::vector<unsigned> convergenceRayCounts;
     };
 
-    /** @brief Execute all complete batches mapped to one worker for one adaptive launch. */
-    template<typename T_Worker>
-    [[nodiscard]] ForwardRayBatchResults executeMappedBatches(
-        T_Worker& worker,
-        unsigned const launchRayCount,
-        unsigned const launchSeed,
-        unsigned const batchCount)
-    {
-        ForwardRayBatchResults localResults;
-        for(auto [batch] : hase::mapIdx(worker, alpaka::IdxRange{batchCount}))
-        {
-            localResults.emplace_back(worker(
-                ForwardRayBatch{
-                    batch,
-                    kernels::forward::rseBatchRayCount(0u, launchRayCount, batch, batchCount),
-                    launchSeed}));
-        }
-        return localResults;
-    }
-
     /** @brief Flatten gathered worker containers while retaining batch indices. */
     [[nodiscard]] inline ForwardRayBatchResults flattenBatchResults(
         std::vector<ForwardRayBatchResults> const& workerResults,

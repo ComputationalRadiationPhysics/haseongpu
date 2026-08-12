@@ -148,8 +148,18 @@ report Python frontend transport, snapshot, and callback time without requiring
 a special build.
 
 ``HASE_FORWARD_LOGGING``
-   Default ``OFF``.  Forwards captured ``calcPhiASE`` stdout/stderr through the
-   Python openPMD launcher.
+   Default ``ON``. This CMake option records the default logging behavior in
+   the generated Python runtime metadata. The Python launcher streams
+   ``calcPhiASE`` stdout and stderr while the backend runs. After each
+   completed simulation step, the backend emits a flushed progress record of
+   the form ``[HASE_STEP_COMPLETE] step=N/M pump=P ase=A`` after earlier work
+   in its Alpaka queue has completed.
+
+   The ``HASE_FORWARD_LOGGING`` environment variable overrides the configured
+   default for one launch. Set it to ``OFF`` to drain both streams without
+   displaying them. Set ``HASE_BACKEND_LOG_FILE`` to a path to append both
+   streams to a prefixed diagnostic log. Backend failures name that file
+   instead of copying its contents into the exception.
 
 MPI Option
 ----------

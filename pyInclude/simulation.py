@@ -78,6 +78,36 @@ def _preferredDefaultBackend():
     return backends[0]
 
 
+def _validate_alpaka_backend(phi_ase):
+    """Validate process-local compute availability for a non-MPI launch."""
+    if str(getattr(phi_ase, "parallelMode", "single")).strip().lower() == "mpi":
+        return
+    try:
+        available = AlpakaBackends.all()
+    except Exception as exc:
+        raise RuntimeError(
+            "HASEonGPU could not query Alpaka backends available to the Python "
+            f"launcher. {HASE_CONFIGURE_HINT}"
+        ) from exc
+    configured = getattr(phi_ase, "backend", None)
+    selected = _preferredDefaultBackend() if configured is None else str(configured)
+    if selected in available:
+        return
+    available_text = "\n".join(f"  {backend}" for backend in available) or "  (none)"
+    raise RuntimeError(
+        f"Alpaka backend '{selected}' is unavailable in the Python launcher process. "
+        f"Available Alpaka backends:\n{available_text}\n{HASE_CONFIGURE_HINT}"
+    )
+
+
+def _validate_launch_backends(phi_ase, *, openpmd_session=None, openpmd_backend=None):
+    """Reject unavailable compute and transport selections before backend launch."""
+    _validate_alpaka_backend(phi_ase)
+    if openpmd_session is None:
+        selected_openpmd = phi_ase.openpmdBackend if openpmd_backend is None else openpmd_backend
+        transport._ensure_backend_available(selected_openpmd)
+
+
 @dataclass
 class PhiASE:
     """Configure and run the ASE flux calculation for one gain-medium state.
@@ -366,6 +396,7 @@ class PhiASE:
     def openStream(self, **kwargs):
         """Open a persistent openPMD transport session owned by this ``PhiASE``."""
         if self._openpmdSession is None:
+            _validate_launch_backends(self, openpmd_backend=kwargs.get("transport", self.openpmdBackend))
             for name, value in self._transportLaunchOptions().items():
                 kwargs.setdefault(name, value)
             if self.openpmdBackend is not None and "transport" not in kwargs:
@@ -399,6 +430,8 @@ class PhiASE:
         elif openpmdSession == "interval":
             openpmdSession = None
 
+        _validate_launch_backends(self, openpmd_session=openpmdSession)
+
         launch_options = {} if openpmdSession is not None else self._transportLaunchOptions()
         self._result = transport.runPhiASE(
             self,
@@ -420,7 +453,7 @@ class PhiASE:
 
 @dataclass
 class TimeStepState:
-    """Snapshot handed to ``onStep`` callbacks after a completed time step.
+    """Snapshot handed to ``on_step`` callbacks after a completed time step.
 
     The arrays are copies of the simulation outputs at ``step``/``time`` and
     contain exactly one value per Tet4 cell. The compiled simulation has no
@@ -477,7 +510,7 @@ class Simulation:
     ``TimeStepState`` snapshots after completed steps. Register ``on_init`` for
     one-time Python setup before launch and ``on_step`` for snapshot consumers.
     Autonomous runs never call Python between backend steps. Synchronized-debug
-    runs additionally allow ``beforeStep`` callbacks to update explicitly
+    runs additionally allow ``before_step`` callbacks to update explicitly
     selected control fields between steps.
     """
 
@@ -501,9 +534,9 @@ class Simulation:
     _time: float
     _step: int
     _initialized: bool
-    _initCallbacks: list
-    _beforeStepCallbacks: list
-    _callbacks: list
+    _init_callbacks: list
+    _before_step_callbacks: list
+    _step_callbacks: list
     _lastState: TimeStepState | None
 
     def __init__(
@@ -547,9 +580,9 @@ class Simulation:
         self._time = 0.0
         self._step = 0
         self._initialized = False
-        self._initCallbacks = []
-        self._beforeStepCallbacks = []
-        self._callbacks = []
+        self._init_callbacks = []
+        self._before_step_callbacks = []
+        self._step_callbacks = []
         self._lastState = None
         self.__post_init__()
 
@@ -645,55 +678,47 @@ class Simulation:
         return self
 
     def on_step(self, callback, *args, **kwargs):
-        """Register a callback that receives each completed state snapshot."""
-        return self.onStep(callback, *args, **kwargs)
-
-    def on_init(self, callback, *args, **kwargs):
-        """Register a callback that runs once before compiled execution."""
-        return self.onInit(callback, *args, **kwargs)
-
-    def onStep(self, callback, *args, **kwargs):
-        """Register a post-step callback.
+        """Register a post-snapshot callback.
 
         The callback signature is ``callback(state, *args, **kwargs)``.
-        ``Simulation`` always supplies the completed ``TimeStepState`` as the
-        first argument, then appends the positional and keyword arguments passed
-        to ``onStep``. For example,
-        ``simulation.onStep(write_vtk, output_dir, scale=5.5)`` calls
-        ``write_vtk(state, output_dir, scale=5.5)`` after every completed step.
+        ``Simulation`` supplies the completed ``TimeStepState`` first, followed
+        by the arguments passed during registration. With ``output_steps``
+        omitted, the callback runs after every completed step. An explicit
+        ``output_steps`` schedule restricts it to those snapshots.
 
-        Use this hook for logging, writing VTK files, explicit state storage,
-        or other work that should consume the immutable step snapshot. Callback
-        return values are ignored. The method returns ``self`` so registrations can be
-        chained.
+        Use this hook for logging, VTK output, or explicit state retention.
+        Callback return values are ignored. The method returns ``self`` so
+        registrations can be chained.
         """
-        self._callbacks.append((callback, args, kwargs))
+        self._step_callbacks.append((callback, args, kwargs))
         return self
 
-    def onInit(self, callback, *args, **kwargs):
+    def on_init(self, callback, *args, **kwargs):
         """Register a one-time initialization callback.
 
         The callback signature is ``callback(simulation, *args, **kwargs)``.
         ``Simulation`` supplies the live simulation object as the first
-        argument, then appends the user arguments passed to ``onInit``. The hook
+        argument, then appends the user arguments passed to ``on_init``. The hook
         runs once, immediately before the first step is evaluated.
 
         Use this hook to initialize or normalize mutable simulation inputs such
         as ``gainMedium``, ``pump``, ``phiASE``, or ``timeStep``. Callback return
         values are ignored. The method returns ``self`` for chaining.
         """
-        self._initCallbacks.append((callback, args, kwargs))
+        self._init_callbacks.append((callback, args, kwargs))
         return self
 
-    def beforeStep(self, callback, *args, **kwargs):
+    def before_step(self, callback, *args, **kwargs):
         """Register a synchronized-debug control callback.
 
         The callback receives the live ``Simulation`` after a completed debug
-        snapshot and before the next step. It may update fields named in
-        ``control_fields``; currently ``beta_volume`` is supported. Autonomous
-        runs reject this callback because their C++ loop never contacts Python.
+        snapshot and before the next step, so it runs after every nonfinal step.
+        It may update fields named in ``control_fields``; currently
+        ``beta_volume`` is supported. Autonomous runs reject this callback
+        because their C++ loop never contacts Python. Synchronized-debug emits
+        every step and does not accept ``output_steps``.
         """
-        self._beforeStepCallbacks.append((callback, args, kwargs))
+        self._before_step_callbacks.append((callback, args, kwargs))
         return self
 
     def run_until(self, max_time=None):
@@ -706,18 +731,6 @@ class Simulation:
             steps += 1
         if steps:
             self.step(steps)
-        return self
-
-    def runUntil(self, endtime=None, endTime=None, *, openpmdSession=None):
-        """Advance steps until the configured or supplied end time is reached."""
-        target = self.endTime if endtime is None and endTime is None else (endtime if endtime is not None else endTime)
-        if target is None:
-            raise ValueError("runUntil requires endtime or an endTime configured on construction")
-        steps = 0
-        while self._time + steps * self.timeStep < float(target) - 0.5 * self.timeStep:
-            steps += 1
-        if steps:
-            self.runSteps(steps, openpmdSession=openpmdSession)
         return self
 
     def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
@@ -733,18 +746,19 @@ class Simulation:
         steps = int(steps)
         if steps <= 0:
             raise ValueError("steps must be positive")
-        if self._beforeStepCallbacks and self.executionMode != "synchronized-debug":
+        if self._before_step_callbacks and self.executionMode != "synchronized-debug":
             raise ValueError(
-                "beforeStep callbacks require execution_mode='synchronized-debug'; "
+                "before_step callbacks require execution_mode='synchronized-debug'; "
                 "autonomous runs do not contact Python between steps"
             )
         if self.pump is None:
             raise ValueError("Simulation requires at least one pump registered with add_pump")
-        self._runInitCallbacks()
+        self._run_init_callbacks()
         if pumpSteps is None:
             pumpSteps = getattr(self.pump, "pumpSteps", None)
         if pumpSteps is not None and int(pumpSteps) < 0:
             raise ValueError("pumpSteps must be non-negative")
+        _validate_launch_backends(self.phiASE)
 
         previous_step = self._step
         previous_time = self._time
@@ -785,7 +799,7 @@ class Simulation:
             received_states.append(state)
             if self.reportTimings:
                 state_materialization_seconds += perf_counter() - state_started
-            for callback, args, kwargs in self._callbacks:
+            for callback, args, kwargs in self._step_callbacks:
                 callback_started = perf_counter() if self.reportTimings else None
                 callback(state, *args, **kwargs)
                 if self.reportTimings:
@@ -794,7 +808,7 @@ class Simulation:
                         perf_counter() - callback_started
                     )
             if self.executionMode == "synchronized-debug" and int(raw_state.step) < steps:
-                for callback, args, kwargs in self._beforeStepCallbacks:
+                for callback, args, kwargs in self._before_step_callbacks:
                     callback(self, *args, **kwargs)
 
         states = transport.runSimulation(
@@ -899,7 +913,7 @@ class Simulation:
         """Return the most recent completed ``TimeStepState`` snapshot.
 
         ``Simulation`` does not retain a full time-step history. Register an
-        ``onStep`` callback to write or store per-step state explicitly.
+        ``on_step`` callback to write or store per-step state explicitly.
         """
         return self.getLastState()
 
@@ -925,11 +939,11 @@ class Simulation:
                 dtype=np.float64,
             )
 
-    def _runInitCallbacks(self):
+    def _run_init_callbacks(self):
         if self._initialized:
             return
         self._initialized = True
-        for callback, args, kwargs in self._initCallbacks:
+        for callback, args, kwargs in self._init_callbacks:
             callback(self, *args, **kwargs)
 
 TimeSteppedSimulation = Simulation

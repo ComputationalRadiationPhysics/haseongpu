@@ -185,19 +185,6 @@ CLADDING_SURFACE_ID = 3
 NUMBER_OF_Z_LAYERS = 10
 
 
-def laserPumpCladdingOutputSteps(timeSlices, pumpSteps):
-    """Observe the pump boundary, when reached, and the final time slice."""
-    finalStep = int(timeSlices)
-    if finalStep <= 0:
-        raise ValueError("timeSlices must be positive")
-    if pumpSteps is None:
-        return (finalStep,)
-    pumpBoundary = int(pumpSteps)
-    if pumpBoundary < 0:
-        raise ValueError("pumpSteps must be non-negative")
-    return tuple(sorted({step for step in (pumpBoundary, finalStep) if 0 < step <= finalStep}))
-
-
 def _assignLegacyTet4SurfaceDomains(topology):
     """Attach the legacy optical regions to its geometrically identical Tet4 mesh."""
     sample_points = np.asarray(topology.samplePoints, dtype=np.float64).copy()
@@ -356,11 +343,7 @@ def runExample(
         enable_ase=enableASE,
         pre_pump=prePump,
         report_timings=reportTimings,
-        output_steps=(
-            laserPumpCladdingOutputSteps(timeSlices, pumpSteps)
-            if outputSteps is None
-            else tuple(int(step) for step in outputSteps)
-        ),
+        output_steps=None if outputSteps is None else tuple(int(step) for step in outputSteps),
     ).add_pump(
         pump,
         injection_method=SurfacePumpInjector(surface_domains="ase_bottom"),
@@ -391,8 +374,8 @@ def main(argv=None):
         nargs="+",
         default=None,
         help=(
-            "Completed one-based step indices to emit. By default, emit only "
-            "the pump boundary and final step."
+            "Completed one-based step indices to emit. By default, emit every "
+            "completed step."
         ),
     )
     parser.add_argument(

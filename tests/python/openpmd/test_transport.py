@@ -523,9 +523,9 @@ def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
         lambda input_path, spec, simulation, run_control: written.append((input_path, spec)),
     )
     monkeypatch.setattr(
-        transport.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+        transport,
+        "_run_backend_process",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, log_path=None),
     )
     monkeypatch.setattr(transport, "read_simulation_output", lambda output_path, on_state=None: output_path)
 
@@ -1063,34 +1063,70 @@ def test_openPmdSessionAssignsMonotonicRequestIterations(monkeypatch):
     assert calls == [(0, "phi0", "medium0", "cross0"), (1, "phi1", "medium1", "cross1")]
 
 
-def test_forwardBackendLoggingReplaysStreamsWhenEnabled(monkeypatch, capsys):
+def test_backendProcessForwardsStreamsWhileRunning(monkeypatch):
+    received = []
+    progressReceived = threading.Event()
+
+    class LineSink:
+        def write(self, value):
+            received.append(value)
+            if "[HASE_STEP_COMPLETE]" in value:
+                progressReceived.set()
+
+        def flush(self):
+            pass
+
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "ON")
+    monkeypatch.delenv("HASE_BACKEND_LOG_FILE", raising=False)
+    monkeypatch.setattr(transport.sys, "stdout", LineSink())
 
-    transport._forward_backend_logging(stdout="backend stdout\n", stderr="backend stderr\n")
+    process = transport._BackendProcess(
+        [
+            sys.executable,
+            "-u",
+            "-c",
+            "import time; print('[HASE_STEP_COMPLETE] step=1/2', flush=True); time.sleep(2)",
+        ]
+    )
+    try:
+        assert progressReceived.wait(timeout=1.0)
+        assert process.poll() is None
+    finally:
+        process.kill()
+        process.wait()
 
-    captured = capsys.readouterr()
-    assert captured.out == "backend stdout\n"
-    assert captured.err == "backend stderr\n"
+    assert "".join(received) == "[HASE_STEP_COMPLETE] step=1/2\n"
 
 
-def test_forwardBackendLoggingIsQuietWhenDisabled(monkeypatch, capsys):
+def test_backendProcessDrainsStreamsWhenConsoleForwardingIsDisabled(monkeypatch, capsys):
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
+    monkeypatch.delenv("HASE_BACKEND_LOG_FILE", raising=False)
 
-    transport._forward_backend_logging(stdout="backend stdout\n", stderr="backend stderr\n")
+    completed = transport._run_backend_process(
+        [sys.executable, "-u", "-c", "import sys; print('backend stdout'); print('backend stderr', file=sys.stderr)"]
+    )
 
     captured = capsys.readouterr()
+    assert completed.returncode == 0
     assert captured.out == ""
     assert captured.err == ""
 
 
-def test_backendFailureDetailIncludesStdoutAndStderr():
-    detail = transport._backend_failure_detail(
-        stdout=" parser progress \n",
-        stderr=" backend error \n",
+def test_backendProcessWritesOptionalDebugLog(monkeypatch, tmp_path, capsys):
+    logPath = tmp_path / "backend.log"
+    monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
+    monkeypatch.setenv("HASE_BACKEND_LOG_FILE", str(logPath))
+
+    completed = transport._run_backend_process(
+        [sys.executable, "-u", "-c", "import sys; print('backend stdout'); print('backend stderr', file=sys.stderr)"]
     )
 
-    assert "calcPhiASE stdout:\nparser progress" in detail
-    assert "calcPhiASE stderr:\nbackend error" in detail
+    assert completed.returncode == 0
+    assert capsys.readouterr() == ("", "")
+    log = logPath.read_text(encoding="utf-8")
+    assert "[stdout] backend stdout\n" in log
+    assert "[stderr] backend stderr\n" in log
+    assert str(logPath) in transport._backend_failure_detail(completed.log_path)
 
 
 def test_openPmdApiRejectsMissingModule(monkeypatch, tmp_path):
@@ -2057,7 +2093,7 @@ def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(
                 {"number_of_steps": 1},
             )
         assert "return code 2" in str(exc_info.value)
-        assert "unknown option --cpp-control" in str(exc_info.value)
+        assert "unknown option --cpp-control" not in str(exc_info.value)
     finally:
         release_writer.set()
 

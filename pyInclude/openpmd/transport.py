@@ -144,27 +144,143 @@ def _forward_backend_logging_enabled():
     override = _env_flag("HASE_FORWARD_LOGGING")
     if override is not None:
         return override
-    return bool(getattr(_runtime_config(), "HASE_FORWARD_LOGGING", False))
+    return bool(getattr(_runtime_config(), "HASE_FORWARD_LOGGING", True))
 
 
-def _forward_backend_logging(stdout="", stderr=""):
-    if not _forward_backend_logging_enabled():
-        return
-    if stdout:
-        sys.stdout.write(stdout)
-        sys.stdout.flush()
-    if stderr:
-        sys.stderr.write(stderr)
-        sys.stderr.flush()
+def _backend_log_path():
+    value = os.environ.get("HASE_BACKEND_LOG_FILE", "").strip()
+    return None if not value else Path(value).expanduser().resolve()
 
 
-def _backend_failure_detail(stdout="", stderr=""):
-    sections = []
-    if stdout and stdout.strip():
-        sections.append("calcPhiASE stdout:\n" + stdout.strip())
-    if stderr and stderr.strip():
-        sections.append("calcPhiASE stderr:\n" + stderr.strip())
-    return ": " + "\n".join(sections) if sections else ""
+def _backend_failure_detail(log_path=None):
+    return "" if log_path is None else f": backend stdout/stderr log: {log_path}"
+
+
+class _BackendProcess:
+    """Run calcPhiASE while continuously draining its diagnostic streams."""
+
+    def __init__(self, command):
+        self.log_path = _backend_log_path()
+        self._log = None
+        self._log_lock = threading.Lock()
+        self._stream_errors = queue.Queue()
+        self._threads = []
+        self._finished = False
+        if self.log_path is not None:
+            self._log = self.log_path.open("a", encoding="utf-8")
+        try:
+            self._proc = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+        except BaseException:
+            if self._log is not None:
+                self._log.close()
+            raise
+        stdout = getattr(self._proc, "stdout", None)
+        stderr = getattr(self._proc, "stderr", None)
+        if stdout is not None:
+            self._start_reader(stdout, sys.stdout, "stdout")
+        if stderr is not None:
+            self._start_reader(stderr, sys.stderr, "stderr")
+
+    @property
+    def returncode(self):
+        return self._proc.returncode
+
+    @property
+    def pid(self):
+        return self._proc.pid
+
+    def poll(self):
+        return self._proc.poll()
+
+    def kill(self):
+        return self._proc.kill()
+
+    def _start_reader(self, source, destination, stream_name):
+        thread = threading.Thread(
+            target=self._drain_stream,
+            args=(source, destination, stream_name),
+            name=f"HASE calcPhiASE {stream_name} reader",
+            daemon=True,
+        )
+        self._threads.append(thread)
+        thread.start()
+
+    def _drain_stream(self, source, destination, stream_name):
+        forward = _forward_backend_logging_enabled()
+        try:
+            for line in source:
+                if forward:
+                    try:
+                        destination.write(line)
+                        destination.flush()
+                    except BaseException as exc:
+                        self._stream_errors.put((stream_name, exc))
+                        forward = False
+                try:
+                    with self._log_lock:
+                        if self._log is not None:
+                            self._log.write(f"[{stream_name}] {line}")
+                            self._log.flush()
+                except BaseException as exc:
+                    self._stream_errors.put(("debug log", exc))
+                    with self._log_lock:
+                        if self._log is not None:
+                            self._log.close()
+                            self._log = None
+        except BaseException as exc:
+            self._stream_errors.put((stream_name, exc))
+        finally:
+            source.close()
+
+    def wait(self):
+        if hasattr(self._proc, "wait"):
+            return_code = self._proc.wait()
+        else:
+            stdout, stderr = self._proc.communicate()
+            self._forward_completed_text(stdout, sys.stdout, "stdout")
+            self._forward_completed_text(stderr, sys.stderr, "stderr")
+            return_code = self._proc.returncode
+        if not self._finished:
+            timeout = _streaming_thread_join_timeout()
+            for thread in self._threads:
+                thread.join(timeout=timeout)
+                if thread.is_alive():
+                    raise RuntimeError(f"{thread.name} did not stop within {timeout:g} seconds")
+            if self._log is not None:
+                with self._log_lock:
+                    self._log.close()
+                    self._log = None
+            self._finished = True
+            try:
+                stream_name, error = self._stream_errors.get_nowait()
+            except queue.Empty:
+                pass
+            else:
+                raise RuntimeError(f"failed to forward calcPhiASE {stream_name}") from error
+        return return_code
+
+    def _forward_completed_text(self, value, destination, stream_name):
+        if not value:
+            return
+        if _forward_backend_logging_enabled():
+            destination.write(value)
+            destination.flush()
+        with self._log_lock:
+            if self._log is not None:
+                for line in value.splitlines(keepends=True):
+                    self._log.write(f"[{stream_name}] {line}")
+                self._log.flush()
+
+
+def _run_backend_process(command):
+    process = _BackendProcess(command)
+    return SimpleNamespace(returncode=process.wait(), log_path=process.log_path)
 
 
 @dataclass(frozen=True)
@@ -1194,17 +1310,17 @@ class OpenPmdPhiAseSession:
         if self._proc is None:
             return
 
-        return_code, stderr = self._finish_backend_process()
+        return_code, log_path = self._finish_backend_process()
         self._write_handles_and_manifest(status="completed" if return_code == 0 else "failed", return_code=return_code)
         if return_code != 0:
-            detail = _backend_failure_detail(stderr=stderr)
+            detail = _backend_failure_detail(log_path)
             raise RuntimeError(f"calcPhiASE failed with return code {return_code}{detail}")
 
     def _finish_backend_process(self):
         return_code = self._proc.wait()
-        stderr = "" if self._proc.stderr is None else self._proc.stderr.read()
+        log_path = self._proc.log_path
         self._proc = None
-        return return_code, stderr
+        return return_code, log_path
 
     def _join_streaming_thread(self, thread, description):
         if thread is None:
@@ -1249,9 +1365,9 @@ class OpenPmdPhiAseSession:
             self._sender = None
 
         return_code = None
-        stderr = ""
+        log_path = None
         if self._proc is not None:
-            return_code, stderr = self._finish_backend_process()
+            return_code, log_path = self._finish_backend_process()
             self._write_handles_and_manifest(
                 status="completed" if return_code == 0 else "failed",
                 return_code=return_code,
@@ -1268,7 +1384,7 @@ class OpenPmdPhiAseSession:
             _, close_error = pending_sender_error
 
         if return_code not in (None, 0) and close_error is None:
-            detail = _backend_failure_detail(stderr=stderr)
+            detail = _backend_failure_detail(log_path)
             close_error = RuntimeError(f"calcPhiASE failed with return code {return_code}{detail}")
 
         if self._watchdog_stop is not None:
@@ -1321,13 +1437,7 @@ class OpenPmdPhiAseSession:
 
         with OpenPmdInputSeries(input_path, backend=self.spec.name) as writer:
             writer.write(phiAse, gainMedium, crossSections, iteration_index=iteration_index, include_static=True)
-        completed = subprocess.run(
-            self._calc_phi_ase_command(input_path, output_path),
-            check=False,
-            text=True,
-            capture_output=True,
-        )
-        _forward_backend_logging(stdout=completed.stdout, stderr=completed.stderr)
+        completed = _run_backend_process(self._calc_phi_ase_command(input_path, output_path))
         if manifest_path is not None:
             _write_artifact_manifest(
                 manifest_path,
@@ -1340,7 +1450,7 @@ class OpenPmdPhiAseSession:
                 return_code=completed.returncode,
             )
         if completed.returncode != 0:
-            detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
+            detail = _backend_failure_detail(completed.log_path)
             raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")
         return read_result(output_path, expected_iteration_index=iteration_index)
 
@@ -1367,11 +1477,7 @@ class OpenPmdPhiAseSession:
         self._sender_errors = queue.Queue()
         self._watchdog_events = queue.Queue()
         self._watchdog_stop = threading.Event()
-        self._proc = subprocess.Popen(
-            self._calc_phi_ase_command(self._input_path, self._output_path),
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        self._proc = _BackendProcess(self._calc_phi_ase_command(self._input_path, self._output_path))
         self._start_result_reader()
         self._start_input_sender()
         self._start_watchdog()
@@ -1506,15 +1612,12 @@ class OpenPmdPhiAseSession:
 
             watchdog_error = self._pop_watchdog_error()
             if watchdog_error is not None:
-                stderr = ""
-                if self._proc is not None and self._proc.poll() is not None and self._proc.stderr is not None:
-                    stderr = self._proc.stderr.read()
-                detail = _backend_failure_detail(stderr=stderr)
+                log_path = None if self._proc is None else getattr(self._proc, "log_path", None)
+                detail = _backend_failure_detail(log_path)
                 raise RuntimeError(f"openPMD backend watchdog failed{detail}") from watchdog_error
 
             if self._proc is not None and self._proc.poll() not in (None, 0):
-                stderr = "" if self._proc.stderr is None else self._proc.stderr.read()
-                detail = _backend_failure_detail(stderr=stderr)
+                detail = _backend_failure_detail(getattr(self._proc, "log_path", None))
                 raise RuntimeError(f"calcPhiASE failed with return code {self._proc.returncode}{detail}")
 
             try:
@@ -1887,12 +1990,7 @@ def _run_streaming_simulation(
             if proc.poll() is None:
                 proc.kill()
 
-    proc = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    proc = _BackendProcess(command)
     reader = threading.Thread(
         target=read_output,
         name="HASE compiled simulation snapshot receiver",
@@ -1907,10 +2005,9 @@ def _run_streaming_simulation(
     writer.start()
 
     try:
-        stdout, stderr = proc.communicate()
+        proc.wait()
     finally:
         backend_finished.set()
-    _forward_backend_logging(stdout=stdout, stderr=stderr)
 
     timeout = _streaming_thread_join_timeout()
     deadline = time.monotonic() + timeout
@@ -1930,7 +2027,7 @@ def _run_streaming_simulation(
                 raise RuntimeError("openPMD simulation input writer failed") from input_payload
 
     if proc.returncode != 0:
-        detail = _backend_failure_detail(stdout=stdout, stderr=stderr)
+        detail = _backend_failure_detail(proc.log_path)
         raise RuntimeError(f"calcPhiASE failed with return code {proc.returncode}{detail}")
     if writer.is_alive():
         raise RuntimeError(f"openPMD simulation input sender thread did not stop within {timeout:g} seconds")
@@ -2001,10 +2098,9 @@ def runSimulation(
             )
 
         _write_simulation_input(input_path, spec, simulation, run_control)
-        completed = subprocess.run(command, check=False, text=True, capture_output=True)
-        _forward_backend_logging(stdout=completed.stdout, stderr=completed.stderr)
+        completed = _run_backend_process(command)
         if completed.returncode != 0:
-            detail = _backend_failure_detail(stdout=completed.stdout, stderr=completed.stderr)
+            detail = _backend_failure_detail(completed.log_path)
             raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")
         return read_simulation_output(output_path, on_state=on_state)
 

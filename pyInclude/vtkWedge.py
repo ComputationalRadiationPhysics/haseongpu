@@ -218,7 +218,7 @@ def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=No
     """Write scalar data on a wedge mesh to a legacy ASCII VTK file.
 
     The preferred simulation callback form is ``vtkWedge(file_name, state,
-    fields=...)`` inside a user ``onStep`` function. ``state`` must be a
+    fields=...)`` inside a user ``on_step`` function. ``state`` must be a
     ``TimeStepState`` produced by ``Simulation``; it carries both the dynamic
     arrays and the static topology needed to write VTK geometry. ``file_name``
     may contain ``{step}``, ``{time}``, and ``{field}`` placeholders.
@@ -237,7 +237,7 @@ def vtkWedge(file_name, data=None, geometry=None, field="phiAse", scalar_name=No
     same file. For standalone array exports outside a ``TimeStepState``, pass
     ``geometry`` as a ``GainMedium`` or ``MeshTopology``.
 
-    The legacy callback-factory form ``simulation.onStep(vtkWedge(path,
+    The callback-factory form ``simulation.on_step(vtkWedge(path,
     geometry, ...))`` is still accepted. In that form, ``every`` controls the
     output period and must be a positive integer.
     """

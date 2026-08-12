@@ -30,6 +30,7 @@ from HASEonGPU import (
     VolumeTopology,
     autonomous_final,
 )
+import pyInclude.simulation as simulation_module
 from pyInclude.openpmd import transport
 
 
@@ -131,6 +132,59 @@ def testCompiledSimulationDelegatesRunStepsToCppTransport(
     assert np.allclose(simulation.gainMedium.get("betaVolume").value, 0.125)
 
 
+def testCompiledSimulationRejectsUnavailableAlpakaBackendBeforeTransport(
+    monkeypatch,
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    monkeypatch.setattr(simulation_module.AlpakaBackends, "all", lambda: ["Host_Cpu_CpuSerial"])
+    phi_ase = realPhiAse(crossSections)
+    phi_ase.backend = "Host_Cpu_CpuOmpBlocks"
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=phi_ase,
+        time_integrator="heun",
+        time_step_size=1e-5,
+    )
+
+    with pytest.raises(RuntimeError, match="Host_Cpu_CpuOmpBlocks"):
+        simulation.step()
+
+    assert fakeCppSimulation == []
+
+
+def testCompiledSimulationRejectsUnavailableOpenPmdBackendBeforeTransport(
+    monkeypatch,
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    monkeypatch.setattr(simulation_module.AlpakaBackends, "all", lambda: ["Host_Cpu_CpuSerial"])
+
+    def reject_openpmd(backend):
+        raise RuntimeError(f"openPMD backend '{backend}' is unavailable; available backends: adios")
+
+    monkeypatch.setattr(transport, "_ensure_backend_available", reject_openpmd)
+    phi_ase = realPhiAse(crossSections, openpmdBackend="hdf5")
+    phi_ase.backend = "Host_Cpu_CpuSerial"
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=phi_ase,
+        time_integrator="heun",
+        time_step_size=1e-5,
+    )
+
+    with pytest.raises(RuntimeError, match="available backends: adios"):
+        simulation.step()
+
+    assert fakeCppSimulation == []
+
+
 def testCompiledSimulationUsesPhiAseMpiLaunchOptions(
     fakeCppSimulation,
     smallGainMedium,
@@ -224,6 +278,7 @@ def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
         time_integrator="explicit-euler",
         time_step_size=1e-5,
         pre_pump=True,
+        output_steps=(2,),
     )
 
     simulation.runSteps(2, pumpSteps=1)
@@ -234,7 +289,7 @@ def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
     assert np.all(np.isfinite(state.betaVolume))
 
 
-def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
+def testTimeSteppedSimulationRunsCallbacksFromEveryDefaultSnapshot(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
@@ -246,7 +301,7 @@ def testTimeSteppedSimulationRunsCallbacksFromCppSnapshots(
         phi_ase=realPhiAse(crossSections),
         time_integrator=ExponentialEuler(),
         time_step_size=1e-5,
-    ).onStep(seen.append)
+    ).on_step(seen.append)
 
     simulation.runSteps(2)
 
@@ -293,6 +348,7 @@ def testInternalRunUsesPumpSolverMaxStepsByDefault(
         phi_ase=realPhiAse(crossSections),
         time_integrator=ExponentialEuler(),
         time_step_size=1e-5,
+        output_steps=(3,),
     )
 
     simulation.runSteps(3)
@@ -316,7 +372,7 @@ def testPublicStepRejectsNegativePumpSteps(
         simulation.step(1, pump_steps=-1)
 
 
-def testOnStepPassesStateBeforeUserArguments(
+def testStepCallbackPassesStateBeforeUserArguments(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
@@ -367,7 +423,7 @@ def testInitCallbacksRunBeforeCompiledTransport(
     assert simulation.current_time == 3.0000000000000004e-5
 
 
-def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
+def testCompiledSimulationRejectsPythonControlCallbacks(
     smallGainMedium,
     pumpProperties,
     crossSections,
@@ -377,9 +433,9 @@ def testCompiledSimulationRejectsPythonBeforeStepCallbacks(
         phi_ase=realPhiAse(crossSections),
         time_integrator="explicit-euler",
         time_step_size=1e-5,
-    ).beforeStep(lambda simulation: None)
+    ).before_step(lambda simulation: None)
 
-    with pytest.raises(ValueError, match="beforeStep"):
+    with pytest.raises(ValueError, match="before_step"):
         simulation.runSteps(1)
 
 
@@ -435,7 +491,7 @@ def testSynchronizedDebugExchangesSelectedControlAfterEveryNonfinalStep(
         time_step_size=1e-5,
         execution_mode="synchronized-debug",
         control_fields=("beta_volume",),
-    ).beforeStep(control)
+    ).before_step(control)
 
     simulation.runSteps(3)
 
@@ -465,6 +521,29 @@ def testSimulationRunContractRejectsUnsupportedModeCombinations(
             time_step_size=1e-5,
             **kwargs,
         )
+
+
+def testSimulationExposesOnlySnakeCaseCallbackAndRunUntilNames(
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    )
+
+    assert callable(simulation.on_init)
+    assert callable(simulation.on_step)
+    assert callable(simulation.before_step)
+    assert callable(simulation.run_until)
+    assert not hasattr(simulation, "onInit")
+    assert not hasattr(simulation, "onStep")
+    assert not hasattr(simulation, "beforeStep")
+    assert not hasattr(simulation, "runUntil")
 
 
 def testCompiledSimulationRejectsExternalOpenPmdSessionOwnership(
