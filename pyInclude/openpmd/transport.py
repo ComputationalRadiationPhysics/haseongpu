@@ -1960,9 +1960,8 @@ def runSimulation(
     steps = int(steps)
     if steps <= 0:
         raise ValueError("steps must be positive")
-    spec = _backend_spec(transport)
-    _ensure_backend_available(spec.name)
     executable = findCalcPhiAse()
+    spec = _ensure_backend_available(transport, executable)
     run_control = _simulation_run_control(simulation, steps=steps, pumpSteps=pumpSteps)
     if simulation.executionMode == "synchronized-debug" and not spec.streaming:
         raise ValueError("synchronized-debug requires an openPMD streaming backend")

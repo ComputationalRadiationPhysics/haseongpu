@@ -500,6 +500,43 @@ def test_autoBackendPrefersAdiosThenSstThenHdf5(monkeypatch, tmp_path):
     assert transport._ensure_backend_available("auto", executable).name == "hdf5"
 
 
+def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
+    executable = tmp_path / "calcPhiASE"
+    executable.write_text("", encoding="utf-8")
+    resolved = transport.OPENPMD_BACKENDS["hdf5"]
+    resolution_calls = []
+    written = []
+
+    monkeypatch.setattr(transport, "findCalcPhiAse", lambda: executable)
+
+    def resolve_backend(backend, selected_executable):
+        resolution_calls.append((backend, selected_executable))
+        return resolved
+
+    monkeypatch.setattr(transport, "_ensure_backend_available", resolve_backend)
+    monkeypatch.setattr(transport, "_simulation_run_control", lambda *args, **kwargs: {})
+    monkeypatch.setattr(transport, "_artifact_root", lambda: tmp_path)
+    monkeypatch.setattr(transport, "_artifact_run_id", lambda: "auto")
+    monkeypatch.setattr(
+        transport,
+        "_write_simulation_input",
+        lambda input_path, spec, simulation, run_control: written.append((input_path, spec)),
+    )
+    monkeypatch.setattr(
+        transport.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    monkeypatch.setattr(transport, "read_simulation_output", lambda output_path, on_state=None: output_path)
+
+    simulation = SimpleNamespace(executionMode="autonomous")
+    output_path = transport.runSimulation(simulation, steps=1, transport="auto")
+
+    assert resolution_calls == [("auto", executable)]
+    assert written == [(tmp_path / "auto-input.h5", resolved)]
+    assert output_path == tmp_path / "auto-output.h5"
+
+
 def test_openPmdBackendProbeIsCachedPerExecutable(monkeypatch, tmp_path):
     transport._OPENPMD_BACKEND_PROBE_CACHE.clear()
     executable = tmp_path / "calcPhiASE"
