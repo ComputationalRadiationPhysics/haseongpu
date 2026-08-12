@@ -1063,7 +1063,7 @@ def test_openPmdSessionAssignsMonotonicRequestIterations(monkeypatch):
     assert calls == [(0, "phi0", "medium0", "cross0"), (1, "phi1", "medium1", "cross1")]
 
 
-def test_backendProcessForwardsStreamsWhileRunning(monkeypatch):
+def test_backendProcessForwardsStreamsByDefaultWhileRunning(monkeypatch):
     received = []
     progressReceived = threading.Event()
 
@@ -1076,8 +1076,13 @@ def test_backendProcessForwardsStreamsWhileRunning(monkeypatch):
         def flush(self):
             pass
 
-    monkeypatch.setenv("HASE_FORWARD_LOGGING", "ON")
+    monkeypatch.delenv("HASE_FORWARD_LOGGING", raising=False)
     monkeypatch.delenv("HASE_BACKEND_LOG_FILE", raising=False)
+    monkeypatch.setattr(
+        transport,
+        "_runtime_config",
+        lambda: pytest.fail("console forwarding must not depend on generated runtime metadata"),
+    )
     monkeypatch.setattr(transport.sys, "stdout", LineSink())
 
     process = transport._BackendProcess(

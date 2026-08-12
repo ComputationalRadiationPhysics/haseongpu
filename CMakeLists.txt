@@ -176,11 +176,7 @@ option(
     "Enable compiled-step timing output selected by HASE_STEP_TIMING_CSV"
     OFF
 )
-option(
-    HASE_FORWARD_LOGGING
-    "Forward calcPhiASE stdout and stderr through the Python launcher by default."
-    ON
-)
+option(HASE_DEBUG_LOGGING "Enable additional backend debug logging." OFF)
 set(HASE_RUNTIME_DIR
     "${CMAKE_SOURCE_DIR}/build"
     CACHE PATH
@@ -934,6 +930,9 @@ if(HASE_BACKEND_TIMING)
 endif()
 if(HASE_STEP_TIMING)
     target_compile_definitions(hase_core INTERFACE HASE_ENABLE_STEP_TIMING)
+endif()
+if(HASE_DEBUG_LOGGING)
+    target_compile_definitions(hase_core INTERFACE HASE_ENABLE_DEBUG_LOGGING)
 endif()
 alpaka_finalize(hase)
 

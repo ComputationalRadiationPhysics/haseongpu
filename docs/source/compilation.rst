@@ -147,19 +147,24 @@ These build-time measurements are independent of
 report Python frontend transport, snapshot, and callback time without requiring
 a special build.
 
-``HASE_FORWARD_LOGGING``
-   Default ``ON``. This CMake option records the default logging behavior in
-   the generated Python runtime metadata. The Python launcher streams
-   ``calcPhiASE`` stdout and stderr while the backend runs. After each
-   completed simulation step, the backend emits a flushed progress record of
-   the form ``[HASE_STEP_COMPLETE] step=N/M pump=P ase=A`` after earlier work
-   in its Alpaka queue has completed.
+``HASE_DEBUG_LOGGING``
+   Default ``OFF``. Enables additional backend messages at the debug verbosity
+   level. Normal builds continue to emit errors, warnings, information,
+   statistics, progress bars, and simulation-step completion records.
 
-   The ``HASE_FORWARD_LOGGING`` environment variable overrides the configured
-   default for one launch. Set it to ``OFF`` to drain both streams without
-   displaying them. Set ``HASE_BACKEND_LOG_FILE`` to a path to append both
-   streams to a prefixed diagnostic log. Backend failures name that file
-   instead of copying its contents into the exception.
+Backend stream forwarding
+-------------------------
+
+The Python launcher displays ``calcPhiASE`` stdout and stderr while the backend
+runs. This runtime behavior is enabled by default and does not depend on a
+CMake option. Set the ``HASE_FORWARD_LOGGING`` environment variable to ``OFF``
+for one launch to drain both streams without displaying them.
+
+After each completed simulation step, the backend emits a flushed progress
+record of the form ``[HASE_STEP_COMPLETE] step=N/M pump=P ase=A`` after earlier
+work in its Alpaka queue has completed. Set ``HASE_BACKEND_LOG_FILE`` to a path
+to append both streams to a prefixed diagnostic log. Backend failures name that
+file instead of copying its contents into the exception.
 
 MPI Option
 ----------

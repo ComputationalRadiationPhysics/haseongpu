@@ -144,7 +144,7 @@ def _forward_backend_logging_enabled():
     override = _env_flag("HASE_FORWARD_LOGGING")
     if override is not None:
         return override
-    return bool(getattr(_runtime_config(), "HASE_FORWARD_LOGGING", True))
+    return True
 
 
 def _backend_log_path():
