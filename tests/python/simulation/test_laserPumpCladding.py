@@ -294,6 +294,7 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             reflectionMaxIterations=17,
             reflectionTolerance=0.0,
             surfaceReservoirSize=32,
+            outputSteps=(2,),
         )
         points, cells, _cell_types, _point_data, cell_data, _fields = _parseVtk(
             output_dir / "laserPumpCladding_002.vtk"
@@ -412,6 +413,16 @@ def testLaserPumpCladdingMediumUsesPrimitiveReflectivityShape():
 @pytest.fixture
 def fakeCompiledSnapshots(monkeypatch):
     calls = []
+    monkeypatch.setattr(
+        AlpakaBackends,
+        "all",
+        lambda: ["Host_Cpu_CpuSerial", "Host_Cpu_CpuOmpBlocks"],
+    )
+    monkeypatch.setattr(
+        transport,
+        "_ensure_backend_available",
+        lambda backend: SimpleNamespace(name="adios" if backend in (None, "auto") else backend),
+    )
 
     def fake_run_simulation(
         simulation,
@@ -500,6 +511,7 @@ def testLaserPumpCladdingExampleWiresOpenPmdBackend(
         pumpSteps=1,
         vtkOutputDir=tmp_path,
         openpmdBackend="hdf5",
+        outputSteps=(2,),
     )
 
     assert state.step == 2

@@ -23,7 +23,6 @@ repository root:
        --backend Host_Cpu_CpuSerial \
        --timeSteps 3 \
        --pumpSteps 3 \
-       --output-steps 1 2 3 \
        --pump-ray-count 1000 \
        --rng-seed 1234 \
        --pump-rng-seed 5489 \
@@ -34,12 +33,11 @@ runtime. ``--openpmd-backend`` is a separate storage/streaming choice. See
 :doc:`backendSelection` for the distinction and :doc:`openpmdTransport` for the
 storage backends.
 
-The explicit output schedule makes the short run write
+The default output schedule writes every completed step, producing
 ``output/laserPumpCladding_001.vtk`` through
-``output/laserPumpCladding_003.vtk``. Without ``--output-steps``, the example
-emits only the pump-boundary and final snapshots. It also prints the final
-PhiASE and excitation array shapes. The small ray count makes this a workflow
-check, not a statistically converged production calculation.
+``output/laserPumpCladding_003.vtk``. The example also prints the final PhiASE
+and excitation array shapes. The small ray count makes this a workflow check,
+not a statistically converged production calculation.
 
 Load the material spectra
 -------------------------
@@ -225,7 +223,7 @@ pump sampling controls:
        enable_ase=enableASE,
        pre_pump=prePump,
        output_steps=(
-           laserPumpCladdingOutputSteps(timeSlices, pumpSteps)
+           None
            if outputSteps is None
            else tuple(int(step) for step in outputSteps)
        ),
@@ -245,9 +243,11 @@ Fresnel calculation. ASE reflection is a separate ``PhiASE`` process using the
 source evaluation. Its ``max_steps`` limits the outer simulation steps that
 include the pump. ``simulation.step(timeSlices)`` controls the total number of
 outer steps, so the run can continue with ASE and fluorescence after pumping
-stops. By default, ``laserPumpCladdingOutputSteps`` emits the pump boundary and
-the final step; ``--output-steps`` replaces that schedule with explicit
-one-based completed-step indices.
+stops. With ``output_steps`` omitted, the backend emits every completed step
+and the registered callbacks write one VTK snapshot per step. Use
+``--output-steps`` to select explicit one-based completed-step indices when
+only part of the trajectory is needed. For example, ``--output-steps 150``
+writes only the final snapshot of a 150-step run.
 
 ``FrozenPhiAseRungeKutta4`` evaluates PhiASE once per RK4 step and reuses it for
 the remaining RK stages, while the pump term is still evaluated at each stage.
@@ -272,6 +272,9 @@ The example registers callbacks before starting the compiled run:
    )
    simulation.step(timeSlices)
    state = simulation.get_last_state()
+
+``on_step`` runs once for each snapshot selected by ``output_steps``. It does
+not control or synchronize backend stepping.
 
 Each callback receives a ``TimeStepState`` for an emitted step, with cell-centered
 ``beta_volume``, ``phi_ase``, ``dndt_pump``, and ``dndt_ase`` arrays. The VTK
@@ -340,8 +343,8 @@ Time and physics controls
    Total outer simulation steps. Default: ``150``.
 
 ``--output-steps STEP [STEP ...]``
-   One-based completed-step indices to emit. By default, the example emits the
-   pump boundary, when reached, and the final step.
+   One-based completed-step indices to emit. If omitted, emit every completed
+   step.
 
 ``--pumpSteps N``
    Initial outer steps that include pump transport. Default: ``100``. Set it to

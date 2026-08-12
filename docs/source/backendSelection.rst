@@ -63,6 +63,13 @@ To leave compute selection in the PhiASE YAML file, the
 ``laserPumpCladding.py`` command uses its default ``--backend UseConfig``.
 Passing ``--backend`` overrides that YAML value for one run.
 
+Before a single-process ``PhiASE`` or ``Simulation`` run, the Python frontend
+checks the selected compute backend against ``AlpakaBackends.all()`` and reports
+the available names without starting ``calcPhiASE``. It also checks the
+openPMD selection against both the compiled provider and the active Python
+``openpmd_api`` provider. For MPI runs, compute-device availability is
+process-local and must hold on every worker; see :doc:`mpi`.
+
 ``AlpakaBackends.known()`` is an alias for ``all()``.  Names that are valid
 Python identifiers are also exposed as attributes, for example
 ``AlpakaBackends.Host_Cpu_CpuSerial``.

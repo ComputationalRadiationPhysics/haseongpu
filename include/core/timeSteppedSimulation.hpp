@@ -212,8 +212,15 @@ namespace hase::core
                     timingCsv.flush();
                 }
 #endif
-                std::swap(m_beta, m_betaNext);
                 unsigned const completedStep = step + 1u;
+                m_queue.enqueueHostFn(
+                    [completedStep, numberOfSteps = m_run.numberOfSteps, pumpEnabled, aseEnabled]
+                    {
+                        dout(V_PROGRESS) << "[HASE_STEP_COMPLETE] step=" << completedStep << '/' << numberOfSteps
+                                         << " pump=" << static_cast<unsigned>(pumpEnabled)
+                                         << " ase=" << static_cast<unsigned>(aseEnabled) << std::endl;
+                    });
+                std::swap(m_beta, m_betaNext);
                 bool const synchronizedDebug = m_run.executionMode == SimulationExecutionMode::SYNCHRONIZED_DEBUG;
                 if(synchronizedDebug || shouldOutput(completedStep))
                 {

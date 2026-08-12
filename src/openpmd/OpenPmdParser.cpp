@@ -915,31 +915,6 @@ namespace
         component.resetDataset({io::determineDatatype<T>(), io::Extent{values.size()}});
         component.storeChunk(const_cast<std::vector<T>&>(values), io::Offset{0u}, io::Extent{values.size()});
     }
-
-    std::vector<unsigned> canonicalConnectivity(hase::core::HostMesh const& mesh)
-    {
-        std::vector<unsigned> connectivity;
-        connectivity.reserve(mesh.numberOfTriangles * (mesh.numberOfLevels - 1u) * 6u);
-        for(unsigned level = 0u; level + 1u < mesh.numberOfLevels; ++level)
-        {
-            unsigned const lower = level * mesh.numberOfPoints;
-            unsigned const upper = (level + 1u) * mesh.numberOfPoints;
-            for(unsigned triangle = 0u; triangle < mesh.numberOfTriangles; ++triangle)
-            {
-                for(unsigned vertex = 0u; vertex < 3u; ++vertex)
-                {
-                    connectivity.push_back(
-                        mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + lower);
-                }
-                for(unsigned vertex = 0u; vertex < 3u; ++vertex)
-                {
-                    connectivity.push_back(
-                        mesh.trianglePointIndices[triangle + vertex * mesh.numberOfTriangles] + upper);
-                }
-            }
-        }
-        return connectivity;
-    }
 } // namespace
 
 namespace hase::openpmd
