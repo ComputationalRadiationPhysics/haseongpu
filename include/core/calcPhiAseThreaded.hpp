@@ -164,7 +164,7 @@ namespace hase::core
     };
 
     /** @brief Identity and collective dispatch for one-thread/one-device workers. */
-    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    template<alpaka::onHost::concepts::Device T_Device, alpaka::concepts::Executor T_Exec>
     struct HaseWorkerDispatch<ThreadOwnedDevices<T_Device, T_Exec>>
     {
         using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
@@ -207,7 +207,7 @@ namespace hase::core
     };
 
     /** @brief Execute one complete forward-ray batch on one thread-owned device. */
-    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    template<alpaka::onHost::concepts::Device T_Device, alpaka::concepts::Executor T_Exec>
     struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, ForwardRayBatch>
     {
         using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
@@ -230,7 +230,7 @@ namespace hase::core
     };
 
     /** @brief Finalize gathered batches on one thread-owned device. */
-    template<alpaka::onHost::concepts::Device T_Device, typename T_Exec>
+    template<alpaka::onHost::concepts::Device T_Device, alpaka::concepts::Executor T_Exec>
     struct HaseWorkItemDispatch<ThreadOwnedDevices<T_Device, T_Exec>, FinalizeForwardAse>
     {
         using T_Policy = ThreadOwnedDevices<T_Device, T_Exec>;
