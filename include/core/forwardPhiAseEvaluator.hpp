@@ -100,7 +100,7 @@ namespace hase::core
             localResults.emplace_back(worker(
                 ForwardRayBatch{
                     batch,
-                    hase::kernels::forward::rseBatchRayCount(0u, launchRayCount, batch, batchCount),
+                    kernels::forward::rseBatchRayCount(0u, launchRayCount, batch, batchCount),
                     launchSeed}));
         }
         return localResults;
@@ -143,13 +143,23 @@ namespace hase::core
             context.batchCount);
         simulation.convergenceRayCounts.assign(context.hostMesh.numberOfCells, 0u);
         unsigned const baseSeed = worker.scatter(context.baseSeed);
-
+        // adaptive sampling loop
         for(unsigned completedIncreases = 0u;; ++completedIncreases)
         {
             unsigned const targetRayCount = adaptiveRayTarget(context.experiment, context.compute, completedIncreases);
             unsigned const launchRayCount = targetRayCount - simulation.raw.rayCount;
             unsigned const launchSeed = random::seedForAdaptiveLaunch(baseSeed, simulation.adaptiveLaunches);
-            auto localResults = executeMappedBatches(worker, launchRayCount, launchSeed, context.batchCount);
+
+            ForwardRayBatchResults localResults;
+            // batch loop
+            for(auto [batch] : hase::mapIdx(worker, alpaka::IdxRange{context.batchCount}))
+            {
+                localResults.emplace_back(worker(
+                    ForwardRayBatch{
+                        batch,
+                        kernels::forward::rseBatchRayCount(0u, launchRayCount, batch, context.batchCount),
+                        launchSeed}));
+            }
             float const localRuntime = std::accumulate(
                 localResults.cbegin(),
                 localResults.cend(),
