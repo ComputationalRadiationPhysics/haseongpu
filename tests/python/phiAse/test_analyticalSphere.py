@@ -11,8 +11,9 @@ import tempfile
 import numpy as np
 import pytest
 
-from HASEonGPU import AlpakaBackends, GainMedium, PhiASE, SpectralDecomposition, VolumeTopology
+from HASEonGPU import GainMedium, PhiASE, SpectralDecomposition, VolumeTopology
 from openpmd_backend_matrix import openpmd_runtime_test_backends
+from alpaka_backend_matrix import alpaka_runtime_backend
 
 
 def analyticalPhiAseSphereCenter(gain, radius, beta, nTot, tauRad):
@@ -158,20 +159,14 @@ sphereCases = [
 
 
 sphereCaseIds = [f"R{float(radius):g}_g0_{float(g0):.2f}" for radius, g0 in sphereCases]
-alpakaBackends = AlpakaBackends.all()
 _NO_ANALYTICAL_SPHERE_BACKEND = "__no_analytical_sphere_backend__"
 
 
 def analyticalSphereBackends():
-    for preferred in ("Host_Cpu_CpuOmpBlocks", "Host_Cpu_CpuSerial"):
-        if preferred in alpakaBackends:
-            return [preferred]
-    cpuBackends = [backend for backend in alpakaBackends if "Cpu" in backend]
-    if cpuBackends:
-        return [cpuBackends[0]]
-    if alpakaBackends:
-        return [alpakaBackends[0]]
-    return [_NO_ANALYTICAL_SPHERE_BACKEND]
+    try:
+        return [alpaka_runtime_backend()]
+    except RuntimeError:
+        return [_NO_ANALYTICAL_SPHERE_BACKEND]
 
 
 def analyticalSphereRayCount():

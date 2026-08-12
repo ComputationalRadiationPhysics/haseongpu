@@ -27,6 +27,9 @@ fi
 if [[ "${HASE_CI_PROVIDER_SMOKE:-0}" == 1 ]]; then
     packages+=(libhdf5-dev)
 fi
+if [[ "${HASE_CI_COMPILER:-gcc}" == nvcc ]]; then
+    packages+=(gcc g++)
+fi
 
 apt-get install -y --no-install-recommends "${packages[@]}"
 if ! command -v cmake >/dev/null 2>&1; then

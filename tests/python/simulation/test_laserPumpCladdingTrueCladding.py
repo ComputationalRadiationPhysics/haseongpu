@@ -15,7 +15,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from HASEonGPU import AlpakaBackends, CrossSectionData, PhiASE
+from HASEonGPU import CrossSectionData, PhiASE
+from alpaka_backend_matrix import alpaka_runtime_backend
 
 
 repoRoot = Path(__file__).resolve().parents[3]
@@ -85,15 +86,8 @@ def _partitioned_tet_integrals(topology, tet_types, phi):
     }
 
 
-def _serial_backend():
-    backends = AlpakaBackends.all()
-    for backend in backends:
-        if "Host_Cpu_CpuSerial" in backend:
-            return backend
-    raise RuntimeError(
-        "true-cladding regression requires the CPU serial backend, "
-        f"available: {backends}"
-    )
+def _runtime_backend():
+    return alpaka_runtime_backend()
 
 
 @pytest.fixture(scope="module")
@@ -263,7 +257,7 @@ def currentTrueCladdingResults(trueCladdingReference, openPmdFileBackend):
             adaptiveSteps=1,
             useReflections=False,
             monochromatic=True,
-            backend=_serial_backend(),
+            backend=_runtime_backend(),
             openpmdBackend=openPmdFileBackend,
             rngSeed=reference["metadata"]["parameters"]["rngSeed"],
         )

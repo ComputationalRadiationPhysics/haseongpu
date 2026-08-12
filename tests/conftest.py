@@ -38,6 +38,7 @@ requiredHaseApi = (
 
 
 from openpmd_backend_matrix import openpmd_runtime_test_backends, openpmd_test_backends
+from alpaka_backend_matrix import alpaka_runtime_backend
 
 
 def _openpmd_file_backends():
@@ -153,10 +154,10 @@ def alpakaRuntimeBackend():
     backends = AlpakaBackends.all()
     if not backends:
         pytest.skip("no Alpaka backend is available in this build")
-    for backend in backends:
-        if "CpuOmpBlocks" in backend:
-            return backend
-    return backends[0]
+    try:
+        return alpaka_runtime_backend(backends)
+    except RuntimeError as exc:
+        pytest.fail(str(exc))
 
 
 @pytest.fixture(scope="session")
