@@ -673,7 +673,11 @@ def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
         return SimpleNamespace(phi_ase=np.zeros((2, 3)), beta_volume=np.zeros((2, 3)))
 
     monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
-    command = _laser_pump_launcher.launchCommand("hdf5", tmp_path)
+    command = _laser_pump_launcher.launchCommand(
+        "hdf5",
+        tmp_path,
+        alpakaBackend="Nvidia_Gpu_CudaRt",
+    )
 
     laserPumpCladding.main(command[2:])
 
@@ -682,6 +686,7 @@ def testLaserPumpCladdingLauncherUsesSupportedCliOptions(monkeypatch, tmp_path):
     assert calls[-1]["kwargs"]["simulation_steps"] == 1
     assert calls[-1]["kwargs"]["pump_steps"] == 1
     assert calls[-1]["kwargs"]["ase_steps"] == 1
+    assert calls[-1]["args"][0] == "Nvidia_Gpu_CudaRt"
 
 
 @pytest.mark.parametrize("option", ("--min-sample-range", "--max-sample-range"))

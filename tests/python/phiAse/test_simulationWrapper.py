@@ -14,6 +14,8 @@ from types import SimpleNamespace
 import pytest
 
 from openpmd_backend_matrix import openpmd_test_backends
+from alpaka_backend_matrix import alpaka_runtime_backend
+
 from pyInclude import PhiASE
 import pyInclude.simulation as simulation_module
 
@@ -23,6 +25,27 @@ class DummyResult:
     relativeStandardError = [0.0]
     totalRays = [4]
     dndtAse = [0.0]
+
+
+def testCiAlpakaRuntimeBackendSelectionUsesCudaWhenRequested(monkeypatch):
+    backends = ["Host_Cpu_CpuOmpBlocks", "Nvidia_Gpu_CudaRt"]
+    monkeypatch.setenv("HASE_TEST_ALPAKA_BACKEND", "cuda")
+
+    assert alpaka_runtime_backend(backends) == "Nvidia_Gpu_CudaRt"
+
+
+def testCiAlpakaRuntimeBackendSelectionRejectsMissingCuda(monkeypatch):
+    monkeypatch.setenv("HASE_TEST_ALPAKA_BACKEND", "cuda")
+
+    with pytest.raises(RuntimeError, match="exactly one CUDA GPU Alpaka backend"):
+        alpaka_runtime_backend(["Host_Cpu_CpuOmpBlocks"])
+
+
+def testCiAlpakaRuntimeBackendSelectionAcceptsExactEnvironmentName(monkeypatch):
+    requested = "Nvidia_Gpu_CudaRt"
+    monkeypatch.setenv("HASE_TEST_ALPAKA_BACKEND", requested)
+
+    assert alpaka_runtime_backend(["Host_Cpu_CpuSerial", requested]) == requested
 
 
 def testSimulationRunUsesOpenPmdTransportAndStoresResults(

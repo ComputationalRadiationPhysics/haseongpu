@@ -13,10 +13,11 @@ import pytest
 repoRoot = Path(__file__).resolve().parents[3]
 
 
-from HASEonGPU import AlpakaBackends, PhiASE, SpectralDecomposition
+from HASEonGPU import PhiASE, SpectralDecomposition
 from pyInclude.geometry import GainMedium, Gmsh, GmshElement, SurfaceOptics, VolumeTopology
 import pyInclude.geometry.volume as volume_module
 import pyInclude.openpmd.transport as transport
+from alpaka_backend_matrix import alpaka_runtime_backend
 from pyInclude.geometry.volume import BOUND_STOP, GMSH_TET4, GMSH_TRI3, VTK_TETRA
 
 try:
@@ -112,16 +113,10 @@ def _writeClosedCubeStl(path):
 
 
 def _runtimeAlpakaBackend():
-    backends = AlpakaBackends.all()
-    for preferred in ("Host_Cpu_CpuOmpBlocks", "Host_Cpu_CpuSerial"):
-        if preferred in backends:
-            return preferred
-    for backend in backends:
-        if "Cpu" in backend:
-            return backend
-    if backends:
-        return backends[0]
-    pytest.skip("no Alpaka backend is available in this build")
+    try:
+        return alpaka_runtime_backend()
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
 
 def _runtimeOpenPmdBackend():

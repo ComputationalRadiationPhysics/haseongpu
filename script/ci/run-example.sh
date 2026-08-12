@@ -15,5 +15,12 @@ if [[ ! " ${openpmd_backends[*]} " =~ " ${backend} " ]]; then
 fi
 ci_export HASE_OPENPMD_RUNTIME_TEST_BACKEND "$backend"
 
+alpaka_backend="$(
+    cd /tmp
+    ci_python "$HASE_CI_ROOT/tests/alpaka_backend_matrix.py"
+)"
+ci_export HASE_CI_SELECTED_ALPAKA_BACKEND "$alpaka_backend"
+
 ci_python "$HASE_CI_ROOT/utils/testLaunchLaserPump.py" \
-    "$backend" "/tmp/hase-laser-pump-cladding-$backend"
+    "$backend" "/tmp/hase-laser-pump-cladding-$backend" \
+    --alpaka-backend "$alpaka_backend"

@@ -14,7 +14,7 @@ import pytest
 
 import pyInclude.openpmd.transport as transport
 from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
-from pyInclude import AlpakaBackends
+from alpaka_backend_matrix import alpaka_runtime_backend
 from pyInclude.geometry import GainMedium, MeshTopology, OpenPmdScalarField, VolumeTopology
 from pyInclude.laser import (
     CrossSectionData,
@@ -71,13 +71,10 @@ MESH_FIELD_VALUES = {
 
 
 def _launch_backend():
-    backends = AlpakaBackends.all()
-    for backend in backends:
-        if "CpuOmpBlocks" in backend:
-            return backend
-    if not backends:
-        pytest.skip("no Alpaka backend is available in this build")
-    return backends[0]
+    try:
+        return alpaka_runtime_backend()
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
 SPECTRAL_FIELD_VALUES = {
     "lambdaAbsorption": np.array([900e-9, 910e-9, 930e-9], dtype=np.float64),
