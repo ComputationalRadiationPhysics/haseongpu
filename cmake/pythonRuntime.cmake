@@ -12,11 +12,6 @@ endif()
 # Wheels do not vendor openPMD-api runtime libraries or generated Python
 # bindings. The frontend uses the matching provider from its runtime environment.
 set(HASE_USE_SYSTEM_OPENPMD_PY True)
-if(HASE_FORWARD_LOGGING)
-    set(HASE_FORWARD_LOGGING_PY True)
-else()
-    set(HASE_FORWARD_LOGGING_PY False)
-endif()
 string(REPLACE "\\" "\\\\" HASE_RUNTIME_DIR_ESCAPED "${HASE_RUNTIME_DIR}")
 string(
     REPLACE

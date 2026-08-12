@@ -47,8 +47,11 @@
 namespace hase::core
 {
 
-    // default without V_DEBUG
-    inline unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT; // extern through logging.hpp
+#ifdef HASE_ENABLE_DEBUG_LOGGING
+    inline unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT | V_DEBUG;
+#else
+    inline unsigned verbosity = V_ERROR | V_INFO | V_WARNING | V_PROGRESS | V_STAT;
+#endif
 
     struct nullstream : std::ostream
     {
