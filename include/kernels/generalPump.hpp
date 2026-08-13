@@ -414,6 +414,7 @@ namespace hase::kernels
         double tiltU = 0.0;
         double tiltV = 0.0;
         double magnification = 1.0;
+        //! Relay throughput applied before inward reinjection at the entry surface.
         double transmission = 1.0;
         int flipU = 1;
         int flipV = 1;
@@ -869,7 +870,8 @@ namespace hase::kernels
         GeneralPumpDeviceSource(
             auto const& queue,
             std::vector<GeneralPumpRayState> const& rays,
-            PumpRelayGeometry geometry)
+            PumpRelayGeometry geometry,
+            unsigned const pumpSteps)
             : m_originX(
                   hase::alpakaUtils::toDevice(
                       queue,
@@ -944,12 +946,18 @@ namespace hase::kernels
             , m_faceCount{geometry.faceCount}
             , m_relayCount{static_cast<unsigned>(geometry.descriptors.size())}
             , m_rayCount{static_cast<unsigned>(rays.size())}
+            , m_pumpSteps{pumpSteps}
         {
         }
 
         [[nodiscard]] unsigned rayCount() const
         {
             return m_rayCount;
+        }
+
+        [[nodiscard]] bool active(unsigned const simulationStep) const
+        {
+            return simulationStep < m_pumpSteps;
         }
 
         [[nodiscard]] auto const& cacheState() const
@@ -1061,6 +1069,7 @@ namespace hase::kernels
         unsigned m_faceCount = 0u;
         unsigned m_relayCount = 0u;
         unsigned m_rayCount = 0u;
+        unsigned m_pumpSteps = 0u;
     };
 
     template<typename T_Device>
@@ -1068,22 +1077,20 @@ namespace hase::kernels
         auto const& queue,
         hase::core::HostMesh const& mesh,
         hase::core::PumpParameters const& pump,
-        unsigned const firstRay,
-        unsigned const localRayCount)
+        unsigned const firstRay = 0u,
+        unsigned const localRayCount = std::numeric_limits<unsigned>::max())
     {
         std::vector<GeneralPumpDeviceSource<T_Device>> result;
         result.reserve(pump.sources.size());
-        for(std::size_t sourceIndex = 0u; sourceIndex < pump.sources.size(); ++sourceIndex)
+        for(auto const& source : pump.sources)
         {
-            auto const& source = pump.sources[sourceIndex];
-            auto rays = samplePumpSource(
-                mesh,
-                source,
-                pump.rayCount,
-                pump.rngSeed + static_cast<std::uint32_t>(sourceIndex),
-                firstRay,
-                localRayCount);
-            result.emplace_back(queue, rays, preparePumpRelayGeometry(mesh, source.relays));
+            if(source.pumpSteps == 0u)
+            {
+                result.emplace_back(queue, std::vector<GeneralPumpRayState>{}, PumpRelayGeometry{}, 0u);
+                continue;
+            }
+            auto rays = samplePumpSource(mesh, source, source.rayCount, source.rngSeed, firstRay, localRayCount);
+            result.emplace_back(queue, rays, preparePumpRelayGeometry(mesh, source.relays), source.pumpSteps);
         }
         return result;
     }
@@ -1135,6 +1142,7 @@ namespace hase::kernels
         std::vector<GeneralPumpDeviceSource<T_Device>>& sources,
         T_BetaBuffer& betaVolume,
         T_VertexBuffer& vertexPumpIntegral,
+        unsigned const simulationStep,
         T_BoundaryPolicy boundaryPolicy = {})
     {
         HASE_HOST_ROUTINE_SCOPE("pump.enqueue_integrals");
@@ -1145,7 +1153,8 @@ namespace hase::kernels
             alpaka::Vec{static_cast<std::size_t>(mesh.numberOfMeshPoints)});
         for(auto& source : sources)
         {
-            source.enqueue(devBundle, queue, mesh, betaVolume, vertexPumpIntegral, boundaryPolicy);
+            if(source.active(simulationStep))
+                source.enqueue(devBundle, queue, mesh, betaVolume, vertexPumpIntegral, boundaryPolicy);
         }
     }
 
@@ -1195,9 +1204,18 @@ namespace hase::kernels
         T_VertexBuffer& vertexPumpIntegral,
         T_LumpedVolumeBuffer& lumpedVertexVolume,
         T_RateBuffer& cellRate,
+        unsigned const simulationStep,
         T_BoundaryPolicy boundaryPolicy = {})
     {
-        enqueueGeneralPumpIntegrals(devBundle, queue, mesh, sources, betaVolume, vertexPumpIntegral, boundaryPolicy);
+        enqueueGeneralPumpIntegrals(
+            devBundle,
+            queue,
+            mesh,
+            sources,
+            betaVolume,
+            vertexPumpIntegral,
+            simulationStep,
+            boundaryPolicy);
         enqueueProjectVertexPumpRateToCells(devBundle, queue, mesh, vertexPumpIntegral, lumpedVertexVolume, cellRate);
     }
 } // namespace hase::kernels

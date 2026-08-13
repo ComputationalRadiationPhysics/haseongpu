@@ -18,7 +18,7 @@ from pyInclude.geometry.vtk import _parseVtk
 repoRoot = Path(__file__).resolve().parents[3]
 exampleDir = repoRoot / "example"
 sys.path.insert(0, str(exampleDir))
-import laserPumpCladding  # noqa: E402
+import laserPumpCladdingApi as laserPumpCladding  # noqa: E402
 
 
 REFERENCE_PATH = (
@@ -133,11 +133,11 @@ def testCurrentTet4WithoutReflectionsMatchesLegacyWedgeIntegral(
     state = laserPumpCladding.runExample(
         backend=alpakaRuntimeBackend,
         openpmdBackend=openPmdRuntimeBackend,
-        timeSlices=metadata["parameters"]["timeSlices"],
-        pumpSteps=metadata["parameters"]["pumpSteps"],
+        simulation_steps=metadata["parameters"]["timeSlices"],
+        pump_steps=metadata["parameters"]["pumpSteps"],
+        ase_steps=metadata["parameters"]["timeSlices"],
         vtkOutputDir=output_dir,
-        enableASE=True,
-        prePump=metadata["parameters"]["prePump"],
+        pre_pump=metadata["parameters"]["prePump"],
         rngSeed=metadata["random"]["rngSeed"],
         useReflections=False,
         minRays=LEGACY_WEDGE_FORWARD_RAYS,

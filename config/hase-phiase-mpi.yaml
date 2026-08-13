@@ -1,12 +1,14 @@
-experiment:
-  minRays: 10000
-  maxRays: 1000000
-  relativeStandardErrorThreshold: 0.1
+schema_version: 2
 
-compute:
-  backend: Host_Cpu_CpuOmpBlocks
-  openpmd_backend: auto
-  parallel_mode: mpi
-  numDevices: 1
-  n_per_node: 2
-  write_vtk: false
+simulation:
+  phi_ase:
+    # Outer Simulation steps that include ASE; null or 0 disables ASE.
+    ase_steps: 0
+    min_rays: 10000
+    max_rays: 1000000
+    relative_standard_error_threshold: 0.1
+    backend: Host_Cpu_CpuOmpBlocks
+    openpmd_backend: auto
+    parallel_mode: mpi
+    num_devices: 1
+    n_per_node: 2

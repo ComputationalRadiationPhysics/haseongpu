@@ -4,6 +4,7 @@ import contextlib
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from .._progress import _ProgressBar
 from ..geometry import OpenPmdComponentField, OpenPmdScalarField
 from .._runtime import runtime_config, runtime_executable_candidates, runtime_root
 from .backends import _clean_backend_names, _load_backend_names
@@ -121,6 +123,7 @@ EXPLICIT_CELL_DOMAINS_SPEC = FieldSpec(
     backendRequired=False,
 )
 DYNAMIC_FIELD_NAMES = {"betaVolume"}
+_STEP_COMPLETE_RE = re.compile(r"\[HASE_STEP_COMPLETE\]\s+step=(\d+)/(\d+)(?:\s|$)")
 EXPLICIT_BETA_VOLUME_SPEC = FieldSpec(
     "betaVolume",
     "beta_volume",
@@ -129,6 +132,8 @@ EXPLICIT_BETA_VOLUME_SPEC = FieldSpec(
     lambda context: (context.numberOfCells,),
     dynamic=True,
 )
+
+
 def _env_flag(name):
     value = os.environ.get(name)
     if value is None:
@@ -147,6 +152,12 @@ def _forward_backend_logging_enabled():
     return True
 
 
+def _frontend_progress_enabled():
+    if not _forward_backend_logging_enabled():
+        return False
+    return not bool(getattr(_runtime_config(), "HASE_DEBUG_LOGGING", True))
+
+
 def _backend_log_path():
     value = os.environ.get("HASE_BACKEND_LOG_FILE", "").strip()
     return None if not value else Path(value).expanduser().resolve()
@@ -159,10 +170,11 @@ def _backend_failure_detail(log_path=None):
 class _BackendProcess:
     """Run calcPhiASE while continuously draining its diagnostic streams."""
 
-    def __init__(self, command):
+    def __init__(self, command, *, progress=False):
         self.log_path = _backend_log_path()
         self._log = None
         self._log_lock = threading.Lock()
+        self._console_lock = threading.Lock()
         self._stream_errors = queue.Queue()
         self._threads = []
         self._finished = False
@@ -180,6 +192,7 @@ class _BackendProcess:
             if self._log is not None:
                 self._log.close()
             raise
+        self._progress = _ProgressBar(sys.stdout) if progress else None
         stdout = getattr(self._proc, "stdout", None)
         stderr = getattr(self._proc, "stderr", None)
         if stdout is not None:
@@ -217,8 +230,7 @@ class _BackendProcess:
             for line in source:
                 if forward:
                     try:
-                        destination.write(line)
-                        destination.flush()
+                        self._forward_line(line, destination, stream_name)
                     except BaseException as exc:
                         self._stream_errors.put((stream_name, exc))
                         forward = False
@@ -238,6 +250,23 @@ class _BackendProcess:
         finally:
             source.close()
 
+    def _forward_line(self, line, destination, stream_name):
+        with self._console_lock:
+            match = (
+                _STEP_COMPLETE_RE.search(line)
+                if self._progress is not None and stream_name == "stdout"
+                else None
+            )
+            if match is not None:
+                self._progress.update(int(match.group(1)), int(match.group(2)))
+                return
+            if self._progress is not None:
+                self._progress.clear()
+            destination.write(line)
+            destination.flush()
+            if self._progress is not None:
+                self._progress.redraw()
+
     def wait(self):
         if hasattr(self._proc, "wait"):
             return_code = self._proc.wait()
@@ -252,6 +281,9 @@ class _BackendProcess:
                 thread.join(timeout=timeout)
                 if thread.is_alive():
                     raise RuntimeError(f"{thread.name} did not stop within {timeout:g} seconds")
+            if self._progress is not None:
+                with self._console_lock:
+                    self._progress.finish()
             if self._log is not None:
                 with self._log_lock:
                     self._log.close()
@@ -269,8 +301,8 @@ class _BackendProcess:
         if not value:
             return
         if _forward_backend_logging_enabled():
-            destination.write(value)
-            destination.flush()
+            for line in value.splitlines(keepends=True):
+                self._forward_line(line, destination, stream_name)
         with self._log_lock:
             if self._log is not None:
                 for line in value.splitlines(keepends=True):
@@ -278,8 +310,8 @@ class _BackendProcess:
                 self._log.flush()
 
 
-def _run_backend_process(command):
-    process = _BackendProcess(command)
+def _run_backend_process(command, *, progress=False):
+    process = _BackendProcess(command, progress=progress)
     return SimpleNamespace(returncode=process.wait(), log_path=process.log_path)
 
 
@@ -1708,42 +1740,35 @@ def _time_integrator_name(solver):
     return name
 
 
-def _simulation_run_control(simulation, *, steps, pumpSteps):
-    pump = simulation.pump
-    if pumpSteps is None:
-        pumpSteps = pump.pumpSteps
-    pump_steps_value = (2**32 - 1) if pumpSteps is None else int(pumpSteps)
-    if pump_steps_value < 0:
-        raise ValueError("pumpSteps must be non-negative")
+def _simulation_run_control(simulation, *, steps):
+    ase_steps = 0 if simulation.phiASE.ase_steps is None else int(simulation.phiASE.ase_steps)
     solver = simulation.timeIntegrationSolver
     control = {
-        "time_step": float(simulation.timeStep),
-        "number_of_steps": int(steps),
-        "enable_ase": bool(getattr(simulation, "enableASE", True)),
-        "pre_pump": bool(getattr(simulation, "prePump", False)),
-        "pump_steps": pump_steps_value,
-        "execution_mode": getattr(simulation, "executionMode", "autonomous"),
-        "time_integrator": _time_integrator_name(solver),
-        "pump_schema_version": 1,
-        "pump_ray_count": int(pump.rayCount),
-        "pump_rng_seed": int(pump.rngSeed),
+        "timeStep": float(simulation.timeStep),
+        "numberOfSteps": int(steps),
+        "firstSimulationStep": int(simulation.current_step),
+        "aseSteps": ase_steps,
+        "prePump": bool(simulation.pre_pump),
+        "executionMode": getattr(simulation, "executionMode", "autonomous"),
+        "timeIntegrator": _time_integrator_name(solver),
+        "pumpSchemaVersion": 2,
     }
     if hasattr(simulation, "outputFields"):
-        control["output_fields_string"] = json.dumps(
+        control["outputFieldsString"] = json.dumps(
             list(simulation.outputFields), separators=(",", ":")
         )
     output_steps = getattr(simulation, "outputSteps", None)
     if output_steps is not None:
         if output_steps and output_steps[-1] > int(steps):
             raise ValueError("output_steps entries must not exceed the number of requested steps")
-        control["output_steps"] = np.asarray(output_steps, dtype=np.uint64)
+        control["outputSteps"] = np.asarray(output_steps, dtype=np.uint64)
     control_fields = getattr(simulation, "controlFields", ())
-    control["control_fields_string"] = json.dumps(list(control_fields), separators=(",", ":"))
+    control["controlFieldsString"] = json.dumps(list(control_fields), separators=(",", ":"))
     control.update(_general_pump_attributes(simulation))
     if hasattr(solver, "iterations"):
-        control["implicit_iterations"] = int(solver.iterations)
+        control["implicitIterations"] = int(solver.iterations)
     if hasattr(solver, "tolerance"):
-        control["implicit_tolerance"] = float(solver.tolerance)
+        control["implicitTolerance"] = float(solver.tolerance)
     return control
 
 
@@ -1825,51 +1850,55 @@ def _general_pump_attributes(simulation):
         source_relay_offsets.append(relay_count)
 
     attributes = {
-        "pump_source_total_power": [float(source.totalPower) for source in pump.sources],
-        "pump_source_surface_offsets": source_surface_offsets,
-        "pump_source_surfaces": source_surfaces,
-        "pump_spectrum_offsets": spectrum_offsets,
-        "pump_spectrum_wavelengths": spectrum_wavelengths,
-        "pump_spectrum_weights": spectrum_weights,
-        "pump_spectrum_sigma_absorption": spectrum_sigma_a,
-        "pump_spectrum_sigma_emission": spectrum_sigma_e,
-        "pump_angular_offsets": angular_offsets,
-        "pump_angular_polar": angular_polar,
-        "pump_angular_azimuthal": angular_azimuthal,
-        "pump_angular_weights": angular_weights,
-        "pump_profile_kind": profile_kind,
-        "pump_profile_radius_u": profile_radius_u,
-        "pump_profile_radius_v": profile_radius_v,
-        "pump_profile_exponent": profile_exponent,
-        "pump_profile_center": profile_center,
-        "pump_profile_axis_u": profile_axis_u,
-        "pump_profile_axis_v": profile_axis_v,
-        "pump_source_relay_offsets": source_relay_offsets,
-        "pump_relay_exit_offsets": relay_exit_offsets,
-        "pump_relay_exit_surfaces": relay_exit_surfaces,
-        "pump_relay_entry_offsets": relay_entry_offsets,
-        "pump_relay_entry_surfaces": relay_entry_surfaces,
-        "pump_relay_flip_u": relay_flip_u,
-        "pump_relay_flip_v": relay_flip_v,
-        "pump_relay_rotation": relay_rotation,
-        "pump_relay_offset": relay_offset,
-        "pump_relay_tilt": relay_tilt,
-        "pump_relay_magnification": relay_magnification,
-        "pump_relay_transmission": relay_transmission,
+        "pumpSourceTotalPower": [float(source.totalPower) for source in pump.sources],
+        "pumpSourceRayCount": [int(source.rayCount) for source in pump.sources],
+        "pumpSourcePumpSteps": [int(source.pumpSteps) for source in pump.sources],
+        "pumpSourceRngSeed": [int(source.rngSeed) for source in pump.sources],
+        "pumpSourceSurfaceOffsets": source_surface_offsets,
+        "pumpSourceSurfaces": source_surfaces,
+        "pumpSpectrumOffsets": spectrum_offsets,
+        "pumpSpectrumWavelengths": spectrum_wavelengths,
+        "pumpSpectrumWeights": spectrum_weights,
+        "pumpSpectrumSigmaAbsorption": spectrum_sigma_a,
+        "pumpSpectrumSigmaEmission": spectrum_sigma_e,
+        "pumpAngularOffsets": angular_offsets,
+        "pumpAngularPolar": angular_polar,
+        "pumpAngularAzimuthal": angular_azimuthal,
+        "pumpAngularWeights": angular_weights,
+        "pumpProfileKind": profile_kind,
+        "pumpProfileRadiusU": profile_radius_u,
+        "pumpProfileRadiusV": profile_radius_v,
+        "pumpProfileExponent": profile_exponent,
+        "pumpProfileCenter": profile_center,
+        "pumpProfileAxisU": profile_axis_u,
+        "pumpProfileAxisV": profile_axis_v,
+        "pumpSourceRelayOffsets": source_relay_offsets,
+        "pumpRelayExitOffsets": relay_exit_offsets,
+        "pumpRelayExitSurfaces": relay_exit_surfaces,
+        "pumpRelayEntryOffsets": relay_entry_offsets,
+        "pumpRelayEntrySurfaces": relay_entry_surfaces,
+        "pumpRelayFlipU": relay_flip_u,
+        "pumpRelayFlipV": relay_flip_v,
+        "pumpRelayRotation": relay_rotation,
+        "pumpRelayOffset": relay_offset,
+        "pumpRelayTilt": relay_tilt,
+        "pumpRelayMagnification": relay_magnification,
+        "pumpRelayTransmission": relay_transmission,
     }
     unsigned_names = {
-        "pump_source_surface_offsets", "pump_source_surfaces", "pump_spectrum_offsets",
-        "pump_angular_offsets", "pump_profile_kind", "pump_source_relay_offsets",
-        "pump_relay_exit_offsets", "pump_relay_exit_surfaces",
-        "pump_relay_entry_offsets", "pump_relay_entry_surfaces",
-        "pump_relay_flip_u", "pump_relay_flip_v",
+        "pumpSourceRayCount", "pumpSourcePumpSteps", "pumpSourceRngSeed",
+        "pumpSourceSurfaceOffsets", "pumpSourceSurfaces", "pumpSpectrumOffsets",
+        "pumpAngularOffsets", "pumpProfileKind", "pumpSourceRelayOffsets",
+        "pumpRelayExitOffsets", "pumpRelayExitSurfaces",
+        "pumpRelayEntryOffsets", "pumpRelayEntrySurfaces",
+        "pumpRelayFlipU", "pumpRelayFlipV",
     }
     for name in unsigned_names:
         attributes[name] = np.asarray(attributes[name], dtype=np.uint64)
     # openPMD backends do not portably represent zero-length attributes. Relay
     # offset arrays retain the zero-relay shape; empty relay payloads are omitted.
     for name in tuple(attributes):
-        if name.startswith("pump_relay_") and np.asarray(attributes[name]).size == 0:
+        if name.startswith("pumpRelay") and np.asarray(attributes[name]).size == 0:
             del attributes[name]
     return attributes
 
@@ -1898,6 +1927,7 @@ def _run_streaming_simulation(
     run_control,
     *,
     on_state=None,
+    progress=False,
 ):
     """Run compiled simulation while Python threads exchange SST snapshots."""
     result_queue = queue.Queue(maxsize=1)
@@ -1912,7 +1942,7 @@ def _run_streaming_simulation(
             def receive_state(state):
                 if on_state is not None:
                     on_state(state)
-                if synchronized_debug and int(state.step) < int(run_control["number_of_steps"]):
+                if synchronized_debug and int(state.step) < int(run_control["numberOfSteps"]):
                     completed_step = int(state.step)
                     control_queue.put(completed_step)
                     acknowledged_step = control_ack_queue.get()
@@ -1958,7 +1988,7 @@ def _run_streaming_simulation(
                         runControl=run_control,
                         dynamic_fields={"beta_volume"},
                     )
-                    for expected_step in range(1, int(run_control["number_of_steps"])):
+                    for expected_step in range(1, int(run_control["numberOfSteps"])):
                         completed_step = control_queue.get()
                         if completed_step is None:
                             raise RuntimeError(
@@ -1990,7 +2020,7 @@ def _run_streaming_simulation(
             if proc.poll() is None:
                 proc.kill()
 
-    proc = _BackendProcess(command)
+    proc = _BackendProcess(command, progress=progress)
     reader = threading.Thread(
         target=read_output,
         name="HASE compiled simulation snapshot receiver",
@@ -2047,7 +2077,6 @@ def runSimulation(
     simulation,
     *,
     steps,
-    pumpSteps=None,
     transport=None,
     command_prefix=None,
     workspace_dir=None,
@@ -2059,7 +2088,8 @@ def runSimulation(
         raise ValueError("steps must be positive")
     executable = findCalcPhiAse()
     spec = _ensure_backend_available(transport, executable)
-    run_control = _simulation_run_control(simulation, steps=steps, pumpSteps=pumpSteps)
+    run_control = _simulation_run_control(simulation, steps=steps)
+    progress = _frontend_progress_enabled()
     if simulation.executionMode == "synchronized-debug" and not spec.streaming:
         raise ValueError("synchronized-debug requires an openPMD streaming backend")
 
@@ -2095,10 +2125,11 @@ def runSimulation(
                 simulation,
                 run_control,
                 on_state=on_state,
+                progress=progress,
             )
 
         _write_simulation_input(input_path, spec, simulation, run_control)
-        completed = _run_backend_process(command)
+        completed = _run_backend_process(command, progress=progress)
         if completed.returncode != 0:
             detail = _backend_failure_detail(completed.log_path)
             raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")

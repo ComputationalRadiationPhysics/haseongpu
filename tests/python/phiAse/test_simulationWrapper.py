@@ -464,10 +464,9 @@ def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch)
     simulation._time = 0.0
     simulation.reportTimings = False
 
-    def fake_run_simulation(simulation_arg, *, steps, pumpSteps=None, transport=None, on_state=None):
+    def fake_run_simulation(simulation_arg, *, steps, transport=None, on_state=None):
         captured["simulation"] = simulation_arg
         captured["steps"] = steps
-        captured["pumpSteps"] = pumpSteps
         captured["transport"] = transport
         return []
 
@@ -478,7 +477,6 @@ def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch)
     assert captured == {
         "simulation": simulation,
         "steps": 1,
-        "pumpSteps": None,
         "transport": "adios-sst",
     }
 

@@ -154,11 +154,6 @@ class TriangleSchema(PrimitiveSchemaDefinition):
     normal = PrimitiveFieldSpec("normal", np.float64, axes=("cell", "local_side", "coordinate"), unitDimension=unitDimension.normal)
     surface = PrimitiveFieldSpec("surface", np.float32, axes=("cell",), unit="m^2", unitDimension=unitDimension.surface)
     claddingGroup = PrimitiveFieldSpec("claddingGroup", np.uint32, axes=("cell",), unitDimension=unitDimension.claddingGroup)
-    refractiveIndex = PrimitiveFieldSpec("refractiveIndex", np.float32, axes=("interface",), unitDimension=unitDimension.refractiveIndex)
-    reflectivity = PrimitiveFieldSpec("reflectivity", np.float32, axes=("cell", "interface"), unitDimension=unitDimension.reflectivity)
-    surfaceReflectivity = PrimitiveFieldSpec("surfaceReflectivity", "surface_reflectivity", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceReflectivity, backendRequired=False)
-    surfaceRefractiveIndexInside = PrimitiveFieldSpec("surfaceRefractiveIndexInside", "surface_refractive_index_inside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexInside, backendRequired=False)
-    surfaceRefractiveIndexOutside = PrimitiveFieldSpec("surfaceRefractiveIndexOutside", "surface_refractive_index_outside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexOutside, backendRequired=False)
 
 
 class PrismSchema(PrimitiveSchemaDefinition):
@@ -175,6 +170,11 @@ BACKEND_FIELD_SPECS = (
     PrimitiveFieldSpec("cellNormalX", "cell_normal_x", np.float64, axes=("cell", "local_side"), unitDimension=unitDimension.cellNormalX),
     PrimitiveFieldSpec("cellNormalY", "cell_normal_y", np.float64, axes=("cell", "local_side"), unitDimension=unitDimension.cellNormalY),
     PrimitiveFieldSpec("claddingCellType", "cladding_cell_type", np.uint32, axes=("cell",), unitDimension=unitDimension.claddingCellType),
+    PrimitiveFieldSpec("refractiveIndex", "refractive_index", np.float32, axes=("interface",), unitDimension=unitDimension.refractiveIndex),
+    PrimitiveFieldSpec("reflectivity", np.float32, axes=("cell", "interface"), unitDimension=unitDimension.reflectivity),
+    PrimitiveFieldSpec("surfaceReflectivity", "surface_reflectivity", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceReflectivity, backendRequired=False),
+    PrimitiveFieldSpec("surfaceRefractiveIndexInside", "surface_refractive_index_inside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexInside, backendRequired=False),
+    PrimitiveFieldSpec("surfaceRefractiveIndexOutside", "surface_refractive_index_outside", np.float32, axes=("surface",), unitDimension=unitDimension.surfaceRefractiveIndexOutside, backendRequired=False),
 )
 
 

@@ -602,7 +602,7 @@ TEST_CASE("openPMD parser reads a transport-valid openPMD record", "[openpmd][pa
     REQUIRE(context.compute.devices.empty());
     REQUIRE(context.compute.rngSeed == 1234u);
     REQUIRE(context.experiment.forwardRayCount == 0u);
-    REQUIRE(context.run.enableAse == true);
+    REQUIRE(context.run.aseSteps == 0u);
     REQUIRE(context.run.timeIntegration.method == "explicit-euler");
 }
 
@@ -667,63 +667,65 @@ TEST_CASE("openPMD parser reads compiled simulation run-control attributes", "[o
         [](io::Series& series, io::Iteration& iteration)
         {
             (void) series;
-            iteration.setAttribute("time_step", 2.0e-5);
-            iteration.setAttribute("number_of_steps", 100u);
-            iteration.setAttribute("enable_ase", false);
-            iteration.setAttribute("pump_steps", 50u);
-            iteration.setAttribute("execution_mode", std::string{"synchronized-debug"});
-            iteration.setAttribute("output_fields_string", std::string{"[\"beta_volume\",\"dndt_pump\"]"});
-            iteration.setAttribute("control_fields_string", std::string{"[\"beta_volume\"]"});
-            iteration.setAttribute("time_integrator", std::string{"frozen-phi-ase-runge-kutta-4"});
+            iteration.setAttribute("timeStep", 2.0e-5);
+            iteration.setAttribute("numberOfSteps", 100u);
+            iteration.setAttribute("firstSimulationStep", 3u);
+            iteration.setAttribute("aseSteps", 75u);
+            iteration.setAttribute("executionMode", std::string{"synchronized-debug"});
+            iteration.setAttribute("outputFieldsString", std::string{"[\"beta_volume\",\"dndt_pump\"]"});
+            iteration.setAttribute("controlFieldsString", std::string{"[\"beta_volume\"]"});
+            iteration.setAttribute("timeIntegrator", std::string{"frozen-phi-ase-runge-kutta-4"});
             using U64 = unsigned long long;
-            iteration.setAttribute("pump_schema_version", 1u);
-            iteration.setAttribute("pump_ray_count", 1234u);
-            iteration.setAttribute("pump_rng_seed", 99u);
-            iteration.setAttribute("pump_source_total_power", std::vector<double>{12.5});
-            iteration.setAttribute("pump_source_surface_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_source_surfaces", std::vector<U64>{11u});
-            iteration.setAttribute("pump_spectrum_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_spectrum_wavelengths", std::vector<double>{940e-9});
-            iteration.setAttribute("pump_spectrum_weights", std::vector<double>{1.0});
-            iteration.setAttribute("pump_spectrum_sigma_absorption", std::vector<double>{1e-22});
-            iteration.setAttribute("pump_spectrum_sigma_emission", std::vector<double>{2e-22});
-            iteration.setAttribute("pump_angular_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_angular_polar", std::vector<double>{0.0});
-            iteration.setAttribute("pump_angular_azimuthal", std::vector<double>{0.0});
-            iteration.setAttribute("pump_angular_weights", std::vector<double>{1.0});
-            iteration.setAttribute("pump_profile_kind", std::vector<U64>{0u});
-            iteration.setAttribute("pump_profile_radius_u", std::vector<double>{1.0});
-            iteration.setAttribute("pump_profile_radius_v", std::vector<double>{1.0});
-            iteration.setAttribute("pump_profile_exponent", std::vector<double>{2.0});
-            iteration.setAttribute("pump_profile_center", std::vector<double>{0.0, 0.0, 0.0});
-            iteration.setAttribute("pump_profile_axis_u", std::vector<double>{1.0, 0.0, 0.0});
-            iteration.setAttribute("pump_profile_axis_v", std::vector<double>{0.0, 1.0, 0.0});
-            iteration.setAttribute("pump_source_relay_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_relay_exit_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_relay_exit_surfaces", std::vector<U64>{12u});
-            iteration.setAttribute("pump_relay_entry_offsets", std::vector<U64>{0u, 1u});
-            iteration.setAttribute("pump_relay_entry_surfaces", std::vector<U64>{12u});
-            iteration.setAttribute("pump_relay_flip_u", std::vector<U64>{0u});
-            iteration.setAttribute("pump_relay_flip_v", std::vector<U64>{0u});
-            iteration.setAttribute("pump_relay_rotation", std::vector<double>{0.0});
-            iteration.setAttribute("pump_relay_offset", std::vector<double>{0.0, 0.0});
-            iteration.setAttribute("pump_relay_tilt", std::vector<double>{0.0, 0.0});
-            iteration.setAttribute("pump_relay_magnification", std::vector<double>{1.0});
-            iteration.setAttribute("pump_relay_transmission", std::vector<double>{0.75});
+            iteration.setAttribute("pumpSchemaVersion", 2u);
+            iteration.setAttribute("pumpSourceTotalPower", std::vector<double>{12.5});
+            iteration.setAttribute("pumpSourceRayCount", std::vector<U64>{1234u});
+            iteration.setAttribute("pumpSourcePumpSteps", std::vector<U64>{50u});
+            iteration.setAttribute("pumpSourceRngSeed", std::vector<U64>{99u});
+            iteration.setAttribute("pumpSourceSurfaceOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpSourceSurfaces", std::vector<U64>{11u});
+            iteration.setAttribute("pumpSpectrumOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpSpectrumWavelengths", std::vector<double>{940e-9});
+            iteration.setAttribute("pumpSpectrumWeights", std::vector<double>{1.0});
+            iteration.setAttribute("pumpSpectrumSigmaAbsorption", std::vector<double>{1e-22});
+            iteration.setAttribute("pumpSpectrumSigmaEmission", std::vector<double>{2e-22});
+            iteration.setAttribute("pumpAngularOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpAngularPolar", std::vector<double>{0.0});
+            iteration.setAttribute("pumpAngularAzimuthal", std::vector<double>{0.0});
+            iteration.setAttribute("pumpAngularWeights", std::vector<double>{1.0});
+            iteration.setAttribute("pumpProfileKind", std::vector<U64>{0u});
+            iteration.setAttribute("pumpProfileRadiusU", std::vector<double>{1.0});
+            iteration.setAttribute("pumpProfileRadiusV", std::vector<double>{1.0});
+            iteration.setAttribute("pumpProfileExponent", std::vector<double>{2.0});
+            iteration.setAttribute("pumpProfileCenter", std::vector<double>{0.0, 0.0, 0.0});
+            iteration.setAttribute("pumpProfileAxisU", std::vector<double>{1.0, 0.0, 0.0});
+            iteration.setAttribute("pumpProfileAxisV", std::vector<double>{0.0, 1.0, 0.0});
+            iteration.setAttribute("pumpSourceRelayOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpRelayExitOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpRelayExitSurfaces", std::vector<U64>{12u});
+            iteration.setAttribute("pumpRelayEntryOffsets", std::vector<U64>{0u, 1u});
+            iteration.setAttribute("pumpRelayEntrySurfaces", std::vector<U64>{12u});
+            iteration.setAttribute("pumpRelayFlipU", std::vector<U64>{0u});
+            iteration.setAttribute("pumpRelayFlipV", std::vector<U64>{0u});
+            iteration.setAttribute("pumpRelayRotation", std::vector<double>{0.0});
+            iteration.setAttribute("pumpRelayOffset", std::vector<double>{0.0, 0.0});
+            iteration.setAttribute("pumpRelayTilt", std::vector<double>{0.0, 0.0});
+            iteration.setAttribute("pumpRelayMagnification", std::vector<double>{1.0});
+            iteration.setAttribute("pumpRelayTransmission", std::vector<double>{0.75});
         });
     hase::openpmd::Parser parser{path, testPath("run-control-output")};
     auto context = parser.read();
 
     REQUIRE(context.run.timeStep == Catch::Approx(2.0e-5));
     REQUIRE(context.run.numberOfSteps == 100u);
-    REQUIRE(context.run.enableAse == false);
-    REQUIRE(context.run.pumpSteps == 50u);
+    REQUIRE(context.run.firstSimulationStep == 3u);
+    REQUIRE(context.run.aseSteps == 75u);
     REQUIRE(context.run.outputFields == std::vector<std::string>{"beta_volume", "dndt_pump"});
     REQUIRE(context.run.controlFields == std::vector<std::string>{"beta_volume"});
     REQUIRE(context.run.timeIntegration.method == "frozen-phi-ase-runge-kutta-4");
-    REQUIRE(context.run.pump.rayCount == 1234u);
-    REQUIRE(context.run.pump.rngSeed == 99u);
     REQUIRE(context.run.pump.sources.size() == 1u);
+    REQUIRE(context.run.pump.sources.front().rayCount == 1234u);
+    REQUIRE(context.run.pump.sources.front().pumpSteps == 50u);
+    REQUIRE(context.run.pump.sources.front().rngSeed == 99u);
     REQUIRE(context.run.pump.sources.front().totalPower == 12.5);
     REQUIRE(context.run.pump.sources.front().relays.front().transmission == 0.75);
 }
@@ -753,12 +755,12 @@ TEST_CASE("openPMD parser rejects legacy compiled pump run control", "[openpmd][
         [](io::Series& series, io::Iteration& iteration)
         {
             (void) series;
-            iteration.setAttribute("time_step", 1.0e-5);
-            iteration.setAttribute("number_of_steps", 1u);
+            iteration.setAttribute("timeStep", 1.0e-5);
+            iteration.setAttribute("numberOfSteps", 1u);
             iteration.setAttribute("pump_routine", std::string{"one-dimensional-z-traversal"});
         });
     auto const error = parserError(path);
-    REQUIRE(error.find("pump_schema_version") != std::string::npos);
+    REQUIRE(error.find("pumpSchemaVersion") != std::string::npos);
     REQUIRE(error.find("general pump schema") != std::string::npos);
 }
 

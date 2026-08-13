@@ -26,7 +26,6 @@ requiredHaseApi = (
     "MeshTopology",
     "OpenPmdBackends",
     "PhiASE",
-    "MonteCarloPumpSolver",
     "Pump",
     "PumpAngularDistribution",
     "PumpSpectrum",
@@ -122,7 +121,6 @@ GainMedium = _hase_api.GainMedium
 Grid = _hase_api.Grid
 MeshTopology = _hase_api.MeshTopology
 PhiASE = _hase_api.PhiASE
-MonteCarloPumpSolver = _hase_api.MonteCarloPumpSolver
 Pump = _hase_api.Pump
 PumpAngularDistribution = _hase_api.PumpAngularDistribution
 PumpSpectrum = _hase_api.PumpSpectrum
@@ -220,8 +218,6 @@ def smallGainMedium(smallTopology):
     return GainMedium(topology=smallTopology).withPhysicalProperties(
         betaVolume=np.zeros((smallTopology.numberOfTriangles, smallTopology.levels - 1)),
         claddingCellTypes=np.zeros(2, dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
         nTot=2.76e20,
         crystalTFluo=9.5e-4,
         claddingNumber=1,
@@ -236,8 +232,10 @@ def pumpProperties(crossSections):
             total_power=1.0,
             spectrum=PumpSpectrum.monochromatic(940e-9),
             cross_sections=crossSections,
+            ray_count=256,
+            pump_steps=1,
+            rng_seed=17,
             angular_distribution=PumpAngularDistribution.collimated(),
         ),
         injector=SurfacePumpInjector((1,)),
-        solver=MonteCarloPumpSolver(ray_count=256, seed=17),
     )

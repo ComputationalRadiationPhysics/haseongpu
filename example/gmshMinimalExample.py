@@ -19,7 +19,6 @@ from HASEonGPU import (
     MeshTopology,
     PhiASE,
     PlanarPumpRelay,
-    MonteCarloPumpSolver,
     Pump,
     PumpSpectrum,
     SuperGaussianPumpProfile,
@@ -104,10 +103,6 @@ def main():
         medium.get("claddingCellTypes").value = np.asarray(
             medium.get("claddingCellTypes").value, dtype=np.uint32
         ).reshape(medium.get("claddingCellTypes").expectedShape)
-        medium.get("refractiveIndices").value = np.asarray([2.0, 1.0, 3.0, 4.0], dtype=np.float32)
-        medium.get("reflectivities").value = np.zeros(
-            medium.get("reflectivities").expectedShape, dtype=np.float32
-        )
         medium.get("nTot").value = 1.388e20 * 2.0  # Doping density [1/cm^3]
         medium.get("crystalTFluo").value = 9.41e-4  # Fluorescence lifetime [s]
         medium.get("claddingNumber").value = 21  # Physical surface tag of "CladdingShell" in the gmsh file.
@@ -125,9 +120,10 @@ def main():
             total_power=16e3 * 16.0,
             spectrum=PumpSpectrum.monochromatic(940e-9),
             cross_sections=cross_sections_data,
+            ray_count=100000,
+            pump_steps=3,
             profile=pump_profile,
         )
-        pump_solver = MonteCarloPumpSolver(ray_count=100000)
 
         phi_ase = PhiASE(
             spectralProperties=cross_sections_data,
@@ -138,6 +134,7 @@ def main():
             backend="Host_Cpu_CpuSerial",
             parallelMode="single",
             numDevices=1,
+            ase_steps=3,
         )
 
         simulation = Simulation(
@@ -145,7 +142,6 @@ def main():
             phi_ase=phi_ase,
             time_integrator=RungeKutta4(),
             time_step_size=1e-5,
-            pump_solver=pump_solver,
             max_time=1e-3,
         ).add_pump(
             pump,

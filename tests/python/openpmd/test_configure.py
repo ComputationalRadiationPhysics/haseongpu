@@ -321,8 +321,10 @@ def test_mainWritesDefaultYamlUnderConfig(tmp_path, monkeypatch, capsys):
     output_path = tmp_path / configure_module.DEFAULT_PHI_ASE_CONFIG_PATH
     assert output_path.is_file()
     generated = yaml.safe_load(output_path.read_text(encoding="utf-8"))
-    assert generated["compute"]["backend"] == "Host_Cpu_CpuSerial"
-    assert generated["compute"]["openpmd_backend"] == "adios"
+    assert generated["schema_version"] == 2
+    assert generated["simulation"]["phi_ase"]["backend"] == "Host_Cpu_CpuSerial"
+    assert generated["simulation"]["phi_ase"]["openpmd_backend"] == "adios"
+    assert generated["simulation"]["phi_ase"]["ase_steps"] == 0
 
     output = capsys.readouterr().out
     assert "Wrote config/hase-phiase.yaml" in output
@@ -571,10 +573,17 @@ def test_generatedYamlLoadsAsPhiAseConfig():
     )
 
     config = yaml.safe_load(yaml_config(selection))
-    assert config["experiment"] == {
-        "minRays": 100000,
-        "maxRays": 100000,
-        "relativeStandardErrorThreshold": 0.1,
+    assert config["schema_version"] == 2
+    assert config["simulation"]["phi_ase"] == {
+        "min_rays": 100000,
+        "max_rays": 100000,
+        "relative_standard_error_threshold": 0.1,
+        "ase_steps": 0,
+        "backend": "Host_Cpu_CpuSerial",
+        "openpmd_backend": "adios",
+        "parallel_mode": "mpi",
+        "num_devices": 2,
+        "n_per_node": 2,
     }
     phi_ase = PhiASE(config)
 

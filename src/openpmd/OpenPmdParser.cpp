@@ -66,54 +66,55 @@ namespace
         constexpr char const* rngSeed = "rng_seed";
         constexpr char const* writeVtk = "write_vtk";
         constexpr char const* devices = "devices";
-        constexpr char const* timeStep = "time_step";
-        constexpr char const* numberOfSteps = "number_of_steps";
-        constexpr char const* enableAse = "enable_ase";
-        constexpr char const* prePump = "pre_pump";
-        constexpr char const* pumpSteps = "pump_steps";
-        constexpr char const* executionMode = "execution_mode";
-        constexpr char const* outputSteps = "output_steps";
-        constexpr char const* outputFieldsString = "output_fields_string";
-        constexpr char const* controlFieldsString = "control_fields_string";
+        constexpr char const* timeStep = "timeStep";
+        constexpr char const* numberOfSteps = "numberOfSteps";
+        constexpr char const* firstSimulationStep = "firstSimulationStep";
+        constexpr char const* aseSteps = "aseSteps";
+        constexpr char const* prePump = "prePump";
+        constexpr char const* executionMode = "executionMode";
+        constexpr char const* outputSteps = "outputSteps";
+        constexpr char const* outputFieldsString = "outputFieldsString";
+        constexpr char const* controlFieldsString = "controlFieldsString";
         constexpr char const* legacyOutputFields = "output_fields";
         constexpr char const* legacyControlFields = "control_fields";
-        constexpr char const* timeIntegrator = "time_integrator";
-        constexpr char const* implicitIterations = "implicit_iterations";
-        constexpr char const* implicitTolerance = "implicit_tolerance";
-        constexpr char const* pumpSchemaVersion = "pump_schema_version";
-        constexpr char const* pumpRayCount = "pump_ray_count";
-        constexpr char const* pumpRngSeed = "pump_rng_seed";
-        constexpr char const* pumpSourceTotalPower = "pump_source_total_power";
-        constexpr char const* pumpSourceSurfaceOffsets = "pump_source_surface_offsets";
-        constexpr char const* pumpSourceSurfaces = "pump_source_surfaces";
-        constexpr char const* pumpSpectrumOffsets = "pump_spectrum_offsets";
-        constexpr char const* pumpSpectrumWavelengths = "pump_spectrum_wavelengths";
-        constexpr char const* pumpSpectrumWeights = "pump_spectrum_weights";
-        constexpr char const* pumpSpectrumSigmaAbsorption = "pump_spectrum_sigma_absorption";
-        constexpr char const* pumpSpectrumSigmaEmission = "pump_spectrum_sigma_emission";
-        constexpr char const* pumpAngularOffsets = "pump_angular_offsets";
-        constexpr char const* pumpAngularPolar = "pump_angular_polar";
-        constexpr char const* pumpAngularAzimuthal = "pump_angular_azimuthal";
-        constexpr char const* pumpAngularWeights = "pump_angular_weights";
-        constexpr char const* pumpProfileKind = "pump_profile_kind";
-        constexpr char const* pumpProfileRadiusU = "pump_profile_radius_u";
-        constexpr char const* pumpProfileRadiusV = "pump_profile_radius_v";
-        constexpr char const* pumpProfileExponent = "pump_profile_exponent";
-        constexpr char const* pumpProfileCenter = "pump_profile_center";
-        constexpr char const* pumpProfileAxisU = "pump_profile_axis_u";
-        constexpr char const* pumpProfileAxisV = "pump_profile_axis_v";
-        constexpr char const* pumpSourceRelayOffsets = "pump_source_relay_offsets";
-        constexpr char const* pumpRelayExitOffsets = "pump_relay_exit_offsets";
-        constexpr char const* pumpRelayExitSurfaces = "pump_relay_exit_surfaces";
-        constexpr char const* pumpRelayEntryOffsets = "pump_relay_entry_offsets";
-        constexpr char const* pumpRelayEntrySurfaces = "pump_relay_entry_surfaces";
-        constexpr char const* pumpRelayFlipU = "pump_relay_flip_u";
-        constexpr char const* pumpRelayFlipV = "pump_relay_flip_v";
-        constexpr char const* pumpRelayRotation = "pump_relay_rotation";
-        constexpr char const* pumpRelayOffset = "pump_relay_offset";
-        constexpr char const* pumpRelayTilt = "pump_relay_tilt";
-        constexpr char const* pumpRelayMagnification = "pump_relay_magnification";
-        constexpr char const* pumpRelayTransmission = "pump_relay_transmission";
+        constexpr char const* timeIntegrator = "timeIntegrator";
+        constexpr char const* implicitIterations = "implicitIterations";
+        constexpr char const* implicitTolerance = "implicitTolerance";
+        constexpr char const* pumpSchemaVersion = "pumpSchemaVersion";
+        constexpr char const* pumpSourceTotalPower = "pumpSourceTotalPower";
+        constexpr char const* pumpSourceRayCount = "pumpSourceRayCount";
+        constexpr char const* pumpSourcePumpSteps = "pumpSourcePumpSteps";
+        constexpr char const* pumpSourceRngSeed = "pumpSourceRngSeed";
+        constexpr char const* pumpSourceSurfaceOffsets = "pumpSourceSurfaceOffsets";
+        constexpr char const* pumpSourceSurfaces = "pumpSourceSurfaces";
+        constexpr char const* pumpSpectrumOffsets = "pumpSpectrumOffsets";
+        constexpr char const* pumpSpectrumWavelengths = "pumpSpectrumWavelengths";
+        constexpr char const* pumpSpectrumWeights = "pumpSpectrumWeights";
+        constexpr char const* pumpSpectrumSigmaAbsorption = "pumpSpectrumSigmaAbsorption";
+        constexpr char const* pumpSpectrumSigmaEmission = "pumpSpectrumSigmaEmission";
+        constexpr char const* pumpAngularOffsets = "pumpAngularOffsets";
+        constexpr char const* pumpAngularPolar = "pumpAngularPolar";
+        constexpr char const* pumpAngularAzimuthal = "pumpAngularAzimuthal";
+        constexpr char const* pumpAngularWeights = "pumpAngularWeights";
+        constexpr char const* pumpProfileKind = "pumpProfileKind";
+        constexpr char const* pumpProfileRadiusU = "pumpProfileRadiusU";
+        constexpr char const* pumpProfileRadiusV = "pumpProfileRadiusV";
+        constexpr char const* pumpProfileExponent = "pumpProfileExponent";
+        constexpr char const* pumpProfileCenter = "pumpProfileCenter";
+        constexpr char const* pumpProfileAxisU = "pumpProfileAxisU";
+        constexpr char const* pumpProfileAxisV = "pumpProfileAxisV";
+        constexpr char const* pumpSourceRelayOffsets = "pumpSourceRelayOffsets";
+        constexpr char const* pumpRelayExitOffsets = "pumpRelayExitOffsets";
+        constexpr char const* pumpRelayExitSurfaces = "pumpRelayExitSurfaces";
+        constexpr char const* pumpRelayEntryOffsets = "pumpRelayEntryOffsets";
+        constexpr char const* pumpRelayEntrySurfaces = "pumpRelayEntrySurfaces";
+        constexpr char const* pumpRelayFlipU = "pumpRelayFlipU";
+        constexpr char const* pumpRelayFlipV = "pumpRelayFlipV";
+        constexpr char const* pumpRelayRotation = "pumpRelayRotation";
+        constexpr char const* pumpRelayOffset = "pumpRelayOffset";
+        constexpr char const* pumpRelayTilt = "pumpRelayTilt";
+        constexpr char const* pumpRelayMagnification = "pumpRelayMagnification";
+        constexpr char const* pumpRelayTransmission = "pumpRelayTransmission";
     } // namespace field
 
     constexpr char const* OPENPMD_SST_CONFIG = R"(
@@ -1444,9 +1445,9 @@ namespace hase::openpmd
         core::SimulationRunControl run;
         run.timeStep = attributeOr<double>(iteration, field::timeStep, 0.0);
         run.numberOfSteps = attributeOr<unsigned>(iteration, field::numberOfSteps, 0u);
-        run.enableAse = attributeOr<bool>(iteration, field::enableAse, true);
+        run.firstSimulationStep = attributeOr<unsigned>(iteration, field::firstSimulationStep, 0u);
+        run.aseSteps = attributeOr<unsigned>(iteration, field::aseSteps, 0u);
         run.prePump = attributeOr<bool>(iteration, field::prePump, false);
-        run.pumpSteps = attributeOr<unsigned>(iteration, field::pumpSteps, std::numeric_limits<unsigned>::max());
         run.executionMode
             = attributeOr<std::string>(iteration, field::executionMode, core::SimulationExecutionMode::AUTONOMOUS);
         if(iteration.containsAttribute(field::outputSteps))
@@ -1467,16 +1468,17 @@ namespace hase::openpmd
         if(iteration.containsAttribute(field::pumpSchemaVersion))
         {
             run.pump.schemaVersion = attributeOr<unsigned>(iteration, field::pumpSchemaVersion, 0u);
-            if(run.pump.schemaVersion != 1u)
+            if(run.pump.schemaVersion != 2u)
             {
                 validationError(
                     field::pumpSchemaVersion,
-                    "expected general pump schema version 1; legacy one-dimensional pump attributes are unsupported");
+                    "expected general pump schema version 2 with per-source sampling and activity controls");
             }
-            run.pump.rayCount = attribute<unsigned>(iteration, field::pumpRayCount);
-            run.pump.rngSeed = attribute<unsigned>(iteration, field::pumpRngSeed);
 
             auto const sourcePower = attribute<std::vector<double>>(iteration, field::pumpSourceTotalPower);
+            auto const sourceRayCount = unsignedVectorAttribute(iteration, field::pumpSourceRayCount);
+            auto const sourcePumpSteps = unsignedVectorAttribute(iteration, field::pumpSourcePumpSteps);
+            auto const sourceRngSeed = unsignedVectorAttribute(iteration, field::pumpSourceRngSeed);
             auto const sourceSurfaceOffsets = unsignedVectorAttribute(iteration, field::pumpSourceSurfaceOffsets);
             auto const sourceSurfacesFlat = unsignedVectorAttribute(iteration, field::pumpSourceSurfaces);
             auto const spectrumOffsets = unsignedVectorAttribute(iteration, field::pumpSpectrumOffsets);
@@ -1512,7 +1514,9 @@ namespace hase::openpmd
             auto const relayTransmission
                 = attributeOr<std::vector<double>>(iteration, field::pumpRelayTransmission, {});
 
-            if(sourcePower.empty() || sourceSurfaceOffsets.size() != sourcePower.size() + 1u
+            if(sourcePower.empty() || sourceRayCount.size() != sourcePower.size()
+               || sourcePumpSteps.size() != sourcePower.size() || sourceRngSeed.size() != sourcePower.size()
+               || sourceSurfaceOffsets.size() != sourcePower.size() + 1u
                || spectrumOffsets.size() != sourcePower.size() + 1u || angularOffsets.size() != sourcePower.size() + 1u
                || sourceRelayOffsets.size() != sourcePower.size() + 1u || profileKind.size() != sourcePower.size()
                || profileRadiusU.size() != sourcePower.size() || profileRadiusV.size() != sourcePower.size()
@@ -1537,6 +1541,9 @@ namespace hase::openpmd
             {
                 auto& source = run.pump.sources[sourceIndex];
                 source.totalPower = sourcePower[sourceIndex];
+                source.rayCount = sourceRayCount[sourceIndex];
+                source.pumpSteps = sourcePumpSteps[sourceIndex];
+                source.rngSeed = sourceRngSeed[sourceIndex];
                 for(auto value :
                     offsetSlice(sourceSurfacesFlat, sourceSurfaceOffsets, sourceIndex, field::pumpSourceSurfaces))
                     source.surfaces.push_back(static_cast<int>(value));

@@ -20,7 +20,6 @@ from HASEonGPU import (
     Heun,
     ImplicitEuler,
     Midpoint,
-    MonteCarloPumpSolver,
     PhiASE,
     Pump,
     PumpSpectrum,
@@ -38,9 +37,12 @@ from pyInclude.openpmd import transport
 def fakeCppSimulation(monkeypatch, smallTopology):
     captured = []
 
-    def make_state(step, simulation, pump_steps):
+    def make_state(step, simulation):
         volume_shape = (smallTopology.numberOfTriangles, smallTopology.levels - 1)
-        pump_active = pump_steps is None or step <= pump_steps
+        simulation_step = simulation.current_step + step - 1
+        pump_active = any(
+            simulation_step < source.pumpSteps for source in simulation.pump.sources
+        )
         fields = set(simulation.outputFields)
         return SimpleNamespace(
             step=step,
@@ -60,7 +62,6 @@ def fakeCppSimulation(monkeypatch, smallTopology):
         simulation,
         *,
         steps,
-        pumpSteps=None,
         transport=None,
         command_prefix=None,
         workspace_dir=None,
@@ -69,7 +70,6 @@ def fakeCppSimulation(monkeypatch, smallTopology):
         call = {
             "simulation": simulation,
             "steps": steps,
-            "pumpSteps": pumpSteps,
             "transport": transport,
         }
         if command_prefix is not None:
@@ -82,7 +82,7 @@ def fakeCppSimulation(monkeypatch, smallTopology):
             if simulation.executionMode == "synchronized-debug" or simulation.outputSteps is None
             else simulation.outputSteps
         )
-        states = [make_state(step, simulation, pumpSteps) for step in emitted_steps]
+        states = [make_state(step, simulation) for step in emitted_steps]
         if on_state is not None:
             for state in states:
                 on_state(state)
@@ -93,11 +93,11 @@ def fakeCppSimulation(monkeypatch, smallTopology):
 
 
 def realPhiAse(crossSections, *, openpmdBackend="adios"):
-    return PhiASE(spectralProperties=crossSections, openpmdBackend=openpmdBackend)
+    return PhiASE(spectralProperties=crossSections, openpmdBackend=openpmdBackend, ase_steps=100)
 
 
 def configuredSimulation(pumpSetup, **kwargs):
-    return Simulation(pump_solver=pumpSetup.solver, **kwargs).add_pump(
+    return Simulation(**kwargs).add_pump(
         pumpSetup.physical, injection_method=pumpSetup.injector
     )
 
@@ -116,14 +116,13 @@ def testCompiledSimulationDelegatesRunStepsToCppTransport(
         time_step_size=1e-5,
     )
 
-    simulation.runSteps(1, pumpSteps=0)
+    simulation.runSteps(1)
 
     state = simulation.getLastState()
     assert fakeCppSimulation == [
         {
             "simulation": simulation,
             "steps": 1,
-            "pumpSteps": 0,
             "transport": "adios",
         }
     ]
@@ -248,8 +247,6 @@ def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
     gain_medium = GainMedium(topology).withPhysicalProperties(
         betaVolume=np.array([0.1]),
         claddingCellTypes=np.array([0], dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=np.zeros((1, 2)),
         nTot=2.76e20,
         crystalTFluo=9.5e-4,
         claddingNumber=1,
@@ -270,6 +267,7 @@ def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
         adaptiveSteps=1,
         rngSeed=1234,
         useReflections=False,
+        ase_steps=2,
     )
     simulation = configuredSimulation(
         pumpProperties,
@@ -281,7 +279,7 @@ def testCompiledSimulationMpiRanksShareOneDeviceAndAdvanceAse(
         output_steps=(2,),
     )
 
-    simulation.runSteps(2, pumpSteps=1)
+    simulation.runSteps(2)
 
     state = simulation.getLastState()
     assert state.step == 2
@@ -314,7 +312,7 @@ def testTimeSteppedSimulationRunsCallbacksFromEveryDefaultSnapshot(
     assert seen[-1].betaVolume.shape == (2, 2)
 
 
-def testPublicStepCanLimitPumpContribution(
+def testPumpOwnsItsContributionDuration(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
@@ -328,21 +326,19 @@ def testPublicStepCanLimitPumpContribution(
         time_step_size=1e-5,
     ).on_step(seen.append)
 
-    simulation.step(3, pump_steps=1)
+    simulation.step(3)
 
-    assert fakeCppSimulation[-1]["pumpSteps"] == 1
     assert np.any(seen[0].dndt_pump > 0.0)
     assert np.allclose(seen[1].dndt_pump, 0.0)
     assert np.allclose(seen[2].dndt_pump, 0.0)
 
 
-def testInternalRunUsesPumpSolverMaxStepsByDefault(
+def testInternalRunUsesPumpActivityWindow(
     fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
     crossSections,
 ):
-    pumpProperties.solver = replace(pumpProperties.solver, max_steps=1)
     simulation = configuredSimulation(pumpProperties,
         gain_medium=smallGainMedium,
         phi_ase=realPhiAse(crossSections),
@@ -353,23 +349,104 @@ def testInternalRunUsesPumpSolverMaxStepsByDefault(
 
     simulation.runSteps(3)
 
-    assert fakeCppSimulation[-1]["pumpSteps"] == 1
+    assert pumpProperties.physical.pump_steps == 1
 
 
-def testPublicStepRejectsNegativePumpSteps(
+def testPumpRejectsNegativePumpSteps(pumpProperties):
+    with pytest.raises(ValueError, match="pump_steps"):
+        replace(pumpProperties.physical, pump_steps=-1)
+
+
+def testSimulationDerivesStepCountFromLongestActivityWindow(
+    fakeCppSimulation,
     smallGainMedium,
     pumpProperties,
     crossSections,
 ):
-    simulation = configuredSimulation(pumpProperties,
+    setup = SimpleNamespace(
+        physical=replace(pumpProperties.physical, pump_steps=3),
+        injector=pumpProperties.injector,
+    )
+    simulation = configuredSimulation(
+        setup,
         gain_medium=smallGainMedium,
-        phi_ase=realPhiAse(crossSections),
+        phi_ase=PhiASE(spectralProperties=crossSections, openpmdBackend="adios", ase_steps=5),
         time_integrator=ExponentialEuler(),
         time_step_size=1e-5,
     )
 
-    with pytest.raises(ValueError, match="pump_steps"):
-        simulation.step(1, pump_steps=-1)
+    simulation.step()
+
+    assert fakeCppSimulation[-1]["steps"] == 5
+
+
+def testZeroActivityCountsDisablePumpAndAse(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    setup = SimpleNamespace(
+        physical=replace(pumpProperties.physical, pump_steps=0),
+        injector=pumpProperties.injector,
+    )
+    seen = []
+    simulation = configuredSimulation(
+        setup,
+        gain_medium=smallGainMedium,
+        phi_ase=PhiASE(spectralProperties=crossSections, openpmdBackend="adios", ase_steps=0),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+        simulation_steps=2,
+    ).on_step(seen.append)
+
+    simulation.step()
+
+    assert len(seen) == 2
+    assert all(np.allclose(state.dndt_pump, 0.0) for state in seen)
+
+
+def testDisabledActivitiesRequireExplicitSimulationSteps(
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    setup = SimpleNamespace(
+        physical=replace(pumpProperties.physical, pump_steps=0),
+        injector=pumpProperties.injector,
+    )
+    simulation = configuredSimulation(
+        setup,
+        gain_medium=smallGainMedium,
+        phi_ase=PhiASE(spectralProperties=crossSections, openpmdBackend="adios", ase_steps=0),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    )
+
+    with pytest.raises(ValueError, match="simulation_steps is required"):
+        simulation.step()
+
+
+def testPumpActivityDoesNotRestartAcrossStepCalls(
+    fakeCppSimulation,
+    smallGainMedium,
+    pumpProperties,
+    crossSections,
+):
+    seen = []
+    simulation = configuredSimulation(
+        pumpProperties,
+        gain_medium=smallGainMedium,
+        phi_ase=realPhiAse(crossSections),
+        time_integrator=ExponentialEuler(),
+        time_step_size=1e-5,
+    ).on_step(seen.append)
+
+    simulation.step(1)
+    simulation.step(1)
+
+    assert np.any(seen[0].dndt_pump > 0.0)
+    assert np.allclose(seen[1].dndt_pump, 0.0)
 
 
 def testStepCallbackPassesStateBeforeUserArguments(
@@ -567,19 +644,20 @@ def testSurfacePumpInjectorRejectsEmptyDomains():
         SurfacePumpInjector(())
 
 
-def testMonteCarloPumpSolverValidatesDedicatedRayControls(pumpProperties):
+def testPumpValidatesDedicatedRayControls(pumpProperties):
     with pytest.raises(ValueError, match="ray_count"):
-        replace(pumpProperties.solver, ray_count=0)
+        replace(pumpProperties.physical, ray_count=0)
     with pytest.raises(ValueError, match="uint32"):
-        replace(pumpProperties.solver, seed=2**32)
+        replace(pumpProperties.physical, rng_seed=2**32)
 
 
-def testPhysicalPumpIsSeparateFromInjectionAndSolver(pumpProperties):
+def testPhysicalPumpIsSeparateFromInjectionAndOwnsSampling(pumpProperties):
     assert pumpProperties.physical.total_power == 1.0
     assert pumpProperties.physical.spectrum.weights.tolist() == [1.0]
     assert pumpProperties.physical.angular_distribution.weights.tolist() == [1.0]
     assert pumpProperties.injector.surface_domains == (1,)
-    assert pumpProperties.solver.ray_count == 256
+    assert pumpProperties.physical.ray_count == 256
+    assert pumpProperties.physical.pump_steps == 1
 
 
 def testTimeIntegrationSolverIsMandatory(
@@ -620,8 +698,6 @@ def testTimeIntegrationSolversCanStepSimulation(
         medium = GainMedium(topology=smallTopology).withPhysicalProperties(
             betaVolume=np.zeros((smallTopology.numberOfTriangles, smallTopology.levels - 1)),
             claddingCellTypes=np.zeros(smallTopology.numberOfTriangles, dtype=np.uint32),
-            refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-            reflectivities=np.zeros((smallTopology.numberOfTriangles, 2)),
             nTot=2.76e20,
             crystalTFluo=9.5e-4,
             claddingNumber=1,
@@ -652,13 +728,13 @@ def testPicmiStyleStepDefaultsToOneStep(
         phi_ase=realPhiAse(crossSections),
         time_integrator=ExponentialEuler(),
         time_step_size=1e-5,
-        max_steps=2,
+        simulation_steps=2,
     )
 
     assert simulation.step() is simulation
-    assert simulation.current_step == 1
-    assert fakeCppSimulation[-1]["steps"] == 1
-    assert simulation.get_last_state().step == 1
+    assert simulation.current_step == 2
+    assert fakeCppSimulation[-1]["steps"] == 2
+    assert simulation.get_last_state().step == 2
 
 
 def testSimulationCanRegisterMultiplePhysicalPumps(

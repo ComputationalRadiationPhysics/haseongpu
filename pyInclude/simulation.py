@@ -21,7 +21,6 @@ from .geometry import GainMedium
 from .laser import (
     CrossSectionData,
     LaserProperties,
-    MonteCarloPumpSolver,
     PlanarPumpRelay,
     Pump,
     SpectralDecomposition,
@@ -173,6 +172,8 @@ class PhiASE:
     """Inclusive last flattened beta sample processed by ASE."""
     rngSeed: int | None = None
     """Optional RNG seed for reproducible Monte Carlo sampling."""
+    ase_steps: int | None = None
+    """Outer steps that include ASE; ``None`` or zero disables ASE in ``Simulation``."""
 
     _result: object | None = field(default=None, init=False, repr=False)
     _openpmdSession: object | None = field(default=None, init=False, repr=False)
@@ -183,6 +184,11 @@ class PhiASE:
         elif isinstance(self.config, dict):
             self._applyConfig(self.config)
 
+        if self.ase_steps is not None:
+            if isinstance(self.ase_steps, bool) or not isinstance(self.ase_steps, (int, np.integer)):
+                raise TypeError("PhiASE.ase_steps must be an integer or None")
+            if self.ase_steps < 0:
+                raise ValueError("PhiASE.ase_steps must be non-negative")
         self._syncCrossSections()
 
     def _syncCrossSections(self):
@@ -279,6 +285,39 @@ class PhiASE:
         return data
 
     def _applyConfig(self, config):
+        if config.get("schema_version") == 2:
+            simulation = config.get("simulation")
+            if not isinstance(simulation, dict) or not isinstance(simulation.get("phi_ase"), dict):
+                raise ValueError("schema-v2 PhiASE YAML requires simulation.phi_ase")
+            section = simulation["phi_ase"]
+            aliases = {
+                "min_rays": "minRays",
+                "max_rays": "maxRays",
+                "propagation_mode": "propagationMode",
+                "forward_ray_count": "forwardRayCount",
+                "relative_standard_error_threshold": "relativeStandardErrorThreshold",
+                "reflection_max_iterations": "reflectionMaxIterations",
+                "reflection_tolerance": "reflectionTolerance",
+                "surface_reservoir_size": "surfaceReservoirSize",
+                "adaptive_steps": "adaptiveSteps",
+                "use_reflections": "useReflections",
+                "openpmd_backend": "openpmdBackend",
+                "parallel_mode": "parallelMode",
+                "num_devices": "numDevices",
+                "n_per_node": "nPerNode",
+                "min_sample_range": "minSampleRange",
+                "max_sample_range": "maxSampleRange",
+                "rng_seed": "rngSeed",
+            }
+            unchanged = {"repetitions", "monochromatic", "backend", "ase_steps"}
+            unknown = sorted(set(section) - set(aliases) - unchanged - {"cross_sections"})
+            if unknown:
+                raise ValueError(f"unsupported simulation.phi_ase options: {unknown}")
+            for name, value in section.items():
+                if name != "cross_sections":
+                    setattr(self, aliases.get(name, name), value)
+            return self
+
         sections = []
         for key in ("phiASE", "phi_ase", "experiment", "compute"):
             value = config.get(key)
@@ -507,11 +546,12 @@ class Simulation:
     """High-level Python wrapper for compiled C++/Alpaka simulation runs.
 
     Python sends the initial setup to the compiled backend and receives
-    ``TimeStepState`` snapshots after completed steps. Register ``on_init`` for
-    one-time Python setup before launch and ``on_step`` for snapshot consumers.
-    Autonomous runs never call Python between backend steps. Synchronized-debug
-    runs additionally allow ``before_step`` callbacks to update explicitly
-    selected control fields between steps.
+    ``TimeStepState`` snapshots after completed steps. ``on_init`` prepares the
+    initial state before step 1, ``on_step`` consumes selected completed-step
+    snapshots, and ``before_step`` updates selected control fields between two
+    steps. Autonomous runs never call Python between backend steps.
+    Synchronized-debug runs call ``before_step`` after each nonfinal
+    ``on_step`` callback and before allowing the next backend step to begin.
     """
 
     gainMedium: GainMedium
@@ -521,10 +561,8 @@ class Simulation:
     timeStep: float
     crossSections: CrossSectionData | None
     endTime: float | None
-    enableASE: bool
+    simulationSteps: int | None
     prePump: bool
-    pumpSolver: MonteCarloPumpSolver
-    maxSteps: int | None
     reportTimings: bool
     executionMode: str
     outputSteps: tuple[int, ...] | None
@@ -546,11 +584,9 @@ class Simulation:
         phi_ase,
         time_integrator,
         time_step_size,
-        pump_solver=None,
         cross_sections=None,
-        max_steps=None,
+        simulation_steps=None,
         max_time=None,
-        enable_ase=True,
         pre_pump=False,
         report_timings=False,
         execution_mode="autonomous",
@@ -565,10 +601,8 @@ class Simulation:
         self.timeStep = float(time_step_size)
         self.crossSections = cross_sections
         self.endTime = max_time
-        self.enableASE = bool(enable_ase)
+        self.simulationSteps = None if simulation_steps is None else int(simulation_steps)
         self.prePump = bool(pre_pump)
-        self.pumpSolver = MonteCarloPumpSolver() if pump_solver is None else pump_solver
-        self.maxSteps = None if max_steps is None else int(max_steps)
         self.reportTimings = bool(report_timings)
         self.executionMode = str(execution_mode)
         self.outputSteps = None if output_steps is None else tuple(int(step) for step in output_steps)
@@ -586,6 +620,13 @@ class Simulation:
         self._lastState = None
         self.__post_init__()
 
+    @classmethod
+    def from_yaml(cls, filename):
+        """Construct a simulation object graph from schema-v2 YAML."""
+        from .configuration import simulation_from_yaml
+
+        return simulation_from_yaml(filename, simulation_cls=cls)
+
     def __post_init__(self):
         if self.timeIntegrationSolver is None:
             raise ValueError("Simulation requires a time_integrator")
@@ -593,10 +634,10 @@ class Simulation:
             raise ValueError("Simulation requires a compiled time integrator name or descriptor with a .name attribute")
         if self.timeStep <= 0.0:
             raise ValueError("time_step_size must be positive")
-        if not isinstance(self.pumpSolver, MonteCarloPumpSolver):
-            raise TypeError("pump_solver must be MonteCarloPumpSolver")
-        if self.maxSteps is not None and self.maxSteps <= 0:
-            raise ValueError("max_steps must be positive")
+        if self.simulationSteps is not None and self.simulationSteps <= 0:
+            raise ValueError("simulation_steps must be positive")
+        if self.simulationSteps is not None and self.endTime is not None:
+            raise ValueError("configure either simulation_steps or max_time, not both")
         if self.executionMode not in {"autonomous", "synchronized-debug"}:
             raise ValueError("execution_mode must be 'autonomous' or 'synchronized-debug'")
         if self.outputSteps is not None and not self.outputSteps:
@@ -662,12 +703,12 @@ class Simulation:
                     angularDistribution=physical.angular_distribution,
                     profile=physical.profile,
                     relays=registered_relays,
+                    rayCount=int(physical.ray_count),
+                    pumpSteps=0 if physical.pump_steps is None else int(physical.pump_steps),
+                    rngSeed=int(physical.rng_seed),
                 )
                 for physical, injector, registered_relays in self._pumpRegistrations
             ),
-            rayCount=self.pumpSolver.ray_count,
-            rngSeed=self.pumpSolver.seed,
-            pumpSteps=self.pumpSolver.max_steps,
         )
         if self.crossSections is None:
             self.crossSections = self._resolveSpectralProperties()
@@ -686,9 +727,12 @@ class Simulation:
         omitted, the callback runs after every completed step. An explicit
         ``output_steps`` schedule restricts it to those snapshots.
 
-        Use this hook for logging, VTK output, or explicit state retention.
-        Callback return values are ignored. The method returns ``self`` so
-        registrations can be chained.
+        State arrays are copies and changing them does not update the backend.
+        With a streaming openPMD backend, callbacks run as snapshots arrive;
+        with a file backend, they run after the compiled process finishes. Use
+        this hook for logging, output, or explicit state retention. Callback
+        return values are ignored. The method returns ``self`` so registrations
+        can be chained.
         """
         self._step_callbacks.append((callback, args, kwargs))
         return self
@@ -698,25 +742,32 @@ class Simulation:
 
         The callback signature is ``callback(simulation, *args, **kwargs)``.
         ``Simulation`` supplies the live simulation object as the first
-        argument, then appends the user arguments passed to ``on_init``. The hook
-        runs once, immediately before the first step is evaluated.
+        argument, then appends the user arguments passed to ``on_init``. The
+        hook runs once, immediately before the first compiled run. Use it to
+        modify the initial state consumed by step 1; it does not run again for
+        later calls to ``step`` on the same object.
 
-        Use this hook to initialize or normalize mutable simulation inputs such
-        as ``gainMedium``, ``pump``, ``phiASE``, or ``timeStep``. Callback return
-        values are ignored. The method returns ``self`` for chaining.
+        Callback return values are ignored. The method returns ``self`` for
+        chaining.
         """
         self._init_callbacks.append((callback, args, kwargs))
         return self
 
     def before_step(self, callback, *args, **kwargs):
-        """Register a synchronized-debug control callback.
+        """Register a synchronized-debug callback that runs between steps.
 
-        The callback receives the live ``Simulation`` after a completed debug
-        snapshot and before the next step, so it runs after every nonfinal step.
-        It may update fields named in ``control_fields``; currently
-        ``beta_volume`` is supported. Autonomous runs reject this callback
-        because their C++ loop never contacts Python. Synchronized-debug emits
-        every step and does not accept ``output_steps``.
+        The callback signature is ``callback(simulation, *args, **kwargs)``.
+        It first runs after step 1: Python has called ``on_step`` for the
+        completed snapshot, then calls ``before_step`` to prepare selected
+        ``control_fields`` before step 2 starts. It repeats after every
+        nonfinal step and is not called after the final step. Use ``on_init``
+        to modify state before step 1.
+
+        This hook requires ``execution_mode="synchronized-debug"`` and a
+        streaming openPMD backend. Currently ``beta_volume`` is the only
+        supported control field. Synchronized-debug emits every step and does
+        not accept ``output_steps``. Callback return values are ignored. The
+        method returns ``self`` for chaining.
         """
         self._before_step_callbacks.append((callback, args, kwargs))
         return self
@@ -733,13 +784,12 @@ class Simulation:
             self.step(steps)
         return self
 
-    def runSteps(self, steps, pumpSteps=None, *, openpmdSession=None):
+    def runSteps(self, steps, *, openpmdSession=None):
         """Run exactly ``steps`` compiled C++/Alpaka time steps and return ``self``.
 
-        Internal transport helper. ``pumpSteps`` limits pump contribution to
-        the first compiled steps and defaults to the registered pump solver. The complete time loop is
-        executed by the C++ backend; Python only sends the initial setup and
-        receives streamed snapshots.
+        Internal transport helper. Each registered pump and ``PhiASE`` owns its
+        activity window. The complete time loop is executed by the C++ backend;
+        Python only sends the initial setup and receives streamed snapshots.
         """
         if openpmdSession not in (None, "interval"):
             raise ValueError("compiled Simulation owns its C++ openPMD lifetime; openpmdSession is no longer supported")
@@ -754,10 +804,6 @@ class Simulation:
         if self.pump is None:
             raise ValueError("Simulation requires at least one pump registered with add_pump")
         self._run_init_callbacks()
-        if pumpSteps is None:
-            pumpSteps = getattr(self.pump, "pumpSteps", None)
-        if pumpSteps is not None and int(pumpSteps) < 0:
-            raise ValueError("pumpSteps must be non-negative")
         _validate_launch_backends(self.phiASE)
 
         previous_step = self._step
@@ -814,7 +860,6 @@ class Simulation:
         states = transport.runSimulation(
             self,
             steps=steps,
-            pumpSteps=pumpSteps,
             transport=self.phiASE.openpmdBackend,
             on_state=consume_raw_state,
             **self.phiASE._transportLaunchOptions(),
@@ -839,13 +884,31 @@ class Simulation:
                 print(f"HASE frontend callback timing: {callback_name}={seconds:.6f}s")
         return self
 
-    def step(self, nsteps=1, *, pump_steps=None):
+    def _derived_simulation_steps(self):
+        activity_steps = [0 if self.phiASE.ase_steps is None else int(self.phiASE.ase_steps)]
+        activity_steps.extend(
+            0 if pump.pump_steps is None else int(pump.pump_steps)
+            for pump, _injector, _relays in self._pumpRegistrations
+        )
+        derived = max(activity_steps, default=0)
+        if derived <= 0:
+            raise ValueError(
+                "simulation_steps is required when all pump_steps and ase_steps are disabled"
+            )
+        return derived
+
+    def step(self, nsteps=None):
         """Advance ``nsteps`` time steps, following the PICMI call pattern."""
+        if nsteps is None:
+            if self.simulationSteps is not None:
+                nsteps = self.simulationSteps
+            elif self.endTime is not None:
+                return self.run_until()
+            else:
+                nsteps = self._derived_simulation_steps()
         if int(nsteps) <= 0:
             raise ValueError("nsteps must be positive")
-        if pump_steps is not None and int(pump_steps) < 0:
-            raise ValueError("pump_steps must be non-negative")
-        self.runSteps(int(nsteps), pumpSteps=pump_steps)
+        self.runSteps(int(nsteps))
         return self
 
     def get_last_state(self):
@@ -876,24 +939,16 @@ class Simulation:
         return self.timeStep
 
     @property
-    def pump_solver(self):
-        return self.pumpSolver
-
-    @property
     def cross_sections(self):
         return self.crossSections
 
     @property
-    def enable_ase(self):
-        return self.enableASE
+    def simulation_steps(self):
+        return self.simulationSteps
 
     @property
     def pre_pump(self):
         return self.prePump
-
-    @property
-    def max_steps(self):
-        return self.maxSteps
 
     @property
     def max_time(self):

@@ -475,11 +475,14 @@ class SuperGaussianPumpProfile:
 
 @dataclass(frozen=True)
 class Pump:
-    """Physical pump definition, independent of its numerical injection method."""
+    """Physical pump source and its independent Monte Carlo sampling budget."""
 
     total_power: float
     spectrum: PumpSpectrum
     cross_sections: CrossSectionData
+    ray_count: int
+    pump_steps: int | None = None
+    rng_seed: int = 5489
     profile: object = field(default_factory=UniformPumpProfile)
     angular_distribution: PumpAngularDistribution = field(default_factory=PumpAngularDistribution.collimated)
     name: str | None = None
@@ -491,6 +494,19 @@ class Pump:
             raise TypeError("pump spectrum must be PumpSpectrum")
         if not isinstance(self.cross_sections, CrossSectionData):
             raise TypeError("pump cross_sections must be CrossSectionData")
+        if isinstance(self.ray_count, bool) or not isinstance(self.ray_count, (int, np.integer)):
+            raise TypeError("pump ray_count must be an integer")
+        if self.ray_count <= 0:
+            raise ValueError("pump ray_count must be positive")
+        if self.pump_steps is not None:
+            if isinstance(self.pump_steps, bool) or not isinstance(self.pump_steps, (int, np.integer)):
+                raise TypeError("pump pump_steps must be an integer or None")
+            if self.pump_steps < 0:
+                raise ValueError("pump pump_steps must be non-negative")
+        if isinstance(self.rng_seed, bool) or not isinstance(self.rng_seed, (int, np.integer)):
+            raise TypeError("pump rng_seed must be an integer")
+        if self.rng_seed < 0 or self.rng_seed >= 2**32:
+            raise ValueError("pump rng_seed must fit uint32")
         if not isinstance(self.angular_distribution, PumpAngularDistribution):
             raise TypeError("pump angular_distribution must be PumpAngularDistribution")
         if not isinstance(self.profile, (UniformPumpProfile, SuperGaussianPumpProfile)):
@@ -506,6 +522,9 @@ class GaussianPump(Pump):
         total_power,
         spectrum,
         cross_sections,
+        ray_count,
+        pump_steps=None,
+        rng_seed=5489,
         waist,
         exponent=2.0,
         center=(0.0, 0.0, 0.0),
@@ -521,6 +540,9 @@ class GaussianPump(Pump):
             total_power=total_power,
             spectrum=spectrum,
             cross_sections=cross_sections,
+            ray_count=ray_count,
+            pump_steps=pump_steps,
+            rng_seed=rng_seed,
             profile=SuperGaussianPumpProfile(
                 radius_u=radii[0],
                 radius_v=radii[1],
@@ -557,7 +579,12 @@ class SurfacePumpInjector:
 
 @dataclass(frozen=True)
 class PlanarPumpRelay:
-    """Affine re-imaging link between tagged planar boundary surfaces."""
+    """Affine return link between tagged planar boundary surfaces.
+
+    ``transmission`` is the fraction of ray power retained through the relay
+    mapping. It is relay throughput, not transmission through the gain-medium
+    boundary. The mapped ray is injected inward through the entry surface.
+    """
 
     exit_domains: object
     entry_domains: object
@@ -568,6 +595,7 @@ class PlanarPumpRelay:
     tilt: tuple[float, float] = (0.0, 0.0)
     magnification: float = 1.0
     transmission: float = 1.0
+    """Dimensionless relay throughput; one means lossless return reinjection."""
 
     def __post_init__(self):
         exit_domains = (self.exit_domains,) if isinstance(self.exit_domains, (str, int)) else tuple(self.exit_domains)
@@ -580,6 +608,8 @@ class PlanarPumpRelay:
             raise ValueError("relay requires exit and entry surface domains")
         object.__setattr__(self, "exit_domains", exit_domains)
         object.__setattr__(self, "entry_domains", entry_domains)
+        object.__setattr__(self, "offset", tuple(float(value) for value in self.offset))
+        object.__setattr__(self, "tilt", tuple(float(value) for value in self.tilt))
         if self.magnification <= 0.0:
             raise ValueError("relay magnification must be positive")
         if self.transmission < 0.0 or self.transmission > 1.0:
@@ -605,24 +635,8 @@ class PlanarPumpRelay:
 
     @classmethod
     def retroreflect(cls, domains, *, transmission=1.0):
+        """Return rays through the same domains with the retained-power fraction."""
         return cls(domains, domains, transmission=transmission)
-
-
-@dataclass(frozen=True)
-class MonteCarloPumpSolver:
-    """Numerical controls shared by pumps registered on a simulation."""
-
-    ray_count: int = 100_000
-    seed: int = 5489
-    max_steps: int | None = None
-
-    def __post_init__(self):
-        if self.ray_count <= 0:
-            raise ValueError("MonteCarloPumpSolver.ray_count must be positive")
-        if self.seed < 0 or self.seed >= 2**32:
-            raise ValueError("MonteCarloPumpSolver.seed must fit uint32")
-        if self.max_steps is not None and self.max_steps < 0:
-            raise ValueError("MonteCarloPumpSolver.max_steps must be non-negative")
 
 
 @dataclass(frozen=True)
@@ -636,6 +650,9 @@ class _PumpSource:
     angularDistribution: PumpAngularDistribution
     profile: object
     relays: tuple[PlanarPumpRelay, ...]
+    rayCount: int
+    pumpSteps: int
+    rngSeed: int
 
 
 @dataclass(frozen=True)
@@ -643,9 +660,6 @@ class _PumpProperties:
     """CamelCase compiled-transport pump graph."""
 
     sources: tuple[_PumpSource, ...]
-    rayCount: int
-    rngSeed: int
-    pumpSteps: int | None
 
 
 def integrate_pump_profile(topology, surface_domains, profile):

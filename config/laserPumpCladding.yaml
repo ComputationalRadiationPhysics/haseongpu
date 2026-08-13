@@ -1,0 +1,220 @@
+# Complete laserPumpCladding configuration for Simulation.from_yaml().
+# Paths are resolved relative to this file. Unknown keys are rejected.
+schema_version: 2
+
+# Named material spectra can be referenced by PhiASE and physical pumps below.
+cross_sections:
+  ase:
+    from_directory:
+      # Four input tables: lambda_a.txt, sigma_a.txt, lambda_e.txt, sigma_e.txt.
+      # Wavelength tables use nm; cross-section tables use cm^2.
+      path: ../example/input
+      # Number of samples in the numerical spectrum passed to the ASE backend.
+      resolution: 1000
+  pump:
+    monochromatic:
+      # Pump wavelength [m].
+      wavelength: 9.40e-7
+      # Absorption and emission cross sections at the pump wavelength [cm^2].
+      cross_section_absorption: 7.7796e-21
+      cross_section_emission: 1.949e-21
+
+simulation:
+  gain_medium:
+    topology:
+      from_file:
+        # Tet4 point coordinates in this VTK file are in metres [m].
+        path: ../example/data/ptTet4.vtk
+        # Supported file formats: vtk, gmsh, stl.
+        format: vtk
+    # Domain numbers are dimensionless mesh labels. "where" also accepts
+    # explicit cell_indices or a gmsh_name/gmsh_tag assignment.
+    cell_domains:
+      - domain: 1
+        name: gain_medium
+        where: all
+    # Later surface assignments override earlier ones. This first labels every
+    # exterior face as cladding, then gives the two z planes dedicated labels.
+    surface_domains:
+      - domain: 3
+        name: cladding
+        where: all_exterior
+      - domain: 1
+        name: ase_bottom
+        where: z_min
+      - domain: 2
+        name: ase_top
+        where: z_max
+    properties:
+      # Active-ion concentration [cm^-3].
+      n_tot: 2.776e20
+      # Fluorescence lifetime [s].
+      fluorescence_lifetime: 9.41e-4
+      # Dimensionless cell-type label that selects the cladding model.
+      cladding_number: 1
+      # Cladding absorption coefficient [cm^-1].
+      cladding_absorption: 5.5
+    # All optics values are dimensionless. reflectivity is the constant
+    # non-TIR reflected-power fraction in [0, 1]; n_inside and n_outside are
+    # refractive indices used to test for total internal reflection (TIR).
+    surface_optics:
+      ase_bottom:
+        # Zero coating reflectivity does not disable TIR: the 1.83-to-1.0
+        # interface still reflects rays above the critical angle.
+        reflectivity: 0.0
+        n_inside: 1.83
+        n_outside: 1.0
+      ase_top:
+        reflectivity: 0.0
+        n_inside: 1.83
+        n_outside: 1.0
+      cladding:
+        reflectivity: 0.0
+        n_inside: 1.0
+        n_outside: 1.0
+  # Monte Carlo ASE estimator, schedule, reflection, compute, and transport.
+  phi_ase:
+    # Name of the full ASE spectrum defined under cross_sections.
+    cross_sections: ase
+    # Outer steps that include ASE [count]. null or 0 disables ASE. With no
+    # explicit simulation_steps, the run length is derived from this value and
+    # the largest pump_steps value.
+    ase_steps: 150
+    # Supported propagation modes: forward (currently the only option).
+    propagation_mode: forward
+    # Initial and maximum global ASE ray-history counts [rays]. Adaptive
+    # batches grow between these limits unless forward_ray_count is supplied.
+    min_rays: 10000
+    max_rays: 1000000
+    # Target relative standard error [fraction]; 0.1 requests 10%. This is
+    # Monte Carlo sampling uncertainty, not discretization or model error.
+    relative_standard_error_threshold: 0.1
+    # Independent estimator repetitions [count] and maximum adaptive count
+    # increases between min_rays and max_rays [count].
+    repetitions: 4
+    adaptive_steps: 4
+    # Enable specular surface reflection using surface_optics above.
+    use_reflections: true
+    # Maximum surface-reservoir passes after the direct pass [count].
+    reflection_max_iterations: 40
+    # Stop when remaining reflected source weight / direct source weight is
+    # below this dimensionless fraction.
+    reflection_tolerance: 1.0e-4
+    # Maximum weighted reflected-source records retained per boundary face.
+    surface_reservoir_size: 32
+    # false integrates the full ASE spectrum; true uses its first sample only.
+    monochromatic: false
+    # Alpaka compute backend. Available values are runtime-dependent; inspect
+    # HASEonGPU.AlpakaBackends.all() for the installed runtime.
+    backend: Host_Cpu_CpuOmpBlocks
+    # openPMD transport: auto | adios | adios-sst | hdf5. Provider support may
+    # restrict the available choices; adios-sst is the streaming transport.
+    openpmd_backend: auto
+    # Process layout: single | mpi. MPI uses num_devices per node and
+    # n_per_node ranks per node; both values are positive integer counts.
+    parallel_mode: single
+    num_devices: 1
+    n_per_node: 1
+
+  # Physical pump sources and their independent numerical controls.
+  pumps:
+    # Each pump owns its sampling budget, RNG seed, and active duration.
+    - # Aperture-integrated optical power [W]. This equals the API example's
+      # 16,000 W/m^2 peak power density integrated over the tagged aperture.
+      total_power: 110127.28516598798
+      # Equal-power histories launched for this source evaluation [rays].
+      ray_count: 50000
+      # Initial outer steps that include this pump [count]. null or 0 disables
+      # only this pump without changing other pumps, ASE, or callbacks.
+      pump_steps: 50
+      # Reproducible unsigned 32-bit Monte Carlo seed [dimensionless integer].
+      rng_seed: 5489
+      # Name of the pump-specific cross section defined above.
+      cross_sections: pump
+      spectrum:
+        # Spectrum forms: monochromatic: wavelength [m], or matching
+        # wavelengths [m] and dimensionless weights arrays.
+        monochromatic: 9.40e-7
+      angular_distribution:
+        # Distribution forms: collimated, uniform_cone, or discrete. Cone and
+        # discrete polar/azimuthal angles are in radians [rad].
+        collimated: {}
+      profile:
+        # Profile kinds: uniform | super_gaussian.
+        kind: super_gaussian
+        # Elliptical 1/e profile radii in the mesh coordinate unit [m here].
+        radius_u: 1.5
+        radius_v: 1.5
+        # Dimensionless super-Gaussian exponent.
+        exponent: 40
+        # World-space centre [m] and dimensionless orthonormal axes.
+        center: [0.0, 0.0, 0.0]
+        axis_u: [1.0, 0.0, 0.0]
+        axis_v: [0.0, 1.0, 0.0]
+      injection:
+        # One surface-domain name or a list; this uses SurfacePumpInjector.
+        surface_domains: ase_bottom
+      relays:
+        # Each entry is one finite PlanarPumpRelay pass, not an unlimited
+        # optical cavity. This identity map returns rays through ase_top once.
+        - exit_domains: ase_top
+          entry_domains: ase_top
+          flip_u: false
+          flip_v: false
+          # In-plane rotation [rad].
+          rotation: 0.0
+          # Local aperture offset in the mesh coordinate unit [m here].
+          offset: [0.0, 0.0]
+          # Direction-cosine offsets in the relay's local (u, v) frame
+          # [dimensionless].
+          tilt: [0.0, 0.0]
+          # Dimensionless image scale; must be positive.
+          magnification: 1.0
+          # Relay throughput/return efficiency in [0, 1], not transmission
+          # through the gain-medium boundary. 1.0 means every exiting pump ray
+          # is reinjected inward through ase_top without relay loss.
+          transmission: 1.0
+
+  time_integrator:
+    # Supported methods: explicit_euler | heun | midpoint | runge_kutta4 |
+    # frozen_phi_ase_runge_kutta4 | implicit_euler | exponential_euler.
+    # implicit_euler additionally accepts iterations and tolerance.
+    method: frozen_phi_ase_runge_kutta4
+  # Duration of one outer simulation step [s].
+  time_step_size: 2.0e-5
+  # Total outer steps [count]. Configure simulation_steps or max_time [s],
+  # never both. If both are omitted, the run uses
+  # max(phi_ase.ase_steps, pumps[*].pump_steps). It may be longer than every
+  # active source so on_step/before_step callbacks continue afterward.
+  simulation_steps: 150
+  # Suppress ASE on outer step 1. Use this when the first pump step should seed
+  # excitation before ASE starts. This is a simulation sequencing rule, not a
+  # property of PhiASE or an individual pump.
+  pre_pump: true
+  # Request backend timing records in addition to normal progress reporting.
+  report_timings: false
+  # Execution modes: autonomous | synchronized-debug.
+  # autonomous is the normal asynchronous mode. With adios-sst, selected
+  # snapshots can reach Python while the backend is active; file transports
+  # are read after backend completion. synchronized-debug requires adios-sst,
+  # emits every step, and waits for Python control before continuing.
+  execution_mode: autonomous
+  # null emits a snapshot for every completed step. Otherwise use a strictly
+  # increasing list of one-based completed steps, for example [50, 150].
+  # synchronized-debug requires null/omitted output_steps because every step
+  # is a synchronization boundary.
+  output_steps: null
+  # Snapshot arrays copied to Python for on_step callbacks. Supported values:
+  # beta_volume, phi_ase, standard_error, relative_standard_error, total_rays,
+  # dndt_ase, and dndt_pump.
+  output_fields:
+    - beta_volume
+    - phi_ase
+    - standard_error
+    - relative_standard_error
+    - total_rays
+    - dndt_ase
+    - dndt_pump
+  # Fields Python may send back in synchronized-debug mode. The only current
+  # option is beta_volume; autonomous runs normally leave this empty.
+  control_fields: []

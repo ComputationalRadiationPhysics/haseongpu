@@ -6,7 +6,7 @@
 
 
 import numpy as np
-from HASEonGPU import GainMedium, Grid, MeshTopology, backendFlat
+from HASEonGPU import GainMedium, Grid, MeshTopology
 from pyInclude.openpmd import PrimitiveFieldSpec, PrismSchema
 
 
@@ -73,8 +73,6 @@ def test_gainMediumOwnsPhysicalProperties():
         .withPhysicalProperties(
             betaVolume=np.ones((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
             claddingCellTypes=np.zeros(2, dtype=np.uint32),
-            refractiveIndices=np.array([1.8, 1.0, 1.8, 1.0], dtype=np.float32),
-            reflectivities=backendFlat(np.ones(4, dtype=np.float32)),
             nTot=5.0,
             crystalTFluo=1.23,
             claddingNumber=2,
@@ -99,19 +97,19 @@ def test_gainMediumPhysicalPropertiesAreDiscoverableAndAssignable():
     gainMedium = GainMedium(topology=topology)
 
     betaVolume = gainMedium.get("betaVolume")
-    refractiveIndices = gainMedium.get("refractiveIndicies")
-
     assert betaVolume.expectedShape == (2, 8)
     assert betaVolume.dtype == np.dtype(np.float64)
-    assert refractiveIndices.name == "refractiveIndices"
-    assert refractiveIndices.expectedShape == (4,)
 
     betaVolume.value = np.ones(betaVolume.expectedShape)
-    refractiveIndices.value = [1.8, 1.0, 1.8, 1.0]
 
     assert gainMedium.physical["betaVolume"].shape == (16,)
-    assert np.allclose(gainMedium.get("refractiveIndices").value, [1.8, 1.0, 1.8, 1.0])
-    assert any(item["name"] == "reflectivities" for item in gainMedium.listProperties())
+    assert not {
+        "refractiveIndices",
+        "reflectivities",
+        "surfaceReflectivity",
+        "surfaceRefractiveIndexInside",
+        "surfaceRefractiveIndexOutside",
+    } & {item["name"] for item in gainMedium.listProperties()}
 
 
 
@@ -140,7 +138,6 @@ def test_primitiveElementsAssignFieldsAndExposeMetadata():
         prism.betaVolume = 0.5
     for triangle in medium.getTriangles():
         triangle.claddingGroup = 7
-        triangle.reflectivities = [0.1, 0.2]
 
     np.testing.assert_array_equal(
         medium.get("betaVolume").value.reshape(medium.get("betaVolume").expectedShape, order="F"),
@@ -150,11 +147,6 @@ def test_primitiveElementsAssignFieldsAndExposeMetadata():
         medium.get("claddingCellTypes").value.reshape(medium.get("claddingCellTypes").expectedShape, order="F"),
         np.full(medium.get("claddingCellTypes").expectedShape, 7, dtype=np.uint32),
     )
-    np.testing.assert_array_equal(
-        medium.get("reflectivities").value.reshape(medium.get("reflectivities").expectedShape, order="F"),
-        np.tile(np.array([[0.1, 0.2]], dtype=np.float32), (medium.numberOfTriangles, 1)),
-    )
-
     prism = next(iter(medium.getPrisms()))
     fields = {field.name: field for field in prism.getFields()}
     assert fields["betaVolume"].meta()["entity"] == "cell_layer"

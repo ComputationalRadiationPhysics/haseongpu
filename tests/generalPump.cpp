@@ -93,6 +93,9 @@ namespace
     hase::core::PumpSourceParameters uniformSource(unsigned const surface)
     {
         hase::core::PumpSourceParameters source;
+        source.rayCount = 1u;
+        source.pumpSteps = 1u;
+        source.rngSeed = 5489u;
         source.surfaces = {static_cast<int>(surface)};
         source.totalPower = 80.0;
         source.wavelengths = {900e-9, 1000e-9};
@@ -281,6 +284,49 @@ TEST_CASE("pump relay preparation encodes physical exit and entry surfaces", "[p
 }
 
 TEMPLATE_LIST_TEST_CASE(
+    "general pump prepares independent source ray counts and activity windows",
+    "[pump][backend][source-controls]",
+    TestBackends)
+{
+    auto const backend = TestType::makeDict();
+    auto deviceSelector = alpaka::onHost::makeDeviceSelector(backend[alpaka::object::deviceSpec]);
+    if(!deviceSelector.isAvailable())
+    {
+        SUCCEED("No device available for " << backend[alpaka::object::deviceSpec].getName());
+        return;
+    }
+    auto device = deviceSelector.makeDevice(0);
+    auto queue = device.makeQueue(alpaka::queueKind::blocking);
+    auto mesh = makeSingleTetMesh();
+
+    auto shortPump = uniformSource(10u);
+    shortPump.rayCount = 7u;
+    shortPump.pumpSteps = 1u;
+    shortPump.rngSeed = 17u;
+    auto longPump = uniformSource(10u);
+    longPump.rayCount = 11u;
+    longPump.pumpSteps = 3u;
+    longPump.rngSeed = 29u;
+    auto disabledPump = uniformSource(999u);
+    disabledPump.rayCount = 13u;
+    disabledPump.pumpSteps = 0u;
+    disabledPump.rngSeed = 41u;
+    hase::core::PumpParameters pump;
+    pump.sources = {shortPump, longPump, disabledPump};
+
+    auto prepared = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump);
+    REQUIRE(prepared.size() == 3u);
+    CHECK(prepared[0].rayCount() == 7u);
+    CHECK(prepared[1].rayCount() == 11u);
+    CHECK(prepared[0].active(0u));
+    CHECK_FALSE(prepared[0].active(1u));
+    CHECK(prepared[1].active(2u));
+    CHECK_FALSE(prepared[1].active(3u));
+    CHECK(prepared[2].rayCount() == 0u);
+    CHECK_FALSE(prepared[2].active(0u));
+}
+
+TEMPLATE_LIST_TEST_CASE(
     "general pump reuses device relay target cache without changing deposition",
     "[pump][backend][integration]",
     TestBackends)
@@ -313,11 +359,10 @@ TEMPLATE_LIST_TEST_CASE(
     relay.transmission = 0.5;
     source.relays = {relay};
     hase::core::PumpParameters pump;
-    pump.rayCount = 512u;
-    pump.rngSeed = 17u;
+    source.rayCount = 512u;
+    source.rngSeed = 17u;
     pump.sources = {source};
-    auto prepared
-        = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
+    auto prepared = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump);
     REQUIRE(prepared.size() == 1u);
 
     hase::kernels::enqueueGeneralPumpIntegrals(
@@ -327,12 +372,13 @@ TEMPLATE_LIST_TEST_CASE(
         prepared,
         betaVolume,
         vertexIntegral,
+        0u,
         hase::kernels::pumpRelayPolicy);
     auto const firstVertexValues = copyDoubleBuffer(queue, vertexIntegral);
     auto const cacheValues = copyUnsignedBuffer(queue, prepared.front().cacheState());
     REQUIRE(firstVertexValues.size() == mesh.numberOfMeshPoints);
     CHECK(std::accumulate(firstVertexValues.cbegin(), firstVertexValues.cend(), 0.0) > 0.0);
-    CHECK(std::count(cacheValues.begin(), cacheValues.end(), 1u) == pump.rayCount);
+    CHECK(std::count(cacheValues.begin(), cacheValues.end(), 1u) == source.rayCount);
 
     hase::kernels::enqueueGeneralPumpIntegrals(
         devBundle,
@@ -341,6 +387,7 @@ TEMPLATE_LIST_TEST_CASE(
         prepared,
         betaVolume,
         vertexIntegral,
+        0u,
         hase::kernels::pumpRelayPolicy);
     auto const repeatedVertexValues = copyDoubleBuffer(queue, vertexIntegral);
     REQUIRE(repeatedVertexValues.size() == firstVertexValues.size());
@@ -404,11 +451,10 @@ TEMPLATE_LIST_TEST_CASE(
     source.sigmaAbsorption = {1.0e-20};
     source.sigmaEmission = {0.0};
     hase::core::PumpParameters pump;
-    pump.rayCount = 1024u;
-    pump.rngSeed = 42u;
+    source.rayCount = 1024u;
+    source.rngSeed = 42u;
     pump.sources = {source};
-    auto prepared
-        = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
+    auto prepared = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump);
 
     hase::kernels::enqueueGeneralPump(
         devBundle,
@@ -418,7 +464,8 @@ TEMPLATE_LIST_TEST_CASE(
         betaVolume,
         vertexIntegral,
         lumpedVertexVolume,
-        cellRate);
+        cellRate,
+        0u);
 
     auto const vertices = copyDoubleBuffer(queue, vertexIntegral);
     auto const rates = copyDoubleBuffer(queue, cellRate);
@@ -461,14 +508,13 @@ TEMPLATE_LIST_TEST_CASE(
     returnPass.transmission = 0.8;
     source.relays = {returnPass};
     hase::core::PumpParameters pump;
-    pump.rayCount = 4096u;
-    pump.rngSeed = 71u;
+    source.rayCount = 4096u;
+    source.rngSeed = 71u;
     pump.sources = {source};
 
     auto runOneStep = [&](auto boundaryPolicy)
     {
-        auto prepared
-            = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump, 0u, pump.rayCount);
+        auto prepared = hase::kernels::prepareGeneralPumpDeviceSources<decltype(device)>(queue, mesh, pump);
         auto betaVolume = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.1});
         auto vertexIntegral = hase::alpakaUtils::toDevice(queue, std::vector<double>(mesh.numberOfMeshPoints, 0.0));
         auto lumpedVertexVolume = hase::alpakaUtils::toDevice(queue, hase::kernels::makeLumpedGainVertexVolumes(mesh));
@@ -482,6 +528,7 @@ TEMPLATE_LIST_TEST_CASE(
             vertexIntegral,
             lumpedVertexVolume,
             cellRate,
+            0u,
             boundaryPolicy);
 
         auto beta = hase::alpakaUtils::toDevice(queue, std::vector<double>{0.1});
