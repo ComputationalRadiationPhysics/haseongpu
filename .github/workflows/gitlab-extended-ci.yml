@@ -1,0 +1,35 @@
+name: GitLab extended CI
+
+# Configure "Require approval for all external contributors" under
+# Settings > Actions > General. The bridge starts with the approved CI run, so
+# one maintainer approval gates both GitHub and GitLab computation.
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - in_progress
+
+permissions:
+  contents: read
+
+jobs:
+  gitlab-extended-ci:
+    name: GitLab extended CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HASE_GITLAB_TRIGGER_TOKEN: ${{ secrets.HASE_GITLAB_TRIGGER_TOKEN }}
+      HASE_GITLAB_READ_API_TOKEN: ${{ secrets.HASE_GITLAB_READ_API_TOKEN }}
+      HASE_GITLAB_PROJECT_ID: ${{ vars.HASE_GITLAB_PROJECT_ID }}
+      HASE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      HASE_SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+      HASE_SOURCE_REF: ${{ github.event.workflow_run.head_branch }}
+      HASE_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || '' }}
+      HASE_GITHUB_RUN_URL: ${{ github.event.workflow_run.html_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Trigger GitLab extended CI and wait
+        run: python3 script/ci/run-gitlab-extended-ci.py
