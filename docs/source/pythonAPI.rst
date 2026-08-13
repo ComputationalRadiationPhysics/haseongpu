@@ -57,7 +57,6 @@ Spectra, pump, and ASE
    GaussianPump
    SurfacePumpInjector
    PlanarPumpRelay
-   MonteCarloPumpSolver
    integrate_pump_profile
    PhiASE
 

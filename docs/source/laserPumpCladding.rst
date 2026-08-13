@@ -1,9 +1,11 @@
 laserPumpCladding Tutorial
 ==========================
 
-This tutorial follows ``example/laserPumpCladding.py`` from material data to a
-time-dependent pump-and-ASE result. It introduces one concept at a time and
-links to the corresponding concept or reference page for details.
+This tutorial follows ``example/laserPumpCladdingApi.py`` from material data to
+a time-dependent pump-and-ASE result. The equivalent
+``example/laserPumpCladdingYaml.py`` constructs the same public objects from
+``config/laserPumpCladding.yaml``. The configuration includes comments for
+units, supported choices, scheduling, and reflection behavior.
 
 The example models a cylindrical Tet4 gain medium. A collimated 940 nm pump
 enters through the bottom surface, traverses the volume, and is returned once
@@ -19,10 +21,11 @@ repository root:
 
 .. code-block:: bash
 
-   python3 example/laserPumpCladding.py \
+   python3 example/laserPumpCladdingApi.py \
        --backend Host_Cpu_CpuSerial \
-       --timeSteps 3 \
-       --pumpSteps 3 \
+       --simulation-steps 3 \
+       --pump-steps 3 \
+       --ase-steps 3 \
        --pump-ray-count 1000 \
        --rng-seed 1234 \
        --pump-rng-seed 5489 \
@@ -32,6 +35,20 @@ repository root:
 runtime. ``--openpmd-backend`` is a separate storage/streaming choice. See
 :doc:`backendSelection` for the distinction and :doc:`openpmdTransport` for the
 storage backends.
+
+To use only declarative configuration, edit a copy of
+``config/laserPumpCladding.yaml`` and run:
+
+.. code-block:: bash
+
+   python3 example/laserPumpCladdingYaml.py \
+       --config config/laserPumpCladding.yaml \
+       --vtk-output-dir output
+
+The YAML entry point accepts only the configuration path and output locations.
+Backend, time-step, pump-ray, seed, and physics values are set in the YAML, not
+as launcher options. The API entry point exposes command-line controls for the
+model assembled directly in Python.
 
 The default output schedule writes every completed step, producing
 ``output/laserPumpCladding_001.vtk`` through
@@ -127,7 +144,7 @@ described in :doc:`Volume topology <python_interface/topology>`.
        crystalTFluo=9.41e-4,
        claddingNumber=1,
        claddingAbsorption=5.5,
-   ).withSurfaceOptics({
+   ).with_surface_optics({
        "ase_bottom": SurfaceOptics(
            reflectivity=0.0, n_inside=1.83, n_outside=1.0
        ),
@@ -151,21 +168,25 @@ field contract and :doc:`theoryAndModel` for the gain equation.
 Configure ASE
 -------------
 
-The example reads adaptive sampling, reflection, compute, openPMD, and MPI
-controls from ``config/hase-phiase.yaml``:
+The API example constructs adaptive sampling, reflection, scheduling, compute,
+openPMD, and MPI controls directly:
 
 .. code-block:: python
 
-   phiAse = PhiASE.fromYaml(
-       phiAseConfigPath,
+   phiAse = PhiASE(
        spectralProperties=spectralProperties,
-       **AseOverride,
+       minRays=10_000,
+       maxRays=1_000_000,
+       useReflections=True,
+       ase_steps=150,
+       backend="Host_Cpu_CpuOmpBlocks",
+       openpmdBackend="auto",
    )
 
-Command-line backend and seed values override the corresponding YAML settings.
-Geometry and excitation are not duplicated in the YAML; they remain in
-``medium`` and are supplied when the simulation runs. The estimator and its
-uncertainty controls are described in :doc:`PhiASE
+``ase_steps=None`` and ``ase_steps=0`` both disable ASE in a time-stepped
+simulation. A positive value enables ASE through that outer step. The shipped
+API and YAML examples both enable ASE surface reflections for 150 steps.
+The estimator and its uncertainty controls are described in :doc:`PhiASE
 <python_interface/phi_ase>`.
 
 Describe the physical pump
@@ -191,21 +212,25 @@ aperture-integrated power expected by ``Pump.total_power``:
        total_power=16e3 * profileArea,
        spectrum=PumpSpectrum.monochromatic(pumpWavelength),
        cross_sections=pumpCrossSections,
+       ray_count=50_000,
+       pump_steps=50,
+       rng_seed=5489,
        angular_distribution=PumpAngularDistribution.collimated(),
        profile=pumpProfile,
    )
 
-``Pump`` contains physical source properties. It does not decide where rays
-enter or how many rays approximate the source. Those numerical and geometrical
-choices are attached when the simulation is assembled. See :doc:`Pump
-configuration <python_interface/pump_properties>` for other spectra, angular
-distributions, profiles, and relay transforms.
+Each ``Pump`` owns its sampling budget, reproducibility seed, and active outer
+steps. This permits independently sampled pumps with different durations.
+``pump_steps=None`` and ``pump_steps=0`` disable that pump. The injector still
+owns the geometric launch location. See :doc:`Pump configuration
+<python_interface/pump_properties>` for other spectra, angular distributions,
+profiles, and relay transforms.
 
 Assemble the simulation
 -----------------------
 
-``Simulation`` combines the medium, ASE estimator, spectra, time integrator, and
-pump sampling controls:
+``Simulation`` combines the medium, ASE estimator, spectra, and time integrator,
+and owns only the outer-loop horizon:
 
 .. code-block:: python
 
@@ -214,14 +239,9 @@ pump sampling controls:
        phi_ase=phiAse,
        time_integrator=FrozenPhiAseRungeKutta4(),
        time_step_size=2e-5,
-       pump_solver=MonteCarloPumpSolver(
-           ray_count=pumpRayCount,
-           seed=pumpRngSeed,
-           max_steps=pumpSteps,
-       ),
+       simulation_steps=150,
        cross_sections=spectralProperties,
-       enable_ase=enableASE,
-       pre_pump=prePump,
+       pre_pump=True,
        output_steps=(
            None
            if outputSteps is None
@@ -235,15 +255,19 @@ pump sampling controls:
 
 ``SurfacePumpInjector`` launches the pump on the named bottom faces.
 ``PlanarPumpRelay.retroreflect("ase_top")`` represents one explicit return pass
-through the top aperture. It is not an unlimited resonator, coating model, or
-Fresnel calculation. ASE reflection is a separate ``PhiASE`` process using the
+through the top aperture. Relay ``transmission`` is the retained power fraction
+through that return mapping; it is not transmission through the gain-medium
+boundary. A value of one reinjects every exiting pump ray inward without relay
+loss. The relay is not an unlimited resonator, coating model, or Fresnel
+calculation. ASE reflection is a separate ``PhiASE`` process using the
 ``SurfaceOptics`` fields.
 
-``MonteCarloPumpSolver.ray_count`` controls equal-power pump histories per
-source evaluation. Its ``max_steps`` limits the outer simulation steps that
-include the pump. ``simulation.step(timeSlices)`` controls the total number of
-outer steps, so the run can continue with ASE and fluorescence after pumping
-stops. With ``output_steps`` omitted, the backend emits every completed step
+``Simulation.simulation_steps`` may be longer or shorter than any pump or ASE
+activity window. If it and ``max_time`` are omitted, ``simulation.step()`` uses
+the maximum ``Pump.pump_steps`` and ``PhiASE.ase_steps``. An explicitly longer
+run continues fluorescence evolution and ``on_step``/``before_step`` callbacks
+after pump and ASE stop. With
+``output_steps`` omitted, the backend emits every completed step
 and the registered callbacks write one VTK snapshot per step. Use
 ``--output-steps`` to select explicit one-based completed-step indices when
 only part of the trajectory is needed. For example, ``--output-steps 150``
@@ -251,8 +275,8 @@ writes only the final snapshot of a 150-step run.
 
 ``FrozenPhiAseRungeKutta4`` evaluates PhiASE once per RK4 step and reuses it for
 the remaining RK stages, while the pump term is still evaluated at each stage.
-The resulting population equation and the behavior of ``pre_pump`` and
-``enable_ase`` are described in :doc:`Pump and Time Stepping
+The resulting population equation and the behavior of ``pre_pump`` are
+described in :doc:`Pump and Time Stepping
 <theoryAndModel>`.
 
 Read and write results
@@ -270,7 +294,7 @@ The example registers callbacks before starting the compiled run:
        spectralProperties,
        medium.get("nTot").value,
    )
-   simulation.step(timeSlices)
+   simulation.step()
    state = simulation.get_last_state()
 
 ``on_step`` runs once for each snapshot selected by ``output_steps``. It does
@@ -303,7 +327,7 @@ then performs one forward PhiASE evaluation:
 
 .. code-block:: bash
 
-   python3 example/laserPumpCladding.py \
+   python3 example/laserPumpCladdingApi.py \
        --phiase-only \
        --tet4-input prepared-state.vtk \
        --backend Host_Cpu_CpuSerial \
@@ -322,14 +346,10 @@ Execution and configuration
    Print the generated option synopsis and exit.
 
 ``--backend BACKEND``
-   Alpaka compute backend. The default ``UseConfig`` keeps the YAML value.
+   Alpaka compute backend. Default: ``Host_Cpu_CpuOmpBlocks``.
 
 ``--openpmd-backend BACKEND``
-   openPMD storage backend. The default ``UseConfig`` keeps the YAML value; use
-   ``auto`` to select a compatible installed backend automatically.
-
-``--phi-ase-config PATH``
-   PhiASE run-control YAML. Defaults to ``config/hase-phiase.yaml``.
+   openPMD storage backend. Default: ``auto``.
 
 ``--timings``
    Print frontend time spent in compiled transport and decoding, snapshot
@@ -339,26 +359,23 @@ Execution and configuration
 Time and physics controls
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``--timeSteps N``
+``--simulation-steps N``
    Total outer simulation steps. Default: ``150``.
 
 ``--output-steps STEP [STEP ...]``
    One-based completed-step indices to emit. If omitted, emit every completed
    step.
 
-``--pumpSteps N``
-   Initial outer steps that include pump transport. Default: ``100``. Set it to
-   ``timeSteps`` to pump for the complete run.
+``--pump-steps N``
+   Initial outer steps that include this pump. Default: ``50``. Zero disables
+   the pump.
 
-``--disable-ase``
-   Evolve pump excitation and fluorescence without ASE transport or depletion.
+``--ase-steps N``
+   Initial outer steps that include ASE. Default: ``150``. Zero disables ASE.
 
 ``--disable-pre-pump``
    Enable ASE during the first pumped step. By default, the first step seeds
    excitation with pump and fluorescence before the first ASE evaluation.
-
-``--disable-reflections``
-   Override the PhiASE configuration and disable ASE surface reflections.
 
 ``--spectral-resolution N``
    Numerical spectral-table resolution passed to the ASE backend. Default:

@@ -101,7 +101,7 @@ assignment to a set of faces:
 
    from HASEonGPU import GainMedium, SurfaceOptics
 
-   medium = GainMedium(topology).withSurfaceOptics({
+   medium = GainMedium(topology).with_surface_optics({
        "pump_input": SurfaceOptics(
            reflectivity=0.0, n_inside=1.83, n_outside=1.0
        )

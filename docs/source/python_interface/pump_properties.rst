@@ -1,15 +1,15 @@
 Pump configuration
 ==================
 
-The pump API separates four concerns that are easy to conflate:
+The pump API separates three concerns that are easy to conflate:
 
-* ``Pump`` describes a physical source;
+* ``Pump`` describes a physical source and owns its independent sampling and
+  activity controls;
 * ``SurfacePumpInjector`` selects the boundary through which it enters;
-* ``PlanarPumpRelay`` describes an optional finite return path;
-* ``MonteCarloPumpSolver`` controls numerical ray sampling and its seed.
+* ``PlanarPumpRelay`` describes an optional finite return path.
 
-This composition lets several physical pumps share one numerical solver while
-using different spectra, profiles, directions, and launch surfaces.
+This composition lets several pumps use different ray counts, seeds, active
+durations, spectra, profiles, directions, and launch surfaces.
 
 Physical source
 ---------------
@@ -28,6 +28,9 @@ and angular distributions:
        total_power=16_000.0,
        spectrum=PumpSpectrum.monochromatic(940e-9),
        cross_sections=pump_cross_sections,
+       ray_count=50_000,
+       pump_steps=50,
+       rng_seed=5489,
        angular_distribution=PumpAngularDistribution.collimated(),
        profile=profile,
    )
@@ -61,24 +64,14 @@ The domain assignment belongs to ``VolumeTopology``; the injector gives that
 geometry a pump-specific role. Repeated ``add_pump`` calls register multiple
 sources before the simulation is initialized.
 
-Numerical sampling
-------------------
+Numerical sampling and activity
+-------------------------------
 
-The solver controls are shared by all registered pump sources:
-
-.. code-block:: python
-
-   pump_solver = MonteCarloPumpSolver(
-       ray_count=50_000,
-       seed=5489,
-       max_steps=100,
-   )
-
-``ray_count`` is the number of equal-power histories launched for each source
-evaluation. ``seed`` makes pump sampling reproducible. ``max_steps`` limits the
-initial outer simulation steps that include pump transport; it is not a limit
-on how many Tet4 cells one ray may traverse. ``Simulation.step`` independently
-selects the total number of outer time steps.
+``Pump.ray_count`` is the number of equal-power histories launched for that
+source evaluation. ``Pump.rng_seed`` makes its sampling reproducible without
+coupling results to registration order. ``Pump.pump_steps`` selects the initial
+outer steps that include that source; ``None`` and zero disable it. The duration
+is not a limit on how many Tet4 cells one ray may traverse.
 
 Power normalization
 -------------------
@@ -101,6 +94,8 @@ profile over the actual tagged surface before constructing the pump:
        total_power=peak_power_density * profile_area,
        spectrum=pump_spectrum,
        cross_sections=pump_cross_sections,
+       ray_count=50_000,
+       pump_steps=50,
        profile=profile,
    )
 
@@ -126,8 +121,11 @@ domains. A simple return from the same aperture is:
    )
 
 General relays support flips, in-plane rotation, offset, tilt, magnification,
-scalar transmission, and aperture vignetting. The ordered tuple represents a
-finite number of explicit passes. It does not create an unlimited cavity.
+scalar transmission, and aperture vignetting. ``transmission`` is relay
+throughput: the retained power fraction applied while mapping the exiting ray
+back to an entry surface. It is not transmission through the gain-medium
+boundary. The ordered tuple represents a finite number of explicit passes. It
+does not create an unlimited cavity.
 
 Transport model
 ---------------
@@ -140,6 +138,6 @@ smoothing and returned to one value per cell; the evolving excitation remains
 cell-centered.
 
 The gain equation, deposited population rate, temporary projection, and model
-limits are specified once in :ref:`general-monte-carlo-pump`. Relay transmission
+limits are specified once in :ref:`general-monte-carlo-pump`. Relay throughput
 is a configured scalar: the current pump model does not calculate polarization,
 coating response, refraction, or Fresnel transmission.

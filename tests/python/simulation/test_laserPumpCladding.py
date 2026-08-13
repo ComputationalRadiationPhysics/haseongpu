@@ -79,6 +79,32 @@ def testLaserPumpCladdingDefaultConfigEnablesReflections():
     assert phi_ase.useReflections is True
 
 
+def testLaserPumpCladdingPhiAseOverridesReplaceInlineDefaults():
+    phi_ase = laserPumpCladding.buildSimulation(
+        useReflections=False,
+        minRays=1234,
+        maxRays=5678,
+        forwardRayCount=3456,
+        relativeStandardErrorThreshold=0.05,
+        adaptiveSteps=2,
+        rngSeed=99,
+        reflectionMaxIterations=17,
+        reflectionTolerance=0.0,
+        surfaceReservoirSize=16,
+    ).phi_ase
+
+    assert phi_ase.useReflections is False
+    assert phi_ase.minRays == 1234
+    assert phi_ase.maxRays == 5678
+    assert phi_ase.forwardRayCount == 3456
+    assert phi_ase.relativeStandardErrorThreshold == pytest.approx(0.05)
+    assert phi_ase.adaptiveSteps == 2
+    assert phi_ase.rngSeed == 99
+    assert phi_ase.reflectionMaxIterations == 17
+    assert phi_ase.reflectionTolerance == 0.0
+    assert phi_ase.surfaceReservoirSize == 16
+
+
 def testLaserPumpCladdingApiAndYamlBuildEquivalentSimulations():
     api = laserPumpCladding.buildSimulation()
     yaml = laserPumpCladdingYaml.buildSimulation()

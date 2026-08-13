@@ -44,14 +44,6 @@ Built-in fields
    Selected cladding type and its absorption coefficient. The coefficient's
    inverse-length unit must match the geometry length unit.
 
-``surfaceReflectivity``, ``surfaceRefractiveIndexInside``, and ``surfaceRefractiveIndexOutside``
-   Arrays indexed by positive surface-domain id. Prefer
-   ``withSurfaceOptics`` to construct these arrays by domain name.
-
-``refractiveIndices`` and ``reflectivities``
-   Compatibility fields for the planar top/bottom surface layout. Explicit
-   Tet4 boundaries use the domain-indexed surface fields above.
-
 The equations that consume these fields are collected in
 :doc:`../theoryAndModel`; the field-to-symbol table there maps the Python names
 to the ASE, pump, and population-rate equations.
@@ -84,7 +76,7 @@ Surface optics
 
    from HASEonGPU import SurfaceOptics
 
-   medium.withSurfaceOptics({
+   medium.with_surface_optics({
        "input": SurfaceOptics(
            reflectivity=0.0, n_inside=1.83, n_outside=1.0
        ),
@@ -93,11 +85,13 @@ Surface optics
        ),
    })
 
-Names are resolved through ``topology.surfaceDomainMap()``. Index zero is
-unused because physical domain ids are positive. A configured reflectivity of
-zero still permits total internal reflection when ``n_inside`` and ``n_outside``
-make the incident angle supercritical. See :ref:`ase-surface-reflections` for
-the implemented model and its limits.
+Names are resolved through ``topology.surfaceDomainMap()``. ``surface_optics``
+returns the configured ``SurfaceOptics`` values keyed by resolved positive
+domain id. Raw domain-indexed reflectivity and refractive-index arrays are
+private transport data and are not gain-medium properties. A configured
+reflectivity of zero still permits total internal reflection when ``n_inside``
+and ``n_outside`` make the incident angle supercritical. See
+:ref:`ase-surface-reflections` for the implemented model and its limits.
 
 Custom openPMD fields
 ---------------------

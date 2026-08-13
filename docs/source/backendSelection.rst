@@ -59,9 +59,9 @@ From Python, query the same list with ``AlpakaBackends``:
    available = AlpakaBackends.all()
    phi_ase = PhiASE(backend=available[0])
 
-To leave compute selection in the PhiASE YAML file, the
-``laserPumpCladding.py`` command uses its default ``--backend UseConfig``.
-Passing ``--backend`` overrides that YAML value for one run.
+``laserPumpCladdingYaml.py`` reads compute selection only from
+``config/laserPumpCladding.yaml``. ``laserPumpCladdingApi.py`` constructs the
+same value in Python and exposes ``--backend`` for an inline-API run.
 
 Before a single-process ``PhiASE`` or ``Simulation`` run, the Python frontend
 checks the selected compute backend against ``AlpakaBackends.all()`` and reports
