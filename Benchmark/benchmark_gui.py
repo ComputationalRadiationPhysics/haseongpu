@@ -47,6 +47,7 @@ class BenchmarkData:
         self.path = path
         self.rows: list[dict[str, str]] = []
         self.columns: list[str] = []
+        self._grouped_average_cache: dict[tuple[str, str | None], dict[str, dict[str, float]]] = {}
         self.reload()
 
     def reload(self) -> None:
@@ -71,12 +72,17 @@ class BenchmarkData:
 
         self.columns = list(dict.fromkeys(fieldnames))
         self.rows = rows
+        self._grouped_average_cache.clear()
 
     def plottable_columns(self) -> list[str]:
         excluded = {DEFAULT_Y_COLUMN, "EndUnixNs"}
         return [column for column in self.columns if column not in excluded]
 
     def grouped_average(self, x_column: str, label_column: str | None) -> dict[str, dict[str, float]]:
+        cache_key = (x_column, label_column)
+        if cache_key in self._grouped_average_cache:
+            return self._grouped_average_cache[cache_key]
+
         buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
 
         for row in self.rows:
@@ -92,7 +98,9 @@ class BenchmarkData:
         series: dict[str, dict[str, float]] = defaultdict(dict)
         for (label, x_value), values in buckets.items():
             series[label][x_value] = statistics.fmean(values)
-        return dict(series)
+        result = dict(series)
+        self._grouped_average_cache[cache_key] = result
+        return result
 
 
 class BenchmarkGui(tk.Tk):
@@ -111,6 +119,7 @@ class BenchmarkGui(tk.Tk):
         self.label_filter_menu: tk.Menu | None = None
         self.label_filter_button: ttk.Menubutton | None = None
         self._updating_label_filter = False
+        self._suspend_plot = False
 
         self._build_controls()
         self._build_plot()
@@ -159,8 +168,8 @@ class BenchmarkGui(tk.Tk):
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)
 
-        self.x_column.trace_add("write", lambda *_: self.plot())
-        self.unit.trace_add("write", lambda *_: self.plot())
+        self.x_column.trace_add("write", lambda *_: self._plot_if_ready())
+        self.unit.trace_add("write", lambda *_: self._plot_if_ready())
         self.label_column.trace_add("write", lambda *_: self._on_label_column_changed())
 
     def _build_plot(self) -> None:
@@ -193,24 +202,36 @@ class BenchmarkGui(tk.Tk):
             messagebox.showerror("Could not load benchmark CSV", str(exc))
             return
 
-        self.csv_path.set(str(path))
-        columns = self.data.plottable_columns()
-        labels = [NO_LABEL] + columns
-        self.x_combo.configure(values=columns)
-        self.label_combo.configure(values=labels)
+        self._suspend_plot = True
+        try:
+            self.csv_path.set(str(path))
+            columns = self.data.plottable_columns()
+            labels = [NO_LABEL] + columns
+            self.x_combo.configure(values=columns)
+            self.label_combo.configure(values=labels)
 
-        if not self.x_column.get() or self.x_column.get() not in columns:
-            preferred = "Timestamp" if "Timestamp" in columns else columns[0] if columns else ""
-            self.x_column.set(preferred)
-        if self.label_column.get() not in labels:
-            self.label_column.set(NO_LABEL)
-        else:
+            if not self.x_column.get() or self.x_column.get() not in columns:
+                preferred = next(
+                    (candidate for candidate in ("KernelMode", "Timestamp", "Kernel", "Mode") if candidate in columns),
+                    columns[0] if columns else "",
+                )
+                self.x_column.set(preferred)
+            if self.label_column.get() not in labels:
+                self.label_column.set(NO_LABEL)
             self._refresh_label_filter_options()
+        finally:
+            self._suspend_plot = False
 
         self.status.set(f"Loaded {len(self.data.rows)} rows from {path}")
         self.plot()
 
+    def _plot_if_ready(self) -> None:
+        if not self._suspend_plot:
+            self.plot()
+
     def _on_label_column_changed(self) -> None:
+        if self._suspend_plot:
+            return
         self._refresh_label_filter_options()
         self.plot()
 
@@ -304,14 +325,7 @@ class BenchmarkGui(tk.Tk):
         if label_column == NO_LABEL:
             label_column = None
 
-        try:
-            self.data.reload()
-        except Exception as exc:
-            self.status.set(f"Reload failed: {exc}")
-            return
-
         factor = {"ns": 1.0, "us": 1_000.0, "ms": 1_000_000.0, "s": 1_000_000_000.0}[self.unit.get()]
-        self._refresh_label_filter_options()
         grouped = self.data.grouped_average(x_column, label_column)
         selected_labels = self.selected_label_values() if label_column else set()
         if selected_labels:
@@ -331,10 +345,18 @@ class BenchmarkGui(tk.Tk):
             y_values = [grouped[label].get(x_value) for x_value in x_values]
             plot_x = [position for position, value in zip(positions, y_values) if value is not None]
             plot_y = [value / factor for value in y_values if value is not None]
-            self.axis.plot(plot_x, plot_y, marker="o", label=label)
+            marker = "o" if len(plot_x) <= 200 else None
+            self.axis.plot(plot_x, plot_y, marker=marker, label=label)
 
-        self.axis.set_xticks(positions)
-        self.axis.set_xticklabels(x_values, rotation=35, ha="right")
+        max_ticks = 12
+        if len(positions) <= max_ticks:
+            tick_positions = positions
+        else:
+            tick_positions = sorted(
+                {round(index * (len(positions) - 1) / (max_ticks - 1)) for index in range(max_ticks)}
+            )
+        self.axis.set_xticks(tick_positions)
+        self.axis.set_xticklabels((x_values[position] for position in tick_positions), rotation=35, ha="right")
         self.axis.set_xlabel(x_column)
         self.axis.set_ylabel(f"Average duration [{self.unit.get()}]")
         self.axis.grid(True, axis="y", alpha=0.3)
