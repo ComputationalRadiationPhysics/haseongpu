@@ -115,11 +115,11 @@ namespace hase::core
                    != run.controlFields.begin() + index)
                     throw std::runtime_error("simulation control_fields must be unique");
             }
-            if(run.pump.schemaVersion != 1u || run.pump.rayCount == 0u || run.pump.sources.empty())
+            if(run.pump.schemaVersion != 2u || run.pump.sources.empty())
                 throw std::runtime_error("invalid general pump configuration");
             for(auto const& source : run.pump.sources)
-                if(source.totalPower <= 0.0 || source.surfaces.empty() || source.wavelengths.empty()
-                   || source.wavelengths.size() != source.spectralWeights.size()
+                if(source.rayCount == 0u || source.totalPower <= 0.0 || source.surfaces.empty()
+                   || source.wavelengths.empty() || source.wavelengths.size() != source.spectralWeights.size()
                    || source.wavelengths.size() != source.sigmaAbsorption.size()
                    || source.wavelengths.size() != source.sigmaEmission.size() || source.polarAngles.empty()
                    || source.polarAngles.size() != source.azimuthalAngles.size()
@@ -168,12 +168,7 @@ namespace hase::core
             , m_lumpedGainVertexVolume(
                   hase::alpakaUtils::toDevice(m_queue, hase::kernels::makeLumpedGainVertexVolumes(hostMesh)))
             , m_generalPumpSources(
-                  hase::kernels::prepareGeneralPumpDeviceSources<T_Device>(
-                      m_queue,
-                      hostMesh,
-                      m_run.pump,
-                      0u,
-                      m_run.pump.rayCount))
+                  hase::kernels::prepareGeneralPumpDeviceSources<T_Device>(m_queue, hostMesh, m_run.pump))
         {
             if(hostMesh.betaVolume.size() != hostMesh.numberOfCells)
                 throw std::runtime_error("simulation beta_volume must contain exactly one value per cell");
@@ -195,12 +190,15 @@ namespace hase::core
 #endif
             for(unsigned step = 0u; step < m_run.numberOfSteps; ++step)
             {
-                bool const pumpEnabled = step < m_run.pumpSteps;
-                bool const aseEnabled = m_run.enableAse && !(m_run.prePump && step == 0u);
+                unsigned const simulationStep = m_run.firstSimulationStep + step;
+                bool const pumpEnabled = std::ranges::any_of(
+                    m_run.pump.sources,
+                    [simulationStep](auto const& source) { return simulationStep < source.pumpSteps; });
+                bool const aseEnabled = simulationStep < m_run.aseSteps && !(m_run.prePump && simulationStep == 0u);
 #ifdef HASE_ENABLE_STEP_TIMING
                 auto const started = std::chrono::steady_clock::now();
 #endif
-                advanceTimeStep(pumpEnabled, aseEnabled);
+                advanceTimeStep(simulationStep, pumpEnabled, aseEnabled);
 #ifdef HASE_ENABLE_STEP_TIMING
                 alpaka::onHost::wait(m_queue);
                 if(timingCsv)
@@ -252,7 +250,7 @@ namespace hase::core
         };
 
         /** @brief Advance one physical time step through its integration stages on the device. */
-        void advanceTimeStep(bool const pumpEnabled, bool const aseEnabled)
+        void advanceTimeStep(unsigned const simulationStep, bool const pumpEnabled, bool const aseEnabled)
         {
             auto evaluateStage = [&](auto& beta, bool const refreshAse = true)
             {
@@ -273,7 +271,16 @@ namespace hase::core
                         beta,
                         m_vertexPumpIntegral,
                         m_lumpedGainVertexVolume,
-                        m_dndtPump);
+                        m_dndtPump,
+                        simulationStep);
+                }
+                else
+                {
+                    alpaka::onHost::fill(
+                        m_queue,
+                        m_dndtPump,
+                        0.0,
+                        alpaka::Vec{static_cast<std::size_t>(m_mesh.numberOfCells)});
                 }
 
                 if(refreshAse)

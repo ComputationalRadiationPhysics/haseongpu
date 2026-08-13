@@ -313,11 +313,10 @@ def testVolumeTopologyRemapsGmshDomainsByName():
     assert topology.cellDomainNames[9] == "gain"
     assert topology.surfaceDomainNames[11] == "outer"
 
-    medium = GainMedium(topology).withSurfaceOptics(
+    medium = GainMedium(topology).with_surface_optics(
         {"outer": SurfaceOptics(reflectivity=0.5, n_inside=1.4, n_outside=1.0)}
     )
-    assert medium.get("surfaceReflectivity").expectedShape == (12,)
-    assert medium.get("surfaceReflectivity").value[11] == np.float32(0.5)
+    assert medium.surface_optics[11] == SurfaceOptics(reflectivity=0.5, n_inside=1.4, n_outside=1.0)
 
 
 def testGainMediumSurfaceOpticsUsesAssignedSurfaceDomains():
@@ -327,22 +326,17 @@ def testGainMediumSurfaceOpticsUsesAssignedSurfaceDomains():
             {"where": "z_max", "domain": 2},
         ]
     )
-    medium = GainMedium(topology).withSurfaceOptics(
+    medium = GainMedium(topology).with_surface_optics(
         {
             1: SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
             2: SurfaceOptics(reflectivity=0.25, n_inside=1.5, n_outside=1.0),
         }
     )
 
-    np.testing.assert_allclose(medium.get("surfaceReflectivity").value, np.asarray([0.0, 0.0, 0.25], dtype=np.float32))
-    np.testing.assert_allclose(
-        medium.get("surfaceRefractiveIndexInside").value,
-        np.asarray([1.0, 1.83, 1.5], dtype=np.float32),
-    )
-    np.testing.assert_allclose(
-        medium.get("surfaceRefractiveIndexOutside").value,
-        np.asarray([1.0, 1.0, 1.0], dtype=np.float32),
-    )
+    assert medium.surface_optics == {
+        1: SurfaceOptics(reflectivity=0.0, n_inside=1.83, n_outside=1.0),
+        2: SurfaceOptics(reflectivity=0.25, n_inside=1.5, n_outside=1.0),
+    }
 
 
 @pytest.mark.integration
@@ -362,8 +356,6 @@ def testVolumeTopologyImportsClosed3dStlAndRunsBackendOnce(tmp_path, monkeypatch
     medium = GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=np.zeros(topology.numberOfCells, dtype=np.float64),
         claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
-        refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
-        reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),
         nTot=1.0,
         crystalTFluo=1.0,
         claddingNumber=99,

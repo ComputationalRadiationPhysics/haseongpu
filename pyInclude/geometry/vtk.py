@@ -135,8 +135,10 @@ def _tet4TopologyFromUnstructuredGrid(path):
     physical.update(cellData)
     for name in (
         "claddingCellTypes",
-        "refractiveIndices",
-        "reflectivities",
+        "surfaceReflectivity",
+        "surfaceRefractiveIndexInside",
+        "surfaceRefractiveIndexOutside",
+        "surfaceOpticsDomains",
         "nTot",
         "crystalTFluo",
         "claddingNumber",
@@ -238,6 +240,14 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
         metadata={"source": str(path), "format": "vtk", **_structured_metadata_from_vtk(points, physical)},
     )
     medium = gainMediumCls(topology=topology)
+    serialized_optics = {
+        name: physical.pop(name, None)
+        for name in (
+            "surfaceReflectivity",
+            "surfaceRefractiveIndexInside",
+            "surfaceRefractiveIndexOutside",
+        )
+    }
     for name, value in physical.items():
         if name in {"cellDomains", "faceBoundaries", "structuredNumberOfPoints", "structuredNumberOfLevels", "structuredThickness"}:
             continue
@@ -249,6 +259,15 @@ def gainMediumFromVtk(path, topologyCls, gainMediumCls, *, numberOfLevels=None, 
                 medium.set(name, backendFlat(arr.reshape(-1)) if arr.ndim <= 1 else value)
         except KeyError:
             continue
+    if any(value is not None for value in serialized_optics.values()):
+        if any(value is None for value in serialized_optics.values()):
+            raise ValueError("VTK surface optics require reflectivity, inside-index, and outside-index arrays")
+        medium._setSurfaceOpticsArrays(
+            serialized_optics["surfaceReflectivity"],
+            serialized_optics["surfaceRefractiveIndexInside"],
+            serialized_optics["surfaceRefractiveIndexOutside"],
+            physical.pop("surfaceOpticsDomains", None),
+        )
     return medium
 
 
@@ -265,6 +284,7 @@ def writeGainMediumVtk(path, gainMedium):
         raise ValueError("writeGainMediumVtk supports Tet4 cells only")
 
     structured = topology.metadata.get("structured", {}) if isinstance(topology.metadata, dict) else {}
+    surface_reflectivity, surface_inside, surface_outside = gainMedium._surfaceOpticsArrays()
     fieldArrays = {
         "cellDomains": topology.cellDomains,
         "faceBoundaries": topology.faceBoundaries,
@@ -272,13 +292,20 @@ def writeGainMediumVtk(path, gainMedium):
         "structuredNumberOfLevels": np.asarray([structured.get("numberOfLevels", 1)], dtype=np.uint32),
         "structuredThickness": np.asarray([structured.get("thickness", 0.0)], dtype=np.float64),
         "claddingCellTypes": gainMedium.get("claddingCellTypes").value,
-        "refractiveIndices": gainMedium.get("refractiveIndices").value,
-        "reflectivities": gainMedium.get("reflectivities").value,
         "nTot": np.asarray([gainMedium.get("nTot").value], dtype=np.float64),
         "crystalTFluo": np.asarray([gainMedium.get("crystalTFluo").value], dtype=np.float64),
         "claddingNumber": np.asarray([gainMedium.get("claddingNumber").value], dtype=np.uint32),
         "claddingAbsorption": np.asarray([gainMedium.get("claddingAbsorption").value], dtype=np.float64),
     }
+    if surface_reflectivity.size:
+        fieldArrays.update(
+            {
+                "surfaceReflectivity": surface_reflectivity,
+                "surfaceRefractiveIndexInside": surface_inside,
+                "surfaceRefractiveIndexOutside": surface_outside,
+                "surfaceOpticsDomains": np.asarray(sorted(gainMedium.surface_optics), dtype=np.int32),
+            }
+        )
     pointArrays = {}
     cellArrays = {"betaVolume": gainMedium.get("betaVolume").value}
 

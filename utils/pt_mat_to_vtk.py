@@ -60,8 +60,6 @@ def _text_medium(input_dir: Path) -> GainMedium:
     return GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=backendFlat(_array(input_dir / "betaVolume.txt", np.float64)),
         claddingCellTypes=_array(input_dir / "claddingCellTypes.txt", np.uint32),
-        refractiveIndices=_array(input_dir / "refractiveIndices.txt", np.float32),
-        reflectivities=backendFlat(_array(input_dir / "reflectivities.txt", np.float32)),
         nTot=_scalar(input_dir / "nTot.txt", float),
         crystalTFluo=_scalar(input_dir / "crystalTFluo.txt", float),
         claddingNumber=_scalar(input_dir / "claddingNumber.txt", int),
@@ -91,8 +89,6 @@ def _pt_mat_medium(material_path: Path, *, number_of_levels: int = 10, length: f
     return GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=np.zeros((topology.numberOfTriangles, topology.levels - 1), dtype=np.float64),
         claddingCellTypes=np.zeros(topology.numberOfTriangles, dtype=np.uint32),
-        refractiveIndices=np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32),
-        reflectivities=np.zeros((topology.numberOfTriangles, 2), dtype=np.float32),
         nTot=2.76e20,
         crystalTFluo=9.5e-4,
         claddingNumber=1,

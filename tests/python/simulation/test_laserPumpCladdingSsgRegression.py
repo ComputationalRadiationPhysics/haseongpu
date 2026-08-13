@@ -16,7 +16,7 @@ import pytest
 from HASEonGPU import AlpakaBackends
 
 repoRoot = Path(__file__).resolve().parents[3]
-exampleScript = repoRoot / "example" / "laserPumpCladding.py"
+exampleScript = repoRoot / "example" / "laserPumpCladdingApi.py"
 plotSsgScript = repoRoot / "scripts" / "plot_ssg.py"
 juliaReferencePath = repoRoot / "tests" / "data" / "julia1D.csv"
 TIME_STEP_S = 2.0e-5
@@ -63,12 +63,13 @@ def test_julia1DMatchesDisabledAse(tmp_path, openPmdRuntimeBackend, openPmdRunti
             alpakaBackend,
             "--openpmd-backend",
             openPmdRuntimeBackend,
-            "--disable-ase",
-            "--timeSteps",
+            "--ase-steps",
+            "0",
+            "--simulation-steps",
             "100",
             "--output-steps",
             *[str(step) for step in range(1, 101)],
-            "--pumpSteps",
+            "--pump-steps",
             "50",
             "--pump-ray-count",
             "100000",

@@ -8,7 +8,6 @@
 #pragma once
 
 #include <cstdint>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -35,11 +34,15 @@ namespace hase::core
         double offset[2] = {0.0, 0.0};
         double tilt[2] = {0.0, 0.0};
         double magnification = 1.0;
+        //! Fraction of power retained by the return mapping, not medium-boundary transmission.
         double transmission = 1.0;
     };
 
     struct PumpSourceParameters
     {
+        unsigned rayCount = 0u;
+        unsigned pumpSteps = 0u;
+        std::uint32_t rngSeed = 5489u;
         std::vector<int> surfaces;
         double totalPower = 0.0;
         std::vector<double> wavelengths;
@@ -55,9 +58,7 @@ namespace hase::core
 
     struct PumpParameters
     {
-        unsigned schemaVersion = 1u;
-        unsigned rayCount = 100000u;
-        std::uint32_t rngSeed = 5489u;
+        unsigned schemaVersion = 2u;
         std::vector<PumpSourceParameters> sources;
     };
 
@@ -115,9 +116,9 @@ namespace hase::core
     {
         double timeStep = 0.0;
         unsigned numberOfSteps = 0u;
-        bool enableAse = true;
+        unsigned firstSimulationStep = 0u;
+        unsigned aseSteps = 0u;
         bool prePump = false;
-        unsigned pumpSteps = std::numeric_limits<unsigned>::max();
         std::string executionMode = SimulationExecutionMode::AUTONOMOUS;
         std::vector<unsigned> outputSteps;
         std::vector<std::string> outputFields = SimulationOutputField::all();

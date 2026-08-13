@@ -13,7 +13,6 @@ from HASEonGPU import (
     CrossSectionData,
     FrozenPhiAseRungeKutta4,
     PhiASE,
-    MonteCarloPumpSolver,
     PlanarPumpRelay,
     Pump,
     PumpSpectrum,
@@ -22,7 +21,7 @@ from HASEonGPU import (
     SurfacePumpInjector,
     integrate_pump_profile,
 )
-import laserPumpCladding as example
+import laserPumpCladdingApi as example
 
 
 def _normalized_wasserstein_distance(first_coordinates, first_weights, second_coordinates, second_weights):
@@ -97,24 +96,25 @@ def test_general_pump_reproduces_legacy_crystal_inversion(openPmdFileBackend, al
         total_power=16e3 * integrate_pump_profile(medium.topology, "ase_bottom", profile),
         spectrum=PumpSpectrum.monochromatic(wavelength),
         cross_sections=pump_cross_sections,
+        ray_count=50_000,
+        pump_steps=3,
+        rng_seed=5489,
         profile=profile,
     )
     spectral = example.laserPumpCladdingSpectralProperties(191)
-    phi_ase = PhiASE.fromYaml(
-        example.defaultPhiAseConfigPath,
+    phi_ase = PhiASE(
         spectralProperties=spectral,
         backend=alpakaRuntimeBackend,
         openpmdBackend=openPmdFileBackend,
+        ase_steps=0,
     )
     simulation = Simulation(
         gain_medium=medium,
         phi_ase=phi_ase,
         time_integrator=FrozenPhiAseRungeKutta4(),
         time_step_size=2e-5,
-        pump_solver=MonteCarloPumpSolver(ray_count=50_000, seed=5489, max_steps=3),
+        simulation_steps=3,
         cross_sections=spectral,
-        enable_ase=False,
-        pre_pump=True,
     ).add_pump(
         pump,
         injection_method=SurfacePumpInjector(surface_domains="ase_bottom"),

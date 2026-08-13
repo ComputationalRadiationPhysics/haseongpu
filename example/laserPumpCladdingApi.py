@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 import numpy as np
@@ -16,12 +15,6 @@ from _source_tree_import import ensure_hase_importable
 
 
 scriptDir = Path(__file__).resolve().parent
-defaultPhiAseConfigPath = Path(
-    os.environ.get(
-        "HASE_PHIASE_CONFIG",
-        scriptDir.parent / "config/hase-phiase.yaml",
-    )
-)
 
 ensure_hase_importable()
 
@@ -40,7 +33,6 @@ from HASEonGPU import (  # noqa: E402
     VolumeTopology,
     backendFlat,
     PhiASE,
-    MonteCarloPumpSolver,
     Simulation,
     SurfaceOptics,
     vtkWedge,
@@ -86,20 +78,32 @@ def loadLaserPumpCladdingTet4Medium(materialPath):
 
 def runTet4PhiAseInput(
     materialPath,
-    phiAseConfigPath=defaultPhiAseConfigPath,
-    backend="UseConfig",
+    backend="Host_Cpu_CpuOmpBlocks",
     spectralResolution=1000,
     **AseOverride,
 ):
     spectralProperties = laserPumpCladdingSpectralProperties(spectralResolution)
     medium = loadLaserPumpCladdingTet4Medium(materialPath)
-    phiAse = PhiASE.fromYaml(
-        phiAseConfigPath,
+    phiAse = PhiASE(
         spectralProperties=spectralProperties,
+        propagationMode="forward",
+        minRays=10000,
+        maxRays=1000000,
+        relativeStandardErrorThreshold=0.1,
+        repetitions=4,
+        adaptiveSteps=4,
+        useReflections=True,
+        reflectionMaxIterations=40,
+        reflectionTolerance=1.0e-4,
+        surfaceReservoirSize=32,
+        monochromatic=False,
+        backend=backend,
+        openpmdBackend="auto",
+        parallelMode="single",
+        numDevices=1,
+        nPerNode=1,
         **AseOverride,
     )
-    if backend != "UseConfig":
-        phiAse.backend = backend
     phiAse.run(gainMedium=medium, crossSections=spectralProperties)
     return phiAse.getResults()
 
@@ -230,48 +234,41 @@ def _assignLegacyTet4SurfaceDomains(topology):
 def laserPumpCladdingMedium(cladAbsorption=5.5):
     materialPath = scriptDir / "data" / "ptTet4.vtk"
     topology = _assignLegacyTet4SurfaceDomains(VolumeTopology.fromVtk(materialPath))
-    refractiveIndices = np.asarray([1.83, 1.0, 1.83, 1.0], dtype=np.float32)
     return GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=backendFlat(np.zeros(topology.numberOfCells, dtype=np.float64)),
         claddingCellTypes=np.zeros(topology.numberOfCells, dtype=np.uint32),
-        refractiveIndices=refractiveIndices,
-        reflectivities=np.zeros((topology.numberOfCells, 2), dtype=np.float32),
         nTot=2 * 1.388e20,
         crystalTFluo=9.41e-4,
         claddingNumber=1,
         claddingAbsorption=cladAbsorption,
-    ).withSurfaceOptics(
+    ).with_surface_optics(
         {
             "ase_bottom": SurfaceOptics(
                 reflectivity=0.0,
-                n_inside=refractiveIndices[0],
-                n_outside=refractiveIndices[1],
+                n_inside=1.83,
+                n_outside=1.0,
             ),
             "ase_top": SurfaceOptics(
                 reflectivity=0.0,
-                n_inside=refractiveIndices[2],
-                n_outside=refractiveIndices[3],
+                n_inside=1.83,
+                n_outside=1.0,
             ),
             "cladding": SurfaceOptics(
                 reflectivity=0.0,
-                n_inside=refractiveIndices[1],
-                n_outside=refractiveIndices[1],
+                n_inside=1.0,
+                n_outside=1.0,
             ),
         }
     )
 
 
-def runExample(
-    phiAseConfigPath=defaultPhiAseConfigPath,
-    backend="UseConfig",
-    timeSlices=150,
-    # pumpSteps: pumped outer simulation steps; None pumps for all timeSlices.
-    pumpSteps=50,
-    vtkOutputDir=scriptDir,
-    openPmdOutputDir=None,
-    openpmdBackend="UseConfig",
-    enableASE=True,
-    prePump=True,
+def buildSimulation(
+    backend="Host_Cpu_CpuOmpBlocks",
+    simulation_steps=150,
+    pump_steps=50,
+    ase_steps=150,
+    openpmdBackend="auto",
+    pre_pump=True,
     spectralResolution=1000,
     pumpRayCount=50000,
     pumpRngSeed=5489,
@@ -279,7 +276,6 @@ def runExample(
     outputSteps=None,
     **AseOverride,
 ):
-    vtkOutputDir = Path(vtkOutputDir)
     spectralProperties = laserPumpCladdingSpectralProperties(spectralResolution)
 
     pumpWavelength = 940e-9
@@ -302,17 +298,30 @@ def runExample(
             raw_cross_section_emission,
         ),
     )
-    absorption=5.5
+    absorption = 5.5
     medium = laserPumpCladdingMedium(cladAbsorption=absorption)
 
-    phiAse = PhiASE.fromYaml(
-        phiAseConfigPath,
+    phiAse = PhiASE(
         spectralProperties=spectralProperties,
-        **AseOverride
+        propagationMode="forward",
+        minRays=10000,
+        maxRays=1000000,
+        relativeStandardErrorThreshold=0.1,
+        repetitions=4,
+        adaptiveSteps=4,
+        useReflections=True,
+        reflectionMaxIterations=40,
+        reflectionTolerance=1.0e-4,
+        surfaceReservoirSize=32,
+        monochromatic=False,
+        backend=backend,
+        openpmdBackend=openpmdBackend,
+        parallelMode="single",
+        numDevices=1,
+        nPerNode=1,
+        ase_steps=ase_steps,
+        **AseOverride,
     )
-
-    if backend != "UseConfig" : phiAse.backend=backend
-    if openpmdBackend != "UseConfig" : phiAse.openpmdBackend=openpmdBackend
 
 
     pumpProfile = SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.5, exponent=40)
@@ -325,23 +334,20 @@ def runExample(
         total_power=16e3 * profileArea,
         spectrum=PumpSpectrum.monochromatic(pumpWavelength),
         cross_sections=pumpCrossSections,
+        ray_count=pumpRayCount,
+        pump_steps=pump_steps,
+        rng_seed=pumpRngSeed,
         angular_distribution=PumpAngularDistribution.collimated(),
         profile=pumpProfile,
     )
-    pumpSolver = MonteCarloPumpSolver(
-        ray_count=pumpRayCount, seed=pumpRngSeed, max_steps=pumpSteps
-    )
-    print(f"Running simulation with backend {phiAse.backend}")
-    print(f"Using openPMD backend {phiAse.openpmdBackend}")
-    simulation = Simulation(
+    return Simulation(
         gain_medium=medium,
         phi_ase=phiAse,
         time_integrator=FrozenPhiAseRungeKutta4(),
         time_step_size=2e-5,
-        pump_solver=pumpSolver,
+        simulation_steps=simulation_steps,
         cross_sections=spectralProperties,
-        enable_ase=enableASE,
-        pre_pump=prePump,
+        pre_pump=pre_pump,
         report_timings=reportTimings,
         output_steps=None if outputSteps is None else tuple(int(step) for step in outputSteps),
     ).add_pump(
@@ -349,25 +355,61 @@ def runExample(
         injection_method=SurfacePumpInjector(surface_domains="ase_bottom"),
         relays=(PlanarPumpRelay.retroreflect("ase_top"),),
     )
+
+
+def runExample(
+    backend="Host_Cpu_CpuOmpBlocks",
+    simulation_steps=150,
+    pump_steps=50,
+    ase_steps=150,
+    vtkOutputDir=scriptDir,
+    openPmdOutputDir=None,
+    openpmdBackend="auto",
+    pre_pump=True,
+    spectralResolution=1000,
+    pumpRayCount=50000,
+    pumpRngSeed=5489,
+    reportTimings=False,
+    outputSteps=None,
+    **AseOverride,
+):
+    simulation = buildSimulation(
+        backend=backend,
+        simulation_steps=simulation_steps,
+        pump_steps=pump_steps,
+        ase_steps=ase_steps,
+        openpmdBackend=openpmdBackend,
+        pre_pump=pre_pump,
+        spectralResolution=spectralResolution,
+        pumpRayCount=pumpRayCount,
+        pumpRngSeed=pumpRngSeed,
+        reportTimings=reportTimings,
+        outputSteps=outputSteps,
+        **AseOverride,
+    )
+    medium = simulation.gain_medium
+    absorption = medium.get("claddingAbsorption").value
+    print(f"Running simulation with backend {simulation.phi_ase.backend}")
+    print(f"Using openPMD backend {simulation.phi_ase.openpmdBackend}")
     simulation.on_step(printState)
     simulation.on_step(
         writeVtkFields,
-        vtkOutputDir,
+        Path(vtkOutputDir),
         absorption,
-        spectralProperties,
+        simulation.cross_sections,
         medium.get("nTot").value,
     )
     if openPmdOutputDir is not None:
         simulation.on_step(writeParaviewState, openPmdOutputDir, absorption)
-    simulation.step(timeSlices)  # adjust this by number of steps
+    simulation.step()
     return simulation.get_last_state()  # return the last state to confirm shape.
 
     # dndt_ASE, flux_clad
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Modern HASEonGPU laser-pump cladding example")
-    parser.add_argument("--backend", type=str, default="UseConfig")
-    parser.add_argument("--openpmd-backend", type=str, default="UseConfig")
-    parser.add_argument("--timeSteps", type=int, default=150)
+    parser = argparse.ArgumentParser(description="Inline-API HASEonGPU laser-pump cladding example")
+    parser.add_argument("--backend", type=str, default="Host_Cpu_CpuOmpBlocks")
+    parser.add_argument("--openpmd-backend", type=str, default="auto")
+    parser.add_argument("--simulation-steps", type=int, default=150)
     parser.add_argument(
         "--output-steps",
         type=int,
@@ -379,29 +421,23 @@ def main(argv=None):
         ),
     )
     parser.add_argument(
-        "--pumpSteps",
+        "--pump-steps",
         type=int,
-        default=100,
+        default=50,
         help=(
             "Number of outer simulation steps with pump contribution. "
-            "Default: 100. Use a value matching --timeSteps to pump for the full run. "
-            "This is distinct from MonteCarloPumpSolver.ray_count, which controls "
-            "the Monte Carlo pump sampling resolution."
+            "Default: 50. Zero disables this pump. Use a value matching "
+            "--simulation-steps to pump for the full run."
         ),
     )
     parser.add_argument(
-        "--phi-ase-config",
-        type=Path,
-        default=defaultPhiAseConfigPath,
-        help="PhiASE run-control YAML. Defaults to config/hase-phiase.yaml.",
+        "--ase-steps",
+        type=int,
+        default=150,
+        help="Number of outer steps with ASE. Zero disables ASE. Default: 150.",
     )
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
-    parser.add_argument(
-        "--disable-ase",
-        action="store_true",
-        help="Disable ASE depletion during the time-stepped pump simulation.",
-    )
     parser.add_argument(
         "--disable-pre-pump",
         action="store_true",
@@ -422,11 +458,6 @@ def main(argv=None):
         help="Backend spectral interpolation resolution. Default: 1000.",
     )
     parser.add_argument(
-        "--disable-reflections",
-        action="store_true",
-        help="Disable ASE surface reflections.",
-    )
-    parser.add_argument(
         "--timings",
         action="store_true",
         help="Print frontend timing split for compiled transport, snapshots, and callbacks.",
@@ -436,16 +467,12 @@ def main(argv=None):
     aseOverrides = {}
     if args.rng_seed is not None:
         aseOverrides["rngSeed"] = args.rng_seed
-    if args.disable_reflections:
-        aseOverrides["useReflections"] = False
-
     if args.phiase_only:
         if args.tet4_input is None:
             parser.error("--phiase-only requires --tet4-input")
         aseOverrides.setdefault("propagationMode", "forward")
         result = runTet4PhiAseInput(
             args.tet4_input,
-            args.phi_ase_config,
             args.backend,
             args.spectral_resolution,
             **aseOverrides,
@@ -456,15 +483,14 @@ def main(argv=None):
         return
 
     state = runExample(
-        args.phi_ase_config,
         args.backend,
-        timeSlices=args.timeSteps,
-        pumpSteps=args.pumpSteps,
+        simulation_steps=args.simulation_steps,
+        pump_steps=args.pump_steps,
+        ase_steps=args.ase_steps,
         vtkOutputDir=args.vtk_output_dir,
         openPmdOutputDir=args.openpmd_output_dir,
         openpmdBackend=args.openpmd_backend,
-        enableASE=not args.disable_ase,
-        prePump=not args.disable_pre_pump,
+        pre_pump=not args.disable_pre_pump,
         spectralResolution=args.spectral_resolution,
         reportTimings=args.timings,
         pumpRayCount=args.pump_ray_count,

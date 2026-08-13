@@ -42,7 +42,6 @@ from .laser import (
     CrossSectionData,
     GaussianPump,
     LaserProperties,
-    MonteCarloPumpSolver,
     PlanarPumpRelay,
     Pump,
     PumpAngularDistribution,

@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from HASEonGPU import GainMedium, MeshTopology, VolumeTopology
+from HASEonGPU import GainMedium, MeshTopology, SurfaceOptics, VolumeTopology
 
 
 repoRoot = Path(__file__).resolve().parents[3]
@@ -33,12 +33,12 @@ def _smallVolumeGainMedium():
     return GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=np.asarray([0.5], dtype=np.float64),
         claddingCellTypes=np.asarray([2], dtype=np.uint32),
-        refractiveIndices=np.asarray([1.0, 1.1, 1.2, 1.3], dtype=np.float64),
-        reflectivities=np.asarray([[0.7, 0.8]], dtype=np.float32),
         nTot=1.0,
         crystalTFluo=2.0,
         claddingNumber=3,
         claddingAbsorption=4.0,
+    ).with_surface_optics(
+        {7: SurfaceOptics(reflectivity=0.7, n_inside=1.2, n_outside=1.0)}
     )
 
 
@@ -56,8 +56,10 @@ def test_gainMediumRoundTripsThroughTet4Vtk(tmp_path):
     assert np.array_equal(loaded.topology.faceBoundaries, medium.topology.faceBoundaries)
     assert np.allclose(loaded.get("betaVolume").value, medium.get("betaVolume").value)
     assert np.array_equal(loaded.get("claddingCellTypes").value, medium.get("claddingCellTypes").value)
-    assert np.allclose(loaded.get("refractiveIndices").value, medium.get("refractiveIndices").value)
-    assert np.allclose(loaded.get("reflectivities").value, medium.get("reflectivities").value)
+    assert set(loaded.surface_optics) == {7}
+    assert loaded.surface_optics[7].reflectivity == pytest.approx(0.7)
+    assert loaded.surface_optics[7].n_inside == pytest.approx(1.2)
+    assert loaded.surface_optics[7].n_outside == pytest.approx(1.0)
     assert loaded.get("nTot").value == medium.get("nTot").value
     assert loaded.get("crystalTFluo").value == medium.get("crystalTFluo").value
     assert loaded.get("claddingNumber").value == medium.get("claddingNumber").value
@@ -113,8 +115,10 @@ def test_bundledExampleVtkFixturesExposeFrontendFields():
         assert medium.numberOfLevels == levels
         assert np.asarray(medium.get("betaVolume").value).size == triangles
         assert np.asarray(medium.get("claddingCellTypes").value).shape == (triangles,)
-        assert np.asarray(medium.get("refractiveIndices").value).shape == (4,)
-        assert np.asarray(medium.get("reflectivities").value).size == triangles * 2
+        with pytest.raises(KeyError, match="unknown gain medium property"):
+            medium.get("refractiveIndices")
+        with pytest.raises(KeyError, match="unknown gain medium property"):
+            medium.get("reflectivities")
         assert np.isfinite(medium.get("nTot").value)
         assert np.isfinite(medium.get("crystalTFluo").value)
         assert medium.get("claddingNumber").value >= 1

@@ -8,13 +8,14 @@ from pyInclude import _runtime
 from pyInclude.openpmd import transport
 
 
-def _write_runtime_config(runtime_dir, *, provider_dir="/provider/one"):
+def _write_runtime_config(runtime_dir, *, provider_dir="/provider/one", debug_logging=False):
     path = runtime_dir / "python" / "pyInclude" / "_runtime" / "_config.py"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         f'HASE_RUNTIME_DIR = {str(runtime_dir)!r}\n'
         'HASE_RUNTIME_VERSION = "2.1.0"\n'
         'HASE_USE_SYSTEM_OPENPMD = True\n'
+        f'HASE_DEBUG_LOGGING = {debug_logging!r}\n'
         f'HASE_OPENPMD_PYTHON_PACKAGE_DIR = {provider_dir!r}\n',
         encoding="utf-8",
     )
@@ -28,6 +29,7 @@ def test_nonstandardRuntimeOwnsExecutableLibrariesAndMetadata(tmp_path, monkeypa
 
     assert _runtime.runtime_root() == runtime_dir
     assert _runtime.runtime_config().HASE_OPENPMD_PYTHON_PACKAGE_DIR == "/provider/one"
+    assert not _runtime.runtime_config().HASE_DEBUG_LOGGING
     assert next(_runtime.runtime_executable_candidates(("calcPhiASE",))).parent == runtime_dir
     assert next(_runtime.runtime_library_candidates(("libprobe.so",))).parent == runtime_dir / "lib"
 

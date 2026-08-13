@@ -16,7 +16,7 @@ import warnings
 
 import numpy as np
 from ..openpmd import BackendFlatArray, FieldSpec, GroupFieldSpec, PrimitiveSchema, PrimitiveSchemaDefinition, schemaFields
-from .domains import DomainMap, surfaceOpticsArrays
+from .domains import DomainMap, SurfaceOptics, _coerceOptics, surfaceOpticsArrays
 from .msh import Gmsh
 from .vtk import gainMediumFromVtk, writeGainMediumVtk
 try:
@@ -78,6 +78,23 @@ _CUSTOM_FIELD_RESERVED_NAMES = {
     "betaVolume",
     "claddingCellTypes",
     "reflectivities",
+    "refractiveIndices",
+    "surfaceReflectivity",
+    "surfaceRefractiveIndexInside",
+    "surfaceRefractiveIndexOutside",
+}
+_REMOVED_OPTICS_PROPERTY_NAMES = {
+    "refractiveIndices",
+    "refractiveIndicies",
+    "refractive_indices",
+    "reflectivities",
+    "surfaceReflectivity",
+    "surfaceReflectivities",
+    "surface_reflectivity",
+    "surfaceRefractiveIndexInside",
+    "surface_refractive_index_inside",
+    "surfaceRefractiveIndexOutside",
+    "surface_refractive_index_outside",
 }
 
 
@@ -450,16 +467,6 @@ def _shape_triangles(topology):
     return (topology.numberOfTriangles,)
 
 
-def _shape_reflectivities(topology):
-    if hasattr(topology, "cellPointIndices"):
-        return (topology.numberOfCells, 2)
-    return (topology.numberOfTriangles, 2)
-
-
-def _shape_refractive(_):
-    return (4,)
-
-
 def _surface_domain_count(topology):
     boundaries = getattr(topology, "faceBoundaries", None)
     if boundaries is None:
@@ -469,18 +476,6 @@ def _surface_domain_count(topology):
     if positive.size == 0:
         return 0
     return int(positive.max()) + 1
-
-
-def _shape_surface_domains(topology):
-    return (_surface_domain_count(topology),)
-
-
-def _default_surface_reflectivity(topology):
-    return np.zeros(_surface_domain_count(topology), dtype=np.float32)
-
-
-def _default_surface_refractive_index(topology):
-    return np.ones(_surface_domain_count(topology), dtype=np.float32)
 
 
 def _shape_scalar(_):
@@ -495,11 +490,6 @@ def _default_beta_volume(topology):
 def _default_cladding_cell_types(topology):
     size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfTriangles
     return np.zeros(size, dtype=np.uint32)
-
-
-def _default_reflectivities(topology):
-    size = topology.numberOfCells if hasattr(topology, "cellPointIndices") else topology.numberOfTriangles
-    return np.ones(2 * size, dtype=np.float32)
 
 
 PHYSICAL_PROPERTY_SPECS = {
@@ -520,44 +510,6 @@ PHYSICAL_PROPERTY_SPECS = {
         shape=_shape_triangles,
         description="Cladding type index for each explicit volume cell or legacy triangle.",
         default=_default_cladding_cell_types,
-    ),
-    "refractiveIndices": PhysicalPropertySpec(
-        name="refractiveIndices",
-        dtype=np.float32,
-        shape=_shape_refractive,
-        description="[bottomInside, bottomOutside, topInside, topOutside].",
-        default=lambda _: np.ones(4, dtype=np.float32),
-    ),
-    "reflectivities": PhysicalPropertySpec(
-        name="reflectivities",
-        dtype=np.float32,
-        shape=_shape_reflectivities,
-        description=(
-            "Surface reflectivity per triangle. Matrix layout is "
-            "(numberOfTriangles, 2): column 0 bottom, column 1 top."
-        ),
-        default=_default_reflectivities,
-    ),
-    "surfaceReflectivity": PhysicalPropertySpec(
-        name="surfaceReflectivity",
-        dtype=np.float32,
-        shape=_shape_surface_domains,
-        description="Reflectivity indexed by gmsh physical surface id; index 0 is unused.",
-        default=_default_surface_reflectivity,
-    ),
-    "surfaceRefractiveIndexInside": PhysicalPropertySpec(
-        name="surfaceRefractiveIndexInside",
-        dtype=np.float32,
-        shape=_shape_surface_domains,
-        description="Interior refractive index indexed by gmsh physical surface id; index 0 is unused.",
-        default=_default_surface_refractive_index,
-    ),
-    "surfaceRefractiveIndexOutside": PhysicalPropertySpec(
-        name="surfaceRefractiveIndexOutside",
-        dtype=np.float32,
-        shape=_shape_surface_domains,
-        description="Exterior refractive index indexed by gmsh physical surface id; index 0 is unused.",
-        default=_default_surface_refractive_index,
     ),
     "nTot": PhysicalPropertySpec(
         name="nTot",
@@ -592,12 +544,6 @@ PHYSICAL_PROPERTY_SPECS = {
 }
 
 PROPERTY_ALIASES = {
-    "refractiveIndicies": "refractiveIndices",
-    "refractive_indices": "refractiveIndices",
-    "surfaceReflectivities": "surfaceReflectivity",
-    "surface_reflectivity": "surfaceReflectivity",
-    "surface_refractive_index_inside": "surfaceRefractiveIndexInside",
-    "surface_refractive_index_outside": "surfaceRefractiveIndexOutside",
     "cladding_cell_types": "claddingCellTypes",
     "cladding_absorption": "claddingAbsorption",
     "cladding_number": "claddingNumber",
@@ -1144,8 +1090,16 @@ class GainMedium:
     physical: dict = field(default_factory=dict)
     """Canonical physical arrays and scalars stored by property name."""
     customFields: dict = field(default_factory=dict)
+    _surfaceOptics: dict[int, SurfaceOptics] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self):
+        removed = sorted(set(self.physical) & _REMOVED_OPTICS_PROPERTY_NAMES)
+        if removed:
+            raise ValueError(
+                "raw optics arrays are no longer GainMedium properties; "
+                "configure SurfaceOptics with with_surface_optics instead: "
+                + ", ".join(removed)
+            )
         gmsh = self.topology.metadata.get("gmsh")
         if (
             isinstance(gmsh, Gmsh)
@@ -1186,20 +1140,59 @@ class GainMedium:
             self.set(name, value)
         return self
 
-    def withSurfaceOptics(self, opticsByDomain):
-        """Set surface optics arrays from a mapping keyed by surface-domain id or name."""
+    def with_surface_optics(self, optics_by_domain):
+        """Set structured boundary optics by surface-domain id or name."""
         if not hasattr(self.topology, "faceBoundaries"):
             raise TypeError("surface optics require a Tet4 VolumeTopology")
-        boundaries = np.asarray(self.topology.faceBoundaries, dtype=np.int32)
+        domain_map = self.topology.surfaceDomainMap() if hasattr(self.topology, "surfaceDomainMap") else DomainMap({})
+        resolved = {
+            domain_map.resolve(domain): _coerceOptics(optics)
+            for domain, optics in optics_by_domain.items()
+        }
+        available = set(np.asarray(self.topology.faceBoundaries, dtype=np.int32).reshape(-1))
+        missing = sorted(set(resolved) - available)
+        if missing:
+            raise ValueError(f"surface optics references unassigned surface domains: {missing}")
+        self._surfaceOptics = resolved
+        return self
+
+    def withSurfaceOptics(self, opticsByDomain):
+        """Compatibility spelling for :meth:`with_surface_optics`."""
+        return self.with_surface_optics(opticsByDomain)
+
+    @property
+    def surface_optics(self):
+        """Configured boundary optics keyed by resolved positive domain id."""
+        return dict(self._surfaceOptics)
+
+    def _surfaceOpticsArrays(self):
+        boundaries = np.asarray(getattr(self.topology, "faceBoundaries", ()), dtype=np.int32)
         positive = boundaries[boundaries > 0]
         min_size = int(np.max(positive) + 1) if positive.size else 0
         domain_map = self.topology.surfaceDomainMap() if hasattr(self.topology, "surfaceDomainMap") else DomainMap({})
-        reflectivity, inside, outside = surfaceOpticsArrays(domain_map, opticsByDomain, minSize=min_size)
-        return self.withPhysicalProperties(
-            surfaceReflectivity=reflectivity,
-            surfaceRefractiveIndexInside=inside,
-            surfaceRefractiveIndexOutside=outside,
-        )
+        return surfaceOpticsArrays(domain_map, self._surfaceOptics, minSize=min_size)
+
+    def _setSurfaceOpticsArrays(self, reflectivity, inside, outside, domains=None):
+        reflectivity = np.asarray(reflectivity, dtype=np.float32).reshape(-1)
+        inside = np.asarray(inside, dtype=np.float32).reshape(-1)
+        outside = np.asarray(outside, dtype=np.float32).reshape(-1)
+        expected = _surface_domain_count(self.topology)
+        if not (reflectivity.size == inside.size == outside.size == expected):
+            raise ValueError(
+                "serialized surface optics arrays must match the topology's surface-domain count"
+            )
+        configured_domains = range(1, expected) if domains is None else np.asarray(domains, dtype=np.int64).reshape(-1)
+        if any(domain <= 0 or domain >= expected for domain in configured_domains):
+            raise ValueError("serialized surface optics contains an invalid surface-domain id")
+        self._surfaceOptics = {
+            int(domain): SurfaceOptics(
+                reflectivity=float(reflectivity[domain]),
+                n_inside=float(inside[domain]),
+                n_outside=float(outside[domain]),
+            )
+            for domain in configured_domains
+        }
+        return self
 
     def toVtk(self, filename):
         """Write this Tet4 gain medium to an ASCII VTK file."""
@@ -1223,7 +1216,11 @@ class GainMedium:
                 "field name must start with a letter and contain only letters, digits, and underscores"
             )
         canonical = PROPERTY_ALIASES.get(name, name)
-        if canonical in PHYSICAL_PROPERTY_SPECS or name in _CUSTOM_FIELD_RESERVED_NAMES:
+        if (
+            canonical in PHYSICAL_PROPERTY_SPECS
+            or name in _CUSTOM_FIELD_RESERVED_NAMES
+            or name in _REMOVED_OPTICS_PROPERTY_NAMES
+        ):
             raise ValueError(f"field name '{name}' is reserved by the built-in gain-medium field set")
         if not isinstance(unit, str) or not unit.strip():
             raise ValueError("field unit must be a non-empty string")
@@ -1445,7 +1442,6 @@ class GainMedium:
             "surface": np.asarray(derived["triangleSurfaces"], dtype=np.float32),
             "claddingGroup": self._fieldView("claddingCellTypes"),
             "claddingCellTypes": self._fieldView("claddingCellTypes"),
-            "reflectivities": self._fieldView("reflectivities"),
         }
         fields.update(self._customFieldViews(("cell",), ("cell", "local_vertex"), ("cell", "local_side")))
         connectivity_meta = {
@@ -1468,7 +1464,6 @@ class GainMedium:
             "surface": {"name": "surface", "entity": "cell", "axes": ("cell",), "dtype": str(np.dtype(np.float32)), "unit": "m^2", "shape": fields["surface"].shape, "isSet": True},
             "claddingGroup": {**self._propertyFieldMeta("claddingCellTypes", entity="cell", axes=("cell",)), "name": "claddingGroup"},
             "claddingCellTypes": self._propertyFieldMeta("claddingCellTypes", entity="cell", axes=("cell",)),
-            "reflectivities": self._propertyFieldMeta("reflectivities", entity="cell_interface", axes=("cell", "interface")),
         }
         metadata.update(self._customFieldMetadata(("cell",), ("cell", "local_vertex"), ("cell", "local_side")))
         return PrimitiveView("triangle", (self.topology.numberOfTriangles,), fields, metadata)
@@ -1508,6 +1503,7 @@ class GainMedium:
         context = self._fieldContext() if context is None else context
         topology = self.topology
         if hasattr(topology, "cellPointIndices"):
+            surface_reflectivity, surface_inside, surface_outside = self._surfaceOpticsArrays()
             yield OpenPmdScalarField(
                 "betaVolume",
                 _flat(self.get("betaVolume").value, None, np.float64, "betaVolume"),
@@ -1522,19 +1518,19 @@ class GainMedium:
                 ),
             )
             yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
-            yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
-            yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
-            if self.get("surfaceReflectivity").expectedShape[0] > 0:
-                yield OpenPmdScalarField("surfaceReflectivity", _flat(self.get("surfaceReflectivity").value, None, np.float32, "surfaceReflectivity"), context)
-                yield OpenPmdScalarField("surfaceRefractiveIndexInside", _flat(self.get("surfaceRefractiveIndexInside").value, None, np.float32, "surfaceRefractiveIndexInside"), context)
-                yield OpenPmdScalarField("surfaceRefractiveIndexOutside", _flat(self.get("surfaceRefractiveIndexOutside").value, None, np.float32, "surfaceRefractiveIndexOutside"), context)
+            yield OpenPmdScalarField("refractiveIndex", np.ones(4, dtype=np.float32), context)
+            yield OpenPmdScalarField("reflectivity", np.zeros(2 * topology.numberOfCells, dtype=np.float32), context)
+            if surface_reflectivity.size > 0:
+                yield OpenPmdScalarField("surfaceReflectivity", surface_reflectivity, context)
+                yield OpenPmdScalarField("surfaceRefractiveIndexInside", surface_inside, context)
+                yield OpenPmdScalarField("surfaceRefractiveIndexOutside", surface_outside, context)
             for field in self.customFields.values():
                 yield OpenPmdScalarField(field.spec.name, field.value, context, prefix="", spec=field.spec)
             return
         yield OpenPmdScalarField("betaVolume", _flat(self.get("betaVolume").value, topology.levels - 1, np.float64, "betaVolume"), context)
         yield OpenPmdScalarField("claddingCellType", _flat(self.get("claddingCellTypes").value, None, np.uint32, "claddingCellTypes"), context)
-        yield OpenPmdScalarField("refractiveIndex", _flat(self.get("refractiveIndices").value, None, np.float32, "refractiveIndices"), context)
-        yield OpenPmdScalarField("reflectivity", _flat(self.get("reflectivities").value, None, np.float32, "reflectivities"), context)
+        yield OpenPmdScalarField("refractiveIndex", np.ones(4, dtype=np.float32), context)
+        yield OpenPmdScalarField("reflectivity", np.zeros(2 * topology.numberOfTriangles, dtype=np.float32), context)
         for field in self.customFields.values():
             yield OpenPmdScalarField(field.spec.name, field.value, context, prefix="", spec=field.spec)
 

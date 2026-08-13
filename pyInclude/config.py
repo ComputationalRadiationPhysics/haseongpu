@@ -397,18 +397,20 @@ def run_reinstall(*, break_system_packages=False, use_ccache=False):
 def yaml_config(selection: WizardSelection):
     """Render a PhiASE-compatible YAML run-control snippet."""
     lines = [
-        "experiment:",
-        "  minRays: 100000",
-        "  maxRays: 100000",
-        "  relativeStandardErrorThreshold: 0.1",
+        "schema_version: 2",
         "",
-        "compute:",
-        f"  backend: {selection.compute_backend}",
-        f"  openpmd_backend: {selection.openpmd_backend}",
-        f"  parallel_mode: {selection.parallel_mode}",
-        f"  numDevices: {int(selection.num_devices)}",
-        f"  n_per_node: {int(selection.n_per_node)}",
-        "  write_vtk: false",
+        "simulation:",
+        "  phi_ase:",
+        "    # Disabled for Simulation until an application sets an activity window.",
+        "    ase_steps: 0",
+        "    min_rays: 100000",
+        "    max_rays: 100000",
+        "    relative_standard_error_threshold: 0.1",
+        f"    backend: {selection.compute_backend}",
+        f"    openpmd_backend: {selection.openpmd_backend}",
+        f"    parallel_mode: {selection.parallel_mode}",
+        f"    num_devices: {int(selection.num_devices)}",
+        f"    n_per_node: {int(selection.n_per_node)}",
     ]
     return "\n".join(lines) + "\n"
 
@@ -472,9 +474,9 @@ def guidance_items(selection: WizardSelection, yaml_path, *, alpaka_backends=(),
     else:
         yaml_text = (
             f"The configuration file is present under {yaml_path} and can be modified afterwards. "
-            "Edit compute.backend to change the alpaka compute backend, "
-            "compute.openpmd_backend to change the openPMD storage/streaming backend, "
-            "and compute.parallel_mode / compute.n_per_node for MPI runs."
+            "Edit simulation.phi_ase.backend to change the alpaka compute backend, "
+            "simulation.phi_ase.openpmd_backend to change the openPMD storage/streaming backend, "
+            "and simulation.phi_ase.parallel_mode / simulation.phi_ase.n_per_node for MPI runs."
         )
     supported = _csv(list(selection.supported_openpmd_backends) or [selection.openpmd_backend])
     if selection.mpi_mode == MPI_MODE_ON:

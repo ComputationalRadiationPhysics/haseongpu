@@ -21,7 +21,7 @@ from HASEonGPU import AlpakaBackends, CrossSectionData, PhiASE
 repoRoot = Path(__file__).resolve().parents[3]
 exampleDir = repoRoot / "example"
 sys.path.insert(0, str(exampleDir))
-import laserPumpCladding  # noqa: E402
+import laserPumpCladdingApi as laserPumpCladding  # noqa: E402
 
 
 REFERENCE_PATH = (

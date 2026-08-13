@@ -70,19 +70,13 @@ def _assertGainMediumLaunchContract(medium):
 
     assert medium.get("betaVolume").expectedShape == (numberOfTriangles, numberOfLevels - 1)
     assert medium.get("claddingCellTypes").expectedShape == (numberOfTriangles,)
-    assert medium.get("reflectivities").expectedShape == (numberOfTriangles, 2)
-    assert medium.get("refractiveIndices").expectedShape == (4,)
 
     betaVolume = np.asarray(medium.get("betaVolume").value)
     cladding = np.asarray(medium.get("claddingCellTypes").value)
-    reflectivities = np.asarray(medium.get("reflectivities").value)
-    refractive = np.asarray(medium.get("refractiveIndices").value)
 
     assert betaVolume.size == numberOfTriangles * (numberOfLevels - 1)
     assert betaVolume.size == topology.numberOfPrisms
     assert cladding.size == numberOfTriangles
-    assert reflectivities.size == 2 * numberOfTriangles
-    assert refractive.size == 4
 
     assert betaVolume.reshape((numberOfTriangles, numberOfLevels - 1), order="F").shape == (
         numberOfTriangles,
@@ -96,17 +90,12 @@ def _mediumForGrid(grid, *, flat):
 
     betaVolume = np.linspace(0.0, 1.0, topology.numberOfPrisms, dtype=np.float64)
     cladding = np.zeros(topology.numberOfTriangles, dtype=np.uint32)
-    reflectivities = np.zeros(2 * topology.numberOfTriangles, dtype=np.float32)
-
     if not flat:
         betaVolume = betaVolume.reshape((topology.numberOfTriangles, topology.levels - 1), order="F")
-        reflectivities = reflectivities.reshape((topology.numberOfTriangles, 2), order="F")
 
     medium.withPhysicalProperties(
         betaVolume=backendFlat(betaVolume) if flat else betaVolume,
         claddingCellTypes=cladding,
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=backendFlat(reflectivities) if flat else reflectivities,
         nTot=1.0,
         crystalTFluo=1.0,
         claddingNumber=0,
@@ -145,23 +134,16 @@ def test_gainMediumPrimitiveViewsShareCanonicalFlatStorage():
     medium = GainMedium(topology=topology).withPhysicalProperties(
         betaVolume=backendFlat(np.array([0.1, 0.3, 0.2, 0.4], dtype=np.float64)),
         claddingCellTypes=np.array([0, 1], dtype=np.uint32),
-        refractiveIndices=[1.8, 1.0, 1.8, 1.0],
-        reflectivities=backendFlat(np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)),
     )
 
     prismView = medium.getPrisms()["betaVolume"]
-    triangleView = medium.getTriangles()["reflectivities"]
 
     assert prismView.shape == (topology.numberOfTriangles, topology.levels - 1)
-    assert triangleView.shape == (topology.numberOfTriangles, 2)
     assert np.shares_memory(prismView, medium.get("betaVolume").value)
-    assert np.shares_memory(triangleView, medium.get("reflectivities").value)
 
     prismView[1, 1] = 9.0
-    triangleView[0, 1] = 0.75
 
     assert medium.get("betaVolume").value[1 + topology.numberOfTriangles] == 9.0
-    assert medium.get("reflectivities").value[topology.numberOfTriangles] == np.float32(0.75)
 
 
 def test_gainMediumRejectsAmbiguousFlat():
@@ -189,8 +171,15 @@ def test_gainMediumRejectsArraysThatBreakGeometryDependencies():
     with pytest.raises(ValueError, match="claddingCellTypes expects"):
         medium.withPhysicalProperties(claddingCellTypes=np.zeros(topology.numberOfTriangles + 1, dtype=np.uint32))
 
-    with pytest.raises(ValueError, match="reflectivities expects"):
+    with pytest.raises(KeyError, match="unknown gain medium property 'reflectivities'"):
         medium.withPhysicalProperties(reflectivities=np.zeros((topology.numberOfTriangles + 1, 2)))
+
+    with pytest.raises(ValueError, match="reserved"):
+        medium.defineField(
+            "refractive_indices",
+            entity="cell",
+            values=np.zeros(topology.numberOfTriangles),
+        )
 
 
 
@@ -257,7 +246,7 @@ def test_defineFieldValidatesSpec():
 
 def test_volume_surface_optics_are_indexed_by_physical_surface_id():
     import numpy as np
-    from pyInclude.geometry import GainMedium, VolumeTopology
+    from pyInclude.geometry import GainMedium, SurfaceOptics, VolumeTopology
 
     points = np.array(
         [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
@@ -265,14 +254,11 @@ def test_volume_surface_optics_are_indexed_by_physical_surface_id():
     )
     cells = np.array([[0, 1, 2, 3]], dtype=np.uint32)
     topology = VolumeTopology.fromTetrahedra(points, cells, faceBoundaries=np.array([[7, -1, -1, -1]], dtype=np.int32))
-    medium = GainMedium(topology).withPhysicalProperties(
-        surfaceReflectivity=np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.65], dtype=np.float32),
-        surfaceRefractiveIndexInside=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5], dtype=np.float32),
-        surfaceRefractiveIndexOutside=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+    medium = GainMedium(topology).with_surface_optics(
+        {7: SurfaceOptics(reflectivity=0.65, n_inside=1.5, n_outside=1.0)}
     )
 
-    assert medium.get("surfaceReflectivity").expectedShape == (8,)
-    assert medium.get("surface_reflectivity").value[7] == np.float32(0.65)
+    assert medium.surface_optics[7] == SurfaceOptics(reflectivity=0.65, n_inside=1.5, n_outside=1.0)
     names = {field.name for field in medium.openPmdFields()}
     assert {"surfaceReflectivity", "surfaceRefractiveIndexInside", "surfaceRefractiveIndexOutside"} <= names
 

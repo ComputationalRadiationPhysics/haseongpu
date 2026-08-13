@@ -1,3 +1,4 @@
+import io
 import os
 import shlex
 import subprocess
@@ -14,7 +15,7 @@ import pytest
 import pyInclude.openpmd.transport as transport
 from openpmd_backend_matrix import openpmd_runtime_backend, openpmd_test_backends
 from pyInclude import AlpakaBackends
-from pyInclude.geometry import GainMedium, MeshTopology, VolumeTopology
+from pyInclude.geometry import GainMedium, MeshTopology, OpenPmdScalarField, VolumeTopology
 from pyInclude.laser import (
     CrossSectionData,
     PlanarPumpRelay,
@@ -108,12 +109,25 @@ def asymmetric_topology():
     return VolumeTopology.fromTetrahedra(VOLUME_POINTS, VOLUME_CELLS)
 
 
+class _BackendContractGainMedium(GainMedium):
+    """Inject legacy records only for the low-level parser contract fixture."""
+
+    def openPmdFields(self, context=None):
+        replacements = {
+            "refractiveIndex": MESH_FIELD_VALUES["refractiveIndex"],
+            "reflectivity": MESH_FIELD_VALUES["reflectivity"],
+        }
+        for field in super().openPmdFields(context):
+            if field.name in replacements:
+                yield OpenPmdScalarField(field.name, replacements[field.name], field.context)
+            else:
+                yield field
+
+
 def asymmetric_medium():
-    return GainMedium(asymmetric_topology()).withPhysicalProperties(
+    return _BackendContractGainMedium(asymmetric_topology()).withPhysicalProperties(
         betaVolume=backendFlat(VOLUME_BETA),
         claddingCellTypes=MESH_FIELD_VALUES["claddingCellType"],
-        refractiveIndices=MESH_FIELD_VALUES["refractiveIndex"],
-        reflectivities=backendFlat(MESH_FIELD_VALUES["reflectivity"]),
         nTot=7.5,
         crystalTFluo=1.75,
         claddingNumber=3,
@@ -164,8 +178,6 @@ def launch_smoke_medium():
     return GainMedium(topology).withPhysicalProperties(
         betaVolume=backendFlat(np.array([0.0], dtype=np.float64)),
         claddingCellTypes=np.array([0], dtype=np.uint32),
-        refractiveIndices=np.array([1.5, 1.0, 1.5, 1.0], dtype=np.float32),
-        reflectivities=backendFlat(np.array([0.0, 0.0], dtype=np.float32)),
         nTot=1.0,
         crystalTFluo=1.0,
         claddingNumber=99,
@@ -506,6 +518,7 @@ def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
     resolved = transport.OPENPMD_BACKENDS["hdf5"]
     resolution_calls = []
     written = []
+    backend_runs = []
 
     monkeypatch.setattr(transport, "findCalcPhiAse", lambda: executable)
 
@@ -517,6 +530,7 @@ def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
     monkeypatch.setattr(transport, "_simulation_run_control", lambda *args, **kwargs: {})
     monkeypatch.setattr(transport, "_artifact_root", lambda: tmp_path)
     monkeypatch.setattr(transport, "_artifact_run_id", lambda: "auto")
+    monkeypatch.setattr(transport, "_frontend_progress_enabled", lambda: True)
     monkeypatch.setattr(
         transport,
         "_write_simulation_input",
@@ -525,7 +539,10 @@ def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
     monkeypatch.setattr(
         transport,
         "_run_backend_process",
-        lambda *args, **kwargs: SimpleNamespace(returncode=0, log_path=None),
+        lambda command, *, progress: (
+            backend_runs.append((command, progress))
+            or SimpleNamespace(returncode=0, log_path=None)
+        ),
     )
     monkeypatch.setattr(transport, "read_simulation_output", lambda output_path, on_state=None: output_path)
 
@@ -534,6 +551,7 @@ def test_runSimulationResolvesAutoAgainstRuntime(monkeypatch, tmp_path):
 
     assert resolution_calls == [("auto", executable)]
     assert written == [(tmp_path / "auto-input.h5", resolved)]
+    assert backend_runs[0][1]
     assert output_path == tmp_path / "auto-output.h5"
 
 
@@ -1103,6 +1121,84 @@ def test_backendProcessForwardsStreamsByDefaultWhileRunning(monkeypatch):
     assert "".join(received) == "[HASE_STEP_COMPLETE] step=1/2\n"
 
 
+def test_backendProcessRendersStepRecordsAsOneProgressLine(monkeypatch, capsys):
+    monkeypatch.delenv("HASE_FORWARD_LOGGING", raising=False)
+    monkeypatch.delenv("HASE_BACKEND_LOG_FILE", raising=False)
+
+    completed = transport._run_backend_process(
+        [
+            sys.executable,
+            "-u",
+            "-c",
+            (
+                "print('[PROGRESS] [HASE_STEP_COMPLETE] step=1/2 pump=1 ase=0', flush=True); "
+                "print('[PROGRESS] [HASE_STEP_COMPLETE] step=2/2 pump=0 ase=1', flush=True)"
+            ),
+        ],
+        progress=True,
+    )
+
+    captured = capsys.readouterr()
+    assert completed.returncode == 0
+    assert captured.err == ""
+    assert "[HASE_STEP_COMPLETE]" not in captured.out
+    assert captured.out.startswith("\r[PROGRESS] [")
+    assert " 50% (1/2)" in captured.out
+    assert "100% (2/2)" in captured.out
+    assert captured.out.count("\n") == 1
+
+
+def test_progressBarTracksElapsedAndRemainingTime():
+    stream = io.StringIO()
+    clock_values = iter((0.0, 10.0))
+    progress = transport._ProgressBar(stream, clock=lambda: next(clock_values))
+
+    progress.update(1, 4)
+
+    assert " 25% (1/4) after 10s (40s total, 30s remaining)" in stream.getvalue()
+
+
+def test_progressBarShrinksToAvoidTerminalWrapping():
+    stream = io.StringIO()
+    clock_values = iter((0.0, 10.0))
+    progress = transport._ProgressBar(
+        stream,
+        clock=lambda: next(clock_values),
+        terminal_columns=80,
+    )
+
+    progress.update(60, 150)
+
+    rendered_line = stream.getvalue().removeprefix("\r")
+    assert len(rendered_line) < 80
+    assert " 40% ( 60/150) after 10s" in rendered_line
+
+
+def test_frontendProgressFollowsLoggingAndDebugConfiguration(monkeypatch):
+    monkeypatch.delenv("HASE_FORWARD_LOGGING", raising=False)
+    monkeypatch.setattr(
+        transport,
+        "_runtime_config",
+        lambda: SimpleNamespace(HASE_DEBUG_LOGGING=False),
+    )
+    assert transport._frontend_progress_enabled()
+
+    monkeypatch.setattr(
+        transport,
+        "_runtime_config",
+        lambda: SimpleNamespace(HASE_DEBUG_LOGGING=True),
+    )
+    assert not transport._frontend_progress_enabled()
+
+    monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
+    monkeypatch.setattr(
+        transport,
+        "_runtime_config",
+        lambda: pytest.fail("disabled logging must not load runtime metadata"),
+    )
+    assert not transport._frontend_progress_enabled()
+
+
 def test_backendProcessDrainsStreamsWhenConsoleForwardingIsDisabled(monkeypatch, capsys):
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
     monkeypatch.delenv("HASE_BACKEND_LOG_FILE", raising=False)
@@ -1132,6 +1228,28 @@ def test_backendProcessWritesOptionalDebugLog(monkeypatch, tmp_path, capsys):
     assert "[stdout] backend stdout\n" in log
     assert "[stderr] backend stderr\n" in log
     assert str(logPath) in transport._backend_failure_detail(completed.log_path)
+
+
+def test_backendProcessKeepsRawStepRecordsInOptionalLog(monkeypatch, tmp_path, capsys):
+    logPath = tmp_path / "backend.log"
+    monkeypatch.delenv("HASE_FORWARD_LOGGING", raising=False)
+    monkeypatch.setenv("HASE_BACKEND_LOG_FILE", str(logPath))
+
+    completed = transport._run_backend_process(
+        [
+            sys.executable,
+            "-u",
+            "-c",
+            "print('[PROGRESS] [HASE_STEP_COMPLETE] step=1/1 pump=1 ase=0', flush=True)",
+        ],
+        progress=True,
+    )
+
+    assert completed.returncode == 0
+    assert "[HASE_STEP_COMPLETE]" not in capsys.readouterr().out
+    assert "[stdout] [PROGRESS] [HASE_STEP_COMPLETE] step=1/1 pump=1 ase=0\n" in logPath.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_openPmdApiRejectsMissingModule(monkeypatch, tmp_path):
@@ -1355,7 +1473,7 @@ def test_timeSteppedInputIncludesInitialVolumeBeta(tmp_path):
         output,
         SimpleNamespace(name=_file_backend_for_tests()),
         simulation,
-        {"number_of_steps": 1},
+        {"numberOfSteps": 1},
     )
 
     series = _io().Series(str(output), _io().Access.read_only)
@@ -1782,10 +1900,16 @@ def test_simulation_run_control_serializes_general_pump_graph():
         angularDistribution=PumpAngularDistribution.collimated(),
         profile=SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.25, exponent=40),
         relays=(PlanarPumpRelay.retroreflect((12,), transmission=0.75),),
+        rayCount=1234,
+        pumpSteps=4,
+        rngSeed=99,
     )
-    pump = _PumpProperties(sources=(source,), rayCount=1234, rngSeed=99, pumpSteps=4)
+    pump = _PumpProperties(sources=(source,))
     simulation = SimpleNamespace(
         pump=pump,
+        phiASE=SimpleNamespace(ase_steps=7),
+        pre_pump=False,
+        current_step=0,
         gainMedium=SimpleNamespace(topology=SimpleNamespace(surfaceDomainMap=lambda: None)),
         timeStep=2.0e-6,
         timeIntegrationSolver=SimpleNamespace(name="implicit-euler", iterations=5, tolerance=1.0e-7),
@@ -1794,32 +1918,33 @@ def test_simulation_run_control_serializes_general_pump_graph():
         executionMode="synchronized-debug",
     )
 
-    control = transport._simulation_run_control(simulation, steps=7, pumpSteps=None)
+    control = transport._simulation_run_control(simulation, steps=7)
 
-    assert control["time_step"] == 2.0e-6
-    assert control["number_of_steps"] == 7
-    assert control["enable_ase"] is True
-    assert control["pump_steps"] == 4
-    assert control["pump_schema_version"] == 1
-    assert control["pump_ray_count"] == 1234
-    assert control["pump_rng_seed"] == 99
-    assert control["output_fields_string"] == '["beta_volume","dndt_pump"]'
-    assert control["control_fields_string"] == '["beta_volume"]'
+    assert control["timeStep"] == 2.0e-6
+    assert control["numberOfSteps"] == 7
+    assert control["firstSimulationStep"] == 0
+    assert control["aseSteps"] == 7
+    assert control["pumpSchemaVersion"] == 2
+    assert control["outputFieldsString"] == '["beta_volume","dndt_pump"]'
+    assert control["controlFieldsString"] == '["beta_volume"]'
     assert "output_fields" not in control
     assert "control_fields" not in control
-    assert control["pump_source_total_power"] == [12.5]
-    assert control["pump_source_surfaces"].tolist() == [11]
-    assert control["pump_spectrum_wavelengths"] == [940e-9]
-    assert control["pump_spectrum_sigma_absorption"] == [1.0e-22]
-    assert control["pump_source_relay_offsets"].tolist() == [0, 1]
-    assert control["pump_relay_exit_surfaces"].tolist() == [12]
-    assert control["pump_relay_transmission"] == [0.75]
-    assert control["time_integrator"] == "implicit-euler"
-    assert control["implicit_iterations"] == 5
-    assert control["implicit_tolerance"] == 1.0e-7
+    assert control["pumpSourceTotalPower"] == [12.5]
+    assert control["pumpSourceRayCount"].tolist() == [1234]
+    assert control["pumpSourcePumpSteps"].tolist() == [4]
+    assert control["pumpSourceRngSeed"].tolist() == [99]
+    assert control["pumpSourceSurfaces"].tolist() == [11]
+    assert control["pumpSpectrumWavelengths"] == [940e-9]
+    assert control["pumpSpectrumSigmaAbsorption"] == [1.0e-22]
+    assert control["pumpSourceRelayOffsets"].tolist() == [0, 1]
+    assert control["pumpRelayExitSurfaces"].tolist() == [12]
+    assert control["pumpRelayTransmission"] == [0.75]
+    assert control["timeIntegrator"] == "implicit-euler"
+    assert control["implicitIterations"] == 5
+    assert control["implicitTolerance"] == 1.0e-7
 
-    simulation.enableASE = False
-    assert transport._simulation_run_control(simulation, steps=7, pumpSteps=None)["enable_ase"] is False
+    simulation.phiASE.ase_steps = 0
+    assert transport._simulation_run_control(simulation, steps=7)["aseSteps"] == 0
 
 
 def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypatch, tmp_path):
@@ -1862,7 +1987,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
                 threading.current_thread().name,
                 Path(input_path).name,
                 spec.name,
-                run_control["number_of_steps"],
+                run_control["numberOfSteps"],
             )
         )
         input_written.set()
@@ -1879,7 +2004,7 @@ def test_streaming_simulation_uses_receiver_thread_before_input_writer(monkeypat
         tmp_path / "output.sst",
         spec,
         SimpleNamespace(),
-        {"number_of_steps": 1},
+        {"numberOfSteps": 1},
     )
 
     assert states[0].step == 1
@@ -1949,7 +2074,7 @@ def test_streaming_simulation_keeps_input_series_open_until_backend_exits(monkey
         tmp_path / "output.sst",
         SimpleNamespace(name="adios-sst"),
         simulation,
-        {"number_of_steps": 1},
+        {"numberOfSteps": 1},
     )
 
     assert states[0].step == 1
@@ -2041,7 +2166,7 @@ def test_streaming_synchronized_debug_exchanges_control_after_each_snapshot(monk
         tmp_path / "output.sst",
         SimpleNamespace(name="adios-sst"),
         simulation,
-        {"number_of_steps": 3},
+        {"numberOfSteps": 3},
         on_state=update_control,
     )
 
@@ -2095,7 +2220,7 @@ def test_streaming_simulation_reports_backend_exit_when_input_sender_is_blocked(
                 tmp_path / "output.sst",
                 SimpleNamespace(name="adios-sst"),
                 SimpleNamespace(),
-                {"number_of_steps": 1},
+                {"numberOfSteps": 1},
             )
         assert "return code 2" in str(exc_info.value)
         assert "unknown option --cpp-control" not in str(exc_info.value)
@@ -2137,7 +2262,7 @@ def test_streaming_simulation_preserves_input_writer_failure(monkeypatch, tmp_pa
             tmp_path / "output.sst",
             SimpleNamespace(name="adios-sst"),
             SimpleNamespace(),
-            {"number_of_steps": 1},
+            {"numberOfSteps": 1},
         )
 
     assert isinstance(exc_info.value.__cause__, ValueError)
