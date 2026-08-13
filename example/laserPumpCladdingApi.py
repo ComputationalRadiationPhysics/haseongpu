@@ -301,27 +301,28 @@ def buildSimulation(
     absorption = 5.5
     medium = laserPumpCladdingMedium(cladAbsorption=absorption)
 
-    phiAse = PhiASE(
-        spectralProperties=spectralProperties,
-        propagationMode="forward",
-        minRays=10000,
-        maxRays=1000000,
-        relativeStandardErrorThreshold=0.1,
-        repetitions=4,
-        adaptiveSteps=4,
-        useReflections=True,
-        reflectionMaxIterations=40,
-        reflectionTolerance=1.0e-4,
-        surfaceReservoirSize=32,
-        monochromatic=False,
-        backend=backend,
-        openpmdBackend=openpmdBackend,
-        parallelMode="single",
-        numDevices=1,
-        nPerNode=1,
-        ase_steps=ase_steps,
-        **AseOverride,
-    )
+    phiAseParameters = {
+        "spectralProperties": spectralProperties,
+        "propagationMode": "forward",
+        "minRays": 10000,
+        "maxRays": 1000000,
+        "relativeStandardErrorThreshold": 0.1,
+        "repetitions": 4,
+        "adaptiveSteps": 4,
+        "useReflections": True,
+        "reflectionMaxIterations": 40,
+        "reflectionTolerance": 1.0e-4,
+        "surfaceReservoirSize": 32,
+        "monochromatic": False,
+        "backend": backend,
+        "openpmdBackend": openpmdBackend,
+        "parallelMode": "single",
+        "numDevices": 1,
+        "nPerNode": 1,
+        "ase_steps": ase_steps,
+    }
+    phiAseParameters.update(AseOverride)
+    phiAse = PhiASE(**phiAseParameters)
 
 
     pumpProfile = SuperGaussianPumpProfile(radius_u=1.5, radius_v=1.5, exponent=40)

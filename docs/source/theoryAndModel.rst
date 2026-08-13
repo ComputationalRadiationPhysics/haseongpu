@@ -295,8 +295,9 @@ Tet4 cell:
 Standard RK4 reevaluates ASE and pump transport at every stage.
 ``FrozenPhiAseRungeKutta4`` reuses its first ASE calculation for the remaining
 stages, while still evaluating the pump contribution. Setting
-``Simulation(enable_ase=False, ...)`` advances pump excitation and fluorescence
-without an ASE calculation.
+``PhiASE(ase_steps=0, ...)`` advances active pump excitation and fluorescence
+without an ASE calculation. Setting one pump's ``pump_steps`` to zero disables
+only that source.
 
 Model Limits
 ------------

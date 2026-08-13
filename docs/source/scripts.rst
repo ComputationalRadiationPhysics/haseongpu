@@ -13,7 +13,8 @@ through Tet4 cells and integrates a cell-data scalar along its tetrahedron
 chords. It writes a CSV plus a PNG plot of the resulting net gain factor over
 time.
 
-For the default ``laserPumpCladding.py`` output, run for example:
+For the default ``laserPumpCladdingApi.py`` or
+``laserPumpCladdingYaml.py`` output, run for example:
 
 .. code-block:: bash
 

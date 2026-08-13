@@ -19,6 +19,7 @@ controls; it does not own geometry or the evolving excitation state.
        backend="Host_Cpu_CpuSerial",
        openpmdBackend="auto",
        rngSeed=1234,
+       ase_steps=150,
    )
 
 Call it directly for one state or pass it to ``Simulation``:
@@ -37,6 +38,10 @@ termination information when reflections are enabled. A time-stepped
 
 Sampling controls
 -----------------
+
+``ase_steps``
+   Initial outer simulation steps that include ASE. ``None`` and zero disable
+   ASE in ``Simulation``. Direct one-state ``PhiASE.run`` calls are unaffected.
 
 ``minRays`` and ``maxRays``
    Initial and maximum global history counts. Adaptive execution adds
@@ -117,22 +122,24 @@ flattened cell range. Normal full-volume runs leave them unset.
 YAML and CLI helpers
 --------------------
 
-``fromYaml`` accepts run-control settings under ``experiment`` and ``compute``:
+``fromYaml`` accepts schema-v2 PhiASE settings under ``simulation.phi_ase``:
 
 .. code-block:: yaml
 
-   experiment:
-     minRays: 100000
-     maxRays: 1000000
-     relative_standard_error_threshold: 0.05
-     adaptive_steps: 4
-     use_reflections: true
-     reflection_max_iterations: 40
-   compute:
-     backend: Host_Cpu_CpuSerial
-     openpmd_backend: auto
-     parallel_mode: single
-     rng_seed: 1234
+   schema_version: 2
+   simulation:
+     phi_ase:
+       min_rays: 100000
+       max_rays: 1000000
+       relative_standard_error_threshold: 0.05
+       adaptive_steps: 4
+       ase_steps: 150
+       use_reflections: true
+       reflection_max_iterations: 40
+       backend: Host_Cpu_CpuSerial
+       openpmd_backend: auto
+       parallel_mode: single
+       rng_seed: 1234
 
 .. code-block:: python
 

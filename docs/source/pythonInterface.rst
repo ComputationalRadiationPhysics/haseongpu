@@ -24,8 +24,8 @@ The setup proceeds from geometry to physical state and then to solvers:
 #. ``CrossSectionData`` supplies wavelength-dependent absorption and emission
    cross sections.
 #. ``Pump`` describes a physical source. ``SurfacePumpInjector`` and optional
-   ``PlanarPumpRelay`` objects place that source in the geometry, while
-   ``MonteCarloPumpSolver`` controls its numerical sampling.
+   ``PlanarPumpRelay`` objects place that source in the geometry. Each pump owns
+   its ray count, RNG seed, and active outer steps.
 #. ``PhiASE`` controls the ASE Monte Carlo estimator and its compute and
    transport settings.
 #. ``Simulation`` combines those objects with a time integrator and returns one
@@ -39,7 +39,7 @@ A compact assembly has this shape:
    import numpy as np
    from HASEonGPU import (
        CrossSectionData, FrozenPhiAseRungeKutta4, GainMedium,
-       MonteCarloPumpSolver, PhiASE, Pump, PumpSpectrum, Simulation,
+       PhiASE, Pump, PumpSpectrum, Simulation,
        SurfacePumpInjector, VolumeTopology,
    )
 
@@ -54,11 +54,16 @@ A compact assembly has this shape:
    )
 
    spectra = CrossSectionData.fromDirectory("spectra", resolution=1000)
-   phi_ase = PhiASE.fromYaml("phiase.yaml", spectralProperties=spectra)
+   phi_ase = PhiASE.fromYaml(
+       "phiase.yaml", spectralProperties=spectra, ase_steps=150
+   )
    pump = Pump(
        total_power=16_000.0,
        spectrum=PumpSpectrum.monochromatic(940e-9),
        cross_sections=pump_cross_sections,
+       ray_count=50_000,
+       pump_steps=50,
+       rng_seed=5489,
    )
 
    simulation = Simulation(
@@ -66,7 +71,7 @@ A compact assembly has this shape:
        phi_ase=phi_ase,
        time_integrator=FrozenPhiAseRungeKutta4(),
        time_step_size=2e-5,
-       pump_solver=MonteCarloPumpSolver(ray_count=50_000, seed=5489),
+       simulation_steps=150,
        cross_sections=spectra,
    ).add_pump(
        pump,
@@ -74,7 +79,7 @@ A compact assembly has this shape:
    )
 
    simulation.on_step(write_state)
-   simulation.step(10)
+   simulation.step()
 
 The names passed to ``SurfacePumpInjector`` and ``SurfaceOptics`` resolve
 against surface domains on the topology. The ASE spectrum passed to ``PhiASE``
@@ -87,8 +92,9 @@ Configuration boundaries
 ------------------------
 
 Geometry, material state, spectra, and physical pumps are Python objects.
-``PhiASE.fromYaml`` loads numerical ASE, compute-backend, openPMD, and MPI run
-controls; keyword arguments override values from the file. The Alpaka compute
+``Simulation.from_yaml`` constructs a complete schema-v2 simulation object
+graph. ``PhiASE.fromYaml`` can read the ``simulation.phi_ase`` subsection for
+applications that assemble the remaining objects in Python. The Alpaka compute
 backend and openPMD storage backend are independent choices. See
 :doc:`Backend Selection <backendSelection>` and :doc:`openPMD Transport
 <openpmdTransport>` rather than duplicating those choices in simulation code.
@@ -107,4 +113,5 @@ Concept pages
    python_interface/phi_ase
    forwardAseRse
    python_interface/simulation
+   python_interface/configuration
    python_interface/utilities

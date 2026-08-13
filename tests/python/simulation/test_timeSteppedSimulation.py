@@ -88,6 +88,11 @@ def fakeCppSimulation(monkeypatch, smallTopology):
                 on_state(state)
         return states
 
+    monkeypatch.setattr(
+        transport,
+        "_ensure_backend_available",
+        lambda backend: SimpleNamespace(name="adios" if backend in (None, "auto") else backend),
+    )
     monkeypatch.setattr(transport, "runSimulation", fake_run_simulation)
     return captured
 

@@ -37,9 +37,11 @@ Select it in Python or YAML:
 
 .. code-block:: yaml
 
-   compute:
-     backend: Host_Cpu_CpuSerial       # Alpaka compute backend
-     openpmd_backend: auto              # choose a compatible backend
+   schema_version: 2
+   simulation:
+     phi_ase:
+       backend: Host_Cpu_CpuSerial       # Alpaka compute backend
+       openpmd_backend: auto              # choose a compatible backend
 
 Set ``PhiASE.openpmdBackend`` or the YAML ``openpmd_backend`` value to override
 automatic selection for a particular run.
@@ -82,6 +84,8 @@ waits for it before starting step *N+1*. Only records listed in
 ``control_fields`` are written in these later iterations; currently that list
 may contain ``beta_volume``. Static topology, spectra, backend selection, and
 all other initialization records are transferred only in iteration zero.
+The user-facing order of ``on_init``, ``on_step``, and ``before_step`` is
+documented in :ref:`simulation-callback-lifecycle`.
 
 Provider Compatibility
 ----------------------
@@ -192,20 +196,21 @@ Compiled Simulation Run Control
 For compiled ``Simulation`` runs, iteration attributes also include run-control
 metadata:
 
-* ``time_step`` and ``number_of_steps``
-* ``pump_steps``
-* ``enable_ase`` and ``pre_pump``
-* ``execution_mode`` (``autonomous`` or ``synchronized-debug``)
-* optional ``output_steps`` containing one-based completed-step indices; when
+* ``timeStep``, ``numberOfSteps``, and ``firstSimulationStep``
+* ``aseSteps`` and ``prePump``
+* ``executionMode`` (``autonomous`` or ``synchronized-debug``)
+* optional ``outputSteps`` containing one-based completed-step indices; when
   omitted, every completed step is emitted
-* ``output_fields_string`` and ``control_fields_string`` as scalar JSON arrays
+* ``outputFieldsString`` and ``controlFieldsString`` as scalar JSON arrays
   of field names; this scalar encoding is identical for ADIOS BP, ADIOS SST,
   and HDF5
-* ``time_integrator`` (``explicit-euler``, ``heun``, ``midpoint``,
+* ``timeIntegrator`` (``explicit-euler``, ``heun``, ``midpoint``,
   ``runge-kutta-4``, ``frozen-phi-ase-runge-kutta-4``,
   ``implicit-euler``, or ``exponential-euler``)
-* ``implicit_iterations`` and ``implicit_tolerance`` for implicit Euler
-* ``pump_schema_version`` (currently ``1``), ``pump_ray_count``, and ``pump_rng_seed``
+* ``implicitIterations`` and ``implicitTolerance`` for implicit Euler
+* ``pumpSchemaVersion`` (currently ``2``)
+* per-source ``pumpSourceRayCount``, ``pumpSourcePumpSteps``, and
+  ``pumpSourceRngSeed`` arrays
 * flattened source, spectrum, angular, profile, and planar-relay arrays
 
 Readers continue to accept the former ``output_fields`` and ``control_fields``
@@ -213,7 +218,7 @@ string-vector attributes for existing series. New writers use only the scalar
 JSON attributes so that run control has one backend-independent wire format.
 
 The C++ backend writes one output iteration for each selected completed step.
-Snapshot iterations contain the records selected by ``output_fields_string``;
+Snapshot iterations contain the records selected by ``outputFieldsString``;
 by default these are the cell-centered ``core_beta_volume`` record plus
 ``core_result_phi_ase``, ``core_result_standard_error``,
 ``core_result_relative_standard_error``, ``core_result_total_rays``,

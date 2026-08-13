@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from openpmd_backend_matrix import openpmd_test_backends
 from pyInclude import PhiASE
 import pyInclude.simulation as simulation_module
 
@@ -362,6 +363,9 @@ def testPhiAsePersistentOpenPmdSessionCanBeOpenedReusedAndClosed(
     crossSections,
     phiAseTestConfigPath,
 ):
+    if "adios-sst" not in openpmd_test_backends():
+        pytest.skip("persistent openPMD session test requires the adios-sst backend")
+
     events = []
     openpmdSession = object()
 
@@ -449,6 +453,9 @@ def testSimulationRunStepsRejectsExternalOpenPmdSessionOwnership():
 
 
 def testSimulationRunStepsPassesStreamingBackendToCompiledTransport(monkeypatch):
+    if "adios-sst" not in openpmd_test_backends():
+        pytest.skip("streaming simulation transport test requires the adios-sst backend")
+
     captured = {}
     simulation = object.__new__(simulation_module.Simulation)
     simulation.phiASE = SimpleNamespace(
