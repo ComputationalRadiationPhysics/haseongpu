@@ -107,7 +107,7 @@ namespace hase::kernels
                     continue;
                 info.area = 0.5 * twiceArea;
                 info.normal = normal * (1.0 / twiceArea);
-                hase::core::Point const center{
+                core::Point const center{
                     mesh.cellCenters[cell],
                     mesh.cellCenters[cell + mesh.numberOfCells],
                     mesh.cellCenters[cell + 2u * mesh.numberOfCells]};
@@ -129,7 +129,7 @@ namespace hase::kernels
 
     [[nodiscard]] inline hase::core::Point perpendicular(hase::core::Point const normal)
     {
-        hase::core::Point reference
+        core::Point reference
             = std::abs(normal.x) < 0.9 ? hase::core::Point{1.0, 0.0, 0.0} : hase::core::Point{0.0, 1.0, 0.0};
         return hostNormalize(hase::core::cross(normal, reference));
     }

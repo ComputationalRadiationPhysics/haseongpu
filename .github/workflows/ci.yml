@@ -6,7 +6,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  gitlab-extended-ci-gate:
+    name: Initialize CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Admit CI workflows
+        run: "true"
+
   pre-commit:
+    needs: gitlab-extended-ci-gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +24,7 @@ jobs:
         run: bash script/ci/pre-commit.sh
 
   ci:
+    needs: gitlab-extended-ci-gate
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.config.container }}
@@ -95,6 +104,7 @@ jobs:
         run: bash script/ci/test-pytest.sh
 
   openpmd-provider-smoke:
+    needs: gitlab-extended-ci-gate
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
