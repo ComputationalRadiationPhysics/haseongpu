@@ -16,6 +16,7 @@ SPEC.loader.exec_module(BRIDGE)
 
 SOURCE_SHA = "a" * 40
 GITHUB_RUN_URL = "https://github.com/example/haseongpu/actions/runs/123"
+GITHUB_BRIDGE_RUN_URL = "https://github.com/example/haseongpu/actions/runs/456"
 GITLAB_PIPELINE_URL = (
     "https://codebase.helmholtz.cloud/th168408/"
     "haseongpu-extended-ci/-/pipelines/42"
@@ -29,6 +30,7 @@ def configure_environment(monkeypatch):
         "HASE_GITHUB_REPOSITORY": "example/haseongpu",
         "HASE_GITHUB_TOKEN": "github-token",
         "HASE_GITHUB_RUN_URL": GITHUB_RUN_URL,
+        "HASE_GITHUB_BRIDGE_RUN_URL": GITHUB_BRIDGE_RUN_URL,
         "HASE_GITLAB_PROJECT_ID": "1234",
         "HASE_GITLAB_TRIGGER_TOKEN": "trigger-token",
         "HASE_GITLAB_READ_API_TOKEN": "read-token",
@@ -198,7 +200,7 @@ def test_trigger_error_updates_error_status(monkeypatch):
         BRIDGE.main()
 
     assert [status["state"] for status in statuses] == ["error"]
-    assert statuses[-1]["target_url"] == GITHUB_RUN_URL
+    assert statuses[-1]["target_url"] == GITHUB_BRIDGE_RUN_URL
 
 
 @pytest.mark.parametrize(
@@ -227,7 +229,7 @@ def test_invalid_source_repository_is_rejected(monkeypatch, repository):
         BRIDGE.main()
 
     assert [status["state"] for status in statuses] == ["error"]
-    assert statuses[0]["target_url"] == GITHUB_RUN_URL
+    assert statuses[0]["target_url"] == GITHUB_BRIDGE_RUN_URL
 
 
 @pytest.mark.parametrize(
@@ -262,4 +264,4 @@ def test_invalid_pipeline_url_updates_error_status(monkeypatch, pipeline):
         BRIDGE.main()
 
     assert [status["state"] for status in statuses] == ["error"]
-    assert statuses[0]["target_url"] == GITHUB_RUN_URL
+    assert statuses[0]["target_url"] == GITHUB_BRIDGE_RUN_URL
