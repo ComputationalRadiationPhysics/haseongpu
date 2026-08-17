@@ -15,6 +15,8 @@ BRIDGE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BRIDGE)
 
 SOURCE_SHA = "a" * 40
+SOURCE_RUN_ID = 123
+SOURCE_RUN_ATTEMPT = 2
 GITHUB_RUN_URL = "https://github.com/example/haseongpu/actions/runs/123"
 GITHUB_BRIDGE_RUN_URL = "https://github.com/example/haseongpu/actions/runs/456"
 GITLAB_PIPELINE_URL = (
@@ -26,6 +28,8 @@ GITLAB_PIPELINE_URL = (
 def configure_environment(monkeypatch):
     environment = {
         "HASE_SOURCE_SHA": SOURCE_SHA,
+        "HASE_SOURCE_RUN_ID": str(SOURCE_RUN_ID),
+        "HASE_SOURCE_RUN_ATTEMPT": str(SOURCE_RUN_ATTEMPT),
         "HASE_SOURCE_REPOSITORY": "contributor/haseongpu",
         "HASE_GITHUB_REPOSITORY": "example/haseongpu",
         "HASE_GITHUB_TOKEN": "github-token",
@@ -127,6 +131,17 @@ def test_post_commit_status_uses_github_status_api(monkeypatch):
     }
 
 
+def test_github_status_description_records_source_run_within_limit():
+    description = BRIDGE.github_status_description(
+        "x" * 200, SOURCE_RUN_ID, SOURCE_RUN_ATTEMPT
+    )
+
+    assert len(description) == BRIDGE.GITHUB_STATUS_DESCRIPTION_LIMIT
+    assert description.endswith(
+        f"[CI run {SOURCE_RUN_ID}/{SOURCE_RUN_ATTEMPT}]"
+    )
+
+
 def test_success_updates_pending_status_and_pipeline_result(monkeypatch):
     statuses = record_statuses(monkeypatch)
     triggered = configure_pipeline(monkeypatch)
@@ -151,6 +166,12 @@ def test_success_updates_pending_status_and_pipeline_result(monkeypatch):
         "HASE_GITHUB_RUN_URL": GITHUB_RUN_URL,
     }
     assert [status["state"] for status in statuses] == ["pending", "success"]
+    assert all(
+        status["description"].endswith(
+            f"[CI run {SOURCE_RUN_ID}/{SOURCE_RUN_ATTEMPT}]"
+        )
+        for status in statuses
+    )
     assert statuses[0]["target_url"] == GITLAB_PIPELINE_URL
     assert statuses[1]["target_url"] == GITLAB_PIPELINE_URL
 
@@ -167,6 +188,9 @@ def test_failed_pipeline_updates_failure_status(monkeypatch):
     assert BRIDGE.main() == 1
 
     assert [status["state"] for status in statuses] == ["pending", "failure"]
+    assert statuses[-1]["description"].endswith(
+        f"[CI run {SOURCE_RUN_ID}/{SOURCE_RUN_ATTEMPT}]"
+    )
     assert statuses[-1]["target_url"] == GITLAB_PIPELINE_URL
 
 
@@ -200,6 +224,9 @@ def test_trigger_error_updates_error_status(monkeypatch):
         BRIDGE.main()
 
     assert [status["state"] for status in statuses] == ["error"]
+    assert statuses[-1]["description"].endswith(
+        f"[CI run {SOURCE_RUN_ID}/{SOURCE_RUN_ATTEMPT}]"
+    )
     assert statuses[-1]["target_url"] == GITHUB_BRIDGE_RUN_URL
 
 

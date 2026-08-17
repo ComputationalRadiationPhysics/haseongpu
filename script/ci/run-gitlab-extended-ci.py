@@ -21,6 +21,7 @@ GITLAB_WEB_HOST = "codebase.helmholtz.cloud"
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_API_VERSION = "2026-03-10"
 GITHUB_STATUS_CONTEXT = "ci/gitlab/codebase.helmholtz.cloud"
+GITHUB_STATUS_DESCRIPTION_LIMIT = 140
 GITHUB_REPOSITORY_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/"
     r"[A-Za-z0-9._-]{1,100}"
@@ -46,6 +47,24 @@ def required_environment(name: str) -> str:
     if not value:
         raise RuntimeError(f"required environment variable is empty: {name}")
     return value
+
+
+def positive_integer_environment(name: str) -> int:
+    value = required_environment(name)
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise RuntimeError(f"{name} must be a positive integer") from error
+    if parsed < 1:
+        raise RuntimeError(f"{name} must be a positive integer")
+    return parsed
+
+
+def github_status_description(
+    message: str, source_run_id: int, source_run_attempt: int
+) -> str:
+    suffix = f" [CI run {source_run_id}/{source_run_attempt}]"
+    return f"{message[: GITHUB_STATUS_DESCRIPTION_LIMIT - len(suffix)]}{suffix}"
 
 
 def github_repository_environment(name: str) -> str:
@@ -188,11 +207,25 @@ def main() -> int:
     source_sha = required_environment("HASE_SOURCE_SHA").lower()
     if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
         raise RuntimeError("HASE_SOURCE_SHA must be a full hexadecimal Git commit")
+    source_run_id = positive_integer_environment("HASE_SOURCE_RUN_ID")
+    source_run_attempt = positive_integer_environment("HASE_SOURCE_RUN_ATTEMPT")
     github_repository = github_repository_environment("HASE_GITHUB_REPOSITORY")
     github_token = required_environment("HASE_GITHUB_TOKEN")
     github_run_url = required_environment("HASE_GITHUB_RUN_URL")
     github_bridge_run_url = required_environment("HASE_GITHUB_BRIDGE_RUN_URL")
     pipeline_url = github_bridge_run_url
+
+    def publish_status(state: str, description: str, target_url: str) -> None:
+        post_commit_status(
+            github_repository,
+            source_sha,
+            github_token,
+            state,
+            github_status_description(
+                description, source_run_id, source_run_attempt
+            ),
+            target_url,
+        )
 
     try:
         project_id = required_environment("HASE_GITLAB_PROJECT_ID")
@@ -226,10 +259,7 @@ def main() -> int:
         pipeline_url = pipeline_web_url(pipeline, pipeline_id, project_id)
         print(f"Triggered GitLab pipeline {pipeline_id}", flush=True)
         append_step_summary(pipeline_id, source_sha, pipeline_url)
-        post_commit_status(
-            github_repository,
-            source_sha,
-            github_token,
+        publish_status(
             "pending",
             f"GitLab pipeline {pipeline_id} is in progress",
             pipeline_url,
@@ -245,20 +275,14 @@ def main() -> int:
                 previous_status = status
 
             if status == "success":
-                post_commit_status(
-                    github_repository,
-                    source_sha,
-                    github_token,
+                publish_status(
                     "success",
                     f"GitLab pipeline {pipeline_id} succeeded",
                     pipeline_url,
                 )
                 return 0
             if status not in TRANSIENT_STATUSES:
-                post_commit_status(
-                    github_repository,
-                    source_sha,
-                    github_token,
+                publish_status(
                     "failure",
                     f"GitLab pipeline {pipeline_id} finished with status {status}",
                     pipeline_url,
@@ -268,10 +292,7 @@ def main() -> int:
                 )
                 return 1
             if time.monotonic() >= deadline:
-                post_commit_status(
-                    github_repository,
-                    source_sha,
-                    github_token,
+                publish_status(
                     "error",
                     f"Timed out waiting for GitLab pipeline {pipeline_id}",
                     pipeline_url,
@@ -284,10 +305,7 @@ def main() -> int:
             time.sleep(POLL_INTERVAL_SECONDS)
     except RuntimeError:
         try:
-            post_commit_status(
-                github_repository,
-                source_sha,
-                github_token,
+            publish_status(
                 "error",
                 "GitLab bridge failed before the pipeline completed",
                 pipeline_url,

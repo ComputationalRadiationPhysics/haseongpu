@@ -13,6 +13,26 @@ jobs:
       - name: Admit CI workflows
         run: "true"
 
+  gitlab-extended-ci-status:
+    name: GitLab extended CI
+    needs: gitlab-extended-ci-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Wait for GitLab extended CI
+        env:
+          HASE_GITHUB_TOKEN: ${{ github.token }}
+          HASE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HASE_SOURCE_RUN_ID: ${{ github.run_id }}
+          HASE_SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: python3 script/ci/wait-for-gitlab-extended-ci.py
+
   pre-commit:
     needs: gitlab-extended-ci-gate
     runs-on: ubuntu-latest
