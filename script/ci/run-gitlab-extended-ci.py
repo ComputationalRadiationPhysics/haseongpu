@@ -191,7 +191,8 @@ def main() -> int:
     github_repository = github_repository_environment("HASE_GITHUB_REPOSITORY")
     github_token = required_environment("HASE_GITHUB_TOKEN")
     github_run_url = required_environment("HASE_GITHUB_RUN_URL")
-    pipeline_url = github_run_url
+    github_bridge_run_url = required_environment("HASE_GITHUB_BRIDGE_RUN_URL")
+    pipeline_url = github_bridge_run_url
 
     try:
         project_id = required_environment("HASE_GITLAB_PROJECT_ID")

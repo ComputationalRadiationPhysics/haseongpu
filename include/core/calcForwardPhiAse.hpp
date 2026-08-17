@@ -183,7 +183,7 @@ namespace hase::core
                 alpaka::onHost::fill(m_queue, m_droppedRays, 0u, alpaka::Vec{static_cast<std::size_t>(m_volumeCount)});
             }
 
-            auto accumulation = hase::kernels::forward::ForwardAccumulationSpans{
+            auto accumulation = kernels::forward::ForwardAccumulationSpans{
                 m_vertexBatchScoreSum.getMdSpan(),
                 m_volumeRayVisits.getMdSpan(),
                 m_droppedRays.getMdSpan()};
