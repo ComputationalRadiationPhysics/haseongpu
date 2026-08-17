@@ -24,6 +24,8 @@ jobs:
       HASE_GITLAB_READ_API_TOKEN: ${{ secrets.HASE_GITLAB_READ_API_TOKEN }}
       HASE_GITLAB_PROJECT_ID: ${{ vars.HASE_GITLAB_PROJECT_ID }}
       HASE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      HASE_SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+      HASE_SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       HASE_SOURCE_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
       HASE_SOURCE_EVENT: ${{ github.event.workflow_run.event }}
       HASE_SOURCE_REF: ${{ github.event.workflow_run.head_branch }}
