@@ -184,11 +184,11 @@ def buildSimulation(
     gainMedium = GainMedium([component], name="amplifier")
     phiAseParameters = {
         "propagationMode": "forward",
-        "minRays": 10000,
+        "minRays": 100000,
         "maxRays": 1000000,
         "relativeStandardErrorThreshold": 0.1,
         "repetitions": 4,
-        "adaptiveSteps": 4,
+        "adaptiveSteps": 2,
         "useReflections": True,
         "reflectionMaxIterations": 40,
         "reflectionTolerance": 1.0e-4,
@@ -414,6 +414,8 @@ def main(argv=None):
     parser.add_argument("--output-steps", type=int, nargs="+", default=None)
     parser.add_argument("--pump-steps", type=int, default=50)
     parser.add_argument("--ase-steps", type=int, default=150)
+    parser.add_argument("--ase-min-rays", type=int, default=100000)
+    parser.add_argument("--ase-max-rays", type=int, default=100000)
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
     parser.add_argument("--disable-pre-pump", action="store_true")
@@ -430,7 +432,12 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    overrides = {} if args.rng_seed is None else {"rngSeed": args.rng_seed}
+    overrides = {
+        "minRays": args.ase_min_rays,
+        "maxRays": args.ase_max_rays,
+    }
+    if args.rng_seed is not None:
+        overrides["rngSeed"] = args.rng_seed
     state = runExample(
         args.backend,
         simulationSteps=args.simulation_steps,

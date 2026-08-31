@@ -273,10 +273,8 @@ namespace hase::core
                 m_vertexBatchScoreSum.getMdSpan(),
                 m_volumeRayVisits.getMdSpan(),
                 m_droppedRays.getMdSpan()};
-            auto frameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
-                m_devBundle.device,
-                m_devBundle.executor,
-                alpaka::Vec{rayCount});
+            auto frameSpec
+                = alpakaUtils::getFrameSpec<uint32_t>(m_devBundle.device, m_devBundle.executor, alpaka::Vec{rayCount});
             m_srmResult = makeForwardRawResult(m_volumeCount, m_materialVertexCount, m_batchCount);
             m_srmResult.rayCount = rayCount;
             if(experiment.useReflections)
@@ -398,7 +396,7 @@ namespace hase::core
          * @param experiment Trace and reflection controls.
          */
         void evaluate(
-            hase::data::TraceView const mesh,
+            data::TraceView const mesh,
             ForwardPhiAseRawResult& result,
             float& runtime,
             unsigned rayCount,

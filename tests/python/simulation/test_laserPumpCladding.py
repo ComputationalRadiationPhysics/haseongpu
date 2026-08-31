@@ -178,6 +178,8 @@ def testLaserPumpCladdingApiAndYamlBuildEquivalentSimulations():
     )
     for name in phi_fields:
         assert getattr(api.phiASE, name) == getattr(yaml.phiASE, name), name
+    assert api.phiASE.minRays == 100000
+    assert api.phiASE.maxRays == 100000
     assert api.phiASE.useReflections is True
     assert api.prePump == yaml.prePump is True
     assert [component.name for component in api.opticalComponents] == [
@@ -784,6 +786,20 @@ def testLaserPumpCladdingCliAcceptsZeroAseSteps(monkeypatch, tmp_path):
     assert calls[-1]["kwargs"]["aseSteps"] == 0
     assert calls[-1]["kwargs"]["spectralResolution"] == 191
     assert calls[-1]["kwargs"]["useCladding"] is True
+
+
+def testLaserPumpCladdingCliForwardsAseRayBounds(monkeypatch):
+    calls = []
+
+    def fake_run_example(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaVolume=np.zeros((2, 3)))
+
+    monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
+    laserPumpCladding.main(["--ase-min-rays", "25000", "--ase-max-rays", "400000"])
+
+    assert calls[-1]["kwargs"]["minRays"] == 25000
+    assert calls[-1]["kwargs"]["maxRays"] == 400000
 
 
 def testLaserPumpCladdingCliCanDisableCladding(monkeypatch, tmp_path):

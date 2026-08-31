@@ -104,11 +104,11 @@ simulation:
   phi_ase:
     ase_steps: 150
     propagation_mode: forward
-    min_rays: 10000
+    min_rays: 100000
     max_rays: 1000000
     relative_standard_error_threshold: 0.1
     repetitions: 4
-    adaptive_steps: 4
+    adaptive_steps: 2 # first run with 100K - second with 1M rays
     use_reflections: true
     reflection_max_iterations: 40
     reflection_tolerance: 1.0e-4

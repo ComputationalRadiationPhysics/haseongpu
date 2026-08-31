@@ -131,10 +131,11 @@ steps. ``SurfacePumpInjector`` places the source on the lower face;
 the same aperture.
 
 ``PhiASE`` performs source-driven forward Monte Carlo transport. The default
-run uses adaptive global ray batches, an RSE target of 0.1, and the
-surface-resampling reflection model. ``FrozenPhiAseRungeKutta4`` reuses the
-first ASE evaluation within each RK4 outer step while reevaluating pump
-transport at every stage.
+run uses 100,000 forward rays, an RSE target of 0.1, and the
+surface-resampling reflection model. The API launcher accepts
+``--ase-min-rays`` and ``--ase-max-rays`` to enable adaptive ray-count bounds.
+``FrozenPhiAseRungeKutta4`` reuses the first ASE evaluation within each RK4
+outer step while reevaluating pump transport at every stage.
 
 Run and inspect snapshots
 -------------------------
