@@ -74,6 +74,7 @@ namespace hase::core
     {
         using T_DoubleBuffer
             = ALPAKA_TYPEOF(alpaka::onHost::alloc<double>(std::declval<T_Device&>(), std::uint32_t{1u}));
+        using T_ByteBuffer = ALPAKA_TYPEOF(alpaka::onHost::alloc<char>(std::declval<T_Device&>(), std::uint32_t{1u}));
         using T_DoubleView = ALPAKA_TYPEOF(std::declval<T_DoubleBuffer&>().getView());
         using SamplingView = hase::kernels::forward::ReflectionSamplingSpans<T_DoubleView, T_DoubleView>;
         static_assert(std::is_trivially_copyable_v<SamplingView>);
@@ -89,6 +90,10 @@ namespace hase::core
             , second(device, maxRayCount)
             , samplingCdf(alpaka::onHost::alloc<double>(device, maxRayCount))
             , samplingTotalWeight(alpaka::onHost::alloc<double>(device, 1u))
+            , samplingCdfScanBuffer(
+                  alpaka::onHost::alloc<char>(
+                      device,
+                      alpaka::onHost::getScanBufferSize<double>(alpaka::Vec{maxRayCount})))
             , maxRayCount(maxRayCount)
         {
         }
@@ -116,8 +121,8 @@ namespace hase::core
         }
 
         /**
-         * @brief Build a cumulative weight array in fixed ray-index order.
-         * @param devBundle Device and executor used for the single-worker kernel.
+         * @brief Build a cumulative weight array in ray-index order with a parallel scan.
+         * @param devBundle Device and executor used for the transform and scan.
          * @param queue Queue targeting the workspace device.
          * @param bank Candidate bank supplying one weight per input ray.
          * @param rayCount Number of candidate slots participating in resampling.
@@ -130,6 +135,16 @@ namespace hase::core
             ReflectionCandidateBank<T_Device>& bank,
             std::uint32_t const rayCount)
         {
+            auto candidateWeights = bank.weights.getView().getSubView(alpaka::Vec{rayCount});
+            auto cdf = samplingCdf.getView().getSubView(alpaka::Vec{rayCount});
+            alpaka::onHost::transform(
+                queue,
+                devBundle.executor,
+                cdf,
+                alpaka::ScalarFunc{hase::kernels::forward::FilterReflectionSamplingWeight{}},
+                candidateWeights);
+            alpaka::onHost::inclusiveScanInPlace(queue, devBundle.executor, samplingCdfScanBuffer, cdf);
+
             auto const scalarFrameSpec = hase::alpakaUtils::getFrameSpec<std::uint32_t>(
                 devBundle.device,
                 devBundle.executor,
@@ -137,9 +152,8 @@ namespace hase::core
             queue.enqueue(
                 scalarFrameSpec,
                 alpaka::KernelBundle{
-                    hase::kernels::forward::BuildOrderedReflectionSamplingCdf{},
+                    hase::kernels::forward::CaptureReflectionSamplingTotalWeight{},
                     rayCount,
-                    bank.view(),
                     samplingView()});
 
             std::array<double, 1u> totalWeightHost{};
@@ -153,6 +167,7 @@ namespace hase::core
         ReflectionCandidateBank<T_Device> second;
         T_DoubleBuffer samplingCdf;
         T_DoubleBuffer samplingTotalWeight;
+        T_ByteBuffer samplingCdfScanBuffer;
         std::uint32_t maxRayCount;
     };
 } // namespace hase::core

@@ -490,6 +490,50 @@ TEST_CASE("reflected histories use exact systematic weighted resampling", "[forw
     CHECK(reflectionCandidateIndex(cdf, cdf.size(), cdf.back(), 9u, 10u, 0.5) == 1u);
 }
 
+TEST_CASE("reflection sampling filters invalid candidate weights", "[forward][reflection][sampling]")
+{
+    auto const filter = hase::kernels::forward::FilterReflectionSamplingWeight{};
+
+    CHECK(filter(2.5) == 2.5);
+    CHECK(filter(0.0) == 0.0);
+    CHECK(filter(-1.0) == 0.0);
+    CHECK(filter(std::numeric_limits<double>::infinity()) == 0.0);
+    CHECK(filter(std::numeric_limits<double>::quiet_NaN()) == 0.0);
+}
+
+TEST_CASE(
+    "reflection sampling builds a filtered cumulative weight on each backend",
+    "[forward][reflection][sampling][backend]")
+{
+    unsigned testedBackendCount = 0u;
+    auto const backends
+        = alpaka::onHost::allBackends(alpaka::onHost::enabledDeviceSpecs, alpaka::exec::enabledExecutors);
+    alpaka::onHost::executeForEachIfHasDevice(
+        [&](alpaka::concepts::BackendSpec auto const& backend) -> int
+        {
+            auto device = alpaka::onHost::makeDeviceSelector(backend).makeDevice(0);
+            auto const executor = alpaka::getExecutor(backend);
+            auto queue = device.makeQueue(alpaka::queueKind::blocking);
+            hase::alpakaUtils::DevBundle devBundle(device, executor);
+            std::array<double, 5u> weights{1.0, std::numeric_limits<double>::infinity(), 2.0, -1.0, 3.0};
+            hase::core::ReflectionResamplingScratch scratch(device, weights.size());
+            auto candidateWeights = hase::alpakaUtils::getHybridBuffer(weights, scratch.first.weights);
+            candidateWeights.toDevice(queue);
+
+            double const totalWeight = scratch.updateSampling(devBundle, queue, scratch.first, weights.size());
+            std::array<double, 5u> cdf{};
+            auto cumulativeWeights = hase::alpakaUtils::getHybridBuffer(cdf, scratch.samplingCdf);
+            cumulativeWeights.toHost(queue);
+
+            CHECK(totalWeight == 6.0);
+            CHECK(cdf == std::array<double, 5u>{1.0, 1.0, 3.0, 3.0, 6.0});
+            ++testedBackendCount;
+            return 0;
+        },
+        backends);
+    CHECK(testedBackendCount > 0u);
+}
+
 TEST_CASE("reflection resampling offset depends only on seed and pass", "[forward][reflection][sampling]")
 {
     using hase::kernels::forward::reflectionResamplingOffset;

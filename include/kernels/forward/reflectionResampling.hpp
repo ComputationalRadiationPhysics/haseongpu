@@ -108,24 +108,24 @@ namespace hase::kernels::forward
         return ray::BoundaryResult::stop;
     }
 
-    /** @brief Build a reproducible cumulative weight array in increasing ray-index order. */
-    struct BuildOrderedReflectionSamplingCdf
+    /** @brief Map invalid reflected-candidate weights to zero before building the sampling CDF. */
+    struct FilterReflectionSamplingWeight
+    {
+        [[nodiscard]] ALPAKA_FN_HOST_ACC constexpr double operator()(double const weight) const
+        {
+            return weight > 0.0 && alpaka::math::isfinite(weight) ? weight : 0.0;
+        }
+    };
+
+    /** @brief Capture the final unnormalized reflected-candidate prefix. */
+    struct CaptureReflectionSamplingTotalWeight
     {
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const&,
             std::uint32_t const candidateCount,
-            alpaka::concepts::SpecializationOf<ReflectionCandidateSpans> auto candidates,
             alpaka::concepts::SpecializationOf<ReflectionSamplingSpans> auto sampling) const
         {
-            double cumulativeWeight = 0.0;
-            for(std::uint32_t candidate = 0u; candidate < candidateCount; ++candidate)
-            {
-                double const weight = candidates.weights[candidate];
-                if(weight > 0.0 && alpaka::math::isfinite(weight))
-                    cumulativeWeight += weight;
-                sampling.cdf[candidate] = cumulativeWeight;
-            }
-            sampling.totalWeight[0u] = cumulativeWeight;
+            sampling.totalWeight[0u] = candidateCount == 0u ? 0.0 : sampling.cdf[candidateCount - 1u];
         }
     };
 
