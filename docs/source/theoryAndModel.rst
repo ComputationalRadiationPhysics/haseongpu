@@ -327,7 +327,9 @@ stages, while still evaluating the pump contribution.
 ``FrozenSourcesRungeKutta4`` evaluates pump and ASE transport once at the
 pre-step beta field, then holds both resulting rate fields fixed during all
 four RK4 stages. Only the fluorescence term :math:`-\beta/\tau` changes with
-the intermediate stage field. Setting
+the intermediate stage field. Consequently, a snapshot from this solver pairs
+the post-step beta field with the pump and ASE rate fields frozen at the
+pre-step beta field. Setting
 ``PhiASE(ase_steps=0, ...)`` advances active pump excitation and fluorescence
 without an ASE calculation. Setting one pump's ``pump_steps`` to zero disables
 only that source.

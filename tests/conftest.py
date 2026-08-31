@@ -88,10 +88,15 @@ def _build_python_roots():
 
 
 def _clear_hase_modules():
+    module_roots = (
+        "HASEonGPU",
+        "hase_transport",
+        "hase_units",
+        "material_library",
+        "pyInclude",
+    )
     for name in list(sys.modules):
-        if name == "HASEonGPU" or name.startswith("HASEonGPU."):
-            del sys.modules[name]
-        elif name == "pyInclude" or name.startswith("pyInclude."):
+        if any(name == root or name.startswith(f"{root}.") for root in module_roots):
             del sys.modules[name]
 
 

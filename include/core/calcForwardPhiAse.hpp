@@ -417,10 +417,10 @@ namespace hase::core
          * @param rayCount Total histories represented by the raw accumulators.
          * @param sourceStrengthTotal Total source-strength normalization.
          */
-        void finalizeCellPhiAse(hase::data::TraceView const mesh, unsigned rayCount, double sourceStrengthTotal)
+        void finalizeCellPhiAse(data::TraceView const mesh, unsigned rayCount, double sourceStrengthTotal)
         {
             m_rseBatchRayCountsBuffer.toDevice(m_queue);
-            hase::kernels::enqueueFinalizeForwardCellPhiAse(
+            kernels::enqueueFinalizeForwardCellPhiAse(
                 m_devBundle,
                 m_queue,
                 mesh,
@@ -448,7 +448,7 @@ namespace hase::core
          * @param sourceStrengthTotal Total source-strength normalization.
          */
         void uploadAndFinalize(
-            hase::data::TraceView const mesh,
+            data::TraceView const mesh,
             ForwardPhiAseRawResult const& rawResult,
             double const sourceStrengthTotal)
         {
@@ -471,7 +471,7 @@ namespace hase::core
          * @return Total source strength copied back to the host.
          */
         double rebuildSourceStrengthPrefix(
-            hase::data::ResidentTrace<T_Device>& meshContainer,
+            data::ResidentTrace<T_Device>& meshContainer,
             alpaka::concepts::IView<double> auto const& betaVolume)
         {
             auto mesh = meshContainer.view();
@@ -483,13 +483,13 @@ namespace hase::core
             else
             {
                 auto sourceStrengthPrefix = meshContainer.sourceStrengthPrefix.toDeviceView();
-                auto const cellFrameSpec = hase::alpakaUtils::getFrameSpec<uint32_t>(
+                auto const cellFrameSpec = alpakaUtils::getFrameSpec<uint32_t>(
                     m_devBundle.device,
                     m_devBundle.executor,
                     alpaka::Vec{mesh.numberOfCells});
                 m_queue.enqueue(
                     cellFrameSpec,
-                    alpaka::KernelBundle{hase::kernels::BuildSourceStrengthWeights{}, mesh, sourceStrengthPrefix});
+                    alpaka::KernelBundle{kernels::BuildSourceStrengthWeights{}, mesh, sourceStrengthPrefix});
                 alpaka::onHost::inclusiveScanInPlace(
                     m_queue,
                     m_devBundle.executor,
@@ -574,9 +574,9 @@ namespace hase::core
         using ExactSurfaceReservoirScratch
             = SurfaceReservoirScratch<T_Device, hase::kernels::forward::surfaceReservoirPosition::Exact>;
         using CentroidSurfaceReservoirScratch
-            = SurfaceReservoirScratch<T_Device, hase::kernels::forward::surfaceReservoirPosition::Centroid>;
+            = SurfaceReservoirScratch<T_Device, kernels::forward::surfaceReservoirPosition::Centroid>;
 
-        hase::alpakaUtils::DevBundle<T_Device, T_Exec> m_devBundle;
+        alpakaUtils::DevBundle<T_Device, T_Exec> m_devBundle;
         T_Queue m_queue;
         std::vector<std::uint32_t> m_rseBatchRayCounts;
         T_RseBatchRayCountsBuffer m_rseBatchRayCountsBuffer;
