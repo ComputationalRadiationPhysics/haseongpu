@@ -277,36 +277,18 @@ namespace hase::core
                 = alpakaUtils::getFrameSpec<uint32_t>(m_devBundle.device, m_devBundle.executor, alpaka::Vec{rayCount});
             m_srmResult = makeForwardRawResult(m_volumeCount, m_materialVertexCount, m_batchCount);
             m_srmResult.rayCount = rayCount;
-            if(experiment.useReflections)
+            auto enqueueTrace = [&](hase::kernels::forward::concepts::TracePolicy auto const diagnostics)
             {
-                auto const controls = resolveSrmControls(experiment);
-                m_srmResult.srmMaxIterations = controls.maxIterations;
-                m_srmResult.srmDivergenceStreak = controls.divergenceStreak;
-                if(experiment.reflectionMode == "direct")
+                if(experiment.useReflections)
                 {
-                    if(!m_directReflectionScratch)
-                        throw std::runtime_error("direct reflection scratch was not initialized");
-                    runForwardSrm(
-                        m_devBundle,
-                        m_queue,
-                        mesh,
-                        experiment,
-                        m_srmResult,
-                        rayCount,
-                        rseBatch,
-                        betaVolumeTotal,
-                        m_vertexBatchScoreSum,
-                        m_volumeRayVisits,
-                        m_droppedRays,
-                        rngSeed,
-                        controls,
-                        *m_directReflectionScratch);
-                }
-                else
-                {
-                    auto runSurfaceSrm = [&](auto& scratch)
+                    auto const controls = resolveSrmControls(experiment);
+                    m_srmResult.srmMaxIterations = controls.maxIterations;
+                    m_srmResult.srmDivergenceStreak = controls.divergenceStreak;
+                    if(experiment.reflectionMode == "direct")
                     {
-                        runForwardSurfaceSrm(
+                        if(!m_directReflectionScratch)
+                            throw std::runtime_error("direct reflection scratch was not initialized");
+                        runForwardSrm(
                             m_devBundle,
                             m_queue,
                             mesh,
@@ -320,36 +302,70 @@ namespace hase::core
                             m_droppedRays,
                             rngSeed,
                             controls,
-                            scratch);
-                    };
-                    if(experiment.srmPositionMode == "centroid")
-                    {
-                        if(!m_centroidSurfaceReservoirScratch)
-                            throw std::runtime_error("centroid surface reservoir scratch was not initialized");
-                        runSurfaceSrm(*m_centroidSurfaceReservoirScratch);
+                            *m_directReflectionScratch,
+                            diagnostics);
                     }
                     else
                     {
-                        if(!m_exactSurfaceReservoirScratch)
-                            throw std::runtime_error("exact surface reservoir scratch was not initialized");
-                        runSurfaceSrm(*m_exactSurfaceReservoirScratch);
+                        auto runSurfaceSrm = [&](auto& scratch)
+                        {
+                            runForwardSurfaceSrm(
+                                m_devBundle,
+                                m_queue,
+                                mesh,
+                                experiment,
+                                m_srmResult,
+                                rayCount,
+                                rseBatch,
+                                betaVolumeTotal,
+                                m_vertexBatchScoreSum,
+                                m_volumeRayVisits,
+                                m_droppedRays,
+                                rngSeed,
+                                controls,
+                                scratch,
+                                diagnostics);
+                        };
+                        if(experiment.srmPositionMode == "centroid")
+                        {
+                            if(!m_centroidSurfaceReservoirScratch)
+                                throw std::runtime_error("centroid surface reservoir scratch was not initialized");
+                            runSurfaceSrm(*m_centroidSurfaceReservoirScratch);
+                        }
+                        else
+                        {
+                            if(!m_exactSurfaceReservoirScratch)
+                                throw std::runtime_error("exact surface reservoir scratch was not initialized");
+                            runSurfaceSrm(*m_exactSurfaceReservoirScratch);
+                        }
                     }
                 }
-            }
+                else
+                {
+                    BENCH_SYNC(m_queue, AccumulateForwardPhiAse);
+                    m_queue.enqueue(
+                        frameSpec,
+                        alpaka::KernelBundle{
+                            hase::kernels::forward::AccumulateForwardPhiAse{},
+                            hase::kernels::forward::TracePolicyList{
+                                hase::kernels::forward::tracePolicy::source::volume,
+                                hase::kernels::forward::tracePolicy::cell::forwardAse,
+                                hase::kernels::forward::tracePolicy::boundary::escape,
+                                hase::kernels::forward::tracePolicy::position::none,
+                                diagnostics},
+                            mesh,
+                            rayCount,
+                            rseBatch,
+                            betaVolumeTotal,
+                            accumulation,
+                            rngSeed});
+                }
+            };
+
+            if(experiment.trackRayVisits)
+                enqueueTrace(hase::kernels::forward::tracePolicy::diagnostics::cellRayVisits);
             else
-            {
-                BENCH_SYNC(m_queue, AccumulateForwardPhiAse);
-                m_queue.enqueue(
-                    frameSpec,
-                    alpaka::KernelBundle{
-                        hase::kernels::forward::AccumulateForwardPhiAse{},
-                        mesh,
-                        rayCount,
-                        rseBatch,
-                        betaVolumeTotal,
-                        accumulation,
-                        rngSeed});
-            }
+                enqueueTrace(hase::kernels::forward::tracePolicy::diagnostics::none);
         }
 
         /**

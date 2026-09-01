@@ -187,6 +187,7 @@ def buildSimulation(
         "minRays": 100000,
         "maxRays": 1000000,
         "relativeStandardErrorThreshold": 0.1,
+        "trackRayVisits": False,
         "repetitions": 4,
         "adaptiveSteps": 2,
         "useReflections": True,
@@ -415,7 +416,7 @@ def main(argv=None):
     parser.add_argument("--pump-steps", type=int, default=50)
     parser.add_argument("--ase-steps", type=int, default=150)
     parser.add_argument("--ase-min-rays", type=int, default=100000)
-    parser.add_argument("--ase-max-rays", type=int, default=100000)
+    parser.add_argument("--ase-max-rays", type=int, default=1000000)
     parser.add_argument("--vtk-output-dir", type=Path, default=scriptDir)
     parser.add_argument("--openpmd-output-dir", type=Path, default=None)
     parser.add_argument("--disable-pre-pump", action="store_true")

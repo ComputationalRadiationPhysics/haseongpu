@@ -107,6 +107,7 @@ simulation:
     min_rays: 100000
     max_rays: 1000000
     relative_standard_error_threshold: 0.1
+    track_ray_visits: false
     repetitions: 4
     adaptive_steps: 2 # first run with 100K - second with 1M rays
     use_reflections: true

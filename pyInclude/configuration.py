@@ -350,6 +350,7 @@ def _phiAse(spec):
         "max_rays": "maxRays",
         "forward_ray_count": "forwardRayCount",
         "relative_standard_error_threshold": "relativeStandardErrorThreshold",
+        "track_ray_visits": "trackRayVisits",
         "adaptive_steps": "adaptiveSteps",
         "use_reflections": "useReflections",
         "reflection_mode": "reflectionMode",

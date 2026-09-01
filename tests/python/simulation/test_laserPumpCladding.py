@@ -170,7 +170,7 @@ def testLaserPumpCladdingApiAndYamlBuildEquivalentSimulations():
 
     phi_fields = (
         "propagationMode", "minRays", "maxRays", "forwardRayCount",
-        "relativeStandardErrorThreshold", "repetitions", "adaptiveSteps",
+        "relativeStandardErrorThreshold", "trackRayVisits", "repetitions", "adaptiveSteps",
         "useReflections", "reflectionMode", "surfaceReservoirSize",
         "srmPositionMode", "reflectionMaxIterations", "reflectionTolerance",
         "monochromatic", "backend", "openpmdBackend",
@@ -178,8 +178,6 @@ def testLaserPumpCladdingApiAndYamlBuildEquivalentSimulations():
     )
     for name in phi_fields:
         assert getattr(api.phiASE, name) == getattr(yaml.phiASE, name), name
-    assert api.phiASE.minRays == 100000
-    assert api.phiASE.maxRays == 100000
     assert api.phiASE.useReflections is True
     assert api.prePump == yaml.prePump is True
     assert [component.name for component in api.opticalComponents] == [
@@ -800,6 +798,20 @@ def testLaserPumpCladdingCliForwardsAseRayBounds(monkeypatch):
 
     assert calls[-1]["kwargs"]["minRays"] == 25000
     assert calls[-1]["kwargs"]["maxRays"] == 400000
+
+
+def testLaserPumpCladdingCliUsesAdaptiveRayBoundsByDefault(monkeypatch):
+    calls = []
+
+    def fake_run_example(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return SimpleNamespace(phiAse=np.zeros((2, 3)), betaVolume=np.zeros((2, 3)))
+
+    monkeypatch.setattr(laserPumpCladding, "runExample", fake_run_example)
+    laserPumpCladding.main([])
+
+    assert calls[-1]["kwargs"]["minRays"] == 100000
+    assert calls[-1]["kwargs"]["maxRays"] == 1000000
 
 
 def testLaserPumpCladdingCliCanDisableCladding(monkeypatch, tmp_path):

@@ -131,6 +131,8 @@ class PhiASE:
     """Explicit fixed forward-ray count; disables adaptive refinement when set."""
     relativeStandardErrorThreshold: float = 0.1
     """Target one-sigma relative sampling uncertainty for ASE flux estimates."""
+    trackRayVisits: bool = False
+    """Count per-cell ray visits in ``totalRays`` for diagnostics."""
     repetitions: int = 4
     """Maximum repeated ASE estimates at a fixed ray count."""
     adaptiveSteps: int = 4
@@ -185,6 +187,7 @@ class PhiASE:
                 transportField("maxRays"),
                 transportField("forwardRayCount", optional=True),
                 transportField("relativeStandardErrorThreshold"),
+                transportField("trackRayVisits"),
                 transportField("repetitions"),
                 transportField("adaptiveSteps"),
                 transportField("useReflections"),
@@ -255,6 +258,9 @@ class PhiASE:
         parser.add_argument("--propagation-mode", choices=("forward",), default=None)
         parser.add_argument("--forward-ray-count", type=int, default=None)
         parser.add_argument("--relative-standard-error-threshold", type=float, default=None)
+        ray_visits = parser.add_mutually_exclusive_group()
+        ray_visits.add_argument("--track-ray-visits", dest="track_ray_visits", action="store_true", default=None)
+        ray_visits.add_argument("--no-track-ray-visits", dest="track_ray_visits", action="store_false")
         parser.add_argument("--reflection-max-iterations", type=int, default=None)
         parser.add_argument("--reflection-tolerance", type=float, default=None)
         reflections = parser.add_mutually_exclusive_group()
@@ -296,6 +302,7 @@ class PhiASE:
             "propagation_mode": "propagationMode",
             "forward_ray_count": "forwardRayCount",
             "relative_standard_error_threshold": "relativeStandardErrorThreshold",
+            "track_ray_visits": "trackRayVisits",
             "reflection_max_iterations": "reflectionMaxIterations",
             "reflection_tolerance": "reflectionTolerance",
             "use_reflections": "useReflections",
@@ -349,6 +356,7 @@ class PhiASE:
             "propagationMode": self.propagationMode,
             "forwardRayCount": forward_ray_count,
             "relativeStandardErrorThreshold": self.relativeStandardErrorThreshold,
+            "trackRayVisits": self.trackRayVisits,
             "reflectionMaxIterations": self.reflectionMaxIterations,
             "reflectionTolerance": self.reflectionTolerance,
             "reflectionMode": self.reflectionMode,

@@ -290,12 +290,21 @@ if(NOT HASE_BUILD_RUNTIME)
 
     set(HASE_RUNTIME_NEEDS_CONFIGURE FALSE)
     if(EXISTS "${HASE_RUNTIME_DIR}/CMakeCache.txt")
-        if(HASE_RUNTIME_FORWARDED_VARIABLES)
-            load_cache(
-                "${HASE_RUNTIME_DIR}"
-                READ_WITH_PREFIX HASE_RUNTIME_CACHE_
-                ${HASE_RUNTIME_FORWARDED_VARIABLES}
+        load_cache(
+            "${HASE_RUNTIME_DIR}"
+            READ_WITH_PREFIX HASE_RUNTIME_CACHE_
+            CMAKE_COMMAND
+            ${HASE_RUNTIME_FORWARDED_VARIABLES}
+        )
+        if(
+            NOT DEFINED HASE_RUNTIME_CACHE_CMAKE_COMMAND
+            OR NOT HASE_RUNTIME_CACHE_CMAKE_COMMAND STREQUAL CMAKE_COMMAND
+        )
+            message(
+                STATUS
+                "Shared runtime CMake command changed; reconfiguring."
             )
+            set(HASE_RUNTIME_NEEDS_CONFIGURE TRUE)
         endif()
         foreach(HASE_CACHE_VARIABLE IN LISTS HASE_RUNTIME_FORWARDED_VARIABLES)
             set(HASE_RUNTIME_CACHE_VARIABLE

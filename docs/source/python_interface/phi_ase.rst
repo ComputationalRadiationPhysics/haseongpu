@@ -15,6 +15,7 @@ evolving excitation state.
        maxRays=1_000_000,
        adaptiveSteps=4,
        relativeStandardErrorThreshold=0.05,
+       trackRayVisits=False,
        useReflections=True,
        reflectionMode="srm",
        surfaceReservoirSize=256,
@@ -69,6 +70,12 @@ Sampling controls
    Target one-sigma uncertainty relative to each cell's estimated mean. ``0.05``
    requests 5%. It measures sampling uncertainty, not discretization or model
    error.
+
+``trackRayVisits``
+   Enable the per-cell ray-visit diagnostic returned as ``totalRays``. It is
+   disabled by default to remove one atomic operation from every finite
+   track-length contribution. When disabled, ``totalRays`` retains the normal
+   cell-shaped result layout and contains zeros.
 
 ``rngSeed``
    Unsigned seed for reproducible ASE histories. If omitted, each invocation
@@ -160,6 +167,7 @@ YAML and CLI helpers
        min_rays: 100000
        max_rays: 1000000
        relative_standard_error_threshold: 0.05
+       track_ray_visits: false
        adaptive_steps: 4
        ase_steps: 150
        use_reflections: true
@@ -187,6 +195,7 @@ loaded YAML value to be overridden explicitly:
 .. code-block:: console
 
    --use-reflections | --no-reflections
+   --track-ray-visits | --no-track-ray-visits
    --monochromatic | --polychromatic
    --write-vtk | --no-write-vtk
 

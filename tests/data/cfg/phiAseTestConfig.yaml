@@ -5,6 +5,7 @@ simulation:
     min_rays: 1000
     max_rays: 10000
     relative_standard_error_threshold: 0.1
+    track_ray_visits: false
     repetitions: 1
     adaptive_steps: 1
     use_reflections: false

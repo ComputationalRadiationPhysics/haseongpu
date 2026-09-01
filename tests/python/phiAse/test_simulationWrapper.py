@@ -213,6 +213,7 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     assert phiAse.reflectionMode == "direct"
     assert phiAse.surfaceReservoirSize == 64
     assert phiAse.srmPositionMode == "exact"
+    assert phiAse.trackRayVisits is False
 
     parser = argparse.ArgumentParser()
     PhiASE.addArguments(parser)
@@ -221,6 +222,7 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
         str(phiAseTestConfigPath),
         "--min-rays",
         "32",
+        "--track-ray-visits",
         "--openpmd-backend",
         "adios-sst",
         "--use-reflections",
@@ -246,6 +248,7 @@ def testPhiAseLoadsYamlAndArgumentOverrides(phiAseTestConfigPath):
     fromArgs = PhiASE.fromArgs(args)
 
     assert fromArgs.minRays == 32
+    assert fromArgs.trackRayVisits is True
     assert fromArgs.maxRays == 10000
     assert fromArgs.openpmdBackend == "adios-sst"
     assert fromArgs.useReflections is True
@@ -317,9 +320,11 @@ def testPhiAseSerializesAdaptiveRangeWithoutAnImplicitFixedRayCount():
     assert attributes["maxRays"] == 1600
     assert attributes["adaptiveSteps"] == 4
     assert attributes["forwardRayCount"] == 0
+    assert attributes["trackRayVisits"] is False
 
-    fixed = PhiASE(minRays=100, maxRays=1600, forwardRayCount=250)
+    fixed = PhiASE(minRays=100, maxRays=1600, forwardRayCount=250, trackRayVisits=True)
     assert fixed.openPmdAttributes(numberOfSamples=1)["forwardRayCount"] == 250
+    assert fixed.openPmdAttributes(numberOfSamples=1)["trackRayVisits"] is True
 
 def testPhiAseDefaultBackendSerializesAvailableAlpakaBackend():
     phiAse = PhiASE()

@@ -16,6 +16,7 @@
 #include <kernels/forward/rayWalk.hpp>
 #include <kernels/forward/reflectionResampling.hpp>
 #include <kernels/forward/surfaceReservoir.hpp>
+#include <kernels/forward/tracePolicyList.hpp>
 #include <kernels/forward/volumeSampling.hpp>
 #include <kernels/reflection.hpp>
 #include <random/randomEngine.hpp>
@@ -148,13 +149,36 @@ namespace hase::kernels::forward
 namespace hase::kernels::forward
 {
 
+    /** @brief Policy-selected per-cell ray-visit diagnostic. */
+    struct RecordCellRayVisit
+    {
+        ALPAKA_FN_ACC void operator()(
+            tracePolicy::diagnostics::None,
+            alpaka::onAcc::concepts::Acc auto const&,
+            alpaka::concepts::IMdSpan<std::uint32_t> auto,
+            unsigned) const
+        {
+        }
+
+        ALPAKA_FN_ACC void operator()(
+            tracePolicy::diagnostics::CellRayVisits,
+            alpaka::onAcc::concepts::Acc auto const& acc,
+            alpaka::concepts::IMdSpan<std::uint32_t> auto cellRayVisits,
+            unsigned const tet) const
+        {
+            alpaka::onAcc::atomicAdd(acc, &cellRayVisits[tet], 1u);
+        }
+    };
+
     /** @brief Cell behavior accumulating track-length scores for one ASE ray. */
-    template<alpaka::concepts::SpecializationOf<ForwardAccumulationSpans> T_Accumulation>
+    template<
+        alpaka::concepts::SpecializationOf<ForwardAccumulationSpans> T_Accumulation,
+        concepts::TracePolicyList T_TracePolicies>
     struct ForwardAseCellPolicy : ray::behaviourDimension::Cell
     {
         T_Accumulation accumulation;
 
-        ALPAKA_FN_HOST_ACC constexpr explicit ForwardAseCellPolicy(T_Accumulation value) : accumulation{value}
+        ALPAKA_FN_HOST_ACC constexpr ForwardAseCellPolicy(T_Accumulation value, T_TracePolicies) : accumulation{value}
         {
         }
 
@@ -170,7 +194,7 @@ namespace hase::kernels::forward
             contribution *= localSegmentTrackLengthIntegral(mesh, tet, intersection.length, rayState.wavelength);
             if(alpaka::math::isfinite(contribution))
             {
-                alpaka::onAcc::atomicAdd(acc, &accumulation.cellRayVisits[tet], 1u);
+                RecordCellRayVisit{}(T_TracePolicies::getDiagnostics(), acc, accumulation.cellRayVisits, tet);
                 auto const weights = segmentMidpointBarycentricVertexWeights(
                     mesh,
                     tet,
@@ -221,6 +245,7 @@ namespace hase::kernels::forward
     {
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const mesh,
             unsigned const forwardRayCount,
             unsigned const batch,
@@ -258,6 +283,7 @@ namespace hase::kernels::forward
                     rseBatchSpectrumStratificationPhase(rngSeed, batch, spectrumSize));
                 walkVolumeSeededForwardRay(
                     acc,
+                    tracePolicies,
                     mesh,
                     tet,
                     origin,
@@ -271,6 +297,7 @@ namespace hase::kernels::forward
 
         ALPAKA_FN_HOST_ACC void walkVolumeSeededForwardRay(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const& mesh,
             unsigned tet,
             hase::core::Point origin,
@@ -293,9 +320,7 @@ namespace hase::kernels::forward
                 acc,
                 mesh,
                 rayState,
-                ray::RayWalkBehaviour{
-                    ForwardAseCellPolicy<ALPAKA_TYPEOF(accumulation)>{accumulation},
-                    ray::BoundaryPolicyEscape{}});
+                ray::RayWalkBehaviour{ForwardAseCellPolicy{accumulation, tracePolicies}, ray::BoundaryPolicyEscape{}});
             if(walkResult == ray::WalkResult::failed)
                 CountDroppedForwardRay<ALPAKA_TYPEOF(accumulation)>{accumulation}(acc, mesh, rayState);
         }
@@ -343,6 +368,7 @@ namespace hase::kernels::forward
 
         ALPAKA_FN_HOST_ACC void walkForwardRay(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             data::TraceView const& mesh,
             unsigned tet,
             core::Point origin,
@@ -368,7 +394,7 @@ namespace hase::kernels::forward
                 mesh,
                 rayState,
                 ray::RayWalkBehaviour{
-                    ForwardAseCellPolicy<ALPAKA_TYPEOF(accumulation)>{accumulation},
+                    ForwardAseCellPolicy{accumulation, tracePolicies},
                     StoreReflectionBoundary<ALPAKA_TYPEOF(candidates)>{candidates, candidateIndex}});
             if(walkResult == ray::WalkResult::failed)
                 CountDroppedForwardRay<ALPAKA_TYPEOF(accumulation)>{accumulation}(acc, mesh, rayState);
@@ -376,6 +402,7 @@ namespace hase::kernels::forward
 
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const mesh,
             unsigned const forwardRayCount,
             unsigned const batch,
@@ -412,6 +439,7 @@ namespace hase::kernels::forward
                     rseBatchSpectrumStratificationPhase(rngSeed, batch, spectrumSize));
                 walkForwardRay(
                     acc,
+                    tracePolicies,
                     mesh,
                     tet,
                     origin,
@@ -432,6 +460,7 @@ namespace hase::kernels::forward
     {
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const mesh,
             unsigned const forwardRayCount,
             unsigned const batch,
@@ -469,6 +498,7 @@ namespace hase::kernels::forward
                 double const wavelength = inputCandidates.wavelengths[candidateIndex];
                 walker.walkForwardRay(
                     acc,
+                    tracePolicies,
                     mesh,
                     tet,
                     origin,
@@ -533,6 +563,7 @@ namespace hase::kernels::forward
 
         ALPAKA_FN_HOST_ACC void walkForwardRay(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             data::TraceView const& mesh,
             unsigned const tet,
             core::Point const origin,
@@ -559,7 +590,7 @@ namespace hase::kernels::forward
                 mesh,
                 rayState,
                 ray::RayWalkBehaviour{
-                    ForwardAseCellPolicy<ALPAKA_TYPEOF(accumulation)>{accumulation},
+                    ForwardAseCellPolicy{accumulation, tracePolicies},
                     StoreReflectionBoundary<ALPAKA_TYPEOF(reservoir), ALPAKA_TYPEOF(rng)>{
                         reservoir,
                         rng,
@@ -570,6 +601,7 @@ namespace hase::kernels::forward
 
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const mesh,
             std::uint32_t const forwardRayCount,
             std::uint32_t const batch,
@@ -605,6 +637,7 @@ namespace hase::kernels::forward
                     rseBatchSpectrumStratificationPhase(rngSeed, batch, spectrumSize));
                 walkForwardRay(
                     acc,
+                    tracePolicies,
                     mesh,
                     tet,
                     origin,
@@ -626,6 +659,7 @@ namespace hase::kernels::forward
     {
         ALPAKA_FN_HOST_ACC void operator()(
             alpaka::onAcc::concepts::Acc auto const& acc,
+            concepts::TracePolicyList auto const tracePolicies,
             hase::data::TraceView const mesh,
             std::uint32_t const forwardRayCount,
             std::uint32_t const batch,
@@ -661,6 +695,7 @@ namespace hase::kernels::forward
                     = restoreSurfaceReservoirPosition(input.positionSpans, mesh, tet, localFace, sample.slotIndex);
                 walker.walkForwardRay(
                     acc,
+                    tracePolicies,
                     mesh,
                     tet,
                     origin,

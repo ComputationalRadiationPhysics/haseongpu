@@ -19,6 +19,7 @@ namespace hase::data
             static constexpr char const* maxRays = "maxRays";
             static constexpr char const* forwardRayCount = "forwardRayCount";
             static constexpr char const* relativeStandardErrorThreshold = "relativeStandardErrorThreshold";
+            static constexpr char const* trackRayVisits = "trackRayVisits";
             static constexpr char const* repetitions = "repetitions";
             static constexpr char const* adaptiveSteps = "adaptiveSteps";
             static constexpr char const* useReflections = "useReflections";
@@ -44,6 +45,7 @@ namespace hase::data
         std::uint64_t maxRays{};
         std::optional<std::uint64_t> forwardRayCount;
         double relativeStandardErrorThreshold{};
+        bool trackRayVisits{};
         std::uint64_t repetitions{};
         std::uint64_t adaptiveSteps{};
         bool useReflections{};

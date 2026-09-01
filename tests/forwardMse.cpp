@@ -1,5 +1,6 @@
 #include <alpaka/math.hpp>
 
+#include <alpakaUtils/HybridBuffer.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <core/calcForwardPhiAse.hpp>
@@ -24,6 +25,25 @@
 
 namespace
 {
+    struct RecordOneCellRayVisit
+    {
+        ALPAKA_FN_ACC void operator()(
+            alpaka::onAcc::concepts::Acc auto const& acc,
+            hase::kernels::forward::concepts::TracePolicyList auto const policies,
+            alpaka::concepts::IMdSpan<std::uint32_t> auto visits) const
+        {
+            for(auto const cell : alpaka::onAcc::makeIdxMap(
+                    acc,
+                    alpaka::onAcc::worker::threadsInGrid,
+                    alpaka::IdxRange{visits.getExtents()}))
+                hase::kernels::forward::RecordCellRayVisit{}(
+                    ALPAKA_TYPEOF(policies)::getDiagnostics(),
+                    acc,
+                    visits,
+                    cell[0u]);
+        }
+    };
+
     hase::data::TraceData makeTraversalMesh(
         std::vector<hase::core::Point> const& points,
         std::vector<std::array<unsigned, hase::data::tet4VertexCount>> const& cells)
@@ -118,6 +138,73 @@ namespace
         return view;
     }
 } // namespace
+
+TEST_CASE("forward trace policies select compile-time dimensions and default diagnostics off", "[forward][policy]")
+{
+    using namespace hase::kernels::forward;
+
+    using DefaultPolicies = TracePolicyList<>;
+    static_assert(std::same_as<decltype(DefaultPolicies::getSource()), tracePolicy::source::Volume>);
+    static_assert(std::same_as<decltype(DefaultPolicies::getCell()), tracePolicy::cell::ForwardAse>);
+    static_assert(std::same_as<decltype(DefaultPolicies::getBoundary()), tracePolicy::boundary::Escape>);
+    static_assert(std::same_as<decltype(DefaultPolicies::getPosition()), tracePolicy::position::None>);
+    static_assert(std::same_as<decltype(DefaultPolicies::getDiagnostics()), tracePolicy::diagnostics::None>);
+
+    constexpr auto policies = TracePolicyList{
+        tracePolicy::source::surfaceReservoir,
+        tracePolicy::cell::forwardAse,
+        tracePolicy::boundary::surfaceReservoir,
+        tracePolicy::position::centroid,
+        tracePolicy::diagnostics::cellRayVisits};
+    using Policies = decltype(policies);
+    static_assert(concepts::TracePolicyList<Policies>);
+    static_assert(std::same_as<decltype(Policies::getSource()), tracePolicy::source::SurfaceReservoir>);
+    static_assert(std::same_as<decltype(Policies::getCell()), tracePolicy::cell::ForwardAse>);
+    static_assert(std::same_as<decltype(Policies::getBoundary()), tracePolicy::boundary::SurfaceReservoir>);
+    static_assert(std::same_as<decltype(Policies::getPosition()), tracePolicy::position::Centroid>);
+    static_assert(std::same_as<decltype(Policies::getDiagnostics()), tracePolicy::diagnostics::CellRayVisits>);
+    STATIC_REQUIRE(policies.hasPolicy(tracePolicy::diagnostics::cellRayVisits));
+}
+
+TEST_CASE("forward ray-visit diagnostic dispatches distinct kernel variants", "[forward][policy][backend]")
+{
+    unsigned testedBackendCount = 0u;
+    auto const backends
+        = alpaka::onHost::allBackends(alpaka::onHost::enabledDeviceSpecs, alpaka::exec::enabledExecutors);
+    alpaka::onHost::executeForEachIfHasDevice(
+        [&](alpaka::concepts::BackendSpec auto const& backend) -> int
+        {
+            auto device = alpaka::onHost::makeDeviceSelector(backend).makeDevice(0);
+            auto const executor = alpaka::getExecutor(backend);
+            auto queue = device.makeQueue(alpaka::queueKind::blocking);
+            auto visits = hase::alpakaUtils::getHybridBuffer(device, std::array<std::uint32_t, 1u>{0u});
+            visits.toDevice(queue);
+            auto const frameSpec = hase::alpakaUtils::getFrameSpec<std::uint32_t>(device, executor, alpaka::Vec{1u});
+
+            queue.enqueue(
+                frameSpec,
+                alpaka::KernelBundle{
+                    RecordOneCellRayVisit{},
+                    hase::kernels::forward::TracePolicyList{hase::kernels::forward::tracePolicy::diagnostics::none},
+                    visits.toDeviceView()});
+            visits.toHost(queue);
+            CHECK(visits.getHostView()[0u] == 0u);
+
+            queue.enqueue(
+                frameSpec,
+                alpaka::KernelBundle{
+                    RecordOneCellRayVisit{},
+                    hase::kernels::forward::TracePolicyList{
+                        hase::kernels::forward::tracePolicy::diagnostics::cellRayVisits},
+                    visits.toDeviceView()});
+            visits.toHost(queue);
+            CHECK(visits.getHostView()[0u] == 1u);
+            ++testedBackendCount;
+            return 0;
+        },
+        backends);
+    CHECK(testedBackendCount > 0u);
+}
 
 TEST_CASE("forward gain lookup follows the receiving cell material and ray wavelength", "[forward][material]")
 {

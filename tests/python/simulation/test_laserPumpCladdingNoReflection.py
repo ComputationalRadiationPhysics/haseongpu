@@ -145,6 +145,7 @@ def testCurrentTet4WithoutReflectionsMatchesLegacyWedgeIntegral(
         maxRays=LEGACY_WEDGE_FORWARD_RAYS,
         forwardRayCount=LEGACY_WEDGE_FORWARD_RAYS,
         relativeStandardErrorThreshold=0.05,
+        trackRayVisits=True,
         adaptiveSteps=metadata["parameters"]["adaptiveSteps"],
         outputSteps=metadata["observable"]["stepNumbers"],
         useCladding=False,

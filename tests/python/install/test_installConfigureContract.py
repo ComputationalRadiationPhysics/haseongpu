@@ -383,6 +383,112 @@ def test_thinFrontendPropagatesBuildSettingsToResidentRuntime(tmp_path):
     ).is_file()
 
 
+@pytest.mark.skipif(
+    shutil.which("ninja") is None,
+    reason="The stale CMake command regression requires Ninja",
+)
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="The lightweight compiler-launcher fixture uses GCC-style arguments",
+)
+def test_thinFrontendRefreshesExpiredCmakeCommand(tmp_path):
+    dependency_prefix = tmp_path / "system dependencies"
+    runtime_dir = tmp_path / "resident runtime"
+    frontend_dir = tmp_path / "thin frontend"
+    compiler_launcher = tmp_path / "emptyCompileLauncher.py"
+    _write_fake_system_dependencies(dependency_prefix)
+    system_openpmd_dir = _write_fake_system_openpmd(dependency_prefix)
+    _write_empty_compile_launcher(compiler_launcher)
+
+    runtime_arguments = [
+        "-DHASE_TESTING=OFF",
+        "-DDISABLE_MPI=ON",
+        "-DHASE_SELECT_BACKEND_ALPAKA=ON",
+        "-DHASE_USE_SYSTEM_ALPAKA=ON",
+        f"-Dalpaka_DIR={dependency_prefix / 'lib' / 'cmake' / 'alpaka'}",
+        "-DHASE_OPENPMD_PROVIDER=system",
+        f"-DopenPMD_DIR={system_openpmd_dir}",
+        "-DHASE_BUILD_RELEASE=OFF",
+        "-DCMAKE_BUILD_TYPE=Release",
+        (
+            "-DCMAKE_CXX_COMPILER_LAUNCHER="
+            f"{sys.executable};{compiler_launcher}"
+        ),
+    ]
+    configure_command = [
+        "cmake",
+        "-G",
+        "Ninja",
+        "-S",
+        str(repoRoot),
+        "-B",
+        str(frontend_dir),
+        "-DHASE_BUILD_RUNTIME=OFF",
+        f"-DHASE_RUNTIME_DIR={runtime_dir}",
+        *runtime_arguments,
+    ]
+    configure_environment = {
+        **os.environ,
+        "CMAKE_ARGS": shlex.join(runtime_arguments),
+    }
+    first = subprocess.run(
+        configure_command,
+        env=configure_environment,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    assert first.returncode == 0, first.stdout
+
+    runtime_cache_path = runtime_dir / "CMakeCache.txt"
+    runtime_ninja_path = runtime_dir / "build.ninja"
+    runtime_cache_stat = runtime_cache_path.stat()
+    runtime_cache_text = runtime_cache_path.read_text(encoding="utf-8")
+    runtime_cache = _cmake_cache_values(runtime_cache_path)
+    current_cmake_command = runtime_cache["CMAKE_COMMAND"]
+    expired_cmake_command = str(
+        tmp_path / "expired-pip-build-env" / "bin" / "cmake"
+    )
+    assert current_cmake_command in runtime_cache_text
+    runtime_cache_path.write_text(
+        runtime_cache_text.replace(
+            f"CMAKE_COMMAND:INTERNAL={current_cmake_command}",
+            f"CMAKE_COMMAND:INTERNAL={expired_cmake_command}",
+        ),
+        encoding="utf-8",
+    )
+    os.utime(
+        runtime_cache_path,
+        ns=(runtime_cache_stat.st_atime_ns, runtime_cache_stat.st_mtime_ns),
+    )
+
+    runtime_ninja_text = runtime_ninja_path.read_text(encoding="utf-8")
+    assert current_cmake_command in runtime_ninja_text
+    runtime_ninja_path.write_text(
+        runtime_ninja_text.replace(
+            current_cmake_command,
+            expired_cmake_command,
+        ),
+        encoding="utf-8",
+    )
+
+    second = subprocess.run(
+        configure_command,
+        env=configure_environment,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    assert second.returncode == 0, second.stdout
+    refreshed_runtime_cache = _cmake_cache_values(runtime_cache_path)
+    assert refreshed_runtime_cache["CMAKE_COMMAND"] == current_cmake_command
+    assert expired_cmake_command not in runtime_ninja_path.read_text(
+        encoding="utf-8"
+    )
+
+
 def test_documentedBundledProviderFindsSystemAdios2Prefix(tmp_path):
     dependency_prefix = tmp_path / "system dependencies"
     openpmd_source = tmp_path / "fake-openpmd"

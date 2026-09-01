@@ -73,6 +73,7 @@ TEST_CASE("simulation preparation builds material-local trace data", "[transport
     phiAse->minRays = 10u;
     phiAse->maxRays = 20u;
     phiAse->relativeStandardErrorThreshold = 0.1;
+    phiAse->trackRayVisits = true;
     phiAse->repetitions = 2u;
     phiAse->adaptiveSteps = 3u;
     phiAse->reflectionMode = "srm";
@@ -117,6 +118,7 @@ TEST_CASE("simulation preparation builds material-local trace data", "[transport
     CHECK(state.ase.reflectionMode == "srm");
     CHECK(state.ase.surfaceReservoirSize == 256u);
     CHECK(state.ase.srmPositionMode == "centroid");
+    CHECK(state.ase.trackRayVisits);
 
     excitation->values.values = {0.75};
     preparation.excitation.apply(*excitation, state.trace.betaVolume);

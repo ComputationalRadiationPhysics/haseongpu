@@ -74,7 +74,8 @@ namespace hase::core
         alpaka::concepts::IBuffer<std::uint32_t> auto& droppedRays,
         unsigned const threadLocalStridingRNG,
         SrmControls const srmControls,
-        ReflectionResamplingScratch<T_Device>& scratch)
+        ReflectionResamplingScratch<T_Device>& scratch,
+        hase::kernels::forward::concepts::TracePolicy auto const diagnostics)
     {
         auto accumulationSpans = hase::kernels::forward::ForwardAccumulationSpans{
             vertexBatchScoreSum.getMdSpan(),
@@ -94,6 +95,12 @@ namespace hase::core
             rayFrameSpec,
             alpaka::KernelBundle{
                 hase::kernels::forward::AccumulateForwardPhiAseReflections{},
+                hase::kernels::forward::TracePolicyList{
+                    hase::kernels::forward::tracePolicy::source::volume,
+                    hase::kernels::forward::tracePolicy::cell::forwardAse,
+                    hase::kernels::forward::tracePolicy::boundary::reflectionCandidates,
+                    hase::kernels::forward::tracePolicy::position::exact,
+                    diagnostics},
                 mesh,
                 rayCount,
                 rseBatch,
@@ -127,6 +134,12 @@ namespace hase::core
                     rayFrameSpec,
                     alpaka::KernelBundle{
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
+                        hase::kernels::forward::TracePolicyList{
+                            hase::kernels::forward::tracePolicy::source::reflectionCandidates,
+                            hase::kernels::forward::tracePolicy::cell::forwardAse,
+                            hase::kernels::forward::tracePolicy::boundary::reflectionCandidates,
+                            hase::kernels::forward::tracePolicy::position::exact,
+                            diagnostics},
                         mesh,
                         rayCount,
                         rseBatch,
@@ -146,6 +159,12 @@ namespace hase::core
                     rayFrameSpec,
                     alpaka::KernelBundle{
                         hase::kernels::forward::AccumulateReflectedForwardPhiAse{},
+                        hase::kernels::forward::TracePolicyList{
+                            hase::kernels::forward::tracePolicy::source::reflectionCandidates,
+                            hase::kernels::forward::tracePolicy::cell::forwardAse,
+                            hase::kernels::forward::tracePolicy::boundary::reflectionCandidates,
+                            hase::kernels::forward::tracePolicy::position::exact,
+                            diagnostics},
                         mesh,
                         rayCount,
                         rseBatch,
@@ -211,8 +230,16 @@ namespace hase::core
         alpaka::concepts::IBuffer<std::uint32_t> auto& droppedRays,
         std::uint32_t const rngSeed,
         SrmControls const srmControls,
-        SurfaceReservoirScratch<T_Device, T_PositionPolicy>& scratch)
+        SurfaceReservoirScratch<T_Device, T_PositionPolicy>& scratch,
+        hase::kernels::forward::concepts::TracePolicy auto const diagnostics)
     {
+        constexpr auto positionPolicy = []
+        {
+            if constexpr(std::same_as<T_PositionPolicy, hase::kernels::forward::surfaceReservoirPosition::Exact>)
+                return hase::kernels::forward::tracePolicy::position::exact;
+            else
+                return hase::kernels::forward::tracePolicy::position::centroid;
+        }();
         auto accumulation = hase::kernels::forward::ForwardAccumulationSpans{
             vertexBatchScoreSum.getMdSpan(),
             volumeRayVisits.getMdSpan(),
@@ -232,6 +259,12 @@ namespace hase::core
             rayFrameSpec,
             alpaka::KernelBundle{
                 hase::kernels::forward::AccumulateForwardPhiAseSurfaceReservoir{},
+                hase::kernels::forward::TracePolicyList{
+                    hase::kernels::forward::tracePolicy::source::volume,
+                    hase::kernels::forward::tracePolicy::cell::forwardAse,
+                    hase::kernels::forward::tracePolicy::boundary::surfaceReservoir,
+                    positionPolicy,
+                    diagnostics},
                 mesh,
                 rayCount,
                 rseBatch,
@@ -265,6 +298,12 @@ namespace hase::core
                 rayFrameSpec,
                 alpaka::KernelBundle{
                     hase::kernels::forward::AccumulateSurfaceReservoirForwardPhiAse{},
+                    hase::kernels::forward::TracePolicyList{
+                        hase::kernels::forward::tracePolicy::source::surfaceReservoir,
+                        hase::kernels::forward::tracePolicy::cell::forwardAse,
+                        hase::kernels::forward::tracePolicy::boundary::surfaceReservoir,
+                        positionPolicy,
+                        diagnostics},
                     mesh,
                     rayCount,
                     rseBatch,

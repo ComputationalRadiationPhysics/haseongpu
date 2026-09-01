@@ -196,6 +196,7 @@ namespace hase::core
         unsigned forwardRayCount = 0u;
         std::string propagationMode = "forward";
         double relativeStandardErrorThreshold = 0.0;
+        bool trackRayVisits = false;
         bool useReflections = false;
         std::string reflectionMode = "direct";
         unsigned surfaceReservoirSize = 64u;
