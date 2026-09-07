@@ -495,7 +495,7 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             reflectionMaxIterations=17,
             reflectionTolerance=0.1,
             outputSteps=(2,),
-            useCladding=True,
+            useCladding=False,
         )
         points, cells, _cell_types, _point_data, cell_data, _fields = _parseVtk(
             output_dir / "laserPumpCladding_002.vtk"

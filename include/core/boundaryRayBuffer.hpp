@@ -162,7 +162,8 @@ namespace hase::core
             auto const domainCount = static_cast<std::uint32_t>(sourceStrengthTotals.getExtents().x());
             if(cellCount == 0u)
             {
-                alpaka::onHost::fill(queue, sourceStrengthTotals.toDeviceView(), 0.0);
+                auto totals = sourceStrengthTotals.toDeviceView();
+                alpaka::onHost::fill(queue, totals, 0.0);
                 return;
             }
             auto sourceStrengthPrefixView = sourceStrengthPrefix.toDeviceView();

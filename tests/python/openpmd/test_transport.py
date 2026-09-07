@@ -1430,7 +1430,7 @@ def test_calcPhiAseDisablesDiagnosticsByDefault(tmp_path):
 
 
 @pytest.mark.integration
-def test_calcPhiAseAdaptiveRangeReachesMaxForUnconvergedCell(tmp_path):
+def test_calcPhiAseAdaptiveRangeReachesMaxForUnconvergedCell(tmp_path, capfd):
     if _backend_execution_parallel_mode() == "mpi":
         pytest.skip("MPI CI rows exercise backend launches with parallelMode='mpi'")
 
@@ -1448,9 +1448,11 @@ def test_calcPhiAseAdaptiveRangeReachesMaxForUnconvergedCell(tmp_path):
         workspace_dir=tmp_path,
     )
 
-    # The zero-emission fixture has an undefined RSE, so refinement must use
-    # every scheduled batch: 1, 1, 2, then 4 additional rays.
-    np.testing.assert_array_equal(result.totalRays, np.array([8], dtype=np.uint32))
+    # The zero-emission fixture consumes the full adaptive budget (1, 1, 2, 4),
+    # but zero-weight primary samples are not transported and make no cell visits.
+    assert "Forward rays      : 8 of 1 - 8 (4 launches)" in capfd.readouterr().out
+    np.testing.assert_array_equal(result.totalRays, np.array([0], dtype=np.uint32))
+    np.testing.assert_array_equal(result.phiAse, np.array([0.0]))
     assert np.isnan(result.relativeStandardError[0])
 
 

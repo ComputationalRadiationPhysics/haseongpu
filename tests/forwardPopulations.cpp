@@ -5,6 +5,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <core/forwardPhiAseEvaluator.hpp>
 
+#include <algorithm>
+#include <cmath>
+
 namespace
 {
     using TestBackends = std::decay_t<
@@ -122,7 +125,11 @@ TEMPLATE_LIST_TEST_CASE(
                 auto const evaluation = context.evaluate(controls, compute, mesh, context.primaryBetaVolume(), result);
                 REQUIRE(evaluation.rayCount == controls.forwardRayCount);
                 REQUIRE(evaluation.adaptiveLaunches == 1u);
-                REQUIRE(result.boundaryStatus == hase::data::BoundaryStatus::converged);
+                REQUIRE(
+                    result.boundaryStatus
+                    == (reflectivity == 0.0f ? hase::data::BoundaryStatus::disabled
+                                             : hase::data::BoundaryStatus::converged));
+                REQUIRE(result.boundaryMaxPasses == (reflectivity == 0.0f ? 0u : controls.boundaryMaxPasses));
                 if(workers == 1u)
                     reference = result;
                 REQUIRE(result.phiAse.size() == mesh.numberOfCells);
@@ -237,6 +244,54 @@ TEMPLATE_LIST_TEST_CASE(
                     CHECK(result.boundaryPasses == reference.boundaryPasses);
                 }
             }
+}
+
+TEMPLATE_LIST_TEST_CASE(
+    "zero-source adaptive budgets are independent of cell visits",
+    "[forward][populations][zero-source]",
+    TestBackends)
+{
+    auto selector = alpaka::onHost::makeDeviceSelector(TestType::makeDict());
+    if(!selector.isAvailable())
+        SKIP("Requested test backend has no available device");
+    auto device = selector.makeDevice(0u);
+    auto const executor = alpaka::getExecutor(TestType::makeDict());
+    auto modes = std::vector{hase::core::ParallelMode::SINGLE};
+#if defined(MPI_FOUND) && !defined(DISABLE_MPI)
+    modes.push_back(hase::core::ParallelMode::MPI);
+#endif
+    for(auto const& mode : modes)
+        for(auto const* reflectionMode : {"direct", "srm"})
+        {
+            CAPTURE(mode, reflectionMode);
+            auto mesh = hase::test::populationCube(1u, 0.0f);
+            std::fill(mesh.betaVolume.begin(), mesh.betaVolume.end(), 0.0);
+            mesh.rebuildStaticPrefixes();
+            auto graph = populationGraph(mesh);
+            hase::core::AseTraceControls controls;
+            controls.minRays = 1u;
+            controls.maxRays = 8u;
+            controls.forwardRayCount = 0u;
+            controls.numIndependentRayPopulations = 8u;
+            controls.relativeStandardErrorThreshold = 0.0;
+            controls.enableDiagnostics = true;
+            controls.useReflections = false;
+            controls.reflectionMode = reflectionMode;
+            hase::core::ForwardPhiAseContext context(std::vector{device}, executor, controls, mesh, graph);
+            hase::core::ExecutionPolicy
+                compute(1u, 3u, 1u, 0u, "zero-source-test", mode, false, {0u}, 0u, mesh.numberOfCells, 1234u);
+            hase::data::PhiAseResult result;
+            auto const evaluation = context.evaluate(controls, compute, mesh, context.primaryBetaVolume(), result);
+            CHECK(evaluation.rayCount == 8u);
+            CHECK(evaluation.adaptiveLaunches == 4u);
+            REQUIRE(result.phiAse.size() == mesh.numberOfCells);
+            for(std::uint32_t cell = 0u; cell < mesh.numberOfCells; ++cell)
+            {
+                CHECK(result.phiAse[cell] == 0.0);
+                CHECK(result.totalRays[cell] == 0u);
+                CHECK(std::isnan(result.relativeStandardError[cell]));
+            }
+        }
 }
 
 TEMPLATE_LIST_TEST_CASE(

@@ -77,6 +77,10 @@ Sampling controls
    counters. Essential failed-ray accounting remains enabled in both modes.
    With diagnostics disabled, ``totalRays`` retains its cell-shaped layout but
    contains zeros; dropped-ray counts still report failures.
+   Visits are not the global sampling budget: zero-weight primary samples are
+   not transported and make no visits, even with diagnostics enabled. In an
+   entirely unpumped solve, adaptive budget accounting can still reach
+   ``maxRays`` while ``totalRays`` remains zero and RSE is undefined.
    ``trackRayVisits`` remains accepted as a deprecated constructor and
    transport input alias, but new output contains only ``enableDiagnostics``.
 

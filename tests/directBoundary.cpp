@@ -108,6 +108,26 @@ TEMPLATE_LIST_TEST_CASE("domain CDFs preserve weak zero and empty sources", "[fo
     CHECK(prefix[2u] == 0.0);
 }
 
+TEMPLATE_LIST_TEST_CASE("empty source topology clears domain totals", "[forward][domain][backend]", TestBackends)
+{
+    auto selector = alpaka::onHost::makeDeviceSelector(TestType::makeDict());
+    if(!selector.isAvailable())
+        SKIP("Requested test backend has no available device");
+    auto device = selector.makeDevice(0u);
+    auto queue = device.makeQueue(alpaka::queueKind::nonBlocking);
+    hase::alpakaUtils::DevBundle bundle(device, alpaka::getExecutor(TestType::makeDict()));
+    hase::data::AseDomainGraph graph;
+    graph.domainCellOffsets = {0u, 0u, 0u};
+    graph.domainSourceStrengthTotals = {1.0, 2.0};
+    hase::core::ResidentAseDomainSources sources(device, graph);
+    sources.toDevice(queue);
+    sources.rebuild(bundle, queue, hase::data::TraceView{});
+    auto const totals = sources.downloadSourceStrengthTotals(queue);
+    REQUIRE(totals.size() == 2u);
+    CHECK(totals[0u] == 0.0);
+    CHECK(totals[1u] == 0.0);
+}
+
 TEMPLATE_LIST_TEST_CASE(
     "direct boundary evaluator owns persistent device buffers",
     "[forward][boundary][backend]",

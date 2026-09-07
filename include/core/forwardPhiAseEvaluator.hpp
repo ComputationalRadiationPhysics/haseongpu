@@ -121,7 +121,7 @@ namespace hase::core
             localWork.push_back(plan[index]);
         (void) worker(PrepareRayPopulationWork{{}, localWork, seed});
         // Every device has finished preparing its source rays before ANY worker traces.
-        (void) worker.gather(true);
+        (void) worker.gather(std::uint32_t{1u});
         ForwardPhiAseRawResult boundary;
         for(std::uint32_t population = 0u; population < context.numIndependentRayPopulations; ++population)
         {
@@ -130,7 +130,9 @@ namespace hase::core
             double initialWeight = 0.0;
             double previousWeight = 0.0;
             std::uint32_t grows = 0u;
-            auto status = data::BoundaryStatus::converged;
+            auto status = !context.experiment.useReflections && context.experiment.domainCount <= 1u
+                              ? data::BoundaryStatus::disabled
+                              : data::BoundaryStatus::converged;
             std::uint32_t passes = 0u;
             double remaining = 0.0;
             for(std::uint32_t pass = 0u;; ++pass)
@@ -219,7 +221,8 @@ namespace hase::core
                 boundary.boundaryStatus = status;
             boundary.boundaryPasses = std::max(boundary.boundaryPasses, passes);
             boundary.boundaryRemainingFraction = std::max(boundary.boundaryRemainingFraction, remaining);
-            boundary.boundaryMaxPasses = context.experiment.resolvedBoundaryMaxPasses();
+            if(status != data::BoundaryStatus::disabled)
+                boundary.boundaryMaxPasses = context.experiment.resolvedBoundaryMaxPasses();
             boundary.boundaryDivergenceStreak = 3u;
             boundary.boundaryGamma = std::max(boundary.boundaryGamma, tail.gamma);
             boundary.boundaryGammaStandardError
@@ -253,7 +256,7 @@ namespace hase::core
             localWork.push_back(plan[index]);
         (void) worker(PrepareRayPopulationWork{{}, localWork, seed});
         // All populations' source/wavelength samples exist before transport starts.
-        (void) worker.gather(true);
+        (void) worker.gather(std::uint32_t{1u});
         (void) worker(TraceLogicalSrmBatches{{}, seed});
         auto raw = worker(CollectRayPopulationWork{});
         auto const elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
