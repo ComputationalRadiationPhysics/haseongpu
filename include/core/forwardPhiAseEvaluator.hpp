@@ -47,7 +47,7 @@ namespace hase::core
          */
         auto copyToVector(hase::concepts::Queue auto const& queue, alpaka::concepts::IBuffer auto const& buffer)
         {
-            using T_Value = alpaka::trait::GetValueType_t<ALPAKA_TYPEOF(buffer)>;
+            using T_Value = alpaka::GetValueType_t<ALPAKA_TYPEOF(buffer)>;
             std::vector<T_Value> result(buffer.getExtents().product());
             auto hybridBuffer = hase::alpakaUtils::getHybridBuffer(result, buffer);
             hybridBuffer.toHost(queue);
@@ -116,12 +116,17 @@ namespace hase::core
             context.betaVolumeTotal,
             context.numIndependentRayPopulations,
             chunkSize);
+        auto const descriptors = worker.gather(worker.descriptor());
+        auto const schedule
+            = makeForwardPopulationSchedule(*descriptors, context.domainCosts, plan, context.interfaces);
         std::vector<ForwardPopulationBatch> localWork;
-        for(auto [index] : hase::mapIdx(worker, alpaka::IdxRange{plan.size()}))
-            localWork.push_back(plan[index]);
+        for(auto const& batch : plan)
+            if(schedule.owner({batch.domainId, batch.rayPopulationId, batch.batchId}) == worker.workerIndex())
+                localWork.push_back(batch);
         (void) worker(PrepareRayPopulationWork{{}, localWork, seed});
         // Every device has finished preparing its source rays before ANY worker traces.
-        (void) worker.gather(std::uint32_t{1u});
+        if(worker.workerCount() > 1u)
+            (void) worker.gather(std::uint32_t{1u});
         ForwardPhiAseRawResult boundary;
         for(std::uint32_t population = 0u; population < context.numIndependentRayPopulations; ++population)
         {
@@ -135,34 +140,37 @@ namespace hase::core
                               : data::BoundaryStatus::converged;
             std::uint32_t passes = 0u;
             double remaining = 0.0;
+            bool const resident = worker.workerCount() == 1u;
             for(std::uint32_t pass = 0u;; ++pass)
             {
-                std::vector<ForwardPopulationRay> localIncoming;
-                if(pass != 0u)
-                    for(std::size_t i = 0u; i < incoming.size(); ++i)
-                        if((i / chunkSize) % worker.workerCount() == worker.workerIndex())
-                            localIncoming.push_back(incoming[i]);
-                auto local = worker(TraceRayPopulationWork{{}, population, localIncoming, pass == 0u});
+                double weight = 0.0;
+                std::vector<ForwardPopulationRay> candidates;
+                if(resident)
+                    weight = worker(TraceResidentRayPopulationWork{{}, population, pass == 0u});
+                else
+                {
+                    auto local = worker(TraceRayPopulationWork{{}, population, incoming, pass == 0u});
+                    if(!context.experiment.useReflections && context.experiment.domainCount <= 1u)
+                        break;
+                    auto gathered = worker.gather(std::move(local));
+                    if(worker.isRoot())
+                    {
+                        for(auto const& part : *gathered)
+                            candidates.insert(candidates.end(), part.begin(), part.end());
+                        std::ranges::sort(candidates, {}, &ForwardPopulationRay::ordinal);
+                        for(auto const& ray : candidates)
+                        {
+                            if(!std::isfinite(ray.weight) || ray.weight < 0.0)
+                                throw std::runtime_error("invalid boundary ray population weight");
+                            weight += ray.weight;
+                        }
+                    }
+                    weight = worker.scatter(weight);
+                }
                 if(!context.experiment.useReflections && context.experiment.domainCount <= 1u)
                     break;
-                auto gathered = worker.gather(std::move(local));
-                std::vector<ForwardPopulationRay> candidates;
-                double weight = 0.0;
-                if(worker.isRoot())
-                {
-                    for(auto const& part : *gathered)
-                        candidates.insert(candidates.end(), part.begin(), part.end());
-                    std::ranges::sort(candidates, {}, &ForwardPopulationRay::ordinal);
-                    for(auto const& ray : candidates)
-                    {
-                        if(!std::isfinite(ray.weight) || ray.weight < 0.0)
-                            throw std::runtime_error("invalid boundary ray population weight");
-                        weight += ray.weight;
-                    }
-                    if(!std::isfinite(weight))
-                        throw std::runtime_error("non-finite boundary ray population total");
-                }
-                weight = worker.scatter(weight);
+                if(!std::isfinite(weight) || weight < 0.0)
+                    throw std::runtime_error("non-finite boundary ray population total");
                 if(pass == 0u)
                 {
                     initialWeight = weight;
@@ -205,14 +213,54 @@ namespace hase::core
                     status = data::BoundaryStatus::maxPasses;
                     break;
                 }
-                if(worker.isRoot())
-                    incoming = worker(
-                        SelectRayPopulationWork{
+                if(resident)
+                    worker(
+                        SelectResidentRayPopulationWork{
                             {},
-                            std::move(candidates),
                             kernels::forward::rayPopulationSeed(seed, population),
                             pass});
-                incoming = worker.scatter(std::move(incoming));
+                else
+                {
+                    std::vector<std::vector<ForwardPopulationRay>> outgoing;
+                    if(worker.isRoot())
+                    {
+                        incoming = worker(
+                            SelectRayPopulationWork{
+                                {},
+                                std::move(candidates),
+                                kernels::forward::rayPopulationSeed(seed, population),
+                                pass});
+                        std::vector<std::vector<std::size_t>> byDomain(context.domainCosts.size());
+                        for(std::size_t index = 0u; index < incoming.size(); ++index)
+                        {
+                            auto const& ray = incoming[index];
+                            if(ray.domainId >= byDomain.size())
+                                throw std::runtime_error("boundary ray targets an unknown domain");
+                            byDomain[ray.domainId].push_back(index);
+                        }
+                        std::vector<DomainWorkItem> routeWork;
+                        for(std::uint32_t domain = 0u; domain < byDomain.size(); ++domain)
+                            for(std::uint32_t begin = 0u, batch = 0u; begin < byDomain[domain].size(); ++batch)
+                            {
+                                auto const size = static_cast<std::uint32_t>(
+                                    std::min<std::size_t>(chunkSize, byDomain[domain].size() - begin));
+                                routeWork.push_back({{domain, population, batch}, size, 0u});
+                                begin += size;
+                            }
+                        auto const routeSchedule
+                            = makeDomainSchedule(*descriptors, context.domainCosts, routeWork, context.interfaces);
+                        outgoing.resize(worker.workerCount());
+                        for(auto const& item : routeWork)
+                        {
+                            auto const& indices = byDomain[item.id.domain];
+                            auto const begin = static_cast<std::size_t>(item.id.batchId) * chunkSize;
+                            auto& target = outgoing.at(routeSchedule.owner(item.id));
+                            for(std::size_t offset = 0u; offset < item.rayCount; ++offset)
+                                target.push_back(incoming[indices[begin + offset]]);
+                        }
+                    }
+                    incoming = worker.distribute(std::move(outgoing));
+                }
             }
             auto const tail = estimateBoundaryTail(fractions);
             if(tail.divergent)
@@ -251,9 +299,13 @@ namespace hase::core
             context.betaVolumeTotal,
             context.numIndependentRayPopulations,
             maxLogicalSrmBatchRays);
+        auto const descriptors = worker.gather(worker.descriptor());
+        auto const schedule
+            = makeForwardPopulationSchedule(*descriptors, context.domainCosts, plan, context.interfaces);
         std::vector<ForwardPopulationBatch> localWork;
-        for(auto [index] : hase::mapIdx(worker, alpaka::IdxRange{plan.size()}))
-            localWork.push_back(plan[index]);
+        for(auto const& batch : plan)
+            if(schedule.owner({batch.domainId, batch.rayPopulationId, batch.batchId}) == worker.workerIndex())
+                localWork.push_back(batch);
         (void) worker(PrepareRayPopulationWork{{}, localWork, seed});
         // All populations' source/wavelength samples exist before transport starts.
         (void) worker.gather(std::uint32_t{1u});

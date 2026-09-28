@@ -136,6 +136,9 @@ there is no configurable forward ray-length cutoff.
    to a bounded weighted sample per mesh face. Both policies route transmitted
    histories between adjacent optical components and keep their large buffers,
    scans, and selections on the accelerator.
+   A single-worker direct population also keeps its candidate and relaunch
+   records on the accelerator across boundary passes. Cross-worker transport
+   currently uses staged exchange; peer-device access is not assumed.
 
 ``surfaceReservoirSize``
    Number of statistically retained ray records per boundary face when

@@ -82,6 +82,7 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
     physicalGainMedium,
     crossSections,
     phiAseTestConfigPath,
+    alpakaRuntimeBackend,
 ):
     captured = {}
 
@@ -95,6 +96,7 @@ def testSimulationRunUsesOpenPmdTransportAndStoresResults(
 
     phiAse = PhiASE.fromYaml(
         phiAseTestConfigPath,
+        backend=alpakaRuntimeBackend,
         repetitions=1,
         adaptiveSteps=1,
         parallelMode="single",
@@ -478,6 +480,7 @@ def testPhiAseRunUsesProvidedOpenPmdSession(
     physicalGainMedium,
     crossSections,
     phiAseTestConfigPath,
+    alpakaRuntimeBackend,
 ):
     captured = {}
     openpmdSession = object()
@@ -490,6 +493,7 @@ def testPhiAseRunUsesProvidedOpenPmdSession(
 
     PhiASE.fromYaml(
         phiAseTestConfigPath,
+        backend=alpakaRuntimeBackend,
     ).run(gainMedium=physicalGainMedium, openpmdSession=openpmdSession)
 
     assert captured["openpmdSession"] is openpmdSession
@@ -499,6 +503,7 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     monkeypatch,
     physicalGainMedium,
     crossSections,
+    alpakaRuntimeBackend,
 ):
     captured = {}
     preflight = []
@@ -516,7 +521,7 @@ def testPhiAseRunForwardsConfiguredOpenPmdBackend(
     )
 
     PhiASE(
-        backend="Host_Cpu_CpuSerial",
+        backend=alpakaRuntimeBackend,
         openpmdBackend="hdf5",
     ).run(gainMedium=physicalGainMedium)
 
@@ -586,6 +591,7 @@ def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
     physicalGainMedium,
     crossSections,
     phiAseTestConfigPath,
+    alpakaRuntimeBackend,
 ):
     captured = {}
 
@@ -597,6 +603,7 @@ def testPhiAseIntervalOpenPmdSessionUsesOneShotTransport(
 
     PhiASE.fromYaml(
         phiAseTestConfigPath,
+        backend=alpakaRuntimeBackend,
     ).run(gainMedium=physicalGainMedium, openpmdSession="interval")
 
     assert captured["openpmdSession"] is None

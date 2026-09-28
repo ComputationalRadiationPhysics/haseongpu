@@ -163,7 +163,7 @@ namespace hase::core
             if(cellCount == 0u)
             {
                 auto totals = sourceStrengthTotals.toDeviceView();
-                alpaka::onHost::fill(queue, totals, 0.0);
+                alpaka::onHost::memset(queue, totals, std::uint8_t{0u});
                 return;
             }
             auto sourceStrengthPrefixView = sourceStrengthPrefix.toDeviceView();

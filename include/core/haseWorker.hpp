@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace hase
 {
@@ -38,9 +39,9 @@ namespace hase
         unsigned const workerIndex = worker.workerIndex();
         if(workerCount == 0u || workerIndex >= workerCount)
             throw std::invalid_argument("invalid HASE worker group identity");
-        auto first = range.m_begin + range.m_stride * workerIndex;
-        first[0u] = std::min(first[0u], range.m_end[0u]);
-        return alpaka::IdxRange{first, range.m_end, range.m_stride * workerCount};
+        auto first = range.getBeginMd() + range.getStrideMd() * workerIndex;
+        first[0u] = std::min(first[0u], range.getEndMd()[0u]);
+        return alpaka::IdxRange{first, range.getEndMd(), range.getStrideMd() * workerCount};
     }
 } // namespace hase
 
@@ -50,7 +51,7 @@ namespace hase::core
      * @brief Policy customization point for worker identity and collectives.
      *
      * A worker policy specialization supplies `workerIndex`, `workerCount`,
-     * `isRoot`, `scatter`, `gather`, and `reduce`. Collective operations must be
+     * `isRoot`, `scatter`, `distribute`, `gather`, and `reduce`. Collective operations must be
      * called in identical order by all workers in the group and outside mapped
      * loops, because workers may own different numbers of work items.
      */
@@ -134,6 +135,13 @@ namespace hase::core
         auto scatter(T_Value&& value)
         {
             return HaseWorkerDispatch<T_WorkerPolicy>::scatter(m_policy, std::forward<T_Value>(value));
+        }
+
+        /** Deliver each worker only its assigned transport records. */
+        template<typename T_Value>
+        auto distribute(std::vector<std::vector<T_Value>> value)
+        {
+            return HaseWorkerDispatch<T_WorkerPolicy>::distribute(m_policy, std::move(value));
         }
 
         /**

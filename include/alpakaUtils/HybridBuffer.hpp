@@ -64,8 +64,8 @@ namespace hase::internal::hybridBuffer
             "hybrid buffer host and device dimensionality must match");
         static_assert(
             std::same_as<
-                std::remove_const_t<alpaka::trait::GetValueType_t<T_HostBuffer>>,
-                std::remove_const_t<alpaka::trait::GetValueType_t<T_DeviceBuffer>>>,
+                std::remove_const_t<alpaka::GetValueType_t<T_HostBuffer>>,
+                std::remove_const_t<alpaka::GetValueType_t<T_DeviceBuffer>>>,
             "hybrid buffer host and device value types must match");
 
         auto const hostExtents = alpaka::onHost::getExtents(hostBuffer);

@@ -28,6 +28,7 @@ namespace hase::core
     {
         data::DomainId domain{};
         data::RayPopulationId rayPopulationId{};
+        std::uint32_t batchId{};
 
         constexpr auto operator<=>(DomainRayPopulationId const&) const = default;
     };
@@ -507,6 +508,13 @@ namespace hase::core
         std::vector<DomainCost> const& domains,
         std::vector<DomainQuota> const& quotas,
         std::uint32_t numIndependentRayPopulations,
+        std::span<data::AseDomainInterface const> interfaces = {});
+
+    /** @brief Schedule concrete execution batches without changing statistical population identity. */
+    [[nodiscard]] DomainSchedule makeDomainSchedule(
+        std::vector<WorkerDescriptor> const& workers,
+        std::vector<DomainCost> const& domains,
+        std::span<DomainWorkItem const> work,
         std::span<data::AseDomainInterface const> interfaces = {});
 
     /** @brief Compute immutable scheduling statistics once from the prepared domain graph. */

@@ -65,4 +65,8 @@ make_hase_cmake_args() {
             -DCMAKE_HIP_ARCHITECTURES=gfx900
         )
     fi
+
+    local -a extra_cmake_args=()
+    read -r -a extra_cmake_args <<< "${HASE_CI_EXTRA_CMAKE_ARGS:-}"
+    HASE_CMAKE_ARGS+=("${extra_cmake_args[@]}")
 }

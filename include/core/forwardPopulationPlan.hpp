@@ -93,4 +93,18 @@ namespace hase::core
         return static_cast<std::uint32_t>(
             std::clamp<std::uint64_t>((static_cast<std::uint64_t>(rays) + partitions - 1u) / partitions, 1u, 65536u));
     }
+
+    /** Map the concrete execution chunks while retaining their independent sampling identities. */
+    [[nodiscard]] inline DomainSchedule makeForwardPopulationSchedule(
+        std::vector<WorkerDescriptor> const& workers,
+        std::vector<DomainCost> const& domains,
+        std::span<ForwardPopulationBatch const> const batches,
+        std::span<data::AseDomainInterface const> const interfaces)
+    {
+        std::vector<DomainWorkItem> work;
+        work.reserve(batches.size());
+        for(auto const& batch : batches)
+            work.push_back({{batch.domainId, batch.rayPopulationId, batch.batchId}, batch.rayCount, 0u});
+        return makeDomainSchedule(workers, domains, work, interfaces);
+    }
 } // namespace hase::core

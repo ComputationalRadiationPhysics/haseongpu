@@ -33,21 +33,12 @@ namespace hase::core
     {
         if(workers.empty() || domains.empty() || numIndependentRayPopulations == 0u)
             throw std::invalid_argument("domain scheduling requires workers, domains, and batches");
-        for(auto const& worker : workers)
-            if(worker.relativeCapacity <= 0.0 || !std::isfinite(worker.relativeCapacity))
-                throw std::invalid_argument("worker relative capacity must be finite and positive");
-
-        std::unordered_map<data::DomainId, DomainCost const*> domainById;
-        for(auto const& domain : domains)
-            if(!domainById.emplace(domain.id, &domain).second)
-                throw std::invalid_argument("domain ids must be unique");
         std::unordered_map<data::DomainId, DomainQuota const*> quotaById;
         for(auto const& quota : quotas)
             if(!quotaById.emplace(quota.id, &quota).second)
                 throw std::invalid_argument("domain quota ids must be unique");
-
-        std::vector<PendingAssignment> pending;
-        pending.reserve(domains.size() * numIndependentRayPopulations);
+        std::vector<DomainWorkItem> work;
+        work.reserve(domains.size() * numIndependentRayPopulations);
         for(auto const& domain : domains)
         {
             auto const found = quotaById.find(domain.id);
@@ -58,9 +49,40 @@ namespace hase::core
             {
                 auto const rays
                     = total / numIndependentRayPopulations + (batch < total % numIndependentRayPopulations ? 1u : 0u);
-                pending.push_back({{domain.id, batch}, rays, estimatedWork(domain, rays)});
+                work.push_back({{domain.id, batch, 0u}, rays, 0u});
             }
         }
+        return makeDomainSchedule(workers, domains, work, interfaces);
+    }
+
+    DomainSchedule makeDomainSchedule(
+        std::vector<WorkerDescriptor> const& workers,
+        std::vector<DomainCost> const& domains,
+        std::span<DomainWorkItem const> const work,
+        std::span<data::AseDomainInterface const> const interfaces)
+    {
+        if(workers.empty() || domains.empty())
+            throw std::invalid_argument("domain scheduling requires workers and domains");
+        for(auto const& worker : workers)
+            if(worker.relativeCapacity <= 0.0 || !std::isfinite(worker.relativeCapacity))
+                throw std::invalid_argument("worker relative capacity must be finite and positive");
+
+        std::unordered_map<data::DomainId, DomainCost const*> domainById;
+        for(auto const& domain : domains)
+            if(!domainById.emplace(domain.id, &domain).second)
+                throw std::invalid_argument("domain ids must be unique");
+        std::vector<PendingAssignment> pending;
+        pending.reserve(work.size());
+        for(auto const& item : work)
+        {
+            auto const found = domainById.find(item.id.domain);
+            if(found == domainById.end())
+                throw std::invalid_argument("scheduled work references an unknown domain");
+            pending.push_back({item.id, item.rayCount, estimatedWork(*found->second, item.rayCount)});
+        }
+        std::ranges::sort(pending, {}, &PendingAssignment::id);
+        if(std::ranges::adjacent_find(pending, {}, &PendingAssignment::id) != pending.end())
+            throw std::invalid_argument("domain execution batch ids must be unique");
         std::ranges::sort(
             pending,
             [](auto const& left, auto const& right)

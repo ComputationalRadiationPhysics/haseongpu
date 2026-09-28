@@ -173,6 +173,74 @@ TEST_CASE("population plan covers every ray independently of execution chunk siz
     CHECK_THROWS_AS(makeForwardPopulationBatches(counts, quotas, 3.0, 54u, 16u), std::invalid_argument);
 }
 
+TEST_CASE("concrete forward batches use cost-aware worker ownership", "[forward][populations][schedule]")
+{
+    using namespace hase::core;
+    std::vector<WorkerDescriptor> workers{{0u, 0u, 0u, 1.0}, {1u, 1u, 0u, 10.0}};
+    std::vector<DomainCost> domains{{0u, 1000u, 1000u, 20u, 1.0, std::nullopt}};
+    std::vector<DomainQuota> quotas{{0u, 12u, 1.0, 0.0}};
+    auto const batches = makeForwardPopulationBatches(std::vector<std::uint32_t>{12u}, quotas, 1.0, 1u, 6u);
+    auto const schedule = makeForwardPopulationSchedule(workers, domains, batches, {});
+    REQUIRE(schedule.assignments().size() == 2u);
+    CHECK(schedule.owner({0u, 0u, 0u}) == 1u);
+    CHECK(schedule.owner({0u, 0u, 1u}) == 1u);
+    CHECK(schedule.assignments()[0u].rayCount == 6u);
+    CHECK(schedule.assignments()[1u].rayCount == 6u);
+}
+
+TEMPLATE_LIST_TEST_CASE(
+    "direct multi-domain transport agrees across resident and distributed workers",
+    "[forward][populations][direct][domain]",
+    TestBackends)
+{
+    auto selector = alpaka::onHost::makeDeviceSelector(TestType::makeDict());
+    if(!selector.isAvailable())
+        SKIP("Requested test backend has no available device");
+    auto device = selector.makeDevice(0u);
+    auto const executor = alpaka::getExecutor(TestType::makeDict());
+    auto mesh = hase::test::populationCube(3u, 0.25f);
+    auto graph = slabPopulationGraph(mesh);
+    hase::core::AseTraceControls controls;
+    controls.reflectionMode = "direct";
+    controls.domainCount = graph.domains.size();
+    controls.forwardRayCount = 4096u;
+    controls.minRays = controls.maxRays = controls.forwardRayCount;
+    controls.numIndependentRayPopulations = 4u;
+    controls.useReflections = true;
+    controls.boundaryMaxPasses = 40u;
+    controls.reflectionTolerance = 1.0e-4;
+    hase::data::PhiAseResult reference;
+    for(auto const workers : {1u, 2u})
+    {
+        hase::core::ForwardPhiAseContext context(std::vector(workers, device), executor, controls, mesh, graph);
+        hase::core::ExecutionPolicy compute(
+            1u,
+            0u,
+            workers,
+            0u,
+            "direct-domain-population-test",
+            hase::core::ParallelMode::SINGLE,
+            false,
+            {0u},
+            0u,
+            mesh.numberOfCells,
+            137u);
+        hase::data::PhiAseResult result;
+        auto const evaluation = context.evaluate(controls, compute, mesh, context.primaryBetaVolume(), result);
+        REQUIRE(evaluation.rayCount == controls.forwardRayCount);
+        REQUIRE(result.phiAse.size() == mesh.numberOfCells);
+        if(workers == 1u)
+            reference = result;
+        for(std::uint32_t cell = 0u; cell < mesh.numberOfCells; ++cell)
+        {
+            CHECK(result.phiAse[cell] == Catch::Approx(reference.phiAse[cell]).epsilon(1.0e-6));
+            CHECK(result.standardError[cell] == Catch::Approx(reference.standardError[cell]).epsilon(1.0e-10));
+        }
+        CHECK(result.boundaryStatus == reference.boundaryStatus);
+        CHECK(result.boundaryPasses == reference.boundaryPasses);
+    }
+}
+
 TEMPLATE_LIST_TEST_CASE(
     "logical SRM batches preserve statistics across worker ownership",
     "[forward][populations][srm]",

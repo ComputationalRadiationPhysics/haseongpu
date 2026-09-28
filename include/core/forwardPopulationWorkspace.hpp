@@ -17,7 +17,6 @@ namespace hase::core
     {
         using T_Rays
             = ALPAKA_TYPEOF(alpaka::onHost::alloc<ForwardPopulationRay>(std::declval<T_Device&>(), std::size_t{1u}));
-        using T_RayView = decltype(std::declval<T_Rays&>().getView());
 
         struct Range
         {
@@ -66,7 +65,7 @@ namespace hase::core
         }
 
         /** Scheduling may change ownership, but never combine two logical reservoirs. */
-        void forEachPreparedBatch(std::invocable<ForwardPopulationBatch const&, T_RayView> auto const& trace)
+        void forEachPreparedBatch(auto const& trace)
         {
             for(auto const& range : m_ranges)
                 trace(
@@ -111,7 +110,8 @@ namespace hase::core
                             accumulation,
                             m_scratch->first.view(),
                             interfaces,
-                            controls.useReflections});
+                            controls.useReflections,
+                            std::uint32_t{0u}});
                 };
                 if(controls.enableDiagnostics)
                     launch(kernels::forward::tracePolicy::diagnostics::enabled);
@@ -160,6 +160,79 @@ namespace hase::core
             return result;
         }
 
+        /** Trace one complete population and return only its scalar surviving weight. */
+        double traceResident(
+            concepts::Queue auto const& queue,
+            data::TraceView const mesh,
+            data::AseDomainInterfaceView const interfaces,
+            AseTraceControls const& controls,
+            alpaka::concepts::SpecializationOf<kernels::forward::ForwardAccumulationSpans> auto accumulation,
+            std::uint32_t const population,
+            bool const primary)
+        {
+            if(primary)
+            {
+                m_activeCount = 0u;
+                for(auto const& range : m_ranges)
+                    if(range.work.rayPopulationId == population)
+                        m_activeCount += range.work.rayCount;
+            }
+            if(m_activeCount == 0u)
+                return 0.0;
+            reserve(m_activeCount, forwardPopulationDomainCount(controls.domainCount));
+            auto const candidateCount = boundaryCandidateCount(m_activeCount);
+            alpaka::onHost::fill(queue, m_scratch->first.weights, 0.0, alpaka::Vec{std::size_t{candidateCount}});
+            auto launch = [&](alpaka::concepts::IView<ForwardPopulationRay> auto input,
+                              std::uint32_t const offset,
+                              auto diagnostics)
+            {
+                queue.enqueue(
+                    getRayFrameSpec(static_cast<std::uint32_t>(input.getExtents().x()), queue),
+                    alpaka::KernelBundle{
+                        kernels::forward::TraceForwardPopulation{},
+                        kernels::forward::TracePolicyList{
+                            kernels::forward::tracePolicy::source::volume,
+                            kernels::forward::tracePolicy::cell::forwardAse,
+                            kernels::forward::tracePolicy::boundary::boundaryCandidates,
+                            kernels::forward::tracePolicy::position::exact,
+                            diagnostics},
+                        mesh,
+                        input,
+                        accumulation,
+                        m_scratch->first.view(),
+                        interfaces,
+                        controls.useReflections,
+                        offset});
+            };
+            auto trace = [&](auto diagnostics)
+            {
+                if(primary)
+                {
+                    for(auto const& range : m_ranges)
+                        if(range.work.rayPopulationId == population)
+                            launch(
+                                m_primaries->getView().getSubView(
+                                    alpaka::Vec{std::size_t{range.offset}},
+                                    alpaka::Vec{std::size_t{range.work.rayCount}}),
+                                range.work.populationOffset + range.work.rayOffset,
+                                diagnostics);
+                }
+                else
+                    launch(m_incoming->getView().getSubView(alpaka::Vec{std::size_t{m_activeCount}}), 0u, diagnostics);
+            };
+            if(controls.enableDiagnostics)
+                trace(kernels::forward::tracePolicy::diagnostics::enabled);
+            else
+                trace(kernels::forward::tracePolicy::diagnostics::none);
+            auto const candidateWeights
+                = m_scratch->first.weights.getView().getSubView(alpaka::Vec{std::size_t{candidateCount}});
+            auto& totalWeight = m_scratch->comb.totalWeight;
+            detail::reduce(queue, 0.0, totalWeight, candidateWeights);
+            alpaka::onHost::memcpy(queue, m_scratch->totalWeight.toDeviceView(), m_scratch->comb.totalWeight);
+            m_scratch->totalWeight.toHost(queue);
+            return m_scratch->totalWeightHost[0u];
+        }
+
         /** Canonical candidate ordering precedes device-side population-wide combing. */
         std::vector<ForwardPopulationRay> select(
             alpaka::concepts::SpecializationOf<alpakaUtils::DevBundle> auto& bundle,
@@ -188,13 +261,66 @@ namespace hase::core
                     kernels::forward::UnpackForwardPopulationCandidates{},
                     records,
                     m_scratch->first.view()});
+            auto const count = enqueueSelection(bundle, queue, size / 2u, domains, seed, pass);
+            if(count == 0u)
+                return {};
+            auto output = m_incoming->getView().getSubView(alpaka::Vec{std::size_t{count}});
+            queue.enqueue(
+                getRayFrameSpec(count, queue),
+                alpaka::KernelBundle{
+                    kernels::forward::SelectForwardPopulationRays{},
+                    records,
+                    m_scratch->comb.selectedView(count),
+                    m_scratch->comb.selectedWeightsView(count),
+                    output,
+                    pass});
+            std::vector<ForwardPopulationRay> result(count);
+            auto resultHost = alpaka::makeView(alpaka::api::host, result.data(), alpaka::Vec{std::size_t{count}});
+            alpaka::onHost::memcpy(queue, resultHost, output);
+            alpaka::onHost::wait(queue);
+            return result;
+        }
+
+        /** Comb resident candidates into the next resident input without moving ray records to the host. */
+        void selectResident(
+            alpaka::concepts::SpecializationOf<alpakaUtils::DevBundle> auto& bundle,
+            concepts::Queue auto const& queue,
+            std::uint32_t const domains,
+            std::uint32_t const seed,
+            std::uint32_t const pass)
+        {
+            auto const count = enqueueSelection(bundle, queue, m_activeCount, domains, seed, pass);
+            m_activeCount = count;
+            if(count == 0u)
+                return;
+            queue.enqueue(
+                getRayFrameSpec(count, queue),
+                alpaka::KernelBundle{
+                    kernels::forward::SelectResidentForwardPopulationRays{},
+                    m_scratch->first.view(),
+                    m_scratch->comb.selectedView(count),
+                    m_scratch->comb.selectedWeightsView(count),
+                    m_incoming->getView().getSubView(alpaka::Vec{std::size_t{count}}),
+                    pass});
+        }
+
+    private:
+        std::uint32_t enqueueSelection(
+            alpaka::concepts::SpecializationOf<alpakaUtils::DevBundle> auto& bundle,
+            concepts::Queue auto const& queue,
+            std::uint32_t const parentCount,
+            std::uint32_t const domains,
+            std::uint32_t const seed,
+            std::uint32_t const pass)
+        {
             auto& scratch = *m_scratch;
+            auto const size = boundaryCandidateCount(parentCount);
             scratch.comb.enqueueRouteMeasurements(
                 bundle,
                 queue,
                 scratch.first.weights.getView(),
                 scratch.first.targetDomains.getView(),
-                size / 2u,
+                parentCount,
                 domains);
             alpaka::onHost::memcpy(queue, scratch.liveCount.toDeviceView(), scratch.comb.liveParentCount);
             alpaka::onHost::memcpy(queue, scratch.routeWeights.toDeviceView(), scratch.comb.routeWeights);
@@ -207,7 +333,7 @@ namespace hase::core
             scratch.routeCandidateCounts.toHost(queue);
             auto const count = scratch.liveCountHost[0u];
             if(count == 0u)
-                return {};
+                return 0u;
             auto const nonEmpty
                 = std::ranges::count_if(scratch.routeCandidateCountsHost, [](auto n) { return n > 0u; });
             if(static_cast<std::uint32_t>(nonEmpty) > count)
@@ -236,24 +362,9 @@ namespace hase::core
                         offset += counts[domain];
                     }
             }
-            auto output = m_incoming->getView().getSubView(alpaka::Vec{std::size_t{count}});
-            queue.enqueue(
-                getRayFrameSpec(count, queue),
-                alpaka::KernelBundle{
-                    kernels::forward::SelectForwardPopulationRays{},
-                    records,
-                    scratch.comb.selectedView(count),
-                    scratch.comb.selectedWeightsView(count),
-                    output,
-                    pass});
-            std::vector<ForwardPopulationRay> result(count);
-            auto resultHost = alpaka::makeView(alpaka::api::host, result.data(), alpaka::Vec{std::size_t{count}});
-            alpaka::onHost::memcpy(queue, resultHost, output);
-            alpaka::onHost::wait(queue);
-            return result;
+            return count;
         }
 
-    private:
         void reserve(std::uint32_t const count, std::uint32_t const domains)
         {
             if(m_scratch && m_capacity >= count && m_domains == domains)
@@ -273,5 +384,6 @@ namespace hase::core
         std::unique_ptr<DirectBoundaryScratch<T_Device>> m_scratch;
         std::vector<Range> m_ranges;
         std::uint32_t m_primaryCapacity{}, m_capacity{}, m_domains{};
+        std::uint32_t m_activeCount{};
     };
 } // namespace hase::core

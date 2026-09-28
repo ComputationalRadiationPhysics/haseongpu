@@ -31,6 +31,12 @@ Execution Model
 * Raw batch accumulators are reduced before one global normalization.
 * GPU IDs printed by HASEonGPU are local to each node.
 
+Direct boundary candidates stay on the device when the worker group has one owner.
+With multiple rank-owned devices, candidates cross ranks through host-staged MPI
+transport because device peer access is not assumed. Candidate payloads gather
+only at the combing rank; selected histories are sent only to their scheduled
+destination owners for the next pass.
+
 For example, with two nodes and four visible GPUs per node, ranks on both nodes
 may report GPUs ``0-3``; those are different physical devices on different
 nodes.

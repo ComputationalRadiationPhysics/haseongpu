@@ -72,8 +72,8 @@ namespace hase::kernels
             alpaka::concepts::Simd auto const& materialIds) const
         {
             using T_Result = std::remove_cvref_t<decltype(betaVolume)>;
-            static_assert(std::same_as<typename T_Result::type, double>);
-            static_assert(std::same_as<typename std::remove_cvref_t<decltype(materialIds)>::type, unsigned>);
+            static_assert(std::same_as<alpaka::GetValueType_t<T_Result>, double>);
+            static_assert(std::same_as<alpaka::GetValueType_t<std::remove_cvref_t<decltype(materialIds)>>, unsigned>);
             auto const active = alpaka::SimdMask<double, T_Result::width()>{
                 [&](auto const lane)
                 {
@@ -119,8 +119,8 @@ namespace hase::kernels
             alpaka::concepts::Simd auto const& materialIds) const
         {
             using T_Result = std::remove_cvref_t<decltype(betaVolume)>;
-            static_assert(std::same_as<typename T_Result::type, double>);
-            static_assert(std::same_as<typename std::remove_cvref_t<decltype(materialIds)>::type, unsigned>);
+            static_assert(std::same_as<alpaka::GetValueType_t<T_Result>, double>);
+            static_assert(std::same_as<alpaka::GetValueType_t<std::remove_cvref_t<decltype(materialIds)>>, unsigned>);
             auto const active = alpaka::SimdMask<double, T_Result::width()>{
                 [&](auto const lane)
                 {

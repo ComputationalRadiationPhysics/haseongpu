@@ -52,7 +52,7 @@ namespace hase::kernels
         ALPAKA_FN_ACC auto operator()(alpaka::concepts::Simd auto const& globalCells) const
         {
             using T_Cells = std::remove_cvref_t<decltype(globalCells)>;
-            static_assert(std::same_as<typename T_Cells::type, std::uint32_t>);
+            static_assert(std::same_as<alpaka::GetValueType_t<T_Cells>, std::uint32_t>);
             return alpaka::Simd<double, T_Cells::width()>{
                 [&](auto const lane)
                 {

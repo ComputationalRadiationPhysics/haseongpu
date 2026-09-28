@@ -539,7 +539,7 @@ TEST_CASE("forward PhiASE beta-volume contribution uses double precision", "[for
 {
     hase::core::BetaVolumeContribution contribution;
     auto const value = contribution(alpaka::Simd<double, 1u>{0.25}, alpaka::Simd<float, 1u>{0.5f});
-    STATIC_REQUIRE(std::is_same_v<alpaka::trait::GetValueType_t<std::remove_cvref_t<decltype(value)>>, double>);
+    STATIC_REQUIRE(std::is_same_v<alpaka::GetValueType_t<std::remove_cvref_t<decltype(value)>>, double>);
     CHECK(value[0] == Catch::Approx(0.125));
 }
 

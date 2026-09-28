@@ -64,6 +64,38 @@ namespace hase::core
         }
     };
 
+    struct TraceResidentRayPopulationWork : ForwardPopulationOperation
+    {
+        std::uint32_t rayPopulationId;
+        bool primary;
+
+        double execute(
+            alpaka::concepts::SpecializationOf<ForwardPhiAseDeviceContext> auto& context,
+            data::TraceView mesh,
+            data::AseDomainSourceView,
+            data::AseDomainInterfaceView interfaces,
+            AseTraceControls const& controls) const
+        {
+            return context.traceResidentRayPopulation(mesh, interfaces, controls, rayPopulationId, primary);
+        }
+    };
+
+    struct SelectResidentRayPopulationWork : ForwardPopulationOperation
+    {
+        std::uint32_t seed;
+        std::uint32_t pass;
+
+        void execute(
+            alpaka::concepts::SpecializationOf<ForwardPhiAseDeviceContext> auto& context,
+            data::TraceView,
+            data::AseDomainSourceView,
+            data::AseDomainInterfaceView,
+            AseTraceControls const& controls) const
+        {
+            context.selectResidentRayPopulation(forwardPopulationDomainCount(controls.domainCount), seed, pass);
+        }
+    };
+
     struct SelectRayPopulationWork : ForwardPopulationOperation
     {
         std::vector<ForwardPopulationRay> candidates;
@@ -318,6 +350,16 @@ namespace hase::core
         {
             using T = std::remove_cvref_t<T_Value>;
             return policy.m_group.scatter(policy.m_workerIndex, T(std::forward<T_Value>(value)));
+        }
+
+        template<typename T_Value>
+        [[nodiscard]] static std::vector<T_Value> distribute(T_Policy& policy, std::vector<std::vector<T_Value>> value)
+        {
+            auto rootParts = policy.m_workerIndex == 0u
+                                 ? std::make_shared<std::vector<std::vector<T_Value>>>(std::move(value))
+                                 : std::shared_ptr<std::vector<std::vector<T_Value>>>{};
+            auto parts = policy.m_group.scatter(policy.m_workerIndex, std::move(rootParts));
+            return std::move(parts->at(policy.m_workerIndex));
         }
 
         template<typename T_Value>

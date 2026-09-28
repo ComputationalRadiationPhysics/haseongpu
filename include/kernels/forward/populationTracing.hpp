@@ -100,7 +100,8 @@ namespace hase::kernels::forward
             alpaka::concepts::SpecializationOf<ForwardAccumulationSpans> auto accumulation,
             alpaka::concepts::SpecializationOf<core::BoundaryRaySpans> auto candidates,
             data::AseDomainInterfaceView const interfaces,
-            bool const reflections) const
+            bool const reflections,
+            std::uint32_t const candidateOffset) const
         {
             for(auto [index] : alpaka::onAcc::makeIdxMap(
                     acc,
@@ -123,7 +124,7 @@ namespace hase::kernels::forward
                     ray.rayPopulationId,
                     accumulation,
                     candidates,
-                    static_cast<std::uint32_t>(index),
+                    candidateOffset + static_cast<std::uint32_t>(index),
                     interfaces,
                     ray.domainId,
                     ray.depth + 1u,
@@ -265,6 +266,42 @@ namespace hase::kernels::forward
                 ray.weight = weights[i];
                 ray.direction = normalize(ray.direction);
                 ray.ordinal = static_cast<std::uint32_t>(i);
+                ray.historyId ^= rayHistoryId(pass, ray.ordinal);
+                output[i] = ray;
+            }
+        }
+    };
+
+    /** Select from resident SoA candidates without packing through a host-visible record. */
+    struct SelectResidentForwardPopulationRays
+    {
+        ALPAKA_FN_ACC void operator()(
+            alpaka::onAcc::concepts::Acc auto const& acc,
+            alpaka::concepts::SpecializationOf<core::BoundaryRaySpans> auto candidates,
+            alpaka::concepts::IView<std::uint32_t> auto selected,
+            alpaka::concepts::IView<double> auto weights,
+            alpaka::concepts::IView<core::ForwardPopulationRay> auto output,
+            std::uint32_t const pass) const
+        {
+            for(auto [i] : alpaka::onAcc::makeIdxMap(
+                    acc,
+                    alpaka::onAcc::worker::threadsInGrid,
+                    alpaka::IdxRange{output.getExtents().x()}))
+            {
+                auto const candidate = selected[i];
+                core::ForwardPopulationRay ray{
+                    .position = candidates.positions.at(candidate),
+                    .direction = normalize(candidates.directions.at(candidate)),
+                    .faceBarycentric = candidates.faceBarycentric.at(candidate),
+                    .weight = weights[i],
+                    .wavelength = candidates.wavelengths[candidate],
+                    .domainId = candidates.targetDomains[candidate],
+                    .cell = candidates.targetCells[candidate],
+                    .face = static_cast<std::int32_t>(candidates.targetFaces[candidate]),
+                    .rayPopulationId = candidates.rayPopulationIds[candidate],
+                    .depth = candidates.reflectionDepths[candidate],
+                    .historyId = candidates.historyIds[candidate],
+                    .ordinal = static_cast<std::uint32_t>(i)};
                 ray.historyId ^= rayHistoryId(pass, ray.ordinal);
                 output[i] = ray;
             }

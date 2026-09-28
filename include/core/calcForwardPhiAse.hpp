@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstdint>
 #include <ctime>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -445,9 +446,10 @@ namespace hase::core
                 m_rayPopulationRayCounts.at(item.rayPopulationId) += item.rayCount;
                 m_accumulatedRayCount += item.rayCount;
             }
-            alpaka::onHost::fill(m_queue, m_vertexPopulationScoreSum, 0.0);
-            alpaka::onHost::fill(m_queue, m_volumeRayVisits, 0u);
-            alpaka::onHost::fill(m_queue, m_droppedRays, 0u);
+            static_assert(std::numeric_limits<double>::is_iec559, "byte zeroing requires IEEE 754 doubles");
+            alpaka::onHost::memset(m_queue, m_vertexPopulationScoreSum, std::uint8_t{0u});
+            alpaka::onHost::memset(m_queue, m_volumeRayVisits, std::uint8_t{0u});
+            alpaka::onHost::memset(m_queue, m_droppedRays, std::uint8_t{0u});
             if(!m_populationWorkspace)
                 m_populationWorkspace = std::make_unique<ForwardPopulationWorkspace<T_Device>>(m_devBundle.device);
             m_populationWorkspace->prepare(m_queue, mesh, sources, work, seed);
@@ -531,6 +533,29 @@ namespace hase::core
                 m_droppedRays.getMdSpan()};
             return m_populationWorkspace
                 ->trace(m_queue, mesh, interfaces, controls, accumulation, population, incoming, primary);
+        }
+
+        double traceResidentRayPopulation(
+            data::TraceView const mesh,
+            data::AseDomainInterfaceView const interfaces,
+            AseTraceControls const& controls,
+            std::uint32_t const population,
+            bool const primary)
+        {
+            auto accumulation = kernels::forward::ForwardAccumulationSpans{
+                m_vertexPopulationScoreSum.getMdSpan(),
+                m_volumeRayVisits.getMdSpan(),
+                m_droppedRays.getMdSpan()};
+            return m_populationWorkspace
+                ->traceResident(m_queue, mesh, interfaces, controls, accumulation, population, primary);
+        }
+
+        void selectResidentRayPopulation(
+            std::uint32_t const domains,
+            std::uint32_t const seed,
+            std::uint32_t const pass)
+        {
+            m_populationWorkspace->selectResident(m_devBundle, m_queue, domains, seed, pass);
         }
 
         std::vector<ForwardPopulationRay> selectRayPopulation(

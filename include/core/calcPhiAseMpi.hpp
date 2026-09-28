@@ -204,12 +204,59 @@ namespace hase::core
 
         template<typename T_Value>
         requires std::is_trivially_copyable_v<T_Value>
+        [[nodiscard]] static std::vector<T_Value> distribute(T_Policy& policy, std::vector<std::vector<T_Value>> value)
+        {
+            std::vector<std::uint64_t> counts(policy.m_workerCount, 0u);
+            int valid = 1;
+            if(policy.m_workerIndex == 0u)
+            {
+                valid = value.size() == policy.m_workerCount;
+                if(valid)
+                    for(unsigned rank = 0u; rank < policy.m_workerCount; ++rank)
+                    {
+                        counts[rank] = value[rank].size();
+                        valid &= counts[rank]
+                                 <= static_cast<std::uint64_t>(std::numeric_limits<int>::max()) / sizeof(T_Value);
+                    }
+            }
+            MPI_Bcast(&valid, 1, MPI_INT, 0, policy.m_communicator);
+            if(!valid)
+                throw std::invalid_argument("MPI population distribution has invalid worker counts");
+            std::uint64_t localCount = 0u;
+            MPI_Scatter(counts.data(), 1, MPI_UINT64_T, &localCount, 1, MPI_UINT64_T, 0, policy.m_communicator);
+            if(policy.m_workerIndex == 0u)
+            {
+                for(unsigned rank = 1u; rank < policy.m_workerCount; ++rank)
+                    MPI_Send(
+                        value[rank].data(),
+                        static_cast<int>(value[rank].size() * sizeof(T_Value)),
+                        MPI_BYTE,
+                        static_cast<int>(rank),
+                        0,
+                        policy.m_communicator);
+                return std::move(value.front());
+            }
+            std::vector<T_Value> local(static_cast<std::size_t>(localCount));
+            MPI_Recv(
+                local.data(),
+                static_cast<int>(localCount * sizeof(T_Value)),
+                MPI_BYTE,
+                0,
+                0,
+                policy.m_communicator,
+                MPI_STATUS_IGNORE);
+            return local;
+        }
+
+        template<typename T_Value>
+        requires std::is_trivially_copyable_v<T_Value>
         [[nodiscard]] static std::shared_ptr<std::vector<std::vector<T_Value>> const> gather(
             T_Policy& policy,
             std::vector<T_Value> value)
         {
             auto result = std::make_shared<std::vector<std::vector<T_Value>>>(policy.m_workerCount);
-            // Each origin broadcasts once; retain rank grouping for canonical reconstruction.
+            // Only the combing owner needs ray payloads. Every rank sees counts so the
+            // collective order stays fixed, but payloads travel only to rank zero.
             for(unsigned rank = 0u; rank < policy.m_workerCount; ++rank)
             {
                 auto& part = result->at(rank);
@@ -219,13 +266,29 @@ namespace hase::core
                 MPI_Bcast(&count, 1, MPI_UINT64_T, static_cast<int>(rank), policy.m_communicator);
                 if(count > static_cast<std::uint64_t>(std::numeric_limits<int>::max()) / sizeof(T_Value))
                     throw std::overflow_error("MPI population gather exceeds the byte-count range");
-                part.resize(static_cast<std::size_t>(count));
-                MPI_Bcast(
-                    part.data(),
-                    static_cast<int>(count * sizeof(T_Value)),
-                    MPI_BYTE,
-                    static_cast<int>(rank),
-                    policy.m_communicator);
+                if(rank != 0u)
+                {
+                    if(policy.m_workerIndex == rank)
+                        MPI_Send(
+                            part.data(),
+                            static_cast<int>(count * sizeof(T_Value)),
+                            MPI_BYTE,
+                            0,
+                            0,
+                            policy.m_communicator);
+                    else if(policy.m_workerIndex == 0u)
+                    {
+                        part.resize(static_cast<std::size_t>(count));
+                        MPI_Recv(
+                            part.data(),
+                            static_cast<int>(count * sizeof(T_Value)),
+                            MPI_BYTE,
+                            static_cast<int>(rank),
+                            0,
+                            policy.m_communicator,
+                            MPI_STATUS_IGNORE);
+                    }
+                }
             }
             return result;
         }

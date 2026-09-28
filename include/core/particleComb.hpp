@@ -4,6 +4,7 @@
 
 #include <alpakaUtils/DevBundle.hpp>
 #include <concepts/concepts.hpp>
+#include <core/boundaryReduce.hpp>
 #include <kernels/forward/particleCombing.hpp>
 
 #include <cstddef>
@@ -95,14 +96,11 @@ namespace hase::core
                     candidateWeights.getSubView(alpaka::Vec{static_cast<std::size_t>(candidateCount)}),
                     liveParents.getView().getSubView(alpaka::Vec{static_cast<std::size_t>(parentCount)}),
                     std::uint32_t{parentCount}});
-            alpaka::onHost::reduce(
+            detail::reduce(
                 queue,
-                devBundle.executor,
                 std::uint32_t{0u},
                 liveParentCount,
-                std::plus{},
                 liveParents.getView().getSubView(alpaka::Vec{static_cast<std::size_t>(parentCount)}));
-
             auto const candidateExtent = alpaka::Vec{static_cast<std::size_t>(candidateCount)};
             for(std::uint32_t domain = 0u; domain < domainCount; ++domain)
             {
