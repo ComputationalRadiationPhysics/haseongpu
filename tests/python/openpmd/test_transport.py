@@ -1502,7 +1502,7 @@ def test_read_simulation_output_uses_cell_layout(tmp_path):
 
     iteration.set_attribute(transport.attributeName("simulationSnapshot/step"), 1)
     iteration.set_attribute(transport.attributeName("simulationSnapshot/time"), 0.25)
-    iteration.set_attribute(transport.attributeName("simulationSnapshot/boundaryStatus"), "stable")
+    iteration.set_attribute(transport.attributeName("simulationSnapshot/boundaryStatus"), "maxPasses")
     iteration.set_attribute(transport.attributeName("simulationSnapshot/boundaryPasses"), 2)
     iteration.set_attribute(transport.attributeName("simulationSnapshot/boundaryRemainingFraction"), 0.25)
     iteration.set_attribute(transport.attributeName("simulationSnapshot/boundaryMaxPasses"), 8)
@@ -1533,7 +1533,7 @@ def test_read_simulation_output_uses_cell_layout(tmp_path):
     np.testing.assert_array_equal(state.totalRays, np.arange(cell_flat.size, dtype=np.uint32))
     np.testing.assert_array_equal(state.dndtAse, cell_flat + 2000.0)
     np.testing.assert_array_equal(state.dndtPump, cell_flat + 3000.0)
-    assert state.aseResult.boundaryStatus == "stable"
+    assert state.aseResult.boundaryStatus == "maxPasses"
     assert state.aseResult.boundaryPasses == 2
     assert state.aseResult.boundaryRemainingFraction == pytest.approx(0.25)
     assert state.aseResult.boundaryMaxPasses == 8

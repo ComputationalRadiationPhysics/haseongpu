@@ -307,19 +307,21 @@ ownership preserves this model, apart from floating-point reduction order.
 Changing the logical batch cap can change its sampling variance and effective
 reservoir capacity. This cap is not an automatic worker-load tuning parameter.
 
-Boundary propagation terminates when the remaining source weight is below
-``reflectionTolerance``, reaches a non-growing stable state, exceeds the
-configured divergence streak, or reaches ``boundaryMaxPasses``. The result
-exposes neutral boundary status, pass count, remaining fraction, and active
-safety limits for either boundary policy.
+Boundary propagation converges when the remaining source weight is zero or its
+fraction of the initial boundary source weight is below
+``reflectionTolerance``. Otherwise, tracing continues until the configured
+divergence streak or ``boundaryMaxPasses`` is reached. Small changes between
+successive pass weights do not establish convergence. The result exposes
+boundary status, pass count, remaining fraction, and active safety limits for
+either boundary policy.
 
-A stable or pass-limited exit is a truncated Neumann series, not by itself a
+A pass-limited exit is a truncated Neumann series, not by itself a
 finite steady field. HASE fits the residual reflected weights to a per-pass
 multiplier :math:`\Gamma`, but retains the candidate tail factor only as a
 diagnostic. Even perfect scalar decay does not establish stationarity of the
 spatial or spectral distribution, so the final-pass field is not extrapolated.
-A confidently supercritical multiplier reports ``diverged``. ``stable`` and
-``maxPasses`` remain unresolved partial tallies and are rejected by material
+A confidently supercritical multiplier reports ``diverged``.
+``maxPasses`` remains an unresolved partial tally and is rejected by material
 integration, as are dropped histories and non-finite ASE outputs.
 
 The ASE boundary model does not calculate angle- or polarization-dependent

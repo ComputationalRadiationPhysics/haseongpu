@@ -77,9 +77,6 @@ TEST_CASE("material integration accepts supported reflected ASE statuses", "[for
 
     result.boundaryStatus = hase::data::BoundaryStatus::converged;
     CHECK_NOTHROW(hase::core::requireUsableBoundaryAseForIntegration(result, 0u));
-
-    result.boundaryStatus = hase::data::BoundaryStatus::stable;
-    CHECK_THROWS_AS(hase::core::requireUsableBoundaryAseForIntegration(result, 0u), std::runtime_error);
 }
 
 TEST_CASE("material integration rejects an unresolved reflected ASE tally", "[forward][reflection-tail]")

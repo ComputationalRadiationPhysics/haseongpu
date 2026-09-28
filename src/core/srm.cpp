@@ -59,8 +59,6 @@ namespace hase::core
             return 0u;
         case data::BoundaryStatus::converged:
             return 1u;
-        case data::BoundaryStatus::stable:
-            return 2u;
         case data::BoundaryStatus::maxPasses:
             return 3u;
         case data::BoundaryStatus::diverged:
@@ -77,8 +75,6 @@ namespace hase::core
             return data::BoundaryStatus::disabled;
         case 1u:
             return data::BoundaryStatus::converged;
-        case 2u:
-            return data::BoundaryStatus::stable;
         case 3u:
             return data::BoundaryStatus::maxPasses;
         default:

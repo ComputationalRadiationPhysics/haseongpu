@@ -199,12 +199,6 @@ namespace hase::core
                     else
                     {
                         grows = 0u;
-                        if(std::abs(weight - previousWeight) / std::max(weight, 1.0e-30)
-                           < context.experiment.reflectionTolerance)
-                        {
-                            status = data::BoundaryStatus::stable;
-                            break;
-                        }
                     }
                     previousWeight = weight;
                 }

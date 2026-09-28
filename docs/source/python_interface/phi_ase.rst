@@ -179,13 +179,14 @@ there is no configurable forward ray-length cutoff.
 
 ``reflectionTolerance``
    Stop when remaining reflected source weight, relative to the direct pass,
-   falls below this fraction.
+   falls below this fraction. Zero remaining weight also counts as convergence,
+   including when this tolerance is zero.
 
 The runtime reports ``boundaryStatus``, ``boundaryPasses``,
 ``boundaryRemainingFraction``, ``boundaryMaxPasses``,
 ``boundaryDivergenceStreak``, ``boundaryGamma``,
 ``boundaryGammaStandardError``, ``boundaryTailFactor``, and
-``boundaryTailClosure``. Terminal status can be ``converged``, ``stable``,
+``boundaryTailClosure``. Terminal status can be ``converged``,
 ``diverged``, or ``maxPasses``; ``disabled`` means neither reflections nor
 inter-component routing required boundary passes.
 ``HASE_SRM_DIVERGENCE_STREAK`` controls how many consecutive growing SRM passes
@@ -196,7 +197,7 @@ For a truncated series, HASE fits the recent reflected population as
 diagnostics only: geometric decay of total weight does not establish a
 geometric spatial or spectral field. No analytical tail is added and the fit
 does not promote an unresolved result to ``converged``.
-``Simulation`` stops before updating excitation when the status is ``stable``,
+``Simulation`` stops before updating excitation when the status is
 ``diverged`` or ``maxPasses``; standalone ``PhiASE.run`` returns those partial
 tallies and diagnostics for analysis. Increasing the pass limit can provide
 more evidence, but does not by itself establish a finite steady-state field.

@@ -405,14 +405,8 @@ namespace hase::core
             else
             {
                 growCount = 0u;
-                if(alpaka::math::abs(currentWeight - previousWeight) / alpaka::math::max(currentWeight, 1.0e-30)
-                   < experiment.reflectionTolerance)
-                {
-                    result.boundaryStatus = data::BoundaryStatus::stable;
-                    break;
-                }
             }
-            if(result.boundaryRemainingFraction < experiment.reflectionTolerance)
+            if(currentWeight == 0.0 || result.boundaryRemainingFraction < experiment.reflectionTolerance)
             {
                 result.boundaryStatus = data::BoundaryStatus::converged;
                 break;

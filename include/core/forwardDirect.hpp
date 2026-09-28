@@ -335,12 +335,6 @@ namespace hase::core
             else
             {
                 growCount = 0u;
-                if(alpaka::math::abs(currentWeight - previousWeight) / alpaka::math::max(currentWeight, 1.0e-30)
-                   < experiment.reflectionTolerance)
-                {
-                    result.boundaryStatus = data::BoundaryStatus::stable;
-                    break;
-                }
             }
             previousWeight = currentWeight;
             populationRayCount = nextPopulationRayCount;

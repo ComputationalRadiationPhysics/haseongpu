@@ -16,11 +16,10 @@ namespace hase::data
     /** @brief Termination state of domain-boundary propagation. */
     enum class BoundaryStatus
     {
-        disabled,
-        converged,
-        stable,
-        diverged,
-        maxPasses
+        disabled = 0,
+        converged = 1,
+        diverged = 3,
+        maxPasses = 4
     };
 
     /**
@@ -35,8 +34,6 @@ namespace hase::data
             return "disabled";
         case BoundaryStatus::converged:
             return "converged";
-        case BoundaryStatus::stable:
-            return "stable";
         case BoundaryStatus::diverged:
             return "diverged";
         case BoundaryStatus::maxPasses:
