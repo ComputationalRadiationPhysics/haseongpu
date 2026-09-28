@@ -1117,6 +1117,21 @@ def test_backendProcessDrainsStreamsWhenConsoleForwardingIsDisabled(monkeypatch,
     assert captured.err == ""
 
 
+def test_backendProcessRetainsBackendFailureReason(monkeypatch):
+    monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")
+    process = transport._BackendProcess(
+        [
+            sys.executable,
+            "-u",
+            "-c",
+            "import sys; print('calcPhiASE failed: unresolved reflection', file=sys.stderr); sys.exit(1)",
+        ]
+    )
+
+    assert process.wait() == 1
+    assert process.backend_error == "unresolved reflection"
+
+
 def test_backendProcessWritesOptionalDebugLog(monkeypatch, tmp_path, capsys):
     logPath = tmp_path / "backend.log"
     monkeypatch.setenv("HASE_FORWARD_LOGGING", "OFF")

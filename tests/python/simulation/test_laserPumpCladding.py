@@ -471,10 +471,16 @@ def testLaserPumpCladdingTet4MediumPreservesLegacyTenLayerPumpLayout():
 
 
 @pytest.mark.integration
-def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
+@pytest.mark.parametrize(
+    ("reflectionMode", "srmPositionMode"),
+    (("direct", "exact"), ("srm", "exact"), ("srm", "centroid")),
+)
+def testLaserPumpCladdingRejectsUnresolvedReflections(
     tmp_path,
     alpakaRuntimeBackend,
     openPmdRuntimeBackend,
+    reflectionMode,
+    srmPositionMode,
 ):
     def run(use_reflections):
         output_dir = tmp_path / f"reflections_{int(use_reflections)}"
@@ -488,12 +494,14 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
             prePump=True,
             rngSeed=1234,
             useReflections=use_reflections,
+            reflectionMode=reflectionMode,
+            srmPositionMode=srmPositionMode,
             minRays=REFLECTION_TOGGLE_FORWARD_RAYS,
             maxRays=REFLECTION_TOGGLE_FORWARD_RAYS,
             adaptiveSteps=1,
             relativeStandardErrorThreshold=0.1,
-            reflectionMaxIterations=17,
-            reflectionTolerance=0.1,
+            reflectionMaxIterations=1,
+            reflectionTolerance=0.0,
             outputSteps=(2,),
             useCladding=False,
         )
@@ -503,10 +511,13 @@ def testLaserPumpCladdingRunExampleReflectionToggleChangesPhiAse(
         return _tet_cell_integral(points, cells, cell_data["phiASE"])
 
     without_reflections = run(False)
-    with_reflections = run(True)
-
     assert without_reflections > 0.0
-    assert with_reflections > without_reflections * 1.05
+    with pytest.raises(
+        RuntimeError,
+        match="boundaryStatus=(maxPasses|diverged)",
+    ):
+        run(True)
+    assert not (tmp_path / "reflections_1" / "laserPumpCladding_002.vtk").exists()
 
 
 @pytest.fixture(scope="module")

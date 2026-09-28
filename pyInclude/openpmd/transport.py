@@ -71,6 +71,7 @@ class _BackendProcess:
         self._stream_errors = queue.Queue()
         self._threads = []
         self._finished = False
+        self.backend_error = None
         if self.log_path is not None:
             self._log = self.log_path.open("a", encoding="utf-8")
         try:
@@ -121,6 +122,8 @@ class _BackendProcess:
         forward = _forward_backend_logging_enabled()
         try:
             for line in source:
+                if stream_name == "stderr" and line.startswith("calcPhiASE failed: "):
+                    self.backend_error = line.removeprefix("calcPhiASE failed: ").strip()
                 if forward:
                     try:
                         self._forward_line(line, destination, stream_name)
@@ -193,6 +196,10 @@ class _BackendProcess:
     def _forward_completed_text(self, value, destination, stream_name):
         if not value:
             return
+        if stream_name == "stderr":
+            for line in value.splitlines():
+                if line.startswith("calcPhiASE failed: "):
+                    self.backend_error = line.removeprefix("calcPhiASE failed: ").strip()
         if _forward_backend_logging_enabled():
             for line in value.splitlines(keepends=True):
                 self._forward_line(line, destination, stream_name)
@@ -205,7 +212,7 @@ class _BackendProcess:
 
 def _run_backend_process(command, *, progress=False):
     process = _BackendProcess(command, progress=progress)
-    return SimpleNamespace(returncode=process.wait(), log_path=process.log_path)
+    return SimpleNamespace(returncode=process.wait(), log_path=process.log_path, backend_error=process.backend_error)
 
 
 @dataclass(frozen=True)
@@ -1216,7 +1223,10 @@ class OpenPmdPhiAseSession:
                 raise RuntimeError(f"openPMD backend watchdog failed{detail}") from watchdog_error
 
             if self._proc is not None and self._proc.poll() not in (None, 0):
-                detail = _backend_failure_detail(getattr(self._proc, "log_path", None))
+                self._proc.wait()
+                detail = _backend_failure_detail(self._proc.log_path)
+                if self._proc.backend_error:
+                    detail = f": {self._proc.backend_error}{detail}"
                 raise RuntimeError(f"calcPhiASE failed with return code {self._proc.returncode}{detail}")
 
             try:
@@ -1419,6 +1429,8 @@ def _run_streaming_simulation(
 
     if proc.returncode != 0:
         detail = _backend_failure_detail(proc.log_path)
+        if proc.backend_error:
+            detail = f": {proc.backend_error}{detail}"
         raise RuntimeError(f"calcPhiASE failed with return code {proc.returncode}{detail}")
     if writer.is_alive():
         raise RuntimeError(f"openPMD simulation input sender thread did not stop within {timeout:g} seconds")
@@ -1492,6 +1504,8 @@ def runSimulation(
         completed = _run_backend_process(command, progress=progress)
         if completed.returncode != 0:
             detail = _backend_failure_detail(completed.log_path)
+            if completed.backend_error:
+                detail = f": {completed.backend_error}{detail}"
             raise RuntimeError(f"calcPhiASE failed with return code {completed.returncode}{detail}")
         return read_simulation_output(output_path, on_state=on_state)
 
