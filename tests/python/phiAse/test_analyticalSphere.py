@@ -371,5 +371,66 @@ def testForwardTerraDiamondSphereCenterMatchesMonolithicAndAnalyticalSolutions(
     assert np.isclose(decomposed_value, monolithic_value, rtol=0.05)
 
 
+@pytest.mark.parametrize("backend", analyticalSphereBackends())
+@pytest.mark.parametrize("openpmdBackend", openpmd_runtime_test_backends())
+def testForwardSphereCenterRefinementStudy(openpmdBackend, backend):
+    if backend == _NO_ANALYTICAL_SPHERE_BACKEND:
+        pytest.fail("analytical sphere test requires at least one Alpaka backend")
+
+    radius = np.float64(0.01)
+    gain = np.float64(100.0)
+    beta = calcBetaFromGain(gain, nTot, sigmaA, sigmaE)
+    fluorescenceLifetime = np.float64(9.41e-4)
+    expected = analyticalPhiAseSphereCenter(gain, radius, beta, nTot, fluorescenceLifetime)
+    material = Material(
+        materialName="analytical sphere material",
+        temperature=293.15 * units.K,
+        refractiveIndex=1.0,
+        fluorescenceLifetime=fluorescenceLifetime * units.s,
+        crossSections=CrossSectionTable.monochromatic(
+            wavelength=np.float64(1030e-9) * units.m,
+            absorption=sigmaA * units.m**2,
+            emission=sigmaE * units.m**2,
+        ),
+        active=True,
+        activeIonDensity=nTot / units.m**3,
+    )
+
+    for meshSizeDivisor in (8.0, 12.0):
+        topology = constructExplicitSphereTopology(radius, meshSizeDivisor=meshSizeDivisor)
+        centerVolume = centeredVolumeIndex(topology, radius)
+        medium = GainMedium([OpticalComponent(domain=Domain.fromTopology(topology), material=material)])
+        for rayCount in (2_000_000, 4_000_000):
+            phiAse = PhiASE(
+                maxRays=rayCount,
+                forwardRayCount=rayCount,
+                repetitions=1,
+                adaptiveSteps=1,
+                relativeStandardErrorThreshold=0.05,
+                enableDiagnostics=True,
+                useReflections=False,
+                backend=backend,
+                openpmdBackend=openpmdBackend,
+                parallelMode="single",
+                numDevices=1,
+                monochromatic=True,
+                rngSeed=1234,
+            )
+            phiAse.run(gainMedium=medium, initialExcitation=beta)
+            result = phiAse.getResults()
+            numerical = float(np.asarray(result.phiAse).reshape(-1)[centerVolume])
+            rse = float(np.asarray(result.relativeStandardError).reshape(-1)[centerVolume])
+            visits = int(np.asarray(result.totalRays).reshape(-1)[centerVolume])
+            relativeError = abs(numerical / expected - 1.0)
+            print(
+                f"sphere refinement: backend={backend}, meshDivisor={meshSizeDivisor}, "
+                f"tets={topology.numberOfCells}, rays={rayCount}, visits={visits}, "
+                f"relativeError={relativeError:.6g}, rse={rse:.6g}"
+            )
+            assert visits > 0
+            assert np.isfinite(rse)
+            assert np.isclose(numerical, expected, rtol=0.05)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
