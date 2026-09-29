@@ -196,9 +196,12 @@ factor. It must not be applied a second time in the population derivative.
 Statistical Uncertainty and Adaptation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The backend retains raw score sums and history counts per independent batch.
-For each cell it calculates the sample variance of normalized batch estimates
-using centered online moments and reports
+For each cell, the backend retains a score sum :math:`S_b` and launched-ray
+count :math:`n_b` for each independent ray population :math:`b`. Zero-score
+histories are included in :math:`n_b`. For each nonempty population it forms
+:math:`Y_b=S_b/n_b`; the reported field uses the equal-weight mean of these
+complete-source estimates. For :math:`M` nonempty populations, RSE uses their
+sample variance:
 
 .. math::
 
@@ -206,9 +209,9 @@ using centered online moments and reports
    s_Y^2 = \frac{1}{M-1}\sum_b (Y_b-\bar Y)^2, \qquad
    \mathrm{RSE} = \frac{\sqrt{s_Y^2/M}}{|\bar Y|}.
 
-At least two active batches are required; otherwise RSE is the maximum error
-sentinel. A zero mean has undefined RSE (NaN). Statistical batches, not
-correlated rays within a stratified or combed population, are the replicates.
+At least two nonempty populations are required; otherwise RSE is the maximum
+error sentinel. A zero mean has undefined RSE (NaN). Logical SRM batches are
+combined within each population; they are not additional RSE samples.
 
 Unlike the former mean-squared-error threshold, RSE is dimensionless: an RSE of
 ``0.1`` represents an estimated one-standard-error uncertainty of 10% relative

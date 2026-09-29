@@ -37,7 +37,7 @@ dependencies=[
     "scipy",
     "numba",
     "vtk",
-    "matplotlib",
+    "matplotlib==3.10.8",
     "pyyaml",
 ]
 
